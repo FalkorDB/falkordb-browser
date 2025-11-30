@@ -1,4 +1,4 @@
-import { ArrowRight, Circle } from "lucide-react"
+import { ArrowRight, Circle, Info } from "lucide-react"
 import { useCallback, useContext, useEffect, useRef, useState } from "react"
 import { cn, GraphRef, handleZoomToFit } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -281,9 +281,23 @@ export default function Toolbar({
                     graphName && session?.user.role !== "Read-Only" &&
                     <>
                         <Button
+                            data-testid={`elementCanvasInfo${label}`}
+                            className="pointer-events-auto bg-background cursor-default border-primary"
+                            variant="Delete"
+                            tooltipVariant="Primary"
+                            tooltipSide="bottom"
+                            title={`Select And Show Properties (Right Click)
+                                Select Multiple Entities (Right Click + Left Ctrl)
+                                Select 2 Nodes to Create Edge`}
+                        >
+                            <Info size={20} />
+                        </Button>
+                        <Button
                             data-testid={`elementCanvasAddNode${label}`}
-                            className="pointer-events-auto px-4 py-2.5 bg-background border-green-900"
-                            variant="Secondary"
+                            className="pointer-events-auto bg-background border-green-900"
+                            variant="Delete"
+                            tooltipVariant="Primary"
+                            tooltipSide="bottom"
                             title="Add Node"
                             onClick={() => setIsAddNode(!isAddNode)}
                         >
@@ -293,8 +307,10 @@ export default function Toolbar({
                             setIsAddEdge &&
                             <Button
                                 data-testid={`elementCanvasAddEdge${label}`}
-                                className="pointer-events-auto px-4 py-2.5 bg-background border-green-900"
-                                variant="Secondary"
+                                className="pointer-events-auto bg-background border-green-900"
+                                variant="Delete"
+                                tooltipVariant="Primary"
+                                tooltipSide="bottom"
                                 title="Add Edge"
                                 onClick={() => setIsAddEdge(!isAddEdge)}
                             >

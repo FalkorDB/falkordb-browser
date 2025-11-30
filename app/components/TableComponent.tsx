@@ -330,7 +330,7 @@ export default function TableComponent({
         </svg>`
     ), [itemHeight])
     const stripBackground = useMemo(() => `url("data:image/svg+xml,${stripSVG}")`, [stripSVG])
-    const columnCount = setRows ? headers.length + 1 : headers.length;
+    const columnCount = (setRows ? headers.length + 1 : headers.length) + 1;
 
     const renderValue = (v: any) => (
         <span className={cn("pointer-events-auto", valueClassName)}>{v}</span>

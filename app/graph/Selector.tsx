@@ -317,7 +317,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     const separator = <div className="h-[80%] w-0.5 bg-border rounded-full" />
 
     return (
-        <div className="z-20 w-full h-[40px] flex flex-row gap-4 items-center">
+        <div className="w-full h-[40px] flex flex-row gap-4 items-center">
             <SelectGraph
                 options={options}
                 setOptions={setOptions}
@@ -343,14 +343,14 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                             />
                         </div>
                         <div className="h-full w-[120px] flex gap-2 items-center p-2 border border-border rounded-lg bg-background">
-                            <Tooltip>
-                                <TooltipTrigger className="cursor-default">
-                                    <Info />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>Run (Enter) History (Arrow Up/Down) Insert new line (Shift + Enter)</p>
-                                </TooltipContent>
-                            </Tooltip>
+                            <Button
+                                className="cursor-default"
+                                title={`Run (Enter)
+                                     History (Arrow Up/Down)
+                                     Insert new line (Shift + Enter)`}
+                            >
+                                <Info />
+                            </Button>
                             {separator}
                             <div className="flex gap-4 items-center">
                                 <DialogComponent

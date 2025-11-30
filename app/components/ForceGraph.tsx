@@ -262,7 +262,7 @@ export default function ForceGraph({
                     const sourceDegree = sourceId !== undefined ? (nodeDegreeMap.get(sourceId) || 0) : 0;
                     const targetDegree = targetId !== undefined ? (nodeDegreeMap.get(targetId) || 0) : 0;
                     const maxDegree = Math.max(sourceDegree, targetDegree);
-                    
+
                     // Use regular link distance for all links
                     // Only increase distance when degree is very high to prevent cluster overlap
                     if (maxDegree >= CROWDING_THRESHOLD) {
@@ -270,7 +270,7 @@ export default function ForceGraph({
                         const extraDistance = Math.min(MAX_LINK_DISTANCE - LINK_DISTANCE, (maxDegree - CROWDING_THRESHOLD) * 1.5);
                         return LINK_DISTANCE + extraDistance;
                     }
-                    
+
                     // For normal links and moderate high-degree links, use base distance
                     return LINK_DISTANCE;
                 })
@@ -279,21 +279,21 @@ export default function ForceGraph({
                     const targetId = getEndpointId(link.target as Node | number | string);
                     const sourceDegree = sourceId !== undefined ? (nodeDegreeMap.get(sourceId) || 0) : 0;
                     const targetDegree = targetId !== undefined ? (nodeDegreeMap.get(targetId) || 0) : 0;
-                    
+
                     // Use the maximum degree of the two endpoints
                     const maxDegree = Math.max(sourceDegree, targetDegree);
-                    
+
                     // Gradually reduce link strength as degree increases
                     // This allows high-degree nodes to still pull, but not as aggressively
                     if (maxDegree <= DEGREE_STRENGTH_DECAY) {
                         return LINK_STRENGTH;
                     }
-                    
+
                     // Scale strength down gradually: strength decreases as degree increases
                     // Formula: MIN + (BASE - MIN) * exp(-(degree - threshold) / threshold)
                     const strengthReduction = Math.max(0, (maxDegree - DEGREE_STRENGTH_DECAY) / DEGREE_STRENGTH_DECAY);
                     const scaledStrength = MIN_LINK_STRENGTH + (LINK_STRENGTH - MIN_LINK_STRENGTH) * Math.exp(-strengthReduction);
-                    
+
                     return Math.max(MIN_LINK_STRENGTH, scaledStrength);
                 });
         }
@@ -571,44 +571,74 @@ export default function ForceGraph({
                     // Get text width
                     ctx.font = '400 2px SofiaSans';
                     ctx.letterSpacing = '0.1px'
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
 
                     let textWidth;
                     let textHeight;
+                    let textAscent;
+                    let textDescent;
+
                     const relationship = graph.RelationshipsMap.get(link.relationship)
 
                     if (relationship) {
-                        ({ textWidth, textHeight } = relationship)
+                        ({ textWidth, textHeight, textAscent, textDescent } = relationship)
                     }
 
-                    if (!textWidth || !textHeight) {
-                        const { width, actualBoundingBoxAscent, actualBoundingBoxDescent } = ctx.measureText(link.relationship)
+                    if (
+                        textWidth === undefined ||
+                        textHeight === undefined ||
+                        textAscent === undefined ||
+                        textDescent === undefined
+                    ) {
+                        const {
+                            width,
+                            actualBoundingBoxAscent,
+                            actualBoundingBoxDescent
+                        } = ctx.measureText(link.relationship)
 
                         textWidth = width
                         textHeight = actualBoundingBoxAscent + actualBoundingBoxDescent
+                        textAscent = actualBoundingBoxAscent
+                        textDescent = actualBoundingBoxDescent
                         if (relationship) {
-                            graph.RelationshipsMap.set(link.relationship, { ...relationship, textWidth, textHeight })
+                            graph.RelationshipsMap.set(link.relationship, {
+                                ...relationship,
+                                textWidth,
+                                textHeight,
+                                textAscent,
+                                textDescent
+                            })
                         }
                     }
 
-                    // Use single save/restore for both background and text
-                    const padding = 0.5;
+                    if (
+                        textWidth === undefined ||
+                        textHeight === undefined ||
+                        textAscent === undefined ||
+                        textDescent === undefined
+                    ) {
+                        return
+                    }
 
+                    // Use single save/restore for both background and text
                     ctx.save();
                     ctx.translate(textX, textY);
                     ctx.rotate(angle);
 
                     // Draw background rectangle (rotated)
                     ctx.fillStyle = background;
+                    const backgroundWidth = textWidth * 0.7;
+                    const backgroundHeight = textHeight * 0.7;
                     ctx.fillRect(
-                        -textWidth / 2 - padding,
-                        -textHeight / 2 - padding,
-                        textWidth + padding * 2,
-                        textHeight + padding * 2
+                        -backgroundWidth / 2,
+                        -backgroundHeight / 2,
+                        backgroundWidth,
+                        backgroundHeight
                     );
 
                     // Draw text
                     ctx.fillStyle = foreground;
-                    ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(link.relationship, 0, 0);
                     ctx.restore();

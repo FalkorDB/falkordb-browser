@@ -55,6 +55,7 @@ export default function DeleteElement({
                     data-testid={`deleteElement${label}`}
                     className="pointer-events-auto bg-background"
                     variant="Delete"
+                    tooltipSide="bottom"
                     title="Delete Element(s)"
                 >
                     <Trash2 size={20} />

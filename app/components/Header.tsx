@@ -141,9 +141,9 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                         <Button
                             className="Gradient bg-clip-text text-transparent font-semibold text-xl"
                             indicator={indicator}
-                            title={`Use English to query the graph.
-                                    The feature requires LLM model and API key.
-                                    Update local user parameters in Settings.`}
+                            title={`Use English to query the graph. 
+                                The feature requires LLM model and API key.
+                                Update local user parameters in Settings.`}
                             label="CHAT"
                             onClick={() => {
                                 if (navigateToSettings && (!model || !secretKey)) {
