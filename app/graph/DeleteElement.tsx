@@ -38,6 +38,7 @@ export default function DeleteElement({
         try {
             setIsLoading(true)
             await onDeleteElement()
+            setOpen(false)
         } finally {
             setIsLoading(false)
         }
