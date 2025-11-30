@@ -7,8 +7,9 @@ import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { MutableRefObject } from "react";
 import { ForceGraphMethods } from "react-force-graph-2d";
-import { Node, Link, DataCell } from "@/app/api/graph/model";
+import { Node, Link, DataCell, MemoryValue } from "@/app/api/graph/model";
 
+export const MEMORY_USAGE_VERSION_THRESHOLD = 41408;
 export const screenSize = {
   sm: 640,
   md: 768,
@@ -21,7 +22,7 @@ export type GraphRef = MutableRefObject<
   ForceGraphMethods<Node, Link> | undefined
 >;
 
-export type Panel = "chat" | "data" | undefined;
+export type Panel = "chat" | "data" | "add" | undefined;
 
 export type TextPriority = {
   name: string;
@@ -54,6 +55,12 @@ export type ReadOnlyCell = {
   type: "readonly";
 };
 
+export type LazyCell = {
+  value?: string;
+  loadCell: () => Promise<string>;
+  type: "readonly";
+};
+
 export type Message = {
   role: "user" | "assistant";
   content: string;
@@ -67,16 +74,17 @@ export type Message = {
     | "Schema";
 };
 
+export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell | LazyCell;
+
 export type ViewportState = {
   zoom: number;
   centerX: number;
   centerY: number;
 };
 
-export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell;
-
 export interface Row {
   cells: Cell[];
+  name: string;
   checked?: boolean;
 }
 
@@ -98,6 +106,7 @@ export async function getSSEGraphResult(
     evtSource.addEventListener("result", (event: MessageEvent) => {
       const result = JSON.parse(event.data);
       evtSource.close();
+      setIndicator("online");
       resolve(result);
     });
 
@@ -131,25 +140,23 @@ export async function getSSEGraphResult(
 export async function securedFetch(
   input: string,
   init: RequestInit,
-  toast?: any,
-  setIndicator?: (indicator: "online" | "offline") => void
+  toast: any,
+  setIndicator: (indicator: "online" | "offline") => void
 ): Promise<Response> {
   const response = await fetch(input, init);
   const { status } = response;
   if (status >= 300) {
     const err = await response.text();
-    if (toast) {
-      toast({
-        title: "Error",
-        description: err,
-        variant: "destructive",
-      });
-    }
+    toast({
+      title: "Error",
+      description: err,
+      variant: "destructive",
+    });
     if (status === 401 || status >= 500) {
-      if (setIndicator) {
-        setIndicator("offline");
-      }
+      setIndicator("offline");
     }
+  } else {
+    setIndicator("online");
   }
   return response;
 }
@@ -228,6 +235,45 @@ export function handleZoomToFit(
   }
 }
 
+const processEntries = (arr: unknown[]): Map<string, MemoryValue> => {
+  const entries: [string, MemoryValue][] = [];
+
+  for (let i = 0; i < arr.length; i += 2) {
+    const key = arr[i] as string;
+    const value = arr[i + 1];
+
+    // If the value is an array, recursively process it
+    if (Array.isArray(value)) {
+      entries.push([key, processEntries(value)]);
+    } else {
+      entries.push([key, value as number]);
+    }
+  }
+
+  return new Map(entries);
+};
+
+export const getMemoryUsage = async (
+  name: string,
+  toast: any,
+  setIndicator: (indicator: "online" | "offline") => void
+): Promise<Map<string, MemoryValue>> => {
+  const result = await securedFetch(
+    `api/graph/${prepareArg(name)}/memory`,
+    {
+      method: "GET",
+    },
+    toast,
+    setIndicator
+  );
+
+  if (!result.ok) return new Map();
+
+  const json = await result.json();
+
+  return processEntries(json.result);
+};
+
 export function createNestedObject(arr: string[]): object {
   if (arr.length === 0) return {};
 
@@ -265,6 +311,39 @@ export function getQueryWithLimit(
   }
 
   return [query, existingLimit];
+}
+
+export const getNodeDisplayText = (node: Node, displayTextPriority: TextPriority[]) => {
+  const { data: nodeData } = node;
+
+  const displayText = displayTextPriority.find(({ name, ignore }) => {
+      const key = ignore
+          ? Object.keys(nodeData).find(
+              (k) => k.toLowerCase() === name.toLowerCase()
+          )
+          : name;
+
+      return (
+          key &&
+          nodeData[key] &&
+          typeof nodeData[key] === "string" &&
+          nodeData[key].trim().length > 0
+      );
+  });
+
+  if (displayText) {
+      const key = displayText.ignore
+          ? Object.keys(nodeData).find(
+              (k) => k.toLowerCase() === displayText.name.toLowerCase()
+          )
+          : displayText.name;
+
+      if (key) {
+          return String(nodeData[key]);
+      }
+  }
+
+  return String(node.id);
 }
 
 export const formatName = (newGraphName: string) =>
@@ -318,4 +397,10 @@ export function getTheme(theme: string | undefined) {
     secondary: currentTheme === "dark" ? "#242424" : "#E6E6E6",
     currentTheme,
   };
+}
+
+// Type guard: runtime check that proves elements is [Node, Node]
+export function isTwoNodes(elements: (Node | Link)[]): elements is [Node, Node] {
+  return elements.length === 2 &&
+    elements.every((e): e is Node => !!e.labels)
 }

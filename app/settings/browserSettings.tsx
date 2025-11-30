@@ -31,7 +31,7 @@ export default function BrowserSettings() {
             defaultQuerySettings: { defaultQuery, setDefaultQuery },
             timeoutSettings: { timeout: timeoutValue },
             limitSettings: { limit },
-            chatSettings: { secretKey, model, navigateToSettings },
+            chatSettings: { secretKey, model, displayChat },
             graphInfo: { refreshInterval, displayTextPriority }
         },
         hasChanges,
@@ -107,7 +107,7 @@ export default function BrowserSettings() {
         }
     }, [hasChanges, navigateBack])
 
-    const separator = <div className="min-h-[0.5px] w-[50%] bg-border rounded-full" />
+    const separator = <div className="min-h-[0.5px] w-full bg-border rounded-full" />
 
     const handleScrollTo = (elementId?: string) => {
         if (elementId) {
@@ -159,7 +159,7 @@ export default function BrowserSettings() {
     }
 
     return (
-        <div className="h-full w-full flex flex-col gap-6 overflow-hidden">
+        <div className="grow basis-0 w-full flex flex-col gap-6 overflow-hidden">
             <div className="flex flex-col gap-2">
                 <h1 className="text-2xl font-medium">Browser Settings</h1>
                 <p className="text-sm text-foreground">Manage your environment&apos;s settings</p>
@@ -278,14 +278,14 @@ export default function BrowserSettings() {
                 {separator}
                 <div className="flex flex-col gap-2">
                     <h1 className="text-2xl font-bold">Environment</h1>
-                    <p className="text-sm text-muted-foreground">Define your keys</p>
+                    <p className="text-sm text-muted-foreground">Define your LLM access for the chat functionality</p>
                 </div>
                 <div className="flex flex-col gap-6">
                     <div className="flex gap-4 items-center">
                         <div className="flex gap-2 items-center">
                             <p>Model</p>
                             <Combobox
-                                disabled={!navigateToSettings}
+                                disabled={!displayChat}
                                 className="p-1"
                                 label="Model"
                                 options={MODELS}
@@ -297,7 +297,7 @@ export default function BrowserSettings() {
                         <div className="w-1 grow flex gap-2 items-center">
                             <p>Secret Key</p>
                             <Input
-                                disabled={!navigateToSettings}
+                                disabled={!displayChat}
                                 className="w-1 grow"
                                 id="secretKeyInput"
                                 value={newSecretKey}

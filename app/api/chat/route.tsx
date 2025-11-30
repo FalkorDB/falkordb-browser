@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "../auth/[...nextauth]/options";
+import { chatRequest, validateBody } from "../validate-body";
 
-const URL = "http://localhost:8080/"
+const CHAT_URL = process.env.CHAT_URL || "http://localhost:8000/"
 
 export async function GET() {
     try {
@@ -12,7 +13,7 @@ export async function GET() {
         }
 
         try {
-            const response = await fetch(`${URL}configured-model`, {
+            const response = await fetch(`${CHAT_URL}configured-model`, {
                 method: "GET",
                 headers: {
                     "Content-Type": "application/json",
@@ -57,11 +58,26 @@ export async function POST(request: NextRequest) {
             throw new Error(await session.text())
         }
 
-        const { messages, graphName, key, model } = await request.json()
+        const body = await request.json()
+
+        // Validate request body
+        const validation = validateBody(chatRequest, body);
+        
+        if (!validation.success) {
+            writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(validation.error)}\n\n`))
+            writer.close()
+            return new Response(readable, {
+                headers: {
+                    "Content-Type": "text/event-stream",
+                    "Cache-Control": "no-cache",
+                    Connection: "keep-alive",
+                },
+            })
+        }
+
+        const { messages, graphName, key, model } = validation.data
 
         try {
-            if (!graphName) throw new Error("Graph name is required")
-            if (!messages) throw new Error("Messages are required")
 
             const requestBody = {
                 "chat_request": {
@@ -72,14 +88,7 @@ export async function POST(request: NextRequest) {
                 model,
             }
 
-            const curlCommand = `curl -X POST "${URL}text_to_cypher" \\
-  -H "Content-Type: application/json" \\
-  -d '${JSON.stringify(requestBody, null, 2)}'`
-
-            console.log("Equivalent curl command:")
-            console.log(curlCommand)
-
-            const response = await fetch(`${URL}text_to_cypher`, {
+            const response = await fetch(`${CHAT_URL}text_to_cypher`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

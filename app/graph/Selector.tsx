@@ -2,7 +2,7 @@
 
 'use client'
 
-import { useEffect, useState, useContext, Dispatch, SetStateAction, useRef, useCallback } from "react";
+import { useEffect, useState, useContext, Dispatch, SetStateAction, useRef, useCallback, useMemo } from "react";
 import { cn, GraphRef, formatName, getTheme } from "@/lib/utils";
 import { History, Info, Maximize2 } from "lucide-react";
 import * as monaco from "monaco-editor";
@@ -38,8 +38,10 @@ interface SchemaProps {
     setSelectedElement: (el: Node | Link | undefined) => void;
     handleDeleteElement: () => Promise<void>;
     chartRef: GraphRef;
-    setIsAddEntity: (isAdd: boolean) => void;
-    setIsAddRelation: (isAdd: boolean) => void;
+    setIsAddNode: (isAdd: boolean) => void;
+    setIsAddEdge: (isAdd: boolean) => void;
+    isAddNode: boolean;
+    isAddEdge: boolean;
     isCanvasLoading: boolean;
     runQuery?: never;
     historyQuery?: never;
@@ -59,8 +61,10 @@ interface GraphProps {
     setSelectedElement?: never;
     handleDeleteElement?: never;
     chartRef?: never;
-    setIsAddEntity?: never;
-    setIsAddRelation?: never;
+    setIsAddNode?: never;
+    setIsAddEdge?: never;
+    isAddNode?: never;
+    isAddEdge?: never;
     isCanvasLoading?: never;
 }
 
@@ -86,8 +90,10 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     setSelectedElement,
     handleDeleteElement,
     chartRef,
-    setIsAddEntity,
-    setIsAddRelation,
+    setIsAddNode,
+    setIsAddEdge,
+    isAddNode,
+    isAddEdge,
     setGraph,
     type,
     isCanvasLoading,
@@ -112,19 +118,52 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     const [maximize, setMaximize] = useState(false)
     const [tab, setTab] = useState<Tab>("text")
 
-    const filters = graphNames.length + 10 <= (historyQuery?.queries.length || 0) ? graphNames.filter(name => historyQuery?.queries.some(query => query.graphName === name)) : Array.from(new Set(historyQuery?.queries.map(query => query.graphName).filter(name => !!name)))
+    const filters = useMemo(() => {
+        const queries = historyQuery?.queries ?? []
+        if (graphNames.length + 10 <= queries.length) {
+            return graphNames.filter(name => queries.some(query => query.graphName === name))
+        }
+        return Array.from(new Set(queries.map(query => query.graphName).filter(name => !!name)))
+    }, [graphNames, historyQuery?.queries])
     const currentQuery = historyQuery?.counter === 0 ? historyQuery.currentQuery : historyQuery?.queries[historyQuery.counter - 1]
 
     const afterSearchCallback = useCallback((newFilteredList: Query[]) => {
         if (!historyQuery || !setHistoryQuery) return
 
         if (newFilteredList.every(q => q.text !== historyQuery.query)) {
-            setHistoryQuery(prev => ({
-                ...prev,
-                counter: 0
-            }))
+            setHistoryQuery(prev => {
+                if (prev.counter === 0) return prev
+                return {
+                    ...prev,
+                    counter: 0
+                }
+            })
         }
     }, [historyQuery, setHistoryQuery])
+
+    const resetHistoryFilters = useCallback(() => {
+        if (!historyQuery) {
+            setFilteredQueries([])
+            setActiveFilters([])
+            return
+        }
+
+        if (graphName && filters.some(name => name === graphName)) {
+            setActiveFilters([graphName])
+            const scopedQueries = [
+                ...historyQuery.queries.filter(({ graphName: n }) => graphName === n)
+            ].reverse()
+
+            setFilteredQueries(scopedQueries)
+            afterSearchCallback(scopedQueries)
+            return
+        }
+
+        const allQueries = [...historyQuery.queries].reverse()
+        setActiveFilters([])
+        setFilteredQueries(allQueries)
+        afterSearchCallback(allQueries)
+    }, [historyQuery, graphName, filters, afterSearchCallback])
 
     const handelSetFilteredQueries = useCallback((name?: string) => {
         if (!historyQuery) return
@@ -151,19 +190,17 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     }, [activeFilters, afterSearchCallback, historyQuery]);
 
     useEffect(() => {
-        if (!historyQuery) return
+        resetHistoryFilters()
+    }, [resetHistoryFilters])
 
-        if (filters.some(name => name === graphName) && graphName) {
-            setActiveFilters([graphName]);
-
-            const newFilteredQueries = [
-                ...historyQuery.queries.filter(({ graphName: n }) => graphName === n)
-            ].reverse()
-
-            setFilteredQueries(newFilteredQueries)
-            afterSearchCallback(newFilteredQueries)
+    useEffect(() => {
+        if (!queriesOpen) {
+            setIsLoading(false)
+            setTab("text")
+            searchQueryRef.current?.blur()
         }
-    }, [graphName, historyQuery?.queries])
+        resetHistoryFilters()
+    }, [queriesOpen, resetHistoryFilters])
 
     const focusEditorAtEnd = () => {
         if (editorRef.current) {
@@ -253,10 +290,34 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
         }
     }
 
+    const handleDeleteQuery = useCallback(() => {
+        if (!historyQuery || !setHistoryQuery || !historyQuery.counter) return
+
+        const removeIndex = historyQuery.counter - 1
+        const queryToDelete = historyQuery.queries[removeIndex]
+        const newQueries = historyQuery.queries.filter((_, idx) => idx !== removeIndex)
+
+        if (newQueries.length === 0) localStorage.removeItem("query history")
+        else localStorage.setItem("query history", JSON.stringify(newQueries))
+
+        const hasQueries = newQueries.length > 0
+        const nextCounter = hasQueries ? Math.min(historyQuery.counter, newQueries.length) : 0
+        const nextQuery = nextCounter ? newQueries[nextCounter - 1].text : historyQuery.currentQuery.text
+
+        setHistoryQuery(prev => ({
+            ...prev,
+            queries: newQueries,
+            counter: nextCounter,
+            query: nextQuery
+        }))
+
+        setFilteredQueries(current => current.filter(query => query.timestamp !== queryToDelete.timestamp))
+    }, [historyQuery, setHistoryQuery, setFilteredQueries])
+
     const separator = <div className="h-[80%] w-0.5 bg-border rounded-full" />
 
     return (
-        <div className="z-20 w-full h-[50px] flex flex-row gap-4 items-center">
+        <div className="w-full h-[40px] flex flex-row gap-4 items-center">
             <SelectGraph
                 options={options}
                 setOptions={setOptions}
@@ -282,14 +343,14 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                             />
                         </div>
                         <div className="h-full w-[120px] flex gap-2 items-center p-2 border border-border rounded-lg bg-background">
-                            <Tooltip>
-                                <TooltipTrigger className="cursor-default">
-                                    <Info />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>Run (Enter) History (Arrow Up/Down) Insert new line (Shift + Enter)</p>
-                                </TooltipContent>
-                            </Tooltip>
+                            <Button
+                                className="cursor-default"
+                                title={`Run (Enter)
+                                     History (Arrow Up/Down)
+                                     Insert new line (Shift + Enter)`}
+                            >
+                                <Info />
+                            </Button>
                             {separator}
                             <div className="flex gap-4 items-center">
                                 <DialogComponent
@@ -315,7 +376,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                     }
                                     title="Query History"
                                 >
-                                    <div className="h-1 grow flex gap-8 p-8">
+                                    <div className="h-1 grow flex gap-4">
                                         <PaginationList
                                             label="Query"
                                             className="w-1/2 bg-secondary rounded-lg overflow-hidden"
@@ -367,17 +428,29 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                 {
                                                     currentQuery &&
                                                     <>
-                                                        <Button
-                                                            ref={submitQuery}
-                                                            data-testid="queryHistoryEditorRun"
-                                                            className="z-10 absolute bottom-4 right-8 py-2 px-8"
-                                                            indicator={indicator}
-                                                            variant="Primary"
-                                                            label="Run"
-                                                            title="Press Enter to run the query"
-                                                            onClick={handleSubmit}
-                                                            isLoading={isLoading}
-                                                        />
+                                                        <div className="z-10 absolute bottom-4 right-8 flex gap-2">
+                                                                                                          {
+                                                                historyQuery.counter ?
+                                                                    <Button
+                                                                        variant="Delete"
+                                                                        data-testid="queryHistoryDelete"
+                                                                        label="Delete"
+                                                                        title="Remove selected query from history"
+                                                                        onClick={handleDeleteQuery}
+                                                                    />
+                                                                    : undefined
+                                                            }               <Button
+                                                                ref={submitQuery}
+                                                                data-testid="queryHistoryEditorRun"
+                                                                className="py-2 px-8"
+                                                                indicator={indicator}
+                                                                variant="Primary"
+                                                                label="Run"
+                                                                title="Press Enter to run the query"
+                                                                onClick={handleSubmit}
+                                                                isLoading={isLoading}
+                                                            />
+                                                        </div>
                                                         <Editor
                                                             key={currentTheme}
                                                             className="SofiaSans"
@@ -391,10 +464,10 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                                 fontSize: 25,
                                                                 lineNumbersMinChars: 3,
                                                                 scrollbar: {
-                                                                    horizontal: "hidden"
+                                                                    horizontal: "auto"
                                                                 },
                                                                 scrollBeyondLastLine: false,
-                                                                wordWrap: "on",
+                                                                wordWrap: "off",
                                                                 renderWhitespace: "none"
                                                             }}
                                                             value={historyQuery.query}
@@ -484,18 +557,21 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                             </Button>
                         </div>
                     </>
-                    : selectedElements && setSelectedElement && handleDeleteElement && setIsAddEntity && setIsAddRelation && chartRef && isCanvasLoading !== undefined && <div className="w-full h-full">
+                    : selectedElements && setSelectedElement && handleDeleteElement && setIsAddNode && setIsAddEdge && chartRef && isCanvasLoading !== undefined && <div className="w-full h-full">
                         <Toolbar
                             graph={graph}
+                            graphName={graphName}
                             label={type}
                             selectedElement={selectedElement}
                             selectedElements={selectedElements}
                             setSelectedElement={setSelectedElement}
                             handleDeleteElement={handleDeleteElement}
-                            setIsAddEntity={setIsAddEntity}
-                            setIsAddRelation={setIsAddRelation}
+                            setIsAddNode={setIsAddNode}
+                            setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => !!e.labels) ? setIsAddEdge : undefined}
                             chartRef={chartRef}
                             isLoadingSchema={!!isCanvasLoading}
+                            isAddNode={isAddNode}
+                            isAddEdge={isAddEdge}
                         />
                     </div>
             }

@@ -130,6 +130,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                 {
                                     field.type === "select" ?
                                         <Combobox
+                                            className="w-fit"
                                             id={field.label}
                                             options={field.options}
                                             label={field.selectType}

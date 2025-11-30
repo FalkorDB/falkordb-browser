@@ -1,5 +1,5 @@
 import { Trash2 } from "lucide-react";
-import { useState, useContext } from "react";
+import { useState, useContext, useEffect } from "react";
 import DialogComponent from "../components/DialogComponent";
 import Button from "../components/ui/Button";
 import CloseDialog from "../components/CloseDialog";
@@ -27,6 +27,12 @@ export default function RemoveLabel({
     
     const [open, setOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
+
+    useEffect(() => {
+        if (!open) {
+            setIsLoading(false)
+        }
+    }, [open])
 
     const handleRemoveLabel = async () => {
         setIsLoading(true)

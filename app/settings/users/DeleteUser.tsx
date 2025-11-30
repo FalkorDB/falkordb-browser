@@ -20,12 +20,12 @@ export default function DeleteUser({ users, setUsers, setRows }: DeleteUserProps
     const deleteSelected = async () => {
         if (!users) return
 
-        const response = await securedFetch('/api/user/', {
+        const response = await securedFetch("/api/user", {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ users })
+            body: JSON.stringify({ users: users.map(user => ({ username: user.username })) })
         }, toast, setIndicator)
 
         if (response.ok) {
@@ -43,7 +43,7 @@ export default function DeleteUser({ users, setUsers, setRows }: DeleteUserProps
             <AlertDialogTrigger disabled={users.length === 0} asChild>
                 <Button
                     disabled={users.length === 0}
-                    variant="Primary"
+                    variant="Delete"
                     id="delete-user"
                     label="Delete Users"
                     title="Remove selected users"

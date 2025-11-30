@@ -3,13 +3,13 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes'
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, TextPriority } from "@/lib/utils";
+import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, TextPriority, MEMORY_USAGE_VERSION_THRESHOLD } from "@/lib/utils";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import LoginVerification from "./loginVerification";
-import { Graph, GraphData, GraphInfo, HistoryQuery, Query } from "./api/graph/model";
+import { Graph, GraphData, GraphInfo, HistoryQuery, MemoryValue, Query } from "./api/graph/model";
 import Header from "./components/Header";
 import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ViewportContext, TableViewContext } from "./components/provider";
 import GraphInfoPanel from "./graph/graphInfo";
@@ -89,6 +89,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [isCollapsed, setIsCollapsed] = useState(true)
   const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>([])
   const [userGraphBeforeTutorial, setUserGraphBeforeTutorial] = useState<string>("")
+  const [showMemoryUsage, setShowMemoryUsage] = useState(false)
 
   const replayTutorial = useCallback(() => {
     router.push("/graph")
@@ -119,8 +120,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       runDefaultQuerySettings: { runDefaultQuery, setRunDefaultQuery },
       defaultQuerySettings: { defaultQuery, setDefaultQuery },
       contentPersistenceSettings: { contentPersistence, setContentPersistence },
-      chatSettings: { secretKey, setSecretKey, model, setModel, navigateToSettings, setNavigateToSettings },
-      graphInfo: { refreshInterval, setRefreshInterval, displayTextPriority, setDisplayTextPriority }
+      chatSettings: { secretKey, setSecretKey, model, setModel, displayChat, navigateToSettings },
+      graphInfo: { showMemoryUsage, refreshInterval, setRefreshInterval, displayTextPriority, setDisplayTextPriority }
     },
     hasChanges,
     setHasChanges,
@@ -135,6 +136,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       localStorage.setItem("limit", newLimit.toString());
       localStorage.setItem("refreshInterval", newRefreshInterval.toString())
       localStorage.setItem("displayTextPriority", JSON.stringify(newDisplayTextPriority))
+      localStorage.setItem("model", newModel)
+      localStorage.setItem("secretKey", newSecretKey)
 
       // Update context
       setContentPersistence(newContentPersistence);
@@ -169,7 +172,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setHasChanges(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, displayTextPriority, newDisplayTextPriority, replayTutorial, tutorialOpen])
+  }), [displayChat, navigateToSettings, contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, displayTextPriority, newDisplayTextPriority, replayTutorial, tutorialOpen])
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -252,10 +255,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const fetchInfo = useCallback(async (type: string) => {
+  const fetchInfo = useCallback(async (type: string, name: string) => {
     if (!graphName) return []
 
-    const result = await securedFetch(`/api/graph/${graphName}/info?type=${type}`, {
+    const result = await securedFetch(`/api/graph/${name}/info?type=${type}`, {
       method: "GET",
     }, toast, setIndicator);
 
@@ -285,25 +288,25 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     try {
       setIsQueryLoading(true)
 
-      const [query, existingLimit] = getQueryWithLimit(q, limit)
-      const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}`;
-
       setHistoryQuery(prev => ({
         ...prev,
         query: q,
       }))
 
+      const [query, existingLimit] = getQueryWithLimit(q, limit)
+      const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}`;
       const result = await getSSEGraphResult(url, toast, setIndicator);
 
       if (!result) throw new Error()
 
       const graphI = await Promise.all([
-        fetchInfo("(label)"),
-        fetchInfo("(relationship type)"),
-        fetchInfo("(property key)"),
+        fetchInfo("(label)", n),
+        fetchInfo("(relationship type)", n),
+        fetchInfo("(property key)", n),
       ]).then(async ([newLabels, newRelationships, newPropertyKeys]) => {
         const colorsArr = localStorage.getItem(n)
-        const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, colorsArr ? JSON.parse(colorsArr) : undefined)
+        const memoryUsage = showMemoryUsage ? await getMemoryUsage(n, toast, setIndicator) : new Map<string, MemoryValue>()
+        const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, colorsArr ? JSON.parse(colorsArr) : undefined)
         setGraphInfo(gi)
         return gi
       }).catch((error) => {
@@ -387,7 +390,22 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   }), [graph, graphInfo, graphName, graphNames, nodesCount, edgesCount, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading])
 
   useEffect(() => {
+    if (status !== "authenticated") return
 
+    (async () => {
+      const result = await securedFetch("/api/auth/DBVersion", {
+        method: "GET",
+      }, toast, setIndicator)
+
+      if (!result.ok) return
+
+      const [name, version] = (await result.json()).result || ["", 0]
+
+      setShowMemoryUsage(name === "graph" && version >= MEMORY_USAGE_VERSION_THRESHOLD)
+    })()
+  }, [status, toast])
+
+  useEffect(() => {
     if (status !== "authenticated") return
 
     setHistoryQuery({ ...defaultQueryHistory, queries: JSON.parse(localStorage.getItem("query history") || "[]") })
@@ -399,8 +417,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setRunDefaultQuery(localStorage.getItem("runDefaultQuery") !== "false")
     setContentPersistence(localStorage.getItem("contentPersistence") !== "false");
     setTutorialOpen(localStorage.getItem("tutorial") !== "false")
-    setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 10))
+    setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30))
     setDisplayTextPriority(JSON.parse(localStorage.getItem("displayTextPriority") || JSON.stringify(DISPLAY_TEXT_PRIORITY)))
+    setSecretKey(localStorage.getItem("secretKey") || "")
+    setModel(localStorage.getItem("model") || "")
   }, [status])
 
   const panelSize = useMemo(() => isCollapsed ? 0 : 15, [isCollapsed])
@@ -427,11 +447,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         const json = await result.json()
 
         if (!json.message) setDisplayChat(true)
-
-        if (json.model) {
-          setModel(json.model)
-          setNewModel(json.model)
-        } else if (json.error) {
+        if (!json.model && json.error) {
           setNavigateToSettings(true)
         }
       }
@@ -470,7 +486,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const handleFetchOptions = useCallback(async () => {
     if (indicator === "offline") return
 
-    await Promise.all(([["Graph", setGraphNames, setGraphName], ["Schema", setSchemaNames, setSchemaName]] as ["Graph" | "Schema", Dispatch<SetStateAction<string[]>>, Dispatch<SetStateAction<string>>][]).map(async ([type, setOptions, setName]) => {
+    await Promise.all(([["Graph", setGraphNames, setGraphName],/* ["Schema", setSchemaNames, setSchemaName] */] as ["Graph" | "Schema", Dispatch<SetStateAction<string[]>>, Dispatch<SetStateAction<string>>][]).map(async ([type, setOptions, setName]) => {
       await fetchOptions(type, toast, setIndicator, indicator, setName, setOptions, contentPersistence)
     }))
   }, [indicator, toast, contentPersistence])
@@ -615,7 +631,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                               graphNames={pathname.includes("/schema") ? schemaNames : graphNames}
                               onSetGraphName={handleOnSetGraphName}
                               onOpenGraphInfo={onExpand}
-                              displayChat={displayChat}
+                              navigateToSettings={navigateToSettings}
                             />
                           }
                           <ResizablePanelGroup direction="horizontal" className="w-1 grow">
@@ -627,6 +643,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                               maxSize={30}
                               onCollapse={() => setIsCollapsed(true)}
                               onExpand={() => setIsCollapsed(false)}
+                              data-testid="graphInfoPanel"
                             >
                               <GraphInfoPanel
                                 onClose={onExpand}

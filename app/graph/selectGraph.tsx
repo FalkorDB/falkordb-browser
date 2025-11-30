@@ -4,7 +4,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/compon
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { DialogHeader, DialogDescription, DialogTrigger, DialogTitle, DialogContent, Dialog } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { fetchOptions, prepareArg, Row, securedFetch } from "@/lib/utils";
+import { fetchOptions, getMemoryUsage, getSSEGraphResult, prepareArg, Row, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
 import { ChevronDown, ChevronUp, PlusCircle, Settings } from "lucide-react";
@@ -35,7 +35,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         settings: {
             contentPersistenceSettings: {
                 contentPersistence
-            }
+            },
+            graphInfo: { showMemoryUsage }
         },
         tutorialOpen
     } = useContext(BrowserSettingsContext)
@@ -44,6 +45,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const { toast } = useToast()
     const { data: session } = useSession()
+    const sessionRole = session?.user.role
 
     const [open, setOpen] = useState(false)
     const [rows, setRows] = useState<Row[]>([])
@@ -62,10 +64,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const handleSetOption = useCallback(async (option: string, optionName: string) => {
         const result = await securedFetch(
-            `api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(option)}?sourceName=${prepareArg(optionName)}`,
+            `api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(option)}`,
             {
                 method: "PATCH",
-                headers: { "Content-Type": "application/json" }
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sourceName: optionName })
             },
             toast,
             setIndicator
@@ -80,7 +83,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             // Rebuild rows to reflect the updated option names
             setRows(
                 newOptions.map(opt =>
-                    session?.user?.role === "Admin"
+                    sessionRole === "Admin"
                         ? ({
                             checked: false,
                             name: opt,
@@ -92,26 +95,69 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         }
 
         return result.ok
-    }, [type, toast, setIndicator, options, setOptions, setSelectedValue, selectedValue, setRows, session])
+    }, [type, toast, setIndicator, options, setOptions, setSelectedValue, selectedValue, setRows, sessionRole])
+
+    const loadMemory = useCallback((opt: string) =>
+        async () => {
+            const memoryMap = await getMemoryUsage(opt, toast, setIndicator);
+            const memoryValue = memoryMap.get("total_graph_sz_mb") || '<1';
+
+            return `${memoryValue} MB`;
+        }, [toast, setIndicator])
+
+    const loadNodesCount = useCallback((opt: string) =>
+        async () => {
+            const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes`, toast, setIndicator);
+
+            if (!result) return "";
+
+            return Number(result.nodes).toLocaleString()
+        }, [toast, setIndicator])
+
+    const loadEdgesCount = useCallback((opt: string) =>
+        async () => {
+            const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges`, toast, setIndicator);
+
+            if (!result) return "";
+
+            return Number(result.edges).toLocaleString()
+        }, [toast, setIndicator])
 
     const handleSetRows = useCallback((opts: string[]) => {
-        setRows(
-            opts.map(opt =>
-                session?.user?.role === "Admin"
-                    ? ({
-                        checked: false,
-                        name: opt,
-                        cells: [{ value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" }]
-                    })
-                    : ({ checked: false, name: opt, cells: [{ value: opt, type: "readonly" }] })
-            )
-        )
-    }, [session, setRows, handleSetOption])
+        setRows(opts.map((opt) => {
+            const baseCell = sessionRole === "Admin"
+                ? { value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" as const }
+                : { value: opt, type: "readonly" as const };
 
-    // Build rows whenever options change
+            const cells: Row["cells"] = [baseCell];
+
+            if (showMemoryUsage) {
+                cells.push({ loadCell: loadMemory(opt), type: "readonly" });
+            }
+
+            cells.push(
+                { loadCell: loadNodesCount(opt), type: "readonly" },
+                { loadCell: loadEdgesCount(opt), type: "readonly" }
+            );
+
+            return {
+                checked: false,
+                name: opt,
+                cells
+            };
+        }));
+    }, [sessionRole, handleSetOption, loadMemory, loadNodesCount, loadEdgesCount, showMemoryUsage])
+
+    useEffect(() => {
+        if (!openMenage) {
+            setOpenDuplicate(false)
+            handleSetRows(options)
+        }
+    }, [openMenage, handleSetRows, options])
+
     useEffect(() => {
         handleSetRows(options)
-    }, [options, session, handleSetRows])
+    }, [options, handleSetRows])
 
     const handleOpenChange = async (o: boolean) => {
         setOpen(o)
@@ -136,7 +182,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             <DropdownMenu open={open} onOpenChange={handleOpenChange}>
                 <DropdownMenuTrigger disabled={options.length === 0 || indicator === "offline"} asChild>
                     <Button
-                        className="h-full w-[230px] text-2xl bg-background rounded-lg border border-border p-2 justify-left disabled:text-gray-400 disabled:opacity-100 SofiaSans"
+                        className="h-full w-[230px] bg-background rounded-lg border border-border p-2 justify-left disabled:text-gray-400 disabled:opacity-100 SofiaSans"
                         label={selectedValue || `Select ${type}`}
                         title={options.length === 0 ? `There are no ${type}` : undefined}
                         indicator={indicator}
@@ -151,7 +197,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
-                    className="h-[40dvh] min-h-fit w-[350px] mt-2 overflow-hidden border border-border rounded-lg flex flex-col items-center p-4"
+                    className="h-[40dvh] min-h-fit w-[350px] mt-2 overflow-hidden border border-border rounded-lg flex flex-col items-center p-2"
                     preventOutsideClose={tutorialOpen}
                 >
                     <PaginationList
@@ -205,7 +251,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 }}
                 hideClose
                 preventOutsideClose={tutorialOpen}
-                className="flex flex-col border-none rounded-lg max-w-none h-[90dvh]"
+                className="flex flex-col border-none rounded-lg max-w-none h-[90dvh] w-[40dvw] p-2"
             >
                 <DialogHeader className="flex-row justify-between items-center border-b border-border pb-4">
                     <DialogTitle className="text-2xl font-medium">Manage Graphs</DialogTitle>
@@ -218,13 +264,19 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     className="grow overflow-hidden"
                     label={`${type}s`}
                     entityName={type}
-                    headers={["Name"]}
+                    headers={[
+                        "Name",
+                        ...(showMemoryUsage ? ["Memory Usage"] : []),
+                        "Nodes #",
+                        "Edges #"
+                    ]}
                     rows={rows}
                     setRows={setRows}
                     inputRef={inputRef}
+                    itemHeight={36}
                 >
                     {
-                        session?.user?.role !== "Read-Only" &&
+                        session?.user.role !== "Read-Only" &&
                         <>
                             <DeleteGraph
                                 type={type}

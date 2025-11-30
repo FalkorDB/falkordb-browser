@@ -1,5 +1,6 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
+import { updateGraphConfig, validateBody } from "../../../validate-body";
 
 export async function GET(
   request: NextRequest,
@@ -26,6 +27,7 @@ export async function GET(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }
@@ -47,11 +49,21 @@ export async function POST(
     const { client } = session;
 
     const { config: configName } = await params;
-    const value = request.nextUrl.searchParams.get("value");
 
     try {
-      if (!value) throw new Error("Value is required");
+      const body = await request.json();
 
+      // Validate request body
+      const validation = validateBody(updateGraphConfig, body);
+      
+      if (!validation.success) {
+        return NextResponse.json(
+          { message: validation.error },
+          { status: 400 }
+        );
+      }
+
+      const { value } = validation.data;
       const parsedValue =
         configName === "CMD_INFO" ? value : parseInt(value, 10);
 
@@ -68,6 +80,7 @@ export async function POST(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }

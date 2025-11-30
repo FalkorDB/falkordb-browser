@@ -1,5 +1,3 @@
-/* eslint-disable max-classes-per-file */
-/* eslint-disable no-param-reassign */
 import { FalkorDB } from "falkordb";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { AuthOptions, Role, User, getServerSession } from "next-auth";
@@ -11,6 +9,7 @@ import { isTokenActive } from "../tokenUtils";
 
 interface CustomJWTPayload {
   sub: string;
+  jti: string; // Token ID for fetching password from Token DB
   username?: string;
   role: Role;
   host: string;
@@ -32,68 +31,6 @@ interface AuthenticatedUser {
 }
 
 const connections = new Map<string, FalkorDB>();
-
-// Admin connection for token management operations
-let adminConnectionForTokens: FalkorDB | null = null;
-
-/**
- * Gets or creates an Admin Redis connection for token management
- * This connection is used to store/retrieve/delete tokens for all users
- * since non-admin users don't have SET/GET/DEL permissions
- */
-export async function getAdminConnectionForTokens(
-  host: string = "localhost",
-  port: number = 6379,
-  tls: boolean = false,
-  ca?: string
-): Promise<FalkorDB> {
-  // Return existing connection if available
-  if (adminConnectionForTokens) {
-    try {
-      // Test if connection is still alive
-      const connection = await adminConnectionForTokens.connection;
-      await connection.ping();
-      return adminConnectionForTokens;
-    } catch (err) {
-      console.warn("Admin token connection is dead, recreating:", err);
-      adminConnectionForTokens = null;
-    }
-  }
-
-  // Create new Admin connection
-  // Note: Default user has "nopass" so we don't provide credentials
-  const connectionOptions: FalkorDBOptions = tls
-    ? {
-        socket: {
-          host,
-          port,
-          tls: true,
-          checkServerIdentity: () => undefined,
-          ca: ca ? [Buffer.from(ca, "base64").toString("utf8")] : undefined,
-        },
-        username: undefined,
-        password: undefined,
-      }
-    : {
-        socket: {
-          host,
-          port,
-        },
-        username: undefined,
-        password: undefined,
-      };
-
-  adminConnectionForTokens = await FalkorDB.connect(connectionOptions);
-  
-  // Verify this is actually an admin connection
-  try {
-    const connection = await adminConnectionForTokens.connection;
-    await connection.aclGetUser("default");
-  } catch (err) {
-    throw new Error("Failed to create admin connection for token management. The default user must have admin privileges.");
-  }
-  return adminConnectionForTokens;
-}
 
 export async function newClient(
   credentials: {
@@ -169,8 +106,7 @@ export async function newClient(
     return { role: "Admin", client };
   } catch (err) {
     if ((err as Error).message.startsWith("NOPERM")) {
-      // eslint-disable-next-line no-console
-      console.debug("user is not admin", err);
+      // User is not admin, continue to check other roles
     } else throw err;
   }
 
@@ -178,12 +114,8 @@ export async function newClient(
     await connection.sendCommand(["GRAPH.QUERY"]);
   } catch (err) {
     if ((err as Error).message.includes("permissions")) {
-      // eslint-disable-next-line no-console
-      console.debug("user is read-only", err);
       return { role: "Read-Only", client };
     }
-    // eslint-disable-next-line no-console
-    console.debug("user is read-write", err);
     return { role: "Read-Write", client };
   }
 
@@ -209,6 +141,8 @@ export function generateConsistentUserId(
   const identifier = `${username || 'default'}@${host}:${port}`;
   return crypto.createHash('sha256').update(identifier).digest('hex');
 }
+
+
 
 /**
  * Retrieves the Authorization header from the request
@@ -287,28 +221,88 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
       if (!isValidJWTPayload(payload)) {
         return null;
       }
-      // Check for existing connection first
-      const existingConnection = connections.get(payload.sub);
-      if (existingConnection) {
-        // SSRF Protection: Validate that token host/port match the connection we're reusing
-        // This prevents attackers from using valid tokens to probe internal networks
-        // Note: We trust payload.host/port here because they were validated during initial login
-        // and the connection already exists in our Map
-        const adminClient = await getAdminConnectionForTokens(payload.host, payload.port, payload.tls, payload.ca);
-        const adminConnection = await adminClient.connection;
-        const tokenActive = await isTokenActive(token, adminConnection);
-        if (!tokenActive) {
+
+      // Validate token is active in FalkorDB (not revoked)
+      const tokenActive = await isTokenActive(token);
+      
+      if (!tokenActive) {
+        // eslint-disable-next-line no-console
+        console.warn("JWT authentication failed: token is not active (revoked or expired)");
+
+        // Clean up stale connection to prevent connection leak
+        const staleClient = connections.get(payload.sub);
+        if (staleClient) {
+          connections.delete(payload.sub);
+          try {
+            await staleClient.close();
+          } catch (closeError) {
+            // eslint-disable-next-line no-console
+            console.warn("Failed to close revoked JWT connection", closeError);
+          }
+        }
+        return null;
+      }
+
+      // Try to reuse existing connection (performance optimization)
+      let client = connections.get(payload.sub);
+
+      if (client) {
+        // Health check: verify connection is still alive
+        try {
+          const connection = await client.connection;
+          await connection.ping();
+          
+          // Connection is healthy, reuse it
+          const user = createUserFromJWTPayload(payload);
+          return { client, user };
+        } catch (pingError) {
+          // Connection is dead, remove from pool and recreate
           // eslint-disable-next-line no-console
-          console.warn("JWT authentication failed: token is not active (revoked or expired)");
+          console.warn("Connection health check failed, recreating:", pingError);
+          connections.delete(payload.sub);
+          
+          try {
+            await client.close();
+          } catch (closeError) {
+            // Ignore close errors on dead connections
+          }
+          
+          client = undefined; // Will be recreated below
+        }
+      }
+
+      // No existing connection or health check failed - fetch password from Token DB and reconnect
+      if (!client) {
+        try {
+          // Fetch password from Token DB (6380) - NOT from JWT
+          const { getPasswordFromTokenDB } = await import('../tokenUtils');
+          const password = await getPasswordFromTokenDB(payload.jti);
+          
+          // Create new connection with retrieved password
+          const { client: reconnectedClient } = await newClient(
+            {
+              host: payload.host,
+              port: payload.port.toString(),
+              username: payload.username || '',
+              password,
+              tls: payload.tls.toString(),
+              ca: payload.ca || undefined,
+            },
+            payload.sub
+          );
+          
+          client = reconnectedClient;
+          // Connection is already cached in connections Map by newClient()
+        } catch (connectionError) {
+          // eslint-disable-next-line no-console
+          console.error("Failed to create connection from Token DB:", connectionError);
           return null;
         }
-        // Reuse existing JWT connection
-        const user = createUserFromJWTPayload(payload);
-        return { client: existingConnection, user };
       }
-      // eslint-disable-next-line no-console
-      console.warn("JWT authentication failed: no existing connection for user", payload.sub);
-      return null;
+
+      // At this point, client is guaranteed to be defined (either reused or recreated)
+      const user = createUserFromJWTPayload(payload);
+      return { client, user };
     } catch (error) {
       // Fall back to session auth if JWT fails
       // eslint-disable-next-line no-console
@@ -338,14 +332,15 @@ const authOptions: AuthOptions = {
         }
 
         try {
-          const id = generateTimeUUID();
+          // Generate random UUID for this session
+          const id = uuidv4();
 
           const { role } = await newClient(credentials, id);
 
           const res: User = {
             id,
             url: credentials.url,
-            host: credentials.host,
+            host: credentials.host || "localhost",
             port: credentials.port ? parseInt(credentials.port, 10) : 6379,
             password: credentials.password,
             username: credentials.username,
@@ -424,7 +419,7 @@ export async function getClient() {
 
   // Fall back to session authentication for regular app requests
   const session = await getServerSession(authOptions);
-  const id = session?.user?.id;
+  const id = session?.user.id;
 
   if (!id) {
     return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
@@ -434,7 +429,31 @@ export async function getClient() {
 
   let connection = connections.get(id);
 
-  // If client is not found, create a new one
+  // Health check: if connection exists, verify it's still alive
+  if (connection) {
+    try {
+      const conn = await connection.connection;
+      await conn.ping();
+
+      // Connection is healthy, reuse it
+      return { client: connection, user };
+    } catch (pingError) {
+      // Connection is dead, remove from pool and recreate
+      // eslint-disable-next-line no-console
+      console.warn("Session connection health check failed, recreating:", pingError);
+      connections.delete(id);
+
+      try {
+        await connection.close();
+      } catch (closeError) {
+        // Ignore close errors on dead connections
+      }
+
+      connection = undefined; // Will be recreated below
+    }
+  }
+
+  // No existing connection or health check failed - create new one
   if (!connection) {
     const { client } = await newClient(
       {

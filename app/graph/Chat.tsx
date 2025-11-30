@@ -1,6 +1,6 @@
 /* eslint-disable no-case-declarations */
 /* eslint-disable react/no-array-index-key */
-import { cn, Message, securedFetch } from "@/lib/utils"
+import { cn, Message } from "@/lib/utils"
 import { useContext, useEffect, useState } from "react"
 import { ChevronDown, ChevronRight, CircleArrowUp, Copy, Loader2, Play, Search, X } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
@@ -18,7 +18,7 @@ export default function Chat({ onClose }: Props) {
     const { setIndicator } = useContext(IndicatorContext)
     const { graphName, runQuery } = useContext(GraphContext)
     const { isQueryLoading } = useContext(QueryLoadingContext)
-    const { settings: { chatSettings: { secretKey, model, navigateToSettings } } } = useContext(BrowserSettingsContext)
+    const { settings: { chatSettings: { secretKey, model } } } = useContext(BrowserSettingsContext)
 
     const { toast } = useToast()
 
@@ -86,27 +86,30 @@ export default function Chat({ onClose }: Props) {
         setTimeout(scrollToBottom, 0)
         setNewMessage("")
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const body: any = {
+            messages: newMessages.filter(message => message.role === "user" || message.type === "Result").map(({ role, content }) => ({
+                role,
+                content
+            })),
+            graphName,
+        }
+
+        if (model) {
+            body.model = model
+        }
+
+        if (secretKey) {
+            body.key = secretKey
+        }
+
         try {
-            const response = await securedFetch("/api/chat", {
+            const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify(!navigateToSettings ? {
-                    messages: newMessages.filter(message => message.role === "user" || message.type === "Result").map(({ role, content }) => ({
-                        role,
-                        content
-                    })),
-                    graphName,
-                } : {
-                    messages: newMessages.filter(message => message.role === "user" || message.type === "Result").map(({ role, content }) => ({
-                        role,
-                        content
-                    })),
-                    graphName,
-                    key: secretKey,
-                    model,
-                })
+                body: JSON.stringify(body)
             });
 
             if (!response.ok) {

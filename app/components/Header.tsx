@@ -26,7 +26,7 @@ interface Props {
     graphNames: string[]
     graphName: string
     onOpenGraphInfo: () => void
-    displayChat: boolean
+    navigateToSettings: boolean
 }
 
 function getPathType(pathname: string): "Schema" | "Graph" | undefined {
@@ -37,11 +37,11 @@ function getPathType(pathname: string): "Schema" | "Graph" | undefined {
 
 const iconSize = 30
 
-export default function Header({ onSetGraphName, graphNames, graphName, onOpenGraphInfo, displayChat }: Props) {
+export default function Header({ onSetGraphName, graphNames, graphName, onOpenGraphInfo, navigateToSettings }: Props) {
 
     const { indicator } = useContext(IndicatorContext)
     const { setPanel } = useContext(PanelContext)
-    const { hasChanges, saveSettings, resetSettings, settings: { chatSettings: { model, secretKey, navigateToSettings } } } = useContext(BrowserSettingsContext)
+    const { hasChanges, saveSettings, resetSettings, settings: { chatSettings: { model, secretKey, displayChat } } } = useContext(BrowserSettingsContext)
 
     const { theme, setTheme } = useTheme()
     const { currentTheme } = getTheme(theme)
@@ -53,7 +53,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
     const [mounted, setMounted] = useState(false)
 
     const type = getPathType(pathname)
-    const showCreate = type && session?.user?.role && session.user.role !== "Read-Only"
+    const showCreate = type && session?.user.role && session.user.role !== "Read-Only"
 
     useEffect(() => {
         setMounted(true)
@@ -81,7 +81,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
 
     return (
         <div className="py-5 px-2 flex flex-col justify-between items-center border-r border-border">
-            <div className="w-full flex flex-col gap-6 items-center">
+            <div className="w-full flex flex-col gap-4 items-center">
                 {
                     mounted && currentTheme &&
                     <Link
@@ -112,14 +112,14 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                     onClick={() => router.push("/graph")}
                     data-testid="GraphsButton"
                 />
-                {separator}
+                {/* {separator}
                 <Button
                     label="SCHEMAS"
                     title="View and manage your schemas"
                     className={cn(type === "Schema" ? "text-primary" : "text-foreground")}
                     onClick={() => router.push("/schema")}
                     data-testid="SchemasButton"
-                />
+                /> */}
                 {
                     type === "Graph" && graphName &&
                     <>
@@ -141,10 +141,18 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                         <Button
                             className="Gradient bg-clip-text text-transparent font-semibold text-xl"
                             indicator={indicator}
+                            title={`Use English to query the graph. 
+                                The feature requires LLM model and API key.
+                                Update local user parameters in Settings.`}
                             label="CHAT"
                             onClick={() => {
                                 if (navigateToSettings && (!model || !secretKey)) {
                                     router.push("/settings")
+                                    toast({
+                                        title: "Incomplete Chat Settings",
+                                        description: "Please complete the chat settings to use the chat feature.",
+                                        variant: "destructive",
+                                    })
                                 } else {
                                     handleSetCurrentPanel("chat")
                                 }
@@ -153,7 +161,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                     </>
                 }
             </div>
-            <div className="w-full flex flex-col gap-6 items-center">
+            <div className="w-full flex flex-col gap-4 items-center">
                 <Button
                     data-testid="settings"
                     title="Adjust application settings"
@@ -169,7 +177,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                                 <FileCode size={iconSize} />
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent side="right" className="bg-background w-full p-4 ml-4">
+                        <DropdownMenuContent side="right" className="bg-background w-full p-2 ml-4">
                             <DropdownMenuGroup className="h-full w-full flex flex-col gap-2 p-2">
                                 <DropdownMenuItem className="focus:bg-transparent">
                                     <a className="flex gap-2 items-center" href="https://docs.falkordb.com/" target="_blank" rel="noreferrer noreferrer">

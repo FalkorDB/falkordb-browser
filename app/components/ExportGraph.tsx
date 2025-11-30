@@ -1,4 +1,4 @@
-import React, { useContext, useState } from "react"
+import React, { useContext, useEffect, useState } from "react"
 import { prepareArg, securedFetch } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import DialogComponent from "./DialogComponent"
@@ -17,6 +17,12 @@ export default function ExportGraph({ selectedValues, type }: Props) {
     const [isLoading, setIsLoading] = useState(false)
     const { toast } = useToast()
     const { indicator, setIndicator } = useContext(IndicatorContext)
+
+    useEffect(() => {
+        if (!open) {
+            setIsLoading(false)
+        }
+    }, [open])
 
     const handleExport = async () => {
         try {

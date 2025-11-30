@@ -38,7 +38,7 @@ export default function DialogComponent({
                 {trigger}
             </DialogTrigger>
             {/* eslint-disable-next-line react/jsx-props-no-spreading */}
-            <DialogContent {...props} preventOutsideClose={preventOutsideClose} data-testid={`${label}Content`} onEscapeKeyDown={(e) => e.stopPropagation()} className={cn("bg-background p-8 flex flex-col gap-8 rounded-lg border-none", className)} hideClose>
+            <DialogContent {...props} preventOutsideClose={preventOutsideClose} data-testid={`${label}Content`} onEscapeKeyDown={(e) => e.stopPropagation()} className={cn("bg-background p-2 flex flex-col gap-4 rounded-lg border-none", className)} hideClose>
                 <DialogHeader className="flex-row justify-between items-center border-b-2 border-border pb-4">
                     <DialogTitle className="text-2xl font-medium">{title}</DialogTitle>
                     <CloseDialog data-testid={`close${label?.charAt(0).toUpperCase()}${label?.slice(1)}`} />

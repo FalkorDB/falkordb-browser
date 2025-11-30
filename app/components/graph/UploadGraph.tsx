@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Dropzone from "../ui/Dropzone";
 import Button from "../ui/Button";
 import CloseDialog from "../CloseDialog";
@@ -12,15 +12,36 @@ export default function UploadGraph({ disabled, open, onOpenChange }: {
 }) {
 
     const [files, setFiles] = useState<File[]>([])
+    const isControlled = typeof open === "boolean" && typeof onOpenChange === "function"
+    const [internalOpen, setInternalOpen] = useState(false)
+    const dialogOpen = useMemo(
+        () => (isControlled ? (open as boolean) : internalOpen),
+        [isControlled, open, internalOpen]
+    )
+
+    const handleOpenChange = (nextOpen: boolean) => {
+        if (onOpenChange) {
+            onOpenChange(nextOpen)
+        } else {
+            setInternalOpen(nextOpen)
+        }
+    }
+
+    useEffect(() => {
+        if (!dialogOpen) {
+            setFiles([])
+        }
+    }, [dialogOpen])
 
     const onUploadData = () => {
-        console.log(files)
+        if (!files.length) return
+        setFiles([])
     }
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog open={dialogOpen} onOpenChange={handleOpenChange}>
             {
-                !onOpenChange &&
+                !isControlled &&
                 <DialogTrigger asChild>
                     <Button
                         label="Upload Data"
