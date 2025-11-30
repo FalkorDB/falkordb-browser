@@ -19,8 +19,6 @@ interface Props {
     data: GraphData
     setData: Dispatch<SetStateAction<GraphData>>
     chartRef: GraphRef
-    selectedElement: Node | Link | undefined
-    setSelectedElement: (element: Node | Link | undefined) => void
     selectedElements: (Node | Link)[]
     setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
     type?: "schema" | "graph"
@@ -127,8 +125,6 @@ export default function ForceGraph({
     data,
     setData,
     chartRef,
-    selectedElement,
-    setSelectedElement,
     selectedElements,
     setSelectedElements,
     type = "graph",
@@ -416,20 +412,18 @@ export default function ForceGraph({
             } else {
                 setSelectedElements([...selectedElements, element])
             }
+        } else {
+            setSelectedElements([element])
         }
-
-        setSelectedElement(element)
     }
 
     const handleUnselected = (evt?: MouseEvent) => {
-        if (evt?.ctrlKey || (!selectedElement && selectedElements.length === 0)) return
-        setSelectedElement(undefined)
+        if (evt?.ctrlKey || selectedElements.length === 0) return
         setSelectedElements([])
     }
 
-    const isLinkSelected = (link: Link) => (selectedElement && selectedElement.source && selectedElement.id === link.id)
+    const isLinkSelected = (link: Link) => (selectedElements.length > 0 && selectedElements.some(el => el.id === link.id && el.source))
         || (hoverElement && hoverElement.source && hoverElement.id === link.id)
-        || (selectedElements.length > 0 && selectedElements.some(el => el.id === link.id && el.source))
 
     return (
         <div ref={parentRef} className="w-full h-full relative">
@@ -468,9 +462,9 @@ export default function ForceGraph({
                         node.y = 0
                     }
 
-                    ctx.lineWidth = ((selectedElement && !selectedElement.source && selectedElement.id === node.id)
+                    ctx.lineWidth = ((selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !el.source)))
                         || (hoverElement && !hoverElement.source && hoverElement.id === node.id)
-                        || (selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !el.source))) ? 1.5 : 0.5
+                        ? 1.5 : 0.5
                     ctx.strokeStyle = foreground;
 
                     ctx.beginPath();

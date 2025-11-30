@@ -18,8 +18,6 @@ import MetadataView from "./MetadataView";
 import ForceGraph from "../components/ForceGraph";
 
 interface Props {
-    selectedElement: Node | Link | undefined
-    setSelectedElement: (el: Node | Link | undefined) => void
     selectedElements: (Node | Link)[]
     setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
     chartRef: GraphRef
@@ -41,8 +39,6 @@ interface Props {
 }
 
 function GraphView({
-    selectedElement,
-    setSelectedElement,
     selectedElements,
     setSelectedElements,
     chartRef,
@@ -91,9 +87,8 @@ function GraphView({
     }, [graph, graph.Id, elementsLength, graph.Data.length, setCurrentTab, isTabEnabled])
 
     useEffect(() => {
-        setSelectedElement(undefined)
         setSelectedElements([])
-    }, [graph.Id, setSelectedElement, setSelectedElements])
+    }, [graph.Id, setSelectedElements])
 
     const onLabelClick = (label: Label) => {
         label.show = !label.show
@@ -131,9 +126,8 @@ function GraphView({
                                 graph={graph}
                                 graphName={graphName}
                                 label="Graph"
-                                selectedElement={selectedElement}
-                                setSelectedElement={setSelectedElement}
                                 selectedElements={selectedElements}
+                                setSelectedElements={setSelectedElements}
                                 handleDeleteElement={handleDeleteElement}
                                 chartRef={chartRef}
                                 setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => !!e.labels) ? setIsAddEdge : undefined}
@@ -220,8 +214,6 @@ function GraphView({
                     data={data}
                     setData={setData}
                     chartRef={chartRef}
-                    selectedElement={selectedElement}
-                    setSelectedElement={setSelectedElement}
                     selectedElements={selectedElements}
                     setSelectedElements={setSelectedElements}
                     setRelationships={setRelationships}
