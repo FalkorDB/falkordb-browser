@@ -290,6 +290,30 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
         }
     }
 
+    const handleDeleteQuery = useCallback(() => {
+        if (!historyQuery || !setHistoryQuery || !historyQuery.counter) return
+
+        const removeIndex = historyQuery.counter - 1
+        const queryToDelete = historyQuery.queries[removeIndex]
+        const newQueries = historyQuery.queries.filter((_, idx) => idx !== removeIndex)
+
+        if (newQueries.length === 0) localStorage.removeItem("query history")
+        else localStorage.setItem("query history", JSON.stringify(newQueries))
+
+        const hasQueries = newQueries.length > 0
+        const nextCounter = hasQueries ? Math.min(historyQuery.counter, newQueries.length) : 0
+        const nextQuery = nextCounter ? newQueries[nextCounter - 1].text : historyQuery.currentQuery.text
+
+        setHistoryQuery(prev => ({
+            ...prev,
+            queries: newQueries,
+            counter: nextCounter,
+            query: nextQuery
+        }))
+
+        setFilteredQueries(current => current.filter(query => query.timestamp !== queryToDelete.timestamp))
+    }, [historyQuery, setHistoryQuery, setFilteredQueries])
+
     const separator = <div className="h-[80%] w-0.5 bg-border rounded-full" />
 
     return (
@@ -404,17 +428,29 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                 {
                                                     currentQuery &&
                                                     <>
-                                                        <Button
-                                                            ref={submitQuery}
-                                                            data-testid="queryHistoryEditorRun"
-                                                            className="z-10 absolute bottom-4 right-8 py-2 px-8"
-                                                            indicator={indicator}
-                                                            variant="Primary"
-                                                            label="Run"
-                                                            title="Press Enter to run the query"
-                                                            onClick={handleSubmit}
-                                                            isLoading={isLoading}
-                                                        />
+                                                        <div className="z-10 absolute bottom-4 right-8 flex gap-2">
+                                                                                                          {
+                                                                historyQuery.counter ?
+                                                                    <Button
+                                                                        variant="Delete"
+                                                                        data-testid="queryHistoryDelete"
+                                                                        label="Delete"
+                                                                        title="Remove selected query from history"
+                                                                        onClick={handleDeleteQuery}
+                                                                    />
+                                                                    : undefined
+                                                            }               <Button
+                                                                ref={submitQuery}
+                                                                data-testid="queryHistoryEditorRun"
+                                                                className="py-2 px-8"
+                                                                indicator={indicator}
+                                                                variant="Primary"
+                                                                label="Run"
+                                                                title="Press Enter to run the query"
+                                                                onClick={handleSubmit}
+                                                                isLoading={isLoading}
+                                                            />
+                                                        </div>
                                                         <Editor
                                                             key={currentTheme}
                                                             className="SofiaSans"
