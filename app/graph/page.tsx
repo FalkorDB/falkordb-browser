@@ -7,7 +7,7 @@ import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
-import { Label, Graph, Link, Node, Relationship, GraphInfo, Value } from "../api/graph/model";
+import { Label, Graph, Link, Node, Relationship, GraphInfo, Value, MemoryValue } from "../api/graph/model";
 import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ViewportContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
@@ -55,7 +55,7 @@ export default function Page() {
             runDefaultQuerySettings: { runDefaultQuery },
             defaultQuerySettings: { defaultQuery },
             contentPersistenceSettings: { contentPersistence },
-            graphInfo: { refreshInterval }
+            graphInfo: { showMemoryUsage, refreshInterval }
         }
     } = useContext(BrowserSettingsContext)
     const { toast } = useToast()
@@ -121,7 +121,7 @@ export default function Page() {
             fetchInfo("(property key)"),
         ]).then(async ([newLabels, newRelationships, newPropertyKeys]) => {
             const colorsArr = localStorage.getItem(graphName)
-            const memoryUsage = await getMemoryUsage(graphName, toast, setIndicator)
+            const memoryUsage = showMemoryUsage ? await getMemoryUsage(graphName, toast, setIndicator) : new Map<string, MemoryValue>()
             const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, colorsArr ? JSON.parse(colorsArr) : undefined)
             setGraphInfo(gi)
             fetchCount()
@@ -140,7 +140,7 @@ export default function Page() {
         return () => {
             clearInterval(interval)
         }
-    }, [fetchCount, fetchInfo, graphName, refreshInterval, setGraphInfo, setIndicator, toast])
+    }, [fetchCount, fetchInfo, graphName, refreshInterval, setGraphInfo, setIndicator, showMemoryUsage, toast])
 
     useEffect(() => {
         setRelationships([...graph.Relationships])

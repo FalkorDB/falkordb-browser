@@ -3,13 +3,13 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes'
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, TextPriority } from "@/lib/utils";
+import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, TextPriority, MEMORY_USAGE_VERSION_THRESHOLD } from "@/lib/utils";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import LoginVerification from "./loginVerification";
-import { Graph, GraphData, GraphInfo, HistoryQuery, Query } from "./api/graph/model";
+import { Graph, GraphData, GraphInfo, HistoryQuery, MemoryValue, Query } from "./api/graph/model";
 import Header from "./components/Header";
 import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ViewportContext, TableViewContext } from "./components/provider";
 import GraphInfoPanel from "./graph/graphInfo";
@@ -89,6 +89,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [isCollapsed, setIsCollapsed] = useState(true)
   const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>([])
   const [userGraphBeforeTutorial, setUserGraphBeforeTutorial] = useState<string>("")
+  const [showMemoryUsage, setShowMemoryUsage] = useState(false)
 
   const replayTutorial = useCallback(() => {
     router.push("/graph")
@@ -120,7 +121,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       defaultQuerySettings: { defaultQuery, setDefaultQuery },
       contentPersistenceSettings: { contentPersistence, setContentPersistence },
       chatSettings: { secretKey, setSecretKey, model, setModel, displayChat, navigateToSettings },
-      graphInfo: { refreshInterval, setRefreshInterval, displayTextPriority, setDisplayTextPriority }
+      graphInfo: { showMemoryUsage, refreshInterval, setRefreshInterval, displayTextPriority, setDisplayTextPriority }
     },
     hasChanges,
     setHasChanges,
@@ -304,7 +305,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         fetchInfo("(property key)", n),
       ]).then(async ([newLabels, newRelationships, newPropertyKeys]) => {
         const colorsArr = localStorage.getItem(n)
-        const memoryUsage = await getMemoryUsage(n, toast, setIndicator)
+        const memoryUsage = showMemoryUsage ? await getMemoryUsage(n, toast, setIndicator) : new Map<string, MemoryValue>()
         const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, colorsArr ? JSON.parse(colorsArr) : undefined)
         setGraphInfo(gi)
         return gi
@@ -389,7 +390,22 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   }), [graph, graphInfo, graphName, graphNames, nodesCount, edgesCount, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading])
 
   useEffect(() => {
+    if (status !== "authenticated") return
 
+    (async () => {
+      const result = await securedFetch("/api/auth/DBVersion", {
+        method: "GET",
+      }, toast, setIndicator)
+
+      if (!result.ok) return
+
+      const [name, version] = (await result.json()).result || ["", 0]
+
+      setShowMemoryUsage(name === "graph" && version >= MEMORY_USAGE_VERSION_THRESHOLD)
+    })()
+  }, [status, toast])
+
+  useEffect(() => {
     if (status !== "authenticated") return
 
     setHistoryQuery({ ...defaultQueryHistory, queries: JSON.parse(localStorage.getItem("query history") || "[]") })
