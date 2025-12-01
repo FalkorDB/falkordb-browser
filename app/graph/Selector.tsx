@@ -33,7 +33,6 @@ interface BaseProps<T = "Schema" | "Graph"> {
 }
 
 interface SchemaProps {
-    selectedElement: Node | Link | undefined
     selectedElements: (Node | Link)[];
     setSelectedElements: (el: (Node | Link)[]) => void;
     handleDeleteElement: () => Promise<void>;
@@ -56,7 +55,6 @@ interface GraphProps {
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>;
     fetchCount: () => Promise<void>;
     isQueryLoading: boolean;
-    selectedElement?: never
     selectedElements?: never;
     setSelectedElements?: never;
     handleDeleteElement?: never;

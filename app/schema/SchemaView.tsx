@@ -14,8 +14,6 @@ import ForceGraph from "../components/ForceGraph"
 interface Props {
     edgesCount: number | undefined
     nodesCount: number | undefined
-    selectedElement: Node | Link | undefined
-    setSelectedElement: (el: Node | Link | undefined) => void
     selectedElements: (Node | Link)[]
     setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
     chartRef: GraphRef
@@ -33,8 +31,6 @@ interface Props {
 export default function SchemaView({
     edgesCount,
     nodesCount,
-    selectedElement,
-    setSelectedElement,
     selectedElements,
     setSelectedElements,
     chartRef,
@@ -59,9 +55,8 @@ export default function SchemaView({
     }, [schema.Id, schema.Relationships.length, schema.Labels.length, setRelationships, schema.Relationships, schema.Labels, setLabels])
 
     useEffect(() => {
-        setSelectedElement(undefined)
         setSelectedElements([])
-    }, [schema.Id, setSelectedElement, setSelectedElements])
+    }, [schema.Id, setSelectedElements])
 
     const onLabelClick = (label: Label) => {
         label.show = !label.show
@@ -129,8 +124,6 @@ export default function SchemaView({
                     chartRef={chartRef}
                     data={data}
                     setData={setData}
-                    selectedElement={selectedElement}
-                    setSelectedElement={setSelectedElement}
                     selectedElements={selectedElements}
                     setSelectedElements={setSelectedElements}
                     type="schema"

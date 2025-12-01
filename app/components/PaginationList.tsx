@@ -125,7 +125,7 @@ interface Props<T extends Item> {
     label: string
     afterSearchCallback: (newFilteredList: T[]) => void
     isSelected: (item: T) => boolean
-    isDeleteSelected: (item: T) => boolean
+    isDeleteSelected?: (item: T) => boolean
     searchRef: React.RefObject<HTMLInputElement>
     isLoading?: boolean
     className?: string
@@ -348,4 +348,5 @@ PaginationList.defaultProps = {
     className: undefined,
     children: undefined,
     isLoading: undefined,
+    isDeleteSelected: undefined,
 }
