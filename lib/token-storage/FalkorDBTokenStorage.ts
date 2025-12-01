@@ -153,6 +153,40 @@ class FalkorDBTokenStorage implements ITokenStorage {
   }
 
   // eslint-disable-next-line class-methods-use-this
+  async isTokenActive(tokenHash: string): Promise<boolean> {
+    const nowUnix = Math.floor(Date.now() / 1000);
+
+    const query = `
+      MATCH (t:Token {token_hash: '${this.escapeString(tokenHash)}'})
+      WHERE t.is_active = true 
+        AND (t.expires_at = -1 OR t.expires_at > ${nowUnix})
+      RETURN t.token_id as token_id
+    `;
+
+    const result = await executePATQuery(query);
+    return !!(result.data && result.data.length > 0);
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  async getEncryptedPassword(tokenId: string): Promise<string | null> {
+    const query = `
+      MATCH (t:Token {token_id: '${this.escapeString(tokenId)}'})
+      WHERE t.is_active = true
+      RETURN t.encrypted_password as encrypted_password
+    `;
+
+    const result = await executePATQuery(query);
+
+    if (!result || !result.data || result.data.length === 0) {
+      return null;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const row = result.data[0] as any;
+    return row.encrypted_password || null;
+  }
+
+  // eslint-disable-next-line class-methods-use-this
   async cleanupExpiredTokens(): Promise<number> {
     const nowUnix = Math.floor(Date.now() / 1000);
 

@@ -230,6 +230,9 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       );
       await settingsTokensPage.navigateToTokensTab();
 
+      // Wait for tokens to load in the UI
+      await settingsTokensPage.waitFor(1500);
+
       // Verify token appears in UI
       expect(await settingsTokensPage.verifyTokenExists(tokenName)).toBe(true);
 
@@ -262,6 +265,16 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
         urls.settingsUrl
       );
       await settingsTokensPage.navigateToTokensTab();
+
+      // Wait for tokens to load in the UI
+      await settingsTokensPage.waitFor(1500);
+      
+      // Verify all tokens exist before attempting to revoke
+      await Promise.all(
+        tokenNames.map(async (tokenName) => {
+          expect(await settingsTokensPage.verifyTokenExists(tokenName)).toBe(true);
+        })
+      );
 
       const tokensBefore = await settingsTokensPage.getTokenCount();
 

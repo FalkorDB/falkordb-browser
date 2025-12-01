@@ -207,7 +207,7 @@ export async function DELETE(
 
     if (!success) {
       return NextResponse.json(
-        { message: "Failed to revoke token - token not found" },
+        { message: "Failed to revoke token" },
         { status: 500 }
       );
     }

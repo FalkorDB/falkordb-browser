@@ -129,6 +129,31 @@ class FileTokenStorage implements ITokenStorage {
     }
   }
 
+  async isTokenActive(tokenHash: string): Promise<boolean> {
+    const tokens = await this.readTokens();
+    const now = Math.floor(Date.now() / 1000);
+    
+    const token = tokens.find(t => t.token_hash === tokenHash);
+    
+    if (!token) {
+      return false;
+    }
+    
+    // Check if active and not expired
+    return token.is_active && (token.expires_at === -1 || token.expires_at > now);
+  }
+
+  async getEncryptedPassword(tokenId: string): Promise<string | null> {
+    const tokens = await this.readTokens();
+    const token = tokens.find(t => t.token_id === tokenId);
+    
+    if (!token || !token.is_active) {
+      return null;
+    }
+    
+    return token.encrypted_password || null;
+  }
+
   async cleanupExpiredTokens(): Promise<number> {
     const tokens = await this.readTokens();
     const now = Math.floor(Date.now() / 1000);

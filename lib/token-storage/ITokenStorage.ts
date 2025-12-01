@@ -58,6 +58,20 @@ export interface ITokenStorage {
   updateLastUsed(tokenId: string): Promise<void>;
 
   /**
+   * Check if a token is active and valid
+   * @param tokenHash - SHA256 hash of the token
+   * @returns true if token is active and not expired
+   */
+  isTokenActive(tokenHash: string): Promise<boolean>;
+
+  /**
+   * Get encrypted password for a token
+   * @param tokenId - The token ID
+   * @returns Encrypted password or null if not found
+   */
+  getEncryptedPassword(tokenId: string): Promise<string | null>;
+
+  /**
    * Clean up expired tokens (optional, for maintenance)
    */
   cleanupExpiredTokens?(): Promise<number>;
