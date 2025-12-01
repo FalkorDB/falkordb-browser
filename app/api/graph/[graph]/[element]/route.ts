@@ -6,7 +6,6 @@ import {
   validateBody,
 } from "../../../validate-body";
 
-// eslint-disable-next-line import/prefer-default-export
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ graph: string; element: string }> }

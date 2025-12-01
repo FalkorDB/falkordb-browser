@@ -11,10 +11,9 @@ import Users from "./users/Users"
 import Configurations from "./Configurations"
 import Button from "../components/ui/Button"
 import BrowserSettings from "./browserSettings"
-import PersonalAccessTokens from "./tokens/PersonalAccessTokens"
 import { IndicatorContext, BrowserSettingsContext } from "../components/provider"
 
-type Tab = 'Browser' | 'Configurations' | 'Users' | 'Tokens'
+type Tab = 'Browser' | 'Configurations' | 'Users'
 
 export default function Settings() {
 
@@ -63,8 +62,8 @@ export default function Settings() {
                 return <Users />
             case 'Configurations':
                 return <Configurations />
-            case 'Tokens':
-                return <PersonalAccessTokens />
+            // case 'Tokens':
+            //     return <PersonalAccessTokens />
             default:
                 return <BrowserSettings />
         }
@@ -98,12 +97,12 @@ export default function Settings() {
                             />
                         </>
                     }
-                    <Button
+                    {/* <Button
                         className={cn("p-2 rounded-lg", current === "Tokens" ? "bg-background" : "text-gray-500")}
                         label="Personal Access Tokens"
                         title="Manage personal access tokens"
                         onClick={() => handleSetCurrent("Tokens")}
-                    />
+                    /> */}
                 </div>
             </div>
             {
