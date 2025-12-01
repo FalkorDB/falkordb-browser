@@ -30,6 +30,7 @@ import { SchemaListResponse } from "./responses/getSchemaResponse";
 import { GraphCountResponse } from "./responses/graphCountResponse";
 import { GraphNodeResponse } from "./responses/graphNodeResponse";
 import { GraphAttributeResponse } from "./responses/graphAttributeResponse";
+import { ListTokensResponse, TokenDetailsResponse } from "./responses/tokenResponse";
 
 export async function getSSEGraphResult(
   url: string,
@@ -430,7 +431,7 @@ export default class ApiCalls {
     }
   }
 
-  async listTokens(): Promise<any> {
+  async listTokens(): Promise<ListTokensResponse> {
     try {
       const headers = await getAdminToken();
       const result = await getRequest(`${urls.api.tokenUrl}tokens`, headers);
@@ -454,7 +455,7 @@ export default class ApiCalls {
     }
   }
 
-  async getTokenDetails(tokenId: string): Promise<any> {
+  async getTokenDetails(tokenId: string): Promise<TokenDetailsResponse> {
     try {
       const headers = await getAdminToken();
       const result = await getRequest(`${urls.api.tokenUrl}tokens/${tokenId}`, headers);
@@ -468,9 +469,15 @@ export default class ApiCalls {
 
   async revokeAllUserTokens(tokens: string[]): Promise<void> {
     try {
-      await Promise.all(
+      const results = await Promise.allSettled(
         tokens.map((tokenId) => this.revokeToken(tokenId))
       );
+      const failures = results.filter((r) => r.status === 'rejected');
+      if (failures.length > 0) {
+        throw new Error(
+          `Failed to revoke ${failures.length} of ${tokens.length} tokens`
+        );
+      }
     } catch (error) {
       throw new Error(
         `Failed to revoke all tokens. \n Error: ${(error as Error).message}`
@@ -513,14 +520,19 @@ export default class ApiCalls {
     try {
       // First get a session/token by logging in
       const loginResponse = await this.generateTokenAsUser(username, password);
-      const { token } = loginResponse;
+      const { token, token_id } = loginResponse;
 
       // Use that token to list tokens
       const result = await getRequest(
         `${urls.api.tokenUrl}tokens`,
         { Authorization: `Bearer ${token}` }
       );
-      return await result.json();
+      const response = await result.json();
+
+      // Clean up the temporary token
+      await this.revokeToken(token_id);
+
+      return response;
     } catch (error) {
       throw new Error(
         `Failed to list tokens as user ${username}. \n Error: ${(error as Error).message}`
@@ -536,14 +548,19 @@ export default class ApiCalls {
     try {
       // First get a session/token by logging in
       const loginResponse = await this.generateTokenAsUser(username, password);
-      const { token } = loginResponse;
+      const { token, token_id } = loginResponse;
 
       // Use that token to revoke via DELETE
       const result = await deleteRequest(
         `${urls.api.tokenUrl}tokens/${tokenId}`,
         { Authorization: `Bearer ${token}` }
       );
-      return await result.json();
+      const response = await result.json();
+
+      // Clean up the temporary token
+      await this.revokeToken(token_id);
+
+      return response;
     } catch (error) {
       throw new Error(
         `Failed to revoke token as user ${username}. \n Error: ${(error as Error).message}`
