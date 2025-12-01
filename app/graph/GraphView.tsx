@@ -19,7 +19,7 @@ import ForceGraph from "../components/ForceGraph";
 
 interface Props {
     selectedElements: (Node | Link)[]
-    setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
+    setSelectedElements: (elements?: (Node | Link)[]) => void
     chartRef: GraphRef
     handleDeleteElement: () => Promise<void>
     setLabels: Dispatch<SetStateAction<Label[]>>

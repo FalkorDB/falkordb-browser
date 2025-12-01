@@ -15,7 +15,7 @@ interface Props {
     edgesCount: number | undefined
     nodesCount: number | undefined
     selectedElements: (Node | Link)[]
-    setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
+    setSelectedElements: (elements?: (Node | Link)[]) => void
     chartRef: GraphRef
     cooldownTicks: number | undefined
     handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void

@@ -20,7 +20,7 @@ interface Props {
     setData: Dispatch<SetStateAction<GraphData>>
     chartRef: GraphRef
     selectedElements: (Node | Link)[]
-    setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
+    setSelectedElements: (el?: (Node | Link)[]) => void
     type?: "schema" | "graph"
     setRelationships: Dispatch<SetStateAction<Relationship[]>>
     parentHeight: number

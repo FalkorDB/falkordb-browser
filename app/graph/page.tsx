@@ -227,15 +227,14 @@ export default function Page() {
         return result.ok
     }, [fetchCount, graph, graphName, handleCooldown, handleSetIsAdd, isAddNode, selectedElements, setData, setIndicator, toast])
 
-    const handleSetSelectedElement = useCallback((el: Node | Link | undefined) => {
+    const handleSetSelectedElements = useCallback((el: (Node | Link)[] = []) => {
+        setSelectedElements(el)
 
-        if (el) {
-            setSelectedElements([el])
+        if (el.length !== 0) {
             setPanel("data")
             setIsAddEdge(false)
             setIsAddNode(false)
         } else {
-            setSelectedElements([])
             setPanel(undefined)
         }
     }, [setPanel])
@@ -286,14 +285,14 @@ export default function Page() {
         fetchCount()
         setSelectedElements([])
 
-        if (panel === "data") handleSetSelectedElement(undefined)
+        if (panel === "data") handleSetSelectedElements()
         else setSelectedElements([])
 
         toast({
             title: "Success",
             description: `${selectedElements.length > 1 ? "Elements" : "Element"} deleted`,
         })
-    }, [selectedElements, graph, setData, fetchCount, panel, handleSetSelectedElement, toast, setIndicator])
+    }, [selectedElements, graph, setData, fetchCount, panel, handleSetSelectedElements, toast, setIndicator])
 
     const getCurrentPanel = useCallback(() => {
         if (!graphName) return undefined
@@ -311,7 +310,7 @@ export default function Page() {
 
                 return <DataPanel
                     object={selectedElements[selectedElements.length - 1]}
-                    onClose={() => handleSetSelectedElement(undefined)}
+                    onClose={() => handleSetSelectedElements()}
                     setLabels={setLabels}
                 />
 
@@ -344,7 +343,7 @@ export default function Page() {
             default:
                 return undefined
         }
-    }, [graphName, panel, handleSetSelectedElement, setPanel, isAddNode, selectedElements, handleCreateElement])
+    }, [graphName, panel, handleSetSelectedElements, setPanel, isAddNode, selectedElements, handleCreateElement])
 
     return (
         <div className="Page p-2 gap-2">
@@ -370,7 +369,7 @@ export default function Page() {
                 >
                     <GraphView
                         selectedElements={selectedElements}
-                        setSelectedElements={setSelectedElements}
+                        setSelectedElements={handleSetSelectedElements}
                         chartRef={chartRef}
                         handleDeleteElement={handleDeleteElement}
                         setLabels={setLabels}
@@ -391,7 +390,7 @@ export default function Page() {
                 </ResizablePanel>
                 <ResizableHandle
                     withHandle
-                    onMouseUp={() => isCollapsed && handleSetSelectedElement(undefined)}
+                    onMouseUp={() => isCollapsed && handleSetSelectedElements()}
                     className={cn("ml-6 w-0", isCollapsed && "hidden")}
                 />
                 <ResizablePanel

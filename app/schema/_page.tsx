@@ -62,13 +62,12 @@ export default function Page() {
         return 0
     }, [selectedElements, isAddNode, isAddEdge])
 
-    const handleSetSelectedElement = useCallback((el: Node | Link | undefined) => {
-        if (el) {
-            setSelectedElements(prev => [...prev, el])
+    const handleSetSelectedElements = useCallback((el: (Node | Link)[] = []) => {
+        setSelectedElements(el)
+        
+        if (el.length !== 0) {
             setIsAddNode(false)
             setIsAddEdge(false)
-        } else {
-            setSelectedElements([])
         }
 
         const currentPanel = panelRef.current
@@ -253,7 +252,7 @@ export default function Page() {
             return (
                 <DataPanel
                     object={selectedElements[selectedElements.length - 1]}
-                    setObject={handleSetSelectedElement}
+                    setObject={handleSetSelectedElements}
                     schema={schema}
                     setLabels={setLabels}
                 />
@@ -315,7 +314,7 @@ export default function Page() {
                         edgesCount={edgesCount}
                         nodesCount={nodesCount}
                         selectedElements={selectedElements}
-                        setSelectedElements={setSelectedElements}
+                        setSelectedElements={handleSetSelectedElements}
                         chartRef={chartRef}
                         cooldownTicks={cooldownTicks}
                         handleCooldown={handleCooldown}
@@ -330,7 +329,7 @@ export default function Page() {
                 </ResizablePanel>
                 <ResizableHandle
                     withHandle
-                    onMouseUp={() => isCollapsed && handleSetSelectedElement(undefined)}
+                    onMouseUp={() => isCollapsed && handleSetSelectedElements(undefined)}
                     className={cn("ml-6 w-0", isCollapsed && "hidden")}
                 />
                 <ResizablePanel
