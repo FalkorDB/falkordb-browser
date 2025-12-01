@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { SignJWT } from "jose";
 import crypto from "crypto";
-import { executePATQuery } from "@/lib/token-storage";
+import StorageFactory from "@/lib/token-storage/StorageFactory";
 import { getClient, generateTimeUUID } from "../[...nextauth]/options";
 import { encrypt } from "../encryption";
 
 
 /**
- * Fetches tokens from FalkorDB with role-based filtering
+ * Fetches tokens with role-based filtering using storage abstraction
  */
 async function fetchTokens(
   isAdmin: boolean,
@@ -21,47 +21,30 @@ async function fetchTokens(
   error?: NextResponse;
 }> {
   try {
-    // Use string interpolation instead of parameterized queries
-    const escapeString = (str: string) => str.replace(/'/g, "''");
-    // Filter by username + host + port
-    const userFilter = isAdmin
-      ? ""
-      : `AND t.username = '${escapeString(username)}' AND t.host = '${escapeString(host)}' AND t.port = ${port}`;
+    const storage = StorageFactory.getStorage();
 
-    const query = `
-      MATCH (t:Token)-[:BELONGS_TO]->(u:User)
-      WHERE t.is_active = true ${userFilter}
-      RETURN t.token_hash as token_hash,
-             t.token_id as token_id,
-             t.user_id as user_id,
-             t.username as username,
-             t.name as name,
-             t.role as role,
-             t.host as host,
-             t.port as port,
-             t.created_at as created_at,
-             t.expires_at as expires_at,
-             t.last_used as last_used
-      ORDER BY t.created_at DESC
-    `;
+    const tokenData = await storage.fetchTokens({
+      isAdmin,
+      username,
+      host,
+      port,
+    });
 
-    const result = await executePATQuery(query);
-
-    // Transform FalkorDB objects to token objects with ISO timestamps
+    // Transform to API response format with ISO timestamps
     // -1 means NULL (never expires / never used)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tokens = (result.data || []).map((row: any) => ({
-      token_hash: row.token_hash,
-      token_id: row.token_id,
-      user_id: row.user_id,
-      username: row.username,
-      name: row.name,
-      role: row.role,
-      host: row.host,
-      port: row.port,
-      created_at: new Date(row.created_at * 1000).toISOString(),
-      expires_at: row.expires_at > 0 ? new Date(row.expires_at * 1000).toISOString() : null,
-      last_used: row.last_used > 0 ? new Date(row.last_used * 1000).toISOString() : null,
+    const tokens = tokenData.map((token: any) => ({
+      token_hash: token.token_hash,
+      token_id: token.token_id,
+      user_id: token.user_id,
+      username: token.username,
+      name: token.name,
+      role: token.role,
+      host: token.host,
+      port: token.port,
+      created_at: new Date(token.created_at * 1000).toISOString(),
+      expires_at: token.expires_at > 0 ? new Date(token.expires_at * 1000).toISOString() : null,
+      last_used: token.last_used > 0 ? new Date(token.last_used * 1000).toISOString() : null,
     }));
 
     return { tokens };
@@ -211,8 +194,10 @@ export async function POST(request: NextRequest) {
 
     const token = await signer.sign(jwtSecret);
 
-    // 7. Store token in FalkorDB
+    // 7. Store token using storage abstraction
     try {
+      const storage = StorageFactory.getStorage();
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const password = (user as any).password || '';
       const encryptedPassword = encrypt(password);
@@ -221,37 +206,29 @@ export async function POST(request: NextRequest) {
       const nowUnix = Math.floor(Date.now() / 1000);
       const expiresAtUnix = expiresAtDate ? Math.floor(expiresAtDate.getTime() / 1000) : -1;
 
-      const escapeString = (str: string) => str.replace(/'/g, "''");
       const username = user.username || "default";
       const host = user.host || "localhost";
       const port = user.port || 6379;
       const role = user.role || "Unknown";
 
-      const query = `
-        MERGE (u:User {username: '${escapeString(username)}', user_id: '${escapeString(user.id)}'})
-        CREATE (t:Token {
-          token_hash: '${escapeString(tokenHash)}',
-          token_id: '${escapeString(tokenId)}',
-          user_id: '${escapeString(user.id)}',
-          username: '${escapeString(username)}',
-          name: '${escapeString(name)}',
-          role: '${escapeString(role)}',
-          host: '${escapeString(host)}',
-          port: ${port},
-          created_at: ${nowUnix},
-          expires_at: ${expiresAtUnix},
-          last_used: -1,
-          is_active: true,
-          encrypted_password: '${escapeString(encryptedPassword)}'
-        })
-        CREATE (t)-[:BELONGS_TO]->(u)
-        RETURN t.token_id as token_id
-      `;
-
-      await executePATQuery(query);
+      await storage.createToken({
+        token_hash: tokenHash,
+        token_id: tokenId,
+        user_id: user.id,
+        username,
+        name,
+        role,
+        host,
+        port,
+        created_at: nowUnix,
+        expires_at: expiresAtUnix,
+        last_used: -1,
+        is_active: true,
+        encrypted_password: encryptedPassword,
+      });
     } catch (storageError) {
       // eslint-disable-next-line no-console
-      console.error('Failed to store token in FalkorDB:', storageError);
+      console.error('Failed to store token:', storageError);
       // Continue - token will still work but can't be managed via UI
     }
 

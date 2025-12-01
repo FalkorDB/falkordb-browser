@@ -30,6 +30,9 @@ yarn-error.log*
 .env*.local
 .env
 
+# local token storage
+/.data/
+
 # vercel
 .vercel
 

@@ -9,8 +9,51 @@ import { FalkorDBOptions } from "falkordb/dist/src/falkordb";
 let patFalkorDBInstance: FalkorDB | null = null;
 
 /**
+ * Parses API_TOKEN_FALKORDB_URL and returns connection configuration
+ * Format: falkordb://[username:password@]host:port[?tls=true]
+ * Falls back to individual PAT_FALKORDB_* env vars if URL not provided
+ */
+function parseFalkorDBUrl(): {
+  host: string;
+  port: number;
+  username?: string;
+  password?: string;
+  tls: boolean;
+  ca?: string;
+} {
+  const url = process.env.API_TOKEN_FALKORDB_URL;
+  
+  if (url) {
+    try {
+      // Parse URL (e.g., falkordb://localhost:6380 or falkordb://user:pass@localhost:6380?tls=true)
+      const parsed = new URL(url);
+      const host = parsed.hostname || "localhost";
+      const port = parsed.port ? parseInt(parsed.port, 10) : 6380;
+      const username = parsed.username || "default";
+      const password = parsed.password || undefined;
+      const tls = parsed.searchParams.get("tls") === "true";
+      
+      return { host, port, username, password, tls };
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn("Failed to parse API_TOKEN_FALKORDB_URL, falling back to PAT_FALKORDB_* env vars:", err);
+    }
+  }
+  
+  // Fallback to individual env vars for backward compatibility
+  return {
+    host: process.env.PAT_FALKORDB_HOST || "localhost",
+    port: parseInt(process.env.PAT_FALKORDB_PORT || "6380", 10),
+    username: process.env.PAT_FALKORDB_USERNAME || "default",
+    password: process.env.PAT_FALKORDB_PASSWORD || undefined,
+    tls: process.env.PAT_FALKORDB_TLS === "true",
+    ca: process.env.PAT_FALKORDB_CA,
+  };
+}
+
+/**
  * Gets or creates a connection to the PAT FalkorDB instance
- * Uses environment variables for configuration
+ * Uses API_TOKEN_FALKORDB_URL or falls back to PAT_FALKORDB_* environment variables
  */
 export async function getPATFalkorDBClient(): Promise<FalkorDB> {
   // Return existing connection if available and healthy
@@ -26,13 +69,8 @@ export async function getPATFalkorDBClient(): Promise<FalkorDB> {
     }
   }
 
-  // Get configuration from environment
-  const host = process.env.PAT_FALKORDB_HOST || "localhost";
-  const port = parseInt(process.env.PAT_FALKORDB_PORT || "6380", 10);
-  const username = process.env.PAT_FALKORDB_USERNAME || "default";
-  const password = process.env.PAT_FALKORDB_PASSWORD || undefined;
-  const tls = process.env.PAT_FALKORDB_TLS === "true";
-  const ca = process.env.PAT_FALKORDB_CA;
+  // Get configuration from API_TOKEN_FALKORDB_URL or individual env vars
+  const { host, port, username, password, tls, ca } = parseFalkorDBUrl();
 
   // Build connection options
   const connectionOptions: FalkorDBOptions = tls

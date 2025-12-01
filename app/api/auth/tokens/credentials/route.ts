@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { SignJWT } from "jose";
 import crypto from "crypto";
-import { executePATQuery } from "@/lib/token-storage";
+import StorageFactory from "@/lib/token-storage/StorageFactory";
 import { newClient, generateTimeUUID } from "../../[...nextauth]/options";
 import { encrypt } from "../../encryption";
 import { login, validateBody } from "../../../validate-body";
@@ -163,14 +163,14 @@ export async function POST(request: NextRequest) {
 
     const token = await signer.sign(jwtSecret);
 
-    // 7. Encrypt password and store token in Token DB (6380)
+    // 7. Encrypt password and store token using storage abstraction
     try {
+      const storage = StorageFactory.getStorage();
+
       const encryptedPassword = encrypt(userPassword);
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
       const nowUnix = Math.floor(Date.now() / 1000);
       const expiresAtUnix = expiresAtDate ? Math.floor(expiresAtDate.getTime() / 1000) : -1;
-
-      const escapeString = (str: string) => str.replace(/'/g, "''");
 
       // Normalize host and port with defaults
       const tokenUsername = authenticatedUser.username || "default";
@@ -178,33 +178,27 @@ export async function POST(request: NextRequest) {
       const tokenPort = authenticatedUser.port || 6379;
       const { role: tokenRole } = authenticatedUser;
 
-      const query = `
-        MERGE (u:User {username: '${escapeString(tokenUsername)}', user_id: '${escapeString(authenticatedUser.id)}'})
-        CREATE (t:Token {
-          token_hash: '${escapeString(tokenHash)}',
-          token_id: '${escapeString(tokenId)}',
-          user_id: '${escapeString(authenticatedUser.id)}',
-          username: '${escapeString(tokenUsername)}',
-          name: '${escapeString(name)}',
-          role: '${escapeString(tokenRole)}',
-          host: '${escapeString(tokenHost)}',
-          port: ${tokenPort},
-          created_at: ${nowUnix},
-          expires_at: ${expiresAtUnix},
-          last_used: -1,
-          is_active: true,
-          encrypted_password: '${escapeString(encryptedPassword)}'
-        })
-        CREATE (t)-[:BELONGS_TO]->(u)
-        RETURN t.token_id as token_id
-      `;
+      await storage.createToken({
+        token_hash: tokenHash,
+        token_id: tokenId,
+        user_id: authenticatedUser.id,
+        username: tokenUsername,
+        name,
+        role: tokenRole,
+        host: tokenHost,
+        port: tokenPort,
+        created_at: nowUnix,
+        expires_at: expiresAtUnix,
+        last_used: -1,
+        is_active: true,
+        encrypted_password: encryptedPassword,
+      });
 
-      await executePATQuery(query);
       // eslint-disable-next-line no-console
       console.log('Token stored successfully for user:', authenticatedUser.username, 'tokenId:', tokenId);
     } catch (storageError) {
       // eslint-disable-next-line no-console
-      console.error('Failed to store token in FalkorDB for user:', authenticatedUser.username, storageError);
+      console.error('Failed to store token for user:', authenticatedUser.username, storageError);
       // Continue - token will still work but can't be managed via UI
     }
 

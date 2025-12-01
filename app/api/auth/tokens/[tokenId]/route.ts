@@ -1,35 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { executePATQuery } from "@/lib/token-storage";
+import StorageFactory from "@/lib/token-storage/StorageFactory";
 import { getClient } from "../../[...nextauth]/options";
 
 /**
- * Fetches token details from FalkorDB by token_id
+ * Fetches token details by token_id using storage abstraction
  */
 async function fetchTokenById(tokenId: string): Promise<{
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tokenData?: any;
   error?: NextResponse;
 }> {
-  const escapeString = (str: string) => str.replace(/'/g, "''");
-  const query = `
-    MATCH (t:Token {token_id: '${escapeString(tokenId)}'})-[:BELONGS_TO]->(u:User)
-    RETURN t.token_hash as token_hash,
-           t.token_id as token_id,
-           t.user_id as user_id,
-           t.username as username,
-           t.name as name,
-           t.role as role,
-           t.host as host,
-           t.port as port,
-           t.created_at as created_at,
-           t.expires_at as expires_at,
-           t.last_used as last_used,
-           t.is_active as is_active
-  `;
+  const storage = StorageFactory.getStorage();
+  const token = await storage.fetchTokenById(tokenId);
 
-  const result = await executePATQuery(query);
-
-  if (!result.data || result.data.length === 0) {
+  if (!token) {
     return {
       error: NextResponse.json(
         { message: "Token not found" },
@@ -38,23 +22,20 @@ async function fetchTokenById(tokenId: string): Promise<{
     };
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const row = result.data[0] as any;
-
   return {
     tokenData: {
-      token_hash: row.token_hash,
-      token_id: row.token_id,
-      user_id: row.user_id,
-      username: row.username,
-      name: row.name,
-      role: row.role,
-      host: row.host,
-      port: row.port,
-      created_at: new Date(row.created_at * 1000).toISOString(),
-      expires_at: row.expires_at > 0 ? new Date(row.expires_at * 1000).toISOString() : null,
-      last_used: row.last_used > 0 ? new Date(row.last_used * 1000).toISOString() : null,
-      is_active: row.is_active,
+      token_hash: token.token_hash,
+      token_id: token.token_id,
+      user_id: token.user_id,
+      username: token.username,
+      name: token.name,
+      role: token.role,
+      host: token.host,
+      port: token.port,
+      created_at: new Date(token.created_at * 1000).toISOString(),
+      expires_at: token.expires_at > 0 ? new Date(token.expires_at * 1000).toISOString() : null,
+      last_used: token.last_used > 0 ? new Date(token.last_used * 1000).toISOString() : null,
+      is_active: token.is_active,
     },
   };
 }
@@ -218,25 +199,15 @@ export async function DELETE(
       return permissionCheck.error!;
     }
 
-    // Revoke token in database
-    const escapeString = (str: string) => str.replace(/'/g, "''");
-    const nowUnix = Math.floor(Date.now() / 1000);
+    // Revoke token using storage abstraction
+    const storage = StorageFactory.getStorage();
     const revokerUsername = authenticatedUser.username || "default";
 
-    const revokeQuery = `
-      MATCH (t:Token {token_id: '${escapeString(tokenId)}'})-[:BELONGS_TO]->(u:User)
-      MATCH (revoker:User {username: '${escapeString(revokerUsername)}'})
-      SET t.is_active = false
-      CREATE (t)-[:REVOKED_BY {at: ${nowUnix}}]->(revoker)
-      RETURN t.token_id as token_id
-    `;
+    const success = await storage.revokeToken(tokenId, revokerUsername);
 
-    const revokeResult = await executePATQuery(revokeQuery);
-
-    // Validate query succeeded
-    if (!revokeResult.data || revokeResult.data.length === 0) {
+    if (!success) {
       return NextResponse.json(
-        { message: "Failed to revoke token - token or user not found" },
+        { message: "Failed to revoke token - token not found" },
         { status: 500 }
       );
     }

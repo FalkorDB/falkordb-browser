@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import crypto from "crypto";
-import { executePATQuery } from "@/lib/token-storage";
+import { executePATQuery } from "@/lib/token-storage/falkordb-client";
 
 /**
  * Validates JWT secret exists in environment
