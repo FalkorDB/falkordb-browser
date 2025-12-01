@@ -12,24 +12,34 @@ import {
   postRequest,
 } from "../../infra/api/apiRequests";
 import urls from "../../config/urls.json";
-import { AddGraphResponse } from "./responses/addGraphResponse";
-import { RemoveGraphResponse } from "./responses/removeGraphResponse";
-import { ModifySettingsRoleResponse } from "./responses/modifySettingsRoleResponse";
-import { GetSettingsRoleValue } from "./responses/getSettingsRoleValue";
-import { CreateUsersResponse } from "./responses/createUsersResponse";
-import { DeleteUsersResponse } from "./responses/deleteUsersResponse";
-import { RunQueryResponse } from "./responses/runQueryResponse";
-import { GetUsersResponse } from "./responses/getUsersResponse";
-import { DuplicateGraphresponse } from "./responses/duplicateGraph";
-import { ChangeGraphNameResponse } from "./responses/changeGraphNameResponse";
-import { AuthCredentialsResponse } from "./responses/LoginResponse";
-import { LogoutResponse } from "./responses/logoutResponse";
-import { AddSchemaResponse } from "./responses/addSchemaResponse";
-import { GetGraphsResponse } from "./responses/getGraphsResponse";
-import { SchemaListResponse } from "./responses/getSchemaResponse";
-import { GraphCountResponse } from "./responses/graphCountResponse";
-import { GraphNodeResponse } from "./responses/graphNodeResponse";
-import { GraphAttributeResponse } from "./responses/graphAttributeResponse";
+import {
+  AddGraphResponse,
+  RemoveGraphResponse,
+  GetGraphsResponse,
+  DuplicateGraphresponse,
+  ChangeGraphNameResponse,
+  RunQueryResponse,
+  GraphCountResponse,
+  GraphNodeResponse,
+  GraphAttributeResponse,
+} from "./responses/graphResponses";
+import {
+  GetUsersResponse,
+  CreateUsersResponse,
+  DeleteUsersResponse,
+} from "./responses/userResponses";
+import {
+  AddSchemaResponse,
+  SchemaListResponse,
+} from "./responses/schemaResponses";
+import {
+  ModifySettingsRoleResponse,
+  GetSettingsRoleValue,
+} from "./responses/settingsResponses";
+import {
+  AuthCredentialsResponse,
+  LogoutResponse,
+} from "./responses/authResponses";
 import { ListTokensResponse, TokenDetailsResponse } from "./responses/tokenResponse";
 
 export async function getSSEGraphResult(
