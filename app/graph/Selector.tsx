@@ -33,9 +33,8 @@ interface BaseProps<T = "Schema" | "Graph"> {
 }
 
 interface SchemaProps {
-    selectedElement: Node | Link | undefined
     selectedElements: (Node | Link)[];
-    setSelectedElement: (el: Node | Link | undefined) => void;
+    setSelectedElements: (el: (Node | Link)[]) => void;
     handleDeleteElement: () => Promise<void>;
     chartRef: GraphRef;
     setIsAddNode: (isAdd: boolean) => void;
@@ -56,9 +55,8 @@ interface GraphProps {
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>;
     fetchCount: () => Promise<void>;
     isQueryLoading: boolean;
-    selectedElement?: never
     selectedElements?: never;
-    setSelectedElement?: never;
+    setSelectedElements?: never;
     handleDeleteElement?: never;
     chartRef?: never;
     setIsAddNode?: never;
@@ -85,9 +83,8 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     historyQuery,
     setHistoryQuery,
     fetchCount,
-    selectedElement,
     selectedElements,
-    setSelectedElement,
+    setSelectedElements,
     handleDeleteElement,
     chartRef,
     setIsAddNode,
@@ -117,6 +114,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     const [isLoading, setIsLoading] = useState(false)
     const [maximize, setMaximize] = useState(false)
     const [tab, setTab] = useState<Tab>("text")
+    const [deleteElements, setDeleteElements] = useState<number[]>([])
 
     const filters = useMemo(() => {
         const queries = historyQuery?.queries ?? []
@@ -291,11 +289,9 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     }
 
     const handleDeleteQuery = useCallback(() => {
-        if (!historyQuery || !setHistoryQuery || !historyQuery.counter) return
+        if (!historyQuery || !setHistoryQuery) return
 
-        const removeIndex = historyQuery.counter - 1
-        const queryToDelete = historyQuery.queries[removeIndex]
-        const newQueries = historyQuery.queries.filter((_, idx) => idx !== removeIndex)
+        const newQueries = historyQuery.queries.filter((_, idx) => !deleteElements.some((removeIndex) => idx === removeIndex))
 
         if (newQueries.length === 0) localStorage.removeItem("query history")
         else localStorage.setItem("query history", JSON.stringify(newQueries))
@@ -311,13 +307,13 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
             query: nextQuery
         }))
 
-        setFilteredQueries(current => current.filter(query => query.timestamp !== queryToDelete.timestamp))
-    }, [historyQuery, setHistoryQuery, setFilteredQueries])
+        setFilteredQueries(current => current.filter(query => !deleteElements.some((removeIndex) => historyQuery.queries[removeIndex].timestamp !== query.timestamp)))
+    }, [historyQuery, setHistoryQuery, deleteElements])
 
     const separator = <div className="h-[80%] w-0.5 bg-border rounded-full" />
 
     return (
-        <div className="w-full h-[40px] flex flex-row gap-4 items-center">
+        <div className="z-20 w-full h-[40px] flex flex-row gap-4 items-center">
             <SelectGraph
                 options={options}
                 setOptions={setOptions}
@@ -381,15 +377,25 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                             label="Query"
                                             className="w-1/2 bg-secondary rounded-lg overflow-hidden"
                                             isSelected={(item) => historyQuery.queries.findIndex(q => q.text === item.text) + 1 === historyQuery.counter}
+                                            isDeleteSelected={(item) => deleteElements.some(idx => historyQuery.queries[idx].text === item.text)}
                                             afterSearchCallback={afterSearchCallback}
                                             dataTestId="queryHistory"
                                             list={filteredQueries}
-                                            onClick={(counter) => {
-                                                const index = historyQuery.queries.findIndex(q => q.text === counter) + 1
-                                                setHistoryQuery(prev => ({
-                                                    ...prev,
-                                                    counter: index === historyQuery.counter ? 0 : index
-                                                }))
+                                            onClick={(counter, evt) => {
+                                                const index = historyQuery.queries.findIndex(q => q.text === counter)
+
+                                                if (evt.type === "rightclick") {
+                                                    if (evt.ctrlKey) {
+                                                        setDeleteElements(prev => prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index])
+                                                    } else {
+                                                        setDeleteElements(prev => prev.includes(index) ? [] : [index])
+                                                    }
+                                                } else if (evt.type === "click") {
+                                                    setHistoryQuery(prev => ({
+                                                        ...prev,
+                                                        counter: index === historyQuery.counter ? 0 : index + 1
+                                                    }))
+                                                }
                                             }}
                                             searchRef={searchQueryRef}
                                         >
@@ -416,6 +422,35 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                     ))
                                                 }
                                             </ul>
+                                            <div className="flex gap-2 p-2">
+                                                <Button
+                                                    variant="Delete"
+                                                    data-testid="queryHistoryDelete"
+                                                    label="Delete"
+                                                    title={`Remove selected query from history
+                                                        press (Right Click) to select
+                                                        press (Ctrl + Right Click) for multi select`}
+                                                    onClick={handleDeleteQuery}
+                                                    disabled={deleteElements.length === 0}
+                                                />
+                                                <Button
+                                                    variant="Delete"
+                                                    data-testid="queryHistoryDelete"
+                                                    label="Delete All"
+                                                    title="Remove all queries from history"
+                                                    onClick={() => {
+                                                        localStorage.removeItem("query history")
+                                                        setHistoryQuery(prev => ({
+                                                            ...prev,
+                                                            queries: [],
+                                                            counter: 0
+                                                        }))
+                                                        setFilteredQueries([])
+                                                        setActiveFilters([])
+                                                    }}
+                                                    disabled={historyQuery.queries.length === 0}
+                                                />
+                                            </div>
                                         </PaginationList>
                                         <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="w-1/2 flex flex-col gap-8 items-center">
                                             <TabsList className="bg-secondary h-fit w-fit p-2">
@@ -428,29 +463,17 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                 {
                                                     currentQuery &&
                                                     <>
-                                                        <div className="z-10 absolute bottom-4 right-8 flex gap-2">
-                                                                                                          {
-                                                                historyQuery.counter ?
-                                                                    <Button
-                                                                        variant="Delete"
-                                                                        data-testid="queryHistoryDelete"
-                                                                        label="Delete"
-                                                                        title="Remove selected query from history"
-                                                                        onClick={handleDeleteQuery}
-                                                                    />
-                                                                    : undefined
-                                                            }               <Button
-                                                                ref={submitQuery}
-                                                                data-testid="queryHistoryEditorRun"
-                                                                className="py-2 px-8"
-                                                                indicator={indicator}
-                                                                variant="Primary"
-                                                                label="Run"
-                                                                title="Press Enter to run the query"
-                                                                onClick={handleSubmit}
-                                                                isLoading={isLoading}
-                                                            />
-                                                        </div>
+                                                        <Button
+                                                            ref={submitQuery}
+                                                            data-testid="queryHistoryEditorRun"
+                                                            className="z-10 absolute bottom-4 right-8 py-2 px-8"
+                                                            indicator={indicator}
+                                                            variant="Primary"
+                                                            label="Run"
+                                                            title="Press Enter to run the query"
+                                                            onClick={handleSubmit}
+                                                            isLoading={isLoading}
+                                                        />
                                                         <Editor
                                                             key={currentTheme}
                                                             className="SofiaSans"
@@ -557,14 +580,13 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                             </Button>
                         </div>
                     </>
-                    : selectedElements && setSelectedElement && handleDeleteElement && setIsAddNode && setIsAddEdge && chartRef && isCanvasLoading !== undefined && <div className="w-full h-full">
+                    : selectedElements && handleDeleteElement && setSelectedElements && setIsAddNode && setIsAddEdge && chartRef && isCanvasLoading !== undefined && <div className="w-full h-full">
                         <Toolbar
                             graph={graph}
                             graphName={graphName}
                             label={type}
-                            selectedElement={selectedElement}
                             selectedElements={selectedElements}
-                            setSelectedElement={setSelectedElement}
+                            setSelectedElements={setSelectedElements}
                             handleDeleteElement={handleDeleteElement}
                             setIsAddNode={setIsAddNode}
                             setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => !!e.labels) ? setIsAddEdge : undefined}
@@ -575,6 +597,6 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                         />
                     </div>
             }
-        </div>
+        </div >
     )
 }

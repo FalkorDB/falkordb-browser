@@ -22,7 +22,7 @@ import { IndicatorContext } from "../components/provider";
 
 interface Props {
     object: Node | Link
-    setObject: (el: Node | Link | undefined) => void
+    setObject: (el?: (Node | Link)[]) => void
     schema: Graph
     setLabels: (labels: Label[]) => void
 }
@@ -54,7 +54,7 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
         if (e.defaultPrevented) return
 
         if (e.key === "Escape") {
-            setObject(undefined)
+            setObject()
         }
     }, [setObject])
 
