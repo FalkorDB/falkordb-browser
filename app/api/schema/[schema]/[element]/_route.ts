@@ -7,7 +7,6 @@ import {
 } from "@/app/api/validate-body";
 import { formatAttributes } from "./utils";
 
-// eslint-disable-next-line import/prefer-default-export
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ schema: string; node: string }> }

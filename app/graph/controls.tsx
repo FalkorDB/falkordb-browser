@@ -43,10 +43,10 @@ export default function Controls({
 
     return (
         <div className="flex items-center gap-2">
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    {
-                        graph.getElements().length > 0 &&
+            {
+                graph.getElements().length > 0 &&
+                <Tooltip>
+                    <TooltipTrigger asChild>
                         <div className="flex items-center gap-2">
                             {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
                             <Switch
@@ -58,12 +58,12 @@ export default function Controls({
                                 }}
                             />
                         </div>
-                    }
-                </TooltipTrigger>
-                <TooltipContent>
-                    <p>Animation Control</p>
-                </TooltipContent>
-            </Tooltip>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>Animation Control</p>
+                    </TooltipContent>
+                </Tooltip>
+            }
             <Button
                 data-testid="zoomInControl"
                 className="text-nowrap p-0 pointer-events-auto"
