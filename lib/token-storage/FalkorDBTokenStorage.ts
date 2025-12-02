@@ -190,19 +190,19 @@ class FalkorDBTokenStorage implements ITokenStorage {
   async cleanupExpiredTokens(): Promise<number> {
     const nowUnix = Math.floor(Date.now() / 1000);
 
-    // Delete tokens that have expired (expires_at > 0 AND expires_at < now)
+    // Soft-delete expired tokens (preserves audit trail and REVOKED_BY relationships)
     const query = `
       MATCH (t:Token)
-      WHERE t.expires_at > 0 AND t.expires_at < ${nowUnix}
-      DELETE t
-      RETURN count(t) as deleted_count
+      WHERE t.expires_at > 0 AND t.expires_at < ${nowUnix} AND t.is_active = true
+      SET t.is_active = false
+      RETURN count(t) as updated_count
     `;
 
     const result = await executePATQuery(query);
 
     if (result.data && result.data.length > 0) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (result.data[0] as any).deleted_count || 0;
+      return (result.data[0] as any).updated_count || 0;
     }
 
     return 0;
