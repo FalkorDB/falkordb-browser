@@ -329,7 +329,7 @@ export default function Page() {
                 </ResizablePanel>
                 <ResizableHandle
                     withHandle
-                    onMouseUp={() => isCollapsed && handleSetSelectedElements(undefined)}
+                    onMouseUp={() => isCollapsed && handleSetSelectedElements()}
                     className={cn("ml-6 w-0", isCollapsed && "hidden")}
                 />
                 <ResizablePanel
