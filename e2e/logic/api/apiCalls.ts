@@ -12,24 +12,35 @@ import {
   postRequest,
 } from "../../infra/api/apiRequests";
 import urls from "../../config/urls.json";
-import { AddGraphResponse } from "./responses/addGraphResponse";
-import { RemoveGraphResponse } from "./responses/removeGraphResponse";
-import { ModifySettingsRoleResponse } from "./responses/modifySettingsRoleResponse";
-import { GetSettingsRoleValue } from "./responses/getSettingsRoleValue";
-import { CreateUsersResponse } from "./responses/createUsersResponse";
-import { DeleteUsersResponse } from "./responses/deleteUsersResponse";
-import { RunQueryResponse } from "./responses/runQueryResponse";
-import { GetUsersResponse } from "./responses/getUsersResponse";
-import { DuplicateGraphresponse } from "./responses/duplicateGraph";
-import { ChangeGraphNameResponse } from "./responses/changeGraphNameResponse";
-import { AuthCredentialsResponse } from "./responses/LoginResponse";
-import { LogoutResponse } from "./responses/logoutResponse";
-import { AddSchemaResponse } from "./responses/addSchemaResponse";
-import { GetGraphsResponse } from "./responses/getGraphsResponse";
-import { SchemaListResponse } from "./responses/getSchemaResponse";
-import { GraphCountResponse } from "./responses/graphCountResponse";
-import { GraphNodeResponse } from "./responses/graphNodeResponse";
-import { GraphAttributeResponse } from "./responses/graphAttributeResponse";
+import {
+  AddGraphResponse,
+  RemoveGraphResponse,
+  GetGraphsResponse,
+  DuplicateGraphresponse,
+  ChangeGraphNameResponse,
+  RunQueryResponse,
+  GraphCountResponse,
+  GraphNodeResponse,
+  GraphAttributeResponse,
+} from "./responses/graphResponses";
+import {
+  GetUsersResponse,
+  CreateUsersResponse,
+  DeleteUsersResponse,
+} from "./responses/userResponses";
+import {
+  AddSchemaResponse,
+  SchemaListResponse,
+} from "./responses/schemaResponses";
+import {
+  ModifySettingsRoleResponse,
+  GetSettingsRoleValue,
+} from "./responses/settingsResponses";
+import {
+  AuthCredentialsResponse,
+  LogoutResponse,
+} from "./responses/authResponses";
+import { ListTokensResponse, TokenDetailsResponse } from "./responses/tokenResponse";
 
 export async function getSSEGraphResult(
   url: string,
@@ -430,7 +441,7 @@ export default class ApiCalls {
     }
   }
 
-  async listTokens(): Promise<any> {
+  async listTokens(): Promise<ListTokensResponse> {
     try {
       const headers = await getAdminToken();
       const result = await getRequest(`${urls.api.tokenUrl}tokens`, headers);
@@ -454,7 +465,7 @@ export default class ApiCalls {
     }
   }
 
-  async getTokenDetails(tokenId: string): Promise<any> {
+  async getTokenDetails(tokenId: string): Promise<TokenDetailsResponse> {
     try {
       const headers = await getAdminToken();
       const result = await getRequest(`${urls.api.tokenUrl}tokens/${tokenId}`, headers);
@@ -468,9 +479,15 @@ export default class ApiCalls {
 
   async revokeAllUserTokens(tokens: string[]): Promise<void> {
     try {
-      await Promise.all(
+      const results = await Promise.allSettled(
         tokens.map((tokenId) => this.revokeToken(tokenId))
       );
+      const failures = results.filter((r) => r.status === 'rejected');
+      if (failures.length > 0) {
+        throw new Error(
+          `Failed to revoke ${failures.length} of ${tokens.length} tokens`
+        );
+      }
     } catch (error) {
       throw new Error(
         `Failed to revoke all tokens. \n Error: ${(error as Error).message}`
@@ -513,14 +530,19 @@ export default class ApiCalls {
     try {
       // First get a session/token by logging in
       const loginResponse = await this.generateTokenAsUser(username, password);
-      const { token } = loginResponse;
+      const { token, token_id } = loginResponse;
 
       // Use that token to list tokens
       const result = await getRequest(
         `${urls.api.tokenUrl}tokens`,
         { Authorization: `Bearer ${token}` }
       );
-      return await result.json();
+      const response = await result.json();
+
+      // Clean up the temporary token
+      await this.revokeToken(token_id);
+
+      return response;
     } catch (error) {
       throw new Error(
         `Failed to list tokens as user ${username}. \n Error: ${(error as Error).message}`
@@ -536,14 +558,19 @@ export default class ApiCalls {
     try {
       // First get a session/token by logging in
       const loginResponse = await this.generateTokenAsUser(username, password);
-      const { token } = loginResponse;
+      const { token, token_id } = loginResponse;
 
       // Use that token to revoke via DELETE
       const result = await deleteRequest(
         `${urls.api.tokenUrl}tokens/${tokenId}`,
         { Authorization: `Bearer ${token}` }
       );
-      return await result.json();
+      const response = await result.json();
+
+      // Clean up the temporary token
+      await this.revokeToken(token_id);
+
+      return response;
     } catch (error) {
       throw new Error(
         `Failed to revoke token as user ${username}. \n Error: ${(error as Error).message}`
