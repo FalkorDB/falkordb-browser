@@ -250,45 +250,23 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
     });
 
     test("@admin Revoke multiple tokens", async () => {
-      const tokensToCreate = 3;
-      const tokenNames = Array.from({ length: tokensToCreate }, (_, i) => 
-        getRandomString(`admin-revoke-multi-${i}`)
-      );
-      
-      // Generate tokens via API
-      await Promise.all(
-        tokenNames.map((tokenName) => apiCall.generateToken({ name: tokenName }))
-      );
-
+      const tokenName1 = getRandomString(`admin-revoke-multi`);
+      const tokenName2 = getRandomString(`admin-revoke-multi`);
+      await apiCall.generateToken({ name: tokenName1 })
+      await apiCall.generateToken({ name: tokenName2 })
+    
       const settingsTokensPage = await browser.createNewPage(
         SettingsTokensPage,
         urls.settingsUrl
       );
+  
       await settingsTokensPage.navigateToTokensTab();
-
-      // Wait for tokens to load in the UI
-      await settingsTokensPage.waitFor(1500);
-      
-      // Verify all tokens exist before attempting to revoke
-      await Promise.all(
-        tokenNames.map(async (tokenName) => {
-          expect(await settingsTokensPage.verifyTokenExists(tokenName)).toBe(true);
-        })
-      );
-
       const tokensBefore = await settingsTokensPage.getTokenCount();
-
-      // Revoke all tokens via UI sequentially
-      await tokenNames.reduce(async (previousPromise, tokenName) => {
-        await previousPromise;
-        await settingsTokensPage.revokeToken(tokenName);
-        await settingsTokensPage.waitFor(500);
-        return Promise.resolve();
-      }, Promise.resolve());
-
-      // Verify token count decreased
+      await settingsTokensPage.revokeToken(tokenName1);
+      await settingsTokensPage.revokeToken(tokenName2);
       const tokensAfter = await settingsTokensPage.getTokenCount();
-      expect(tokensAfter).toBeLessThanOrEqual(tokensBefore - tokensToCreate);
+      
+      expect(tokensAfter).toBe(tokensBefore - 2);
     });
   });
 

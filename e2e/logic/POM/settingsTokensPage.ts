@@ -313,7 +313,6 @@ export default class SettingsTokensPage extends HeaderComponent {
 
   async revokeToken(name: string): Promise<void> {
     await this.clickRevokeButtonByName(name);
-    await this.waitFor(300);
     await this.clickRevokeConfirmButton();
     await this.waitFor(1000);
   }
