@@ -13,8 +13,7 @@ interface Props {
     graph: Graph
     graphName: string
     selectedElements: (Node | Link)[]
-    selectedElement: Node | Link | undefined
-    setSelectedElement: (el: Node | Link | undefined) => void
+    setSelectedElements: (elements: (Node | Link)[]) => void
     handleDeleteElement: () => Promise<void>
     chartRef: GraphRef
     label: "Graph" | "Schema"
@@ -33,8 +32,7 @@ export default function Toolbar({
     graph,
     graphName,
     selectedElements,
-    selectedElement,
-    setSelectedElement,
+    setSelectedElements,
     handleDeleteElement,
     chartRef,
     label,
@@ -108,7 +106,7 @@ export default function Toolbar({
 
     const handleSearchElement = (element: Node | Link) => {
         handleZoomToFit(chartRef, (node: Node) => element.labels ? element.id === node.id : node.id === element.source.id || node.id === element.target.id, 4)
-        setSelectedElement(element)
+        setSelectedElements([element])
         setSearchElement("")
         setSuggestions([])
     }
@@ -318,7 +316,7 @@ export default function Toolbar({
                             </Button>
                         }
                         {
-                            (selectedElements.length !== 0 || selectedElement) &&
+                            selectedElements.length !== 0 &&
                             <DeleteElement
                                 label={label}
                                 description="Are you sure you want to delete this element(s)?"

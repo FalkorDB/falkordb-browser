@@ -43,7 +43,6 @@ export default function Page() {
 
     const panelRef = useRef<ImperativePanelHandle>(null)
 
-    const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>()
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
     const [labels, setLabels] = useState<Label[]>([])
@@ -58,14 +57,15 @@ export default function Page() {
     const [isCollapsed, setIsCollapsed] = useState(true)
 
     const panelSize = useMemo(() => {
-        if (selectedElement) return 30
+        if (selectedElements.length !== 0) return 30
         if (isAddNode || isAddEdge) return 40
         return 0
-    }, [selectedElement, isAddNode, isAddEdge])
+    }, [selectedElements, isAddNode, isAddEdge])
 
-    const handleSetSelectedElement = useCallback((el: Node | Link | undefined) => {
-        setSelectedElement(el)
-        if (el) {
+    const handleSetSelectedElements = useCallback((el: (Node | Link)[] = []) => {
+        setSelectedElements(el)
+        
+        if (el.length !== 0) {
             setIsAddNode(false)
             setIsAddEdge(false)
         }
@@ -84,7 +84,7 @@ export default function Page() {
 
         if (isAdd) {
             setIsAddEdge(false)
-            setSelectedElement(undefined)
+            setSelectedElements([])
         }
 
         if (!currentPanel) return
@@ -99,7 +99,7 @@ export default function Page() {
 
         if (isAdd) {
             setIsAddNode(false)
-            setSelectedElement(undefined)
+            setSelectedElements([])
         }
 
         if (!currentPanel) return
@@ -161,11 +161,6 @@ export default function Page() {
     const handleDeleteElement = async () => {
         const stateSelectedElements = Object.values(selectedElements)
 
-        if (stateSelectedElements.length === 0 && selectedElement) {
-            stateSelectedElements.push(selectedElement)
-            setSelectedElement(undefined)
-        }
-
         await Promise.all(stateSelectedElements.map(async (element) => {
             const { id } = element
             const type = !element.source
@@ -213,7 +208,6 @@ export default function Page() {
 
         setRelationships(schema.removeLinks(selectedElements.map((element) => element.id)))
         fetchCount()
-        setSelectedElement(undefined)
         setSelectedElements([])
         setData({ ...schema.Elements })
         handleCooldown()
@@ -254,11 +248,11 @@ export default function Page() {
     }
 
     const getCurrentPanel = () => {
-        if (selectedElement) {
+        if (selectedElements.length !== 0) {
             return (
                 <DataPanel
-                    object={selectedElement}
-                    setObject={handleSetSelectedElement}
+                    object={selectedElements[selectedElements.length - 1]}
+                    setObject={handleSetSelectedElements}
                     schema={schema}
                     setLabels={setLabels}
                 />
@@ -299,9 +293,8 @@ export default function Page() {
                 setOptions={setSchemaNames}
                 graphName={schemaName}
                 setGraphName={setSchemaName}
-                selectedElement={selectedElement}
                 selectedElements={selectedElements}
-                setSelectedElement={handleSetSelectedElement}
+                setSelectedElements={setSelectedElements}
                 handleDeleteElement={handleDeleteElement}
                 chartRef={chartRef}
                 setIsAddNode={handleSetIsAddNode}
@@ -320,10 +313,8 @@ export default function Page() {
                     <SchemaView
                         edgesCount={edgesCount}
                         nodesCount={nodesCount}
-                        selectedElement={selectedElement}
-                        setSelectedElement={handleSetSelectedElement}
                         selectedElements={selectedElements}
-                        setSelectedElements={setSelectedElements}
+                        setSelectedElements={handleSetSelectedElements}
                         chartRef={chartRef}
                         cooldownTicks={cooldownTicks}
                         handleCooldown={handleCooldown}
@@ -338,7 +329,7 @@ export default function Page() {
                 </ResizablePanel>
                 <ResizableHandle
                     withHandle
-                    onMouseUp={() => isCollapsed && handleSetSelectedElement(undefined)}
+                    onMouseUp={() => isCollapsed && handleSetSelectedElements()}
                     className={cn("ml-6 w-0", isCollapsed && "hidden")}
                 />
                 <ResizablePanel
