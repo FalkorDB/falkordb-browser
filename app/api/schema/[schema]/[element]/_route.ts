@@ -55,7 +55,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ schema: string; node: string }> }
+  { params }: { params: Promise<{ schema: string; element: string }> }
 ) {
   try {
     const session = await getClient();
@@ -79,7 +79,7 @@ export async function POST(
 
     try {
       if (!type) {
-        if (!label) throw new Error("Label is required");
+        if (label.length === 0) throw new Error("Label is required");
 
         if (!selectedNodes || selectedNodes.length !== 2)
           throw new Error("Selected nodes are required");
@@ -109,8 +109,6 @@ export async function POST(
           ? await graph.roQuery(query)
           : await graph.query(query);
 
-      if (!result) throw new Error("Something went wrong");
-
       return NextResponse.json({ result }, { status: 200 });
     } catch (error) {
       console.error(error);
@@ -129,7 +127,7 @@ export async function POST(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ schema: string; node: string }> }
+  { params }: { params: Promise<{ schema: string; element: string }> }
 ) {
   try {
     const session = await getClient();
@@ -139,9 +137,9 @@ export async function DELETE(
     }
 
     const { client, user } = session;
-    const { schema, node } = await params;
+    const { schema, element } = await params;
     const schemaName = `${schema}_schema`;
-    const nodeId = Number(node);
+    const elementId = Number(element);
     const body = await request.json();
 
     const validation = validateBody(deleteSchemaElement, body);
@@ -155,14 +153,12 @@ export async function DELETE(
     try {
       const graph = client.selectGraph(schemaName);
       const query = type
-        ? `MATCH (n) WHERE ID(n) = $nodeId DELETE n`
-        : `MATCH ()-[e]-() WHERE ID(e) = $nodeId DELETE e`;
-      const result =
-        user.role === "Read-Only"
-          ? await graph.roQuery(query, { params: { nodeId } })
-          : await graph.query(query, { params: { nodeId } });
+        ? `MATCH (n) WHERE ID(n) = $id DELETE n`
+        : `MATCH ()-[e]-() WHERE ID(e) = $id DELETE e`;
 
-      if (!result) throw new Error("Something went wrong");
+      if (user.role === "Read-Only")
+        await graph.roQuery(query, { params: { id: elementId } });
+      else await graph.query(query, { params: { id: elementId } });
 
       return NextResponse.json(
         { message: "Node deleted successfully" },
