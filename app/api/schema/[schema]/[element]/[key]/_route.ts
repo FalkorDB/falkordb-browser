@@ -7,9 +7,9 @@ import {
 import { NextRequest, NextResponse } from "next/server";
 import { formatAttribute } from "../utils";
 
-export async function PATCH(
+export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ schema: string; node: string; key: string }> }
+  { params }: { params: Promise<{ schema: string; element: string; key: string }> }
 ) {
   try {
     const session = await getClient();
@@ -19,9 +19,9 @@ export async function PATCH(
     }
 
     const { client, user } = session;
-    const { schema, node, key } = await params;
+    const { schema, element, key } = await params;
     const schemaName = `${schema}_schema`;
-    const elementId = Number(node);
+    const elementId = Number(element);
     const body = await request.json();
 
     try {
@@ -37,19 +37,18 @@ export async function PATCH(
       const { type, attribute } = validation.data;
       const [formattedKey, formattedValue] = formatAttribute([key, attribute]);
       const graph = client.selectGraph(schemaName);
-      const q = type
-        ? `MATCH (n) WHERE ID(n) = $id SET n.${formattedKey} = $value`
-        : `MATCH (n)-[e]-(m) WHERE ID(e) = $id SET e.${formattedKey} = $value`;
-      const result =
-        user.role === "Read-Only"
-          ? await graph.roQuery(q, {
-              params: { id: elementId, value: formattedValue },
-            })
-          : await graph.query(q, {
-              params: { id: elementId, value: formattedValue },
-            });
 
-      if (!result) throw new Error("Something went wrong");
+      const query = type
+        ? `MATCH (n) WHERE ID(n) = $id SET n.${formattedKey} = $value`
+        : `MATCH ()-[e]->() WHERE ID(e) = $id SET e.${formattedKey} = $value`;
+
+      if (user.role === "Read-Only")
+        await graph.roQuery(query, {
+          params: { id: elementId, value: formattedValue },
+        });
+      else await graph.query(query, {
+        params: { id: elementId, value: formattedValue },
+      });
 
       return NextResponse.json(
         { message: "Attribute updated successfully" },
@@ -72,7 +71,7 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ schema: string; node: string; key: string }> }
+  { params }: { params: Promise<{ schema: string; element: string; key: string }> }
 ) {
   try {
     const session = await getClient();
@@ -82,9 +81,9 @@ export async function DELETE(
     }
 
     const { client, user } = session;
-    const { schema, node, key } = await params;
+    const { schema, element, key } = await params;
     const schemaName = `${schema}_schema`;
-    const elementId = Number(node);
+    const elementId = Number(element);
     const body = await request.json();
 
     try {
@@ -100,15 +99,13 @@ export async function DELETE(
       const { type } = validation.data;
 
       const graph = client.selectGraph(schemaName);
-      const q = type
+      const query = type
         ? `MATCH (n) WHERE ID(n) = $id SET n.${key} = NULL`
-        : `MATCH (n)-[e]-(m) WHERE ID(e) = $id SET e.${key} = NULL`;
-      const result =
-        user.role === "Read-Only"
-          ? await graph.roQuery(q, { params: { id: elementId } })
-          : await graph.query(q, { params: { id: elementId } });
+        : `MATCH ()-[e]->() WHERE ID(e) = $id SET e.${key} = NULL`;
 
-      if (!result) throw new Error("Something went wrong");
+      if (user.role === "Read-Only")
+        await graph.roQuery(query, { params: { id: elementId } });
+      else await graph.query(query, { params: { id: elementId } });
 
       return NextResponse.json(
         { message: "Attribute deleted successfully" },

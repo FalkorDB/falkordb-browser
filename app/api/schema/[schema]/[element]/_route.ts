@@ -79,35 +79,47 @@ export async function POST(
 
     try {
       if (!type) {
-        if (label.length === 0) throw new Error("Label is required");
-
         if (!selectedNodes || selectedNodes.length !== 2)
           throw new Error("Selected nodes are required");
+
+        if (label.length === 0) throw new Error("Label is required");
       }
 
       const formattedAttributes = formatAttributes(attributes);
       const graph = client.selectGraph(schemaName);
       const query = type
         ? `CREATE (n${label.length > 0 ? `:${label.join(":")}` : ""}${
-            formattedAttributes?.length > 0
+            formattedAttributes.length > 0
               ? ` {${formattedAttributes
-                  .map(([k, v]) => `${k}: "${v}"`)
+                  .map(([k]) => `${k}: $attr_${k}`)
                   .join(",")}}`
               : ""
           }) RETURN n`
-        : `MATCH (a), (b) WHERE ID(a) = ${selectedNodes![0].id} AND ID(b) = ${
-            selectedNodes![1].id
-          } CREATE (a)-[e:${label[0]}${
-            formattedAttributes?.length > 0
+        : `MATCH (a), (b) WHERE ID(a) = $nodeA AND ID(b) = $nodeB CREATE (a)-[e:${
+            label[0]
+          }${
+            formattedAttributes.length > 0
               ? ` {${formattedAttributes
-                  .map(([k, v]) => `${k}: "${v}"`)
+                  .map(([k]) => `${k}: $attr_${k}`)
                   .join(",")}}`
               : ""
           }]->(b) RETURN e`;
+
+      const queryParams: Record<string, string | number | boolean> = {};
+      if (!type && selectedNodes) {
+        queryParams.nodeA = selectedNodes[0].id;
+        queryParams.nodeB = selectedNodes[1].id;
+      }
+      if (formattedAttributes.length > 0) {
+        formattedAttributes.forEach(([k, v]) => {
+          queryParams[`attr_${k}`] = v;
+        });
+      }
+
       const result =
         user.role === "Read-Only"
-          ? await graph.roQuery(query)
-          : await graph.query(query);
+          ? await graph.roQuery(query, { params: queryParams })
+          : await graph.query(query, { params: queryParams });
 
       return NextResponse.json({ result }, { status: 200 });
     } catch (error) {
@@ -154,14 +166,14 @@ export async function DELETE(
       const graph = client.selectGraph(schemaName);
       const query = type
         ? `MATCH (n) WHERE ID(n) = $id DELETE n`
-        : `MATCH ()-[e]-() WHERE ID(e) = $id DELETE e`;
+        : `MATCH ()-[e]->() WHERE ID(e) = $id DELETE e`;
 
       if (user.role === "Read-Only")
         await graph.roQuery(query, { params: { id: elementId } });
       else await graph.query(query, { params: { id: elementId } });
 
       return NextResponse.json(
-        { message: "Node deleted successfully" },
+        { message: "Element deleted successfully" },
         { status: 200 }
       );
     } catch (error) {
