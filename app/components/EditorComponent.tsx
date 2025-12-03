@@ -273,13 +273,6 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
     }, [indicator])
 
     useEffect(() => {
-        setHistoryQuery(prev => ({
-            ...prev,
-            query: historyQuery.counter ? historyQuery.queries[historyQuery.counter - 1].text : historyQuery.currentQuery.text
-        }))
-    }, [historyQuery.counter])
-
-    useEffect(() => {
         if (historyQuery.query && placeholderRef.current) {
             placeholderRef.current.style.display = "none"
         } else if (!historyQuery.query && placeholderRef.current && blur) {
