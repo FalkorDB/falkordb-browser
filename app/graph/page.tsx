@@ -181,7 +181,6 @@ export default function Page() {
 
         if (isAdd) {
             setter(false)
-            setSelectedElements([])
             setPanel("add")
         } else {
             setPanel(undefined)
