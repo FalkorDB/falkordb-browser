@@ -451,6 +451,7 @@ export default function CreateElementPanel(props: Props) {
                         {
                             (type ? (labelsHover || labels.length === 0) : labels.length === 0) &&
                             <AddLabel
+                                type={type ? "Label" : "Type"}
                                 onAddLabel={handleAddLabel}
                                 trigger={
                                     <Button
