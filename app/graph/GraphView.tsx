@@ -2,7 +2,7 @@
 
 'use client'
 
-import { useState, useEffect, Dispatch, SetStateAction, useContext, useCallback } from "react";
+import { useEffect, Dispatch, SetStateAction, useContext, useCallback } from "react";
 import { GitGraph, ScrollText, Table } from "lucide-react"
 import { cn, GraphRef, Tab } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -62,8 +62,6 @@ function GraphView({
     const { graph, graphName, currentTab, setCurrentTab } = useContext(GraphContext)
     const { setData, data, isSaved, setViewport, viewport } = useContext(ViewportContext)
 
-    const [parentHeight, setParentHeight] = useState<number>(0)
-    const [parentWidth, setParentWidth] = useState<number>(0)
     const elementsLength = graph.getElements().length
 
     useEffect(() => {
@@ -107,7 +105,11 @@ function GraphView({
     const onRelationshipClick = (relationship: Relationship) => {
         relationship.show = !relationship.show
 
-        relationship.elements.filter((link) => link.source.visible && link.target.visible).forEach((link) => {
+        relationship.elements.filter((link) => {
+            const sourceNode = graph.NodesMap.get(link.source);
+            const targetNode = graph.NodesMap.get(link.target);
+            return sourceNode?.visible && targetNode?.visible;
+        }).forEach((link) => {
             link.visible = relationship.show
         })
 
@@ -217,10 +219,6 @@ function GraphView({
                     selectedElements={selectedElements}
                     setSelectedElements={setSelectedElements}
                     setRelationships={setRelationships}
-                    parentHeight={parentHeight}
-                    parentWidth={parentWidth}
-                    setParentHeight={setParentHeight}
-                    setParentWidth={setParentWidth}
                     isLoading={isLoading}
                     handleCooldown={handleCooldown}
                     cooldownTicks={cooldownTicks}

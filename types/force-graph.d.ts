@@ -13,6 +13,8 @@ declare global {
                     graphDataProp?: GraphData;
                     themeProp?: string;
                     displayTextPriorityProp?: Array<{ name: string; ignore: boolean }>;
+                    cooldownTicksProp?: number | undefined;
+                    loadingProp?: boolean;
                 },
                 HTMLElement
             >;

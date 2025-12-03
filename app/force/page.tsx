@@ -5,9 +5,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { GraphData, Node } from '../api/graph/model';
 
-// Import the custom element to register it
-import '../components/force-graph-element';
-
 export default function ForcePage() {
     const [graphData, setGraphData] = useState<GraphData>({
         nodes: [],
@@ -27,15 +24,20 @@ export default function ForcePage() {
     const sampleData: GraphData = useMemo(() => ({
         nodes,
         links: [
-            { id: 1, relationship: 'KNOWS', color: '#999', source: nodes[0], target: nodes[1], visible: true, expand: false, collapsed: false, curve: 0, data: { since: 2015 } },
-            { id: 2, relationship: 'KNOWS', color: '#999', source: nodes[0], target: nodes[2], visible: true, expand: false, collapsed: false, curve: 0, data: { since: 2018 } },
-            { id: 3, relationship: 'KNOWS', color: '#999', source: nodes[1], target: nodes[3], visible: true, expand: false, collapsed: false, curve: 0, data: { since: 2020 } },
-            { id: 4, relationship: 'KNOWS', color: '#999', source: nodes[2], target: nodes[3], visible: true, expand: false, collapsed: false, curve: 0, data: { since: 2017 } },
-            { id: 5, relationship: 'WORKS_WITH', color: '#999', source: nodes[0], target: nodes[3], visible: true, expand: false, collapsed: false, curve: 0, data: {} }
+            { id: 1, relationship: 'KNOWS', color: '#999', source: 1, target: 2, visible: true, expand: false, collapsed: false, curve: 0, data: { since: 2015 } },
+            { id: 2, relationship: 'KNOWS', color: '#999', source: 1, target: 3, visible: true, expand: false, collapsed: false, curve: 0, data: { since: 2018 } },
+            { id: 3, relationship: 'KNOWS', color: '#999', source: 2, target: 4, visible: true, expand: false, collapsed: false, curve: 0, data: { since: 2020 } },
+            { id: 4, relationship: 'KNOWS', color: '#999', source: 3, target: 4, visible: true, expand: false, collapsed: false, curve: 0, data: { since: 2017 } },
+            { id: 5, relationship: 'WORKS_WITH', color: '#999', source: 1, target: 4, visible: true, expand: false, collapsed: false, curve: 0, data: {} }
         ]
     }), [nodes]);
 
     useEffect(() => {
+        // Dynamically import the custom element only on client side
+        if (typeof window !== 'undefined') {
+            import('../components/force-graph-element');
+        }
+
         // Set sample data on mount
         setGraphData(sampleData);
 
@@ -99,6 +101,8 @@ export default function ForcePage() {
         }
     }, [theme]);
 
+    if (typeof window === 'undefined') return null
+
     const handleLoadSample = () => {
         setGraphData(sampleData);
     };
@@ -157,6 +161,7 @@ export default function ForcePage() {
                     data={JSON.stringify(graphData)}
                     theme={theme}
                     style={{ width: '100%', height: '100%', display: 'block' }}
+                    displayTextPriorityProp={[{ "name": "name", "ignore": false }, { "name": "title", "ignore": true }]}
                 />
             </div>
         </div>

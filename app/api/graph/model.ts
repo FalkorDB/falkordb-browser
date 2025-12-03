@@ -71,8 +71,8 @@ export type Link = LinkObject<
     id: number;
     relationship: string;
     color: string;
-    source: Node;
-    target: Node;
+    source: number;
+    target: number;
     visible: boolean;
     expand: boolean;
     collapsed: boolean;
@@ -114,7 +114,7 @@ export type DataRow = {
 
 export type Data = DataRow[];
 
-export type MemoryValue = number | Map<string, MemoryValue>
+export type MemoryValue = number | Map<string, MemoryValue>;
 
 export const DEFAULT_COLORS = [
   "hsl(246, 100%, 70%)",
@@ -143,10 +143,6 @@ export interface InfoRelationship {
 
 export interface Relationship extends InfoRelationship {
   elements: Link[];
-  textWidth?: number;
-  textHeight?: number;
-  textAscent?: number;
-  textDescent?: number;
 }
 
 export const getLabelWithFewestElements = (labels: Label[]): Label =>
@@ -464,22 +460,22 @@ export class Graph {
   public calculateLinkCurve(link: Link, existingLinks: Link[] = []): number {
     const start = link.source;
     const end = link.target;
-    
+
     // Find all links between the same nodes (including new links being added)
     const allLinks = [...this.elements.links, ...existingLinks];
     const sameNodesLinks = allLinks.filter(
       (l) =>
-        (l.source.id === start.id && l.target.id === end.id) ||
-        (l.target.id === start.id && l.source.id === end.id)
+        (l.source === start && l.target === end) ||
+        (l.target === start && l.source === end)
     );
-    
+
     let index = sameNodesLinks.findIndex((l) => l.id === link.id);
     index = index === -1 ? sameNodesLinks.length : index;
-    
+
     const even = index % 2 === 0;
     let curve;
 
-    if (start.id === end.id) {
+    if (start === end) {
       if (even) {
         curve = Math.floor(-(index / 2)) - 3;
       } else {
@@ -597,8 +593,8 @@ export class Graph {
 
         link = {
           id: cell.id,
-          source,
-          target: source,
+          source: cell.sourceId,
+          target: cell.destinationId,
           relationship: cell.relationshipType,
           color: relation.color,
           expand: false,
@@ -651,8 +647,8 @@ export class Graph {
 
         link = {
           id: cell.id,
-          source,
-          target,
+          source: cell.sourceId,
+          target: cell.destinationId,
           relationship: cell.relationshipType,
           color: relation.color,
           expand: false,
@@ -742,9 +738,11 @@ export class Graph {
       });
     });
 
-    newElements.filter((element): element is Link => !!element.source).forEach((link) => {
-      link.curve = this.calculateLinkCurve(link);
-    });
+    newElements
+      .filter((element): element is Link => !!element.source)
+      .forEach((link) => {
+        link.curve = this.calculateLinkCurve(link);
+      });
 
     newElements
       .filter((element): element is Node => "labels" in element)
@@ -809,26 +807,23 @@ export class Graph {
 
   public visibleLinks(visible: boolean) {
     this.elements.links.forEach((link) => {
+      const sourceNode = this.nodesMap.get(link.source);
+      const targetNode = this.nodesMap.get(link.target);
+
       if (
         this.RelationshipsMap.get(link.relationship)!.show &&
         visible &&
-        this.elements.nodes.map((n) => n.id).includes(link.source.id) &&
-        link.source.visible &&
-        this.elements.nodes.map((n) => n.id).includes(link.target.id) &&
-        link.target.visible
+        sourceNode?.visible &&
+        targetNode?.visible
       ) {
-        // eslint-disable-next-line no-param-reassign
         link.visible = true;
       }
 
       if (
         !visible &&
-        ((this.elements.nodes.map((n) => n.id).includes(link.source.id) &&
-          !link.source.visible) ||
-          (this.elements.nodes.map((n) => n.id).includes(link.target.id) &&
-            !link.target.visible))
+        (sourceNode?.visible === false ||
+          targetNode?.visible === false)
       ) {
-        // eslint-disable-next-line no-param-reassign
         link.visible = false;
       }
     });
@@ -836,7 +831,7 @@ export class Graph {
 
   public removeLinks(ids: number[] = []): Relationship[] {
     const links = this.elements.links.filter(
-      (link) => ids.includes(link.source.id) || ids.includes(link.target.id)
+      (link) => ids.includes(link.source) || ids.includes(link.target)
     );
 
     this.elements = {
@@ -845,8 +840,8 @@ export class Graph {
         .map((link) => {
           if (
             (ids.length !== 0 && !links.includes(link)) ||
-            (this.elements.nodes.map((n) => n.id).includes(link.source.id) &&
-              this.elements.nodes.map((n) => n.id).includes(link.target.id))
+            (this.nodesMap.has(link.source) &&
+              this.nodesMap.has(link.target))
           ) {
             return link;
           }
