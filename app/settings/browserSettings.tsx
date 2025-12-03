@@ -7,11 +7,11 @@ import { RotateCcw, PlusCircle, Trash2, ChevronUp, ChevronDown, MonitorPlay, Che
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BrowserSettingsContext } from "../components/provider";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Combobox from "../components/ui/combobox";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const MODELS = ["gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-4.1"]
 
@@ -326,7 +326,7 @@ export default function BrowserSettings() {
                         <CardContent className="pt-2">
                             <div className="flex flex-col sm:flex-row gap-4 p-4 bg-muted/10 rounded-lg">
                                 <div className="flex items-center gap-2">
-                                    <label className="text-sm font-medium whitespace-nowrap">Model</label>
+                                    <span className="text-sm font-medium whitespace-nowrap">Model</span>
                                     <Combobox
                                         disabled={!displayChat}
                                         className="p-1"
@@ -338,7 +338,8 @@ export default function BrowserSettings() {
                                     />
                                 </div>
                                 <div className="flex-1 flex items-center gap-2">
-                                    <label className="text-sm font-medium whitespace-nowrap">Secret Key</label>
+                                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+                                    <label htmlFor="secretKeyInput" className="text-sm font-medium whitespace-nowrap">Secret Key</label>
                                     <Input
                                         disabled={!displayChat}
                                         className="flex-1"
