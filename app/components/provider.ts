@@ -66,9 +66,10 @@ type BrowserSettingsContextType = {
       model: string;
       setModel: Dispatch<SetStateAction<string>>;
       navigateToSettings: boolean;
-      setNavigateToSettings: Dispatch<SetStateAction<boolean>>;
+      displayChat: boolean;
     };
     graphInfo: {
+      showMemoryUsage: boolean;
       refreshInterval: number;
       setRefreshInterval: Dispatch<SetStateAction<number>>;
       displayTextPriority: TextPriority[];
@@ -200,9 +201,9 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         model: "",
         setModel: () => {},
         navigateToSettings: false,
-        setNavigateToSettings: () => {},
+        displayChat: false,
       },
-      graphInfo: { refreshInterval: 0, setRefreshInterval: () => {}, displayTextPriority: [], setDisplayTextPriority: () => {} },
+      graphInfo: { showMemoryUsage: false, refreshInterval: 0, setRefreshInterval: () => {}, displayTextPriority: [], setDisplayTextPriority: () => {} },
     },
     hasChanges: false,
     setHasChanges: () => {},

@@ -1,8 +1,8 @@
-import { PlusCircle } from "lucide-react"
+import { ArrowRight, Circle, Info } from "lucide-react"
 import { useCallback, useContext, useEffect, useRef, useState } from "react"
 import { cn, GraphRef, handleZoomToFit } from "@/lib/utils"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useSession } from "next-auth/react"
 import { Graph, Link, Node } from "../api/graph/model"
 import Input from "../components/ui/Input"
 import Button from "../components/ui/Button"
@@ -11,14 +11,16 @@ import { GraphContext } from "../components/provider"
 
 interface Props {
     graph: Graph
+    graphName: string
     selectedElements: (Node | Link)[]
-    selectedElement: Node | Link | undefined
-    setSelectedElement: (el: Node | Link | undefined) => void
+    setSelectedElements: (elements: (Node | Link)[]) => void
     handleDeleteElement: () => Promise<void>
     chartRef: GraphRef
     label: "Graph" | "Schema"
-    setIsAddEntity?: (isAdd: boolean) => void
-    setIsAddRelation?: (isAdd: boolean) => void
+    setIsAddNode: (isAddNode: boolean) => void
+    setIsAddEdge?: (isAddEdge: boolean) => void
+    isAddNode: boolean
+    isAddEdge: boolean
     isLoadingSchema?: boolean
 }
 
@@ -28,26 +30,28 @@ const ITEMS_PER_PAGE = 30
 
 export default function Toolbar({
     graph,
+    graphName,
     selectedElements,
-    selectedElement,
-    setSelectedElement,
+    setSelectedElements,
     handleDeleteElement,
     chartRef,
     label,
-    setIsAddEntity,
-    setIsAddRelation,
-    isLoadingSchema,
+    setIsAddNode,
+    setIsAddEdge,
+    isAddEdge,
+    isAddNode,
+    isLoadingSchema
 }: Props) {
 
     const { isLoading: isLoadingGraph } = useContext(GraphContext)
 
     const suggestionRef = useRef<HTMLDivElement>(null)
+    const { data: session } = useSession()
 
     const [suggestions, setSuggestions] = useState<(Node | Link)[]>([])
     const [suggestionIndex, setSuggestionIndex] = useState(0)
     const [searchElement, setSearchElement] = useState("")
     const [deleteOpen, setDeleteOpen] = useState(false)
-    const [addOpen, setAddOpen] = useState(false)
     const [scrollTop, setScrollTop] = useState(0)
     const [startIndex, setStartIndex] = useState(0)
     const [topFakeItemHeight, setTopFakeItemHeight] = useState(0)
@@ -102,7 +106,7 @@ export default function Toolbar({
 
     const handleSearchElement = (element: Node | Link) => {
         handleZoomToFit(chartRef, (node: Node) => element.labels ? element.id === node.id : node.id === element.source.id || node.id === element.target.id, 4)
-        setSelectedElement(element)
+        setSelectedElements([element])
         setSearchElement("")
         setSuggestions([])
     }
@@ -270,12 +274,49 @@ export default function Toolbar({
                     </div>
                 }
             </div>
-            <div className={cn("flex gap-2", label === "Schema" && "h-full")}>
+            <div className={cn("flex flex-row-reverse gap-2", label === "Schema" && "h-full")}>
                 {
-                    graph.Id &&
+                    graphName && session?.user.role !== "Read-Only" &&
                     <>
+                        <Button
+                            data-testid={`elementCanvasInfo${label}`}
+                            className="pointer-events-auto bg-background cursor-default border-primary"
+                            variant="Delete"
+                            tooltipVariant="Primary"
+                            tooltipSide="bottom"
+                            title={`Select And Show Properties (Right Click)
+                                Select Multiple Entities (Right Click + Left Ctrl)
+                                Select 2 Nodes to Create Edge`}
+                        >
+                            <Info size={20} />
+                        </Button>
+                        <Button
+                            data-testid={`elementCanvasAddNode${label}`}
+                            className="pointer-events-auto bg-background border-green-900"
+                            variant="Delete"
+                            tooltipVariant="Primary"
+                            tooltipSide="bottom"
+                            title="Add Node"
+                            onClick={() => setIsAddNode(!isAddNode)}
+                        >
+                            <Circle size={20} />
+                        </Button>
                         {
-                            (selectedElements.length !== 0 || selectedElement) &&
+                            setIsAddEdge &&
+                            <Button
+                                data-testid={`elementCanvasAddEdge${label}`}
+                                className="pointer-events-auto bg-background border-green-900"
+                                variant="Delete"
+                                tooltipVariant="Primary"
+                                tooltipSide="bottom"
+                                title="Add Edge"
+                                onClick={() => setIsAddEdge(!isAddEdge)}
+                            >
+                                <ArrowRight size={20} />
+                            </Button>
+                        }
+                        {
+                            selectedElements.length !== 0 &&
                             <DeleteElement
                                 label={label}
                                 description="Are you sure you want to delete this element(s)?"
@@ -283,47 +324,6 @@ export default function Toolbar({
                                 setOpen={setDeleteOpen}
                                 onDeleteElement={handleDeleteElement}
                             />
-                        }
-                        {
-                            setIsAddEntity && setIsAddRelation &&
-                            <DropdownMenu open={addOpen} onOpenChange={setAddOpen}>
-                                <DropdownMenuTrigger asChild>
-                                    <Button
-                                        data-testid={`elementCanvasAdd${label}`}
-                                        className="pointer-events-auto"
-                                        variant="Secondary"
-                                        label="Add Element"
-                                    >
-                                        <PlusCircle size={20} />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent>
-                                    <Button
-                                        data-testid={`elementCanvasAddNode${label}`}
-                                        className="pointer-events-auto"
-                                        variant="Secondary"
-                                        label="Add Node"
-                                        onClick={() => {
-                                            setIsAddEntity(true)
-                                            setAddOpen(false)
-                                        }}
-                                    >
-                                        <PlusCircle size={20} />
-                                    </Button>
-                                    <Button
-                                        data-testid={`elementCanvasAddEdge${label}`}
-                                        className="pointer-events-auto"
-                                        variant="Secondary"
-                                        label="Add Edge"
-                                        onClick={() => {
-                                            setIsAddRelation(true)
-                                            setAddOpen(false)
-                                        }}
-                                    >
-                                        <PlusCircle size={20} />
-                                    </Button>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
                         }
                     </>
                 }
@@ -333,7 +333,6 @@ export default function Toolbar({
 }
 
 Toolbar.defaultProps = {
-    setIsAddEntity: undefined,
-    setIsAddRelation: undefined,
+    setIsAddEdge: undefined,
     isLoadingSchema: false,
 }
