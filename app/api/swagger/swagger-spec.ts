@@ -30,10 +30,10 @@ const swaggerSpec = {
       name: "Graph",
       description: "Graph management and query endpoints",
     },
-    {
-      name: "Schema",
-      description: "Schema management endpoints",
-    },
+    // {
+    //   name: "Schema",
+    //   description: "Schema management endpoints",
+    // },
     {
       name: "Configurations",
       description: "Database configuration management endpoints",
@@ -1411,926 +1411,926 @@ const swaggerSpec = {
         }
       }
     },
-    "/api/schema": {
-      get: {
-        tags: ["Schema"],
-        summary: "List all schemas",
-        description: "Get a list of all schemas in the FalkorDB instance",
-        security: [{ bearerAuth: [] }],
-        responses: {
-          "200": {
-            description: "List of schemas retrieved successfully"
-          }
-        }
-      }
-    },
-    "/api/schema/{schema}": {
-      get: {
-        tags: ["Schema"],
-        summary: "Get schema information",
-        description: "Get detailed information about a specific schema",
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          {
-            in: "path",
-            name: "schema",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Schema name"
-          }
-        ],
-        responses: {
-          "200": {
-            description: "Schema information retrieved successfully"
-          }
-        }
-      },
-      post: {
-        tags: ["Schema"],
-        summary: "Create new schema",
-        description: "Create a new schema with the specified name",
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          {
-            in: "path",
-            name: "schema",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Schema name to create"
-          }
-        ],
-        responses: {
-          "201": {
-            description: "Schema created successfully"
-          }
-        }
-      },
-      delete: {
-        tags: ["Schema"],
-        summary: "Delete schema",
-        description: "Delete a schema and all its data permanently",
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          {
-            in: "path",
-            name: "schema",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Schema name to delete"
-          }
-        ],
-        responses: {
-          "200": {
-            description: "Schema deleted successfully"
-          }
-        }
-      },
-      patch: {
-        tags: ["Schema"],
-        summary: "Rename schema",
-        description: "Rename an existing schema to a new name",
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          {
-            in: "path",
-            name: "schema",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "New schema name"
-          },
-          {
-            in: "query",
-            name: "sourceName",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Current schema name to rename"
-          }
-        ],
-        responses: {
-          "200": {
-            description: "Schema renamed successfully",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    data: {
-                      description: "Rename operation result"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            description: "Bad request - schema already exists or missing sourceName"
-          },
-          "500": {
-            description: "Internal server error"
-          }
-        }
-      }
-    },
-    "/api/schema/{schema}/count": {
-      get: {
-        tags: ["Schema"],
-        summary: "Get schema element counts",
-        description: "Get the count of nodes and relationships in a schema",
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          {
-            in: "path",
-            name: "schema",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Schema name"
-          }
-        ],
-        responses: {
-          "200": {
-            description: "Schema element counts retrieved successfully"
-          }
-        }
-      }
-    },
-    "/api/schema/{schema}/duplicate": {
-      patch: {
-        tags: ["Schema"],
-        summary: "Duplicate schema",
-        description: "Create a copy of an existing schema with a new name, preserving all data and structure",
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          {
-            in: "path",
-            name: "schema",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "New schema name for the duplicate"
-          },
-          {
-            in: "query",
-            name: "sourceName",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Source schema name to duplicate from"
-          }
-        ],
-        responses: {
-          "200": {
-            description: "Schema duplicated successfully",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    result: {
-                      description: "Duplication operation result"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            description: "Bad request - missing sourceName parameter"
-          },
-          "500": {
-            description: "Internal server error"
-          }
-        }
-      }
-    },
-    "/api/schema/{schema}/new": {
-      post: {
-        tags: ["Schema"],
-        summary: "Create node or relationship in schema (Backend Endpoint)",
-        description: "The actual backend endpoint for creating nodes and relationships. Use type=true for nodes, type=false for relationships. The label parameter is where you specify the labels to add to the node or relationship type.",
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          {
-            in: "path",
-            name: "schema",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Schema name"
-          }
-        ],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                properties: {
-                  type: {
-                    type: "boolean",
-                    description: "true for node creation, false for relationship creation",
-                    example: true
-                  },
-                  label: {
-                    type: "array",
-                    items: {
-                      type: "string"
-                    },
-                    description: "For nodes: Labels to add to the node (multiple labels supported, e.g., ['Person', 'User']). For relationships: Relationship type (only first label used, e.g., ['KNOWS']).",
-                    example: ["Person", "User"]
-                  },
-                  attributes: {
-                    type: "array",
-                    items: {
-                      type: "array",
-                      items: {
-                        anyOf: [
-                          { type: "string" },
-                          { 
-                            type: "array",
-                            items: { type: "string" }
-                          }
-                        ]
-                      },
-                      minItems: 2,
-                      maxItems: 2
-                    },
-                    description: "Attribute definitions: [[key, [type, default, unique, required]], ...]. Example: [[\"name\", [\"STRING\", \"\", \"false\", \"true\"]], [\"age\", [\"INTEGER\", \"0\", \"false\", \"false\"]]]",
-                    example: [
-                      ["name", ["STRING", "", "false", "true"]],
-                      ["age", ["INTEGER", "0", "false", "false"]]
-                    ]
-                  },
-                  selectedNodes: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        id: { type: "number" }
-                      }
-                    },
-                    minItems: 2,
-                    maxItems: 2,
-                    description: "Required for relationship creation only. Source and target nodes for the relationship.",
-                    example: [{"id": 1}, {"id": 2}]
-                  }
-                },
-                required: ["type", "label", "attributes"]
-              }
-            }
-          }
-        },
-        responses: {
-          "200": {
-            description: "Node or relationship created successfully"
-          }
-        }
-      }
-    },
-    "/api/schema/{schema}/nodes": {
-      post: {
-        tags: ["Schema"],
-        summary: "Create node in schema",
-        description: "Create a new node in the specified schema. Multiple labels are supported and will be joined with colons (e.g., :Person:User). This endpoint actually maps to /api/schema/{schema}/new in the backend with type=true.",
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          {
-            in: "path",
-            name: "schema",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Schema name"
-          }
-        ],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                properties: {
-                  type: {
-                    type: "boolean",
-                    enum: [true],
-                    description: "Must be true for node creation",
-                    example: true
-                  },
-                  label: {
-                    type: "array",
-                    items: {
-                      type: "string"
-                    },
-                    description: "Labels for the node (multiple labels supported)",
-                    example: ["Person", "User"]
-                  },
-                  attributes: {
-                    type: "array",
-                    items: {
-                      type: "array",
-                      items: {
-                        anyOf: [
-                          { type: "string" },
-                          { 
-                            type: "array",
-                            items: { type: "string" }
-                          }
-                        ]
-                      },
-                      minItems: 2,
-                      maxItems: 2
-                    },
-                    description: "Attribute definitions: [[key, [type, default, unique, required]], ...]. Example: [[\"name\", [\"STRING\", \"\", \"false\", \"true\"]], [\"age\", [\"INTEGER\", \"0\", \"false\", \"false\"]]]",
-                    example: [
-                      ["name", ["STRING", "", "false", "true"]],
-                      ["age", ["INTEGER", "0", "false", "false"]]
-                    ]
-                  }
-                },
-                required: ["type", "label", "attributes"]
-              }
-            }
-          }
-        },
-        responses: {
-          "200": {
-            description: "Node created successfully"
-          }
-        }
-      }
-    },
-    "/api/schema/{schema}/relationships": {
-      post: {
-        tags: ["Schema"],
-        summary: "Create relationship in schema",
-        description: "Create a new relationship between two nodes in the specified schema. Only the first label in the array is used as the relationship type. This endpoint actually maps to /api/schema/{schema}/new in the backend with type=false.",
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          {
-            in: "path",
-            name: "schema",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Schema name"
-          }
-        ],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                properties: {
-                  type: {
-                    type: "boolean",
-                    enum: [false],
-                    description: "Must be false for relationship creation",
-                    example: false
-                  },
-                  label: {
-                    type: "array",
-                    items: {
-                      type: "string"
-                    },
-                    description: "Relationship type (only first label used)",
-                    example: ["KNOWS"]
-                  },
-                  attributes: {
-                    type: "array",
-                    items: {
-                      type: "array",
-                      items: {
-                        anyOf: [
-                          { type: "string" },
-                          { 
-                            type: "array",
-                            items: { type: "string" }
-                          }
-                        ]
-                      },
-                      minItems: 2,
-                      maxItems: 2
-                    },
-                    description: "Attribute definitions: [[key, [type, default, unique, required]], ...]. Example: [[\"since\", [\"STRING\", \"2024\", \"false\", \"false\"]]]",
-                    example: [
-                      ["since", ["STRING", "2024", "false", "false"]]
-                    ]
-                  },
-                  selectedNodes: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        id: { type: "number" }
-                      }
-                    },
-                    minItems: 2,
-                    maxItems: 2,
-                    description: "Source and target nodes for the relationship",
-                    example: [{"id": 1}, {"id": 2}]
-                  }
-                },
-                required: ["type", "label", "attributes", "selectedNodes"]
-              }
-            }
-          }
-        },
-        responses: {
-          "200": {
-            description: "Relationship created successfully"
-          }
-        }
-      }
-    },
-    "/api/schema/{schema}/{element}": {
-      delete: {
-        tags: ["Schema"],
-        summary: "Delete element from schema",
-        description: "Delete a specific element from the schema by ID. Set type=true for node deletion.",
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          {
-            in: "path",
-            name: "schema",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Schema name"
-          },
-          {
-            in: "path",
-            name: "element",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Element ID to delete"
-          }
-        ],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                properties: {
-                  type: {
-                    type: "boolean",
-                    enum: [true],
-                    description: "Must be true for node deletion",
-                    example: true
-                  }
-                },
-                required: ["type"]
-              }
-            }
-          }
-        },
-        responses: {
-          "200": {
-            description: "Element deleted successfully"
-          }
-        }
-      }
-    },
-    "/api/schema/{schema}/{relationshipId}": {
-      delete: {
-        tags: ["Schema"],
-        summary: "Delete relationship from schema",
-        description: "Delete a specific relationship from the schema by ID. Set type=false for relationship deletion.",
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          {
-            in: "path",
-            name: "schema",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Schema name"
-          },
-          {
-            in: "path",
-            name: "relationshipId",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Relationship ID to delete"
-          }
-        ],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                properties: {
-                  type: {
-                    type: "boolean",
-                    enum: [false],
-                    description: "Must be false for relationship deletion",
-                    example: false
-                  }
-                },
-                required: ["type"]
-              }
-            }
-          }
-        },
-        responses: {
-          "200": {
-            description: "Relationship deleted successfully"
-          }
-        }
-      }
-    },
-    "/api/schema/{schema}/{element}/label": {
-      post: {
-        tags: ["Schema"],
-        summary: "Add label to element",
-        description: "Add a new label to an existing element in the schema",
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          {
-            in: "path",
-            name: "schema",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Schema name"
-          },
-          {
-            in: "path",
-            name: "element",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Element ID"
-          }
-        ],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                properties: {
-                  label: {
-                    type: "string",
-                    description: "Label to add to the element",
-                    example: "your_label"
-                  }
-                },
-                required: ["label"]
-              }
-            }
-          }
-        },
-        responses: {
-          "200": {
-            description: "Label added successfully"
-          }
-        }
-      },
-      delete: {
-        tags: ["Schema"],
-        summary: "Remove label from element",
-        description: "Remove a specific label from an existing element in the schema",
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          {
-            in: "path",
-            name: "schema",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Schema name"
-          },
-          {
-            in: "path",
-            name: "element",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Element ID"
-          }
-        ],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                properties: {
-                  label: {
-                    type: "string",
-                    description: "Label to remove from the element",
-                    example: "your_label"
-                  }
-                },
-                required: ["label"]
-              }
-            }
-          }
-        },
-        responses: {
-          "200": {
-            description: "Label removed successfully"
-          }
-        }
-      }
-    },
-    "/api/schema/{schema}/{element}/{key}": {
-      patch: {
-        tags: ["Schema"],
-        summary: "Add/Update attribute on element",
-        description: "Add a new attribute or update an existing attribute on an element in the schema",
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          {
-            in: "path",
-            name: "schema",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Schema name",
-            example: "test"
-          },
-          {
-            in: "path",
-            name: "element",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Element ID",
-            example: "2"
-          },
-          {
-            in: "path",
-            name: "key",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Attribute key to add/update",
-            example: "attribute_key"
-          }
-        ],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                properties: {
-                  type: {
-                    type: "boolean",
-                    enum: [true],
-                    description: "Must be true for node attributes",
-                    example: true
-                  },
-                  attribute: {
-                    type: "array",
-                    items: {
-                      type: "string"
-                    },
-                    description: "Attribute configuration [type, default, unique, required]",
-                    example: ["STRING", "your_description", "false", "true"]
-                  }
-                },
-                required: ["type", "attribute"]
-              }
-            }
-          }
-        },
-        responses: {
-          "200": {
-            description: "Attribute added/updated successfully"
-          }
-        }
-      },
-      delete: {
-        tags: ["Schema"],
-        summary: "Remove attribute from element",
-        description: "Remove a specific attribute from an element in the schema",
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          {
-            in: "path",
-            name: "schema",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Schema name",
-            example: "test"
-          },
-          {
-            in: "path",
-            name: "element",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Element ID",
-            example: "2"
-          },
-          {
-            in: "path",
-            name: "key",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Attribute key to remove",
-            example: "attribute_key"
-          }
-        ],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                properties: {
-                  type: {
-                    type: "boolean",
-                    enum: [true],
-                    description: "Must be true for node attributes",
-                    example: true
-                  }
-                },
-                required: ["type"]
-              }
-            }
-          }
-        },
-        responses: {
-          "200": {
-            description: "Attribute removed successfully"
-          }
-        }
-      }
-    },
-    "/api/schema/{schema}/{relationshipId}/{key}": {
-      patch: {
-        tags: ["Schema"],
-        summary: "Add/Update attribute to relationship",
-        description: "Add a new attribute or update an existing attribute on a relationship in the schema",
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          {
-            in: "path",
-            name: "schema",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Schema name",
-            example: "test"
-          },
-          {
-            in: "path",
-            name: "relationshipId",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Relationship ID",
-            example: "1"
-          },
-          {
-            in: "path",
-            name: "key",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Attribute key to add/update",
-            example: "since"
-          }
-        ],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                properties: {
-                  type: {
-                    type: "boolean",
-                    enum: [false],
-                    description: "Must be false for relationship attributes",
-                    example: false
-                  },
-                  attribute: {
-                    type: "array",
-                    items: {
-                      type: "string"
-                    },
-                    description: "Attribute configuration [type, default, unique, required]",
-                    example: ["STRING", "2024", "false", "false"]
-                  }
-                },
-                required: ["type", "attribute"]
-              }
-            }
-          }
-        },
-        responses: {
-          "200": {
-            description: "Attribute added/updated successfully"
-          }
-        }
-      },
-      delete: {
-        tags: ["Schema"],
-        summary: "Remove attribute from relationship",
-        description: "Remove a specific attribute from a relationship in the schema",
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          {
-            in: "path",
-            name: "schema",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Schema name",
-            example: "test"
-          },
-          {
-            in: "path",
-            name: "relationshipId",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Relationship ID",
-            example: "1"
-          },
-          {
-            in: "path",
-            name: "key",
-            required: true,
-            schema: {
-              type: "string"
-            },
-            description: "Attribute key to remove",
-            example: "since"
-          }
-        ],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                properties: {
-                  type: {
-                    type: "boolean",
-                    enum: [false],
-                    description: "Must be false for relationship attributes",
-                    example: false
-                  }
-                },
-                required: ["type"]
-              }
-            }
-          }
-        },
-        responses: {
-          "200": {
-            description: "Attribute removed successfully"
-          }
-        }
-      }
-    },
+    // "/api/schema": {
+    //   get: {
+    //     tags: ["Schema"],
+    //     summary: "List all schemas",
+    //     description: "Get a list of all schemas in the FalkorDB instance",
+    //     security: [{ bearerAuth: [] }],
+    //     responses: {
+    //       "200": {
+    //         description: "List of schemas retrieved successfully"
+    //       }
+    //     }
+    //   }
+    // },
+    // "/api/schema/{schema}": {
+    //   get: {
+    //     tags: ["Schema"],
+    //     summary: "Get schema information",
+    //     description: "Get detailed information about a specific schema",
+    //     security: [{ bearerAuth: [] }],
+    //     parameters: [
+    //       {
+    //         in: "path",
+    //         name: "schema",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Schema name"
+    //       }
+    //     ],
+    //     responses: {
+    //       "200": {
+    //         description: "Schema information retrieved successfully"
+    //       }
+    //     }
+    //   },
+    //   post: {
+    //     tags: ["Schema"],
+    //     summary: "Create new schema",
+    //     description: "Create a new schema with the specified name",
+    //     security: [{ bearerAuth: [] }],
+    //     parameters: [
+    //       {
+    //         in: "path",
+    //         name: "schema",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Schema name to create"
+    //       }
+    //     ],
+    //     responses: {
+    //       "201": {
+    //         description: "Schema created successfully"
+    //       }
+    //     }
+    //   },
+    //   delete: {
+    //     tags: ["Schema"],
+    //     summary: "Delete schema",
+    //     description: "Delete a schema and all its data permanently",
+    //     security: [{ bearerAuth: [] }],
+    //     parameters: [
+    //       {
+    //         in: "path",
+    //         name: "schema",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Schema name to delete"
+    //       }
+    //     ],
+    //     responses: {
+    //       "200": {
+    //         description: "Schema deleted successfully"
+    //       }
+    //     }
+    //   },
+    //   patch: {
+    //     tags: ["Schema"],
+    //     summary: "Rename schema",
+    //     description: "Rename an existing schema to a new name",
+    //     security: [{ bearerAuth: [] }],
+    //     parameters: [
+    //       {
+    //         in: "path",
+    //         name: "schema",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "New schema name"
+    //       },
+    //       {
+    //         in: "query",
+    //         name: "sourceName",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Current schema name to rename"
+    //       }
+    //     ],
+    //     responses: {
+    //       "200": {
+    //         description: "Schema renamed successfully",
+    //         content: {
+    //           "application/json": {
+    //             schema: {
+    //               type: "object",
+    //               properties: {
+    //                 data: {
+    //                   description: "Rename operation result"
+    //                 }
+    //               }
+    //             }
+    //           }
+    //         }
+    //       },
+    //       "400": {
+    //         description: "Bad request - schema already exists or missing sourceName"
+    //       },
+    //       "500": {
+    //         description: "Internal server error"
+    //       }
+    //     }
+    //   }
+    // },
+    // "/api/schema/{schema}/count": {
+    //   get: {
+    //     tags: ["Schema"],
+    //     summary: "Get schema element counts",
+    //     description: "Get the count of nodes and relationships in a schema",
+    //     security: [{ bearerAuth: [] }],
+    //     parameters: [
+    //       {
+    //         in: "path",
+    //         name: "schema",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Schema name"
+    //       }
+    //     ],
+    //     responses: {
+    //       "200": {
+    //         description: "Schema element counts retrieved successfully"
+    //       }
+    //     }
+    //   }
+    // },
+    // "/api/schema/{schema}/duplicate": {
+    //   patch: {
+    //     tags: ["Schema"],
+    //     summary: "Duplicate schema",
+    //     description: "Create a copy of an existing schema with a new name, preserving all data and structure",
+    //     security: [{ bearerAuth: [] }],
+    //     parameters: [
+    //       {
+    //         in: "path",
+    //         name: "schema",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "New schema name for the duplicate"
+    //       },
+    //       {
+    //         in: "query",
+    //         name: "sourceName",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Source schema name to duplicate from"
+    //       }
+    //     ],
+    //     responses: {
+    //       "200": {
+    //         description: "Schema duplicated successfully",
+    //         content: {
+    //           "application/json": {
+    //             schema: {
+    //               type: "object",
+    //               properties: {
+    //                 result: {
+    //                   description: "Duplication operation result"
+    //                 }
+    //               }
+    //             }
+    //           }
+    //         }
+    //       },
+    //       "400": {
+    //         description: "Bad request - missing sourceName parameter"
+    //       },
+    //       "500": {
+    //         description: "Internal server error"
+    //       }
+    //     }
+    //   }
+    // },
+    // "/api/schema/{schema}/new": {
+    //   post: {
+    //     tags: ["Schema"],
+    //     summary: "Create node or relationship in schema (Backend Endpoint)",
+    //     description: "The actual backend endpoint for creating nodes and relationships. Use type=true for nodes, type=false for relationships. The label parameter is where you specify the labels to add to the node or relationship type.",
+    //     security: [{ bearerAuth: [] }],
+    //     parameters: [
+    //       {
+    //         in: "path",
+    //         name: "schema",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Schema name"
+    //       }
+    //     ],
+    //     requestBody: {
+    //       required: true,
+    //       content: {
+    //         "application/json": {
+    //           schema: {
+    //             type: "object",
+    //             properties: {
+    //               type: {
+    //                 type: "boolean",
+    //                 description: "true for node creation, false for relationship creation",
+    //                 example: true
+    //               },
+    //               label: {
+    //                 type: "array",
+    //                 items: {
+    //                   type: "string"
+    //                 },
+    //                 description: "For nodes: Labels to add to the node (multiple labels supported, e.g., ['Person', 'User']). For relationships: Relationship type (only first label used, e.g., ['KNOWS']).",
+    //                 example: ["Person", "User"]
+    //               },
+    //               attributes: {
+    //                 type: "array",
+    //                 items: {
+    //                   type: "array",
+    //                   items: {
+    //                     anyOf: [
+    //                       { type: "string" },
+    //                       { 
+    //                         type: "array",
+    //                         items: { type: "string" }
+    //                       }
+    //                     ]
+    //                   },
+    //                   minItems: 2,
+    //                   maxItems: 2
+    //                 },
+    //                 description: "Attribute definitions: [[key, [type, default, unique, required]], ...]. Example: [[\"name\", [\"STRING\", \"\", \"false\", \"true\"]], [\"age\", [\"INTEGER\", \"0\", \"false\", \"false\"]]]",
+    //                 example: [
+    //                   ["name", ["STRING", "", "false", "true"]],
+    //                   ["age", ["INTEGER", "0", "false", "false"]]
+    //                 ]
+    //               },
+    //               selectedNodes: {
+    //                 type: "array",
+    //                 items: {
+    //                   type: "object",
+    //                   properties: {
+    //                     id: { type: "number" }
+    //                   }
+    //                 },
+    //                 minItems: 2,
+    //                 maxItems: 2,
+    //                 description: "Required for relationship creation only. Source and target nodes for the relationship.",
+    //                 example: [{"id": 1}, {"id": 2}]
+    //               }
+    //             },
+    //             required: ["type", "label", "attributes"]
+    //           }
+    //         }
+    //       }
+    //     },
+    //     responses: {
+    //       "200": {
+    //         description: "Node or relationship created successfully"
+    //       }
+    //     }
+    //   }
+    // },
+    // "/api/schema/{schema}/nodes": {
+    //   post: {
+    //     tags: ["Schema"],
+    //     summary: "Create node in schema",
+    //     description: "Create a new node in the specified schema. Multiple labels are supported and will be joined with colons (e.g., :Person:User). This endpoint actually maps to /api/schema/{schema}/new in the backend with type=true.",
+    //     security: [{ bearerAuth: [] }],
+    //     parameters: [
+    //       {
+    //         in: "path",
+    //         name: "schema",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Schema name"
+    //       }
+    //     ],
+    //     requestBody: {
+    //       required: true,
+    //       content: {
+    //         "application/json": {
+    //           schema: {
+    //             type: "object",
+    //             properties: {
+    //               type: {
+    //                 type: "boolean",
+    //                 enum: [true],
+    //                 description: "Must be true for node creation",
+    //                 example: true
+    //               },
+    //               label: {
+    //                 type: "array",
+    //                 items: {
+    //                   type: "string"
+    //                 },
+    //                 description: "Labels for the node (multiple labels supported)",
+    //                 example: ["Person", "User"]
+    //               },
+    //               attributes: {
+    //                 type: "array",
+    //                 items: {
+    //                   type: "array",
+    //                   items: {
+    //                     anyOf: [
+    //                       { type: "string" },
+    //                       { 
+    //                         type: "array",
+    //                         items: { type: "string" }
+    //                       }
+    //                     ]
+    //                   },
+    //                   minItems: 2,
+    //                   maxItems: 2
+    //                 },
+    //                 description: "Attribute definitions: [[key, [type, default, unique, required]], ...]. Example: [[\"name\", [\"STRING\", \"\", \"false\", \"true\"]], [\"age\", [\"INTEGER\", \"0\", \"false\", \"false\"]]]",
+    //                 example: [
+    //                   ["name", ["STRING", "", "false", "true"]],
+    //                   ["age", ["INTEGER", "0", "false", "false"]]
+    //                 ]
+    //               }
+    //             },
+    //             required: ["type", "label", "attributes"]
+    //           }
+    //         }
+    //       }
+    //     },
+    //     responses: {
+    //       "200": {
+    //         description: "Node created successfully"
+    //       }
+    //     }
+    //   }
+    // },
+    // "/api/schema/{schema}/relationships": {
+    //   post: {
+    //     tags: ["Schema"],
+    //     summary: "Create relationship in schema",
+    //     description: "Create a new relationship between two nodes in the specified schema. Only the first label in the array is used as the relationship type. This endpoint actually maps to /api/schema/{schema}/new in the backend with type=false.",
+    //     security: [{ bearerAuth: [] }],
+    //     parameters: [
+    //       {
+    //         in: "path",
+    //         name: "schema",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Schema name"
+    //       }
+    //     ],
+    //     requestBody: {
+    //       required: true,
+    //       content: {
+    //         "application/json": {
+    //           schema: {
+    //             type: "object",
+    //             properties: {
+    //               type: {
+    //                 type: "boolean",
+    //                 enum: [false],
+    //                 description: "Must be false for relationship creation",
+    //                 example: false
+    //               },
+    //               label: {
+    //                 type: "array",
+    //                 items: {
+    //                   type: "string"
+    //                 },
+    //                 description: "Relationship type (only first label used)",
+    //                 example: ["KNOWS"]
+    //               },
+    //               attributes: {
+    //                 type: "array",
+    //                 items: {
+    //                   type: "array",
+    //                   items: {
+    //                     anyOf: [
+    //                       { type: "string" },
+    //                       { 
+    //                         type: "array",
+    //                         items: { type: "string" }
+    //                       }
+    //                     ]
+    //                   },
+    //                   minItems: 2,
+    //                   maxItems: 2
+    //                 },
+    //                 description: "Attribute definitions: [[key, [type, default, unique, required]], ...]. Example: [[\"since\", [\"STRING\", \"2024\", \"false\", \"false\"]]]",
+    //                 example: [
+    //                   ["since", ["STRING", "2024", "false", "false"]]
+    //                 ]
+    //               },
+    //               selectedNodes: {
+    //                 type: "array",
+    //                 items: {
+    //                   type: "object",
+    //                   properties: {
+    //                     id: { type: "number" }
+    //                   }
+    //                 },
+    //                 minItems: 2,
+    //                 maxItems: 2,
+    //                 description: "Source and target nodes for the relationship",
+    //                 example: [{"id": 1}, {"id": 2}]
+    //               }
+    //             },
+    //             required: ["type", "label", "attributes", "selectedNodes"]
+    //           }
+    //         }
+    //       }
+    //     },
+    //     responses: {
+    //       "200": {
+    //         description: "Relationship created successfully"
+    //       }
+    //     }
+    //   }
+    // },
+    // "/api/schema/{schema}/{element}": {
+    //   delete: {
+    //     tags: ["Schema"],
+    //     summary: "Delete element from schema",
+    //     description: "Delete a specific element from the schema by ID. Set type=true for node deletion.",
+    //     security: [{ bearerAuth: [] }],
+    //     parameters: [
+    //       {
+    //         in: "path",
+    //         name: "schema",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Schema name"
+    //       },
+    //       {
+    //         in: "path",
+    //         name: "element",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Element ID to delete"
+    //       }
+    //     ],
+    //     requestBody: {
+    //       required: true,
+    //       content: {
+    //         "application/json": {
+    //           schema: {
+    //             type: "object",
+    //             properties: {
+    //               type: {
+    //                 type: "boolean",
+    //                 enum: [true],
+    //                 description: "Must be true for node deletion",
+    //                 example: true
+    //               }
+    //             },
+    //             required: ["type"]
+    //           }
+    //         }
+    //       }
+    //     },
+    //     responses: {
+    //       "200": {
+    //         description: "Element deleted successfully"
+    //       }
+    //     }
+    //   }
+    // },
+    // "/api/schema/{schema}/{relationshipId}": {
+    //   delete: {
+    //     tags: ["Schema"],
+    //     summary: "Delete relationship from schema",
+    //     description: "Delete a specific relationship from the schema by ID. Set type=false for relationship deletion.",
+    //     security: [{ bearerAuth: [] }],
+    //     parameters: [
+    //       {
+    //         in: "path",
+    //         name: "schema",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Schema name"
+    //       },
+    //       {
+    //         in: "path",
+    //         name: "relationshipId",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Relationship ID to delete"
+    //       }
+    //     ],
+    //     requestBody: {
+    //       required: true,
+    //       content: {
+    //         "application/json": {
+    //           schema: {
+    //             type: "object",
+    //             properties: {
+    //               type: {
+    //                 type: "boolean",
+    //                 enum: [false],
+    //                 description: "Must be false for relationship deletion",
+    //                 example: false
+    //               }
+    //             },
+    //             required: ["type"]
+    //           }
+    //         }
+    //       }
+    //     },
+    //     responses: {
+    //       "200": {
+    //         description: "Relationship deleted successfully"
+    //       }
+    //     }
+    //   }
+    // },
+    // "/api/schema/{schema}/{element}/label": {
+    //   post: {
+    //     tags: ["Schema"],
+    //     summary: "Add label to element",
+    //     description: "Add a new label to an existing element in the schema",
+    //     security: [{ bearerAuth: [] }],
+    //     parameters: [
+    //       {
+    //         in: "path",
+    //         name: "schema",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Schema name"
+    //       },
+    //       {
+    //         in: "path",
+    //         name: "element",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Element ID"
+    //       }
+    //     ],
+    //     requestBody: {
+    //       required: true,
+    //       content: {
+    //         "application/json": {
+    //           schema: {
+    //             type: "object",
+    //             properties: {
+    //               label: {
+    //                 type: "string",
+    //                 description: "Label to add to the element",
+    //                 example: "your_label"
+    //               }
+    //             },
+    //             required: ["label"]
+    //           }
+    //         }
+    //       }
+    //     },
+    //     responses: {
+    //       "200": {
+    //         description: "Label added successfully"
+    //       }
+    //     }
+    //   },
+    //   delete: {
+    //     tags: ["Schema"],
+    //     summary: "Remove label from element",
+    //     description: "Remove a specific label from an existing element in the schema",
+    //     security: [{ bearerAuth: [] }],
+    //     parameters: [
+    //       {
+    //         in: "path",
+    //         name: "schema",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Schema name"
+    //       },
+    //       {
+    //         in: "path",
+    //         name: "element",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Element ID"
+    //       }
+    //     ],
+    //     requestBody: {
+    //       required: true,
+    //       content: {
+    //         "application/json": {
+    //           schema: {
+    //             type: "object",
+    //             properties: {
+    //               label: {
+    //                 type: "string",
+    //                 description: "Label to remove from the element",
+    //                 example: "your_label"
+    //               }
+    //             },
+    //             required: ["label"]
+    //           }
+    //         }
+    //       }
+    //     },
+    //     responses: {
+    //       "200": {
+    //         description: "Label removed successfully"
+    //       }
+    //     }
+    //   }
+    // },
+    // "/api/schema/{schema}/{element}/{key}": {
+    //   patch: {
+    //     tags: ["Schema"],
+    //     summary: "Add/Update attribute on element",
+    //     description: "Add a new attribute or update an existing attribute on an element in the schema",
+    //     security: [{ bearerAuth: [] }],
+    //     parameters: [
+    //       {
+    //         in: "path",
+    //         name: "schema",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Schema name",
+    //         example: "test"
+    //       },
+    //       {
+    //         in: "path",
+    //         name: "element",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Element ID",
+    //         example: "2"
+    //       },
+    //       {
+    //         in: "path",
+    //         name: "key",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Attribute key to add/update",
+    //         example: "attribute_key"
+    //       }
+    //     ],
+    //     requestBody: {
+    //       required: true,
+    //       content: {
+    //         "application/json": {
+    //           schema: {
+    //             type: "object",
+    //             properties: {
+    //               type: {
+    //                 type: "boolean",
+    //                 enum: [true],
+    //                 description: "Must be true for node attributes",
+    //                 example: true
+    //               },
+    //               attribute: {
+    //                 type: "array",
+    //                 items: {
+    //                   type: "string"
+    //                 },
+    //                 description: "Attribute configuration [type, default, unique, required]",
+    //                 example: ["STRING", "your_description", "false", "true"]
+    //               }
+    //             },
+    //             required: ["type", "attribute"]
+    //           }
+    //         }
+    //       }
+    //     },
+    //     responses: {
+    //       "200": {
+    //         description: "Attribute added/updated successfully"
+    //       }
+    //     }
+    //   },
+    //   delete: {
+    //     tags: ["Schema"],
+    //     summary: "Remove attribute from element",
+    //     description: "Remove a specific attribute from an element in the schema",
+    //     security: [{ bearerAuth: [] }],
+    //     parameters: [
+    //       {
+    //         in: "path",
+    //         name: "schema",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Schema name",
+    //         example: "test"
+    //       },
+    //       {
+    //         in: "path",
+    //         name: "element",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Element ID",
+    //         example: "2"
+    //       },
+    //       {
+    //         in: "path",
+    //         name: "key",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Attribute key to remove",
+    //         example: "attribute_key"
+    //       }
+    //     ],
+    //     requestBody: {
+    //       required: true,
+    //       content: {
+    //         "application/json": {
+    //           schema: {
+    //             type: "object",
+    //             properties: {
+    //               type: {
+    //                 type: "boolean",
+    //                 enum: [true],
+    //                 description: "Must be true for node attributes",
+    //                 example: true
+    //               }
+    //             },
+    //             required: ["type"]
+    //           }
+    //         }
+    //       }
+    //     },
+    //     responses: {
+    //       "200": {
+    //         description: "Attribute removed successfully"
+    //       }
+    //     }
+    //   }
+    // },
+    // "/api/schema/{schema}/{relationshipId}/{key}": {
+    //   patch: {
+    //     tags: ["Schema"],
+    //     summary: "Add/Update attribute to relationship",
+    //     description: "Add a new attribute or update an existing attribute on a relationship in the schema",
+    //     security: [{ bearerAuth: [] }],
+    //     parameters: [
+    //       {
+    //         in: "path",
+    //         name: "schema",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Schema name",
+    //         example: "test"
+    //       },
+    //       {
+    //         in: "path",
+    //         name: "relationshipId",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Relationship ID",
+    //         example: "1"
+    //       },
+    //       {
+    //         in: "path",
+    //         name: "key",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Attribute key to add/update",
+    //         example: "since"
+    //       }
+    //     ],
+    //     requestBody: {
+    //       required: true,
+    //       content: {
+    //         "application/json": {
+    //           schema: {
+    //             type: "object",
+    //             properties: {
+    //               type: {
+    //                 type: "boolean",
+    //                 enum: [false],
+    //                 description: "Must be false for relationship attributes",
+    //                 example: false
+    //               },
+    //               attribute: {
+    //                 type: "array",
+    //                 items: {
+    //                   type: "string"
+    //                 },
+    //                 description: "Attribute configuration [type, default, unique, required]",
+    //                 example: ["STRING", "2024", "false", "false"]
+    //               }
+    //             },
+    //             required: ["type", "attribute"]
+    //           }
+    //         }
+    //       }
+    //     },
+    //     responses: {
+    //       "200": {
+    //         description: "Attribute added/updated successfully"
+    //       }
+    //     }
+    //   },
+    //   delete: {
+    //     tags: ["Schema"],
+    //     summary: "Remove attribute from relationship",
+    //     description: "Remove a specific attribute from a relationship in the schema",
+    //     security: [{ bearerAuth: [] }],
+    //     parameters: [
+    //       {
+    //         in: "path",
+    //         name: "schema",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Schema name",
+    //         example: "test"
+    //       },
+    //       {
+    //         in: "path",
+    //         name: "relationshipId",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Relationship ID",
+    //         example: "1"
+    //       },
+    //       {
+    //         in: "path",
+    //         name: "key",
+    //         required: true,
+    //         schema: {
+    //           type: "string"
+    //         },
+    //         description: "Attribute key to remove",
+    //         example: "since"
+    //       }
+    //     ],
+    //     requestBody: {
+    //       required: true,
+    //       content: {
+    //         "application/json": {
+    //           schema: {
+    //             type: "object",
+    //             properties: {
+    //               type: {
+    //                 type: "boolean",
+    //                 enum: [false],
+    //                 description: "Must be false for relationship attributes",
+    //                 example: false
+    //               }
+    //             },
+    //             required: ["type"]
+    //           }
+    //         }
+    //       }
+    //     },
+    //     responses: {
+    //       "200": {
+    //         description: "Attribute removed successfully"
+    //       }
+    //     }
+    //   }
+    // },
     "/api/user": {
       get: {
         tags: ["Users"],
