@@ -1,3 +1,4 @@
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
@@ -15,8 +16,8 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import ForceGraph from "force-graph";
 import * as d3 from "d3";
-import { getTheme, getNodeDisplayText } from "@/lib/utils";
-import { GraphData, Node, Link } from "../api/graph/model";
+import { getNodeDisplayText, getTheme, GraphRef } from "@/lib/utils";
+import { GraphData, Link, Node } from "../api/graph/model";
 
 type LinkWithNode = Link & { source: Node; target: Node };
 
@@ -121,9 +122,8 @@ const getEndpointId = (
  * document.body.appendChild(element);
  * ```
  */
-// eslint-disable-next-line import/prefer-default-export
-export class ForceGraphElement extends HTMLElement {
-  private graphInstance: any = null;
+export default class ForceGraphElement extends HTMLElement {
+  private graphInstance: GraphRef["current"] = undefined;
 
   private resizeObserver: ResizeObserver | null = null;
 
@@ -146,7 +146,7 @@ export class ForceGraphElement extends HTMLElement {
 
   private cooldownTicks: number | undefined = undefined;
 
-  private isLoading: boolean = false;
+  private loading: boolean = false;
 
   // Cache for relationship text measurements
   private relationshipTextCache: Map<
@@ -157,6 +157,9 @@ export class ForceGraphElement extends HTMLElement {
       actualBoundingBoxDescent: number;
     }
   > = new Map();
+
+  // Cache for node display names
+  private nodeDisplayNameCache: Map<Node["id"], [string, string]> = new Map();
 
   // Static getter for observed attributes (MDN best practice)
   static get observedAttributes(): string[] {
@@ -215,7 +218,7 @@ export class ForceGraphElement extends HTMLElement {
 
     // Get loading state from attribute
     if (this.hasAttribute("loading")) {
-      this.isLoading = this.getAttribute("loading") === "true";
+      this.loading = this.getAttribute("loading") === "true";
       this.updateLoadingState();
     }
 
@@ -252,7 +255,7 @@ export class ForceGraphElement extends HTMLElement {
         // eslint-disable-next-line no-underscore-dangle
         this.graphInstance._destructor();
       }
-      this.graphInstance = null;
+      this.graphInstance = undefined;
     }
 
     if (this.loadingOverlay) {
@@ -266,43 +269,6 @@ export class ForceGraphElement extends HTMLElement {
     // Re-initialize if needed
     if (!this.graphInstance) {
       this.initializeGraph();
-    }
-  }
-
-  attributeChangedCallback(
-    name: string,
-    oldValue: string | null,
-    newValue: string | null
-  ) {
-    // MDN: This callback is called when attributes are changed, added, removed, or replaced
-    if (oldValue === newValue) return;
-
-    const value = newValue || "";
-
-    if (name === "data") {
-      try {
-        this.graphData = JSON.parse(value || '{"nodes": [], "links": []}');
-        this.updateGraphData();
-      } catch (e) {
-        // eslint-disable-next-line no-console
-        console.error("Failed to parse data attribute:", e);
-        this.graphData = { nodes: [], links: [] };
-      }
-    } else if (name === "theme") {
-      this.theme = value || "system";
-      this.updateTheme();
-    } else if (name === "cooldown-ticks") {
-      const cooldownValue =
-        value === "undefined" || value === null || value === ""
-          ? undefined
-          : Number(value);
-      this.cooldownTicks = Number.isNaN(cooldownValue)
-        ? undefined
-        : cooldownValue;
-      this.updateCooldownTicks();
-    } else if (name === "loading") {
-      this.isLoading = value === "true";
-      this.updateLoadingState();
     }
   }
 
@@ -353,6 +319,7 @@ export class ForceGraphElement extends HTMLElement {
 
         ctx.lineWidth = isSelected ? 1.5 : 0.5;
         ctx.strokeStyle = foreground;
+        ctx.fillStyle = nodeCopy.color;
 
         ctx.beginPath();
         ctx.arc(nodeCopy.x, nodeCopy.y, NODE_SIZE, 0, 2 * Math.PI, false);
@@ -365,13 +332,16 @@ export class ForceGraphElement extends HTMLElement {
         ctx.font = `400 2px SofiaSans`;
         ctx.letterSpacing = "0.1px";
 
-        let [line1, line2] = nodeCopy.displayName || ["", ""];
+        let [line1, line2] = this.nodeDisplayNameCache.get(nodeCopy.id) || [
+          "",
+          "",
+        ];
 
         if (!line1 && !line2) {
           const text = getNodeDisplayText(nodeCopy, this.displayTextPriority);
           const textRadius = NODE_SIZE - PADDING / 2;
           [line1, line2] = wrapTextForCircularNode(ctx, text, textRadius);
-          nodeCopy.displayName = [line1, line2];
+          this.nodeDisplayNameCache.set(nodeCopy.id, [line1, line2]);
         }
 
         const textMetrics = ctx.measureText(line1);
@@ -700,8 +670,8 @@ export class ForceGraphElement extends HTMLElement {
 
       return {
         ...link,
-        source: sourceNode,
-        target: targetNode,
+        source: sourceNode || data.nodes[0],
+        target: targetNode || data.nodes[0],
       } as LinkWithNode;
     });
 
@@ -716,6 +686,8 @@ export class ForceGraphElement extends HTMLElement {
 
     // Clear text measurement cache when graph data changes
     this.relationshipTextCache.clear();
+    // Clear node display name cache when graph data changes
+    this.nodeDisplayNameCache.clear();
 
     // Convert GraphData with IDs to force-graph format with node references
     const forceGraphData = ForceGraphElement.convertToForceGraphData(
@@ -741,7 +713,7 @@ export class ForceGraphElement extends HTMLElement {
 
   private updateLoadingState() {
     if (this.loadingOverlay) {
-      this.loadingOverlay.style.visibility = this.isLoading
+      this.loadingOverlay.style.visibility = this.loading
         ? "visible"
         : "hidden";
     }
@@ -750,60 +722,56 @@ export class ForceGraphElement extends HTMLElement {
   private isNodeSelected(node: Node): boolean {
     return (
       (this.hoverElement &&
-        !this.hoverElement.source &&
+        !(this.hoverElement as any).source &&
         this.hoverElement.id === node.id) ||
       (this.selectedElements.length > 0 &&
-        this.selectedElements.some((el) => el.id === node.id && !el.source))
+        this.selectedElements.some(
+          (el) => el.id === node.id && !(el as any).source
+        ))
     );
   }
 
   private isLinkSelected(link: Link): boolean {
     return (
       (this.hoverElement &&
-        this.hoverElement.source &&
+        (this.hoverElement as any).source &&
         this.hoverElement.id === link.id) ||
       (this.selectedElements.length > 0 &&
-        this.selectedElements.some((el) => el.id === link.id && el.source))
+        this.selectedElements.some(
+          (el) => el.id === link.id && (el as any).source
+        ))
     );
   }
 
-  // Getters and setters for properties
-  get graphDataProp(): GraphData {
+  // Getters and setters for properties (PascalCase matching types file)
+  get GraphData(): GraphData {
     return this.graphData;
   }
 
-  set graphDataProp(value: GraphData) {
+  set GraphData(value: GraphData) {
     // Normalize to ensure source/target are always IDs
     this.graphData = value;
     this.updateGraphData();
   }
 
-  get themeProp(): string {
-    return this.theme;
-  }
-
-  set themeProp(value: string) {
-    this.theme = value;
-    this.setAttribute("theme", value);
-    this.updateTheme();
-  }
-
-  get displayTextPriorityProp(): Array<{ name: string; ignore: boolean }> {
+  get DisplayTextPriority(): Array<{ name: string; ignore: boolean }> {
     return this.displayTextPriority;
   }
 
-  set displayTextPriorityProp(value: Array<{ name: string; ignore: boolean }>) {
+  set DisplayTextPriority(value: Array<{ name: string; ignore: boolean }>) {
     this.displayTextPriority = value;
+    // Clear display name cache when priority changes
+    this.nodeDisplayNameCache.clear();
     if (this.graphInstance) {
       this.updateGraphData();
     }
   }
 
-  get cooldownTicksProp(): number | undefined {
+  get CooldownTicks(): number | undefined {
     return this.cooldownTicks;
   }
 
-  set cooldownTicksProp(value: number | undefined) {
+  set CooldownTicks(value: number | undefined) {
     this.cooldownTicks = value;
     if (value === undefined) {
       this.removeAttribute("cooldown-ticks");
@@ -813,12 +781,12 @@ export class ForceGraphElement extends HTMLElement {
     this.updateCooldownTicks();
   }
 
-  get loadingProp(): boolean {
-    return this.isLoading;
+  get Loading(): boolean {
+    return this.loading;
   }
 
-  set loadingProp(value: boolean) {
-    this.isLoading = value;
+  set Loading(value: boolean) {
+    this.loading = value;
     if (value) {
       this.setAttribute("loading", "true");
     } else {

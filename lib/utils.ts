@@ -6,8 +6,8 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { MutableRefObject } from "react";
-import { ForceGraphMethods } from "react-force-graph-2d";
 import { Node, Link, DataCell, MemoryValue } from "@/app/api/graph/model";
+import * as d3 from "d3";
 
 export const MEMORY_USAGE_VERSION_THRESHOLD = 41408;
 export const screenSize = {
@@ -18,8 +18,55 @@ export const screenSize = {
   "2xl": 1536,
 };
 
+// Type for vanilla force-graph library instance
+export interface VanillaForceGraphInstance {
+  width(width: number): VanillaForceGraphInstance;
+  height(height: number): VanillaForceGraphInstance;
+  graphData(data: { nodes: Node[]; links: any[] }): VanillaForceGraphInstance;
+  nodeRelSize(size: number): VanillaForceGraphInstance;
+  nodeCanvasObjectMode(mode: () => string): VanillaForceGraphInstance;
+  linkCanvasObjectMode(mode: () => string): VanillaForceGraphInstance;
+  linkDirectionalArrowRelPos(pos: number): VanillaForceGraphInstance;
+  linkDirectionalArrowLength(length: number | ((link: Link) => number)): VanillaForceGraphInstance;
+  linkDirectionalArrowColor(color: string | ((link: Link) => string)): VanillaForceGraphInstance;
+  linkWidth(width: number | ((link: Link) => number)): VanillaForceGraphInstance;
+  linkLabel(label: string | ((link: Link) => string)): VanillaForceGraphInstance;
+  nodeLabel(label: string | ((node: Node) => string)): VanillaForceGraphInstance;
+  nodeCanvasObject(fn: (node: Node, ctx: CanvasRenderingContext2D) => void): VanillaForceGraphInstance;
+  linkCanvasObject(fn: (link: any, ctx: CanvasRenderingContext2D) => void): VanillaForceGraphInstance;
+  onNodeClick(fn: (node: Node) => void): VanillaForceGraphInstance;
+  onNodeHover(fn: (node: Node | null) => void): VanillaForceGraphInstance;
+  onLinkHover(fn: (link: Link | null) => void): VanillaForceGraphInstance;
+  onNodeRightClick(fn: (node: Node, event: MouseEvent) => void): VanillaForceGraphInstance;
+  onLinkRightClick(fn: (link: Link, event: MouseEvent) => void): VanillaForceGraphInstance;
+  onBackgroundClick(fn: (event?: MouseEvent) => void): VanillaForceGraphInstance;
+  onBackgroundRightClick(fn: (event?: MouseEvent) => void): VanillaForceGraphInstance;
+  linkCurvature(curvature: string | number): VanillaForceGraphInstance;
+  nodeVisibility(visibility: string): VanillaForceGraphInstance;
+  linkVisibility(visibility: string): VanillaForceGraphInstance;
+  cooldownTicks(ticks: number): VanillaForceGraphInstance;
+  cooldownTime(time: number): VanillaForceGraphInstance;
+  onEngineStop(fn: () => void): VanillaForceGraphInstance;
+  backgroundColor(color: string): VanillaForceGraphInstance;
+  d3Force(name: "link"): d3.ForceLink<any, any> | undefined;
+  d3Force(name: "center"): d3.ForceCenter<any> | undefined;
+  d3Force(name: "charge"): d3.ForceManyBody<any> | undefined;
+  d3Force(name: "collision"): d3.ForceCollide<any> | undefined;
+  d3Force(name: string): d3.Force<any, any> | undefined;
+  d3Force(name: string, force: d3.Force<any, any> | null): VanillaForceGraphInstance;
+  d3ReheatSimulation(): VanillaForceGraphInstance;
+  zoom(): number;
+  zoom(scale: number, durationMs?: number): VanillaForceGraphInstance;
+  centerAt(): { x: number; y: number };
+  centerAt(x?: number, y?: number, durationMs?: number): VanillaForceGraphInstance;
+  zoomToFit(durationMs?: number, padding?: number, nodeFilter?: (node: Node) => boolean): VanillaForceGraphInstance;
+  // Private cleanup method
+  _destructor?: () => void;
+}
+
+// GraphRef for vanilla force-graph library
 export type GraphRef = MutableRefObject<
-  ForceGraphMethods<Node, Link> | undefined
+  VanillaForceGraphInstance | undefined
 >;
 
 export type Panel = "chat" | "data" | "add" | undefined;

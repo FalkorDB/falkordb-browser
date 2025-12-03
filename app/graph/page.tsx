@@ -1,10 +1,9 @@
 'use client'
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { cn, getMemoryUsage, isTwoNodes, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, getMemoryUsage, GraphRef, isTwoNodes, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
-import { ForceGraphMethods } from "react-force-graph-2d";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { Label, Graph, Link, Node, Relationship, GraphInfo, Value, MemoryValue } from "../api/graph/model";
@@ -60,7 +59,7 @@ export default function Page() {
     } = useContext(BrowserSettingsContext)
     const { toast } = useToast()
 
-    const chartRef = useRef<ForceGraphMethods<Node, Link>>()
+    const chartRef = useRef<GraphRef["current"]>()
     const panelRef = useRef<ImperativePanelHandle>(null)
 
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])

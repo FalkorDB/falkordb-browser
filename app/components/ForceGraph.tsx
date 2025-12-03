@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable react/require-default-props */
 /* eslint-disable no-param-reassign */
 
 "use client"
@@ -8,9 +7,9 @@ import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, u
 import { securedFetch, GraphRef, Tab, ViewportState, getNodeDisplayText } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import { useTheme } from "next-themes"
+import { ForceGraphElement } from "@/types/force-graph"
 import { Link, Node, Relationship, Graph, GraphData } from "../api/graph/model"
 import { BrowserSettingsContext, IndicatorContext } from "./provider"
-// Import the custom element to register it
 import "./force-graph-element"
 
 interface Props {
@@ -30,9 +29,6 @@ interface Props {
     setViewport?: Dispatch<SetStateAction<ViewportState>>
     isSaved?: boolean
 }
-
-// Note: The custom element (force-graph-element.ts) handles all rendering logic
-// This component now wraps the custom element with React-specific logic
 
 export default function ForceGraph({
     graph,
@@ -57,10 +53,9 @@ export default function ForceGraph({
 
     const { theme } = useTheme()
     const { toast } = useToast()
-    // Theme is handled by the custom element
 
     const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
-    const graphElementRef = useRef<HTMLElement & { graphDataProp: GraphData; themeProp: string; displayTextPriorityProp: Array<{ name: string; ignore: boolean }>; cooldownTicksProp: number | undefined; loadingProp: boolean; getGraphInstance: () => any } | null>(null);
+    const graphElementRef = useRef<ForceGraphElement | null>(null);
 
     const [, setHoverElement] = useState<Node | Link | undefined>()
 
@@ -103,21 +98,6 @@ export default function ForceGraph({
             }
         };
     }, [chartRef, graph.Id, setViewport])
-
-    // Note: Force configuration is now handled by the custom element
-    // The custom element automatically configures forces based on node degrees
-
-    // Clear cached display names when displayTextPriority changes
-    useEffect(() => {
-        data.nodes.forEach(node => {
-            node.displayName = ['', ''];
-        });
-        // Force a re-render by updating the custom element
-        if (graphElementRef.current) {
-            const updatedData = { ...data };
-            graphElementRef.current.graphDataProp = updatedData;
-        }
-    }, [displayTextPriority, data]);
 
     const handleGetNodeDisplayText = useCallback((node: Node) => getNodeDisplayText(node, displayTextPriority), [displayTextPriority])
 
@@ -209,47 +189,40 @@ export default function ForceGraph({
         setSelectedElements([])
     }, [selectedElements.length, setSelectedElements])
 
-    // Note: Link selection logic is now handled by the custom element
+    // // Update custom element when data changes
+    // useEffect(() => {
+    //     if (!graphElementRef.current) return
 
-    // Update custom element when data changes
-    useEffect(() => {
-        if (graphElementRef.current) {
-            // eslint-disable-next-line no-console
-            console.log('ForceGraph: Updating graphDataProp with data:', data);
-            graphElementRef.current.graphDataProp = data;
-        } else {
-            // eslint-disable-next-line no-console
-            console.log('ForceGraph: graphElementRef.current is null');
-        }
-    }, [data]);
+    //     graphElementRef.current.graphDataProp = data;
+    // }, [data]);
 
-    // Update custom element when theme changes
-    useEffect(() => {
-        if (graphElementRef.current) {
-            graphElementRef.current.themeProp = theme || 'system';
-        }
-    }, [theme]);
+    // // Update custom element when theme changes
+    // useEffect(() => {
+    //     if (graphElementRef.current) {
+    //         graphElementRef.current.themeProp = theme || 'system';
+    //     }
+    // }, [theme]);
 
-    // Update custom element when displayTextPriority changes
-    useEffect(() => {
-        if (graphElementRef.current) {
-            graphElementRef.current.displayTextPriorityProp = displayTextPriority;
-        }
-    }, [displayTextPriority]);
+    // // Update custom element when displayTextPriority changes
+    // useEffect(() => {
+    //     if (graphElementRef.current) {
+    //         graphElementRef.current.displayTextPriorityProp = displayTextPriority;
+    //     }
+    // }, [displayTextPriority]);
 
-    // Update custom element when cooldownTicks changes
-    useEffect(() => {
-        if (graphElementRef.current) {
-            graphElementRef.current.cooldownTicksProp = cooldownTicks;
-        }
-    }, [cooldownTicks]);
+    // // Update custom element when cooldownTicks changes
+    // useEffect(() => {
+    //     if (graphElementRef.current) {
+    //         graphElementRef.current.cooldownTicksProp = cooldownTicks;
+    //     }
+    // }, [cooldownTicks]);
 
-    // Update custom element when isLoading changes
-    useEffect(() => {
-        if (graphElementRef.current) {
-            graphElementRef.current.loadingProp = isLoading;
-        }
-    }, [isLoading]);
+    // // Update custom element when isLoading changes
+    // useEffect(() => {
+    //     if (graphElementRef.current) {
+    //         graphElementRef.current.loadingProp = isLoading;
+    //     }
+    // }, [isLoading]);
 
     // Set up event listeners for the custom element
     useEffect(() => {
@@ -309,7 +282,7 @@ export default function ForceGraph({
         const handleEngineStopEvent = async (e: Event) => {
             const customEvent = e as CustomEvent;
             const { cooldownTicks: currentCooldownTicks } = customEvent.detail as { cooldownTicks: number | undefined };
-            
+
             if (currentCooldownTicks === 0) return;
 
             // Import handleZoomToFit dynamically to avoid circular dependency
@@ -340,40 +313,29 @@ export default function ForceGraph({
         };
     }, [handleNodeClick, handleRightClick, handleUnselected, indicator, chartRef, data.nodes.length, handleCooldown]);
 
-    // Expose graph instance to chartRef for programmatic control
     useEffect(() => {
         if (graphElementRef.current && chartRef) {
-            const element = graphElementRef.current;
-            const graphInstance = element.getGraphInstance?.();
-            if (graphInstance) {
-                // Create a proxy object that matches the ForceGraphMethods interface
-                chartRef.current = {
-                    zoom: (k?: number, duration?: number) => graphInstance?.zoom?.(k, duration),
-                    zoomToFit: (duration?: number, padding?: number, filter?: (node: Node) => boolean) => graphInstance?.zoomToFit?.(duration, padding, filter),
-                    centerAt: (x?: number, y?: number, duration?: number) => graphInstance?.centerAt?.(x, y, duration),
-                    d3Force: (name: string) => graphInstance?.d3Force?.(name),
-                    d3ReheatSimulation: () => graphInstance?.d3ReheatSimulation?.(),
-                } as any;
-            }
+            chartRef.current = graphElementRef.current.getGraphInstance?.();
         }
     }, [chartRef]);
 
-    // Update custom element when isLoading changes
-    useEffect(() => {
-        if (graphElementRef.current) {
-            graphElementRef.current.loadingProp = isLoading;
-        }
-    }, [isLoading]);
-
     return (
         <force-graph
-            ref={graphElementRef}
-            data={JSON.stringify(data)}
-            theme={theme}
-            displayTextPriorityProp={displayTextPriority}
-            cooldownTicksProp={cooldownTicks}
-            loadingProp={isLoading}
             className="w-full h-full relative"
+            ref={graphElementRef}
+            GraphData={data}
+            Theme={theme}
+            DisplayTextPriority={displayTextPriority}
+            CooldownTicks={cooldownTicks}
+            Loading={isLoading}
         />
     )
+}
+
+ForceGraph.defaultProps = {
+    type: "graph",
+    currentTab: "Graph",
+    isSaved: undefined,
+    viewport: undefined,
+    setViewport: undefined,
 }
