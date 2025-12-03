@@ -122,7 +122,7 @@ export async function DELETE(
     } catch (error) {
       console.error(error);
       return NextResponse.json(
-        { error: (error as Error).message },
+        { message: (error as Error).message },
         { status: 400 }
       );
     }

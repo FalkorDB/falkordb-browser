@@ -82,7 +82,7 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
 
     const onSetAttribute = async (att: [string, string[]]) => {
         const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/${prepareArg(att[0])}`, {
-            method: "PATCH",
+            method: "POST",
             body: JSON.stringify({ type, attribute: att[1] })
         }, toast, setIndicator)
 

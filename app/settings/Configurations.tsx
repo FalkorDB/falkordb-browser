@@ -240,7 +240,7 @@ export default function Configurations() {
     }, []);
 
     return (
-        <div className="grow base-0 overflow-hidden">
+        <div className="grow basis-0 overflow-hidden">
             <TableComponent
                 label="Configs"
                 entityName="Config"

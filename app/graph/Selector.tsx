@@ -188,10 +188,6 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     }, [activeFilters, afterSearchCallback, historyQuery]);
 
     useEffect(() => {
-        resetHistoryFilters()
-    }, [resetHistoryFilters])
-
-    useEffect(() => {
         if (!queriesOpen) {
             setIsLoading(false)
             setTab("text")

@@ -52,7 +52,6 @@ export async function GET(
   }
 }
 
-
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ graph: string; element: string }> }
@@ -74,36 +73,36 @@ export async function POST(
       const validation = validateBody(createGraphElement, body);
 
       if (!validation.success) {
-        return NextResponse.json({ message: validation.error }, { status: 400 });
+        return NextResponse.json(
+          { message: validation.error },
+          { status: 400 }
+        );
       }
 
       const { type, label, attributes, selectedNodes } = validation.data;
-      
+
       if (!type) {
         if (!selectedNodes || selectedNodes.length !== 2)
           throw new Error("Selected nodes are required");
 
-        if (!label || label.length === 0)
-          throw new Error("Label is required");
+        if (label.length === 0) throw new Error("Label is required");
       }
-      
+
       const graph = client.selectGraph(graphId);
       const query = type
         ? `CREATE (n${label && label.length > 0 ? `:${label.join(":")}` : ""}${
             attributes.length > 0
-              ? ` {${attributes
-                  .map(([k]) => `${k}: $attr_${k}`)
-                  .join(",")}}`
+              ? ` {${attributes.map(([k]) => `${k}: $attr_${k}`).join(",")}}`
               : ""
           }) RETURN n`
-        : `MATCH (a), (b) WHERE ID(a) = $nodeA AND ID(b) = $nodeB CREATE (a)-[e:${label![0]}${
-          attributes.length > 0
-              ? ` {${attributes
-                  .map(([k]) => `${k}: $attr_${k}`)
-                  .join(",")}}`
+        : `MATCH (a), (b) WHERE ID(a) = $nodeA AND ID(b) = $nodeB CREATE (a)-[e:${
+            label![0]
+          }${
+            attributes.length > 0
+              ? ` {${attributes.map(([k]) => `${k}: $attr_${k}`).join(",")}}`
               : ""
           }]->(b) RETURN e`;
-      
+
       const queryParams: Record<string, string | number | boolean> = {};
       if (!type && selectedNodes) {
         queryParams.nodeA = selectedNodes[0].id;
@@ -114,7 +113,7 @@ export async function POST(
           queryParams[`attr_${k}`] = v;
         });
       }
-      
+
       const result =
         user.role === "Read-Only"
           ? await graph.roQuery(query, { params: queryParams })
@@ -159,7 +158,10 @@ export async function DELETE(
       const validation = validateBody(deleteGraphElement, body);
 
       if (!validation.success) {
-        return NextResponse.json({ message: validation.error }, { status: 400 });
+        return NextResponse.json(
+          { message: validation.error },
+          { status: 400 }
+        );
       }
 
       const { type } = validation.data;
