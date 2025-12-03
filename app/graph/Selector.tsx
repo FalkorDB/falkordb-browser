@@ -443,6 +443,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                         }))
                                                         setFilteredQueries([])
                                                         setActiveFilters([])
+                                                        setDeleteElements([])
                                                     }}
                                                     disabled={historyQuery.queries.length === 0}
                                                 />
