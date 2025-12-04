@@ -1,4 +1,3 @@
-
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
@@ -161,34 +160,14 @@ export default class ForceGraphElement extends HTMLElement {
   // Cache for node display names
   private nodeDisplayNameCache: Map<Node["id"], [string, string]> = new Map();
 
-  // Static getter for observed attributes (MDN best practice)
-  static get observedAttributes(): string[] {
-    return ["data", "theme", "cooldown-ticks", "loading"];
-  }
-
   connectedCallback() {
-    // Set up element styles - use the element itself as container
-    if (!this.style.width) {
-      this.style.width = "100%";
-    }
-    if (!this.style.height) {
-      this.style.height = "100%";
-    }
-    this.style.position = "relative";
-    this.style.display = "block";
+    // ensure defaults are set but allow override
+    if (!this.style.width) this.style.width = "100%";
+    if (!this.style.height) this.style.height = "100%";
+    if (!this.style.display) this.style.display = "block";
 
     // Create loading overlay
-    this.loadingOverlay = document.createElement("div");
-    this.loadingOverlay.style.position = "absolute";
-    this.loadingOverlay.style.inset = "0";
-    this.loadingOverlay.style.backgroundColor = "var(--background, #ffffff)";
-    this.loadingOverlay.style.display = "flex";
-    this.loadingOverlay.style.alignItems = "center";
-    this.loadingOverlay.style.justifyContent = "center";
-    this.loadingOverlay.style.zIndex = "10";
-    this.loadingOverlay.style.visibility = "hidden";
-    this.loadingOverlay.textContent = "Loading...";
-    this.appendChild(this.loadingOverlay);
+    this.createLoadingOverlay();
 
     // Parse initial data from attribute
     if (this.hasAttribute("data")) {
@@ -205,6 +184,7 @@ export default class ForceGraphElement extends HTMLElement {
     // Get theme from attribute
     if (this.hasAttribute("theme")) {
       this.theme = this.getAttribute("theme") || "system";
+      this.updateTheme();
     }
 
     // Get cooldownTicks from attribute
@@ -711,11 +691,87 @@ export default class ForceGraphElement extends HTMLElement {
     this.graphInstance.cooldownTicks(this.cooldownTicks ?? Infinity);
   }
 
+  private createLoadingOverlay() {
+    this.loadingOverlay = document.createElement("div");
+    this.loadingOverlay.style.position = "absolute";
+    this.loadingOverlay.style.inset = "0";
+    this.loadingOverlay.style.backgroundColor = "var(--background, #ffffff)";
+    this.loadingOverlay.style.display = "none";
+    this.loadingOverlay.style.alignItems = "center";
+    this.loadingOverlay.style.justifyContent = "center";
+    this.loadingOverlay.style.zIndex = "10";
+    this.loadingOverlay.className =
+      "absolute inset-x-0 inset-y-0 bg-background flex items-center justify-center z-10";
+
+    // Create spinner container (matching Spinning component structure)
+    const spinnerContainer = document.createElement("div");
+    spinnerContainer.style.display = "flex";
+    spinnerContainer.style.alignItems = "center";
+    spinnerContainer.style.gap = "1rem"; // space-x-4 equivalent
+
+    // Create circular skeleton (h-12 w-12 rounded-full)
+    const circularSkeleton = document.createElement("div");
+    circularSkeleton.style.width = "3rem"; // h-12 = 48px = 3rem
+    circularSkeleton.style.height = "3rem"; // w-12 = 48px = 3rem
+    circularSkeleton.style.borderRadius = "9999px"; // rounded-full
+    circularSkeleton.style.backgroundColor = "var(--muted, #f3f4f6)";
+    circularSkeleton.style.animation =
+      "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite";
+
+    // Create text skeletons container
+    const textContainer = document.createElement("div");
+    textContainer.style.display = "flex";
+    textContainer.style.flexDirection = "column";
+    textContainer.style.gap = "0.5rem"; // space-y-2
+
+    // Create first rectangular skeleton (h-4 w-[250px])
+    const skeleton1 = document.createElement("div");
+    skeleton1.style.height = "1rem"; // h-4 = 16px = 1rem
+    skeleton1.style.width = "250px";
+    skeleton1.style.borderRadius = "0.375rem"; // rounded-md
+    skeleton1.style.backgroundColor = "var(--muted, #f3f4f6)";
+    skeleton1.style.animation =
+      "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite";
+
+    // Create second rectangular skeleton (h-4 w-[200px])
+    const skeleton2 = document.createElement("div");
+    skeleton2.style.height = "1rem"; // h-4 = 16px = 1rem
+    skeleton2.style.width = "200px";
+    skeleton2.style.borderRadius = "0.375rem"; // rounded-md
+    skeleton2.style.backgroundColor = "var(--muted, #f3f4f6)";
+    skeleton2.style.animation =
+      "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite";
+
+    // Assemble the structure
+    textContainer.appendChild(skeleton1);
+    textContainer.appendChild(skeleton2);
+    spinnerContainer.appendChild(circularSkeleton);
+    spinnerContainer.appendChild(textContainer);
+    this.loadingOverlay.appendChild(spinnerContainer);
+
+    // Add pulse animation if not already defined
+    if (!document.getElementById("force-graph-pulse-style")) {
+      const style = document.createElement("style");
+      style.id = "force-graph-pulse-style";
+      style.textContent = `
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.5;
+          }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    this.appendChild(this.loadingOverlay);
+  }
+
   private updateLoadingState() {
     if (this.loadingOverlay) {
-      this.loadingOverlay.style.visibility = this.loading
-        ? "visible"
-        : "hidden";
+      this.loadingOverlay.style.display = this.loading ? "flex" : "none";
     }
   }
 
@@ -749,9 +805,21 @@ export default class ForceGraphElement extends HTMLElement {
   }
 
   set GraphData(value: GraphData) {
-    // Normalize to ensure source/target are always IDs
-    this.graphData = value;
+    console.log("data", value);
+    this.graphData = {
+      nodes: value.nodes.map((node) => ({ ...node })),
+      links: value.links.map((link) => ({ ...link })),
+    };
     this.updateGraphData();
+  }
+
+  get Theme(): string {
+    return this.theme;
+  }
+
+  set Theme(value: string) {
+    this.theme = value;
+    this.updateTheme();
   }
 
   get DisplayTextPriority(): Array<{ name: string; ignore: boolean }> {
@@ -772,6 +840,7 @@ export default class ForceGraphElement extends HTMLElement {
   }
 
   set CooldownTicks(value: number | undefined) {
+    console.log("cooldown", value);
     this.cooldownTicks = value;
     if (value === undefined) {
       this.removeAttribute("cooldown-ticks");
@@ -786,6 +855,7 @@ export default class ForceGraphElement extends HTMLElement {
   }
 
   set Loading(value: boolean) {
+    
     this.loading = value;
     if (value) {
       this.setAttribute("loading", "true");

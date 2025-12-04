@@ -321,7 +321,6 @@ export default function ForceGraph({
 
     return (
         <force-graph
-            className="w-full h-full relative"
             ref={graphElementRef}
             GraphData={data}
             Theme={theme}
