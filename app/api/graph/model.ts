@@ -3,8 +3,6 @@
 /* eslint-disable no-param-reassign */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { LinkObject, NodeObject } from "react-force-graph-2d";
-
 export type Value = string | number | boolean;
 
 export type HistoryQuery = {
@@ -52,7 +50,7 @@ const getSchemaValue = (value: string): string[] => {
   return [type, description, unique, required];
 };
 
-export type Node = NodeObject<{
+export type Node = {
   id: number;
   labels: string[];
   color: string;
@@ -62,25 +60,22 @@ export type Node = NodeObject<{
   data: {
     [key: string]: any;
   };
-}>;
+};
 
-export type Link = LinkObject<
-  Node,
-  {
-    id: number;
-    relationship: string;
-    color: string;
-    source: number;
-    target: number;
-    visible: boolean;
-    expand: boolean;
-    collapsed: boolean;
-    curve: number;
-    data: {
-      [key: string]: any;
-    };
-  }
->;
+export type Link = {
+  id: number;
+  relationship: string;
+  color: string;
+  source: number;
+  target: number;
+  visible: boolean;
+  expand: boolean;
+  collapsed: boolean;
+  curve: number;
+  data: {
+    [key: string]: any;
+  };
+};
 
 export type GraphData = {
   nodes: Node[];
@@ -734,7 +729,7 @@ export class Graph {
     });
 
     newElements
-      .filter((element): element is Link => !!element.source)
+      .filter((element): element is Link => "source" in element)
       .forEach((link) => {
         link.curve = this.calculateLinkCurve(link);
       });
@@ -816,8 +811,7 @@ export class Graph {
 
       if (
         !visible &&
-        (sourceNode?.visible === false ||
-          targetNode?.visible === false)
+        (sourceNode?.visible === false || targetNode?.visible === false)
       ) {
         link.visible = false;
       }
@@ -835,8 +829,7 @@ export class Graph {
         .map((link) => {
           if (
             (ids.length !== 0 && !links.includes(link)) ||
-            (this.nodesMap.has(link.source) &&
-              this.nodesMap.has(link.target))
+            (this.nodesMap.has(link.source) && this.nodesMap.has(link.target))
           ) {
             return link;
           }
@@ -870,14 +863,15 @@ export class Graph {
   public removeElements(elements: (Node | Link)[]) {
     elements.forEach((element) => {
       const { id } = element;
-      const type = !element.source;
+      const type = !("source" in element);
 
       if (type) {
+        const node = element as Node;
         this.elements.nodes.splice(
           this.elements.nodes.findIndex((n) => n.id === id),
           1
         );
-        const category = this.labelsMap.get(element.labels[0]);
+        const category = this.labelsMap.get(node.labels[0]);
 
         if (category) {
           category.elements = category.elements.filter((e) => e.id !== id);
@@ -890,11 +884,12 @@ export class Graph {
           }
         }
       } else {
+        const link = element as Link;
         this.elements.links.splice(
           this.elements.links.findIndex((l) => l.id === id),
           1
         );
-        const category = this.relationshipsMap.get(element.relationship);
+        const category = this.relationshipsMap.get(link.relationship);
 
         if (category) {
           category.elements = category.elements.filter((e) => e.id !== id);
@@ -909,8 +904,8 @@ export class Graph {
       }
     });
 
-    const nodes = elements.filter((n): n is Node => !n.source);
-    const links = elements.filter((l): l is Link => l.source);
+    const nodes = elements.filter((n): n is Node => !("source" in n));
+    const links = elements.filter((l): l is Link => "source" in l);
 
     this.elements = {
       nodes: this.elements.nodes.filter(

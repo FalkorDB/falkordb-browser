@@ -60,7 +60,7 @@ function GraphView({
 }: Props) {
 
     const { graph, graphName, currentTab, setCurrentTab } = useContext(GraphContext)
-    const { setData, data, isSaved, setViewport, viewport } = useContext(ViewportContext)
+    const { setData, data, setViewport, viewport } = useContext(ViewportContext)
 
     const elementsLength = graph.getElements().length
 
@@ -132,7 +132,7 @@ function GraphView({
                                 setSelectedElements={setSelectedElements}
                                 handleDeleteElement={handleDeleteElement}
                                 chartRef={chartRef}
-                                setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => !!e.labels) ? setIsAddEdge : undefined}
+                                setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => !("source" in e)) ? setIsAddEdge : undefined}
                                 setIsAddNode={setIsAddNode}
                                 isAddEdge={isAddEdge}
                                 isAddNode={isAddNode}
@@ -225,7 +225,6 @@ function GraphView({
                     currentTab={currentTab}
                     viewport={viewport}
                     setViewport={setViewport}
-                    isSaved={isSaved}
                 />
             </TabsContent>
             <TabsContent value="Table" className="h-1 grow w-full mt-0 overflow-hidden">

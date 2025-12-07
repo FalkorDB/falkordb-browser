@@ -4,13 +4,12 @@
 "use client"
 
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react"
-import { securedFetch, GraphRef, Tab, ViewportState, getNodeDisplayText } from "@/lib/utils"
+import { securedFetch, GraphRef, Tab, ViewportState, getNodeDisplayText, type VanillaForceGraphInstance } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import { useTheme } from "next-themes"
-import { ForceGraphElement } from "@/types/force-graph"
+import { FalkordbCanvasElement } from "@falkordb/canvas"
 import { Link, Node, Relationship, Graph, GraphData } from "../api/graph/model"
 import { BrowserSettingsContext, IndicatorContext } from "./provider"
-import "./force-graph-element"
 
 interface Props {
     graph: Graph
@@ -27,7 +26,6 @@ interface Props {
     currentTab?: Tab
     viewport?: ViewportState
     setViewport?: Dispatch<SetStateAction<ViewportState>>
-    isSaved?: boolean
 }
 
 export default function ForceGraph({
@@ -45,7 +43,6 @@ export default function ForceGraph({
     currentTab = "Graph",
     viewport,
     setViewport,
-    isSaved
 }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
@@ -55,7 +52,7 @@ export default function ForceGraph({
     const { toast } = useToast()
 
     const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
-    const graphElementRef = useRef<ForceGraphElement | null>(null);
+    const graphElementRef = useRef<InstanceType<typeof FalkordbCanvasElement> | null>(null);
 
     const [, setHoverElement] = useState<Node | Link | undefined>()
 
@@ -65,7 +62,7 @@ export default function ForceGraph({
 
     // Load saved viewport on mount
     useEffect(() => {
-        if (isSaved && viewport) {
+        if (!isLoading && viewport) {
             const { zoom, centerX, centerY } = viewport;
             setTimeout(() => {
                 if (chartRef.current) {
@@ -77,7 +74,7 @@ export default function ForceGraph({
             handleCooldown()
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [chartRef, graph.Id, currentTab, graph.Elements.nodes.length, isSaved])
+    }, [chartRef, graph.Id, currentTab, graph.Elements.nodes.length, isLoading])
 
     // Save viewport on unmount
     useEffect(() => {
@@ -189,41 +186,6 @@ export default function ForceGraph({
         setSelectedElements([])
     }, [selectedElements.length, setSelectedElements])
 
-    // // Update custom element when data changes
-    // useEffect(() => {
-    //     if (!graphElementRef.current) return
-
-    //     graphElementRef.current.graphDataProp = data;
-    // }, [data]);
-
-    // // Update custom element when theme changes
-    // useEffect(() => {
-    //     if (graphElementRef.current) {
-    //         graphElementRef.current.themeProp = theme || 'system';
-    //     }
-    // }, [theme]);
-
-    // // Update custom element when displayTextPriority changes
-    // useEffect(() => {
-    //     if (graphElementRef.current) {
-    //         graphElementRef.current.displayTextPriorityProp = displayTextPriority;
-    //     }
-    // }, [displayTextPriority]);
-
-    // // Update custom element when cooldownTicks changes
-    // useEffect(() => {
-    //     if (graphElementRef.current) {
-    //         graphElementRef.current.cooldownTicksProp = cooldownTicks;
-    //     }
-    // }, [cooldownTicks]);
-
-    // // Update custom element when isLoading changes
-    // useEffect(() => {
-    //     if (graphElementRef.current) {
-    //         graphElementRef.current.loadingProp = isLoading;
-    //     }
-    // }, [isLoading]);
-
     // Set up event listeners for the custom element
     useEffect(() => {
         const element = graphElementRef.current;
@@ -315,12 +277,12 @@ export default function ForceGraph({
 
     useEffect(() => {
         if (graphElementRef.current && chartRef) {
-            chartRef.current = graphElementRef.current.getGraphInstance?.();
+            chartRef.current = graphElementRef.current.getGraphInstance?.() as VanillaForceGraphInstance | undefined;
         }
     }, [chartRef]);
 
     return (
-        <force-graph
+        <falkordb-canvas
             ref={graphElementRef}
             GraphData={data}
             Theme={theme}
@@ -334,7 +296,6 @@ export default function ForceGraph({
 ForceGraph.defaultProps = {
     type: "graph",
     currentTab: "Graph",
-    isSaved: undefined,
     viewport: undefined,
     setViewport: undefined,
 }

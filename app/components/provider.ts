@@ -140,7 +140,6 @@ type ViewportContextType = {
   setViewport: Dispatch<SetStateAction<ViewportState>>;
   data: GraphData;
   setData: Dispatch<SetStateAction<GraphData>>;
-  isSaved: boolean;
 };
 
 type TableViewContextType = {
@@ -176,7 +175,12 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         newModel: "",
         setNewModel: () => {},
       },
-      graphInfo: { newRefreshInterval: 0, setNewRefreshInterval: () => {}, newDisplayTextPriority: [], setNewDisplayTextPriority: () => {} },
+      graphInfo: {
+        newRefreshInterval: 0,
+        setNewRefreshInterval: () => {},
+        newDisplayTextPriority: [],
+        setNewDisplayTextPriority: () => {},
+      },
     },
     settings: {
       limitSettings: {
@@ -203,7 +207,13 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         navigateToSettings: false,
         displayChat: false,
       },
-      graphInfo: { showMemoryUsage: false, refreshInterval: 0, setRefreshInterval: () => {}, displayTextPriority: [], setDisplayTextPriority: () => {} },
+      graphInfo: {
+        showMemoryUsage: false,
+        refreshInterval: 0,
+        setRefreshInterval: () => {},
+        displayTextPriority: [],
+        setDisplayTextPriority: () => {},
+      },
     },
     hasChanges: false,
     setHasChanges: () => {},
@@ -284,7 +294,6 @@ export const ViewportContext = createContext<ViewportContextType>({
   setViewport: () => {},
   data: { nodes: [], links: [] },
   setData: () => {},
-  isSaved: false,
 });
 
 export const TableViewContext = createContext<TableViewContextType>({

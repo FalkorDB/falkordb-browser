@@ -240,7 +240,7 @@ export default function Page() {
 
     const handleDeleteElement = useCallback(async () => {
         await Promise.all(selectedElements.map(async (element) => {
-            const type = !element.source
+            const type = !("source" in element)
             const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${prepareArg(element.id.toString())}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type })

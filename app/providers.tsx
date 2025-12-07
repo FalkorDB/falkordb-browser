@@ -101,7 +101,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [search, setSearch] = useState("")
   const [expand, setExpand] = useState<Map<number, number>>(new Map())
 
-  const isSaved = data.nodes.some(n => n.x && n.y)
   const dataHash = useMemo(() => JSON.stringify(graph.Data), [graph.Data])
 
   const browserSettingsContext = useMemo(() => ({
@@ -199,8 +198,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setViewport,
     data,
     setData,
-    isSaved
-  }), [viewport, data, isSaved])
+  }), [viewport, data])
 
   const tableViewContext = useMemo(() => ({
     scrollPosition,

@@ -162,7 +162,7 @@ export default function Page() {
 
         await Promise.all(stateSelectedElements.map(async (element) => {
             const { id } = element
-            const type = !element.source
+            const type = !("source" in element)
             const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(id.toString())}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type }),
@@ -179,7 +179,8 @@ export default function Page() {
             }
 
             if (type) {
-                (element as Node).labels.forEach((labelName) => {
+                const node = element as Node
+                node.labels.forEach((labelName) => {
                     const label = schema.LabelsMap.get(labelName)
 
                     if (label) {
@@ -192,7 +193,7 @@ export default function Page() {
                     }
                 })
             } else {
-                const relation = schema.RelationshipsMap.get(element.relationship)
+                const relation = schema.RelationshipsMap.get((element as Link).relationship)
 
                 if (relation) {
                     relation.elements = relation.elements.filter(n => n.id !== id)

@@ -27,20 +27,42 @@ export interface VanillaForceGraphInstance {
   nodeCanvasObjectMode(mode: () => string): VanillaForceGraphInstance;
   linkCanvasObjectMode(mode: () => string): VanillaForceGraphInstance;
   linkDirectionalArrowRelPos(pos: number): VanillaForceGraphInstance;
-  linkDirectionalArrowLength(length: number | ((link: Link) => number)): VanillaForceGraphInstance;
-  linkDirectionalArrowColor(color: string | ((link: Link) => string)): VanillaForceGraphInstance;
-  linkWidth(width: number | ((link: Link) => number)): VanillaForceGraphInstance;
-  linkLabel(label: string | ((link: Link) => string)): VanillaForceGraphInstance;
-  nodeLabel(label: string | ((node: Node) => string)): VanillaForceGraphInstance;
-  nodeCanvasObject(fn: (node: Node, ctx: CanvasRenderingContext2D) => void): VanillaForceGraphInstance;
-  linkCanvasObject(fn: (link: any, ctx: CanvasRenderingContext2D) => void): VanillaForceGraphInstance;
+  linkDirectionalArrowLength(
+    length: number | ((link: Link) => number)
+  ): VanillaForceGraphInstance;
+  linkDirectionalArrowColor(
+    color: string | ((link: Link) => string)
+  ): VanillaForceGraphInstance;
+  linkWidth(
+    width: number | ((link: Link) => number)
+  ): VanillaForceGraphInstance;
+  linkLabel(
+    label: string | ((link: Link) => string)
+  ): VanillaForceGraphInstance;
+  nodeLabel(
+    label: string | ((node: Node) => string)
+  ): VanillaForceGraphInstance;
+  nodeCanvasObject(
+    fn: (node: Node, ctx: CanvasRenderingContext2D) => void
+  ): VanillaForceGraphInstance;
+  linkCanvasObject(
+    fn: (link: any, ctx: CanvasRenderingContext2D) => void
+  ): VanillaForceGraphInstance;
   onNodeClick(fn: (node: Node) => void): VanillaForceGraphInstance;
   onNodeHover(fn: (node: Node | null) => void): VanillaForceGraphInstance;
   onLinkHover(fn: (link: Link | null) => void): VanillaForceGraphInstance;
-  onNodeRightClick(fn: (node: Node, event: MouseEvent) => void): VanillaForceGraphInstance;
-  onLinkRightClick(fn: (link: Link, event: MouseEvent) => void): VanillaForceGraphInstance;
-  onBackgroundClick(fn: (event?: MouseEvent) => void): VanillaForceGraphInstance;
-  onBackgroundRightClick(fn: (event?: MouseEvent) => void): VanillaForceGraphInstance;
+  onNodeRightClick(
+    fn: (node: Node, event: MouseEvent) => void
+  ): VanillaForceGraphInstance;
+  onLinkRightClick(
+    fn: (link: Link, event: MouseEvent) => void
+  ): VanillaForceGraphInstance;
+  onBackgroundClick(
+    fn: (event?: MouseEvent) => void
+  ): VanillaForceGraphInstance;
+  onBackgroundRightClick(
+    fn: (event?: MouseEvent) => void
+  ): VanillaForceGraphInstance;
   linkCurvature(curvature: string | number): VanillaForceGraphInstance;
   nodeVisibility(visibility: string): VanillaForceGraphInstance;
   linkVisibility(visibility: string): VanillaForceGraphInstance;
@@ -53,21 +75,30 @@ export interface VanillaForceGraphInstance {
   d3Force(name: "charge"): d3.ForceManyBody<any> | undefined;
   d3Force(name: "collision"): d3.ForceCollide<any> | undefined;
   d3Force(name: string): d3.Force<any, any> | undefined;
-  d3Force(name: string, force: d3.Force<any, any> | null): VanillaForceGraphInstance;
+  d3Force(
+    name: string,
+    force: d3.Force<any, any> | null
+  ): VanillaForceGraphInstance;
   d3ReheatSimulation(): VanillaForceGraphInstance;
   zoom(): number;
   zoom(scale: number, durationMs?: number): VanillaForceGraphInstance;
   centerAt(): { x: number; y: number };
-  centerAt(x?: number, y?: number, durationMs?: number): VanillaForceGraphInstance;
-  zoomToFit(durationMs?: number, padding?: number, nodeFilter?: (node: Node) => boolean): VanillaForceGraphInstance;
+  centerAt(
+    x?: number,
+    y?: number,
+    durationMs?: number
+  ): VanillaForceGraphInstance;
+  zoomToFit(
+    durationMs?: number,
+    padding?: number,
+    nodeFilter?: (node: Node) => boolean
+  ): VanillaForceGraphInstance;
   // Private cleanup method
   _destructor?: () => void;
 }
 
 // GraphRef for vanilla force-graph library
-export type GraphRef = MutableRefObject<
-  VanillaForceGraphInstance | undefined
->;
+export type GraphRef = MutableRefObject<VanillaForceGraphInstance | undefined>;
 
 export type Panel = "chat" | "data" | "add" | undefined;
 
@@ -360,38 +391,41 @@ export function getQueryWithLimit(
   return [query, existingLimit];
 }
 
-export const getNodeDisplayText = (node: Node, displayTextPriority: TextPriority[]) => {
+export const getNodeDisplayText = (
+  node: Node,
+  displayTextPriority: TextPriority[]
+) => {
   const { data: nodeData } = node;
 
   const displayText = displayTextPriority.find(({ name, ignore }) => {
-      const key = ignore
-          ? Object.keys(nodeData).find(
-              (k) => k.toLowerCase() === name.toLowerCase()
-          )
-          : name;
+    const key = ignore
+      ? Object.keys(nodeData).find(
+          (k) => k.toLowerCase() === name.toLowerCase()
+        )
+      : name;
 
-      return (
-          key &&
-          nodeData[key] &&
-          typeof nodeData[key] === "string" &&
-          nodeData[key].trim().length > 0
-      );
+    return (
+      key &&
+      nodeData[key] &&
+      typeof nodeData[key] === "string" &&
+      nodeData[key].trim().length > 0
+    );
   });
 
   if (displayText) {
-      const key = displayText.ignore
-          ? Object.keys(nodeData).find(
-              (k) => k.toLowerCase() === displayText.name.toLowerCase()
-          )
-          : displayText.name;
+    const key = displayText.ignore
+      ? Object.keys(nodeData).find(
+          (k) => k.toLowerCase() === displayText.name.toLowerCase()
+        )
+      : displayText.name;
 
-      if (key) {
-          return String(nodeData[key]);
-      }
+    if (key) {
+      return String(nodeData[key]);
+    }
   }
 
   return String(node.id);
-}
+};
 
 export const formatName = (newGraphName: string) =>
   newGraphName === '""' ? "" : newGraphName;
@@ -447,7 +481,8 @@ export function getTheme(theme: string | undefined) {
 }
 
 // Type guard: runtime check that proves elements is [Node, Node]
-export function isTwoNodes(elements: (Node | Link)[]): elements is [Node, Node] {
-  return elements.length === 2 &&
-    elements.every((e): e is Node => !!e.labels)
+export function isTwoNodes(
+  elements: (Node | Link)[]
+): elements is [Node, Node] {
+  return elements.length === 2 && elements.every((e): e is Node => !!e.labels);
 }
