@@ -2,7 +2,7 @@
 
 "use client"
 
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useEffect } from "react";
 import { Trash2 } from "lucide-react";
 import CloseDialog from "../components/CloseDialog";
 import DialogComponent from "../components/DialogComponent";
@@ -28,10 +28,17 @@ export default function DeleteElement({
     const { indicator } = useContext(IndicatorContext)
     const [isLoading, setIsLoading] = useState(false)
 
+    useEffect(() => {
+        if (!open) {
+            setIsLoading(false)
+        }
+    }, [open])
+
     const handleDelete = async () => {
         try {
             setIsLoading(true)
             await onDeleteElement()
+            setOpen(false)
         } finally {
             setIsLoading(false)
         }
@@ -48,6 +55,7 @@ export default function DeleteElement({
                     data-testid={`deleteElement${label}`}
                     className="pointer-events-auto bg-background"
                     variant="Delete"
+                    tooltipSide="bottom"
                     title="Delete Element(s)"
                 >
                     <Trash2 size={20} />

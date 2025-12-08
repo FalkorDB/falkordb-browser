@@ -1,6 +1,6 @@
 import { Locator } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
-import { interactWhenVisible, waitForTimeOut } from "../../infra/utils";
+import { interactWhenVisible, waitForElementToBeVisible, waitForTimeOut } from "../../infra/utils";
 
 export default class SettingsUsersPage extends BasePage {
   private get usersTabBtn(): Locator {
@@ -15,7 +15,7 @@ export default class SettingsUsersPage extends BasePage {
     return this.page.getByRole("button", { name: "Submit" });
   }
 
-  private get selectRoleBtnInAddUser(): Locator {
+  private get selectRoleBtn(): Locator {
     return this.page.getByTestId("selectRole");
   }
 
@@ -25,11 +25,7 @@ export default class SettingsUsersPage extends BasePage {
 
   private get userRow(): (selectedUser: string) => Locator {
     return (selectedUser: string) =>
-      this.page.locator(`//tbody/tr[@data-id='${selectedUser}']`);
-  }
-
-  private get userSelectRoleBtn(): Locator {
-    return this.page.locator(`button[data-testid="selectRole"]`);
+      this.page.getByTestId(`tableRowUsers${selectedUser}`);
   }
 
   private get selectUserRole(): (role: string) => Locator {
@@ -71,7 +67,7 @@ export default class SettingsUsersPage extends BasePage {
 
   private get findUserNameInTable(): (selectedUser: string) => Locator {
     return (selectedUser: string) =>
-      this.page.getByTestId(`contentUsers${selectedUser}Name`);
+      this.page.getByTestId(`tableRowUsers${selectedUser}`);
   }
 
   private get deleteUsersBtn(): Locator {
@@ -101,7 +97,8 @@ export default class SettingsUsersPage extends BasePage {
 
   async verifyUserExists(selectedUser: string): Promise<boolean> {
     await this.waitForPageIdle();
-    const isVisible = await this.findUserNameInTable(selectedUser).isVisible();
+    await this.searchForElement(selectedUser);
+    const isVisible = await waitForElementToBeVisible(this.findUserNameInTable(selectedUser));
     return isVisible;
   }
 
@@ -139,7 +136,7 @@ export default class SettingsUsersPage extends BasePage {
 
   async clickOnSelectRoleBtnInAddUser(): Promise<void> {
     await interactWhenVisible(
-      this.selectRoleBtnInAddUser,
+      this.selectRoleBtn,
       (el) => el.click(),
       "select role button"
     );
@@ -179,7 +176,7 @@ export default class SettingsUsersPage extends BasePage {
 
   async clickUserSelectRoleBtn(): Promise<void> {
     await interactWhenVisible(
-      this.userSelectRoleBtn,
+      this.selectRoleBtn,
       (el) => el.click(),
       "select role button"
     );
@@ -269,6 +266,8 @@ export default class SettingsUsersPage extends BasePage {
 
   async removeUser(selectedUser: string): Promise<void> {
     await this.waitForPageIdle();
+    // Search for user to bring into viewport (virtual scrolling)
+    await this.searchForElement(selectedUser);
     await this.clickUserCheckboxBtn(selectedUser);
     await this.clickDeleteUsersBtn();
     await this.clickConfirmUserDeleteMsg();

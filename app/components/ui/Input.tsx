@@ -17,7 +17,7 @@ const Input = forwardRef<HTMLInputElement, Props>(({
         <input
             ref={ref}
             className={cn(
-                "border border-border p-2 rounded-lg disabled:cursor-not-allowed disabled:opacity-50 bg-input text-foreground",
+                "border border-border p-1 rounded-lg disabled:cursor-not-allowed disabled:opacity-50 bg-input text-foreground",
                 className
             )}
             {...props}

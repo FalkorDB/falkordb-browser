@@ -30,6 +30,9 @@ yarn-error.log*
 .env*.local
 .env
 
+# local token storage
+/.data/
+
 # vercel
 .vercel
 
@@ -45,3 +48,4 @@ next-env.d.ts
 /e2e/playwright/.auth
 /playwright
 /tls
+.history

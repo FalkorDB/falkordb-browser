@@ -548,16 +548,18 @@ test.describe("Data panel Tests", () => {
   test(`@readwrite delete node via API and validate node count via UI`, async () => {
     const graphName = getRandomString("graph");
     await apicalls.addGraph(graphName);
+    await apicalls.runQuery(graphName, CREATE_TWO_NODES_QUERY);
+    const idRes = await apicalls.runQuery(
+      graphName,
+      'MATCH (n {name: "a"}) RETURN ID(n) AS id LIMIT 1'
+    );
+    const nodeId = idRes?.data?.[0]?.id ?? idRes?.data?.[0]?.n?.identity ?? "0";
+    await apicalls.deleteGraphNode(graphName, String(nodeId), { type: true });
     const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
     await browser.setPageToFullScreen();
     await graph.selectGraphByName(graphName);
-    await graph.insertQuery(CREATE_TWO_NODES_QUERY);
-    await graph.clickRunQuery(false);
-    await apicalls.deleteGraphNode(graphName, "0", { type: "true" });
-    await graph.refreshPage();
-    await graph.selectGraphByName(graphName);
     await graph.insertQuery("match (n) return n");
-    await graph.clickRunQuery(false);
+    await graph.clickRunQuery();
     const nodesCount = await graph.getNodesCount();
     expect(parseInt(nodesCount ?? "0", 10)).toBe(1);
     await apicalls.removeGraph(graphName);

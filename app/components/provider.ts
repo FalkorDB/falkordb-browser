@@ -1,5 +1,5 @@
 import { createContext, Dispatch, SetStateAction } from "react";
-import { Panel, Tab, ViewportState } from "@/lib/utils";
+import { Panel, Tab, TextPriority, ViewportState } from "@/lib/utils";
 import { Graph, GraphData, GraphInfo, HistoryQuery } from "../api/graph/model";
 
 type BrowserSettingsContextType = {
@@ -33,6 +33,8 @@ type BrowserSettingsContextType = {
     graphInfo: {
       newRefreshInterval: number;
       setNewRefreshInterval: Dispatch<SetStateAction<number>>;
+      newDisplayTextPriority: TextPriority[];
+      setNewDisplayTextPriority: Dispatch<SetStateAction<TextPriority[]>>;
     };
   };
   settings: {
@@ -64,11 +66,14 @@ type BrowserSettingsContextType = {
       model: string;
       setModel: Dispatch<SetStateAction<string>>;
       navigateToSettings: boolean;
-      setNavigateToSettings: Dispatch<SetStateAction<boolean>>;
+      displayChat: boolean;
     };
     graphInfo: {
+      showMemoryUsage: boolean;
       refreshInterval: number;
       setRefreshInterval: Dispatch<SetStateAction<number>>;
+      displayTextPriority: TextPriority[];
+      setDisplayTextPriority: Dispatch<SetStateAction<TextPriority[]>>;
     };
   };
   hasChanges: boolean;
@@ -171,7 +176,7 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         newModel: "",
         setNewModel: () => {},
       },
-      graphInfo: { newRefreshInterval: 0, setNewRefreshInterval: () => {} },
+      graphInfo: { newRefreshInterval: 0, setNewRefreshInterval: () => {}, newDisplayTextPriority: [], setNewDisplayTextPriority: () => {} },
     },
     settings: {
       limitSettings: {
@@ -196,9 +201,9 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         model: "",
         setModel: () => {},
         navigateToSettings: false,
-        setNavigateToSettings: () => {},
+        displayChat: false,
       },
-      graphInfo: { refreshInterval: 0, setRefreshInterval: () => {} },
+      graphInfo: { showMemoryUsage: false, refreshInterval: 0, setRefreshInterval: () => {}, displayTextPriority: [], setDisplayTextPriority: () => {} },
     },
     hasChanges: false,
     setHasChanges: () => {},

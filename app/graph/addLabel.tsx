@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { useState, useContext } from "react";
+import { useState, useContext, useEffect } from "react";
 import DialogComponent from "../components/DialogComponent";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -7,11 +7,13 @@ import CloseDialog from "../components/CloseDialog";
 import { IndicatorContext } from "../components/provider";
 
 interface Props {
+    type?: "Label" | "Type"
     trigger?: React.ReactNode
     onAddLabel: (label: string) => Promise<boolean>
 }
 
 export default function AddLabel({
+    type = "Label",
     trigger = <Button
         variant="Primary"
         label="Add Label"
@@ -27,6 +29,13 @@ export default function AddLabel({
     const [open, setOpen] = useState(false)
     const [label, setLabel] = useState("")
     const [isLoading, setIsLoading] = useState(false)
+
+    useEffect(() => {
+        if (!open) {
+            setLabel("")
+            setIsLoading(false)
+        }
+    }, [open])
 
     const handleAddLabel = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
@@ -45,7 +54,7 @@ export default function AddLabel({
 
     return (
         <DialogComponent
-            title="Add Label"
+            title={`Add ${type}`}
             trigger={trigger}
             open={open}
             onOpenChange={setOpen}
@@ -64,8 +73,8 @@ export default function AddLabel({
                     <Button
                         indicator={indicator}
                         variant="Primary"
-                        label="Add label"
-                        title="Add a new label"
+                        label={`Add ${type}`}
+                        title={`Add a new ${type}`}
                         type="submit"
                         isLoading={isLoading}
                         data-testid="addLabelButton"
@@ -83,5 +92,6 @@ export default function AddLabel({
 }
 
 AddLabel.defaultProps = {
+    type: "Label",
     trigger: undefined
 }

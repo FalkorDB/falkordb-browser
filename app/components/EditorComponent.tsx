@@ -57,6 +57,9 @@ interface Props {
     isQueryLoading: boolean
 }
 
+const MAX_HEIGHT = 20
+const LINE_HEIGHT = 22
+const PLACEHOLDER = "Type your query here to start"
 const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     renderLineHighlight: "none",
     glyphMargin: false,
@@ -73,10 +76,10 @@ const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     links: false,
     minimap: { enabled: false },
     automaticLayout: true,
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "400",
     wordWrap: "off",
-    lineHeight: 32,
+    lineHeight: LINE_HEIGHT,
     lineNumbersMinChars: 2,
     overviewRulerLanes: 0,
     overviewRulerBorder: false,
@@ -224,11 +227,6 @@ const SUGGESTIONS: monaco.languages.CompletionItem[] = [
     }))
 ]
 
-const MAX_HEIGHT = 20
-const LINE_HEIGHT = 32
-
-const PLACEHOLDER = "Type your query here to start"
-
 export default function EditorComponent({ graph, graphName, historyQuery, maximize, setMaximize, runQuery, setHistoryQuery, editorKey, isQueryLoading }: Props) {
     const { indicator, setIndicator } = useContext(IndicatorContext)
     const { tutorialOpen } = useContext(BrowserSettingsContext)
@@ -273,13 +271,6 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
     useEffect(() => {
         indicatorRef.current = indicator
     }, [indicator])
-
-    useEffect(() => {
-        setHistoryQuery(prev => ({
-            ...prev,
-            query: historyQuery.counter ? historyQuery.queries[historyQuery.counter - 1].text : historyQuery.currentQuery.text
-        }))
-    }, [historyQuery.counter])
 
     useEffect(() => {
         if (historyQuery.query && placeholderRef.current) {
@@ -637,7 +628,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
     return (
         <div data-testid="editor" style={{ height: editorHeight + 18 }} className="absolute w-full flex items-start gap-8 border border-border rounded-lg overflow-hidden bg-background p-2">
             <div className="h-full w-1 grow flex rounded-lg overflow-hidden">
-                <div ref={containerRef} className="h-full relative grow w-1" data-testid="editorContainer">
+                <div ref={containerRef} className="h-full relative grow w-1" data-value={historyQuery.query} data-testid="editorContainer">
                     <Editor
                         className="SofiaSans"
                         key={`${editorKey}-${currentTheme}`}
@@ -672,7 +663,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                             editorRef.current = e
                         }}
                     />
-                    <span ref={placeholderRef} className="w-full top-0 left-0 absolute pointer-events-none text-2xl truncate SofiaSans">
+                    <span ref={placeholderRef} className="w-full top-0 left-0 absolute pointer-events-none truncate SofiaSans">
                         {PLACEHOLDER}
                     </span>
                 </div>
@@ -680,6 +671,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                     {
                         historyQuery.query &&
                         <Button
+                            data-testid="clearEditor"
                             title="Clear"
                             onClick={() => {
                                 setHistoryQuery(prev => ({
@@ -722,6 +714,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                                 {
                                     historyQuery.query &&
                                     <Button
+                                        data-testid="clearEditor"
                                         title="Clear"
                                         onClick={() => {
                                             setHistoryQuery(prev => ({
@@ -762,7 +755,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                                 },
                                 lineNumbersMinChars: 3,
                                 minimap: { enabled: false },
-                                lineHeight: 30,
+                                lineHeight: LINE_HEIGHT,
                                 fontSize: 25,
                             }}
                             value={historyQuery.query}

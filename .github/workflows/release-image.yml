@@ -2,6 +2,12 @@ name: Release image to DockerHub
 
 on:
   workflow_dispatch:
+    inputs:
+      cypher_version:
+        description: 'text-to-cypher version to release'
+        required: true
+        default: 'v0.1.5'
+
   push:
     tags: ["v*.*.*"]
     branches:
@@ -11,6 +17,15 @@ jobs:
   build-and-release:
     runs-on: ubuntu-latest
     steps:
+      - name: Set up variables
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "CYPHER_VERSION=${{ github.event.inputs.cypher_version }}" >> $GITHUB_ENV
+          else
+            # Get the latest released version from GitHub releases
+            LATEST_VERSION=$(curl -s https://api.github.com/repos/falkordb/text-to-cypher/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+            echo "CYPHER_VERSION=$LATEST_VERSION" >> $GITHUB_ENV
+          fi
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -35,3 +50,5 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: ${{ env.TAGS }}
+          build-args: |
+            CYPHER_VERSION=${{ env.CYPHER_VERSION }}

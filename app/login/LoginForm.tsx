@@ -4,7 +4,8 @@ import { SignInOptions, SignInResponse, signIn } from "next-auth/react";
 import { FormEvent, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
-import { Check, Info } from "lucide-react";
+import Link from "next/link";
+import { Check, Info, FileText } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useTheme } from "next-themes";
 import { getTheme } from "@/lib/utils";
@@ -146,12 +147,14 @@ export default function LoginForm() {
 
     // Handle URL mode
     if (loginMode === "url") {
-      // Validate URL format starts with falkor:// or falkors://
       const trimmedUrl = falkordbUrl.trim();
       
-      if (trimmedUrl && (!trimmedUrl.startsWith("falkor://") && !trimmedUrl.startsWith("falkors://"))) {
+      // Validate URL format: falkor[s]://[[username][:password]@][host][:port][/db-number]
+      // Also supports redis:// and rediss:// protocols
+      const urlPattern = /^(falkor|falkors|redis|rediss):\/\/(?:([^:@]+)(?::([^@]+))?@)?([^:/\s]+)(?::(\d+))?(?:\/(\d+))?$/;
+      if (trimmedUrl && !urlPattern.test(trimmedUrl)) {
         setError({
-          message: "Invalid FalkorDB URL format. Expected: falkor://[user:pass@]host[:port] or falkors://[user:pass@]host[:port]",
+          message: "Invalid URL format. Expected: falkor[s]://[[username][:password]@][host][:port][/db-number] (also supports redis[s]://)",
           show: true
         });
         return;
@@ -205,8 +208,8 @@ export default function LoginForm() {
 
   return (
     <div className="relative h-full w-full flex flex-col">
-      <div className="grow flex items-center justify-center">
-        <div className="flex flex-col gap-8 items-center w-[500px]">
+      <div className="grow basis-0 flex items-center justify-center overflow-auto">
+        <div className="flex flex-col gap-8 items-center max-h-full w-[500px]">
           {mounted && currentTheme && <Image style={{ width: 'auto', height: '80px' }} priority src={`/icons/Browser-${currentTheme}.svg`} alt="FalkorDB Browser Logo" width={0} height={0} />}
 
           {/* Login Mode Toggle */}
@@ -320,6 +323,13 @@ export default function LoginForm() {
               </div>
             }
           </FormComponent>
+          <Link 
+            href="/docs" 
+            className="flex items-center gap-2 text-sm text-muted hover:text-primary transition-colors duration-200"
+          >
+            <FileText className="w-4 h-4" />
+            API Documentation
+          </Link>
         </div>
       </div>
       <div className="h-5 Gradient" />

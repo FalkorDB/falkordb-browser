@@ -130,6 +130,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                 {
                                     field.type === "select" ?
                                         <Combobox
+                                            className="w-fit"
                                             id={field.label}
                                             options={field.options}
                                             label={field.selectType}
@@ -174,7 +175,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
             }
             {children}
             <div className="min-h-5">
-                {error && <p className="text-sm text-destructive">{error.show ? error.message : ""}</p>}
+                {error?.show && <p className="text-sm text-destructive">{error.message}</p>}
             </div>
             <div className="flex justify-end gap-2">
                 <Button
