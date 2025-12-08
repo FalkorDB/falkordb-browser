@@ -29,6 +29,14 @@ const GraphView = dynamic(() => import("./GraphView"), {
     </div>
 })
 
+/**
+ * Render the main Graph page UI that orchestrates the selector, graph view, and right-hand panels.
+ *
+ * The component coordinates context state, data fetching, periodic graph info refresh, element selection
+ * and deletion, and layout of resizable panels (graph canvas and optional data/chat panel).
+ *
+ * @returns The React element for the graph page UI.
+ */
 export default function Page() {
     const { historyQuery, setHistoryQuery } = useContext(HistoryQueryContext)
     const { setIndicator } = useContext(IndicatorContext);
@@ -181,7 +189,6 @@ export default function Page() {
 
         if (isAdd) {
             setter(false)
-            setSelectedElements([])
             setPanel("add")
         } else {
             setPanel(undefined)

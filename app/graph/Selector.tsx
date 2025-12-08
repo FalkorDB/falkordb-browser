@@ -125,10 +125,24 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     }, [graphNames, historyQuery?.queries])
     const currentQuery = historyQuery?.counter === 0 ? historyQuery.currentQuery : historyQuery?.queries[historyQuery.counter - 1]
 
+    useEffect(() => {
+        if (!historyQuery || !setHistoryQuery) return
+        setHistoryQuery(prev => ({
+            ...prev,
+            query: prev.counter ? prev.queries[prev.counter - 1].text : prev.currentQuery.text
+        }))
+    }, [historyQuery?.counter])
+
     const afterSearchCallback = useCallback((newFilteredList: Query[]) => {
         if (!historyQuery || !setHistoryQuery) return
 
-        if (newFilteredList.every(q => q.text !== historyQuery.query)) {
+        // Get the currently selected query based on counter
+        const selectedQuery = historyQuery.counter === 0 
+            ? historyQuery.currentQuery 
+            : historyQuery.queries[historyQuery.counter - 1]
+
+        // If the selected query is not in the filtered list, reset counter to 0
+        if (selectedQuery && newFilteredList.every(q => q.text !== selectedQuery.text)) {
             setHistoryQuery(prev => {
                 if (prev.counter === 0) return prev
                 return {
@@ -292,8 +306,24 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
         if (newQueries.length === 0) localStorage.removeItem("query history")
         else localStorage.setItem("query history", JSON.stringify(newQueries))
 
-        const hasQueries = newQueries.length > 0
-        const nextCounter = hasQueries ? Math.min(historyQuery.counter, newQueries.length) : 0
+        // Check if counter points to a deleted query (counter is 1-indexed, so counter - 1 is the index)
+        const isCounterDeleted = historyQuery.counter > 0 && deleteElements.includes(historyQuery.counter - 1)
+        
+        let nextCounter: number
+        if (isCounterDeleted) {
+            // Unselect if counter points to deleted query
+            nextCounter = 0
+        } else if (historyQuery.counter > 0) {
+            // Adjust counter to account for deleted queries before it
+            const deletedBeforeCount = deleteElements.filter(idx => idx < historyQuery.counter - 1).length
+            nextCounter = Math.max(1, historyQuery.counter - deletedBeforeCount)
+            // Clamp to new array length
+            nextCounter = Math.min(nextCounter, newQueries.length)
+        } else {
+            // Counter is 0 (currentQuery), keep it
+            nextCounter = 0
+        }
+
         const nextQuery = nextCounter ? newQueries[nextCounter - 1].text : historyQuery.currentQuery.text
 
         setHistoryQuery(prev => ({
@@ -302,7 +332,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
             counter: nextCounter,
             query: nextQuery
         }))
-
+        setDeleteElements([])
         setFilteredQueries(current => current.filter(query => !deleteElements.some((removeIndex) => historyQuery.queries[removeIndex].timestamp !== query.timestamp)))
     }, [historyQuery, setHistoryQuery, deleteElements])
 
@@ -373,7 +403,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                             label="Query"
                                             className="w-1/2 bg-secondary rounded-lg overflow-hidden"
                                             isSelected={(item) => historyQuery.queries.findIndex(q => q.text === item.text) + 1 === historyQuery.counter}
-                                            isDeleteSelected={(item) => deleteElements.some(idx => historyQuery.queries[idx].text === item.text)}
+                                            isDeleteSelected={(item) => deleteElements.some(idx => historyQuery.queries[idx]?.text === item.text)}
                                             afterSearchCallback={afterSearchCallback}
                                             dataTestId="queryHistory"
                                             list={filteredQueries}
@@ -443,6 +473,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                         }))
                                                         setFilteredQueries([])
                                                         setActiveFilters([])
+                                                        setDeleteElements([])
                                                     }}
                                                     disabled={historyQuery.queries.length === 0}
                                                 />

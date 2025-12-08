@@ -2,7 +2,12 @@ import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { runQuery } from "@/app/api/utils";
 import { NextResponse, NextRequest } from "next/server";
 
-// eslint-disable-next-line import/prefer-default-export
+/**
+ * Streams the edge count for a specified graph using Server-Sent Events (SSE).
+ *
+ * @param params - Promise resolving to route parameters; must include `graph` (the graph identifier)
+ * @returns A Response with `Content-Type: text/event-stream` that emits an `event: result` with `{ edges }` on success or an `event: error` with `{ message, status }` on failure
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ graph: string }> }
@@ -75,4 +80,3 @@ export async function GET(
     },
   });
 }
-
