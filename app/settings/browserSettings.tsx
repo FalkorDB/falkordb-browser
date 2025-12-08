@@ -50,10 +50,10 @@ export default function BrowserSettings() {
     const [isResetting, setIsResetting] = useState(false)
     const [newPriorityField, setNewPriorityField] = useState<TextPriority>({ name: "", ignore: false })
     const [expandedSections, setExpandedSections] = useState({
-        queryExecution: true,
-        environment: true,
-        graphInfo: true,
-        tutorial: true
+        queryExecution: false,
+        environment: false,
+        graphInfo: false,
+        userExperience: false
     })
 
     const toggleSection = (section: keyof typeof expandedSections) => {
@@ -169,11 +169,119 @@ export default function BrowserSettings() {
 
     return (
         <div className="grow basis-0 w-full flex flex-col gap-6 overflow-hidden">
-            <div className="flex flex-col gap-2 px-2">
-                <h1 className="text-3xl font-semibold">Browser Settings</h1>
-                <p className="text-base text-muted-foreground">Customize your browser experience and manage configurations</p>
+            <div className="flex items-start justify-between gap-4 px-2">
+                <div className="flex flex-col gap-2">
+                    <h1 className="text-3xl font-semibold">Browser Settings</h1>
+                    <p className="text-base text-muted-foreground">Customize your browser experience and manage configurations</p>
+                </div>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            data-testid="replayTutorial"
+                            className="w-fit"
+                            variant="Primary"
+                            onClick={replayTutorial}
+                            label="Replay Tutorial"
+                        >
+                            <MonitorPlay />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>Replay tutorial - Go over the browser main features by following a guided tour</p>
+                    </TooltipContent>
+                </Tooltip>
             </div>
             <form ref={scrollableContainerRef} className="h-1 grow px-2 overflow-y-auto flex flex-col gap-6 pb-8" onSubmit={handleSubmit}>
+                {/* Environment Section */}
+                <Card className="border-border shadow-sm">
+                    <CardHeader
+                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => toggleSection('environment')}
+                    >
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-1.5">
+                                <CardTitle className="text-2xl font-semibold">Environment</CardTitle>
+                                <CardDescription className="text-sm">Configure LLM access for chat functionality</CardDescription>
+                            </div>
+                            <ChevronRight className={cn("h-5 w-5 transition-transform duration-200", expandedSections.environment && "rotate-90")} />
+                        </div>
+                    </CardHeader>
+                    {expandedSections.environment && (
+                        <CardContent className="pt-2">
+                            <div className="flex flex-col sm:flex-row gap-4 p-4 bg-muted/10 rounded-lg">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium whitespace-nowrap">Model</span>
+                                    <Combobox
+                                        disabled={!displayChat}
+                                        className="p-1"
+                                        label="Model"
+                                        options={MODELS}
+                                        selectedValue={newModel}
+                                        setSelectedValue={handleModelChange}
+                                        inTable
+                                    />
+                                </div>
+                                <div className="flex-1 flex items-center gap-2">
+                                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+                                    <label htmlFor="secretKeyInput" className="text-sm font-medium whitespace-nowrap">Secret Key</label>
+                                    <Input
+                                        disabled={!displayChat}
+                                        className="flex-1"
+                                        id="secretKeyInput"
+                                        placeholder="Enter your API secret key..."
+                                        value={newSecretKey}
+                                        onChange={(e) => createChangeHandler(setNewSecretKey)(e.target.value, 'secretKeyInput')}
+                                    />
+                                </div>
+                            </div>
+                        </CardContent>
+                    )}
+                </Card>
+
+                {/* Graph Info Section */}
+                <Card className="border-border shadow-sm">
+                    <CardHeader
+                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => toggleSection('graphInfo')}
+                    >
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-1.5">
+                                <CardTitle className="text-2xl font-semibold">Graph Info</CardTitle>
+                                <CardDescription className="text-sm">Configure graph visualization and data refresh settings</CardDescription>
+                            </div>
+                            <ChevronRight className={cn("h-5 w-5 transition-transform duration-200", expandedSections.graphInfo && "rotate-90")} />
+                        </div>
+                    </CardHeader>
+                    {expandedSections.graphInfo && (
+                        <CardContent className="space-y-6 pt-2">
+                            {/* Refresh Interval */}
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 p-4 bg-muted/10 rounded-lg">
+                                <div className="flex flex-col gap-2 flex-1">
+                                    <h3 className="text-lg font-semibold">Refresh Interval</h3>
+                                    <p className="text-sm text-muted-foreground">
+                                        Reload graph info data every {newRefreshInterval} seconds
+                                    </p>
+                                </div>
+                                <div className="w-full sm:w-64">
+                                    <Slider
+                                        id="refreshInterval"
+                                        className="w-full"
+                                        min={5}
+                                        max={60}
+                                        value={[newRefreshInterval]}
+                                        onValueChange={(value) => createChangeHandler(setNewRefreshInterval)(value[value.length - 1], "refreshInterval")}
+                                    />
+                                    <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                                        <span>5s</span>
+                                        <span>60s</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </CardContent>
+                    )}
+                </Card>
+
                 {/* Query Execution Section */}
                 <Card className="border-border shadow-sm">
                     <CardHeader
@@ -291,6 +399,26 @@ export default function BrowserSettings() {
                                 </div>
                             </div>
 
+                        </CardContent>
+                    )}
+                </Card>
+
+                {/* User Experience Section */}
+                <Card className="border-border shadow-sm">
+                    <CardHeader
+                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => toggleSection('userExperience')}
+                    >
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-1.5">
+                                <CardTitle className="text-2xl font-semibold">User Experience</CardTitle>
+                                <CardDescription className="text-sm">Customize browser behavior and visual preferences</CardDescription>
+                            </div>
+                            <ChevronRight className={cn("h-5 w-5 transition-transform duration-200", expandedSections.userExperience && "rotate-90")} />
+                        </div>
+                    </CardHeader>
+                    {expandedSections.userExperience && (
+                        <CardContent className="space-y-6 pt-2">
                             {/* Content Persistence */}
                             <div className="flex items-center gap-4 p-4 bg-muted/10 rounded-lg">
                                 <Switch
@@ -302,95 +430,6 @@ export default function BrowserSettings() {
                                 <div className="flex flex-col gap-2">
                                     <h3 className="text-lg font-semibold">Content Persistence</h3>
                                     <p className="text-sm text-muted-foreground">Enable this function to &apos;Auto-Save&apos; your data in your next Browser session.</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    )}
-                </Card>
-
-                {/* Environment Section */}
-                <Card className="border-border shadow-sm">
-                    <CardHeader
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() => toggleSection('environment')}
-                    >
-                        <div className="flex items-center justify-between">
-                            <div className="space-y-1.5">
-                                <CardTitle className="text-2xl font-semibold">Environment</CardTitle>
-                                <CardDescription className="text-sm">Configure LLM access for chat functionality</CardDescription>
-                            </div>
-                            <ChevronRight className={cn("h-5 w-5 transition-transform duration-200", expandedSections.environment && "rotate-90")} />
-                        </div>
-                    </CardHeader>
-                    {expandedSections.environment && (
-                        <CardContent className="pt-2">
-                            <div className="flex flex-col sm:flex-row gap-4 p-4 bg-muted/10 rounded-lg">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium whitespace-nowrap">Model</span>
-                                    <Combobox
-                                        disabled={!displayChat}
-                                        className="p-1"
-                                        label="Model"
-                                        options={MODELS}
-                                        selectedValue={newModel}
-                                        setSelectedValue={handleModelChange}
-                                        inTable
-                                    />
-                                </div>
-                                <div className="flex-1 flex items-center gap-2">
-                                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                                    <label htmlFor="secretKeyInput" className="text-sm font-medium whitespace-nowrap">Secret Key</label>
-                                    <Input
-                                        disabled={!displayChat}
-                                        className="flex-1"
-                                        id="secretKeyInput"
-                                        placeholder="Enter your API secret key..."
-                                        value={newSecretKey}
-                                        onChange={(e) => createChangeHandler(setNewSecretKey)(e.target.value, 'secretKeyInput')}
-                                    />
-                                </div>
-                            </div>
-                        </CardContent>
-                    )}
-                </Card>
-
-                {/* Graph Info Section */}
-                <Card className="border-border shadow-sm">
-                    <CardHeader
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() => toggleSection('graphInfo')}
-                    >
-                        <div className="flex items-center justify-between">
-                            <div className="space-y-1.5">
-                                <CardTitle className="text-2xl font-semibold">Graph Info</CardTitle>
-                                <CardDescription className="text-sm">Configure graph visualization and data refresh settings</CardDescription>
-                            </div>
-                            <ChevronRight className={cn("h-5 w-5 transition-transform duration-200", expandedSections.graphInfo && "rotate-90")} />
-                        </div>
-                    </CardHeader>
-                    {expandedSections.graphInfo && (
-                        <CardContent className="space-y-6 pt-2">
-                            {/* Refresh Interval */}
-                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 p-4 bg-muted/10 rounded-lg">
-                                <div className="flex flex-col gap-2 flex-1">
-                                    <h3 className="text-lg font-semibold">Refresh Interval</h3>
-                                    <p className="text-sm text-muted-foreground">
-                                        Reload graph info data every {newRefreshInterval} seconds
-                                    </p>
-                                </div>
-                                <div className="w-full sm:w-64">
-                                    <Slider
-                                        id="refreshInterval"
-                                        className="w-full"
-                                        min={5}
-                                        max={60}
-                                        value={[newRefreshInterval]}
-                                        onValueChange={(value) => createChangeHandler(setNewRefreshInterval)(value[value.length - 1], "refreshInterval")}
-                                    />
-                                    <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                                        <span>5s</span>
-                                        <span>60s</span>
-                                    </div>
                                 </div>
                             </div>
 
@@ -515,43 +554,6 @@ export default function BrowserSettings() {
                                         ))
                                     }
                                 </ul>
-                            </div>
-                        </CardContent>
-                    )}
-                </Card>
-
-                {/* Tutorial Section */}
-                <Card className="border-border shadow-sm">
-                    <CardHeader
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() => toggleSection('tutorial')}
-                    >
-                        <div className="flex items-center justify-between">
-                            <div className="space-y-1.5">
-                                <CardTitle className="text-2xl font-semibold">Tutorial</CardTitle>
-                                <CardDescription className="text-sm">Learn about browser features with a guided tour</CardDescription>
-                            </div>
-                            <ChevronRight className={cn("h-5 w-5 transition-transform duration-200", expandedSections.tutorial && "rotate-90")} />
-                        </div>
-                    </CardHeader>
-                    {expandedSections.tutorial && (
-                        <CardContent className="pt-2">
-                            <div className="flex flex-col gap-4 p-4 bg-muted/10 rounded-lg">
-                                <div className="flex flex-col gap-2">
-                                    <h3 className="text-lg font-semibold">Replay Tutorial</h3>
-                                    <p className="text-sm text-muted-foreground">
-                                        Go over the browser main features by following a guided tour
-                                    </p>
-                                </div>
-                                <Button
-                                    data-testid="replayTutorial"
-                                    className="w-fit"
-                                    variant="Primary"
-                                    onClick={replayTutorial}
-                                    label="Replay Tutorial"
-                                >
-                                    <MonitorPlay />
-                                </Button>
                             </div>
                         </CardContent>
                     )}
