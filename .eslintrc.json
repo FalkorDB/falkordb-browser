@@ -30,7 +30,8 @@
   },
   "parser": "@typescript-eslint/parser",
   "ignorePatterns": [
-    "components/ui/"
+    "components/ui/",
+    "next.config.js"
   ],
   "overrides": [
     {

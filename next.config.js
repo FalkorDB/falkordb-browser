@@ -38,7 +38,15 @@ const nextConfig = {
       }
     ];
   },
-  webpack(config) {
+  webpack(config, { isServer }) {
+    // Externalize falkordb for server-side to avoid BigInt bundling issues
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push({
+        falkordb: 'commonjs falkordb',
+      });
+    }
+
     // Grab the existing rule that handles SVG imports
     const fileLoaderRule = config.module.rules.find((rule) =>
       rule.test?.test?.('.svg'),
