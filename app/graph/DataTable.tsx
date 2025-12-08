@@ -221,6 +221,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
 
         setTimeout(() => {
             if (setTextareaRef.current) {
+                setTextareaRef.current.style.height = 'auto'
                 setTextareaRef.current.style.height = `${setTextareaRef.current.scrollHeight}px`
             }
         }, 0)
@@ -408,6 +409,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                     rows={1}
                     onInput={(e) => {
                         const target = e.target as HTMLTextAreaElement
+                        target.style.height = 'auto'
                         target.style.height = `${target.scrollHeight}px`
                     }}
                 />
