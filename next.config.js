@@ -5,6 +5,8 @@ const nextConfig = {
   images: {
     unoptimized: true
   },
+  // Keep falkordb server-only to avoid bundling BigInt in client/runtime
+  serverExternalPackages: ['falkordb'],
   async headers() {
     return [
       {
@@ -38,15 +40,7 @@ const nextConfig = {
       }
     ];
   },
-  webpack(config, { isServer }) {
-    // Externalize falkordb for server-side to avoid BigInt bundling issues
-    if (isServer) {
-      config.externals = config.externals || [];
-      config.externals.push({
-        falkordb: 'commonjs falkordb',
-      });
-    }
-
+  webpack(config) {
     // Grab the existing rule that handles SVG imports
     const fileLoaderRule = config.module.rules.find((rule) =>
       rule.test?.test?.('.svg'),
