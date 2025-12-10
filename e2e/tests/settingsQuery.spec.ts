@@ -20,7 +20,7 @@ test.describe.serial("Query Settings", () => {
     await browser.closeBrowser();
   });
 
-  test.only(`@admin Validate that running a query with timeout returns an error`, async () => {
+  test(`@admin Validate that running a query with timeout returns an error`, async () => {
     const graphName = getRandomString("settingsQuery");
     await apiCall.addGraph(graphName);
     const querySettings = await browser.createNewPage(
