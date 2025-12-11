@@ -530,7 +530,7 @@ export default class ApiCalls {
     try {
       // First get a session/token by logging in
       const loginResponse = await this.generateTokenAsUser(username, password);
-      const { token, token_id } = loginResponse;
+      const { token, token_id: tokenId } = loginResponse;
 
       // Use that token to list tokens
       const result = await getRequest(
@@ -540,7 +540,7 @@ export default class ApiCalls {
       const response = await result.json();
 
       // Clean up the temporary token
-      await this.revokeToken(token_id);
+      await this.revokeToken(tokenId);
 
       return response;
     } catch (error) {
@@ -558,7 +558,7 @@ export default class ApiCalls {
     try {
       // First get a session/token by logging in
       const loginResponse = await this.generateTokenAsUser(username, password);
-      const { token, token_id } = loginResponse;
+      const { token, token_id: tempTokenId } = loginResponse;
 
       // Use that token to revoke via DELETE
       const result = await deleteRequest(
@@ -568,7 +568,7 @@ export default class ApiCalls {
       const response = await result.json();
 
       // Clean up the temporary token
-      await this.revokeToken(token_id);
+      await this.revokeToken(tempTokenId);
 
       return response;
     } catch (error) {

@@ -40,6 +40,30 @@ interface Props {
     onExpandChange?: Dispatch<SetStateAction<Map<number, number>>>
 }
 
+/**
+ * Render a virtualized, searchable, and editable table for heterogeneous row data.
+ *
+ * Renders a sticky-header table with client-side search, virtualized rows (top/bottom spacers), per-column expand/collapse for object cells, inline editing (text/select), optional row selection, and per-cell lazy loading for readonly cells. Maintains and exposes scroll position, search term, and expand state via callback props when provided.
+ *
+ * @param headers - Column header labels in display order.
+ * @param rows - Array of row objects to display; each row contains ordered cells with types and optional edit/load handlers.
+ * @param label - Short identifier used for data-testid attributes and input placeholders.
+ * @param entityName - Optional human-readable entity name used in the search placeholder.
+ * @param valueClassName - CSS class applied to rendered cell values and labels.
+ * @param inputRef - Optional ref forwarded to the inline text input when a cell is in edit mode.
+ * @param children - Optional React nodes rendered left of the search input (controls, buttons).
+ * @param setRows - Optional setter to update the rows array (enables row-selection checkboxes).
+ * @param className - Additional CSS classes applied to the root container.
+ * @param itemHeight - Height in pixels of a single (non-expanded) row used for virtualization calculations.
+ * @param itemsPerPage - Approximate number of items used to compute virtualization window size.
+ * @param initialScrollPosition - Optional scrollTop to restore on first render.
+ * @param onScrollChange - Optional callback invoked with the new scrollTop when the table scrolls.
+ * @param initialSearch - Optional initial search string to apply on mount.
+ * @param onSearchChange - Optional callback invoked when the search term changes.
+ * @param initialExpand - Map indicating per-column initial expansion depths (index -> depth).
+ * @param onExpandChange - Optional callback invoked when the per-column expand map changes.
+ * @returns The table React node with virtualization, search, inline editing, lazy cell loading, and per-column expansion controls.
+ */
 export default function TableComponent({
     headers,
     rows,

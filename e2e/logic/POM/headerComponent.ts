@@ -100,20 +100,20 @@ export default class HeaderComponent extends BasePage {
 
     async clickOnFalkor(): Promise<Page> {
         await this.waitForPageIdle();
-        const [newPage] = await Promise.all([
-            this.page.waitForEvent('popup'),
-            this.clickFalkorDBLogo()
-        ]);
+        // Start listening for popup BEFORE triggering the click to avoid race condition
+        const popupPromise = this.page.waitForEvent('popup');
+        await this.clickFalkorDBLogo();
+        const newPage = await popupPromise;
         return newPage;
     }
 
     async clickOnDocumentation(): Promise<Page> {
         await this.waitForPageIdle();
-        const [newPage] = await Promise.all([
-            this.page.waitForEvent('popup'),
-            this.clickOnHelpBtn(),
-            this.clickOnDocumentationBtn()
-        ]);
+        // Start listening for popup BEFORE triggering the clicks to avoid race condition
+        const popupPromise = this.page.waitForEvent('popup');
+        await this.clickOnHelpBtn();
+        await this.clickOnDocumentationBtn();
+        const newPage = await popupPromise;
         return newPage;
     }
 
@@ -127,11 +127,11 @@ export default class HeaderComponent extends BasePage {
 
     async clickOnSupport(): Promise<Page> {
         await this.waitForPageIdle();
-        const [newPage] = await Promise.all([
-            this.page.waitForEvent('popup'),
-            this.clickOnHelpBtn(),
-            this.clickOnSupportBtn()
-        ]);
+        // Start listening for popup BEFORE triggering the clicks to avoid race condition
+        const popupPromise = this.page.waitForEvent('popup');
+        await this.clickOnHelpBtn();
+        await this.clickOnSupportBtn();
+        const newPage = await popupPromise;
         return newPage;
     }
 

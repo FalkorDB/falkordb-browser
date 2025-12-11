@@ -27,6 +27,7 @@ test.describe.serial("Query Settings", () => {
       QuerySettingsPage,
       urls.settingsUrl
     );
+    await querySettings.expandQueryExecutionSection();
     const timeout = 1;
     await querySettings.fillTimeout(timeout);
     await querySettings.clickSaveQuerySettingsBtn();
@@ -53,6 +54,7 @@ test.describe.serial("Query Settings", () => {
         QuerySettingsPage,
         urls.settingsUrl
       );
+      await querySettings.expandQueryExecutionSection();
       const limit = 5;
       await querySettings.fillLimit(limit);
       await querySettings.clickSaveQuerySettingsBtn();
@@ -84,6 +86,7 @@ test.describe.serial("Query Settings", () => {
         urls.settingsUrl
       );
       await browser.setPageToFullScreen();
+      await querySettings.expandQueryExecutionSection();
       const limit = 5;
       await querySettings.fillLimit(limit);
       await querySettings.clickSaveQuerySettingsBtn();
@@ -103,6 +106,7 @@ test.describe.serial("Query Settings", () => {
       QuerySettingsPage,
       urls.settingsUrl
     );
+    await querySettings.expandQueryExecutionSection();
     const limit = -1;
     await querySettings.fillLimit(limit);
     const limitValue = await querySettings.getLimit();
@@ -114,6 +118,7 @@ test.describe.serial("Query Settings", () => {
       QuerySettingsPage,
       urls.settingsUrl
     );
+    await querySettings.expandQueryExecutionSection();
     const timeout = -1;
     await querySettings.fillTimeout(timeout);
     const timeoutValue = await querySettings.getTimeout();
@@ -125,11 +130,13 @@ test.describe.serial("Query Settings", () => {
       QuerySettingsPage,
       urls.settingsUrl
     );
+    await querySettings.expandQueryExecutionSection();
     const defaultQuery = "MATCH (n) RETURN n";
     await querySettings.clickRunDefaultQuerySwitchOn();
     await querySettings.fillRunDefaultQueryInput(defaultQuery);
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.refreshPage();
+    await querySettings.expandQueryExecutionSection();
     const defaultQueryValue = await querySettings.getRunDefaultQueryInput();
     expect(defaultQuery).toBe(defaultQueryValue);
   });
@@ -139,15 +146,18 @@ test.describe.serial("Query Settings", () => {
       QuerySettingsPage,
       urls.settingsUrl
     );
+    await querySettings.expandQueryExecutionSection();
     const defaultQuery = "MATCH (n) RETURN n";
     await querySettings.clickRunDefaultQuerySwitchOn();
     await querySettings.fillRunDefaultQueryInput(defaultQuery);
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.refreshPage();
+    await querySettings.expandQueryExecutionSection();
     const queryValue = await querySettings.getRunDefaultQueryInput();
     expect(queryValue).toBe(defaultQuery);
     await querySettings.clickRunDefaultQueryResetBtn();
     await querySettings.refreshPage();
+    await querySettings.expandQueryExecutionSection();
     const defaultQueryValue = await querySettings.getRunDefaultQueryInput();
     expect(defaultQueryValue).toBe(getDefaultQuery());
   });
@@ -157,15 +167,18 @@ test.describe.serial("Query Settings", () => {
       QuerySettingsPage,
       urls.settingsUrl
     );
+    await querySettings.expandQueryExecutionSection();
     await querySettings.clickRunDefaultQuerySwitchOn();
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.refreshPage();
+    await querySettings.expandQueryExecutionSection();
     const runDefaultQuerySwitchOn =
       await querySettings.getRunDefaultQuerySwitch();
     expect(runDefaultQuerySwitchOn).toBeTruthy();
     await querySettings.clickRunDefaultQuerySwitchOff();
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.refreshPage();
+    await querySettings.expandQueryExecutionSection();
     const runDefaultQuerySwitchOff =
       await querySettings.getRunDefaultQuerySwitch();
     expect(runDefaultQuerySwitchOff).toBeFalsy();
@@ -176,15 +189,18 @@ test.describe.serial("Query Settings", () => {
       QuerySettingsPage,
       urls.settingsUrl
     );
+    await querySettings.expandUserExperienceSection();
     await querySettings.clickContentPersistenceSwitchOn();
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.refreshPage();
+    await querySettings.expandUserExperienceSection();
     const contentPersistenceSwitchOn =
       await querySettings.getContentPersistenceSwitch();
     expect(contentPersistenceSwitchOn).toBeTruthy();
     await querySettings.clickContentPersistenceSwitchOff();
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.refreshPage();
+    await querySettings.expandUserExperienceSection();
     const contentPersistenceSwitchOff =
       await querySettings.getContentPersistenceSwitch();
     expect(contentPersistenceSwitchOff).toBeFalsy();
@@ -197,6 +213,7 @@ test.describe.serial("Query Settings", () => {
       QuerySettingsPage,
       urls.settingsUrl
     );
+    await querySettings.expandQueryExecutionSection();
     const defaultQuery = "MATCH (n) RETURN n";
     await querySettings.clickRunDefaultQuerySwitchOn();
     await querySettings.fillRunDefaultQueryInput(defaultQuery);
@@ -220,7 +237,9 @@ test.describe.serial("Query Settings", () => {
       QuerySettingsPage,
       urls.settingsUrl
     );
+    await querySettings.expandQueryExecutionSection();
     await querySettings.clickRunDefaultQuerySwitchOn();
+    await querySettings.expandUserExperienceSection();
     await querySettings.clickContentPersistenceSwitchOn();
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.clickGraphsTabInHeader();

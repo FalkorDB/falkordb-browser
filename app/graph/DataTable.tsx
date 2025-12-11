@@ -33,6 +33,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
     const { displayTextPriority } = graphInfoSettings
 
     const setInputRef = useRef<HTMLInputElement>(null)
+    const setTextareaRef = useRef<HTMLTextAreaElement>(null)
     const addInputRef = useRef<HTMLInputElement>(null)
     const scrollableContainerRef = useRef<HTMLDivElement>(null)
 
@@ -116,8 +117,12 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
     }, [measureValueOverflow])
 
     useEffect(() => {
-        if (setInputRef.current && editable) {
-            setInputRef.current.focus()
+        if (editable) {
+            if (setInputRef.current) {
+                setInputRef.current.focus()
+            } else if (setTextareaRef.current) {
+                setTextareaRef.current.focus()
+            }
         }
     }, [editable])
 
@@ -211,6 +216,15 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
         setEditable(key)
         setNewVal(value ?? "")
         setNewType(typeof value === "undefined" ? "string" : typeof value as ValueType)
+
+        if (typeof value !== "undefined" && typeof value !== "string") return
+
+        setTimeout(() => {
+            if (setTextareaRef.current) {
+                setTextareaRef.current.style.height = 'auto'
+                setTextareaRef.current.style.height = `${setTextareaRef.current.scrollHeight}px`
+            }
+        }, 0)
     }
 
     const setProperty = async (key: string, val: Value, isUndo: boolean, actionType: ("added" | "set") = "set") => {
@@ -332,7 +346,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
         }
     }
 
-    const handleAddKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const handleAddKeyDown = async (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         if (e.key === "Escape") {
             setIsAddValue(false)
             setNewKey("")
@@ -340,21 +354,25 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
             e.stopPropagation()
         }
 
-        if (e.key !== "Enter" || isAddLoading || indicator === "offline") return
-
-        handleAddValue(newKey, newVal)
+        if (e.key === "Enter" && !e.shiftKey) {
+            if (isAddLoading || indicator === "offline") return
+            e.preventDefault()
+            handleAddValue(newKey, newVal)
+        }
     }
 
-    const handleSetKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const handleSetKeyDown = async (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         if (e.key === "Escape") {
             handleSetEditable("", "")
             setNewKey("")
             e.stopPropagation()
         }
 
-        if (e.key !== "Enter" || isSetLoading || indicator === "offline") return
-
-        setProperty(editable, newVal, true)
+        if (e.key === "Enter" && !e.shiftKey) {
+            if (isSetLoading || indicator === "offline") return
+            e.preventDefault()
+            setProperty(editable, newVal, true)
+        }
     }
 
     const getCellEditableContent = (t: ValueType, actionType: "set" | "add" = "set") => {
@@ -381,13 +399,19 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                     onKeyDown={actionType === "set" ? handleSetKeyDown : handleAddKeyDown}
                 />
             default:
-                return <Input
-                    className="w-full"
-                    ref={setInputRef}
+                return <textarea
+                    className="w-full border border-border p-1 rounded-lg disabled:cursor-not-allowed disabled:opacity-50 bg-input text-foreground resize-none overflow-hidden"
+                    ref={setTextareaRef}
                     data-testid={dataTestId}
                     value={newVal as string}
                     onChange={(e) => setNewVal(e.target.value)}
                     onKeyDown={actionType === "set" ? handleSetKeyDown : handleAddKeyDown}
+                    rows={1}
+                    onInput={(e) => {
+                        const target = e.target as HTMLTextAreaElement
+                        target.style.height = 'auto'
+                        target.style.height = `${target.scrollHeight}px`
+                    }}
                 />
         }
     }
@@ -618,7 +642,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                     {
                         isAddValue && (
                             <>
-                                <div className="flex items-center px-2 border-b border-border h-14">
+                                <div className="flex items-center px-2 border-b border-border min-h-14">
                                     <Input
                                         className="w-full"
                                         data-testid="DataPanelAddAttributeKey"
@@ -628,13 +652,13 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                         onKeyDown={handleAddKeyDown}
                                     />
                                 </div>
-                                <div className="flex items-center px-2 border-b border-border h-14">
+                                <div className="flex items-center px-2 border-b border-border min-h-14">
                                     {getCellEditableContent(newType, "add")}
                                 </div>
-                                <div className="flex items-center px-2 border-b border-border h-14">
+                                <div className="flex items-center px-2 border-b border-border min-h-14">
                                     {getNewTypeInput()}
                                 </div>
-                                <div className="flex items-center gap-1 justify-start px-2 border-b border-border h-14">
+                                <div className="flex items-center gap-1 justify-start px-2 border-b border-border min-h-14">
                                     <Button
                                         data-testid="DataPanelAddAttributeConfirm"
                                         variant="button"

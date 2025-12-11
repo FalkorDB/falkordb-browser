@@ -7,6 +7,14 @@ import {
 import GraphPage from "./graphPage";
 
 export default class SettingsQueryPage extends GraphPage {
+  private get queryExecutionSectionHeader(): Locator {
+    return this.page.getByRole("heading", { name: "Query Execution" }).locator("xpath=ancestor::div[@class and contains(@class, 'cursor-pointer')]");
+  }
+
+  private get userExperienceSectionHeader(): Locator {
+    return this.page.getByRole("heading", { name: "User Experience" }).locator("xpath=ancestor::div[@class and contains(@class, 'cursor-pointer')]");
+  }
+
   private get limitInput(): Locator {
     return this.page.locator("#limitInput");
   }
@@ -233,5 +241,29 @@ export default class SettingsQueryPage extends GraphPage {
     } else {
       throw new Error("Save Query Settings button not visible after 1s");
     }
+  }
+
+  async expandQueryExecutionSection(): Promise<void> {
+    await interactWhenVisible(
+      this.queryExecutionSectionHeader,
+      async (el) => {
+        await el.click();
+        // Wait a bit for the section to expand
+        await this.page.waitForTimeout(300);
+      },
+      "expand query execution section"
+    );
+  }
+
+  async expandUserExperienceSection(): Promise<void> {
+    await interactWhenVisible(
+      this.userExperienceSectionHeader,
+      async (el) => {
+        await el.click();
+        // Wait a bit for the section to expand
+        await this.page.waitForTimeout(300);
+      },
+      "expand user experience section"
+    );
   }
 }
