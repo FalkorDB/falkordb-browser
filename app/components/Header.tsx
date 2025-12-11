@@ -240,24 +240,26 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                         </div>
                     </DrawerContent>
                 </Drawer>
-                {separator}
                 {
                     mounted &&
-                    <Button
-                        data-testid="themeToggle"
-                        title={`Toggle theme current theme: ${theme}`}
-                        onClick={() => {
-                            let newTheme = ""
-                            if (theme === "dark") newTheme = "light"
-                            else if (theme === "light") newTheme = "system"
-                            else newTheme = "dark"
-                            setTheme(newTheme)
-                        }}
-                    >
-                        {theme === "dark" && <Sun size={iconSize} />}
-                        {theme === "light" && <Monitor size={iconSize} />}
-                        {theme === "system" && <Moon size={iconSize} />}
-                    </Button>
+                    <>
+                        {separator}
+                        <Button
+                            data-testid="themeToggle"
+                            title={`Toggle theme current theme: ${theme}`}
+                            onClick={() => {
+                                let newTheme = ""
+                                if (theme === "dark") newTheme = "light"
+                                else if (theme === "light") newTheme = "system"
+                                else newTheme = "dark"
+                                setTheme(newTheme)
+                            }}
+                        >
+                            {theme === "dark" && <Sun size={iconSize} />}
+                            {theme === "light" && <Monitor size={iconSize} />}
+                            {theme === "system" && <Moon size={iconSize} />}
+                        </Button>
+                    </>
                 }
                 {
                     indicator === "offline" &&
@@ -284,6 +286,6 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                     <LogOut size={iconSize - 5} />
                 </Button>
             </div>
-        </div>
+        </div >
     )
 }
