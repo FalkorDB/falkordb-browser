@@ -6,8 +6,8 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { MutableRefObject } from "react";
-import { ForceGraphMethods } from "react-force-graph-2d";
 import { Node, Link, DataCell, MemoryValue } from "@/app/api/graph/model";
+import { ForceGraphInstance, GraphNode } from "@/falkordb-canvas/falkordb-canvas-types";
 
 export const MEMORY_USAGE_VERSION_THRESHOLD = 41408;
 export const screenSize = {
@@ -18,9 +18,7 @@ export const screenSize = {
   "2xl": 1536,
 };
 
-export type GraphRef = MutableRefObject<
-  ForceGraphMethods<Node, Link> | undefined
->;
+export type GraphRef = MutableRefObject<ForceGraphInstance>;
 
 export type Panel = "chat" | "data" | "add" | undefined;
 
@@ -224,7 +222,7 @@ export function rgbToHSL(hex: string): string {
  */
 export function handleZoomToFit(
   chartRef?: GraphRef,
-  filter?: (node: Node) => boolean,
+  filter?: (node: GraphNode) => boolean,
   paddingMultiplier = 1
 ) {
   const chart = chartRef?.current;
@@ -329,39 +327,6 @@ export function getQueryWithLimit(
   return [query, existingLimit];
 }
 
-export const getNodeDisplayText = (node: Node, displayTextPriority: TextPriority[]) => {
-  const { data: nodeData } = node;
-
-  const displayText = displayTextPriority.find(({ name, ignore }) => {
-      const key = ignore
-          ? Object.keys(nodeData).find(
-              (k) => k.toLowerCase() === name.toLowerCase()
-          )
-          : name;
-
-      return (
-          key &&
-          nodeData[key] &&
-          typeof nodeData[key] === "string" &&
-          nodeData[key].trim().length > 0
-      );
-  });
-
-  if (displayText) {
-      const key = displayText.ignore
-          ? Object.keys(nodeData).find(
-              (k) => k.toLowerCase() === displayText.name.toLowerCase()
-          )
-          : displayText.name;
-
-      if (key) {
-          return String(nodeData[key]);
-      }
-  }
-
-  return String(node.id);
-}
-
 export const formatName = (newGraphName: string) =>
   newGraphName === '""' ? "" : newGraphName;
 
@@ -418,5 +383,5 @@ export function getTheme(theme: string | undefined) {
 // Type guard: runtime check that proves elements is [Node, Node]
 export function isTwoNodes(elements: (Node | Link)[]): elements is [Node, Node] {
   return elements.length === 2 &&
-    elements.every((e): e is Node => !!e.labels)
+    elements.every((e): e is Node => "labels" in e)
 }

@@ -1,10 +1,9 @@
 'use client'
 
 import { useContext, useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { cn, getSSEGraphResult, isTwoNodes, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, getSSEGraphResult, GraphRef, isTwoNodes, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
-import { ForceGraphMethods } from "react-force-graph-2d";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { Label, Graph, GraphData, Link, Node, Relationship } from "../api/graph/model";
@@ -42,6 +41,7 @@ export default function Page() {
     const { toast } = useToast()
 
     const panelRef = useRef<ImperativePanelHandle>(null)
+    const chartRef = useRef<GraphRef["current"]>()
 
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
@@ -49,7 +49,6 @@ export default function Page() {
     const [relationships, setRelationships] = useState<Relationship[]>([])
     const [data, setData] = useState<GraphData>(schema.Elements)
     const [isAddEdge, setIsAddEdge] = useState(false)
-    const chartRef = useRef<ForceGraphMethods<Node, Link>>()
     const [edgesCount, setEdgesCount] = useState<number | undefined>()
     const [nodesCount, setNodesCount] = useState<number | undefined>()
     const [isAddNode, setIsAddNode] = useState(false)
@@ -163,7 +162,7 @@ export default function Page() {
 
         await Promise.all(stateSelectedElements.map(async (element) => {
             const { id } = element
-            const type = !element.source
+            const type = !("source" in element)
             const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(id.toString())}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type }),
@@ -229,8 +228,6 @@ export default function Page() {
                 handleSetIsAddNode(false)
             } else {
                 const link = schema.extendEdge(json.result.data[0].e, false, true)
-                // Calculate curve for the newly created edge
-                link.curve = schema.calculateLinkCurve(link)
                 setRelationships(prev => [...prev.filter(p => p.name !== link.relationship), schema.RelationshipsMap.get(link.relationship)!])
                 handleSetIsAddEdge(false)
             }

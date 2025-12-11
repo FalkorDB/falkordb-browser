@@ -107,7 +107,7 @@ function GraphView({
     const onRelationshipClick = (relationship: Relationship) => {
         relationship.show = !relationship.show
 
-        relationship.elements.filter((link) => link.source.visible && link.target.visible).forEach((link) => {
+        relationship.elements.filter((link) => graph.NodesMap.get(link.source)?.visible && graph.NodesMap.get(link.target)?.visible).forEach((link) => {
             link.visible = relationship.show
         })
 
@@ -130,7 +130,7 @@ function GraphView({
                                 setSelectedElements={setSelectedElements}
                                 handleDeleteElement={handleDeleteElement}
                                 chartRef={chartRef}
-                                setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => !!e.labels) ? setIsAddEdge : undefined}
+                                setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => "labels" in e) ? setIsAddEdge : undefined}
                                 setIsAddNode={setIsAddNode}
                                 isAddEdge={isAddEdge}
                                 isAddNode={isAddNode}

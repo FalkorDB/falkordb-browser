@@ -4,13 +4,13 @@
 
 "use client"
 
-import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
-import ForceGraph2D from "react-force-graph-2d"
-import { securedFetch, GraphRef, handleZoomToFit, getTheme, Tab, ViewportState, getNodeDisplayText } from "@/lib/utils"
-import { useToast } from "@/components/ui/use-toast"
-import * as d3 from "d3"
+import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react"
 import { useTheme } from "next-themes"
-import { Link, Node, Relationship, Graph, getLabelWithFewestElements, GraphData } from "../api/graph/model"
+import FalkorDBForceGraph from "@/falkordb-canvas/falkordb-canvas"
+import type { Data, GraphLink, GraphNode } from "@/falkordb-canvas/falkordb-canvas-types"
+import { securedFetch, GraphRef, getTheme, Tab, ViewportState } from "@/lib/utils"
+import { useToast } from "@/components/ui/use-toast"
+import { Link, Node, Relationship, Graph, GraphData } from "../api/graph/model"
 import { BrowserSettingsContext, IndicatorContext } from "./provider"
 import Spinning from "./ui/spinning"
 
@@ -23,8 +23,6 @@ interface Props {
     setSelectedElements: (el?: (Node | Link)[]) => void
     type?: "schema" | "graph"
     setRelationships: Dispatch<SetStateAction<Relationship[]>>
-    parentHeight: number
-    parentWidth: number
     setParentHeight: Dispatch<SetStateAction<number>>
     setParentWidth: Dispatch<SetStateAction<number>>
     isLoading: boolean
@@ -36,89 +34,24 @@ interface Props {
     isSaved?: boolean
 }
 
-const NODE_SIZE = 6
-const PADDING = 2;
-
-/**
- * Wraps text into two lines with ellipsis handling for circular nodes
- * @param ctx Canvas context for text measurement
- * @param text The text to wrap
- * @param maxRadius Maximum radius of the circular node for text fitting
- * @returns Tuple of [line1, line2] with proper ellipsis handling
- */
-const wrapTextForCircularNode = (ctx: CanvasRenderingContext2D, text: string, maxRadius: number): [string, string] => {
-    const ellipsis = '...';
-    const ellipsisWidth = ctx.measureText(ellipsis).width;
-
-    // Use fixed text height - it's essentially constant for a given font
-    const halfTextHeight = 1.125; // Fixed value based on font size (1.5px * 1.5 spacing / 2)
-
-
-    const availableRadius = Math.sqrt(Math.max(0, maxRadius * maxRadius - halfTextHeight * halfTextHeight));
-
-    const lineWidth = availableRadius * 2;
-
-    const words = text.split(/\s+/);
-    let line1 = '';
-    let line2 = '';
-
-    // Build first line - try to fit as many words as possible
-    for (let i = 0; i < words.length; i += 1) {
-        const word = words[i];
-        const testLine = line1 ? `${line1} ${word}` : word;
-        const testWidth = ctx.measureText(testLine).width;
-
-        if (testWidth <= lineWidth) {
-            line1 = testLine;
-        } else if (!line1) {
-            // If first word is too long, break it in the middle
-            let partialWord = word;
-            while (partialWord.length > 0 && ctx.measureText(partialWord).width > lineWidth) {
-                partialWord = partialWord.slice(0, -1);
-            }
-            line1 = partialWord;
-            // Put remaining part of word and other words in line2
-            const remainingWords = [word.slice(partialWord.length), ...words.slice(i + 1)];
-            line2 = remainingWords.join(' ');
-            break;
-        } else {
-            // Put remaining words in line2
-            line2 = words.slice(i).join(' ');
-            break;
-        }
-    }
-
-    // Truncate line2 if needed
-    if (line2 && ctx.measureText(line2).width > lineWidth) {
-        while (line2.length > 0 && ctx.measureText(line2).width + ellipsisWidth > lineWidth) {
-            line2 = line2.slice(0, -1);
-        }
-        line2 += ellipsis;
-    }
-
-    return [line1, line2 || ''];
-};
-
-const LINK_DISTANCE = 50;
-const MAX_LINK_DISTANCE = 80; // Maximum distance only when clusters would overlap
-const LINK_STRENGTH = 0.5;
-const MIN_LINK_STRENGTH = 0.3; // Minimum strength for very high-degree nodes
-const COLLISION_STRENGTH = 1.35;
-const CHARGE_STRENGTH = -5; // Stronger repulsion to maintain circular arrangement
-const CENTER_STRENGTH = 0.4;
-const COLLISION_BASE_RADIUS = NODE_SIZE * 2;
-const HIGH_DEGREE_PADDING = 1.25;
-const DEGREE_STRENGTH_DECAY = 15; // Degree at which strength starts significantly decreasing
-const CROWDING_THRESHOLD = 20; // Degree threshold where we start adding distance to prevent overlap
-
-const getEndpointId = (endpoint: Node | number | string | undefined): Node["id"] | undefined => {
-    if (endpoint === undefined || endpoint === null) return undefined;
-    if (typeof endpoint === "object") return endpoint.id;
-    if (typeof endpoint === "number") return endpoint;
-
-    const parsed = Number(endpoint);
-    return Number.isNaN(parsed) ? undefined : parsed;
-};
+const convertToCanvasData = (graphData: GraphData): Data => ({
+    nodes: graphData.nodes.map(({ id, labels, color, visible, data }) => ({
+        id,
+        labels,
+        color,
+        visible,
+        data
+    })),
+    links: graphData.links.map(({ id, relationship, color, visible, source, target, data }) => ({
+        id,
+        relationship,
+        color,
+        visible,
+        source,
+        target,
+        data
+    }))
+});
 
 export default function ForceGraph({
     graph,
@@ -129,8 +62,6 @@ export default function ForceGraph({
     setSelectedElements,
     type = "graph",
     setRelationships,
-    parentHeight,
-    parentWidth,
     setParentHeight,
     setParentWidth,
     isLoading,
@@ -142,45 +73,36 @@ export default function ForceGraph({
     isSaved
 }: Props) {
 
-    const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { setIndicator } = useContext(IndicatorContext)
     const { settings: { graphInfo: { displayTextPriority } } } = useContext(BrowserSettingsContext)
 
     const { theme } = useTheme()
     const { toast } = useToast()
     const { background, foreground } = getTheme(theme)
 
-    const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
+    const lastClick = useRef<{ date: Date, id: number }>({ date: new Date(), id: -1 })
     const parentRef = useRef<HTMLDivElement>(null)
+    const canvasRef = useRef<FalkorDBForceGraph>(null)
 
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
-
-    const nodeDegreeMap = useMemo(() => {
-        const degree = new Map<Node["id"], number>();
-
-        data.nodes.forEach(node => degree.set(node.id, 0));
-
-        data.links.forEach(link => {
-            const sourceId = getEndpointId(link.source as Node | number | string);
-            const targetId = getEndpointId(link.target as Node | number | string);
-
-            if (sourceId !== undefined) {
-                degree.set(sourceId, (degree.get(sourceId) || 0) + 1);
-            }
-            if (targetId !== undefined) {
-                degree.set(targetId, (degree.get(targetId) || 0) + 1);
-            }
-        });
-
-        return degree;
-    }, [data.links, data.nodes]);
 
     useEffect(() => {
         setData({ ...graph.Elements })
     }, [graph, setData])
 
+    // Initialize canvas ref for backward compatibility
+    useEffect(() => {
+        if (canvasRef.current) {
+            const forceGraph = canvasRef.current.getGraph();
+            if (forceGraph) {
+                chartRef.current = forceGraph;
+            }
+        }
+    }, [chartRef])
+
     // Load saved viewport on mount
     useEffect(() => {
-        if (isSaved && viewport) {
+        if (isSaved && viewport && chartRef.current) {
             const { zoom, centerX, centerY } = viewport;
             setTimeout(() => {
                 if (chartRef.current) {
@@ -215,16 +137,6 @@ export default function ForceGraph({
     }, [chartRef, graph.Id, setViewport])
 
     useEffect(() => {
-        if (!parentRef.current) return;
-
-        const canvas = parentRef.current.querySelector('canvas') as HTMLCanvasElement;
-
-        if (!canvas) return;
-
-        canvas.setAttribute('data-engine-status', 'stop');
-    }, [])
-
-    useEffect(() => {
         const handleResize = () => {
             if (!parentRef.current) return
             setParentWidth(parentRef.current.clientWidth)
@@ -245,96 +157,7 @@ export default function ForceGraph({
         }
     }, [parentRef, setParentHeight, setParentWidth])
 
-    useEffect(() => {
-        if (!chartRef.current) return;
-
-        const linkForce = chartRef.current.d3Force('link');
-
-        if (linkForce) {
-            linkForce
-                .distance((link: Link) => {
-                    const sourceId = getEndpointId(link.source as Node | number | string);
-                    const targetId = getEndpointId(link.target as Node | number | string);
-                    const sourceDegree = sourceId !== undefined ? (nodeDegreeMap.get(sourceId) || 0) : 0;
-                    const targetDegree = targetId !== undefined ? (nodeDegreeMap.get(targetId) || 0) : 0;
-                    const maxDegree = Math.max(sourceDegree, targetDegree);
-
-                    // Use regular link distance for all links
-                    // Only increase distance when degree is very high to prevent cluster overlap
-                    if (maxDegree >= CROWDING_THRESHOLD) {
-                        // Gradually increase distance for very high-degree nodes to prevent crowding
-                        const extraDistance = Math.min(MAX_LINK_DISTANCE - LINK_DISTANCE, (maxDegree - CROWDING_THRESHOLD) * 1.5);
-                        return LINK_DISTANCE + extraDistance;
-                    }
-
-                    // For normal links and moderate high-degree links, use base distance
-                    return LINK_DISTANCE;
-                })
-                .strength((link: Link) => {
-                    const sourceId = getEndpointId(link.source as Node | number | string);
-                    const targetId = getEndpointId(link.target as Node | number | string);
-                    const sourceDegree = sourceId !== undefined ? (nodeDegreeMap.get(sourceId) || 0) : 0;
-                    const targetDegree = targetId !== undefined ? (nodeDegreeMap.get(targetId) || 0) : 0;
-
-                    // Use the maximum degree of the two endpoints
-                    const maxDegree = Math.max(sourceDegree, targetDegree);
-
-                    // Gradually reduce link strength as degree increases
-                    // This allows high-degree nodes to still pull, but not as aggressively
-                    if (maxDegree <= DEGREE_STRENGTH_DECAY) {
-                        return LINK_STRENGTH;
-                    }
-
-                    // Scale strength down gradually: strength decreases as degree increases
-                    // Formula: MIN + (BASE - MIN) * exp(-(degree - threshold) / threshold)
-                    const strengthReduction = Math.max(0, (maxDegree - DEGREE_STRENGTH_DECAY) / DEGREE_STRENGTH_DECAY);
-                    const scaledStrength = MIN_LINK_STRENGTH + (LINK_STRENGTH - MIN_LINK_STRENGTH) * Math.exp(-strengthReduction);
-
-                    return Math.max(MIN_LINK_STRENGTH, scaledStrength);
-                });
-        }
-
-        // Add collision force to prevent node overlap (scale radius by node degree)
-        chartRef.current.d3Force('collision', d3.forceCollide((node: Node) => {
-            const degree = nodeDegreeMap.get(node.id) || 0;
-            return COLLISION_BASE_RADIUS + Math.sqrt(degree) * HIGH_DEGREE_PADDING;
-        }).strength(COLLISION_STRENGTH).iterations(2));
-
-        // Center force to keep graph centered
-        const centerForce = chartRef.current.d3Force('center');
-
-        if (centerForce) {
-            centerForce.strength(CENTER_STRENGTH);
-        }
-
-        // Add charge force to repel nodes
-        const chargeForce = chartRef.current.d3Force('charge');
-
-        if (chargeForce) {
-            chargeForce
-                .strength(CHARGE_STRENGTH)
-                .distanceMax(300); // Increased to help maintain circular arrangement
-        }
-
-        // Reheat the simulation
-        chartRef.current.d3ReheatSimulation();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [chartRef, graph.Elements.links.length, graph.Elements.nodes.length, graph, nodeDegreeMap])
-
-    // Clear cached display names when displayTextPriority changes
-    useEffect(() => {
-        data.nodes.forEach(node => {
-            node.displayName = ['', ''];
-        });
-        // Force a re-render by reheating the simulation
-        if (chartRef.current) {
-            chartRef.current.d3ReheatSimulation();
-        }
-    }, [displayTextPriority, chartRef, data.nodes]);
-
-    const handleGetNodeDisplayText = useCallback((node: Node) => getNodeDisplayText(node, displayTextPriority), [displayTextPriority])
-
-    const onFetchNode = async (node: Node) => {
+    const onFetchNode = useCallback(async (node: Node) => {
         const result = await securedFetch(`/api/${type}/${graph.Id}/${node.id}`, {
             method: 'GET',
             headers: {
@@ -352,9 +175,9 @@ export default function ForceGraph({
                 })
             }
         }
-    }
+    }, [type, graph, toast, setIndicator])
 
-    const deleteNeighbors = (nodes: Node[]) => {
+    const deleteNeighbors = useCallback((nodes: Node[]) => {
         if (nodes.length === 0) return;
 
         const expandedNodes: Node[] = []
@@ -363,7 +186,11 @@ export default function ForceGraph({
             nodes: graph.Elements.nodes.filter(node => {
                 if (!node.collapsed) return true
 
-                const isTarget = graph.Elements.links.some(link => link.target.id === node.id && nodes.some(n => n.id === link.source.id));
+                const isTarget = graph.Elements.links.some(link => {
+                    const targetId = typeof (link.target as any) === 'object' ? (link.target as any).id : link.target;
+                    const sourceId = typeof (link.source as any) === 'object' ? (link.source as any).id : link.source;
+                    return targetId === node.id && nodes.some(n => n.id === sourceId);
+                });
 
                 if (!isTarget) return true
 
@@ -381,49 +208,118 @@ export default function ForceGraph({
         deleteNeighbors(expandedNodes)
 
         setRelationships(graph.removeLinks(nodes.map(n => n.id)))
-    }
+    }, [graph, setRelationships])
 
-    const handleNodeClick = async (node: Node) => {
+    const handleNodeClick = useCallback(async (node: GraphNode) => {
+        const fullNode = graph.NodesMap.get(node.id);
+        if (!fullNode) return;
+
         const now = new Date()
-        const { date, name } = lastClick.current
-        lastClick.current = { date: now, name: handleGetNodeDisplayText(node) }
+        const { date, id: name } = lastClick.current
+        lastClick.current = { date: now, id: node.id }
 
-        if (now.getTime() - date.getTime() < 1000 && name === handleGetNodeDisplayText(node)) {
-            if (!node.expand) {
-                await onFetchNode(node)
+        if (now.getTime() - date.getTime() < 1000 && name === node.id) {
+            if (!fullNode.expand) {
+                await onFetchNode(fullNode)
             } else {
-                deleteNeighbors([node])
+                deleteNeighbors([fullNode])
             }
 
-            node.expand = !node.expand
+            fullNode.expand = !fullNode.expand
             setData({ ...graph.Elements })
             handleCooldown(undefined, false)
         }
-    }
+    }, [graph, displayTextPriority, onFetchNode, deleteNeighbors, setData, handleCooldown])
 
-    const handleHover = (element: Node | Link | null) => {
-        setHoverElement(element === null ? undefined : element)
-    }
+    const handleHover = useCallback((element: GraphNode | GraphLink | null) => {
+        if (element === null) {
+            setHoverElement(undefined);
+            return;
+        }
 
-    const handleRightClick = (element: Node | Link, evt: MouseEvent) => {
+        // Find the full element from the graph
+        if ('source' in element) {
+            const fullLink = graph.LinksMap.get(element.id);
+            if (fullLink) setHoverElement(fullLink);
+        } else {
+            const fullNode = graph.NodesMap.get(element.id);
+            if (fullNode) setHoverElement(fullNode);
+        }
+    }, [graph])
+
+    const handleRightClick = useCallback((element: GraphNode | GraphLink, evt: MouseEvent) => {
+        // Find the full element from the graph
+        let fullElement: Node | Link | undefined;
+        if ('source' in element) {
+            fullElement = graph.LinksMap.get(element.id);
+        } else {
+            fullElement = graph.NodesMap.get(element.id);
+        }
+
+        if (!fullElement) return;
+
         if (evt.ctrlKey) {
-            if (selectedElements.includes(element)) {
-                setSelectedElements(selectedElements.filter((el) => el !== element))
+            if (selectedElements.includes(fullElement)) {
+                setSelectedElements(selectedElements.filter((el) => el !== fullElement))
             } else {
-                setSelectedElements([...selectedElements, element])
+                setSelectedElements([...selectedElements, fullElement])
             }
         } else {
-            setSelectedElements([element])
+            setSelectedElements([fullElement])
         }
-    }
+    }, [graph, selectedElements, setSelectedElements])
 
-    const handleUnselected = (evt?: MouseEvent) => {
+    const handleUnselected = useCallback((evt?: MouseEvent) => {
         if (evt?.ctrlKey || selectedElements.length === 0) return
         setSelectedElements([])
-    }
+    }, [selectedElements, setSelectedElements])
 
-    const isLinkSelected = (link: Link) => (selectedElements.length > 0 && selectedElements.some(el => el.id === link.id && el.source))
-        || (hoverElement && hoverElement.source && hoverElement.id === link.id)
+    const handleEngineStop = useCallback(() => {
+        handleCooldown(0, false)
+    }, [handleCooldown])
+
+    const checkIsNodeSelected = useCallback((node: GraphNode) =>
+        selectedElements.some(el => el.id === node.id && !('source' in el)) ||
+        (!!hoverElement && !('source' in hoverElement) && hoverElement.id === node.id)
+    , [selectedElements, hoverElement])
+
+    const checkIsLinkSelected = useCallback((link: GraphLink) =>
+        selectedElements.some(el => el.id === link.id && 'source' in el) ||
+        (!!hoverElement && 'source' in hoverElement && hoverElement.id === link.id)
+    , [selectedElements, hoverElement])
+
+    // Setup canvas configuration
+    useEffect(() => {
+        if (!canvasRef.current || !parentRef.current) return;
+
+        canvasRef.current.setConfig({
+            width: parentRef.current.clientWidth,
+            height: parentRef.current.clientHeight,
+            backgroundColor: background,
+            foregroundColor: foreground,
+            displayTextPriority,
+            cooldownTicks,
+            onNodeClick: handleNodeClick,
+            onNodeRightClick: handleRightClick,
+            onLinkRightClick: handleRightClick,
+            onNodeHover: handleHover,
+            onLinkHover: handleHover,
+            onBackgroundClick: handleUnselected,
+            onEngineStop: handleEngineStop,
+            isNodeSelected: checkIsNodeSelected,
+            isLinkSelected: checkIsLinkSelected,
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [background, foreground, displayTextPriority, cooldownTicks, selectedElements, hoverElement,
+        handleNodeClick, handleRightClick, handleHover, handleUnselected, handleEngineStop, checkIsNodeSelected, checkIsLinkSelected])
+
+    // Update canvas data
+    useEffect(() => {
+        if (!canvasRef.current) return;
+
+        const canvasData = convertToCanvasData(data);
+        canvasRef.current.setData(canvasData);
+    }, [data])
 
     return (
         <div ref={parentRef} className="w-full h-full relative">
@@ -433,230 +329,7 @@ export default function ForceGraph({
                     <Spinning />
                 </div>
             }
-            <ForceGraph2D
-                ref={chartRef}
-                width={parentWidth}
-                height={parentHeight}
-                linkLabel={(link) => link.relationship}
-                nodeLabel={(node) => type === "graph" ? handleGetNodeDisplayText(node) : node.labels[0]}
-                graphData={data}
-                nodeRelSize={NODE_SIZE}
-                nodeCanvasObjectMode={() => 'after'}
-                linkCanvasObjectMode={() => 'after'}
-                linkDirectionalArrowRelPos={1}
-                linkDirectionalArrowLength={(link) => {
-                    let length = 0;
-
-                    if (link.source !== link.target) {
-                        length = isLinkSelected(link) ? 4 : 2
-                    }
-
-                    return length;
-                }}
-                linkDirectionalArrowColor={(link) => link.color}
-                linkWidth={(link) => isLinkSelected(link) ? 2 : 1}
-                nodeCanvasObject={(node, ctx) => {
-
-                    if (!node.x || !node.y) {
-                        node.x = 0
-                        node.y = 0
-                    }
-
-                    ctx.lineWidth = ((selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !el.source)))
-                        || (hoverElement && !hoverElement.source && hoverElement.id === node.id)
-                        ? 1.5 : 0.5
-                    ctx.strokeStyle = foreground;
-
-                    ctx.beginPath();
-                    ctx.arc(node.x, node.y, NODE_SIZE, 0, 2 * Math.PI, false);
-                    ctx.stroke();
-                    ctx.fill();
-
-                    ctx.fillStyle = 'black';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.font = `400 2px SofiaSans`;
-                    ctx.letterSpacing = '0.1px'
-
-                    let [line1, line2] = node.displayName;
-
-                    // If displayName is empty or invalid, generate new text wrapping
-                    if (!line1 && !line2) {
-                        let text = '';
-
-                        if (type === "graph") {
-                            text = handleGetNodeDisplayText(node);
-                        } else {
-                            text = getLabelWithFewestElements(node.labels.map(label => graph.LabelsMap.get(label) || graph.createLabel([label])[0])).name;
-                        }
-
-                        // Calculate text wrapping for circular node
-                        const textRadius = NODE_SIZE - PADDING / 2; // Leave some padding inside the circle
-                        [line1, line2] = wrapTextForCircularNode(ctx, text, textRadius);
-
-                        // Cache the result
-                        node.displayName = [line1, line2];
-                    }
-
-                    const textMetrics = ctx.measureText(line1);
-                    const textHeight = textMetrics.actualBoundingBoxAscent + textMetrics.actualBoundingBoxDescent;
-                    const halfTextHeight = textHeight / 2 * 1.5;
-
-                    // Draw the text lines
-                    if (line1) {
-                        ctx.fillText(line1, node.x, line2 ? node.y - halfTextHeight : node.y);
-                    }
-                    if (line2) {
-                        ctx.fillText(line2, node.x, node.y + halfTextHeight);
-                    }
-                }}
-                linkCanvasObject={(link, ctx) => {
-                    const start = link.source;
-                    const end = link.target;
-
-                    if (!start.x || !start.y || !end.x || !end.y) {
-                        start.x = 0
-                        start.y = 0
-                        end.x = 0
-                        end.y = 0
-                    }
-
-                    let textX;
-                    let textY;
-                    let angle;
-
-                    if (start.id === end.id) {
-                        const radius = NODE_SIZE * link.curve * 6.2;
-                        const angleOffset = -Math.PI / 4; // 45 degrees offset for text alignment
-                        textX = start.x + radius * Math.cos(angleOffset);
-                        textY = start.y + radius * Math.sin(angleOffset);
-                        angle = -angleOffset;
-                    } else {
-                        // Calculate the control point for the quadratic Bézier curve
-                        const dx = end.x - start.x;
-                        const dy = end.y - start.y;
-                        const distance = Math.sqrt(dx * dx + dy * dy);
-
-                        // Calculate perpendicular vector for curve offset
-                        const perpX = dy / distance;
-                        const perpY = -dx / distance;
-
-                        // Control point with larger offset to match the actual curve
-                        const curvature = link.curve || 0;
-                        const controlX = (start.x + end.x) / 2 + perpX * curvature * distance * 1.0;
-                        const controlY = (start.y + end.y) / 2 + perpY * curvature * distance * 1.0;
-
-                        // Calculate point on Bézier curve at t = 0.5 (midpoint)
-                        const t = 0.5;
-                        const oneMinusT = 1 - t;
-                        textX = oneMinusT * oneMinusT * start.x + 2 * oneMinusT * t * controlX + t * t * end.x;
-                        textY = oneMinusT * oneMinusT * start.y + 2 * oneMinusT * t * controlY + t * t * end.y;
-
-                        // Calculate tangent angle at t = 0.5
-                        const tangentX = 2 * oneMinusT * (controlX - start.x) + 2 * t * (end.x - controlX);
-                        const tangentY = 2 * oneMinusT * (controlY - start.y) + 2 * t * (end.y - controlY);
-                        angle = Math.atan2(tangentY, tangentX);
-
-                        // maintain label vertical orientation for legibility
-                        if (angle > Math.PI / 2) angle = -(Math.PI - angle);
-                        if (angle < -Math.PI / 2) angle = -(-Math.PI - angle);
-                    }
-
-                    // Get text width
-                    ctx.font = '400 2px SofiaSans';
-                    ctx.letterSpacing = '0.1px'
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-
-                    let textWidth;
-                    let textHeight;
-                    let textAscent;
-                    let textDescent;
-
-                    const relationship = graph.RelationshipsMap.get(link.relationship)
-
-                    if (relationship) {
-                        ({ textWidth, textHeight, textAscent, textDescent } = relationship)
-                    }
-
-                    if (
-                        textWidth === undefined ||
-                        textHeight === undefined ||
-                        textAscent === undefined ||
-                        textDescent === undefined
-                    ) {
-                        const {
-                            width,
-                            actualBoundingBoxAscent,
-                            actualBoundingBoxDescent
-                        } = ctx.measureText(link.relationship)
-
-                        textWidth = width
-                        textHeight = actualBoundingBoxAscent + actualBoundingBoxDescent
-                        textAscent = actualBoundingBoxAscent
-                        textDescent = actualBoundingBoxDescent
-                        if (relationship) {
-                            graph.RelationshipsMap.set(link.relationship, {
-                                ...relationship,
-                                textWidth,
-                                textHeight,
-                                textAscent,
-                                textDescent
-                            })
-                        }
-                    }
-
-                    if (
-                        textWidth === undefined ||
-                        textHeight === undefined ||
-                        textAscent === undefined ||
-                        textDescent === undefined
-                    ) {
-                        return
-                    }
-
-                    // Use single save/restore for both background and text
-                    ctx.save();
-                    ctx.translate(textX, textY);
-                    ctx.rotate(angle);
-
-                    // Draw background rectangle (rotated)
-                    ctx.fillStyle = background;
-                    const backgroundWidth = textWidth * 0.7;
-                    const backgroundHeight = textHeight * 0.7;
-                    ctx.fillRect(
-                        -backgroundWidth / 2,
-                        -backgroundHeight / 2,
-                        backgroundWidth,
-                        backgroundHeight
-                    );
-
-                    // Draw text
-                    ctx.fillStyle = foreground;
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText(link.relationship, 0, 0);
-                    ctx.restore();
-                }}
-                onNodeClick={indicator === "offline" ? undefined : handleNodeClick}
-                onNodeHover={handleHover}
-                onLinkHover={handleHover}
-                onNodeRightClick={handleRightClick}
-                onLinkRightClick={handleRightClick}
-                onBackgroundClick={handleUnselected}
-                onBackgroundRightClick={handleUnselected}
-                onEngineStop={async () => {
-                    if (cooldownTicks === 0) return
-
-                    handleZoomToFit(chartRef, undefined, data.nodes.length < 2 ? 4 : undefined)
-                    setTimeout(() => handleCooldown(0), 1000)
-                }}
-                linkCurvature="curve"
-                nodeVisibility="visible"
-                linkVisibility="visible"
-                cooldownTicks={cooldownTicks}
-                cooldownTime={1000}
-                backgroundColor={background}
-            />
+            <falkordb-canvas ref={canvasRef} />
         </div>
     )
 }
