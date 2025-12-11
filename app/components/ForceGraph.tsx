@@ -622,12 +622,16 @@ export default function ForceGraph({
 
                     // Draw background rectangle (rotated)
                     ctx.fillStyle = background;
-                    const backgroundWidth = textWidth * 0.7;
-                    const backgroundHeight = textHeight * 0.7;
+                    const backgroundHeight = textHeight * 1.5;
+                    
+                    // Move background up to align with text that appears at top of bg
+                    // Use the actual text metrics to calculate proper vertical offset
+                    const bgOffsetY = -(textAscent - textDescent) - 0.18;
+                    
                     ctx.fillRect(
-                        -backgroundWidth / 2,
-                        -backgroundHeight / 2,
-                        backgroundWidth,
+                        -textWidth / 2,
+                        -backgroundHeight / 2 + bgOffsetY,
+                        textWidth,
                         backgroundHeight
                     );
 
