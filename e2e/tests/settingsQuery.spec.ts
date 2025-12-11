@@ -157,6 +157,7 @@ test.describe.serial("Query Settings", () => {
     expect(queryValue).toBe(defaultQuery);
     await querySettings.clickRunDefaultQueryResetBtn();
     await querySettings.refreshPage();
+    await querySettings.expandQueryExecutionSection();
     const defaultQueryValue = await querySettings.getRunDefaultQueryInput();
     expect(defaultQueryValue).toBe(getDefaultQuery());
   });
@@ -177,6 +178,7 @@ test.describe.serial("Query Settings", () => {
     await querySettings.clickRunDefaultQuerySwitchOff();
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.refreshPage();
+    await querySettings.expandQueryExecutionSection();
     const runDefaultQuerySwitchOff =
       await querySettings.getRunDefaultQuerySwitch();
     expect(runDefaultQuerySwitchOff).toBeFalsy();
@@ -198,6 +200,7 @@ test.describe.serial("Query Settings", () => {
     await querySettings.clickContentPersistenceSwitchOff();
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.refreshPage();
+    await querySettings.expandUserExperienceSection();
     const contentPersistenceSwitchOff =
       await querySettings.getContentPersistenceSwitch();
     expect(contentPersistenceSwitchOff).toBeFalsy();

@@ -257,7 +257,8 @@ export default function BrowserSettings() {
                             {/* Refresh Interval */}
                             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 p-4 bg-muted/10 rounded-lg">
                                 <div className="flex flex-col gap-2 flex-1">
-                                    <h3 className="text-lg font-semibold">Refresh Interval</h3>
+                                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+                                    <label htmlFor="refreshInterval" className="text-lg font-semibold">Refresh Interval</label>
                                     <p className="text-sm text-muted-foreground">
                                         Reload graph info data every {newRefreshInterval} seconds
                                     </p>
