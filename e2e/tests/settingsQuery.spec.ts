@@ -136,6 +136,7 @@ test.describe.serial("Query Settings", () => {
     await querySettings.fillRunDefaultQueryInput(defaultQuery);
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.refreshPage();
+    await querySettings.expandQueryExecutionSection();
     const defaultQueryValue = await querySettings.getRunDefaultQueryInput();
     expect(defaultQuery).toBe(defaultQueryValue);
   });
