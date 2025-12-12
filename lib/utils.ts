@@ -245,7 +245,9 @@ export function handleZoomToFit(
   }
 }
 
-const processEntries = (arr: unknown[]): Map<string, MemoryValue> => {
+type MemoryValueType = (string | number | MemoryValueType)[];
+
+const processEntries = (arr: MemoryValueType): Map<string, MemoryValue> => {
   const entries: [string, MemoryValue][] = [];
 
   for (let i = 0; i < arr.length; i += 2) {
