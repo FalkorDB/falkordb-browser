@@ -2,6 +2,8 @@
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  // Keep falkordb server-only to avoid bundling BigInt in client/runtime
+  serverExternalPackages: ['falkordb'],
   images: {
     unoptimized: true
   },

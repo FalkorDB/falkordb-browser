@@ -454,7 +454,7 @@ export default function BrowserSettings() {
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter') {
                                                 e.preventDefault()
-                                                if (newPriorityField.name.trim() && !newDisplayTextPriority.some(filed => filed.name === newPriorityField.name.trim())) {
+                                                if (newPriorityField.name.trim() && !newDisplayTextPriority.some(field => field.name === newPriorityField.name.trim())) {
                                                     setNewDisplayTextPriority([...newDisplayTextPriority, newPriorityField])
                                                     setNewPriorityField({ name: "", ignore: false })
                                                 }
@@ -465,12 +465,12 @@ export default function BrowserSettings() {
                                     <Button
                                         variant="Secondary"
                                         onClick={() => {
-                                            if (newPriorityField.name.trim() && !newDisplayTextPriority.some(filed => filed.name === newPriorityField.name.trim())) {
+                                            if (newPriorityField.name.trim() && !newDisplayTextPriority.some(field => field.name === newPriorityField.name.trim())) {
                                                 setNewDisplayTextPriority([...newDisplayTextPriority, newPriorityField])
                                                 setNewPriorityField({ name: "", ignore: false })
                                             }
                                         }}
-                                        disabled={!newPriorityField.name.trim() || newDisplayTextPriority.some(filed => filed.name === newPriorityField.name.trim())}
+                                        disabled={!newPriorityField.name.trim() || newDisplayTextPriority.some(field => field.name === newPriorityField.name.trim())}
                                     >
                                         <PlusCircle size={20} />
                                     </Button>
