@@ -1,8 +1,7 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
 import { GET as getDBVersion } from "@/app/api/auth/DBVersion/route";
-
-const MEMORY_USAGE_VERSION_THRESHOLD = 41408
+import { MEMORY_USAGE_VERSION_THRESHOLD } from "@/app/utils";
 
 /**
  * Handle GET requests to return memory usage for the specified graph.

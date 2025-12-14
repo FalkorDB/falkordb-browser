@@ -9,7 +9,6 @@ import { MutableRefObject } from "react";
 import { ForceGraphMethods } from "react-force-graph-2d";
 import { Node, Link, DataCell, MemoryValue } from "@/app/api/graph/model";
 
-export const MEMORY_USAGE_VERSION_THRESHOLD = 41408;
 export const screenSize = {
   sm: 640,
   md: 768,
