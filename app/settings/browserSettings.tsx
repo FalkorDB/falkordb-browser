@@ -540,7 +540,7 @@ export default function BrowserSettings() {
                                                                 <Switch
                                                                     checked={ignore}
                                                                     disabled={name === "id"}
-                                                                    className={!ignore ? "bg-border" : "bg-primary"}
+                                                                    className="data-[state=unchecked]:bg-border"
                                                                     onCheckedChange={(checked) => {
                                                                         setNewDisplayTextPriority(prev => {
                                                                             const newPriority = [...prev]
