@@ -1,10 +1,10 @@
-import { ForceGraphConfig, GraphData } from './falkordb-canvas-types';
+import { ForceGraphConfig, Data, ForceGraphInstance } from './falkordb-canvas-types';
 
 declare class FalkorDBForceGraph extends HTMLElement {
   setConfig(config: Partial<ForceGraphConfig>): void;
-  getData(): GraphData;
-  setData(data: GraphData): void;
-  getGraph(): any;
+  getData(): Data;
+  setData(data: Data): void;
+  getGraph(): ForceGraphInstance | undefined;
 }
 
 export default FalkorDBForceGraph;

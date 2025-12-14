@@ -13,9 +13,11 @@ export interface ForceGraphConfig {
   onLinkHover?: (link: GraphLink | null) => void;
   onBackgroundClick?: (event: MouseEvent) => void;
   onEngineStop?: () => void;
-  cooldownTicks?: number;
+  cooldownTicks?: number | undefined;
+  cooldownTime?: number;
   isLinkSelected?: (link: GraphLink) => boolean;
   isNodeSelected?: (node: GraphNode) => boolean;
+  isLoading?: boolean;
 }
 
 export type GraphNode = NodeObject & {

@@ -34,7 +34,7 @@ export default function DataPanel({ object, onClose, setLabels }: Props) {
 
     const [labelsHover, setLabelsHover] = useState(false)
     const [label, setLabel] = useState<string[]>([]);
-    const type = !object.source
+    const type = !("source" in object)
 
     const handleClose = useCallback((e: KeyboardEvent) => {
         if (e.key === "Escape") {

@@ -209,7 +209,6 @@ export default function Page() {
         fetchCount()
         setSelectedElements([])
         setData({ ...schema.Elements })
-        handleCooldown()
     }
 
     const handleCreateElement = async (attributes: [string, string[]][], elementLabel: string[]) => {
@@ -238,8 +237,6 @@ export default function Page() {
         }
 
         setData({ ...schema.Elements })
-
-        handleCooldown()
 
         return result.ok
     }

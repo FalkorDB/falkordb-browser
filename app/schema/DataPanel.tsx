@@ -48,7 +48,7 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
     const [newLabel, setNewLabel] = useState<string>("")
     const [label, setLabel] = useState<string[]>([])
     const [hover, setHover] = useState<string>("")
-    const type = !object.source
+    const type = !("source" in object)
 
     const handleClose = useCallback((e: KeyboardEvent) => {
         if (e.defaultPrevented) return
@@ -68,8 +68,8 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
 
     useEffect(() => {
         setAttributes(Object.entries(object.data).filter(([key, val]) => !(key === "name" && Number(val) === object.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))
-        setLabel(object.source ? [object.relationship] : [...object.labels])
-    }, [object])
+        setLabel(type ? [...object.labels] : [object.relationship])
+    }, [object, type])
 
     const handleSetEditable = ([key, val]: [string, string[]] = getDefaultAttribute()) => {
         if (key !== "") {

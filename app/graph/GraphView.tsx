@@ -2,7 +2,7 @@
 
 'use client'
 
-import { useState, useEffect, Dispatch, SetStateAction, useContext, useCallback } from "react";
+import { useEffect, Dispatch, SetStateAction, useContext, useCallback } from "react";
 import { GitGraph, ScrollText, Table } from "lucide-react"
 import { cn, GraphRef, Tab } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -60,10 +60,8 @@ function GraphView({
 }: Props) {
 
     const { graph, graphName, currentTab, setCurrentTab } = useContext(GraphContext)
-    const { setData, data, isSaved, setViewport, viewport } = useContext(ViewportContext)
+    const { setData, data, setViewport, viewport } = useContext(ViewportContext)
 
-    const [parentHeight, setParentHeight] = useState<number>(0)
-    const [parentWidth, setParentWidth] = useState<number>(0)
     const elementsLength = graph.getElements().length
 
     useEffect(() => {
@@ -217,17 +215,11 @@ function GraphView({
                     selectedElements={selectedElements}
                     setSelectedElements={setSelectedElements}
                     setRelationships={setRelationships}
-                    parentHeight={parentHeight}
-                    parentWidth={parentWidth}
-                    setParentHeight={setParentHeight}
-                    setParentWidth={setParentWidth}
                     isLoading={isLoading}
-                    handleCooldown={handleCooldown}
                     cooldownTicks={cooldownTicks}
                     currentTab={currentTab}
                     viewport={viewport}
                     setViewport={setViewport}
-                    isSaved={isSaved}
                 />
             </TabsContent>
             <TabsContent value="Table" className="h-1 grow w-full mt-0 overflow-hidden">

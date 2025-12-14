@@ -6,13 +6,13 @@
 
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react"
 import { useTheme } from "next-themes"
-import FalkorDBForceGraph from "@/falkordb-canvas/falkordb-canvas"
+import type FalkorDBForceGraph from "@/falkordb-canvas/falkordb-canvas"
 import type { Data, GraphLink, GraphNode } from "@/falkordb-canvas/falkordb-canvas-types"
 import { securedFetch, GraphRef, getTheme, Tab, ViewportState } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import { Link, Node, Relationship, Graph, GraphData } from "../api/graph/model"
 import { BrowserSettingsContext, IndicatorContext } from "./provider"
-import Spinning from "./ui/spinning"
+import "@/falkordb-canvas/falkordb-canvas"
 
 interface Props {
     graph: Graph
@@ -23,15 +23,11 @@ interface Props {
     setSelectedElements: (el?: (Node | Link)[]) => void
     type?: "schema" | "graph"
     setRelationships: Dispatch<SetStateAction<Relationship[]>>
-    setParentHeight: Dispatch<SetStateAction<number>>
-    setParentWidth: Dispatch<SetStateAction<number>>
     isLoading: boolean
-    handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void
     cooldownTicks: number | undefined
     currentTab?: Tab
     viewport?: ViewportState
     setViewport?: Dispatch<SetStateAction<ViewportState>>
-    isSaved?: boolean
 }
 
 const convertToCanvasData = (graphData: GraphData): Data => ({
@@ -62,15 +58,11 @@ export default function ForceGraph({
     setSelectedElements,
     type = "graph",
     setRelationships,
-    setParentHeight,
-    setParentWidth,
     isLoading,
-    handleCooldown,
     cooldownTicks,
     currentTab = "Graph",
     viewport,
     setViewport,
-    isSaved
 }: Props) {
 
     const { setIndicator } = useContext(IndicatorContext)
@@ -94,15 +86,16 @@ export default function ForceGraph({
     useEffect(() => {
         if (canvasRef.current) {
             const forceGraph = canvasRef.current.getGraph();
+
             if (forceGraph) {
                 chartRef.current = forceGraph;
             }
         }
-    }, [chartRef])
+    }, [chartRef, data])
 
     // Load saved viewport on mount
     useEffect(() => {
-        if (isSaved && viewport && chartRef.current) {
+        if (!isLoading && viewport && chartRef.current) {
             const { zoom, centerX, centerY } = viewport;
             setTimeout(() => {
                 if (chartRef.current) {
@@ -110,11 +103,9 @@ export default function ForceGraph({
                     chartRef.current.centerAt(centerX, centerY, 0);
                 }
             }, 100);
-        } else if (currentTab === "Graph" && graph.Elements.nodes.length > 0) {
-            handleCooldown()
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [chartRef, graph.Id, currentTab, graph.Elements.nodes.length, isSaved])
+    }, [chartRef, graph.Id, currentTab, graph.Elements.nodes.length, isLoading])
 
     // Save viewport on unmount
     useEffect(() => {
@@ -135,27 +126,6 @@ export default function ForceGraph({
             }
         };
     }, [chartRef, graph.Id, setViewport])
-
-    useEffect(() => {
-        const handleResize = () => {
-            if (!parentRef.current) return
-            setParentWidth(parentRef.current.clientWidth)
-            setParentHeight(parentRef.current.clientHeight)
-        }
-
-        window.addEventListener('resize', handleResize)
-
-        const observer = new ResizeObserver(handleResize)
-
-        if (parentRef.current) {
-            observer.observe(parentRef.current)
-        }
-
-        return () => {
-            window.removeEventListener('resize', handleResize)
-            observer.disconnect()
-        }
-    }, [parentRef, setParentHeight, setParentWidth])
 
     const onFetchNode = useCallback(async (node: Node) => {
         const result = await securedFetch(`/api/${type}/${graph.Id}/${node.id}`, {
@@ -227,9 +197,8 @@ export default function ForceGraph({
 
             fullNode.expand = !fullNode.expand
             setData({ ...graph.Elements })
-            handleCooldown(undefined, false)
         }
-    }, [graph, displayTextPriority, onFetchNode, deleteNeighbors, setData, handleCooldown])
+    }, [graph, onFetchNode, deleteNeighbors, setData])
 
     const handleHover = useCallback((element: GraphNode | GraphLink | null) => {
         if (element === null) {
@@ -274,19 +243,15 @@ export default function ForceGraph({
         setSelectedElements([])
     }, [selectedElements, setSelectedElements])
 
-    const handleEngineStop = useCallback(() => {
-        handleCooldown(0, false)
-    }, [handleCooldown])
-
     const checkIsNodeSelected = useCallback((node: GraphNode) =>
         selectedElements.some(el => el.id === node.id && !('source' in el)) ||
         (!!hoverElement && !('source' in hoverElement) && hoverElement.id === node.id)
-    , [selectedElements, hoverElement])
+        , [selectedElements, hoverElement])
 
     const checkIsLinkSelected = useCallback((link: GraphLink) =>
         selectedElements.some(el => el.id === link.id && 'source' in el) ||
         (!!hoverElement && 'source' in hoverElement && hoverElement.id === link.id)
-    , [selectedElements, hoverElement])
+        , [selectedElements, hoverElement])
 
     // Setup canvas configuration
     useEffect(() => {
@@ -298,6 +263,7 @@ export default function ForceGraph({
             backgroundColor: background,
             foregroundColor: foreground,
             displayTextPriority,
+            isLoading,
             cooldownTicks,
             onNodeClick: handleNodeClick,
             onNodeRightClick: handleRightClick,
@@ -305,13 +271,12 @@ export default function ForceGraph({
             onNodeHover: handleHover,
             onLinkHover: handleHover,
             onBackgroundClick: handleUnselected,
-            onEngineStop: handleEngineStop,
             isNodeSelected: checkIsNodeSelected,
             isLinkSelected: checkIsLinkSelected,
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [background, foreground, displayTextPriority, cooldownTicks, selectedElements, hoverElement,
-        handleNodeClick, handleRightClick, handleHover, handleUnselected, handleEngineStop, checkIsNodeSelected, checkIsLinkSelected])
+    }, [background, foreground, displayTextPriority, isLoading, cooldownTicks, selectedElements, hoverElement,
+        handleNodeClick, handleRightClick, handleHover, handleUnselected, checkIsNodeSelected, checkIsLinkSelected])
 
     // Update canvas data
     useEffect(() => {
@@ -323,12 +288,6 @@ export default function ForceGraph({
 
     return (
         <div ref={parentRef} className="w-full h-full relative">
-            {
-                isLoading &&
-                <div className="absolute inset-x-0 inset-y-0 bg-background flex items-center justify-center z-10">
-                    <Spinning />
-                </div>
-            }
             <falkordb-canvas ref={canvasRef} />
         </div>
     )

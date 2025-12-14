@@ -12,7 +12,7 @@ import Input from "../components/ui/Input"
 import DialogComponent from "../components/DialogComponent"
 import CloseDialog from "../components/CloseDialog"
 import { Link, Node, Value } from "../api/graph/model"
-import { GraphContext, IndicatorContext, BrowserSettingsContext } from "../components/provider"
+import { GraphContext, IndicatorContext } from "../components/provider"
 import ToastButton from "../components/ToastButton"
 import Button from "../components/ui/Button"
 import Combobox from "../components/ui/combobox"
@@ -29,8 +29,6 @@ interface Props {
 export default function DataTable({ object, type, lastObjId, className }: Props) {
 
     const { graph, graphInfo, setGraphInfo } = useContext(GraphContext)
-    const { settings: { graphInfo: graphInfoSettings } } = useContext(BrowserSettingsContext)
-    const { displayTextPriority } = graphInfoSettings
 
     const setInputRef = useRef<HTMLInputElement>(null)
     const setTextareaRef = useRef<HTMLTextAreaElement>(null)
@@ -154,39 +152,6 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
         setExpandedAttributes({})
     }, [lastObjId, object, setAttributes, type])
 
-    const getNodeDisplayKey = (node: Node) => {
-        const { data: nodeData } = node;
-
-        const displayText = displayTextPriority.find(({ name, ignore }) => {
-            const key = ignore
-                ? Object.keys(nodeData).find(
-                    (k) => k.toLowerCase() === name.toLowerCase()
-                )
-                : name;
-
-            return (
-                key &&
-                nodeData[key] &&
-                typeof nodeData[key] === "string" &&
-                nodeData[key].trim().length > 0
-            );
-        });
-
-        if (displayText) {
-            const key = displayText.ignore
-                ? Object.keys(nodeData).find(
-                    (k) => k.toLowerCase() === displayText.name.toLowerCase()
-                )
-                : displayText.name;
-
-            if (key) {
-                return key;
-            }
-        }
-
-        return "id";
-    }
-
     const getDefaultVal = (t: ValueType) => {
         switch (t) {
             case "boolean":
@@ -259,10 +224,6 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
 
                 object.data[key] = val
 
-                if (object.labels && getNodeDisplayKey(object as Node) === key) {
-                    object.displayName = ['', '']
-                }
-
                 setAttributes(Object.keys(object.data))
 
                 handleSetEditable("")
@@ -319,10 +280,6 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                 const value = object.data[key]
 
                 graph.removeProperty(key, id, type)
-
-                if (object.labels && getNodeDisplayKey(object as Node) === key) {
-                    object.displayName = ['', ''];
-                }
 
                 delete object.data[key]
 

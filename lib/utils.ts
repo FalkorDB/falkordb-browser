@@ -221,16 +221,15 @@ export function rgbToHSL(hex: string): string {
  * @param paddingMultiplier - Multiplier applied to the computed padding (default: 1).
  */
 export function handleZoomToFit(
-  chartRef?: GraphRef,
+  chartRef: GraphRef,
   filter?: (node: GraphNode) => boolean,
   paddingMultiplier = 1
 ) {
-  const chart = chartRef?.current;
+  const chart = chartRef.current;
   if (chart) {
-    // Get canvas dimensions
-    const canvas = document.querySelector(
-      ".force-graph-container canvas"
-    ) as HTMLCanvasElement;
+    // Get canvas dimensions from the custom element's shadow DOM
+    const customElement = document.querySelector("falkordb-canvas") as any;
+    const canvas = customElement?.shadowRoot?.querySelector("canvas") as HTMLCanvasElement;
 
     if (!canvas) return;
 

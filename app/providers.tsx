@@ -111,7 +111,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [search, setSearch] = useState("")
   const [expand, setExpand] = useState<Map<number, number>>(new Map())
 
-  const isSaved = data.nodes.some(n => n.x && n.y)
   const dataHash = useMemo(() => JSON.stringify(graph.Data), [graph.Data])
 
   const browserSettingsContext = useMemo(() => ({
@@ -209,8 +208,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setViewport,
     data,
     setData,
-    isSaved
-  }), [viewport, data, isSaved])
+  }), [viewport, data])
 
   const tableViewContext = useMemo(() => ({
     scrollPosition,
@@ -350,10 +348,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setGraph(g)
       fetchCount();
       setLastLimit(limit)
-
-      if (g.Elements.nodes.length > 0) {
-        handleCooldown();
-      }
 
       localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }))
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment

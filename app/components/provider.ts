@@ -140,7 +140,6 @@ type ViewportContextType = {
   setViewport: Dispatch<SetStateAction<ViewportState>>;
   data: GraphData;
   setData: Dispatch<SetStateAction<GraphData>>;
-  isSaved: boolean;
 };
 
 type TableViewContextType = {
@@ -284,7 +283,6 @@ export const ViewportContext = createContext<ViewportContextType>({
   setViewport: () => {},
   data: { nodes: [], links: [] },
   setData: () => {},
-  isSaved: false,
 });
 
 export const TableViewContext = createContext<TableViewContextType>({

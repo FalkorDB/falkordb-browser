@@ -226,10 +226,8 @@ export default function Page() {
 
         setData({ ...graph.Elements })
 
-        handleCooldown()
-
         return result.ok
-    }, [fetchCount, graph, graphName, handleCooldown, handleSetIsAdd, isAddNode, selectedElements, setData, setIndicator, toast])
+    }, [fetchCount, graph, graphName, handleSetIsAdd, isAddNode, selectedElements, setData, setIndicator, toast])
 
     const handleSetSelectedElements = useCallback((el: (Node | Link)[] = []) => {
         setSelectedElements(el)

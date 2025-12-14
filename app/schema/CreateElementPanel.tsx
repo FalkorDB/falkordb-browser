@@ -633,7 +633,7 @@ export default function SchemaCreateElement(props: Props) {
                 title="Swap the order of selected nodes"
                 data-testid="swapSelectedNodesButton"
                 onClick={() => setSelectedNodes && setSelectedNodes(prev => {
-                  const nodes = prev.filter((e): e is Node => !!e.labels) as [Node, Node]
+                  const nodes = prev.filter((e): e is Node => "labels" in e)
                   return [nodes[1], nodes[0]]
                 })}
               >

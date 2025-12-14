@@ -2,7 +2,7 @@
 
 'use client'
 
-import { useEffect, useState, useContext, Dispatch, SetStateAction } from "react"
+import { useEffect, useContext, Dispatch, SetStateAction } from "react"
 import { GraphRef } from "@/lib/utils"
 import Labels from "../graph/labels"
 import { Label, Link, Node, GraphData, Relationship } from "../api/graph/model"
@@ -45,9 +45,6 @@ export default function SchemaView({
     isLoading
 }: Props) {
     const { schema, schemaName } = useContext(SchemaContext)
-
-    const [parentWidth, setParentWidth] = useState(0)
-    const [parentHeight, setParentHeight] = useState(0)
 
     useEffect(() => {
         setRelationships([...schema.Relationships])
@@ -128,13 +125,8 @@ export default function SchemaView({
                     setSelectedElements={setSelectedElements}
                     type="schema"
                     isLoading={isLoading}
-                    handleCooldown={handleCooldown}
                     cooldownTicks={cooldownTicks}
                     setRelationships={setRelationships}
-                    parentHeight={parentHeight}
-                    parentWidth={parentWidth}
-                    setParentHeight={setParentHeight}
-                    setParentWidth={setParentWidth}
                 />
             </div>
         </div>

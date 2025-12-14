@@ -8,7 +8,8 @@ import { ArrowRight, ArrowRightLeft, Check, Info, Pencil, Plus, Trash2, X } from
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
-import { cn, getNodeDisplayText } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { getNodeDisplayText } from "@/falkordb-canvas/falkordb-cnavas-utils";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Combobox from "../components/ui/combobox";
