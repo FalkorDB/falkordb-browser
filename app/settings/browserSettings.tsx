@@ -195,7 +195,11 @@ export default function BrowserSettings() {
                 {/* Environment Section */}
                 <Card className="border-border shadow-sm">
                     <CardHeader
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSection('environment'); } }}
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={expandedSections.environment}
+                        className="cursor-pointer hover:bg-muted/50 focus:bg-muted/50 focus:outline-none transition-colors"
                         onClick={() => toggleSection('environment')}
                     >
                         <div className="flex items-center justify-between">
@@ -241,7 +245,11 @@ export default function BrowserSettings() {
                 {/* Graph Info Section */}
                 <Card className="border-border shadow-sm">
                     <CardHeader
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSection('graphInfo'); } }}
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={expandedSections.graphInfo}
+                        className="cursor-pointer hover:bg-muted/50 focus:bg-muted/50 focus:outline-none transition-colors"
                         onClick={() => toggleSection('graphInfo')}
                     >
                         <div className="flex items-center justify-between">
@@ -286,7 +294,11 @@ export default function BrowserSettings() {
                 {/* Query Execution Section */}
                 <Card className="border-border shadow-sm">
                     <CardHeader
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSection('queryExecution'); } }}
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={expandedSections.queryExecution}
+                        className="cursor-pointer hover:bg-muted/50 focus:bg-muted/50 focus:outline-none transition-colors"
                         onClick={() => toggleSection('queryExecution')}
                     >
                         <div className="flex items-center justify-between">
@@ -407,7 +419,11 @@ export default function BrowserSettings() {
                 {/* User Experience Section */}
                 <Card className="border-border shadow-sm">
                     <CardHeader
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSection('userExperience'); } }}
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={expandedSections.userExperience}
+                        className="cursor-pointer hover:bg-muted/50 focus:bg-muted/50 focus:outline-none transition-colors"
                         onClick={() => toggleSection('userExperience')}
                     >
                         <div className="flex items-center justify-between">
