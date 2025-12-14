@@ -177,8 +177,15 @@ export default function Chat({ onClose }: Props) {
                             break;
 
                         case "Result":
+                            setMessages(prev => [
+                                ...prev,
+                                {
+                                    role: "assistant",
+                                    content: eventData.trim(),
+                                    type: eventType
+                                }
+                            ]);
                             isResult = true
-
                             break;
 
                         case "Error":

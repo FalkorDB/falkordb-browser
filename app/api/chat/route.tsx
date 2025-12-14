@@ -13,7 +13,7 @@ export async function GET() {
         }
 
         try {
-            const response = await fetch(`${CHAT_URL}configured-model`, {
+            const response = await fetch(`${CHAT_URL}api/configured-model`, {
                 method: "GET",
                 headers: {
                     "Content-Type": "application/json",
@@ -21,6 +21,10 @@ export async function GET() {
             })
 
             if (!response.ok) {
+                // If endpoint doesn't exist (404), still allow chat but without model info
+                if (response.status === 404) {
+                    return NextResponse.json({}, { status: 200 })
+                }
                 throw new Error(await response.text())
             }
 
@@ -29,11 +33,13 @@ export async function GET() {
             return NextResponse.json(data)
         } catch (error) {
             const { message } = (error as Error)
-            
-            if (message.includes("fetch failed")) {
-                return NextResponse.json({ message: "Server is not available" }, { status: 200 })
+
+            // Gracefully handle missing endpoint or server unavailability
+            // Return empty object to allow chat to be displayed
+            if (message.includes("fetch failed") || message.includes("404") || message.includes("Not Found")) {
+                return NextResponse.json({}, { status: 200 })
             }
-            
+
             console.error(error)
             return NextResponse.json({ error: message }, { status: 400 })
         }
@@ -78,17 +84,25 @@ export async function POST(request: NextRequest) {
         const { messages, graphName, key, model } = validation.data
 
         try {
+            // Get the database connection from the session user
+            const dbConnection = session.user.url || `falkor://${session.user.host}:${session.user.port}`
 
-            const requestBody = {
+            const requestBody: Record<string, unknown> = {
                 "chat_request": {
                     messages,
                 },
                 "graph_name": graphName,
-                key,
-                model,
+                "model": model || "gpt-4o-mini", // Default model if not provided
+                "falkordb_connection": dbConnection, // Send database connection for full execution
+                "stream": true // Enable streaming for real-time progress updates
             }
 
-            const response = await fetch(`${CHAT_URL}text_to_cypher`, {
+            // Only add key if provided
+            if (key) {
+                requestBody.key = key
+            }
+
+            const response = await fetch(`${CHAT_URL}api/text_to_cypher`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -100,6 +114,7 @@ export async function POST(request: NextRequest) {
                 throw new Error(`Error: ${await response.text()}`);
             }
 
+            // Handle streaming SSE response from text-to-cypher
             const reader = response.body?.getReader();
             const decoder = new TextDecoder();
 
@@ -107,31 +122,35 @@ export async function POST(request: NextRequest) {
                 if (!reader) return;
 
                 const { done, value } = await reader.read();
-                if (done) return;
+                if (done) {
+                    writer.close();
+                    return;
+                }
 
                 const chunk = decoder.decode(value, { stream: true });
-
                 const lines = chunk.split('\n').filter(line => line);
-                let isResult = false
-
+                let isResult = false;
 
                 lines.forEach(line => {
-                    const data = JSON.parse(line.split("data:")[1])
-                    const type: EventType = Object.keys(data)[0] as EventType
+                    if (line.startsWith('data: ')) {
+                        const data = JSON.parse(line.slice(6)); // Remove 'data: ' prefix
+                        const type: EventType = Object.keys(data)[0] as EventType
 
-                    isResult = type === "Result" || type === "Error"
+                        isResult = type === "Result" || type === "Error"
 
-                    writer.write(encoder.encode(`event: ${type} data: ${data[type]}\n\n`))
-                })
+                        writer.write(encoder.encode(`event: ${type} data: ${data[type]}\n\n`))
+                    }
+                });
 
+                // Continue processing the stream unless we received Result or Error
                 if (!isResult) {
-                    processStream();
+                    await processStream();
                 } else {
                     writer.close();
                 }
             };
 
-            processStream()
+            await processStream();
         } catch (error) {
             console.error(error)
             writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify((error as Error).message)}\n\n`))
