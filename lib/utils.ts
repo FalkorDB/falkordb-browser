@@ -9,7 +9,6 @@ import { MutableRefObject } from "react";
 import { ForceGraphMethods } from "react-force-graph-2d";
 import { Node, Link, DataCell, MemoryValue } from "@/app/api/graph/model";
 
-export const MEMORY_USAGE_VERSION_THRESHOLD = 41408;
 export const screenSize = {
   sm: 640,
   md: 768,
@@ -212,6 +211,16 @@ export function rgbToHSL(hex: string): string {
   return `hsl(${hDeg}, ${sPct}%, ${lPct}%)`;
 }
 
+/**
+ * Fits the force-graph view to show all (optionally filtered) nodes within the canvas bounds.
+ *
+ * The function computes padding as 10% of the smaller canvas dimension, scales it by
+ * `paddingMultiplier`, and invokes the graph's `zoomToFit` with a 500ms duration.
+ *
+ * @param chartRef - Optional reference to the force-graph instance to operate on.
+ * @param filter - Optional predicate to include only nodes that should be considered when fitting.
+ * @param paddingMultiplier - Multiplier applied to the computed padding (default: 1).
+ */
 export function handleZoomToFit(
   chartRef?: GraphRef,
   filter?: (node: Node) => boolean,
@@ -235,7 +244,9 @@ export function handleZoomToFit(
   }
 }
 
-const processEntries = (arr: unknown[]): Map<string, MemoryValue> => {
+type MemoryValueType = (string | number | MemoryValueType)[];
+
+const processEntries = (arr: MemoryValueType): Map<string, MemoryValue> => {
   const entries: [string, MemoryValue][] = [];
 
   for (let i = 0; i < arr.length; i += 2) {
@@ -274,6 +285,12 @@ export const getMemoryUsage = async (
   return processEntries(json.result);
 };
 
+/**
+ * Builds a nested object from an array of keys, where each element becomes a nested property.
+ *
+ * @param arr - Ordered list of keys; each successive element becomes a child object of the previous key
+ * @returns An object where each string in `arr` is a nested key (an empty array returns `{}`)
+ */
 export function createNestedObject(arr: string[]): object {
   if (arr.length === 0) return {};
 

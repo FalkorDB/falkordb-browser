@@ -3,7 +3,7 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes'
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, TextPriority, MEMORY_USAGE_VERSION_THRESHOLD } from "@/lib/utils";
+import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, TextPriority } from "@/lib/utils";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -14,6 +14,7 @@ import Header from "./components/Header";
 import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ViewportContext, TableViewContext } from "./components/provider";
 import GraphInfoPanel from "./graph/graphInfo";
 import Tutorial from "./components/Tutorial";
+import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 
 const defaultQueryHistory: HistoryQuery = {
   queries: [],
@@ -38,6 +39,16 @@ const DISPLAY_TEXT_PRIORITY = [
   { name: "id", ignore: false }
 ]
 
+/**
+ * Wraps application UI with authentication-aware providers, state, and layout for graph and schema views.
+ *
+ * This component wires authentication/session handling, global UI and graph state, periodic status checks,
+ * query execution helpers, and the nested context providers used throughout the app. It also renders the
+ * main layout including header, tutorial, graph info panel, and the resizable content panels.
+ *
+ * @param children - The React node(s) to render inside the provider-managed layout (main content area).
+ * @returns A React element containing the provider hierarchy and application layout used by graph/schema pages.
+ */
 function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { toast } = useToast()
@@ -172,7 +183,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setHasChanges(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [displayChat, navigateToSettings, contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, displayTextPriority, newDisplayTextPriority, replayTutorial, tutorialOpen])
+  }), [displayChat, navigateToSettings, contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, displayTextPriority, newDisplayTextPriority, replayTutorial, tutorialOpen, showMemoryUsage])
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -365,7 +376,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setIsQueryLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graphName, limit, timeout, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries]);
+  }, [graphName, limit, timeout, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries, showMemoryUsage]);
 
   const graphContext = useMemo(() => ({
     graph,
