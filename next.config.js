@@ -5,6 +5,8 @@ const nextConfig = {
   images: {
     unoptimized: true
   },
+  // Keep falkordb server-only to avoid bundling BigInt in client/runtime
+  serverExternalPackages: ['falkordb'],
   async headers() {
     return [
       {
