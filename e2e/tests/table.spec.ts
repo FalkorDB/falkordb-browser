@@ -50,4 +50,16 @@ test.describe('Table View Tests', () => {
         const data = await tableView.getRowsCount();
         expect(data).toBe(10);
     })
+
+    test('@admin Validate that export button is visible in table view when there is data', async () => {
+        const graphName = getRandomString('table');
+        await apiCalls.addGraph(graphName);
+        const tableView = await browser.createNewPage(TableView, urls.graphUrl);
+        await tableView.selectGraphByName(graphName);
+        await tableView.insertQuery("CREATE (n {name: 'test'}) RETURN n");
+        await tableView.clickRunQuery(false);
+        await tableView.clickTableTab();
+        const isExportButtonVisible = await tableView.isExportButtonVisible();
+        expect(isExportButtonVisible).toBe(true);
+    })
 })
