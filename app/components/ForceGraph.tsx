@@ -268,7 +268,7 @@ export default function ForceGraph({
 
     const handleLoadingChange = useCallback((loading: boolean) => {
             setIsLoading(loading)
-    }, [])
+    }, [setIsLoading])
 
     // Update dimensions
     useEffect(() => {
