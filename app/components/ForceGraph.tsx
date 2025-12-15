@@ -462,13 +462,18 @@ export default function ForceGraph({
                         node.y = 0
                     }
 
+                    // Get label style customization
+                    const label = getLabelWithFewestElements(node.labels.map(l => graph.LabelsMap.get(l) || graph.createLabel([l])[0]));
+                    const customSize = label.style?.customSize || 1;
+                    const nodeSize = NODE_SIZE * customSize;
+
                     ctx.lineWidth = ((selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !el.source)))
                         || (hoverElement && !hoverElement.source && hoverElement.id === node.id)
                         ? 1.5 : 0.5
                     ctx.strokeStyle = foreground;
 
                     ctx.beginPath();
-                    ctx.arc(node.x, node.y, NODE_SIZE, 0, 2 * Math.PI, false);
+                    ctx.arc(node.x, node.y, nodeSize, 0, 2 * Math.PI, false);
                     ctx.stroke();
                     ctx.fill();
 
@@ -485,13 +490,27 @@ export default function ForceGraph({
                         let text = '';
 
                         if (type === "graph") {
-                            text = handleGetNodeDisplayText(node);
+                            // Check if label has custom caption property
+                            const customCaption = label.style?.customCaption;
+                            if (customCaption) {
+                                if (customCaption === "Description") {
+                                    text = handleGetNodeDisplayText(node);
+                                } else if (customCaption === "id") {
+                                    text = String(node.id);
+                                } else if (node.data[customCaption]) {
+                                    text = String(node.data[customCaption]);
+                                } else {
+                                    text = handleGetNodeDisplayText(node);
+                                }
+                            } else {
+                                text = handleGetNodeDisplayText(node);
+                            }
                         } else {
-                            text = getLabelWithFewestElements(node.labels.map(label => graph.LabelsMap.get(label) || graph.createLabel([label])[0])).name;
+                            text = label.name;
                         }
 
                         // Calculate text wrapping for circular node
-                        const textRadius = NODE_SIZE - PADDING / 2; // Leave some padding inside the circle
+                        const textRadius = nodeSize - PADDING / 2; // Leave some padding inside the circle
                         [line1, line2] = wrapTextForCircularNode(ctx, text, textRadius);
 
                         // Cache the result

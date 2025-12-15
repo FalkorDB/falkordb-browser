@@ -123,16 +123,46 @@ export const DEFAULT_COLORS = [
   "hsl(180, 66%, 70%)",
 ];
 
+// Color palette for node customization
+export const STYLE_COLORS = [
+  "#FDE047", // Yellow
+  "#C084FC", // Purple
+  "#FB923C", // Orange
+  "#67E8F9", // Cyan
+  "#FB7185", // Rose
+  "#FDE68A", // Light Yellow
+  "#86EFAC", // Green
+  "#E9D5FF", // Light Purple
+  "#60A5FA", // Blue
+  "#FBBF24", // Amber
+  "#F472B6", // Pink
+  "#6EE7B7", // Emerald
+  "#A3A3A3", // Gray
+  "#E5E5E5", // Light Gray
+  "#60A5FA", // Sky Blue
+  "#14B8A6", // Teal
+];
+
+// Size options for node customization (relative to base NODE_SIZE)
+export const NODE_SIZE_OPTIONS = [0.5, 0.7, 0.85, 1, 1.15, 1.3, 1.5, 1.7, 2, 2.3, 2.6];
+
 export interface InfoLabel {
   name: string;
   color: string;
   show: boolean;
 }
 
+export interface LabelStyle {
+  customColor?: string; // Custom color override
+  customSize?: number; // Custom size multiplier (1 = default)
+  customCaption?: string; // Custom property to display as caption
+}
+
 export interface Label extends InfoLabel {
   elements: Node[];
   textWidth?: number;
   textHeight?: number;
+  style?: LabelStyle; // Style customization
 }
 
 export interface InfoRelationship {
@@ -754,7 +784,8 @@ export class Graph {
             (l) => this.labelsMap.get(l) || this.createLabel([l])[0]
           )
         );
-        node.color = label.color;
+        // Use custom color if available, otherwise use default label color
+        node.color = label.style?.customColor || label.color;
       });
 
     // remove empty category if there are no more empty nodes category
@@ -779,6 +810,9 @@ export class Graph {
           elements: [],
         };
 
+        // Load saved style from localStorage
+        this.loadLabelStyle(c);
+
         this.labelsMap.set(c.name, c);
         this.labels.push(c);
       }
@@ -789,6 +823,27 @@ export class Graph {
 
       return c;
     });
+  }
+
+  public loadLabelStyle(label: Label): void {
+    if (typeof window === "undefined") return;
+    
+    const storageKey = `labelStyle_${this.id}_${label.name}`;
+    const savedStyle = localStorage.getItem(storageKey);
+    
+    if (savedStyle) {
+      try {
+        const style = JSON.parse(savedStyle);
+        label.style = style;
+        
+        // Apply custom color if present
+        if (style.customColor) {
+          label.color = style.customColor;
+        }
+      } catch (e) {
+        // Ignore invalid JSON
+      }
+    }
   }
 
   public createRelationship(relationship: string): Relationship {
