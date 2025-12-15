@@ -370,6 +370,7 @@ const authOptions: AuthOptions = {
           tls: user.tls,
           ca: user.ca,
           role: user.role,
+          url: user.url,
         };
       }
 
@@ -392,6 +393,7 @@ const authOptions: AuthOptions = {
             tls: token.tls as boolean,
             ca: token.ca,
             role: token.role as Role,
+            url: token.url as string,
           },
         };
       }
