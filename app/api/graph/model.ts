@@ -52,6 +52,9 @@ const getSchemaValue = (value: string): string[] => {
   return [type, description, unique, required];
 };
 
+// Constant for empty display name
+export const EMPTY_DISPLAY_NAME: [string, string] = ['', ''];
+
 export type Node = NodeObject<{
   id: number;
   labels: string[];
@@ -139,7 +142,7 @@ export const STYLE_COLORS = [
   "#6EE7B7", // Emerald
   "#A3A3A3", // Gray
   "#E5E5E5", // Light Gray
-  "#60A5FA", // Sky Blue
+  "#818CF8", // Indigo
   "#14B8A6", // Teal
 ];
 

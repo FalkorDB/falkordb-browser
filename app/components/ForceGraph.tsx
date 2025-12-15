@@ -10,7 +10,7 @@ import { securedFetch, GraphRef, handleZoomToFit, getTheme, Tab, ViewportState, 
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
 import { useTheme } from "next-themes"
-import { Link, Node, Relationship, Graph, getLabelWithFewestElements, GraphData } from "../api/graph/model"
+import { Link, Node, Relationship, Graph, getLabelWithFewestElements, GraphData, EMPTY_DISPLAY_NAME } from "../api/graph/model"
 import { BrowserSettingsContext, IndicatorContext } from "./provider"
 import Spinning from "./ui/spinning"
 
@@ -324,7 +324,8 @@ export default function ForceGraph({
     // Clear cached display names when displayTextPriority changes
     useEffect(() => {
         data.nodes.forEach(node => {
-            node.displayName = ['', ''];
+            // eslint-disable-next-line no-param-reassign
+            node.displayName = [...EMPTY_DISPLAY_NAME];
         });
         // Force a re-render by reheating the simulation
         if (chartRef.current) {

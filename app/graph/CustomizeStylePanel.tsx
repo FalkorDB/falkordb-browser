@@ -4,7 +4,7 @@ import { useContext, useState, useEffect, useCallback } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GraphContext } from "@/app/components/provider";
-import { Label, STYLE_COLORS, NODE_SIZE_OPTIONS, LabelStyle } from "@/app/api/graph/model";
+import { Label, STYLE_COLORS, NODE_SIZE_OPTIONS, LabelStyle, EMPTY_DISPLAY_NAME } from "@/app/api/graph/model";
 import Button from "@/app/components/ui/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -110,7 +110,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
             // Clear cached display names to force recalculation
             updatedLabel.elements.forEach(n => {
                 // eslint-disable-next-line no-param-reassign
-                n.displayName = ['', ''];
+                n.displayName = [...EMPTY_DISPLAY_NAME];
             });
 
             // Persist to localStorage

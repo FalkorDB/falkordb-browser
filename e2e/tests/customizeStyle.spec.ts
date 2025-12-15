@@ -56,8 +56,8 @@ test.describe("Customize Style Tests", () => {
     await customizeButton.click();
     
     // Verify customization panel is visible
-    await graph.page.waitForTimeout(500);
     const panelTitle = graph.page.getByText("Customize Style");
+    await panelTitle.waitFor({ state: 'visible' });
     expect(await panelTitle.isVisible()).toBeTruthy();
     
     // Verify color section is visible
@@ -89,13 +89,12 @@ test.describe("Customize Style Tests", () => {
     const customizeButton = graph.page.getByTestId("customizeStyleperson1");
     await customizeButton.click();
     
-    // Click a color option
-    await graph.page.waitForTimeout(500);
+    // Wait for panel and click a color option
+    const panelTitle = graph.page.getByText("Customize Style");
+    await panelTitle.waitFor({ state: 'visible' });
     const colorButtons = graph.page.locator('button[aria-label^="Select color"]');
-    const firstColorButton = colorButtons.first();
-    await firstColorButton.click();
-    
-    await graph.page.waitForTimeout(500);
+    await colorButtons.first().waitFor({ state: 'visible' });
+    await colorButtons.first().click();
     
     // Close the panel
     const closeButton = graph.page.getByTitle("Close");
@@ -118,13 +117,13 @@ test.describe("Customize Style Tests", () => {
     const customizeButton = graph.page.getByTestId("customizeStyleperson1");
     await customizeButton.click();
     
-    // Click a size option
-    await graph.page.waitForTimeout(500);
+    // Wait for panel and click a size option
+    const panelTitle = graph.page.getByText("Customize Style");
+    await panelTitle.waitFor({ state: 'visible' });
     const sizeButtons = graph.page.locator('button[aria-label^="Select size"]');
     const secondSizeButton = sizeButtons.nth(1);
+    await secondSizeButton.waitFor({ state: 'visible' });
     await secondSizeButton.click();
-    
-    await graph.page.waitForTimeout(500);
     
     // Close the panel
     const closeButton = graph.page.getByTitle("Close");
@@ -147,12 +146,12 @@ test.describe("Customize Style Tests", () => {
     const customizeButton = graph.page.getByTestId("customizeStyleperson1");
     await customizeButton.click();
     
-    // Click a caption option
-    await graph.page.waitForTimeout(500);
-    const captionOption = graph.page.getByText("id");
+    // Wait for panel and click a caption option
+    const panelTitle = graph.page.getByText("Customize Style");
+    await panelTitle.waitFor({ state: 'visible' });
+    const captionOption = graph.page.getByText("id").last();
+    await captionOption.waitFor({ state: 'visible' });
     await captionOption.click();
-    
-    await graph.page.waitForTimeout(500);
     
     // Close the panel
     const closeButton = graph.page.getByTitle("Close");
@@ -175,14 +174,15 @@ test.describe("Customize Style Tests", () => {
     const customizeButton = graph.page.getByTestId("customizeStyleperson1");
     await customizeButton.click();
     
-    await graph.page.waitForTimeout(500);
+    // Wait for panel to be visible
+    const panelTitle = graph.page.getByText("Customize Style");
+    await panelTitle.waitFor({ state: 'visible' });
     
     // Press ESC key
     await graph.page.keyboard.press("Escape");
     
-    await graph.page.waitForTimeout(500);
-    
     // Verify panel is closed - graph info should be visible again
+    await panelTitle.waitFor({ state: 'hidden' });
     expect(await graph.isGraphInfoPanelContainerVisible()).toBeTruthy();
     
     await apiCall.removeGraph(graphName);
