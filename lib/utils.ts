@@ -7,7 +7,7 @@ import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { MutableRefObject } from "react";
 import { Node, Link, DataCell, MemoryValue } from "@/app/api/graph/model";
-import { ForceGraphInstance, GraphNode } from "@/falkordb-canvas/falkordb-canvas-types";
+import { ForceGraphInstance, GraphNode } from "falkordb-canvas";
 
 export const MEMORY_USAGE_VERSION_THRESHOLD = 41408;
 export const screenSize = {

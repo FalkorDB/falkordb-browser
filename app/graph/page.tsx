@@ -7,7 +7,7 @@ import dynamic from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { Label, Graph, Link, Node, Relationship, GraphInfo, Value, MemoryValue } from "../api/graph/model";
-import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ViewportContext } from "../components/provider";
+import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ForceGraphContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
 import DataPanel from "./DataPanel";
@@ -41,7 +41,7 @@ export default function Page() {
     const { setIndicator } = useContext(IndicatorContext);
     const { panel, setPanel } = useContext(PanelContext)
     const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext)
-    const { setData } = useContext(ViewportContext)
+    const { setData } = useContext(ForceGraphContext)
     const {
         graph,
         setGraph,
@@ -53,7 +53,6 @@ export default function Page() {
         setGraphNames,
         runQuery,
         fetchCount,
-        isLoading,
         handleCooldown,
         cooldownTicks,
     } = useContext(GraphContext)
@@ -378,7 +377,6 @@ export default function Page() {
                         setRelationships={setRelationships}
                         labels={labels}
                         relationships={relationships}
-                        isLoading={isLoading}
                         handleCooldown={handleCooldown}
                         cooldownTicks={cooldownTicks}
                         fetchCount={fetchCount}

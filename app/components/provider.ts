@@ -104,6 +104,7 @@ type GraphContextType = {
   handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void;
   cooldownTicks: number | undefined;
   isLoading: boolean;
+  setIsLoading: (loading: boolean) => void;
 };
 
 type SchemaContextType = {
@@ -135,7 +136,7 @@ type QueryLoadingContextType = {
   setIsQueryLoading: Dispatch<SetStateAction<boolean>>;
 };
 
-type ViewportContextType = {
+type ForceGraphContextType = {
   viewport: ViewportState;
   setViewport: Dispatch<SetStateAction<ViewportState>>;
   data: GraphData;
@@ -175,7 +176,12 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         newModel: "",
         setNewModel: () => {},
       },
-      graphInfo: { newRefreshInterval: 0, setNewRefreshInterval: () => {}, newDisplayTextPriority: [], setNewDisplayTextPriority: () => {} },
+      graphInfo: {
+        newRefreshInterval: 0,
+        setNewRefreshInterval: () => {},
+        newDisplayTextPriority: [],
+        setNewDisplayTextPriority: () => {},
+      },
     },
     settings: {
       limitSettings: {
@@ -202,7 +208,13 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         navigateToSettings: false,
         displayChat: false,
       },
-      graphInfo: { showMemoryUsage: false, refreshInterval: 0, setRefreshInterval: () => {}, displayTextPriority: [], setDisplayTextPriority: () => {} },
+      graphInfo: {
+        showMemoryUsage: false,
+        refreshInterval: 0,
+        setRefreshInterval: () => {},
+        displayTextPriority: [],
+        setDisplayTextPriority: () => {},
+      },
     },
     hasChanges: false,
     setHasChanges: () => {},
@@ -233,6 +245,7 @@ export const GraphContext = createContext<GraphContextType>({
   handleCooldown: () => {},
   cooldownTicks: undefined,
   isLoading: false,
+  setIsLoading: () => {},
 });
 
 export const SchemaContext = createContext<SchemaContextType>({
@@ -278,7 +291,7 @@ export const QueryLoadingContext = createContext<QueryLoadingContextType>({
   setIsQueryLoading: () => {},
 });
 
-export const ViewportContext = createContext<ViewportContextType>({
+export const ForceGraphContext = createContext<ForceGraphContextType>({
   viewport: { centerX: 0, centerY: 0, zoom: 0 },
   setViewport: () => {},
   data: { nodes: [], links: [] },

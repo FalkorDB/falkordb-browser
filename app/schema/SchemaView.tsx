@@ -26,6 +26,7 @@ interface Props {
     labels: Label[]
     relationships: Relationship[]
     isLoading: boolean
+    setIsLoading: (loading: boolean) => void
 }
 
 export default function SchemaView({
@@ -42,7 +43,8 @@ export default function SchemaView({
     setRelationships,
     labels,
     relationships,
-    isLoading
+    isLoading,
+    setIsLoading
 }: Props) {
     const { schema, schemaName } = useContext(SchemaContext)
 
@@ -125,6 +127,8 @@ export default function SchemaView({
                     setSelectedElements={setSelectedElements}
                     type="schema"
                     isLoading={isLoading}
+                    setIsLoading={setIsLoading}
+                    handleCooldown={handleCooldown}
                     cooldownTicks={cooldownTicks}
                     setRelationships={setRelationships}
                 />

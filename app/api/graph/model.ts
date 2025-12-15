@@ -448,7 +448,11 @@ export class Graph {
     currentLimit: number,
     graphInfo?: GraphInfo
   ): Graph {
-    const graph = Graph.empty(undefined, currentLimit, graphInfo);
+    const graph = Graph.empty(
+      undefined,
+      currentLimit,
+      graphInfo
+    );
     graph.extend(results, isCollapsed, isSchema);
     graph.id = id;
     return graph;
@@ -728,6 +732,9 @@ export class Graph {
         }
       });
     });
+
+    this.nodesMap = new Map<number, Node>(this.elements.nodes.map((n) => [n.id, n]));
+    this.linksMap = new Map<number, Link>(this.elements.links.map((l) => [l.id, l]));
 
     newElements
       .filter((element): element is Node => "labels" in element)

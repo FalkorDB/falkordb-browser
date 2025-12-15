@@ -12,7 +12,7 @@ import Input from "../components/ui/Input"
 import DialogComponent from "../components/DialogComponent"
 import CloseDialog from "../components/CloseDialog"
 import { Link, Node, Value } from "../api/graph/model"
-import { GraphContext, IndicatorContext } from "../components/provider"
+import { GraphContext, IndicatorContext, ForceGraphContext } from "../components/provider"
 import ToastButton from "../components/ToastButton"
 import Button from "../components/ui/Button"
 import Combobox from "../components/ui/combobox"
@@ -29,6 +29,7 @@ interface Props {
 export default function DataTable({ object, type, lastObjId, className }: Props) {
 
     const { graph, graphInfo, setGraphInfo } = useContext(GraphContext)
+    const { setData } = useContext(ForceGraphContext)
 
     const setInputRef = useRef<HTMLInputElement>(null)
     const setTextareaRef = useRef<HTMLTextAreaElement>(null)
@@ -225,6 +226,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                 object.data[key] = val
 
                 setAttributes(Object.keys(object.data))
+                setData({ ...graph.Elements })
 
                 handleSetEditable("")
                 toast({
@@ -284,6 +286,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                 delete object.data[key]
 
                 setAttributes(Object.keys(object.data))
+                setData({ ...graph.Elements })
 
                 toast({
                     title: "Success",

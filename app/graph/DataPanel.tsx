@@ -11,7 +11,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
 import Button from "../components/ui/Button";
 import { Label, Link, Node } from "../api/graph/model";
-import { IndicatorContext, GraphContext } from "../components/provider";
+import { IndicatorContext, GraphContext, ForceGraphContext } from "../components/provider";
 import DataTable from "./DataTable";
 import AddLabel from "./addLabel";
 import RemoveLabel from "./RemoveLabel";
@@ -25,6 +25,7 @@ interface Props {
 export default function DataPanel({ object, onClose, setLabels }: Props) {
     const { setIndicator } = useContext(IndicatorContext)
     const { graph, setGraphInfo } = useContext(GraphContext)
+    const { setData } = useContext(ForceGraphContext)
 
     const lastObjId = useRef<number | undefined>(undefined)
     const labelsListRef = useRef<HTMLUListElement>(null)
@@ -89,6 +90,7 @@ export default function DataPanel({ object, onClose, setLabels }: Props) {
             const newGraphInfo = graph.GraphInfo.clone()
             setGraphInfo(newGraphInfo)
             graph.GraphInfo = newGraphInfo
+            setData({ ...graph.Elements })
             return true
         }
 
@@ -121,6 +123,7 @@ export default function DataPanel({ object, onClose, setLabels }: Props) {
             const newGraphInfo = graph.GraphInfo.clone()
             setGraphInfo(newGraphInfo)
             graph.GraphInfo = newGraphInfo
+            setData({ ...graph.Elements })
             return true
         }
 

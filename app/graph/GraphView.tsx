@@ -6,7 +6,7 @@ import { useEffect, Dispatch, SetStateAction, useContext, useCallback } from "re
 import { GitGraph, ScrollText, Table } from "lucide-react"
 import { cn, GraphRef, Tab } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { GraphContext, ViewportContext } from "@/app/components/provider";
+import { GraphContext, ForceGraphContext } from "@/app/components/provider";
 import { Label, Link, Node, Relationship, HistoryQuery } from "../api/graph/model";
 import Button from "../components/ui/Button";
 import TableView from "./TableView";
@@ -26,8 +26,7 @@ interface Props {
     setRelationships: Dispatch<SetStateAction<Relationship[]>>
     labels: Label[]
     relationships: Relationship[]
-    isLoading: boolean
-    handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void
+    handleCooldown: (ticks?: 0) => void
     cooldownTicks: number | undefined
     fetchCount: () => Promise<void>
     historyQuery: HistoryQuery
@@ -47,7 +46,6 @@ function GraphView({
     setRelationships,
     labels,
     relationships,
-    isLoading,
     handleCooldown,
     cooldownTicks,
     fetchCount,
@@ -59,8 +57,8 @@ function GraphView({
     isAddNode
 }: Props) {
 
-    const { graph, graphName, currentTab, setCurrentTab } = useContext(GraphContext)
-    const { setData, data, setViewport, viewport } = useContext(ViewportContext)
+    const { graph, graphName, currentTab, setCurrentTab, isLoading, setIsLoading } = useContext(GraphContext)
+    const { setData, data, setViewport, viewport } = useContext(ForceGraphContext)
 
     const elementsLength = graph.getElements().length
 
@@ -216,7 +214,9 @@ function GraphView({
                     setSelectedElements={setSelectedElements}
                     setRelationships={setRelationships}
                     isLoading={isLoading}
+                    setIsLoading={setIsLoading}
                     cooldownTicks={cooldownTicks}
+                    handleCooldown={handleCooldown}
                     currentTab={currentTab}
                     viewport={viewport}
                     setViewport={setViewport}

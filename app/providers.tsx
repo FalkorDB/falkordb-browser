@@ -11,7 +11,7 @@ import { ImperativePanelHandle } from "react-resizable-panels";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphData, GraphInfo, HistoryQuery, MemoryValue, Query } from "./api/graph/model";
 import Header from "./components/Header";
-import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ViewportContext, TableViewContext } from "./components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ForceGraphContext, TableViewContext } from "./components/provider";
 import GraphInfoPanel from "./graph/graphInfo";
 import Tutorial from "./components/Tutorial";
 
@@ -249,17 +249,9 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     }
   }, [graphName, toast]);
 
-  const handleCooldown = useCallback((ticks?: 0, isSetLoading: boolean = true) => {
+  const handleCooldown = useCallback((ticks?: 0) => {
     if (typeof window !== 'undefined') {
       setCooldownTicks(ticks)
-
-      if (isSetLoading) {
-        setIsLoading(ticks !== 0)
-      }
-
-      const canvas = document.querySelector('.force-graph-container canvas');
-
-      if (canvas) canvas.setAttribute('data-engine-status', ticks === 0 ? 'stop' : 'running');
     }
   }, []);
 
@@ -391,6 +383,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     handleCooldown,
     cooldownTicks,
     isLoading,
+    setIsLoading
   }), [graph, graphInfo, graphName, graphNames, nodesCount, edgesCount, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading])
 
   useEffect(() => {
@@ -617,7 +610,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                 <IndicatorContext.Provider value={indicatorContext}>
                   <PanelContext.Provider value={panelContext}>
                     <QueryLoadingContext.Provider value={queryLoadingContext}>
-                      <ViewportContext.Provider value={viewportContext}>
+                      <ForceGraphContext.Provider value={viewportContext}>
                         <TableViewContext.Provider value={tableViewContext}>
                           {
                             pathname === "/graph" &&
@@ -671,7 +664,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                             </ResizablePanel>
                           </ResizablePanelGroup>
                         </TableViewContext.Provider>
-                      </ViewportContext.Provider>
+                      </ForceGraphContext.Provider>
                     </QueryLoadingContext.Provider>
                   </PanelContext.Provider>
                 </IndicatorContext.Provider>

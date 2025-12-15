@@ -125,15 +125,8 @@ export default function Page() {
         }
     }, [toast, setIndicator, schemaName])
 
-    const handleCooldown = (ticks?: 0, isSetLoading = true) => {
+    const handleCooldown = (ticks?: 0) => {
         setCooldownTicks(ticks)
-
-        if (isSetLoading) setIsCanvasLoading(ticks !== 0)
-        const canvas = document.querySelector('.force-graph-container canvas')
-
-        if (!canvas) return
-
-        canvas.setAttribute('data-engine-status', ticks === 0 ? 'stop' : 'running')
     }
 
     const fetchSchema = useCallback(async () => {
@@ -249,6 +242,7 @@ export default function Page() {
                     setObject={handleSetSelectedElements}
                     schema={schema}
                     setLabels={setLabels}
+                    setData={setData}
                 />
             )
         }
@@ -319,6 +313,7 @@ export default function Page() {
                         labels={labels}
                         relationships={relationships}
                         isLoading={isCanvasLoading}
+                        setIsLoading={setIsCanvasLoading}
                     />
                 </ResizablePanel>
                 <ResizableHandle
