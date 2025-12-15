@@ -133,12 +133,16 @@ export async function POST(request: NextRequest) {
 
                 lines.forEach(line => {
                     if (line.startsWith('data: ')) {
-                        const data = JSON.parse(line.slice(6)); // Remove 'data: ' prefix
-                        const type: EventType = Object.keys(data)[0] as EventType
+                        try {
+                            const data = JSON.parse(line.slice(6)); // Remove 'data: ' prefix
+                            const type: EventType = Object.keys(data)[0] as EventType
 
-                        isResult = type === "Result" || type === "Error"
+                            isResult = type === "Result" || type === "Error"
 
-                        writer.write(encoder.encode(`event: ${type} data: ${data[type]}\n\n`))
+                            writer.write(encoder.encode(`event: ${type} data: ${data[type]}\n\n`))
+                        } catch (parseError) {
+                            console.error("Failed to parse SSE data:", line, parseError)
+                        }
                     }
                 });
 
