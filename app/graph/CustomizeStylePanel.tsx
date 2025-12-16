@@ -3,7 +3,7 @@
 import { useContext, useState, useEffect, useCallback } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { GraphContext } from "@/app/components/provider";
+import { GraphContext, ViewportContext } from "@/app/components/provider";
 import { Label, STYLE_COLORS, NODE_SIZE_OPTIONS, LabelStyle, EMPTY_DISPLAY_NAME } from "@/app/api/graph/model";
 import Button from "@/app/components/ui/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -15,7 +15,8 @@ interface Props {
 
 export default function CustomizeStylePanel({ label, onClose }: Props) {
     const { graph } = useContext(GraphContext);
-    
+    const { setData } = useContext(ViewportContext);
+
     // Get available properties from nodes with this label
     const availableProperties = Array.from(
         new Set(
@@ -54,15 +55,19 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
 
     const handleColorSelect = (color: string) => {
         setSelectedColor(color);
-        
+
         // Update label style
         const updatedLabel = graph.LabelsMap.get(label.name);
         if (updatedLabel) {
+            // Update label color directly for sidebar badge
+            // eslint-disable-next-line no-param-reassign
+            updatedLabel.color = color;
+
             updatedLabel.style = {
                 ...updatedLabel.style,
                 customColor: color,
             };
-            
+
             // Update all nodes with this label
             updatedLabel.elements.forEach(n => {
                 // eslint-disable-next-line no-param-reassign
@@ -74,12 +79,18 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
                 ...updatedLabel.style,
                 customColor: color,
             });
+
+            // Trigger canvas re-render for color update
+            setData({
+                nodes: [...graph.Elements.nodes],
+                links: graph.Elements.links
+            });
         }
     };
 
     const handleSizeSelect = (size: number) => {
         setSelectedSize(size);
-        
+
         // Update label style
         const updatedLabel = graph.LabelsMap.get(label.name);
         if (updatedLabel) {
@@ -93,12 +104,19 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
                 ...updatedLabel.style,
                 customSize: size,
             });
+
+            // Size changes need canvas re-render for collision physics
+            // But avoid handleCooldown to prevent reheating simulation
+            setData({
+                nodes: [...graph.Elements.nodes],
+                links: graph.Elements.links
+            });
         }
     };
 
     const handleCaptionSelect = (caption: string) => {
         setSelectedCaption(caption);
-        
+
         // Update label style
         const updatedLabel = graph.LabelsMap.get(label.name);
         if (updatedLabel) {
@@ -117,6 +135,13 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
             saveStyleToStorage(label.name, {
                 ...updatedLabel.style,
                 customCaption: caption,
+            });
+
+            // Caption changes need canvas re-render for text update
+            // But avoid handleCooldown to prevent reheating simulation
+            setData({
+                nodes: [...graph.Elements.nodes],
+                links: graph.Elements.links
             });
         }
     };

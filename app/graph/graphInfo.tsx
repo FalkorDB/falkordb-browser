@@ -98,7 +98,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                         if (!label) return null;
                         
                         return (
-                            <li key={label.name} className="max-w-full flex gap-1">
+                            <li key={`${label.name}-${label.style?.customColor || label.color}`} className="max-w-full flex gap-1">
                                 <Button
                                     style={{ backgroundColor: label.style?.customColor || label.color }}
                                     className="h-6 w-full p-2 rounded-full flex justify-center items-center text-black SofiaSans"

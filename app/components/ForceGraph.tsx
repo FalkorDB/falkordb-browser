@@ -294,10 +294,12 @@ export default function ForceGraph({
                 });
         }
 
-        // Add collision force to prevent node overlap (scale radius by node degree)
+        // Add collision force to prevent node overlap (scale radius by node degree and custom size)
         chartRef.current.d3Force('collision', d3.forceCollide((node: Node) => {
             const degree = nodeDegreeMap.get(node.id) || 0;
-            return COLLISION_BASE_RADIUS + Math.sqrt(degree) * HIGH_DEGREE_PADDING;
+            const label = getLabelWithFewestElements(node.labels.map(l => graph.LabelsMap.get(l) || graph.createLabel([l])[0]));
+            const customSize = label.style?.customSize || 1;
+            return (COLLISION_BASE_RADIUS * customSize) + Math.sqrt(degree) * HIGH_DEGREE_PADDING;
         }).strength(COLLISION_STRENGTH).iterations(2));
 
         // Center force to keep graph centered
@@ -442,7 +444,7 @@ export default function ForceGraph({
                 nodeLabel={(node) => type === "graph" ? handleGetNodeDisplayText(node) : node.labels[0]}
                 graphData={data}
                 nodeRelSize={NODE_SIZE}
-                nodeCanvasObjectMode={() => 'after'}
+                nodeCanvasObjectMode={() => 'replace'}
                 linkCanvasObjectMode={() => 'after'}
                 linkDirectionalArrowRelPos={1}
                 linkDirectionalArrowLength={(link) => {
@@ -468,15 +470,18 @@ export default function ForceGraph({
                     const customSize = label.style?.customSize || 1;
                     const nodeSize = NODE_SIZE * customSize;
 
+                    // Draw the node circle with custom color and size
+                    ctx.fillStyle = node.color;
+                    ctx.beginPath();
+                    ctx.arc(node.x, node.y, nodeSize, 0, 2 * Math.PI, false);
+                    ctx.fill();
+
+                    // Draw the border
                     ctx.lineWidth = ((selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !el.source)))
                         || (hoverElement && !hoverElement.source && hoverElement.id === node.id)
                         ? 1.5 : 0.5
                     ctx.strokeStyle = foreground;
-
-                    ctx.beginPath();
-                    ctx.arc(node.x, node.y, nodeSize, 0, 2 * Math.PI, false);
                     ctx.stroke();
-                    ctx.fill();
 
                     ctx.fillStyle = 'black';
                     ctx.textAlign = 'center';
