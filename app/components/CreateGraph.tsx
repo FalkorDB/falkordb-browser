@@ -2,7 +2,7 @@
 
 "use client"
 
-import React, { useState, useContext } from "react"
+import React, { useState, useContext, useEffect } from "react"
 import { InfoIcon, PlusCircle } from "lucide-react"
 import { prepareArg, securedFetch } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
@@ -44,6 +44,13 @@ export default function CreateGraph({
     const [isLoading, setIsLoading] = useState(false)
     const [graphName, setGraphName] = useState("")
     const [open, setOpen] = useState(false)
+
+    useEffect(() => {
+        if (!open) {
+            setGraphName("")
+            setIsLoading(false)
+        }
+    }, [open])
 
     const handleCreateGraph = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()

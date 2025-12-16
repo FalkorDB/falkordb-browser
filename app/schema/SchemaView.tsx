@@ -14,11 +14,8 @@ import ForceGraph from "../components/ForceGraph"
 interface Props {
     edgesCount: number | undefined
     nodesCount: number | undefined
-    selectedElement: Node | Link | undefined
-    setSelectedElement: (el: Node | Link | undefined) => void
     selectedElements: (Node | Link)[]
-    setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
-    isAddRelation: boolean
+    setSelectedElements: (elements?: (Node | Link)[]) => void
     chartRef: GraphRef
     cooldownTicks: number | undefined
     handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void
@@ -29,17 +26,13 @@ interface Props {
     labels: Label[]
     relationships: Relationship[]
     isLoading: boolean
-    setSelectedNodes: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
 }
 
 export default function SchemaView({
     edgesCount,
     nodesCount,
-    selectedElement,
-    setSelectedElement,
     selectedElements,
     setSelectedElements,
-    isAddRelation,
     chartRef,
     cooldownTicks,
     handleCooldown,
@@ -47,7 +40,6 @@ export default function SchemaView({
     setData,
     setLabels,
     setRelationships,
-    setSelectedNodes,
     labels,
     relationships,
     isLoading
@@ -56,13 +48,6 @@ export default function SchemaView({
 
     const [parentWidth, setParentWidth] = useState(0)
     const [parentHeight, setParentHeight] = useState(0)
-    const elementsLength = schema.getElements().length
-
-    useEffect(() => {
-        if (!elementsLength) return;
-
-        setData({ ...schema.Elements })
-    }, [schema, elementsLength, setData])
 
     useEffect(() => {
         setRelationships([...schema.Relationships])
@@ -70,9 +55,8 @@ export default function SchemaView({
     }, [schema.Id, schema.Relationships.length, schema.Labels.length, setRelationships, schema.Relationships, schema.Labels, setLabels])
 
     useEffect(() => {
-        setSelectedElement(undefined)
         setSelectedElements([])
-    }, [schema.Id, setSelectedElement, setSelectedElements])
+    }, [schema.Id, setSelectedElements])
 
     const onLabelClick = (label: Label) => {
         label.show = !label.show
@@ -140,13 +124,9 @@ export default function SchemaView({
                     chartRef={chartRef}
                     data={data}
                     setData={setData}
-                    selectedElement={selectedElement}
-                    setSelectedElement={setSelectedElement}
                     selectedElements={selectedElements}
                     setSelectedElements={setSelectedElements}
                     type="schema"
-                    isAddElement={isAddRelation}
-                    setSelectedNodes={setSelectedNodes}
                     isLoading={isLoading}
                     handleCooldown={handleCooldown}
                     cooldownTicks={cooldownTicks}

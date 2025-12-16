@@ -7,7 +7,7 @@ import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { MutableRefObject } from "react";
 import { ForceGraphMethods } from "react-force-graph-2d";
-import { Node, Link, DataCell } from "@/app/api/graph/model";
+import { Node, Link, DataCell, MemoryValue } from "@/app/api/graph/model";
 
 export const screenSize = {
   sm: 640,
@@ -21,7 +21,12 @@ export type GraphRef = MutableRefObject<
   ForceGraphMethods<Node, Link> | undefined
 >;
 
-export type Panel = "chat" | "data" | undefined;
+export type Panel = "chat" | "data" | "add" | undefined;
+
+export type TextPriority = {
+  name: string;
+  ignore: boolean;
+};
 
 export type SelectCell = {
   value: string;
@@ -42,8 +47,16 @@ export type TextCell = {
   onChange: (value: string) => Promise<boolean>;
 };
 
+export type Tab = "Graph" | "Table" | "Metadata";
+
 export type ReadOnlyCell = {
   value: string;
+  type: "readonly";
+};
+
+export type LazyCell = {
+  value?: string;
+  loadCell: () => Promise<string>;
   type: "readonly";
 };
 
@@ -60,9 +73,17 @@ export type Message = {
     | "Schema";
 };
 
-export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell;
+export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell | LazyCell;
+
+export type ViewportState = {
+  zoom: number;
+  centerX: number;
+  centerY: number;
+};
+
 export interface Row {
   cells: Cell[];
+  name: string;
   checked?: boolean;
 }
 
@@ -84,6 +105,7 @@ export async function getSSEGraphResult(
     evtSource.addEventListener("result", (event: MessageEvent) => {
       const result = JSON.parse(event.data);
       evtSource.close();
+      setIndicator("online");
       resolve(result);
     });
 
@@ -117,25 +139,23 @@ export async function getSSEGraphResult(
 export async function securedFetch(
   input: string,
   init: RequestInit,
-  toast?: any,
-  setIndicator?: (indicator: "online" | "offline") => void
+  toast: any,
+  setIndicator: (indicator: "online" | "offline") => void
 ): Promise<Response> {
   const response = await fetch(input, init);
   const { status } = response;
   if (status >= 300) {
     const err = await response.text();
-    if (toast) {
-      toast({
-        title: "Error",
-        description: err,
-        variant: "destructive",
-      });
-    }
+    toast({
+      title: "Error",
+      description: err,
+      variant: "destructive",
+    });
     if (status === 401 || status >= 500) {
-      if (setIndicator) {
-        setIndicator("offline");
-      }
+      setIndicator("offline");
     }
+  } else {
+    setIndicator("online");
   }
   return response;
 }
@@ -191,6 +211,16 @@ export function rgbToHSL(hex: string): string {
   return `hsl(${hDeg}, ${sPct}%, ${lPct}%)`;
 }
 
+/**
+ * Fits the force-graph view to show all (optionally filtered) nodes within the canvas bounds.
+ *
+ * The function computes padding as 10% of the smaller canvas dimension, scales it by
+ * `paddingMultiplier`, and invokes the graph's `zoomToFit` with a 500ms duration.
+ *
+ * @param chartRef - Optional reference to the force-graph instance to operate on.
+ * @param filter - Optional predicate to include only nodes that should be considered when fitting.
+ * @param paddingMultiplier - Multiplier applied to the computed padding (default: 1).
+ */
 export function handleZoomToFit(
   chartRef?: GraphRef,
   filter?: (node: Node) => boolean,
@@ -214,6 +244,53 @@ export function handleZoomToFit(
   }
 }
 
+type MemoryValueType = (string | number | MemoryValueType)[];
+
+const processEntries = (arr: MemoryValueType): Map<string, MemoryValue> => {
+  const entries: [string, MemoryValue][] = [];
+
+  for (let i = 0; i < arr.length; i += 2) {
+    const key = arr[i] as string;
+    const value = arr[i + 1];
+
+    // If the value is an array, recursively process it
+    if (Array.isArray(value)) {
+      entries.push([key, processEntries(value)]);
+    } else {
+      entries.push([key, value as number]);
+    }
+  }
+
+  return new Map(entries);
+};
+
+export const getMemoryUsage = async (
+  name: string,
+  toast: any,
+  setIndicator: (indicator: "online" | "offline") => void
+): Promise<Map<string, MemoryValue>> => {
+  const result = await securedFetch(
+    `api/graph/${prepareArg(name)}/memory`,
+    {
+      method: "GET",
+    },
+    toast,
+    setIndicator
+  );
+
+  if (!result.ok) return new Map();
+
+  const json = await result.json();
+
+  return processEntries(json.result);
+};
+
+/**
+ * Builds a nested object from an array of keys, where each element becomes a nested property.
+ *
+ * @param arr - Ordered list of keys; each successive element becomes a child object of the previous key
+ * @returns An object where each string in `arr` is a nested key (an empty array returns `{}`)
+ */
 export function createNestedObject(arr: string[]): object {
   if (arr.length === 0) return {};
 
@@ -251,6 +328,39 @@ export function getQueryWithLimit(
   }
 
   return [query, existingLimit];
+}
+
+export const getNodeDisplayText = (node: Node, displayTextPriority: TextPriority[]) => {
+  const { data: nodeData } = node;
+
+  const displayText = displayTextPriority.find(({ name, ignore }) => {
+      const key = ignore
+          ? Object.keys(nodeData).find(
+              (k) => k.toLowerCase() === name.toLowerCase()
+          )
+          : name;
+
+      return (
+          key &&
+          nodeData[key] &&
+          typeof nodeData[key] === "string" &&
+          nodeData[key].trim().length > 0
+      );
+  });
+
+  if (displayText) {
+      const key = displayText.ignore
+          ? Object.keys(nodeData).find(
+              (k) => k.toLowerCase() === displayText.name.toLowerCase()
+          )
+          : displayText.name;
+
+      if (key) {
+          return String(nodeData[key]);
+      }
+  }
+
+  return String(node.id);
 }
 
 export const formatName = (newGraphName: string) =>
@@ -296,7 +406,7 @@ export function getTheme(theme: string | undefined) {
   if (currentTheme === "system")
     currentTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
       ? "dark"
-      : "light"
+      : "light";
 
   return {
     background: currentTheme === "dark" ? "#1A1A1A" : "#FFFFFF",
@@ -304,4 +414,10 @@ export function getTheme(theme: string | undefined) {
     secondary: currentTheme === "dark" ? "#242424" : "#E6E6E6",
     currentTheme,
   };
+}
+
+// Type guard: runtime check that proves elements is [Node, Node]
+export function isTwoNodes(elements: (Node | Link)[]): elements is [Node, Node] {
+  return elements.length === 2 &&
+    elements.every((e): e is Node => !!e.labels)
 }

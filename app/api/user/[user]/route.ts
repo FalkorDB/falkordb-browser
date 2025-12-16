@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "../../auth/[...nextauth]/options";
 import { ROLE } from "../model";
+import { updateUserRole, validateBody } from "../../validate-body";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function PATCH(
@@ -18,36 +19,36 @@ export async function PATCH(
 
     const { user: username } = await params;
     
-    // Validate username to prevent injection attacks
-    if (!username || typeof username !== 'string' || username.trim().length === 0) {
-      return NextResponse.json(
-        { message: "Invalid username" },
-        { status: 400 }
-      );
-    }
-
-    const roleParam = req.nextUrl.searchParams.get("role");
-    const role = ROLE.get(roleParam || "");
-    
     try {
-      if (!role) {
+      const body = await req.json();
+      
+      // Validate request body
+      const validation = validateBody(updateUserRole, body);
+      
+      if (!validation.success) {
         return NextResponse.json(
-          { message: "Invalid or missing role" },
+          { message: validation.error },
           { status: 400 }
         );
       }
 
+      const { role: roleKey } = validation.data;
+      const role = ROLE.get(roleKey);
+      if (!role) throw new Error("Invalid role");
+
       await (await client.connection).aclSetUser(username, role);
-      return NextResponse.json({ message: "User updated" }, { status: 200 });
+      return NextResponse.json({ message: "User role updated" }, { status: 200 });
     } catch (error) {
+      console.error(error);
       return NextResponse.json(
-        { message: "Failed to update user" },
+        { message: (error as Error).message },
         { status: 400 }
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
-      { message: "Internal server error" },
+      { message: (err as Error).message },
       { status: 500 }
     );
   }

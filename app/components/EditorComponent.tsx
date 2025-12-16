@@ -14,7 +14,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useTheme } from "next-themes";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
-import { IndicatorContext } from "./provider";
+import { BrowserSettingsContext, IndicatorContext } from "./provider";
 import { Graph, HistoryQuery } from "../api/graph/model";
 
 export const setTheme = (monacoI: Monaco, themeName: string, backgroundColor: string, isDark: boolean) => {
@@ -57,6 +57,9 @@ interface Props {
     isQueryLoading: boolean
 }
 
+const MAX_HEIGHT = 20
+const LINE_HEIGHT = 22
+const PLACEHOLDER = "Type your query here to start"
 const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     renderLineHighlight: "none",
     glyphMargin: false,
@@ -73,10 +76,10 @@ const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     links: false,
     minimap: { enabled: false },
     automaticLayout: true,
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "400",
     wordWrap: "off",
-    lineHeight: 32,
+    lineHeight: LINE_HEIGHT,
     lineNumbersMinChars: 2,
     overviewRulerLanes: 0,
     overviewRulerBorder: false,
@@ -224,13 +227,9 @@ const SUGGESTIONS: monaco.languages.CompletionItem[] = [
     }))
 ]
 
-const MAX_HEIGHT = 20
-const LINE_HEIGHT = 32
-
-const PLACEHOLDER = "Type your query here to start"
-
 export default function EditorComponent({ graph, graphName, historyQuery, maximize, setMaximize, runQuery, setHistoryQuery, editorKey, isQueryLoading }: Props) {
     const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { tutorialOpen } = useContext(BrowserSettingsContext)
 
     const { toast } = useToast()
     const { theme } = useTheme()
@@ -243,6 +242,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
     const graphIdRef = useRef(graph.Id)
     const graphNameRef = useRef(graphName)
     const queryRef = useRef(historyQuery.query)
+    const tutorialOpenRef = useRef(tutorialOpen)
 
     const [monacoEditor, setMonacoEditor] = useState<Monaco | null>(null)
     const [sugDisposed, setSugDisposed] = useState<monaco.IDisposable>()
@@ -257,6 +257,10 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
         [blur, lineNumber])
 
     useEffect(() => {
+        tutorialOpenRef.current = tutorialOpen
+    }, [tutorialOpen])
+
+    useEffect(() => {
         graphNameRef.current = graphName
     }, [graphName])
 
@@ -267,13 +271,6 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
     useEffect(() => {
         indicatorRef.current = indicator
     }, [indicator])
-
-    useEffect(() => {
-        setHistoryQuery(prev => ({
-            ...prev,
-            query: historyQuery.counter ? historyQuery.queries[historyQuery.counter - 1].text : historyQuery.currentQuery.text
-        }))
-    }, [historyQuery.counter])
 
     useEffect(() => {
         if (historyQuery.query && placeholderRef.current) {
@@ -549,7 +546,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
 
         // eslint-disable-next-line no-bitwise
         e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-            if (indicatorRef.current === "offline" || !queryRef.current || !graphNameRef.current) return
+            if (indicatorRef.current === "offline" || !queryRef.current || !graphNameRef.current || tutorialOpenRef.current) return
             submitQuery.current?.click();
         });
 
@@ -560,7 +557,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
             keybindings: [monaco.KeyCode.Enter],
             contextMenuOrder: 1.5,
             run: async () => {
-                if (indicatorRef.current === "offline" || !queryRef.current || !graphNameRef.current) return
+                if (indicatorRef.current === "offline" || !queryRef.current || !graphNameRef.current || tutorialOpenRef.current) return
                 submitQuery.current?.click()
             },
             precondition: '!suggestWidgetVisible',
@@ -629,9 +626,9 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
     }
 
     return (
-        <div style={{ height: editorHeight + 18 }} className="absolute w-full flex items-start gap-8 border border-border rounded-lg overflow-hidden bg-background p-2">
+        <div data-testid="editor" style={{ height: editorHeight + 18 }} className="absolute w-full flex items-start gap-8 border border-border rounded-lg overflow-hidden bg-background p-2">
             <div className="h-full w-1 grow flex rounded-lg overflow-hidden">
-                <div ref={containerRef} className="h-full relative grow w-1" data-testid="editorContainer">
+                <div ref={containerRef} className="h-full relative grow w-1" data-value={historyQuery.query} data-testid="editorContainer">
                     <Editor
                         className="SofiaSans"
                         key={`${editorKey}-${currentTheme}`}
@@ -666,7 +663,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                             editorRef.current = e
                         }}
                     />
-                    <span ref={placeholderRef} className="w-full top-0 left-0 absolute pointer-events-none text-2xl truncate SofiaSans">
+                    <span ref={placeholderRef} className="w-full top-0 left-0 absolute pointer-events-none truncate SofiaSans">
                         {PLACEHOLDER}
                     </span>
                 </div>
@@ -674,6 +671,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                     {
                         historyQuery.query &&
                         <Button
+                            data-testid="clearEditor"
                             title="Clear"
                             onClick={() => {
                                 setHistoryQuery(prev => ({
@@ -700,7 +698,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                 </div>
             </div>
             <Dialog open={maximize} onOpenChange={setMaximize}>
-                <DialogContent disableClose className="w-full h-full">
+                <DialogContent hideClose className="w-full h-full">
                     <div className="relative w-full h-full">
                         <VisuallyHidden>
                             <DialogTitle />
@@ -716,6 +714,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                                 {
                                     historyQuery.query &&
                                     <Button
+                                        data-testid="clearEditor"
                                         title="Clear"
                                         onClick={() => {
                                             setHistoryQuery(prev => ({
@@ -756,7 +755,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                                 },
                                 lineNumbersMinChars: 3,
                                 minimap: { enabled: false },
-                                lineHeight: 30,
+                                lineHeight: LINE_HEIGHT,
                                 fontSize: 25,
                             }}
                             value={historyQuery.query}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
+import { renameGraph, validateBody } from "../../validate-body";
 
 export async function DELETE(
   request: NextRequest,
@@ -16,28 +17,25 @@ export async function DELETE(
 
     const { graph: graphId } = await params;
 
-    // Validate graph ID
-    if (!graphId || typeof graphId !== 'string' || graphId.trim().length === 0) {
-      return NextResponse.json(
-        { message: "Invalid graph ID" },
-        { status: 400 }
-      );
-    }
-
     try {
-      const graph = client.selectGraph(graphId);
-      await graph.delete();
+      if (graphId) {
+        const graph = client.selectGraph(graphId);
 
-      return NextResponse.json({ message: "Graph deleted successfully" });
+        await graph.delete();
+
+        return NextResponse.json({ message: `${graphId} graph deleted` });
+      }
     } catch (error) {
+      console.error(error);
       return NextResponse.json(
-        { message: "Failed to delete graph" },
+        { message: (error as Error).message },
         { status: 400 }
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
-      { message: "Internal server error" },
+      { message: (err as Error).message },
       { status: 500 }
     );
   }
@@ -60,12 +58,9 @@ export async function POST(
 
     try {
       const graph = client.selectGraph(graphId);
-      const result =
-        user.role === "Read-Only"
-          ? await graph.roQuery("RETURN 1")
-          : await graph.query("RETURN 1");
 
-      if (!result) throw new Error("Something went wrong");
+      if (user.role === "Read-Only") await graph.roQuery("RETURN 1");
+      else await graph.query("RETURN 1");
 
       return NextResponse.json(
         { message: "Graph created successfully" },
@@ -79,6 +74,7 @@ export async function POST(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }
@@ -100,46 +96,39 @@ export async function PATCH(
     const { client } = session;
 
     const { graph: graphId } = await params;
-    const sourceName = request.nextUrl.searchParams.get("sourceName");
-
-    // Validate graph ID
-    if (!graphId || typeof graphId !== 'string' || graphId.trim().length === 0) {
-      return NextResponse.json(
-        { message: "Invalid graph ID" },
-        { status: 400 }
-      );
-    }
-
-    // Validate source name
-    if (!sourceName || typeof sourceName !== 'string' || sourceName.trim().length === 0) {
-      return NextResponse.json(
-        { message: "Invalid source name" },
-        { status: 400 }
-      );
-    }
 
     try {
+      const body = await request.json();
+
+      // Validate request body
+      const validation = validateBody(renameGraph, body);
+
+      if (!validation.success) {
+        return NextResponse.json(
+          { message: validation.error },
+          { status: 400 }
+        );
+      }
+
+      const { sourceName } = validation.data;
       const data = await (
         await client.connection
       ).renameNX(sourceName, graphId);
 
-      if (!data) {
-        return NextResponse.json(
-          { message: "Graph name already exists" },
-          { status: 409 }
-        );
-      }
+      if (!data) throw new Error(`${graphId} already exists`);
 
       return NextResponse.json({ data });
     } catch (error) {
+      console.error(error);
       return NextResponse.json(
-        { message: "Failed to rename graph" },
+        { message: (error as Error).message },
         { status: 400 }
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
-      { message: "Internal server error" },
+      { message: (err as Error).message },
       { status: 500 }
     );
   }
@@ -168,20 +157,8 @@ export async function GET(
     const timeout = Number(request.nextUrl.searchParams.get("timeout"));
 
     try {
-      // Validate query parameter
-      if (!query || typeof query !== 'string' || query.trim().length === 0) {
-        throw new Error("Invalid query parameter");
-      }
-
-      // Validate timeout
-      if (Number.isNaN(timeout) || timeout < 0) {
-        throw new Error("Invalid timeout parameter");
-      }
-
-      // Validate graph ID
-      if (!graphId || typeof graphId !== 'string' || graphId.trim().length === 0) {
-        throw new Error("Invalid graph ID");
-      }
+      if (!query) throw new Error("Missing parameter query");
+      if (Number.isNaN(timeout)) throw new Error("Invalid parameter timeout");
 
       const graph = client.selectGraph(graphId);
 
@@ -190,17 +167,54 @@ export async function GET(
           ? await graph.roQuery(query, { TIMEOUT: timeout })
           : await graph.query(query, { TIMEOUT: timeout });
 
-      if (!result) throw new Error("Query returned no result");
+      const writeDataLine = (chunk: string) => {
+        writer.write(encoder.encode(`data: ${chunk}\n`));
+      };
 
-      writer.write(
-        encoder.encode(`event: result\ndata: ${JSON.stringify(result)}\n\n`)
-      );
+      const streamResult = () => {
+        writer.write(encoder.encode("event: result\n"));
+        writeDataLine("{");
+
+        let isFirstField = true;
+
+        const entries = Object.entries(result ?? {}).filter(
+          ([, value]) => value !== undefined
+        );
+
+        for (let idx = 0; idx < entries.length; idx += 1) {
+          const [key, value] = entries[idx];
+
+          if (key === "data" && Array.isArray(value)) {
+            writeDataLine(`${isFirstField ? "" : ","}"data":[`);
+            isFirstField = false;
+
+            for (let i = 0; i < value.length; i += 1) {
+              const row = value[i];
+              const rowChunk = JSON.stringify(row);
+              writeDataLine(i < value.length - 1 ? `${rowChunk},` : rowChunk);
+            }
+
+            writeDataLine("]");
+          } else {
+            writeDataLine(
+              `${isFirstField ? "" : ","}"${key}":${JSON.stringify(value)}`
+            );
+            isFirstField = false;
+          }
+        }
+
+        writeDataLine("}");
+        writer.write(encoder.encode("\n"));
+      };
+
+      streamResult();
       writer.close();
     } catch (error) {
+      console.error(error);
       writer.write(
         encoder.encode(
           `event: error\ndata: ${JSON.stringify({
-            message: error instanceof Error ? error.message : "Query execution failed",
+            message: (error as Error).message,
             status: 400,
           })}\n\n`
         )
@@ -208,10 +222,11 @@ export async function GET(
       writer.close();
     }
   } catch (error) {
+    console.error(error);
     writer.write(
       encoder.encode(
         `event: error\ndata: ${JSON.stringify({
-          message: "Internal server error",
+          message: (error as Error).message,
           status: 500,
         })}\n\n`
       )
@@ -223,7 +238,7 @@ export async function GET(
   request.signal.addEventListener("abort", () => {
     writer.close();
   });
-  
+
   return new Response(readable, {
     headers: {
       "Content-Type": "text/event-stream",

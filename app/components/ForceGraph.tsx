@@ -4,28 +4,24 @@
 
 "use client"
 
-import React, { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react"
+import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
-import { securedFetch, GraphRef, handleZoomToFit, getTheme } from "@/lib/utils"
+import { securedFetch, GraphRef, handleZoomToFit, getTheme, Tab, ViewportState, getNodeDisplayText } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
 import { useTheme } from "next-themes"
-import { GraphData, Link, Node, Relationship, Graph, getLabelWithFewestElements } from "../api/graph/model"
-import { IndicatorContext } from "./provider"
+import { Link, Node, Relationship, Graph, getLabelWithFewestElements, GraphData } from "../api/graph/model"
+import { BrowserSettingsContext, IndicatorContext } from "./provider"
 import Spinning from "./ui/spinning"
 
 interface Props {
     graph: Graph
-    chartRef: GraphRef
     data: GraphData
     setData: Dispatch<SetStateAction<GraphData>>
-    selectedElement: Node | Link | undefined
-    setSelectedElement: (element: Node | Link | undefined) => void
+    chartRef: GraphRef
     selectedElements: (Node | Link)[]
-    setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
+    setSelectedElements: (el?: (Node | Link)[]) => void
     type?: "schema" | "graph"
-    isAddElement?: boolean
-    setSelectedNodes?: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
     setRelationships: Dispatch<SetStateAction<Relationship[]>>
     parentHeight: number
     parentWidth: number
@@ -34,44 +30,14 @@ interface Props {
     isLoading: boolean
     handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void
     cooldownTicks: number | undefined
+    currentTab?: Tab
+    viewport?: ViewportState
+    setViewport?: Dispatch<SetStateAction<ViewportState>>
+    isSaved?: boolean
 }
 
 const NODE_SIZE = 6
 const PADDING = 2;
-
-const DISPLAY_TEXT_PRIORITY = [
-    "name",
-    "title",
-    "label",
-    "id",
-    "displayName"
-]
-
-/**
- * Determines the display text for a node based on priority order:
- * 1. name
- * 2. title
- * 3. label
- * 4. id (property, not node.id)
- * 5. Any other string property
- * 6. Node ID (fallback if no properties exist)
- */
-const getNodeDisplayText = (node: Node): string => {
-    const { data } = node;
-
-    const displayText = DISPLAY_TEXT_PRIORITY.find(priority =>
-        data[priority] && typeof data[priority] === 'string' && data[priority].trim().length > 0
-    )
-
-    if (displayText) return data[displayText];
-
-    const otherStringProperty = Object.entries(data).find(([key, value]) =>
-        key !== 'name' && key !== 'title' && key !== 'label' && key !== 'id' &&
-        typeof value === 'string' && value.trim().length > 0
-    )
-
-    return otherStringProperty?.[1] || node.id.toString();
-};
 
 /**
  * Wraps text into two lines with ellipsis handling for circular nodes
@@ -133,24 +99,35 @@ const wrapTextForCircularNode = (ctx: CanvasRenderingContext2D, text: string, ma
     return [line1, line2 || ''];
 };
 
-const REFERENCE_NODE_COUNT = 2000;
-const BASE_LINK_DISTANCE = 20;
-const BASE_LINK_STRENGTH = 0.5;
-const BASE_CHARGE_STRENGTH = -1;
-const BASE_CENTER_STRENGTH = 0.1;
+const LINK_DISTANCE = 50;
+const MAX_LINK_DISTANCE = 80; // Maximum distance only when clusters would overlap
+const LINK_STRENGTH = 0.5;
+const MIN_LINK_STRENGTH = 0.3; // Minimum strength for very high-degree nodes
+const COLLISION_STRENGTH = 1.35;
+const CHARGE_STRENGTH = -5; // Stronger repulsion to maintain circular arrangement
+const CENTER_STRENGTH = 0.4;
+const COLLISION_BASE_RADIUS = NODE_SIZE * 2;
+const HIGH_DEGREE_PADDING = 1.25;
+const DEGREE_STRENGTH_DECAY = 15; // Degree at which strength starts significantly decreasing
+const CROWDING_THRESHOLD = 20; // Degree threshold where we start adding distance to prevent overlap
+
+const getEndpointId = (endpoint: Node | number | string | undefined): Node["id"] | undefined => {
+    if (endpoint === undefined || endpoint === null) return undefined;
+    if (typeof endpoint === "object") return endpoint.id;
+    if (typeof endpoint === "number") return endpoint;
+
+    const parsed = Number(endpoint);
+    return Number.isNaN(parsed) ? undefined : parsed;
+};
 
 export default function ForceGraph({
     graph,
-    chartRef,
     data,
     setData,
-    selectedElement,
-    setSelectedElement,
+    chartRef,
     selectedElements,
     setSelectedElements,
     type = "graph",
-    isAddElement = false,
-    setSelectedNodes,
     setRelationships,
     parentHeight,
     parentWidth,
@@ -159,9 +136,14 @@ export default function ForceGraph({
     isLoading,
     handleCooldown,
     cooldownTicks,
+    currentTab = "Graph",
+    viewport,
+    setViewport,
+    isSaved
 }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { settings: { graphInfo: { displayTextPriority } } } = useContext(BrowserSettingsContext)
 
     const { theme } = useTheme()
     const { toast } = useToast()
@@ -172,9 +154,65 @@ export default function ForceGraph({
 
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
 
+    const nodeDegreeMap = useMemo(() => {
+        const degree = new Map<Node["id"], number>();
+
+        data.nodes.forEach(node => degree.set(node.id, 0));
+
+        data.links.forEach(link => {
+            const sourceId = getEndpointId(link.source as Node | number | string);
+            const targetId = getEndpointId(link.target as Node | number | string);
+
+            if (sourceId !== undefined) {
+                degree.set(sourceId, (degree.get(sourceId) || 0) + 1);
+            }
+            if (targetId !== undefined) {
+                degree.set(targetId, (degree.get(targetId) || 0) + 1);
+            }
+        });
+
+        return degree;
+    }, [data.links, data.nodes]);
+
     useEffect(() => {
-        handleZoomToFit(chartRef, undefined, data.nodes.length < 2 ? 4 : undefined)
-    }, [chartRef, data.nodes.length, data])
+        setData({ ...graph.Elements })
+    }, [graph, setData])
+
+    // Load saved viewport on mount
+    useEffect(() => {
+        if (isSaved && viewport) {
+            const { zoom, centerX, centerY } = viewport;
+            setTimeout(() => {
+                if (chartRef.current) {
+                    chartRef.current.zoom(zoom, 0);
+                    chartRef.current.centerAt(centerX, centerY, 0);
+                }
+            }, 100);
+        } else if (currentTab === "Graph" && graph.Elements.nodes.length > 0) {
+            handleCooldown()
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [chartRef, graph.Id, currentTab, graph.Elements.nodes.length, isSaved])
+
+    // Save viewport on unmount
+    useEffect(() => {
+        const chart = chartRef.current;
+
+        return () => {
+            if (chart && setViewport) {
+                const zoom = chart.zoom();
+                const centerPos = chart.centerAt();
+
+                if (centerPos) {
+                    setViewport({
+                        zoom,
+                        centerX: centerPos.x,
+                        centerY: centerPos.y,
+                    });
+                }
+            }
+        };
+    }, [chartRef, graph.Id, setViewport])
 
     useEffect(() => {
         if (!parentRef.current) return;
@@ -210,49 +248,94 @@ export default function ForceGraph({
     useEffect(() => {
         if (!chartRef.current) return;
 
-        const nodeCount = data.nodes.length;
-
-        // Memoize square root calculations to avoid redundant computation
-        const sqrtNodeCount = Math.sqrt(nodeCount);
-        const sqrtRefNodeCount = Math.sqrt(REFERENCE_NODE_COUNT);
-        const ratio = sqrtNodeCount / sqrtRefNodeCount;
-
-        // Use Math.min/Math.max for capping
-        const linkDistance = Math.max(Math.min(BASE_LINK_DISTANCE * ratio, 120), 20);
-        const chargeStrength = Math.min(Math.max(BASE_CHARGE_STRENGTH * ratio, -80), -1);
-
-        // Adjust link force and length
         const linkForce = chartRef.current.d3Force('link');
 
         if (linkForce) {
             linkForce
-                .distance(linkDistance)
-                .strength(BASE_LINK_STRENGTH);
+                .distance((link: Link) => {
+                    const sourceId = getEndpointId(link.source as Node | number | string);
+                    const targetId = getEndpointId(link.target as Node | number | string);
+                    const sourceDegree = sourceId !== undefined ? (nodeDegreeMap.get(sourceId) || 0) : 0;
+                    const targetDegree = targetId !== undefined ? (nodeDegreeMap.get(targetId) || 0) : 0;
+                    const maxDegree = Math.max(sourceDegree, targetDegree);
+
+                    // Use regular link distance for all links
+                    // Only increase distance when degree is very high to prevent cluster overlap
+                    if (maxDegree >= CROWDING_THRESHOLD) {
+                        // Gradually increase distance for very high-degree nodes to prevent crowding
+                        const extraDistance = Math.min(MAX_LINK_DISTANCE - LINK_DISTANCE, (maxDegree - CROWDING_THRESHOLD) * 1.5);
+                        return LINK_DISTANCE + extraDistance;
+                    }
+
+                    // For normal links and moderate high-degree links, use base distance
+                    return LINK_DISTANCE;
+                })
+                .strength((link: Link) => {
+                    const sourceId = getEndpointId(link.source as Node | number | string);
+                    const targetId = getEndpointId(link.target as Node | number | string);
+                    const sourceDegree = sourceId !== undefined ? (nodeDegreeMap.get(sourceId) || 0) : 0;
+                    const targetDegree = targetId !== undefined ? (nodeDegreeMap.get(targetId) || 0) : 0;
+
+                    // Use the maximum degree of the two endpoints
+                    const maxDegree = Math.max(sourceDegree, targetDegree);
+
+                    // Gradually reduce link strength as degree increases
+                    // This allows high-degree nodes to still pull, but not as aggressively
+                    if (maxDegree <= DEGREE_STRENGTH_DECAY) {
+                        return LINK_STRENGTH;
+                    }
+
+                    // Scale strength down gradually: strength decreases as degree increases
+                    // Formula: MIN + (BASE - MIN) * exp(-(degree - threshold) / threshold)
+                    const strengthReduction = Math.max(0, (maxDegree - DEGREE_STRENGTH_DECAY) / DEGREE_STRENGTH_DECAY);
+                    const scaledStrength = MIN_LINK_STRENGTH + (LINK_STRENGTH - MIN_LINK_STRENGTH) * Math.exp(-strengthReduction);
+
+                    return Math.max(MIN_LINK_STRENGTH, scaledStrength);
+                });
         }
 
-        // Add collision force to prevent node overlap
-        chartRef.current.d3Force('collision', d3.forceCollide(NODE_SIZE * 2).strength(1));
+        // Add collision force to prevent node overlap (scale radius by node degree)
+        chartRef.current.d3Force('collision', d3.forceCollide((node: Node) => {
+            const degree = nodeDegreeMap.get(node.id) || 0;
+            return COLLISION_BASE_RADIUS + Math.sqrt(degree) * HIGH_DEGREE_PADDING;
+        }).strength(COLLISION_STRENGTH).iterations(2));
 
         // Center force to keep graph centered
         const centerForce = chartRef.current.d3Force('center');
 
         if (centerForce) {
-            centerForce.strength(BASE_CENTER_STRENGTH);
+            centerForce.strength(CENTER_STRENGTH);
         }
 
         // Add charge force to repel nodes
         const chargeForce = chartRef.current.d3Force('charge');
 
         if (chargeForce) {
-            chargeForce.strength(chargeStrength);
+            chargeForce
+                .strength(CHARGE_STRENGTH)
+                .distanceMax(300); // Increased to help maintain circular arrangement
         }
 
         // Reheat the simulation
         chartRef.current.d3ReheatSimulation();
-    }, [chartRef, data.nodes.length, graph.Elements.links.length, graph.Elements.nodes.length])
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [chartRef, graph.Elements.links.length, graph.Elements.nodes.length, graph, nodeDegreeMap])
+
+    // Clear cached display names when displayTextPriority changes
+    useEffect(() => {
+        data.nodes.forEach(node => {
+            node.displayName = ['', ''];
+        });
+        // Force a re-render by reheating the simulation
+        if (chartRef.current) {
+            chartRef.current.d3ReheatSimulation();
+        }
+    }, [displayTextPriority, chartRef, data.nodes]);
+
+    const handleGetNodeDisplayText = useCallback((node: Node) => getNodeDisplayText(node, displayTextPriority), [displayTextPriority])
 
     const onFetchNode = async (node: Node) => {
-        const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {
+        const result = await securedFetch(`/api/${type}/${graph.Id}/${node.id}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
@@ -275,17 +358,12 @@ export default function ForceGraph({
         if (nodes.length === 0) return;
 
         const expandedNodes: Node[] = []
-        
-        // Convert nodes array to Set for O(1) lookup
-        const nodeIdSet = new Set(nodes.map(n => n.id));
 
         graph.Elements = {
             nodes: graph.Elements.nodes.filter(node => {
                 if (!node.collapsed) return true
 
-                const isTarget = graph.Elements.links.some(link => 
-                    link.target.id === node.id && nodeIdSet.has(link.source.id)
-                );
+                const isTarget = graph.Elements.links.some(link => link.target.id === node.id && nodes.some(n => n.id === link.source.id));
 
                 if (!isTarget) return true
 
@@ -308,9 +386,9 @@ export default function ForceGraph({
     const handleNodeClick = async (node: Node) => {
         const now = new Date()
         const { date, name } = lastClick.current
-        lastClick.current = { date: now, name: getNodeDisplayText(node) }
+        lastClick.current = { date: now, name: handleGetNodeDisplayText(node) }
 
-        if (now.getTime() - date.getTime() < 1000 && name === getNodeDisplayText(node)) {
+        if (now.getTime() - date.getTime() < 1000 && name === handleGetNodeDisplayText(node)) {
             if (!node.expand) {
                 await onFetchNode(node)
             } else {
@@ -328,51 +406,24 @@ export default function ForceGraph({
     }
 
     const handleRightClick = (element: Node | Link, evt: MouseEvent) => {
-        if (!element.source && isAddElement) {
-            if (setSelectedNodes) {
-                setSelectedNodes(prev => {
-                    const node = element as Node
-                    if (prev[0] === undefined) {
-                        return [node, undefined]
-                    }
-                    if (prev[1] === undefined) {
-                        return [prev[0], node]
-                    }
-                    return [node, prev[0]]
-                })
-                return
-            }
-        }
-
         if (evt.ctrlKey) {
             if (selectedElements.includes(element)) {
                 setSelectedElements(selectedElements.filter((el) => el !== element))
             } else {
                 setSelectedElements([...selectedElements, element])
             }
+        } else {
+            setSelectedElements([element])
         }
-
-        setSelectedElement(element)
     }
 
     const handleUnselected = (evt?: MouseEvent) => {
-        if (evt?.ctrlKey || (!selectedElement && selectedElements.length === 0)) return
-        setSelectedElement(undefined)
+        if (evt?.ctrlKey || selectedElements.length === 0) return
         setSelectedElements([])
     }
 
-    // Memoize selected element IDs for performance
-    const selectedElementIds = React.useMemo(() => {
-        const ids = new Set<number>();
-        if (selectedElement?.source) ids.add(selectedElement.id as number);
-        if (hoverElement?.source) ids.add(hoverElement.id as number);
-        selectedElements.forEach(el => {
-            if (el.source) ids.add(el.id as number);
-        });
-        return ids;
-    }, [selectedElement, hoverElement, selectedElements]);
-
-    const isLinkSelected = (link: Link) => selectedElementIds.has(link.id as number);
+    const isLinkSelected = (link: Link) => (selectedElements.length > 0 && selectedElements.some(el => el.id === link.id && el.source))
+        || (hoverElement && hoverElement.source && hoverElement.id === link.id)
 
     return (
         <div ref={parentRef} className="w-full h-full relative">
@@ -387,7 +438,7 @@ export default function ForceGraph({
                 width={parentWidth}
                 height={parentHeight}
                 linkLabel={(link) => link.relationship}
-                nodeLabel={(node) => type === "graph" ? getNodeDisplayText(node) : node.labels[0]}
+                nodeLabel={(node) => type === "graph" ? handleGetNodeDisplayText(node) : node.labels[0]}
                 graphData={data}
                 nodeRelSize={NODE_SIZE}
                 nodeCanvasObjectMode={() => 'after'}
@@ -405,17 +456,15 @@ export default function ForceGraph({
                 linkDirectionalArrowColor={(link) => link.color}
                 linkWidth={(link) => isLinkSelected(link) ? 2 : 1}
                 nodeCanvasObject={(node, ctx) => {
+
                     if (!node.x || !node.y) {
                         node.x = 0
                         node.y = 0
                     }
 
-                    // Check if node is selected/hovered (optimized with early returns)
-                    const isSelected = (selectedElement && !selectedElement.source && selectedElement.id === node.id)
+                    ctx.lineWidth = ((selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !el.source)))
                         || (hoverElement && !hoverElement.source && hoverElement.id === node.id)
-                        || (selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !el.source));
-                    
-                    ctx.lineWidth = isSelected ? 1.5 : 0.5;
+                        ? 1.5 : 0.5
                     ctx.strokeStyle = foreground;
 
                     ctx.beginPath();
@@ -436,7 +485,7 @@ export default function ForceGraph({
                         let text = '';
 
                         if (type === "graph") {
-                            text = getNodeDisplayText(node);
+                            text = handleGetNodeDisplayText(node);
                         } else {
                             text = getLabelWithFewestElements(node.labels.map(label => graph.LabelsMap.get(label) || graph.createLabel([label])[0])).name;
                         }
@@ -516,44 +565,74 @@ export default function ForceGraph({
                     // Get text width
                     ctx.font = '400 2px SofiaSans';
                     ctx.letterSpacing = '0.1px'
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
 
                     let textWidth;
                     let textHeight;
+                    let textAscent;
+                    let textDescent;
+
                     const relationship = graph.RelationshipsMap.get(link.relationship)
 
                     if (relationship) {
-                        ({ textWidth, textHeight } = relationship)
+                        ({ textWidth, textHeight, textAscent, textDescent } = relationship)
                     }
 
-                    if (!textWidth || !textHeight) {
-                        const { width, actualBoundingBoxAscent, actualBoundingBoxDescent } = ctx.measureText(link.relationship)
+                    if (
+                        textWidth === undefined ||
+                        textHeight === undefined ||
+                        textAscent === undefined ||
+                        textDescent === undefined
+                    ) {
+                        const {
+                            width,
+                            actualBoundingBoxAscent,
+                            actualBoundingBoxDescent
+                        } = ctx.measureText(link.relationship)
 
                         textWidth = width
                         textHeight = actualBoundingBoxAscent + actualBoundingBoxDescent
+                        textAscent = actualBoundingBoxAscent
+                        textDescent = actualBoundingBoxDescent
                         if (relationship) {
-                            graph.RelationshipsMap.set(link.relationship, { ...relationship, textWidth, textHeight })
+                            graph.RelationshipsMap.set(link.relationship, {
+                                ...relationship,
+                                textWidth,
+                                textHeight,
+                                textAscent,
+                                textDescent
+                            })
                         }
                     }
 
-                    // Use single save/restore for both background and text
-                    const padding = 0.5;
+                    if (
+                        textWidth === undefined ||
+                        textHeight === undefined ||
+                        textAscent === undefined ||
+                        textDescent === undefined
+                    ) {
+                        return
+                    }
 
+                    // Use single save/restore for both background and text
                     ctx.save();
                     ctx.translate(textX, textY);
                     ctx.rotate(angle);
 
                     // Draw background rectangle (rotated)
                     ctx.fillStyle = background;
+                    const backgroundWidth = textWidth * 0.7;
+                    const backgroundHeight = textHeight * 0.7;
                     ctx.fillRect(
-                        -textWidth / 2 - padding,
-                        -textHeight / 2 - padding,
-                        textWidth + padding * 2,
-                        textHeight + padding * 2
+                        -backgroundWidth / 2,
+                        -backgroundHeight / 2,
+                        backgroundWidth,
+                        backgroundHeight
                     );
 
                     // Draw text
                     ctx.fillStyle = foreground;
-                    ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(link.relationship, 0, 0);
                     ctx.restore();

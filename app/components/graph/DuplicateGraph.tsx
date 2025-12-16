@@ -1,4 +1,4 @@
-import { FormEvent, useContext, useState } from "react";
+import { FormEvent, useContext, useEffect, useState } from "react";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import DialogComponent from "../DialogComponent";
@@ -20,6 +20,13 @@ export default function DuplicateGraph({ open, onOpenChange, selectedValue, onDu
     const { toast } = useToast()
     const { indicator, setIndicator } = useContext(IndicatorContext)
 
+    useEffect(() => {
+        if (!open) {
+            setDuplicateName("")
+            setIsLoading(false)
+        }
+    }, [open])
+
     const handleDuplicate = async (e: FormEvent) => {
         e.preventDefault()
 
@@ -33,8 +40,10 @@ export default function DuplicateGraph({ open, onOpenChange, selectedValue, onDu
 
         try {
             setIsLoading(true)
-            const result = await securedFetch(`api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(duplicateName)}/duplicate?sourceName=${prepareArg(selectedValue)}`, {
-                method: "PATCH"
+            const result = await securedFetch(`api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(duplicateName)}/duplicate`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sourceName: selectedValue })
             }, toast, setIndicator)
 
             if (!result.ok) return

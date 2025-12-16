@@ -44,8 +44,15 @@ export default function DeleteGraph({
     }
   }, [open, closeManage, setOpenMenage])
 
+  useEffect(() => {
+    if (!open) {
+      setIsLoading(false)
+    }
+  }, [open])
+
   const handleDelete = async (deleteGraphNames: string[]) => {
     setIsLoading(true)
+    let newGraphNames
     try {
       const [failedDeletedGraphs, successDeletedGraphs] = await Promise.all(deleteGraphNames
         .map(async (name) => {
@@ -57,9 +64,9 @@ export default function DeleteGraph({
 
           return name
 
-        })).then(newGraphNames => [newGraphNames.filter(n => n !== ""), deleteGraphNames.filter(n => !newGraphNames.includes(n))])
+        })).then(result => [result.filter(n => n !== ""), deleteGraphNames.filter(n => !result.includes(n))])
 
-      const newGraphNames = graphNames.filter(n => !successDeletedGraphs.includes(n))
+      newGraphNames = graphNames.filter(n => !successDeletedGraphs.includes(n))
 
       setGraphNames(newGraphNames)
 
@@ -76,7 +83,9 @@ export default function DeleteGraph({
     } finally {
       setIsLoading(false)
       setOpen(false)
-      setCloseManage(true)
+      if (typeof newGraphNames !== "undefined" && newGraphNames.length === 0) {
+        setCloseManage(true)
+      }
     }
   }
 

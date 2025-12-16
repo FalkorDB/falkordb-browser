@@ -135,7 +135,7 @@ export default function AddUser({ onAddUser }: {
                     <PlusCircle size={20} />
                 </Button>
             </DrawerTrigger>
-            <DrawerContent side="right" className="gap-6 after:hidden">
+            <DrawerContent side="right" className="gap-2 after:hidden">
                 <VisuallyHidden>
                     <DrawerTitle />
                     <DrawerDescription />

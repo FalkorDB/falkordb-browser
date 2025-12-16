@@ -12,24 +12,35 @@ import {
   postRequest,
 } from "../../infra/api/apiRequests";
 import urls from "../../config/urls.json";
-import { AddGraphResponse } from "./responses/addGraphResponse";
-import { RemoveGraphResponse } from "./responses/removeGraphResponse";
-import { ModifySettingsRoleResponse } from "./responses/modifySettingsRoleResponse";
-import { GetSettingsRoleValue } from "./responses/getSettingsRoleValue";
-import { CreateUsersResponse } from "./responses/createUsersResponse";
-import { DeleteUsersResponse } from "./responses/deleteUsersResponse";
-import { RunQueryResponse } from "./responses/runQueryResponse";
-import { GetUsersResponse } from "./responses/getUsersResponse";
-import { DuplicateGraphresponse } from "./responses/duplicateGraph";
-import { ChangeGraphNameResponse } from "./responses/changeGraphNameResponse";
-import { AuthCredentialsResponse } from "./responses/LoginResponse";
-import { LogoutResponse } from "./responses/logoutResponse";
-import { AddSchemaResponse } from "./responses/addSchemaResponse";
-import { GetGraphsResponse } from "./responses/getGraphsResponse";
-import { SchemaListResponse } from "./responses/getSchemaResponse";
-import { GraphCountResponse } from "./responses/graphCountResponse";
-import { GraphNodeResponse } from "./responses/graphNodeResponse";
-import { GraphAttributeResponse } from "./responses/graphAttributeResponse";
+import {
+  AddGraphResponse,
+  RemoveGraphResponse,
+  GetGraphsResponse,
+  DuplicateGraphresponse,
+  ChangeGraphNameResponse,
+  RunQueryResponse,
+  GraphCountResponse,
+  GraphNodeResponse,
+  GraphAttributeResponse,
+} from "./responses/graphResponses";
+import {
+  GetUsersResponse,
+  CreateUsersResponse,
+  DeleteUsersResponse,
+} from "./responses/userResponses";
+import {
+  AddSchemaResponse,
+  SchemaListResponse,
+} from "./responses/schemaResponses";
+import {
+  ModifySettingsRoleResponse,
+  GetSettingsRoleValue,
+} from "./responses/settingsResponses";
+import {
+  AuthCredentialsResponse,
+  LogoutResponse,
+} from "./responses/authResponses";
+import { ListTokensResponse, TokenDetailsResponse } from "./responses/tokenResponse";
 
 export async function getSSEGraphResult(
   url: string,
@@ -168,7 +179,8 @@ export default class ApiCalls {
   ): Promise<ChangeGraphNameResponse> {
     try {
       const result = await patchRequest(
-        `${urls.api.graphUrl + destinationGraph}?sourceName=${sourceGraph}`
+        `${urls.api.graphUrl + destinationGraph}`,
+        { sourceName: sourceGraph }
       );
       return await result.json();
     } catch (error) {
@@ -197,9 +209,9 @@ export default class ApiCalls {
     data?: any
   ): Promise<DuplicateGraphresponse> {
     try {
-      const result = await postRequest(
-        `${urls.api.graphUrl + destinationGraph}?sourceName=${sourceGraph}`,
-        data
+      const result = await patchRequest(
+        `${urls.api.graphUrl + destinationGraph}/duplicate`,
+        { sourceName: sourceGraph, ...data }
       );
       return await result.json();
     } catch (error) {
@@ -219,7 +231,6 @@ export default class ApiCalls {
       )}`;
       return await getSSEGraphResult(url);
     } catch (error) {
-      console.error(error);
       throw new Error(
         `Failed to run query. \n Error: ${(error as Error).message}`
       );
@@ -284,7 +295,7 @@ export default class ApiCalls {
   async deleteGraphNode(
     graph: string,
     node: string,
-    data: Record<string, string>
+    data: Record<string, string | boolean>
   ): Promise<GraphNodeResponse> {
     try {
       const result = await deleteRequest(
@@ -349,7 +360,8 @@ export default class ApiCalls {
   ): Promise<ModifySettingsRoleResponse> {
     try {
       const result = await postRequest(
-        `${urls.api.settingsConfig + roleName}?value=${roleValue}`
+        `${urls.api.settingsConfig + roleName}`,
+        { value: roleValue }
       );
       return await result.json();
     } catch (error) {
@@ -412,6 +424,160 @@ export default class ApiCalls {
     }
   }
 
+  // Token API methods
+  async generateToken(data?: {
+    name?: string;
+    expiresAt?: string | null;
+    ttlSeconds?: number;
+  }): Promise<any> {
+    try {
+      const headers = await getAdminToken();
+      const result = await postRequest(`${urls.api.tokenUrl}tokens`, data, undefined, headers);
+      return await result.json();
+    } catch (error) {
+      throw new Error(
+        `Failed to generate token. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
+  async listTokens(): Promise<ListTokensResponse> {
+    try {
+      const headers = await getAdminToken();
+      const result = await getRequest(`${urls.api.tokenUrl}tokens`, headers);
+      return await result.json();
+    } catch (error) {
+      throw new Error(
+        `Failed to list tokens. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
+  async revokeToken(tokenId: string): Promise<any> {
+    try {
+      const headers = await getAdminToken();
+      const result = await deleteRequest(`${urls.api.tokenUrl}tokens/${tokenId}`, headers);
+      return await result.json();
+    } catch (error) {
+      throw new Error(
+        `Failed to revoke token. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
+  async getTokenDetails(tokenId: string): Promise<TokenDetailsResponse> {
+    try {
+      const headers = await getAdminToken();
+      const result = await getRequest(`${urls.api.tokenUrl}tokens/${tokenId}`, headers);
+      return await result.json();
+    } catch (error) {
+      throw new Error(
+        `Failed to get token details. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
+  async revokeAllUserTokens(tokens: string[]): Promise<void> {
+    try {
+      const results = await Promise.allSettled(
+        tokens.map((tokenId) => this.revokeToken(tokenId))
+      );
+      const failures = results.filter((r) => r.status === 'rejected');
+      if (failures.length > 0) {
+        throw new Error(
+          `Failed to revoke ${failures.length} of ${tokens.length} tokens`
+        );
+      }
+    } catch (error) {
+      throw new Error(
+        `Failed to revoke all tokens. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
+  // Multi-user token operations
+  async  generateTokenAsUser(
+    username: string,
+    password: string,
+    data?: {
+      name?: string;
+      expiresAt?: string | null;
+      ttlSeconds?: number;
+      host?: string;
+      port?: string;
+      tls?: string;
+    }
+  ): Promise<any> {
+    try {
+      const payload = {
+        ...data,
+        username,
+        password,
+        host: data?.host || "localhost",
+        port: data?.port || "6379",
+        tls: data?.tls || "false",
+      };
+      const result = await postRequest(`${urls.api.tokenUrl}tokens/credentials`, payload);
+      return await result.json();
+    } catch (error) {
+      throw new Error(
+        `Failed to generate token as user ${username}. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
+  async listTokensAsUser(username: string, password: string): Promise<any> {
+    try {
+      // First get a session/token by logging in
+      const loginResponse = await this.generateTokenAsUser(username, password);
+      const { token, token_id: tokenId } = loginResponse;
+
+      // Use that token to list tokens
+      const result = await getRequest(
+        `${urls.api.tokenUrl}tokens`,
+        { Authorization: `Bearer ${token}` }
+      );
+      const response = await result.json();
+
+      // Clean up the temporary token
+      await this.revokeToken(tokenId);
+
+      return response;
+    } catch (error) {
+      throw new Error(
+        `Failed to list tokens as user ${username}. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
+  async revokeTokenAsUser(
+    username: string,
+    password: string,
+    tokenId: string
+  ): Promise<any> {
+    try {
+      // First get a session/token by logging in
+      const loginResponse = await this.generateTokenAsUser(username, password);
+      const { token, token_id: tempTokenId } = loginResponse;
+
+      // Use that token to revoke via DELETE
+      const result = await deleteRequest(
+        `${urls.api.tokenUrl}tokens/${tokenId}`,
+        { Authorization: `Bearer ${token}` }
+      );
+      const response = await result.json();
+
+      // Clean up the temporary token
+      await this.revokeToken(tempTokenId);
+
+      return response;
+    } catch (error) {
+      throw new Error(
+        `Failed to revoke token as user ${username}. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
   async addSchema(schemaName: string): Promise<AddSchemaResponse> {
     try {
       const result = await postRequest(`${urls.api.schemaUrl + schemaName}`);
@@ -444,7 +610,6 @@ export default class ApiCalls {
       }_schema?query=${encodeURIComponent(schema)}`;
       return await getSSEGraphResult(url);
     } catch (error) {
-      console.error(error);
       throw new Error(
         `Failed to run schema query. \n Error: ${(error as Error).message}`
       );

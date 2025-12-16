@@ -5,7 +5,7 @@
 
 import { LinkObject, NodeObject } from "react-force-graph-2d";
 
-export type Value = string | number | boolean | Value[];
+export type Value = string | number | boolean;
 
 export type HistoryQuery = {
   queries: Query[];
@@ -22,7 +22,7 @@ export type Query = {
   graphName: string;
   timestamp: number;
   status: "Success" | "Failed" | "Empty";
-  elementsCount: number
+  elementsCount: number;
 };
 
 const getSchemaValue = (value: string): string[] => {
@@ -114,6 +114,8 @@ export type DataRow = {
 
 export type Data = DataRow[];
 
+export type MemoryValue = number | Map<string, MemoryValue>
+
 export const DEFAULT_COLORS = [
   "hsl(246, 100%, 70%)",
   "hsl(330, 100%, 70%)",
@@ -143,6 +145,8 @@ export interface Relationship extends InfoRelationship {
   elements: Link[];
   textWidth?: number;
   textHeight?: number;
+  textAscent?: number;
+  textDescent?: number;
 }
 
 export const getLabelWithFewestElements = (labels: Label[]): Label =>
@@ -159,6 +163,8 @@ export class GraphInfo {
 
   private relationships: Map<string, InfoRelationship>;
 
+  private memoryUsage: Map<string, MemoryValue>;
+
   private colors: string[];
 
   private colorsCounter: number = 0;
@@ -167,11 +173,13 @@ export class GraphInfo {
     propertyKeys: string[] | undefined,
     labels: Map<string, InfoLabel>,
     relationships: Map<string, InfoRelationship>,
+    memoryUsage: Map<string, MemoryValue>,
     colors?: string[]
   ) {
     this.propertyKeys = propertyKeys;
     this.labels = labels;
     this.relationships = relationships;
+    this.memoryUsage = memoryUsage;
     this.colors = [...(colors || DEFAULT_COLORS)];
   }
 
@@ -191,6 +199,10 @@ export class GraphInfo {
     return this.relationships;
   }
 
+  get MemoryUsage(): Map<string, MemoryValue> {
+    return this.memoryUsage;
+  }
+
   get Colors(): string[] {
     return this.colors;
   }
@@ -200,21 +212,33 @@ export class GraphInfo {
       this.propertyKeys,
       new Map(this.labels),
       new Map(this.relationships),
+      new Map(this.memoryUsage),
       [...this.colors]
     );
   }
 
-  public static empty(propertyKeys?: string[], colors?: string[]): GraphInfo {
-    return new GraphInfo(propertyKeys || [], new Map(), new Map(), colors);
+  public static empty(
+    propertyKeys?: string[],
+    memoryUsage?: Map<string, MemoryValue>,
+    colors?: string[]
+  ): GraphInfo {
+    return new GraphInfo(
+      propertyKeys || [],
+      new Map(),
+      new Map(),
+      new Map(memoryUsage),
+      colors
+    );
   }
 
   public static create(
     propertyKeys: string[],
     labels: string[],
     relationships: string[],
+    memoryUsage: Map<string, MemoryValue>,
     colors?: string[]
   ): GraphInfo {
-    const graphInfo = GraphInfo.empty(propertyKeys, colors);
+    const graphInfo = GraphInfo.empty(propertyKeys, memoryUsage, colors);
     graphInfo.createLabel(labels);
     relationships.forEach((relationship) =>
       graphInfo.createRelationship(relationship)
@@ -435,6 +459,39 @@ export class Graph {
     graph.extend(results, isCollapsed, isSchema);
     graph.id = id;
     return graph;
+  }
+
+  public calculateLinkCurve(link: Link, existingLinks: Link[] = []): number {
+    const start = link.source;
+    const end = link.target;
+    
+    // Find all links between the same nodes (including new links being added)
+    const allLinks = [...this.elements.links, ...existingLinks];
+    const sameNodesLinks = allLinks.filter(
+      (l) =>
+        (l.source.id === start.id && l.target.id === end.id) ||
+        (l.target.id === start.id && l.source.id === end.id)
+    );
+    
+    let index = sameNodesLinks.findIndex((l) => l.id === link.id);
+    index = index === -1 ? sameNodesLinks.length : index;
+    
+    const even = index % 2 === 0;
+    let curve;
+
+    if (start.id === end.id) {
+      if (even) {
+        curve = Math.floor(-(index / 2)) - 3;
+      } else {
+        curve = Math.floor((index + 1) / 2) + 2;
+      }
+    } else if (even) {
+      curve = Math.floor(-(index / 2));
+    } else {
+      curve = Math.floor((index + 1) / 2);
+    }
+
+    return curve * 0.4;
   }
 
   public extendNode(
@@ -685,51 +742,9 @@ export class Graph {
       });
     });
 
-    // Optimize link curvature calculation by grouping links first
-    const linksByNodePair = new Map<string, Link[]>();
-    
-    newElements
-      .filter((element): element is Link => "source" in element)
-      .forEach((link) => {
-        const start = link.source;
-        const end = link.target;
-        
-        // Create a consistent key for node pairs (bidirectional)
-        const key = start.id === end.id 
-          ? `self-${start.id}` 
-          : [start.id, end.id].sort().join('-');
-        
-        if (!linksByNodePair.has(key)) {
-          linksByNodePair.set(key, []);
-        }
-        linksByNodePair.get(key)!.push(link);
-      });
-
-    // Now calculate curves for each group
-    newElements
-      .filter((element): element is Link => "source" in element)
-      .forEach((link) => {
-        const start = link.source;
-        const end = link.target;
-        
-        const key = start.id === end.id 
-          ? `self-${start.id}` 
-          : [start.id, end.id].sort().join('-');
-        
-        const sameNodesLinks = linksByNodePair.get(key) || [];
-        let index = sameNodesLinks.findIndex((l) => l.id === link.id);
-        index = index === -1 ? 0 : index;
-        const even = index % 2 === 0;
-        let curve;
-
-        if (start.id === end.id) {
-          curve = even ? Math.floor(-(index / 2)) - 3 : Math.floor((index + 1) / 2) + 2;
-        } else {
-          curve = even ? Math.floor(-(index / 2)) : Math.floor((index + 1) / 2);
-        }
-
-        link.curve = curve * 0.4;
-      });
+    newElements.filter((element): element is Link => !!element.source).forEach((link) => {
+      link.curve = this.calculateLinkCurve(link);
+    });
 
     newElements
       .filter((element): element is Node => "labels" in element)
@@ -793,18 +808,13 @@ export class Graph {
   }
 
   public visibleLinks(visible: boolean) {
-    // Optimize by creating a Set of node IDs for O(1) lookup instead of O(n) array.includes
-    const nodeIds = new Set(this.elements.nodes.map((n) => n.id));
-    
     this.elements.links.forEach((link) => {
-      const relationship = this.RelationshipsMap.get(link.relationship);
-      
       if (
-        relationship?.show &&
+        this.RelationshipsMap.get(link.relationship)!.show &&
         visible &&
-        nodeIds.has(link.source.id) &&
+        this.elements.nodes.map((n) => n.id).includes(link.source.id) &&
         link.source.visible &&
-        nodeIds.has(link.target.id) &&
+        this.elements.nodes.map((n) => n.id).includes(link.target.id) &&
         link.target.visible
       ) {
         // eslint-disable-next-line no-param-reassign
@@ -813,8 +823,10 @@ export class Graph {
 
       if (
         !visible &&
-        ((nodeIds.has(link.source.id) && !link.source.visible) ||
-          (nodeIds.has(link.target.id) && !link.target.visible))
+        ((this.elements.nodes.map((n) => n.id).includes(link.source.id) &&
+          !link.source.visible) ||
+          (this.elements.nodes.map((n) => n.id).includes(link.target.id) &&
+            !link.target.visible))
       ) {
         // eslint-disable-next-line no-param-reassign
         link.visible = false;
@@ -823,23 +835,18 @@ export class Graph {
   }
 
   public removeLinks(ids: number[] = []): Relationship[] {
-    // Optimize with Set for O(1) lookup instead of O(n) array.includes
-    const idsSet = new Set(ids);
-    const nodeIds = new Set(this.elements.nodes.map((n) => n.id));
-    
     const links = this.elements.links.filter(
-      (link) => idsSet.has(link.source.id) || idsSet.has(link.target.id)
+      (link) => ids.includes(link.source.id) || ids.includes(link.target.id)
     );
-    
-    const linksSet = new Set(links);
 
     this.elements = {
       nodes: this.elements.nodes,
       links: this.elements.links
         .map((link) => {
           if (
-            (ids.length !== 0 && !linksSet.has(link)) ||
-            (nodeIds.has(link.source.id) && nodeIds.has(link.target.id))
+            (ids.length !== 0 && !links.includes(link)) ||
+            (this.elements.nodes.map((n) => n.id).includes(link.source.id) &&
+              this.elements.nodes.map((n) => n.id).includes(link.target.id))
           ) {
             return link;
           }

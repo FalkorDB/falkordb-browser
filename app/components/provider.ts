@@ -1,6 +1,6 @@
 import { createContext, Dispatch, SetStateAction } from "react";
-import { Panel } from "@/lib/utils";
-import { Graph, GraphInfo, HistoryQuery } from "../api/graph/model";
+import { Panel, Tab, TextPriority, ViewportState } from "@/lib/utils";
+import { Graph, GraphData, GraphInfo, HistoryQuery } from "../api/graph/model";
 
 type BrowserSettingsContextType = {
   newSettings: {
@@ -33,6 +33,8 @@ type BrowserSettingsContextType = {
     graphInfo: {
       newRefreshInterval: number;
       setNewRefreshInterval: Dispatch<SetStateAction<number>>;
+      newDisplayTextPriority: TextPriority[];
+      setNewDisplayTextPriority: Dispatch<SetStateAction<TextPriority[]>>;
     };
   };
   settings: {
@@ -64,17 +66,22 @@ type BrowserSettingsContextType = {
       model: string;
       setModel: Dispatch<SetStateAction<string>>;
       navigateToSettings: boolean;
-      setNavigateToSettings: Dispatch<SetStateAction<boolean>>;
+      displayChat: boolean;
     };
     graphInfo: {
+      showMemoryUsage: boolean;
       refreshInterval: number;
       setRefreshInterval: Dispatch<SetStateAction<number>>;
+      displayTextPriority: TextPriority[];
+      setDisplayTextPriority: Dispatch<SetStateAction<TextPriority[]>>;
     };
   };
   hasChanges: boolean;
   setHasChanges: Dispatch<SetStateAction<boolean>>;
   saveSettings: () => void;
   resetSettings: () => void;
+  replayTutorial: () => void;
+  tutorialOpen: boolean;
 };
 
 type GraphContextType = {
@@ -90,6 +97,8 @@ type GraphContextType = {
   setNodesCount: Dispatch<SetStateAction<number | undefined>>;
   edgesCount: number | undefined;
   setEdgesCount: Dispatch<SetStateAction<number | undefined>>;
+  currentTab: Tab;
+  setCurrentTab: Dispatch<SetStateAction<Tab>>;
   runQuery: (query: string, name?: string) => Promise<void>;
   fetchCount: () => Promise<void>;
   handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void;
@@ -126,59 +135,84 @@ type QueryLoadingContextType = {
   setIsQueryLoading: Dispatch<SetStateAction<boolean>>;
 };
 
-export const BrowserSettingsContext = createContext<BrowserSettingsContextType>({
-  newSettings: {
-    limitSettings: { newLimit: 0, setNewLimit: () => {} },
-    timeoutSettings: { newTimeout: 0, setNewTimeout: () => {} },
-    runDefaultQuerySettings: {
-      newRunDefaultQuery: false,
-      setNewRunDefaultQuery: () => {},
+type ViewportContextType = {
+  viewport: ViewportState;
+  setViewport: Dispatch<SetStateAction<ViewportState>>;
+  data: GraphData;
+  setData: Dispatch<SetStateAction<GraphData>>;
+  isSaved: boolean;
+};
+
+type TableViewContextType = {
+  scrollPosition: number;
+  setScrollPosition: Dispatch<SetStateAction<number>>;
+  search: string;
+  setSearch: Dispatch<SetStateAction<string>>;
+  expand: Map<number, number>;
+  setExpand: Dispatch<SetStateAction<Map<number, number>>>;
+  dataHash: string;
+};
+
+export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
+  {
+    newSettings: {
+      limitSettings: { newLimit: 0, setNewLimit: () => {} },
+      timeoutSettings: { newTimeout: 0, setNewTimeout: () => {} },
+      runDefaultQuerySettings: {
+        newRunDefaultQuery: false,
+        setNewRunDefaultQuery: () => {},
+      },
+      defaultQuerySettings: {
+        newDefaultQuery: "",
+        setNewDefaultQuery: () => {},
+      },
+      contentPersistenceSettings: {
+        newContentPersistence: false,
+        setNewContentPersistence: () => {},
+      },
+      chatSettings: {
+        newSecretKey: "",
+        setNewSecretKey: () => {},
+        newModel: "",
+        setNewModel: () => {},
+      },
+      graphInfo: { newRefreshInterval: 0, setNewRefreshInterval: () => {}, newDisplayTextPriority: [], setNewDisplayTextPriority: () => {} },
     },
-    defaultQuerySettings: { newDefaultQuery: "", setNewDefaultQuery: () => {} },
-    contentPersistenceSettings: {
-      newContentPersistence: false,
-      setNewContentPersistence: () => {},
+    settings: {
+      limitSettings: {
+        limit: 0,
+        setLimit: () => {},
+        lastLimit: 0,
+        setLastLimit: () => {},
+      },
+      timeoutSettings: { timeout: 0, setTimeout: () => {} },
+      runDefaultQuerySettings: {
+        runDefaultQuery: false,
+        setRunDefaultQuery: () => {},
+      },
+      defaultQuerySettings: { defaultQuery: "", setDefaultQuery: () => {} },
+      contentPersistenceSettings: {
+        contentPersistence: false,
+        setContentPersistence: () => {},
+      },
+      chatSettings: {
+        secretKey: "",
+        setSecretKey: () => {},
+        model: "",
+        setModel: () => {},
+        navigateToSettings: false,
+        displayChat: false,
+      },
+      graphInfo: { showMemoryUsage: false, refreshInterval: 0, setRefreshInterval: () => {}, displayTextPriority: [], setDisplayTextPriority: () => {} },
     },
-    chatSettings: {
-      newSecretKey: "",
-      setNewSecretKey: () => {},
-      newModel: "",
-      setNewModel: () => {},
-    },
-    graphInfo: { newRefreshInterval: 0, setNewRefreshInterval: () => {} },
-  },
-  settings: {
-    limitSettings: {
-      limit: 0,
-      setLimit: () => {},
-      lastLimit: 0,
-      setLastLimit: () => {},
-    },
-    timeoutSettings: { timeout: 0, setTimeout: () => {} },
-    runDefaultQuerySettings: {
-      runDefaultQuery: false,
-      setRunDefaultQuery: () => {},
-    },
-    defaultQuerySettings: { defaultQuery: "", setDefaultQuery: () => {} },
-    contentPersistenceSettings: {
-      contentPersistence: false,
-      setContentPersistence: () => {},
-    },
-    chatSettings: {
-      secretKey: "",
-      setSecretKey: () => {},
-      model: "",
-      setModel: () => {},
-      navigateToSettings: false,
-      setNavigateToSettings: () => {},
-    },
-    graphInfo: { refreshInterval: 0, setRefreshInterval: () => {} },
-  },
-  hasChanges: false,
-  setHasChanges: () => {},
-  saveSettings: () => {},
-  resetSettings: () => {},
-});
+    hasChanges: false,
+    setHasChanges: () => {},
+    saveSettings: () => {},
+    resetSettings: () => {},
+    replayTutorial: () => {},
+    tutorialOpen: false,
+  }
+);
 
 export const GraphContext = createContext<GraphContextType>({
   graph: Graph.empty(),
@@ -193,6 +227,8 @@ export const GraphContext = createContext<GraphContextType>({
   setNodesCount: () => {},
   edgesCount: undefined,
   setEdgesCount: () => {},
+  currentTab: "Graph",
+  setCurrentTab: () => {},
   runQuery: async () => {},
   fetchCount: async () => {},
   handleCooldown: () => {},
@@ -241,4 +277,22 @@ export const PanelContext = createContext<PanelContextType>({
 export const QueryLoadingContext = createContext<QueryLoadingContextType>({
   isQueryLoading: false,
   setIsQueryLoading: () => {},
+});
+
+export const ViewportContext = createContext<ViewportContextType>({
+  viewport: { centerX: 0, centerY: 0, zoom: 0 },
+  setViewport: () => {},
+  data: { nodes: [], links: [] },
+  setData: () => {},
+  isSaved: false,
+});
+
+export const TableViewContext = createContext<TableViewContextType>({
+  scrollPosition: 0,
+  setScrollPosition: () => {},
+  search: "",
+  setSearch: () => {},
+  expand: new Map(),
+  setExpand: () => {},
+  dataHash: "",
 });

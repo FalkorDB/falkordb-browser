@@ -13,10 +13,13 @@ export default function LoginVerification({ children }: { children: React.ReactN
 
     useEffect(() => {
         if (data?.user || data === undefined) return
-        localStorage.removeItem("query history")
+        localStorage.removeItem("savedContent")
     }, [data])
 
     useEffect(() => {
+        // Skip authentication redirects for /docs routes
+        if (url.startsWith('/docs')) return
+        
         if ((url === "/login" || url === "/") && status === "authenticated") {
             router.push("/graph")
         } else if (status === "unauthenticated" && url !== "/login") {

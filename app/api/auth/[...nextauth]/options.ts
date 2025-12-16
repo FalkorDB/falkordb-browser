@@ -1,20 +1,22 @@
-/* eslint-disable max-classes-per-file */
-/* eslint-disable no-param-reassign */
 import { FalkorDB } from "falkordb";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { AuthOptions, Role, User, getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { FalkorDBOptions } from "falkordb/dist/src/falkordb";
 import { v4 as uuidv4 } from "uuid";
+import crypto from "crypto";
+import { isTokenActive } from "../tokenUtils";
 
 interface CustomJWTPayload {
   sub: string;
+  jti: string; // Token ID for fetching password from Token DB
   username?: string;
   role: Role;
   host: string;
   port: number;
   tls: boolean;
   ca?: string;
+  url?: string;
 }
 
 interface AuthenticatedUser {
@@ -25,96 +27,72 @@ interface AuthenticatedUser {
   port: number;
   tls: boolean;
   ca?: string;
+  url?: string;
 }
 
-// Store connections with timestamp for cleanup
-interface ConnectionEntry {
-  client: FalkorDB;
-  timestamp: number;
-}
-
-const connections = new Map<string, ConnectionEntry>();
-
-// Connection timeout: 2 hours (matches JWT expiration)
-const CONNECTION_TIMEOUT_MS = 2 * 60 * 60 * 1000;
-
-/**
- * Clean up stale connections that haven't been used recently
- */
-function cleanupStaleConnections(): void {
-  const now = Date.now();
-  const staleIds: string[] = [];
-
-  connections.forEach((entry, id) => {
-    if (now - entry.timestamp > CONNECTION_TIMEOUT_MS) {
-      staleIds.push(id);
-    }
-  });
-
-  staleIds.forEach((id) => {
-    const entry = connections.get(id);
-    if (entry) {
-      connections.delete(id);
-      entry.client.close().catch(() => {
-        // Ignore errors during cleanup
-      });
-    }
-  });
-}
-
-// Run cleanup every 30 minutes
-if (typeof setInterval !== 'undefined') {
-  setInterval(cleanupStaleConnections, 30 * 60 * 1000);
-}
+const connections = new Map<string, FalkorDB>();
 
 export async function newClient(
   credentials: {
-    host: string;
-    port: string;
-    password: string;
-    username: string;
-    tls: string;
-    ca: string;
+    host?: string;
+    port?: string;
+    password?: string;
+    username?: string;
+    tls?: string;
+    ca?: string;
+    url?: string;
   },
   id: string
 ): Promise<{ role: Role; client: FalkorDB }> {
-  const connectionOptions: FalkorDBOptions =
-    credentials.tls === "true"
-      ? {
-          socket: {
-            host: credentials.host ?? "localhost",
-            port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-            tls: credentials.tls === "true",
-            checkServerIdentity: () => undefined,
-            ca:
-              credentials.ca === "undefined"
-                ? undefined
-                : [Buffer.from(credentials.ca, "base64").toString("utf8")],
-          },
-          password: credentials.password ?? undefined,
-          username: credentials.username ?? undefined,
-        }
-      : {
-          socket: {
-            host: credentials.host || "localhost",
-            port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-          },
-          password: credentials.password ?? undefined,
-          username: credentials.username ?? undefined,
-        };
+  let connectionOptions: FalkorDBOptions;
+
+  // If URL is provided, use it directly
+  if (credentials.url) {
+    connectionOptions = {
+      url: credentials.url ?? "falkor://localhost:6379",
+    };
+  } else {
+    // Use individual connection parameters
+    connectionOptions =
+      credentials.tls === "true"
+        ? {
+            socket: {
+              host: credentials.host ?? "localhost",
+              port: credentials.port ? parseInt(credentials.port, 10) : 6379,
+              tls: credentials.tls === "true",
+              checkServerIdentity: () => undefined,
+              ca:
+                !credentials.ca || credentials.ca === "undefined"
+                  ? undefined
+                  : [Buffer.from(credentials.ca, "base64").toString("utf8")],
+            },
+            password: credentials.password ?? undefined,
+            username: credentials.username ?? undefined,
+          }
+        : {
+            socket: {
+              host: credentials.host || "localhost",
+              port: credentials.port ? parseInt(credentials.port, 10) : 6379,
+            },
+            password: credentials.password ?? undefined,
+            username: credentials.username ?? undefined,
+          };
+  }
 
   const client = await FalkorDB.connect(connectionOptions);
 
-  // Save connection in connections map with timestamp for later use
-  connections.set(id, { client, timestamp: Date.now() });
+  // Save connection in connections map for later use
+  connections.set(id, client);
 
   client.on("error", (err) => {
-    // Close connection on error and remove from connections map
+    // Close coonection on error and remove from connections map
+    // eslint-disable-next-line no-console
     console.error("FalkorDB Client Error", err);
-    const entry = connections.get(id);
-    if (entry) {
+    const connection = connections.get(id);
+    if (connection) {
       connections.delete(id);
-      entry.client.close().catch((e) => {
+      connection.close().catch((e) => {
+        // eslint-disable-next-line no-console
         console.warn("FalkorDB Client Disconnect Error", e);
       });
     }
@@ -128,7 +106,7 @@ export async function newClient(
     return { role: "Admin", client };
   } catch (err) {
     if ((err as Error).message.startsWith("NOPERM")) {
-      console.debug("user is not admin", err);
+      // User is not admin, continue to check other roles
     } else throw err;
   }
 
@@ -136,10 +114,8 @@ export async function newClient(
     await connection.sendCommand(["GRAPH.QUERY"]);
   } catch (err) {
     if ((err as Error).message.includes("permissions")) {
-      console.debug("user is read-only", err);
       return { role: "Read-Only", client };
     }
-    console.debug("user is read-write", err);
     return { role: "Read-Write", client };
   }
 
@@ -153,6 +129,22 @@ export function generateTimeUUID() {
 }
 
 /**
+ * Generates a consistent user ID based on credentials
+ * This ensures the same user gets the same ID across multiple logins
+ * Format: SHA-256 hash of "username@host:port"
+ */
+export function generateConsistentUserId(
+  username: string,
+  host: string,
+  port: number
+): string {
+  const identifier = `${username || 'default'}@${host}:${port}`;
+  return crypto.createHash('sha256').update(identifier).digest('hex');
+}
+
+
+
+/**
  * Retrieves the Authorization header from the request
  */
 async function getAuthorizationHeader(): Promise<string | null> {
@@ -163,6 +155,19 @@ async function getAuthorizationHeader(): Promise<string | null> {
   } catch (e) {
     // Headers not available, continue with session auth only
     return null;
+  }
+}
+
+/**
+ * Checks if the request requires JWT-only authentication
+ */
+async function isJWTOnlyRequest(): Promise<boolean> {
+  try {
+    const { headers } = await import('next/headers');
+    const headersList = await headers();
+    return headersList.get("X-JWT-Only") === "true";
+  } catch (e) {
+    return false;
   }
 }
 
@@ -196,6 +201,7 @@ function createUserFromJWTPayload(payload: CustomJWTPayload): AuthenticatedUser 
     port: payload.port,
     tls: payload.tls || false,
     ca: payload.ca,
+    url: payload.url,
   };
 }
 
@@ -211,28 +217,92 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
     try {
       const token = authorizationHeader.substring(7);
       const payload = await verifyJWTToken(token);
-
       // Validate JWT payload structure
       if (!isValidJWTPayload(payload)) {
         return null;
       }
 
-      // Check for existing connection first
-      const existingEntry = connections.get(payload.sub);
+      // Validate token is active in FalkorDB (not revoked)
+      const tokenActive = await isTokenActive(token);
+      
+      if (!tokenActive) {
+        // eslint-disable-next-line no-console
+        console.warn("JWT authentication failed: token is not active (revoked or expired)");
 
-      if (existingEntry) {
-        // Update timestamp to keep connection alive
-        existingEntry.timestamp = Date.now();
-        
-        // Reuse existing JWT connection
-        const user = createUserFromJWTPayload(payload);
-        return { client: existingEntry.client, user };
+        // Clean up stale connection to prevent connection leak
+        const staleClient = connections.get(payload.sub);
+        if (staleClient) {
+          connections.delete(payload.sub);
+          try {
+            await staleClient.close();
+          } catch (closeError) {
+            // eslint-disable-next-line no-console
+            console.warn("Failed to close revoked JWT connection", closeError);
+          }
+        }
+        return null;
       }
 
-      // JWT authentication requires an existing connection
-      // Cannot create new connection without password
-      // Fall back to session authentication
-      return null;
+      // Try to reuse existing connection (performance optimization)
+      let client = connections.get(payload.sub);
+
+      if (client) {
+        // Health check: verify connection is still alive
+        try {
+          const connection = await client.connection;
+          await connection.ping();
+          
+          // Connection is healthy, reuse it
+          const user = createUserFromJWTPayload(payload);
+          return { client, user };
+        } catch (pingError) {
+          // Connection is dead, remove from pool and recreate
+          // eslint-disable-next-line no-console
+          console.warn("Connection health check failed, recreating:", pingError);
+          connections.delete(payload.sub);
+          
+          try {
+            await client.close();
+          } catch (closeError) {
+            // Ignore close errors on dead connections
+          }
+          
+          client = undefined; // Will be recreated below
+        }
+      }
+
+      // No existing connection or health check failed - fetch password from Token DB and reconnect
+      if (!client) {
+        try {
+          // Fetch password from Token DB (6380) - NOT from JWT
+          const { getPasswordFromTokenDB } = await import('../tokenUtils');
+          const password = await getPasswordFromTokenDB(payload.jti);
+          
+          // Create new connection with retrieved password
+          const { client: reconnectedClient } = await newClient(
+            {
+              host: payload.host,
+              port: payload.port.toString(),
+              username: payload.username || '',
+              password,
+              tls: payload.tls.toString(),
+              ca: payload.ca || undefined,
+            },
+            payload.sub
+          );
+          
+          client = reconnectedClient;
+          // Connection is already cached in connections Map by newClient()
+        } catch (connectionError) {
+          // eslint-disable-next-line no-console
+          console.error("Failed to create connection from Token DB:", connectionError);
+          return null;
+        }
+      }
+
+      // At this point, client is guaranteed to be defined (either reused or recreated)
+      const user = createUserFromJWTPayload(payload);
+      return { client, user };
     } catch (error) {
       // Fall back to session auth if JWT fails
       // eslint-disable-next-line no-console
@@ -240,7 +310,6 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
       return null;
     }
   }
-
   return null;
 }
 
@@ -255,6 +324,7 @@ const authOptions: AuthOptions = {
         password: { label: "Password", type: "password" },
         tls: { label: "tls", type: "boolean" },
         ca: { label: "ca", type: "string" },
+        url: { label: "url", type: "string" },
       },
       async authorize(credentials) {
         if (!credentials) {
@@ -262,22 +332,25 @@ const authOptions: AuthOptions = {
         }
 
         try {
-          const id = generateTimeUUID();
+          // Generate random UUID for this session
+          const id = uuidv4();
 
           const { role } = await newClient(credentials, id);
 
           const res: User = {
             id,
-            host: credentials.host,
+            url: credentials.url,
+            host: credentials.host || "localhost",
             port: credentials.port ? parseInt(credentials.port, 10) : 6379,
             password: credentials.password,
             username: credentials.username,
             tls: credentials.tls === "true",
-            ca: credentials.ca,
+            ca: credentials.url ? undefined : credentials.ca,
             role,
           };
           return res;
         } catch (err) {
+          // eslint-disable-next-line no-console
           console.error("FalkorDB Client Connect Error", err);
           return null;
         }
@@ -292,8 +365,8 @@ const authOptions: AuthOptions = {
           id: user.id,
           host: user.host,
           port: user.port,
-          username: user.username,
           password: user.password,
+          username: user.username,
           tls: user.tls,
           ca: user.ca,
           role: user.role,
@@ -328,15 +401,25 @@ const authOptions: AuthOptions = {
 };
 
 export async function getClient() {
+  // Check if this is a JWT-only request (from /docs)
+  const jwtOnlyRequired = await isJWTOnlyRequest();
+  
   // Try JWT authentication first
   const jwtResult = await tryJWTAuthentication();
   if (jwtResult) {
     return jwtResult;
   }
 
-  // Fall back to session authentication
+  // If JWT-only is required and JWT failed, return 401 immediately
+  if (jwtOnlyRequired) {
+    return NextResponse.json({ 
+      message: "JWT authentication required for API documentation. Please use the login endpoint to get a token and authorize in Swagger UI." 
+    }, { status: 401 });
+  }
+
+  // Fall back to session authentication for regular app requests
   const session = await getServerSession(authOptions);
-  const id = session?.user?.id;
+  const id = session?.user.id;
 
   if (!id) {
     return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
@@ -344,11 +427,35 @@ export async function getClient() {
 
   const { user } = session;
 
-  let entry = connections.get(id);
+  let connection = connections.get(id);
 
-  // If client is not found, create a new one
-  if (!entry) {
-    await newClient(
+  // Health check: if connection exists, verify it's still alive
+  if (connection) {
+    try {
+      const conn = await connection.connection;
+      await conn.ping();
+
+      // Connection is healthy, reuse it
+      return { client: connection, user };
+    } catch (pingError) {
+      // Connection is dead, remove from pool and recreate
+      // eslint-disable-next-line no-console
+      console.warn("Session connection health check failed, recreating:", pingError);
+      connections.delete(id);
+
+      try {
+        await connection.close();
+      } catch (closeError) {
+        // Ignore close errors on dead connections
+      }
+
+      connection = undefined; // Will be recreated below
+    }
+  }
+
+  // No existing connection or health check failed - create new one
+  if (!connection) {
+    const { client } = await newClient(
       {
         host: user.host,
         port: user.port.toString() ?? "6379",
@@ -360,17 +467,16 @@ export async function getClient() {
       user.id
     );
 
-    entry = connections.get(id);
+    connection = client;
   }
 
-  if (!entry) {
+  const client = connection;
+
+  if (!client) {
     return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
   }
 
-  // Update timestamp to keep connection alive
-  entry.timestamp = Date.now();
-  
-  return { client: entry.client, user };
+  return { client, user };
 }
 
 export default authOptions;

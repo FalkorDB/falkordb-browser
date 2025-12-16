@@ -1,17 +1,18 @@
 'use client'
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { cn, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, getMemoryUsage, isTwoNodes, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
-import { Label, Graph, GraphData, Link, Node, Relationship, GraphInfo } from "../api/graph/model";
-import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext } from "../components/provider";
+import { Label, Graph, Link, Node, Relationship, GraphInfo, Value, MemoryValue } from "../api/graph/model";
+import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ViewportContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
-import GraphDataPanel from "./GraphDataPanel";
+import DataPanel from "./DataPanel";
+import CreateElementPanel from "./CreateElementPanel";
 
 const Selector = dynamic(() => import("./Selector"), {
     ssr: false,
@@ -28,11 +29,20 @@ const GraphView = dynamic(() => import("./GraphView"), {
     </div>
 })
 
+/**
+ * Render the main Graph page UI that orchestrates the selector, graph view, and right-hand panels.
+ *
+ * The component coordinates context state, data fetching, periodic graph info refresh, element selection
+ * and deletion, and layout of resizable panels (graph canvas and optional data/chat panel).
+ *
+ * @returns The React element for the graph page UI.
+ */
 export default function Page() {
     const { historyQuery, setHistoryQuery } = useContext(HistoryQueryContext)
     const { setIndicator } = useContext(IndicatorContext);
     const { panel, setPanel } = useContext(PanelContext)
     const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext)
+    const { setData } = useContext(ViewportContext)
     const {
         graph,
         setGraph,
@@ -53,7 +63,7 @@ export default function Page() {
             runDefaultQuerySettings: { runDefaultQuery },
             defaultQuerySettings: { defaultQuery },
             contentPersistenceSettings: { contentPersistence },
-            graphInfo: { refreshInterval }
+            graphInfo: { showMemoryUsage, refreshInterval }
         }
     } = useContext(BrowserSettingsContext)
     const { toast } = useToast()
@@ -61,16 +71,17 @@ export default function Page() {
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
     const panelRef = useRef<ImperativePanelHandle>(null)
 
-    const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>()
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
     const [labels, setLabels] = useState<Label[]>([])
-    const [data, setData] = useState<GraphData>({ ...graph.Elements })
     const [relationships, setRelationships] = useState<Relationship[]>([])
     const [isCollapsed, setIsCollapsed] = useState(true)
+    const [isAddNode, setIsAddNode] = useState(false)
+    const [isAddEdge, setIsAddEdge] = useState(false)
 
     const panelSize = useMemo(() => {
         switch (panel) {
             case "data":
+            case "add":
                 return 30
             case "chat":
                 return 40
@@ -80,16 +91,18 @@ export default function Page() {
     }, [panel])
 
     useEffect(() => {
-        if (panel !== "data") {
-            setSelectedElement(undefined)
-        }
-
         const currentPanel = panelRef.current
 
         if (!currentPanel) return
 
         if (panel) currentPanel.expand()
         else currentPanel.collapse()
+
+        if (panel !== "chat") return
+
+        setSelectedElements([])
+        setIsAddNode(false)
+        setIsAddEdge(false)
     }, [panel])
 
     const fetchInfo = useCallback(async (type: string) => {
@@ -115,7 +128,8 @@ export default function Page() {
             fetchInfo("(property key)"),
         ]).then(async ([newLabels, newRelationships, newPropertyKeys]) => {
             const colorsArr = localStorage.getItem(graphName)
-            const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, colorsArr ? JSON.parse(colorsArr) : undefined)
+            const memoryUsage = showMemoryUsage ? await getMemoryUsage(graphName, toast, setIndicator) : new Map<string, MemoryValue>()
+            const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, colorsArr ? JSON.parse(colorsArr) : undefined)
             setGraphInfo(gi)
             fetchCount()
         }).catch((error) => {
@@ -133,7 +147,7 @@ export default function Page() {
         return () => {
             clearInterval(interval)
         }
-    }, [fetchInfo, graphName, refreshInterval, setGraphInfo, toast])
+    }, [fetchCount, fetchInfo, graphName, refreshInterval, setGraphInfo, setIndicator, showMemoryUsage, toast])
 
     useEffect(() => {
         setRelationships([...graph.Relationships])
@@ -170,23 +184,69 @@ export default function Page() {
         setIsQueryLoading(false)
     }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames, setIsQueryLoading])
 
-    const handleSetSelectedElement = useCallback((el: Node | Link | undefined) => {
-        setSelectedElement(el)
-        setPanel(el ? "data" : undefined)
+    const handleSetIsAdd = useCallback((mainSetter: (isAdd: boolean) => void, setter: (isAdd: boolean) => void) => (isAdd: boolean) => {
+        mainSetter(isAdd)
 
-        const currentPanel = panelRef.current
+        if (isAdd) {
+            setter(false)
+            setPanel("add")
+        } else {
+            setPanel(undefined)
+        }
+    }, [setPanel])
 
-        if (!currentPanel) return
+    const handleCreateElement = useCallback(async (attributes: [string, Value][], label: string[]) => {
+        const fakeId = "-1"
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/${fakeId}`, {
+            method: "POST",
+            body: JSON.stringify({
+                attributes,
+                label,
+                type: isAddNode,
+                selectedNodes: isAddNode ? undefined : selectedElements
+            })
+        }, toast, setIndicator)
 
-        if (el) currentPanel.expand()
-        else currentPanel.collapse()
+        if (result.ok) {
+            const json = await result.json()
+
+            if (isAddNode) {
+                const { labels: ls } = graph.extendNode(json.result.data[0].n, false, false, true)
+                setLabels(prev => [...prev, ...ls.filter(c => !prev.some(p => p.name === c)).map(c => graph.LabelsMap.get(c)!)])
+                handleSetIsAdd(setIsAddNode, setIsAddEdge)(false)
+            } else {
+                const link = graph.extendEdge(json.result.data[0].e, false, false, true)
+                // Calculate curve for the newly created edge
+                link.curve = graph.calculateLinkCurve(link)
+                setRelationships(prev => [...prev.filter(p => p.name !== link.relationship), graph.RelationshipsMap.get(link.relationship)!])
+                handleSetIsAdd(setIsAddEdge, setIsAddNode)(false)
+            }
+
+            fetchCount()
+
+            setSelectedElements([])
+        }
+
+        setData({ ...graph.Elements })
+
+        handleCooldown()
+
+        return result.ok
+    }, [fetchCount, graph, graphName, handleCooldown, handleSetIsAdd, isAddNode, selectedElements, setData, setIndicator, toast])
+
+    const handleSetSelectedElements = useCallback((el: (Node | Link)[] = []) => {
+        setSelectedElements(el)
+
+        if (el.length !== 0) {
+            setPanel("data")
+            setIsAddEdge(false)
+            setIsAddNode(false)
+        } else {
+            setPanel(undefined)
+        }
     }, [setPanel])
 
     const handleDeleteElement = useCallback(async () => {
-        if (selectedElements.length === 0 && selectedElement) {
-            selectedElements.push(selectedElement)
-        }
-
         await Promise.all(selectedElements.map(async (element) => {
             const type = !element.source
             const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${prepareArg(element.id.toString())}`, {
@@ -231,13 +291,15 @@ export default function Page() {
         setData({ ...graph.Elements })
         fetchCount()
         setSelectedElements([])
-        handleSetSelectedElement(undefined)
+
+        if (panel === "data") handleSetSelectedElements()
+        else setSelectedElements([])
 
         toast({
             title: "Success",
             description: `${selectedElements.length > 1 ? "Elements" : "Element"} deleted`,
         })
-    }, [selectedElements, selectedElement, graph, fetchCount, handleSetSelectedElement, toast, setIndicator])
+    }, [selectedElements, graph, setData, fetchCount, panel, handleSetSelectedElements, toast, setIndicator])
 
     const getCurrentPanel = useCallback(() => {
         if (!graphName) return undefined
@@ -249,19 +311,49 @@ export default function Page() {
                         onClose={() => setPanel(undefined)}
                     />
                 )
+
             case "data":
-                return <GraphDataPanel
-                    object={selectedElement!}
-                    setObject={handleSetSelectedElement}
+                if (selectedElements.length === 0) return undefined
+
+                return <DataPanel
+                    object={selectedElements[selectedElements.length - 1]}
+                    onClose={() => handleSetSelectedElements()}
                     setLabels={setLabels}
                 />
+
+            case "add": {
+                const onCloseHandler = () => {
+                    setPanel(undefined)
+                    setIsAddEdge(false)
+                    setIsAddNode(false)
+                }
+
+                if (isAddNode) {
+                    return <CreateElementPanel
+                        type
+                        onCreate={handleCreateElement}
+                        onClose={onCloseHandler}
+                    />
+                }
+
+                if (!isTwoNodes(selectedElements)) return undefined
+
+                return <CreateElementPanel
+                    type={false}
+                    onCreate={handleCreateElement}
+                    onClose={onCloseHandler}
+                    selectedNodes={selectedElements}
+                    setSelectedNodes={setSelectedElements}
+                />
+            }
+
             default:
                 return undefined
         }
-    }, [graphName, panel, selectedElement, handleSetSelectedElement, handleDeleteElement, setPanel])
+    }, [graphName, panel, handleSetSelectedElements, setPanel, isAddNode, selectedElements, handleCreateElement])
 
     return (
-        <div className="Page p-8 gap-8">
+        <div className="Page p-2 gap-2">
             <Selector
                 type="Graph"
                 graph={graph}
@@ -283,13 +375,9 @@ export default function Page() {
                     minSize={30}
                 >
                     <GraphView
-                        selectedElement={selectedElement}
-                        setSelectedElement={handleSetSelectedElement}
                         selectedElements={selectedElements}
-                        setSelectedElements={setSelectedElements}
+                        setSelectedElements={handleSetSelectedElements}
                         chartRef={chartRef}
-                        data={data}
-                        setData={setData}
                         handleDeleteElement={handleDeleteElement}
                         setLabels={setLabels}
                         setRelationships={setRelationships}
@@ -301,9 +389,17 @@ export default function Page() {
                         fetchCount={fetchCount}
                         historyQuery={historyQuery}
                         setHistoryQuery={setHistoryQuery}
+                        setIsAddNode={handleSetIsAdd(setIsAddNode, setIsAddEdge)}
+                        setIsAddEdge={handleSetIsAdd(setIsAddEdge, setIsAddNode)}
+                        isAddEdge={isAddEdge}
+                        isAddNode={isAddNode}
                     />
                 </ResizablePanel>
-                <ResizableHandle withHandle onMouseUp={() => isCollapsed && handleSetSelectedElement(undefined)} className={cn("ml-6 w-0", isCollapsed && "hidden")} />
+                <ResizableHandle
+                    withHandle
+                    onMouseUp={() => isCollapsed && handleSetSelectedElements()}
+                    className={cn("ml-6 w-0", isCollapsed && "hidden")}
+                />
                 <ResizablePanel
                     ref={panelRef}
                     collapsible

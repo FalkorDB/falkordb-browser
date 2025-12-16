@@ -37,16 +37,22 @@ export default function Users() {
     const { toast } = useToast()
     const { setIndicator } = useContext(IndicatorContext);
 
+    useEffect(() => {
+        if (!open) {
+            setNewUser(null)
+        }
+    }, [open])
+
     const handleSetRole = async (user: SetUser) => {
         const { username, role, oldRole } = user
-        const result = await securedFetch(`api/user/${prepareArg(username)}?role=${role}`, {
-            method: 'PATCH'
+        const result = await securedFetch(`api/user/${prepareArg(username)}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ role })
         }, toast, setIndicator)
 
         if (result.ok) {
             setUsers(prev => prev.map(u => u.username === username ? { ...u, role } : u))
             setRows(prev => prev.map((row): Row => row.cells[0].value === username ? { ...row, cells: [row.cells[0], { ...row.cells[1], value: role }] } : row))
-
             toast({
                 title: "Success",
                 description: `${username} role updated successfully`,
@@ -69,6 +75,7 @@ export default function Users() {
                 const data = await result.json()
                 setUsers(data.result.map((user: User) => ({ ...user, selected: false })))
                 setRows(data.result.map(({ username, role }: User): Row => ({
+                    name: username,
                     cells: [{
                         value: username,
                         type: "readonly"
@@ -108,16 +115,19 @@ export default function Users() {
             })
             setUsers(prev => [...prev, { username, role, selected: false }])
             setRows(prev => [...prev, {
+                name: username,
                 cells: [{
                     value: username,
                     type: "readonly"
                 }, {
                     value: role,
-                    onChange: (value: string) => {
+                    onChange: async (value: string) => {
                         setNewUser({ username, role: value, oldRole: role })
                         setOpen(true)
+                        return true
                     },
                     type: "select",
+                    options: ROLES,
                     selectType: "Role"
                 }],
                 checked: false,
@@ -140,7 +150,7 @@ export default function Users() {
                 </div>
             </TableComponent>
             <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="bg-background p-8 flex flex-col gap-8 rounded-lg border-none" disableClose>
+                <DialogContent className="bg-background p-8 flex flex-col gap-8 rounded-lg border-none" hideClose>
                     <DialogHeader className="flex-row justify-between items-center border-b border-border pb-4">
                         <DialogTitle className="text-2xl font-medium">Set User Role</DialogTitle>
                         <CloseDialog />

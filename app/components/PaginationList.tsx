@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils"
-import { Fragment, useEffect, useRef, useState } from "react"
+import { Fragment, KeyboardEvent, MouseEvent, useEffect, useRef, useState } from "react"
 import { Check, Circle, Loader2, X } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import Button from "./ui/Button"
@@ -29,16 +29,16 @@ const getLastRun = (timestamp: number) => {
 
 const getExecutionTime = (metadata: string[]) => metadata.find(value => value.startsWith("Query internal execution time:"))?.split(":")[1].replace(" milliseconds", "ms")
 
-const getSeparator = (selected: boolean, hover: boolean) => (
+const getItemClassName = (selected: boolean, deleteSelected: boolean, hover: boolean, prefix: "text" | "bg" = "text") => {
+    if (selected) return `${prefix}-primary border-primary`
+    if (deleteSelected) return `${prefix}-destructive border-destructive`
+    if (hover) return `${prefix}-foreground border-foreground`
+    return `${prefix}-border border-border`
+}
+
+const getSeparator = (selected: boolean, deleteSelected: boolean, hover: boolean) => (
     <div
-        className={cn("h-2/3 w-px rounded-full",
-            // eslint-disable-next-line no-nested-ternary
-            selected
-                ? "bg-primary"
-                : hover
-                    ? "bg-foreground"
-                    : "bg-border"
-        )}
+        className={cn("h-2/3 w-px rounded-full", getItemClassName(selected, deleteSelected, hover, "bg"))}
     />
 )
 
@@ -54,7 +54,7 @@ const getStatusIcon = (status: Query["status"]) => {
     }
 }
 
-const getQueryElement = (item: Query, selected: boolean, hover: boolean) => {
+const getQueryElement = (item: Query, selected: boolean, deleteSelected: boolean, hover: boolean) => {
     const executionTime = getExecutionTime(item.metadata);
 
     // Build array of items to display
@@ -111,7 +111,7 @@ const getQueryElement = (item: Query, selected: boolean, hover: boolean) => {
                             {element.tooltip}
                         </TooltipContent>
                     </Tooltip>
-                    {index < elements.length - 1 && getSeparator(selected, hover)}
+                    {index < elements.length - 1 && getSeparator(selected, deleteSelected, hover)}
                 </Fragment>
             ))}
         </div>
@@ -120,18 +120,19 @@ const getQueryElement = (item: Query, selected: boolean, hover: boolean) => {
 
 interface Props<T extends Item> {
     list: T[]
-    onClick: (label: string) => void
+    onClick: (label: string, evt: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLInputElement>) => void
     dataTestId: string
     label: string
     afterSearchCallback: (newFilteredList: T[]) => void
     isSelected: (item: T) => boolean
+    isDeleteSelected?: (item: T) => boolean
     searchRef: React.RefObject<HTMLInputElement>
     isLoading?: boolean
     className?: string
     children?: React.ReactNode
 }
 
-export default function PaginationList<T extends Item>({ list, onClick, dataTestId, afterSearchCallback, isSelected, label, isLoading, className, children, searchRef }: Props<T>) {
+export default function PaginationList<T extends Item>({ list, onClick, dataTestId, afterSearchCallback, isSelected, isDeleteSelected, label, isLoading, className, children, searchRef }: Props<T>) {
 
     const [filteredList, setFilteredList] = useState<T[]>([...list])
     const [hoverIndex, setHoverIndex] = useState<number>(0)
@@ -203,7 +204,7 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
     }
 
     return (
-        <div className={cn("w-full flex flex-col gap-4 p-6", className)}>
+        <div className={cn("w-full flex flex-col gap-2 p-3", className)}>
             {children}
             <div className="flex gap-2 items-center">
                 <Input
@@ -233,7 +234,7 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
 
                         if (e.key === "Enter") {
                             e.preventDefault()
-                            onClick(typeof items[hoverIndex] === "string" ? items[hoverIndex] : items[hoverIndex].text)
+                            onClick(typeof items[hoverIndex] === "string" ? items[hoverIndex] : items[hoverIndex].text, e)
                         }
                     }}
                     onFocus={() => setHoverIndex(0)}
@@ -249,6 +250,7 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                 {
                     items.map((item, index) => {
                         const selected = isSelected ? isSelected(item) : false
+                        const deleteSelected = isDeleteSelected ? isDeleteSelected(item) : false
                         const hover = hoverIndex === index
                         const isString = typeof item === "string"
                         const text = isString ? item : item.text
@@ -257,7 +259,7 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                             <>
                                 {
                                     !isString && (item.status || item.elementsCount || item.timestamp || item.graphName || getExecutionTime(item.metadata)) &&
-                                    getQueryElement(item, selected, hover)
+                                    getQueryElement(item, selected, deleteSelected, hover)
                                 }
                                 <p data-testid={`${dataTestId}${text}Text`} className={cn("truncate w-full text-left", !isString && "h-1 grow")}>{text}</p>
                             </>
@@ -265,16 +267,11 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
 
                         return (
                             <li
-                                data-testid={`${dataTestId}${text}`}
                                 className={cn(
-                                    "border-b",
-                                    // eslint-disable-next-line no-nested-ternary
-                                    selected
-                                        ? "text-primary border-primary"
-                                        : hover
-                                            ? "text-foreground border-foreground"
-                                            : "text-border border-border"
+                                    "border-b cursor-pointer",
+                                    getItemClassName(selected, deleteSelected, hover)
                                 )}
+                                data-testid={`${dataTestId}${text}`}
                                 onMouseEnter={() => setHoverIndex(index)}
                                 onMouseLeave={() => searchRef.current !== document.activeElement && setHoverIndex(-1)}
                                 style={{ height: `${itemHeight}px` }}
@@ -284,9 +281,18 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                                     onClick ?
                                         <Button
                                             className={cn("w-full h-full text-xl gap-0", !isString ? "flex-col" : "text-center")}
+                                            data-testid={`${dataTestId}${text}Button`}
                                             title={text}
-                                            onClick={() => {
-                                                onClick(text)
+                                            onClick={(e) => {
+                                                onClick(text, e)
+                                            }}
+                                            onContextMenu={(e) => {
+                                                e.preventDefault()
+                                                const syntheticEvent = {
+                                                    ...e,
+                                                    type: "rightclick" as const
+                                                } as typeof e & { type: "rightclick" }
+                                                onClick(text, syntheticEvent)
                                             }}
                                             tabIndex={-1}
                                         >
@@ -299,7 +305,7 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                     })
                 }
             </ul>
-            <ul className="flex gap-6 p-4 items-center justify-center">
+            <ul className="flex gap-6 p-2 items-center justify-center">
                 <li className="flex gap-4">
                     <Button disabled={stepCounter < 4} label="<<" title="Previous 5 pages" onClick={() => setStepCounter(prev => prev > 4 ? prev - 5 : prev)} />
                     <Button disabled={stepCounter === 0} label="<" title="Previous page" onClick={() => handleSetStepCounter(prev => prev > 0 ? prev - 1 : prev)} />
@@ -330,8 +336,8 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                         ))
                 }
                 <li className="flex gap-4">
-                    <Button disabled={stepCounter > pageCount - 6} label=">>" title="Next 5 pages" onClick={() => handleSetStepCounter(prev => prev < pageCount - 5 ? prev + 5 : prev)} />
                     <Button disabled={stepCounter > pageCount - 2} label=">" title="Next page" onClick={() => handleSetStepCounter(prev => prev < pageCount - 1 ? prev + 1 : prev)} />
+                    <Button disabled={stepCounter > pageCount - 6} label=">>" title="Next 5 pages" onClick={() => handleSetStepCounter(prev => prev < pageCount - 5 ? prev + 5 : prev)} />
                 </li>
             </ul>
         </div>
@@ -342,4 +348,5 @@ PaginationList.defaultProps = {
     className: undefined,
     children: undefined,
     isLoading: undefined,
+    isDeleteSelected: undefined,
 }
