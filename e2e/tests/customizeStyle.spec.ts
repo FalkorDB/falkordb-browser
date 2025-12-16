@@ -34,8 +34,13 @@ test.describe("Customize Style Tests", () => {
     await graph.clickRunQuery();
     await graph.openGraphInfoButton();
     
+    // Wait for the label button to appear first
+    const labelButton = graph.page.getByTestId("graphInfoperson1Node");
+    await labelButton.waitFor({ state: 'visible', timeout: 10000 });
+    
     // Check if customize style button exists for person1 label
     const customizeButton = graph.page.getByTestId("customizeStyleperson1");
+    await customizeButton.waitFor({ state: 'visible', timeout: 5000 });
     expect(await customizeButton.isVisible()).toBeTruthy();
     
     await apiCall.removeGraph(graphName);
@@ -51,8 +56,13 @@ test.describe("Customize Style Tests", () => {
     await graph.clickRunQuery();
     await graph.openGraphInfoButton();
     
+    // Wait for the label button to appear first
+    const labelButton = graph.page.getByTestId("graphInfoperson1Node");
+    await labelButton.waitFor({ state: 'visible', timeout: 10000 });
+    
     // Click customize style button
     const customizeButton = graph.page.getByTestId("customizeStyleperson1");
+    await customizeButton.waitFor({ state: 'visible', timeout: 5000 });
     await customizeButton.click();
     
     // Verify customization panel is visible
@@ -85,8 +95,13 @@ test.describe("Customize Style Tests", () => {
     await graph.clickRunQuery();
     await graph.openGraphInfoButton();
     
+    // Wait for the label button to appear first
+    const labelButton = graph.page.getByTestId("graphInfoperson1Node");
+    await labelButton.waitFor({ state: 'visible', timeout: 10000 });
+    
     // Click customize style button
     const customizeButton = graph.page.getByTestId("customizeStyleperson1");
+    await customizeButton.waitFor({ state: 'visible', timeout: 5000 });
     await customizeButton.click();
     
     // Wait for panel and click a color option
@@ -113,8 +128,13 @@ test.describe("Customize Style Tests", () => {
     await graph.clickRunQuery();
     await graph.openGraphInfoButton();
     
+    // Wait for the label button to appear first
+    const labelButton = graph.page.getByTestId("graphInfoperson1Node");
+    await labelButton.waitFor({ state: 'visible', timeout: 10000 });
+    
     // Click customize style button
     const customizeButton = graph.page.getByTestId("customizeStyleperson1");
+    await customizeButton.waitFor({ state: 'visible', timeout: 5000 });
     await customizeButton.click();
     
     // Wait for panel and click a size option
@@ -142,8 +162,13 @@ test.describe("Customize Style Tests", () => {
     await graph.clickRunQuery();
     await graph.openGraphInfoButton();
     
+    // Wait for the label button to appear first
+    const labelButton = graph.page.getByTestId("graphInfoperson1Node");
+    await labelButton.waitFor({ state: 'visible', timeout: 10000 });
+    
     // Click customize style button
     const customizeButton = graph.page.getByTestId("customizeStyleperson1");
+    await customizeButton.waitFor({ state: 'visible', timeout: 5000 });
     await customizeButton.click();
     
     // Wait for panel and click a caption option
@@ -170,8 +195,13 @@ test.describe("Customize Style Tests", () => {
     await graph.clickRunQuery();
     await graph.openGraphInfoButton();
     
+    // Wait for the label button to appear first
+    const labelButton = graph.page.getByTestId("graphInfoperson1Node");
+    await labelButton.waitFor({ state: 'visible', timeout: 10000 });
+    
     // Click customize style button
     const customizeButton = graph.page.getByTestId("customizeStyleperson1");
+    await customizeButton.waitFor({ state: 'visible', timeout: 5000 });
     await customizeButton.click();
     
     // Wait for panel to be visible
