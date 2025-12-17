@@ -10,7 +10,6 @@ import { securedFetch, getTheme, GraphRef } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import { Link, Node, Relationship, Graph, GraphData } from "../api/graph/model"
 import { BrowserSettingsContext, IndicatorContext } from "./provider"
-import "falkordb-canvas";
 
 interface Props {
     graph: Graph
@@ -80,27 +79,37 @@ export default function ForceGraph({
     const parentRef = useRef<HTMLDivElement>(null)
 
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
+    const [canvasLoaded, setCanvasLoaded] = useState(false);
+
+    // Load falkordb-canvas web component on client side only
+    useEffect(() => {
+        import('falkordb-canvas').then(() => {
+            setCanvasLoaded(true);
+        });
+    }, []);
 
     // Load saved viewport on mount
     useEffect(() => {
-        if (!viewport || !canvasRef.current) return
         console.log(viewport);
+        
+        if (!viewport || !canvasRef.current || !canvasLoaded) return
 
         canvasRef.current.setViewport(viewport);
-    }, [canvasRef, viewport])
+    }, [canvasRef, viewport, canvasLoaded])
 
     // Save viewport on unmount
     useEffect(() => {
         const canvas = canvasRef.current;
 
         return () => {
-            if (canvas && setViewport) {
+            if (canvas && setViewport && canvasLoaded) {
                 console.log(canvas.getViewport());
+                
                 setViewport(canvas.getViewport());
                 setGraphData(canvas.getGraphData());
             }
         };
-    }, [canvasRef, graph.Id, setGraphData, setViewport])
+    }, [canvasRef, graph.Id, setGraphData, setViewport, canvasLoaded])
 
     const onFetchNode = useCallback(async (node: Node) => {
         const result = await securedFetch(`/api/${type}/${graph.Id}/${node.id}`, {
@@ -243,43 +252,44 @@ export default function ForceGraph({
 
     // Update dimensions
     useEffect(() => {
-        if (!canvasRef.current || !parentRef.current) return;
+        if (!canvasRef.current || !parentRef.current || !canvasLoaded) return;
+
         canvasRef.current.setWidth(parentRef.current.clientWidth);
         canvasRef.current.setHeight(parentRef.current.clientHeight);
-    }, [parentRef.current?.clientWidth, parentRef.current?.clientHeight, canvasRef]);
+    }, [parentRef.current?.clientWidth, parentRef.current?.clientHeight, canvasRef, canvasLoaded]);
 
     // Update colors
     useEffect(() => {
-        if (!canvasRef.current) return;
+        if (!canvasRef.current || !canvasLoaded) return;
         canvasRef.current.setBackgroundColor(background);
-    }, [canvasRef, background]);
+    }, [canvasRef, background, canvasLoaded]);
 
     useEffect(() => {
-        if (!canvasRef.current) return;
+        if (!canvasRef.current || !canvasLoaded) return;
         canvasRef.current.setForegroundColor(foreground);
-    }, [canvasRef, foreground]);
+    }, [canvasRef, foreground, canvasLoaded]);
 
     // Update text priority
     useEffect(() => {
-        if (!canvasRef.current) return;
+        if (!canvasRef.current || !canvasLoaded) return;
         canvasRef.current.setDisplayTextPriority(displayTextPriority);
-    }, [canvasRef, displayTextPriority]);
+    }, [canvasRef, displayTextPriority, canvasLoaded]);
 
     // Update loading state
     useEffect(() => {
-        if (!canvasRef.current) return;
+        if (!canvasRef.current || !canvasLoaded) return;
         canvasRef.current.setIsLoading(isLoading);
-    }, [canvasRef, isLoading]);
+    }, [canvasRef, isLoading, canvasLoaded]);
 
     // Update cooldown ticks
     useEffect(() => {
-        if (!canvasRef.current) return;
+        if (!canvasRef.current || !canvasLoaded) return;
         canvasRef.current.setCooldownTicks(cooldownTicks);
-    }, [canvasRef, cooldownTicks]);
+    }, [canvasRef, cooldownTicks, canvasLoaded]);
 
     // Update event handlers and selection functions
     useEffect(() => {
-        if (!canvasRef.current) return;
+        if (!canvasRef.current || !canvasLoaded) return;
         canvasRef.current.setConfig({
             onNodeClick: handleNodeClick,
             onNodeRightClick: handleRightClick,
@@ -292,13 +302,13 @@ export default function ForceGraph({
             onEngineStop: handleEngineStop,
             onLoadingChange: handleLoadingChange
         });
-    }, [handleNodeClick, handleRightClick, handleHover, handleUnselected, checkIsNodeSelected, checkIsLinkSelected, handleEngineStop, handleLoadingChange, canvasRef])
+    }, [handleNodeClick, handleRightClick, handleHover, handleUnselected, checkIsNodeSelected, checkIsLinkSelected, handleEngineStop, handleLoadingChange, canvasRef, canvasLoaded])
 
     // Update canvas data
     useEffect(() => {
         const canvas = canvasRef.current;
 
-        if (!canvas) return;
+        if (!canvas || !canvasLoaded) return;
 
         if (graphData) {
             canvas.setGraphData(graphData);
@@ -309,7 +319,7 @@ export default function ForceGraph({
         }
 
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [canvasRef, data, setGraphData])
+    }, [canvasRef, data, setGraphData, canvasLoaded])
 
     return (
         <div ref={parentRef} className="w-full h-full relative">

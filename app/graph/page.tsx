@@ -11,7 +11,10 @@ import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorCon
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
 import DataPanel from "./DataPanel";
-import CreateElementPanel from "./CreateElementPanel";
+
+const CreateElementPanel = dynamicImport(() => import("./CreateElementPanel"), {
+    ssr: false,
+});
 
 const Selector = dynamicImport(() => import("./Selector"), {
     ssr: false,
