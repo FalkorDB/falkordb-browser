@@ -185,6 +185,22 @@ export default function Page() {
         setIsQueryLoading(false)
     }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames, setIsQueryLoading])
 
+    const handleSetSelectedElements = useCallback((el: (Node | Link)[] = []) => {
+        setSelectedElements(el)
+
+        if (el.length !== 0) {
+            setPanel("data")
+            setIsAddEdge(false)
+            setIsAddNode(false)
+        } else {
+            setPanel(undefined)
+        }
+    }, [setPanel])
+
+    useEffect(() => {
+        handleSetSelectedElements()
+    }, [graph, handleSetSelectedElements])
+
     const handleSetIsAdd = useCallback((mainSetter: (isAdd: boolean) => void, setter: (isAdd: boolean) => void) => (isAdd: boolean) => {
         mainSetter(isAdd)
 
@@ -230,18 +246,6 @@ export default function Page() {
 
         return result.ok
     }, [fetchCount, graph, graphName, handleSetIsAdd, isAddNode, selectedElements, setData, setIndicator, toast])
-
-    const handleSetSelectedElements = useCallback((el: (Node | Link)[] = []) => {
-        setSelectedElements(el)
-
-        if (el.length !== 0) {
-            setPanel("data")
-            setIsAddEdge(false)
-            setIsAddNode(false)
-        } else {
-            setPanel(undefined)
-        }
-    }, [setPanel])
 
     const handleDeleteElement = useCallback(async () => {
         await Promise.all(selectedElements.map(async (element) => {
@@ -316,6 +320,7 @@ export default function Page() {
                     object={selectedElements[selectedElements.length - 1]}
                     onClose={() => handleSetSelectedElements()}
                     setLabels={setLabels}
+                    canvasRef={canvasRef}
                 />
 
             case "add": {

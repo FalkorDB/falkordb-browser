@@ -103,7 +103,29 @@ function GraphView({
         graph.visibleLinks(label.show)
 
         graph.LabelsMap.set(label.name, label)
-        setData({ ...graph.Elements })
+
+        const canvas = canvasRef.current
+
+        if (canvas) {
+            const currentData = canvas.getGraphData()
+            currentData.nodes.forEach(canvasNode => {
+                const appNode = graph.NodesMap.get(canvasNode.id)
+
+                if (appNode) {
+                    canvasNode.visible = appNode.visible
+                }
+            })
+            currentData.links.forEach(canvasLink => {
+                const appLink = graph.LinksMap.get(canvasLink.id)
+
+                if (appLink) {
+                    canvasLink.visible = appLink.visible
+                }
+            })
+            canvas.setGraphData({ ...currentData })
+        }
+        
+        setLabels([...graph.Labels])
     }
 
     const onRelationshipClick = (relationship: Relationship) => {
@@ -114,7 +136,27 @@ function GraphView({
         })
 
         graph.RelationshipsMap.set(relationship.name, relationship)
-        setData({ ...graph.Elements })
+
+        const canvas = canvasRef.current
+
+        if (canvas) {
+            const currentData = canvas.getGraphData()
+            currentData.nodes.forEach(canvasNode => {
+                const appNode = graph.NodesMap.get(canvasNode.id)
+                if (appNode) {
+                    canvasNode.visible = appNode.visible
+                }
+            })
+            currentData.links.forEach(canvasLink => {
+                const appLink = graph.LinksMap.get(canvasLink.id)
+                if (appLink) {
+                    canvasLink.visible = appLink.visible
+                }
+            })
+            canvas.setGraphData({ ...currentData })
+        }
+
+        setRelationships([...graph.Relationships])
     }
 
     return (

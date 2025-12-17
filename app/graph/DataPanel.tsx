@@ -4,14 +4,14 @@
 
 'use client'
 
-import { prepareArg, securedFetch } from "@/lib/utils";
+import { prepareArg, securedFetch, GraphRef } from "@/lib/utils";
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Pencil, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
 import Button from "../components/ui/Button";
 import { Label, Link, Node } from "../api/graph/model";
-import { IndicatorContext, GraphContext, ForceGraphContext } from "../components/provider";
+import { IndicatorContext, GraphContext } from "../components/provider";
 import DataTable from "./DataTable";
 import AddLabel from "./addLabel";
 import RemoveLabel from "./RemoveLabel";
@@ -20,12 +20,12 @@ interface Props {
     object: Node | Link;
     onClose: () => void;
     setLabels: Dispatch<SetStateAction<Label[]>>;
+    canvasRef: GraphRef;
 }
 
-export default function DataPanel({ object, onClose, setLabels }: Props) {
+export default function DataPanel({ object, onClose, setLabels, canvasRef }: Props) {
     const { setIndicator } = useContext(IndicatorContext)
     const { graph, setGraphInfo } = useContext(GraphContext)
-    const { setData } = useContext(ForceGraphContext)
 
     const lastObjId = useRef<number | undefined>(undefined)
     const labelsListRef = useRef<HTMLUListElement>(null)
@@ -90,7 +90,19 @@ export default function DataPanel({ object, onClose, setLabels }: Props) {
             const newGraphInfo = graph.GraphInfo.clone()
             setGraphInfo(newGraphInfo)
             graph.GraphInfo = newGraphInfo
-            setData({ ...graph.Elements })
+
+            const canvas = canvasRef.current
+            if (canvas) {
+                const currentData = canvas.getGraphData()
+                currentData.nodes.forEach(canvasNode => {
+                    const appNode = graph.NodesMap.get(canvasNode.id)
+                    if (appNode) {
+                        canvasNode.labels.push(newLabel)
+                    }
+                })
+                canvas.setGraphData({ ...currentData })
+            }
+
             return true
         }
 
@@ -123,7 +135,22 @@ export default function DataPanel({ object, onClose, setLabels }: Props) {
             const newGraphInfo = graph.GraphInfo.clone()
             setGraphInfo(newGraphInfo)
             graph.GraphInfo = newGraphInfo
-            setData({ ...graph.Elements })
+
+            const canvas = canvasRef.current
+            if (canvas) {
+                const currentData = canvas.getGraphData()
+                currentData.nodes.forEach(canvasNode => {
+                    const appNode = graph.NodesMap.get(canvasNode.id)
+                    if (appNode) {
+                        canvasNode.labels.splice(
+                            canvasNode.labels.findIndex((l) => l === removeLabel),
+                            1
+                        );
+                    }
+                })
+                canvas.setGraphData({ ...currentData })
+            }
+
             return true
         }
 
@@ -204,6 +231,7 @@ export default function DataPanel({ object, onClose, setLabels }: Props) {
                 lastObjId={lastObjId}
                 object={object}
                 type={type}
+                canvasRef={canvasRef}
             />
         </div >
     )
