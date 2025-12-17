@@ -9,7 +9,6 @@ import { MutableRefObject } from "react";
 import { Node, Link, DataCell, MemoryValue } from "@/app/api/graph/model";
 import type { FalkorDBCanvas } from "falkordb-canvas";
 
-export const MEMORY_USAGE_VERSION_THRESHOLD = 41408;
 export const screenSize = {
   sm: 640,
   md: 768,
@@ -199,7 +198,7 @@ export function rgbToHSL(hex: string): string {
   return `hsl(${hDeg}, ${sPct}%, ${lPct}%)`;
 }
 
-const processEntries = (arr: unknown[]): Map<string, MemoryValue> => {
+const processEntries = (arr: MemoryValueType): Map<string, MemoryValue> => {
   const entries: [string, MemoryValue][] = [];
 
   for (let i = 0; i < arr.length; i += 2) {

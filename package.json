@@ -2,7 +2,7 @@
   "name": "falkordb-browser",
   "author": "FalkorDB",
   "description": "FalkorDB Browser",
-  "version": "1.6.0",
+  "version": "1.6.3",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -58,7 +58,7 @@
     "eslint-plugin-react": "^7.37.4",
     "eslint-plugin-react-hooks": "^4.6.2",
     "eventsource": "^4.0.0",
-    "falkordb": "^6.3.1",
+    "falkordb": "^6.4.0",
     "falkordb-canvas": "file:../falkordb-canvas",
     "force-graph": "^1.51.0",
     "jose": "^6.1.0",

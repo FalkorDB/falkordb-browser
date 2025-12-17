@@ -14,7 +14,7 @@ import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Combobox from "../components/ui/combobox";
 
-const MODELS = ["gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-4.1"]
+const MODELS = ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"]
 
 export default function BrowserSettings() {
     const {
@@ -455,7 +455,7 @@ export default function BrowserSettings() {
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter') {
                                                 e.preventDefault()
-                                                if (newPriorityField.name.trim() && !newDisplayTextPriority.some(filed => filed.name === newPriorityField.name.trim())) {
+                                                if (newPriorityField.name.trim() && !newDisplayTextPriority.some(field => field.name === newPriorityField.name.trim())) {
                                                     setNewDisplayTextPriority([...newDisplayTextPriority, newPriorityField])
                                                     setNewPriorityField({ name: "", ignore: false })
                                                 }
@@ -466,12 +466,12 @@ export default function BrowserSettings() {
                                     <Button
                                         variant="Secondary"
                                         onClick={() => {
-                                            if (newPriorityField.name.trim() && !newDisplayTextPriority.some(filed => filed.name === newPriorityField.name.trim())) {
+                                            if (newPriorityField.name.trim() && !newDisplayTextPriority.some(field => field.name === newPriorityField.name.trim())) {
                                                 setNewDisplayTextPriority([...newDisplayTextPriority, newPriorityField])
                                                 setNewPriorityField({ name: "", ignore: false })
                                             }
                                         }}
-                                        disabled={!newPriorityField.name.trim() || newDisplayTextPriority.some(filed => filed.name === newPriorityField.name.trim())}
+                                        disabled={!newPriorityField.name.trim() || newDisplayTextPriority.some(field => field.name === newPriorityField.name.trim())}
                                     >
                                         <PlusCircle size={20} />
                                     </Button>

@@ -3,9 +3,9 @@ import { NextResponse, NextRequest } from "next/server";
 import { duplicateGraph, validateBody } from "../../../validate-body";
 
 /**
- * Copies data from the source specified by the query parameter `sourceName` into the destination `graph` provided by route params.
+ * Copies data from the source specified by the JSON body property `sourceName` into the destination `graph` provided by route params.
  *
- * @param request - The incoming request; must include `sourceName` in URL search params indicating the source graph to copy from.
+ * @param request - The incoming request; must include `sourceName` in the JSON body indicating the source graph to copy from.
  * @param params - A promise resolving to an object `{ graph: string }` where `graph` is the destination graph name.
  * @returns On success, a JSON object containing `result`. If `sourceName` is missing or the copy operation fails, returns a JSON `{ message }` with status 400. If authentication/session handling yields a `NextResponse`, that response is returned as-is. On unexpected errors, returns a JSON `{ message }` with status 500.
  */
