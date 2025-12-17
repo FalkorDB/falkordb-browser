@@ -90,8 +90,6 @@ export default function ForceGraph({
 
     // Load saved viewport on mount
     useEffect(() => {
-        console.log(viewport);
-        
         if (!viewport || !canvasRef.current || !canvasLoaded) return
 
         canvasRef.current.setViewport(viewport);
@@ -103,8 +101,6 @@ export default function ForceGraph({
 
         return () => {
             if (canvas && setViewport && canvasLoaded) {
-                console.log(canvas.getViewport());
-                
                 setViewport(canvas.getViewport());
                 setGraphData(canvas.getGraphData());
             }
