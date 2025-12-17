@@ -101,8 +101,11 @@ export default function ForceGraph({
 
         return () => {
             if (canvas && setViewport && canvasLoaded) {
-                setViewport(canvas.getViewport());
-                setGraphData(canvas.getGraphData());
+                const savedData = canvas.getGraphData()
+                if (savedData.nodes.length !== 0) {
+                    setViewport(canvas.getViewport());
+                    setGraphData(savedData);
+                }
             }
         };
     }, [canvasRef, graph.Id, setGraphData, setViewport, canvasLoaded])
