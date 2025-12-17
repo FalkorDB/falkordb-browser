@@ -7,6 +7,7 @@ import { GitGraph, ScrollText, Table } from "lucide-react"
 import { cn, GraphRef, Tab } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GraphContext, ForceGraphContext } from "@/app/components/provider";
+import dynamic from "next/dynamic";
 import { Label, Link, Node, Relationship, HistoryQuery } from "../api/graph/model";
 import Button from "../components/ui/Button";
 import TableView from "./TableView";
@@ -15,12 +16,17 @@ import Controls from "./controls";
 import GraphDetails from "./GraphDetails";
 import Labels from "./labels";
 import MetadataView from "./MetadataView";
-import ForceGraph from "../components/ForceGraph";
+import Spinning from "../components/ui/spinning";
+
+const ForceGraph = dynamic(() => import("../components/ForceGraph"), {
+    ssr: false,
+    loading: () => <div className="h-full w-full flex justify-center items-center"><Spinning /></div>
+});
 
 interface Props {
     selectedElements: (Node | Link)[]
     setSelectedElements: (elements?: (Node | Link)[]) => void
-    chartRef: GraphRef
+    canvasRef: GraphRef
     handleDeleteElement: () => Promise<void>
     setLabels: Dispatch<SetStateAction<Label[]>>
     setRelationships: Dispatch<SetStateAction<Relationship[]>>
@@ -40,7 +46,7 @@ interface Props {
 function GraphView({
     selectedElements,
     setSelectedElements,
-    chartRef,
+    canvasRef,
     handleDeleteElement,
     setLabels,
     setRelationships,
@@ -58,7 +64,7 @@ function GraphView({
 }: Props) {
 
     const { graph, graphName, currentTab, setCurrentTab, isLoading, setIsLoading } = useContext(GraphContext)
-    const { setData, data, setViewport, viewport } = useContext(ForceGraphContext)
+    const { setData, data, graphData, setGraphData, setViewport, viewport } = useContext(ForceGraphContext)
 
     const elementsLength = graph.getElements().length
 
@@ -125,7 +131,7 @@ function GraphView({
                                 selectedElements={selectedElements}
                                 setSelectedElements={setSelectedElements}
                                 handleDeleteElement={handleDeleteElement}
-                                chartRef={chartRef}
+                                canvasRef={canvasRef}
                                 setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => "labels" in e) ? setIsAddEdge : undefined}
                                 setIsAddNode={setIsAddNode}
                                 isAddEdge={isAddEdge}
@@ -194,7 +200,7 @@ function GraphView({
                                 <div className="h-full w-px bg-border rounded-full" />
                                 <Controls
                                     graph={graph}
-                                    chartRef={chartRef}
+                                    canvasRef={canvasRef}
                                     disabled={graph.getElements().length === 0}
                                     handleCooldown={handleCooldown}
                                     cooldownTicks={cooldownTicks}
@@ -209,7 +215,9 @@ function GraphView({
                     graph={graph}
                     data={data}
                     setData={setData}
-                    chartRef={chartRef}
+                    graphData={graphData}
+                    setGraphData={setGraphData}
+                    canvasRef={canvasRef}
                     selectedElements={selectedElements}
                     setSelectedElements={setSelectedElements}
                     setRelationships={setRelationships}
@@ -217,7 +225,6 @@ function GraphView({
                     setIsLoading={setIsLoading}
                     cooldownTicks={cooldownTicks}
                     handleCooldown={handleCooldown}
-                    currentTab={currentTab}
                     viewport={viewport}
                     setViewport={setViewport}
                 />

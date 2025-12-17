@@ -3,11 +3,12 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes'
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, TextPriority, MEMORY_USAGE_VERSION_THRESHOLD } from "@/lib/utils";
+import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, MEMORY_USAGE_VERSION_THRESHOLD } from "@/lib/utils";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
+import type { GraphData as CanvasData, TextPriority, ViewportState } from "falkordb-canvas";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphData, GraphInfo, HistoryQuery, MemoryValue, Query } from "./api/graph/model";
 import Header from "./components/Header";
@@ -64,6 +65,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [schema, setSchema] = useState<Graph>(Graph.empty())
   const [graph, setGraph] = useState<Graph>(Graph.empty())
   const [data, setData] = useState<GraphData>({ ...graph.Elements })
+  const [graphData, setGraphData] = useState<CanvasData>()
   const [graphInfo, setGraphInfo] = useState<GraphInfo>(GraphInfo.empty())
   const [schemaName, setSchemaName] = useState<string>("")
   const [graphName, setGraphName] = useState<string>("")
@@ -106,7 +108,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("tutorial");
     setTutorialOpen(true);
   }, [router]);
-  const [viewport, setViewport] = useState<{ zoom: number; centerX: number; centerY: number }>({ centerX: 0, centerY: 0, zoom: 0 })
+  const [viewport, setViewport] = useState<ViewportState>()
   const [scrollPosition, setScrollPosition] = useState(0)
   const [search, setSearch] = useState("")
   const [expand, setExpand] = useState<Map<number, number>>(new Map())
@@ -208,7 +210,9 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setViewport,
     data,
     setData,
-  }), [viewport, data])
+    graphData,
+    setGraphData,
+  }), [viewport, data, graphData])
 
   const tableViewContext = useMemo(() => ({
     scrollPosition,
@@ -338,6 +342,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       }
 
       setGraph(g)
+      setData({ ...g.Elements })
       fetchCount();
       setLastLimit(limit)
 

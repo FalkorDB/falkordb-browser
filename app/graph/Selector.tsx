@@ -36,7 +36,7 @@ interface SchemaProps {
     selectedElements: (Node | Link)[];
     setSelectedElements: (el: (Node | Link)[]) => void;
     handleDeleteElement: () => Promise<void>;
-    chartRef: GraphRef;
+    canvasRef: GraphRef;
     setIsAddNode: (isAdd: boolean) => void;
     setIsAddEdge: (isAdd: boolean) => void;
     isAddNode: boolean;
@@ -58,7 +58,7 @@ interface GraphProps {
     selectedElements?: never;
     setSelectedElements?: never;
     handleDeleteElement?: never;
-    chartRef?: never;
+    canvasRef?: never;
     setIsAddNode?: never;
     setIsAddEdge?: never;
     isAddNode?: never;
@@ -86,7 +86,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     selectedElements,
     setSelectedElements,
     handleDeleteElement,
-    chartRef,
+    canvasRef,
     setIsAddNode,
     setIsAddEdge,
     isAddNode,
@@ -607,7 +607,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                             </Button>
                         </div>
                     </>
-                    : selectedElements && handleDeleteElement && setSelectedElements && setIsAddNode && setIsAddEdge && chartRef && isCanvasLoading !== undefined && <div className="w-full h-full">
+                    : selectedElements && handleDeleteElement && setSelectedElements && setIsAddNode && setIsAddEdge && canvasRef && isCanvasLoading !== undefined && <div className="w-full h-full">
                         <Toolbar
                             graph={graph}
                             graphName={graphName}
@@ -617,7 +617,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                             handleDeleteElement={handleDeleteElement}
                             setIsAddNode={setIsAddNode}
                             setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => "labels" in e) ? setIsAddEdge : undefined}
-                            chartRef={chartRef}
+                            canvasRef={canvasRef}
                             isLoadingSchema={!!isCanvasLoading}
                             isAddNode={isAddNode}
                             isAddEdge={isAddEdge}

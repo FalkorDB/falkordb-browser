@@ -7,7 +7,7 @@ import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { MutableRefObject } from "react";
 import { Node, Link, DataCell, MemoryValue } from "@/app/api/graph/model";
-import { ForceGraphInstance, GraphNode } from "falkordb-canvas";
+import type { FalkorDBCanvas } from "falkordb-canvas";
 
 export const MEMORY_USAGE_VERSION_THRESHOLD = 41408;
 export const screenSize = {
@@ -18,14 +18,9 @@ export const screenSize = {
   "2xl": 1536,
 };
 
-export type GraphRef = MutableRefObject<ForceGraphInstance>;
+export type GraphRef = MutableRefObject<FalkorDBCanvas | null>;
 
 export type Panel = "chat" | "data" | "add" | undefined;
-
-export type TextPriority = {
-  name: string;
-  ignore: boolean;
-};
 
 export type SelectCell = {
   value: string;
@@ -73,12 +68,6 @@ export type Message = {
 };
 
 export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell | LazyCell;
-
-export type ViewportState = {
-  zoom: number;
-  centerX: number;
-  centerY: number;
-};
 
 export interface Row {
   cells: Cell[];
@@ -208,38 +197,6 @@ export function rgbToHSL(hex: string): string {
   const lPct = Math.round(l * 100);
 
   return `hsl(${hDeg}, ${sPct}%, ${lPct}%)`;
-}
-
-/**
- * Fits the force-graph view to show all (optionally filtered) nodes within the canvas bounds.
- *
- * The function computes padding as 10% of the smaller canvas dimension, scales it by
- * `paddingMultiplier`, and invokes the graph's `zoomToFit` with a 500ms duration.
- *
- * @param chartRef - Optional reference to the force-graph instance to operate on.
- * @param filter - Optional predicate to include only nodes that should be considered when fitting.
- * @param paddingMultiplier - Multiplier applied to the computed padding (default: 1).
- */
-export function handleZoomToFit(
-  chartRef: GraphRef,
-  filter?: (node: GraphNode) => boolean,
-  paddingMultiplier = 1
-) {
-  const chart = chartRef.current;
-  if (chart) {
-    // Get canvas dimensions from the custom element's shadow DOM
-    const customElement = document.querySelector("falkordb-canvas") as any;
-    const canvas = customElement?.shadowRoot?.querySelector("canvas") as HTMLCanvasElement;
-
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-
-    // Calculate padding as 10% of the smallest canvas dimension
-    const minDimension = Math.min(rect.width, rect.height);
-    const padding = minDimension * 0.1;
-    chart.zoomToFit(500, padding * paddingMultiplier, filter);
-  }
 }
 
 const processEntries = (arr: unknown[]): Map<string, MemoryValue> => {

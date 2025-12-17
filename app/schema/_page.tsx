@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
+import type { GraphData as CanvasData } from "falkordb-canvas";
 import { Label, Graph, GraphData, Link, Node, Relationship } from "../api/graph/model";
 import { IndicatorContext, SchemaContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
@@ -41,13 +42,14 @@ export default function Page() {
     const { toast } = useToast()
 
     const panelRef = useRef<ImperativePanelHandle>(null)
-    const chartRef = useRef<GraphRef["current"]>()
+    const canvasRef = useRef<GraphRef["current"]>(null)
 
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
     const [labels, setLabels] = useState<Label[]>([])
     const [relationships, setRelationships] = useState<Relationship[]>([])
     const [data, setData] = useState<GraphData>(schema.Elements)
+    const [graphData, setGraphData] = useState<CanvasData>()
     const [isAddEdge, setIsAddEdge] = useState(false)
     const [edgesCount, setEdgesCount] = useState<number | undefined>()
     const [nodesCount, setNodesCount] = useState<number | undefined>()
@@ -284,7 +286,7 @@ export default function Page() {
                 selectedElements={selectedElements}
                 setSelectedElements={setSelectedElements}
                 handleDeleteElement={handleDeleteElement}
-                chartRef={chartRef}
+                canvasRef={canvasRef}
                 setIsAddNode={handleSetIsAddNode}
                 setIsAddEdge={handleSetIsAddEdge}
                 setGraph={setSchema}
@@ -303,11 +305,13 @@ export default function Page() {
                         nodesCount={nodesCount}
                         selectedElements={selectedElements}
                         setSelectedElements={handleSetSelectedElements}
-                        chartRef={chartRef}
+                        canvasRef={canvasRef}
                         cooldownTicks={cooldownTicks}
                         handleCooldown={handleCooldown}
                         data={data}
                         setData={setData}
+                        graphData={graphData}
+                        setGraphData={setGraphData}
                         setLabels={setLabels}
                         setRelationships={setRelationships}
                         labels={labels}

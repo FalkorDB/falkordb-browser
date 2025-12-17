@@ -1,6 +1,6 @@
 import { ArrowRight, Circle, Info } from "lucide-react"
 import { useCallback, useContext, useEffect, useRef, useState } from "react"
-import { cn, GraphRef, handleZoomToFit } from "@/lib/utils"
+import { cn, GraphRef } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useSession } from "next-auth/react"
 import { Graph, Link, Node } from "../api/graph/model"
@@ -15,7 +15,7 @@ interface Props {
     selectedElements: (Node | Link)[]
     setSelectedElements: (elements: (Node | Link)[]) => void
     handleDeleteElement: () => Promise<void>
-    chartRef: GraphRef
+    canvasRef: GraphRef
     label: "Graph" | "Schema"
     setIsAddNode: (isAddNode: boolean) => void
     setIsAddEdge?: (isAddEdge: boolean) => void
@@ -34,7 +34,7 @@ export default function Toolbar({
     selectedElements,
     setSelectedElements,
     handleDeleteElement,
-    chartRef,
+    canvasRef,
     label,
     setIsAddNode,
     setIsAddEdge,
@@ -105,7 +105,7 @@ export default function Toolbar({
     }, [graph, handleOnChange, searchElement])
 
     const handleSearchElement = (element: Node | Link) => {
-        handleZoomToFit(chartRef, (node) => "labels" in element ? element.id === node.id : node.id === element.source || node.id === element.target, 4)
+        canvasRef.current?.zoomToFit(4, (node) => "labels" in element ? element.id === node.id : node.id === element.source || node.id === element.target)
         setSelectedElements([element])
         setSearchElement("")
         setSuggestions([])

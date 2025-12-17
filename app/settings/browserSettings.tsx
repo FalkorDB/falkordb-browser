@@ -1,13 +1,14 @@
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
 import { useRouter } from "next/navigation";
-import { cn, getDefaultQuery, TextPriority } from "@/lib/utils";
+import { cn, getDefaultQuery } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { RotateCcw, PlusCircle, Trash2, ChevronUp, ChevronDown, MonitorPlay, ChevronRight } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { TextPriority } from "falkordb-canvas";
 import { BrowserSettingsContext } from "../components/provider";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";

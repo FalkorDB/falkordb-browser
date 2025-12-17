@@ -1,5 +1,6 @@
 import { createContext, Dispatch, SetStateAction } from "react";
-import { Panel, Tab, TextPriority, ViewportState } from "@/lib/utils";
+import { Panel, Tab } from "@/lib/utils";
+import type { GraphData as CanvasData, TextPriority, ViewportState } from "falkordb-canvas";
 import { Graph, GraphData, GraphInfo, HistoryQuery } from "../api/graph/model";
 
 type BrowserSettingsContextType = {
@@ -141,6 +142,8 @@ type ForceGraphContextType = {
   setViewport: Dispatch<SetStateAction<ViewportState>>;
   data: GraphData;
   setData: Dispatch<SetStateAction<GraphData>>;
+  graphData: CanvasData | undefined;
+  setGraphData: Dispatch<SetStateAction<CanvasData | undefined>>;
 };
 
 type TableViewContextType = {
@@ -296,6 +299,8 @@ export const ForceGraphContext = createContext<ForceGraphContextType>({
   setViewport: () => {},
   data: { nodes: [], links: [] },
   setData: () => {},
+  graphData: { nodes: [], links: [] },
+  setGraphData: () => {},
 });
 
 export const TableViewContext = createContext<TableViewContextType>({

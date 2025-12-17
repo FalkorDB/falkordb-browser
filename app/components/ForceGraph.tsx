@@ -1,11 +1,12 @@
+/* eslint-disable react/require-default-props */
 /* eslint-disable no-param-reassign */
 
 "use client"
 
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react"
 import { useTheme } from "next-themes"
-import type { FalkorDBCanvas, Data, GraphLink, GraphNode } from "falkordb-canvas"
-import { securedFetch, GraphRef, getTheme, Tab, ViewportState } from "@/lib/utils"
+import type { Data, GraphLink, GraphNode, GraphData as CanvasData, ViewportState } from "falkordb-canvas"
+import { securedFetch, getTheme, GraphRef } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import { Link, Node, Relationship, Graph, GraphData } from "../api/graph/model"
 import { BrowserSettingsContext, IndicatorContext } from "./provider"
@@ -15,7 +16,9 @@ interface Props {
     graph: Graph
     data: GraphData
     setData: Dispatch<SetStateAction<GraphData>>
-    chartRef: GraphRef
+    graphData: CanvasData | undefined
+    setGraphData: Dispatch<SetStateAction<CanvasData | undefined>>
+    canvasRef: GraphRef
     selectedElements: (Node | Link)[]
     setSelectedElements: (el?: (Node | Link)[]) => void
     setRelationships: Dispatch<SetStateAction<Relationship[]>>
@@ -24,7 +27,6 @@ interface Props {
     cooldownTicks: number | undefined
     type?: "schema" | "graph"
     handleCooldown: (ticks?: 0) => void
-    currentTab?: Tab
     viewport?: ViewportState
     setViewport?: Dispatch<SetStateAction<ViewportState>>
 }
@@ -52,7 +54,9 @@ export default function ForceGraph({
     graph,
     data,
     setData,
-    chartRef,
+    graphData,
+    setGraphData,
+    canvasRef,
     selectedElements,
     setSelectedElements,
     setRelationships,
@@ -61,9 +65,8 @@ export default function ForceGraph({
     cooldownTicks,
     handleCooldown,
     type = "graph",
-    currentTab = "Graph",
-    viewport,
-    setViewport,
+    viewport = undefined,
+    setViewport = undefined,
 }: Props) {
 
     const { setIndicator } = useContext(IndicatorContext)
@@ -75,61 +78,29 @@ export default function ForceGraph({
 
     const lastClick = useRef<{ date: Date, id: number }>({ date: new Date(), id: -1 })
     const parentRef = useRef<HTMLDivElement>(null)
-    const canvasRef = useRef<FalkorDBCanvas>(null)
 
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
-    const [mount, setMount] = useState(false)
-
-    useEffect(() => {
-        setData({ ...graph.Elements })
-    }, [graph, setData])
-
-    // Initialize canvas ref for backward compatibility
-    useEffect(() => {
-        if (canvasRef.current) {
-            const forceGraph = canvasRef.current.getGraph();
-
-            if (forceGraph) {
-                chartRef.current = forceGraph;
-            }
-        }
-    }, [chartRef, data])
 
     // Load saved viewport on mount
     useEffect(() => {
-        if (!isLoading && viewport && chartRef.current && !mount) {
-            const { zoom, centerX, centerY } = viewport;
-            
-            setTimeout(() => {
-                if (chartRef.current) {
-                    chartRef.current.zoom(zoom, 0);
-                    chartRef.current.centerAt(centerX, centerY, 0);
-                    setMount(true)
-                }
-            }, 100);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [chartRef, graph.Id, currentTab, graph.Elements.nodes.length, isLoading])
+        if (!viewport || !canvasRef.current) return
+        console.log(viewport);
+
+        canvasRef.current.setViewport(viewport);
+    }, [canvasRef, viewport])
 
     // Save viewport on unmount
     useEffect(() => {
-        const chart = chartRef.current;
+        const canvas = canvasRef.current;
 
         return () => {
-            if (chart && setViewport) {
-                const zoom = chart.zoom();
-                const centerPos = chart.centerAt();
-
-                if (centerPos) {
-                    setViewport({
-                        zoom,
-                        centerX: centerPos.x,
-                        centerY: centerPos.y,
-                    });
-                }
+            if (canvas && setViewport) {
+                console.log(canvas.getViewport());
+                setViewport(canvas.getViewport());
+                setGraphData(canvas.getGraphData());
             }
         };
-    }, [chartRef, graph.Id, setViewport])
+    }, [canvasRef, graph.Id, setGraphData, setViewport])
 
     const onFetchNode = useCallback(async (node: Node) => {
         const result = await securedFetch(`/api/${type}/${graph.Id}/${node.id}`, {
@@ -267,7 +238,7 @@ export default function ForceGraph({
     }, [cooldownTicks, handleCooldown])
 
     const handleLoadingChange = useCallback((loading: boolean) => {
-            setIsLoading(loading)
+        setIsLoading(loading)
     }, [setIsLoading])
 
     // Update dimensions
@@ -275,36 +246,36 @@ export default function ForceGraph({
         if (!canvasRef.current || !parentRef.current) return;
         canvasRef.current.setWidth(parentRef.current.clientWidth);
         canvasRef.current.setHeight(parentRef.current.clientHeight);
-    }, [parentRef.current?.clientWidth, parentRef.current?.clientHeight]);
+    }, [parentRef.current?.clientWidth, parentRef.current?.clientHeight, canvasRef]);
 
     // Update colors
     useEffect(() => {
         if (!canvasRef.current) return;
         canvasRef.current.setBackgroundColor(background);
-    }, [background]);
+    }, [canvasRef, background]);
 
     useEffect(() => {
         if (!canvasRef.current) return;
         canvasRef.current.setForegroundColor(foreground);
-    }, [foreground]);
+    }, [canvasRef, foreground]);
 
     // Update text priority
     useEffect(() => {
         if (!canvasRef.current) return;
         canvasRef.current.setDisplayTextPriority(displayTextPriority);
-    }, [displayTextPriority]);
+    }, [canvasRef, displayTextPriority]);
 
     // Update loading state
     useEffect(() => {
         if (!canvasRef.current) return;
         canvasRef.current.setIsLoading(isLoading);
-    }, [isLoading]);
+    }, [canvasRef, isLoading]);
 
     // Update cooldown ticks
     useEffect(() => {
         if (!canvasRef.current) return;
         canvasRef.current.setCooldownTicks(cooldownTicks);
-    }, [cooldownTicks]);
+    }, [canvasRef, cooldownTicks]);
 
     // Update event handlers and selection functions
     useEffect(() => {
@@ -321,26 +292,28 @@ export default function ForceGraph({
             onEngineStop: handleEngineStop,
             onLoadingChange: handleLoadingChange
         });
-    }, [handleNodeClick, handleRightClick, handleHover, handleUnselected, checkIsNodeSelected, checkIsLinkSelected, handleEngineStop, handleLoadingChange])
+    }, [handleNodeClick, handleRightClick, handleHover, handleUnselected, checkIsNodeSelected, checkIsLinkSelected, handleEngineStop, handleLoadingChange, canvasRef])
 
     // Update canvas data
     useEffect(() => {
-        if (!canvasRef.current) return;
+        const canvas = canvasRef.current;
 
-        const canvasData = convertToCanvasData(data);
-        canvasRef.current.setData(canvasData);
-    }, [data])
+        if (!canvas) return;
+
+        if (graphData) {
+            canvas.setGraphData(graphData);
+            setGraphData(undefined);
+        } else {
+            const canvasData = convertToCanvasData(data);
+            canvas.setData(canvasData);
+        }
+
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [canvasRef, data, setGraphData])
 
     return (
         <div ref={parentRef} className="w-full h-full relative">
             <falkordb-canvas ref={canvasRef} />
         </div>
     )
-}
-
-ForceGraph.defaultProps = {
-    type: "graph",
-    currentTab: "Graph",
-    viewport: undefined,
-    setViewport: undefined,
 }

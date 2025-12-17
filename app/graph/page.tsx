@@ -3,7 +3,7 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { cn, getMemoryUsage, GraphRef, isTwoNodes, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
-import dynamic from "next/dynamic";
+import dynamicImport from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { Label, Graph, Link, Node, Relationship, GraphInfo, Value, MemoryValue } from "../api/graph/model";
@@ -13,7 +13,7 @@ import Chat from "./Chat";
 import DataPanel from "./DataPanel";
 import CreateElementPanel from "./CreateElementPanel";
 
-const Selector = dynamic(() => import("./Selector"), {
+const Selector = dynamicImport(() => import("./Selector"), {
     ssr: false,
     loading: () => <div className="h-[50px] flex flex-row gap-4 items-center">
         <div className="w-[230px] h-full animate-pulse rounded-md border border-border bg-background" />
@@ -21,7 +21,7 @@ const Selector = dynamic(() => import("./Selector"), {
         <div className="w-[120px] h-full animate-pulse rounded-md border border-border bg-background" />
     </div>
 })
-const GraphView = dynamic(() => import("./GraphView"), {
+const GraphView = dynamicImport(() => import("./GraphView"), {
     ssr: false,
     loading: () => <div className="h-full w-full bg-background flex justify-center items-center border border-border rounded-lg">
         <Spinning />
@@ -66,7 +66,7 @@ export default function Page() {
     } = useContext(BrowserSettingsContext)
     const { toast } = useToast()
 
-    const chartRef = useRef<GraphRef["current"]>()
+    const canvasRef = useRef<GraphRef["current"]>(null)
     const panelRef = useRef<ImperativePanelHandle>(null)
 
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
@@ -371,7 +371,7 @@ export default function Page() {
                     <GraphView
                         selectedElements={selectedElements}
                         setSelectedElements={handleSetSelectedElements}
-                        chartRef={chartRef}
+                        canvasRef={canvasRef}
                         handleDeleteElement={handleDeleteElement}
                         setLabels={setLabels}
                         setRelationships={setRelationships}

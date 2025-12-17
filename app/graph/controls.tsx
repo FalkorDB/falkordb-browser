@@ -4,7 +4,7 @@
 
 import { Pause, Play, Shrink, ZoomIn, ZoomOut } from "lucide-react";
 import { useContext } from "react";
-import { handleZoomToFit, GraphRef } from "@/lib/utils";
+import { GraphRef } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Switch } from "@/components/ui/switch";
 import Button from "../components/ui/Button";
@@ -14,7 +14,7 @@ import { Graph } from "../api/graph/model";
 interface Props {
     graph: Graph,
     disabled: boolean,
-    chartRef: GraphRef,
+    canvasRef: GraphRef,
     handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void,
     cooldownTicks: number | undefined
 }
@@ -22,7 +22,7 @@ interface Props {
 export default function Controls({
     graph,
     disabled,
-    chartRef,
+    canvasRef,
     handleCooldown,
     cooldownTicks,
 }: Props) {
@@ -30,14 +30,11 @@ export default function Controls({
     const { indicator } = useContext(IndicatorContext)
 
     const handleZoomClick = (changeFactor: number) => {
-        const chart = chartRef.current
-        if (chart) {
-            chart.zoom(chart.zoom() * changeFactor)
-        }
+        canvasRef.current?.zoom(canvasRef.current.getZoom() * changeFactor)
     }
 
     const handleCenterClick = () => {
-        handleZoomToFit(chartRef)
+        canvasRef.current?.zoomToFit()
     }
 
 

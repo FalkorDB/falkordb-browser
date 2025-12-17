@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable no-param-reassign */
 
+'use client'
+
 import { Check, CirclePlus, Info, Pencil, Trash2, X } from "lucide-react"
 import { cn, prepareArg, securedFetch } from "@/lib/utils"
 import { toast } from "@/components/ui/use-toast"

@@ -4,23 +4,32 @@
 
 import { useEffect, useContext, Dispatch, SetStateAction } from "react"
 import { GraphRef } from "@/lib/utils"
+import type { GraphData as CanvasData } from "falkordb-canvas"
+import dynamic from "next/dynamic"
 import Labels from "../graph/labels"
 import { Label, Link, Node, GraphData, Relationship } from "../api/graph/model"
 import { SchemaContext } from "../components/provider"
 import Controls from "../graph/controls"
 import GraphDetails from "../graph/GraphDetails"
-import ForceGraph from "../components/ForceGraph"
+import Spinning from "../components/ui/spinning"
+
+const ForceGraph = dynamic(() => import("../components/ForceGraph"), {
+    ssr: false,
+    loading: () => <div className="h-full w-full flex justify-center items-center"><Spinning /></div>
+});
 
 interface Props {
     edgesCount: number | undefined
     nodesCount: number | undefined
     selectedElements: (Node | Link)[]
     setSelectedElements: (elements?: (Node | Link)[]) => void
-    chartRef: GraphRef
+    canvasRef: GraphRef
     cooldownTicks: number | undefined
     handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void
     data: GraphData
     setData: Dispatch<SetStateAction<GraphData>>
+    graphData: CanvasData | undefined
+    setGraphData: Dispatch<SetStateAction<CanvasData | undefined>>
     setLabels: Dispatch<SetStateAction<Label[]>>
     setRelationships: Dispatch<SetStateAction<Relationship[]>>
     labels: Label[]
@@ -34,11 +43,13 @@ export default function SchemaView({
     nodesCount,
     selectedElements,
     setSelectedElements,
-    chartRef,
+    canvasRef,
     cooldownTicks,
     handleCooldown,
     data,
     setData,
+    graphData,
+    setGraphData,
     setLabels,
     setRelationships,
     labels,
@@ -108,7 +119,7 @@ export default function SchemaView({
                             <div className="h-full w-px bg-border rounded-full" />
                             <Controls
                                 graph={schema}
-                                chartRef={chartRef}
+                                canvasRef={canvasRef}
                                 disabled={schema.getElements().length === 0}
                                 handleCooldown={handleCooldown}
                                 cooldownTicks={cooldownTicks}
@@ -120,9 +131,11 @@ export default function SchemaView({
             <div className="relative h-full w-full rounded-lg overflow-hidden">
                 <ForceGraph
                     graph={schema}
-                    chartRef={chartRef}
+                    canvasRef={canvasRef}
                     data={data}
                     setData={setData}
+                    graphData={graphData}
+                    setGraphData={setGraphData}
                     selectedElements={selectedElements}
                     setSelectedElements={setSelectedElements}
                     type="schema"
