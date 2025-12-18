@@ -73,6 +73,7 @@ jobs:
           load: true
 
       - name: Run Trivy vulnerability scanner
+        id: trivy-scan
         uses: aquasecurity/trivy-action@0.33.1
         continue-on-error: true
         with:
@@ -146,4 +147,11 @@ jobs:
                 body: comment
               });
             }
+
+      - name: Fail if vulnerabilities found
+        if: steps.trivy-scan.outcome == 'failure'
+        run: |
+          echo "❌ HIGH or CRITICAL vulnerabilities detected in the Docker image!"
+          echo "Please review the security scan results above."
+          exit 1
 
