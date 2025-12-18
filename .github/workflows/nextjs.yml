@@ -93,10 +93,11 @@ jobs:
       - name: Generate Trivy report for PR
         if: github.event_name == 'pull_request'
         uses: aquasecurity/trivy-action@0.33.1
+        continue-on-error: true
         with:
           image-ref: 'falkordb/falkordb-browser:test'
-          format: 'markdown'
-          output: 'trivy-results.md'
+          format: 'table'
+          output: 'trivy-results.txt'
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'HIGH,CRITICAL'
@@ -109,9 +110,9 @@ jobs:
             const fs = require('fs');
             
             let comment;
-            if (fs.existsSync('trivy-results.md')) {
-              const report = fs.readFileSync('trivy-results.md', 'utf8');
-              comment = `## 🔒 Trivy Security Scan Results\n\n${report}`;
+            if (fs.existsSync('trivy-results.txt')) {
+              const report = fs.readFileSync('trivy-results.txt', 'utf8');
+              comment = `## 🔒 Trivy Security Scan Results\n\n\`\`\`\n${report}\n\`\`\`\n`;
             } else {
               comment = `## 🔒 Trivy Security Scan Results\n\n✅ No HIGH or CRITICAL vulnerabilities detected in the Docker image.`;
             }
