@@ -8,7 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
-import type { GraphData as CanvasData, TextPriority, ViewportState } from "falkordb-canvas";
+import type { GraphData as CanvasData, TextPriority, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphData, GraphInfo, HistoryQuery, MemoryValue, Query } from "./api/graph/model";
 import Header from "./components/Header";

@@ -10,7 +10,7 @@ import { Fragment, MutableRefObject, useCallback, useContext, useEffect, useLayo
 import { useSession } from "next-auth/react"
 import { Switch } from "@/components/ui/switch"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { getNodeDisplayKey } from "falkordb-canvas"
+import { getNodeDisplayKey } from "@falkordb/canvas"
 import Input from "../components/ui/Input"
 import DialogComponent from "../components/DialogComponent"
 import CloseDialog from "../components/CloseDialog"

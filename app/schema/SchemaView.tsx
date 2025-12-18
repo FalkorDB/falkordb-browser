@@ -4,7 +4,7 @@
 
 import { useEffect, useContext, Dispatch, SetStateAction } from "react"
 import { GraphRef } from "@/lib/utils"
-import type { GraphData as CanvasData } from "falkordb-canvas"
+import type { GraphData as CanvasData } from "@falkordb/canvas"
 import dynamic from "next/dynamic"
 import Labels from "../graph/labels"
 import { Label, Link, Node, GraphData, Relationship } from "../api/graph/model"

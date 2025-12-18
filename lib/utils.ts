@@ -7,7 +7,7 @@ import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { MutableRefObject } from "react";
 import { Node, Link, DataCell, MemoryValue } from "@/app/api/graph/model";
-import type { FalkorDBCanvas } from "falkordb-canvas";
+import type { FalkorDBCanvas } from "@falkordb/canvas";
 
 export const screenSize = {
   sm: 640,
@@ -197,6 +197,8 @@ export function rgbToHSL(hex: string): string {
 
   return `hsl(${hDeg}, ${sPct}%, ${lPct}%)`;
 }
+
+type MemoryValueType = (string | number | MemoryValueType)[];
 
 const processEntries = (arr: MemoryValueType): Map<string, MemoryValue> => {
   const entries: [string, MemoryValue][] = [];

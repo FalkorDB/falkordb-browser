@@ -5,7 +5,7 @@
 
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react"
 import { useTheme } from "next-themes"
-import type { Data, GraphLink, GraphNode, GraphData as CanvasData, ViewportState } from "falkordb-canvas"
+import type { Data, GraphLink, GraphNode, GraphData as CanvasData, ViewportState } from "@falkordb/canvas"
 import { securedFetch, getTheme, GraphRef } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import { Link, Node, Relationship, Graph, GraphData } from "../api/graph/model"
@@ -83,7 +83,7 @@ export default function ForceGraph({
 
     // Load falkordb-canvas web component on client side only
     useEffect(() => {
-        import('falkordb-canvas').then(() => {
+        import('@falkordb/canvas').then(() => {
             setCanvasLoaded(true);
         });
     }, []);

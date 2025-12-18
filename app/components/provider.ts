@@ -1,6 +1,6 @@
 import { createContext, Dispatch, SetStateAction } from "react";
 import { Panel, Tab } from "@/lib/utils";
-import type { GraphData as CanvasData, TextPriority, ViewportState } from "falkordb-canvas";
+import type { GraphData as CanvasData, TextPriority, ViewportState } from "@falkordb/canvas";
 import { Graph, GraphData, GraphInfo, HistoryQuery } from "../api/graph/model";
 
 type BrowserSettingsContextType = {

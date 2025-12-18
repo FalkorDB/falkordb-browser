@@ -6,7 +6,7 @@ import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
-import type { GraphData as CanvasData } from "falkordb-canvas";
+import type { GraphData as CanvasData } from "@falkordb/canvas";
 import { Label, Graph, GraphData, Link, Node, Relationship } from "../api/graph/model";
 import { IndicatorContext, SchemaContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
