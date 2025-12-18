@@ -48,6 +48,27 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
+          push: false
+          tags: ${{ env.TAGS }}
+          build-args: |
+            CYPHER_VERSION=${{ env.CYPHER_VERSION }}
+          load: true
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.TAGS }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'HIGH,CRITICAL'
+
+      - name: Push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
           push: true
           tags: ${{ env.TAGS }}
           build-args: |
