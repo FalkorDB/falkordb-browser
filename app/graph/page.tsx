@@ -1,20 +1,22 @@
 'use client'
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { cn, getMemoryUsage, isTwoNodes, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, getMemoryUsage, GraphRef, isTwoNodes, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
-import dynamic from "next/dynamic";
-import { ForceGraphMethods } from "react-force-graph-2d";
+import dynamicImport from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { Label, Graph, Link, Node, Relationship, GraphInfo, Value, MemoryValue } from "../api/graph/model";
-import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ViewportContext } from "../components/provider";
+import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ForceGraphContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
 import DataPanel from "./DataPanel";
-import CreateElementPanel from "./CreateElementPanel";
 
-const Selector = dynamic(() => import("./Selector"), {
+const CreateElementPanel = dynamicImport(() => import("./CreateElementPanel"), {
+    ssr: false,
+});
+
+const Selector = dynamicImport(() => import("./Selector"), {
     ssr: false,
     loading: () => <div className="h-[50px] flex flex-row gap-4 items-center">
         <div className="w-[230px] h-full animate-pulse rounded-md border border-border bg-background" />
@@ -22,7 +24,7 @@ const Selector = dynamic(() => import("./Selector"), {
         <div className="w-[120px] h-full animate-pulse rounded-md border border-border bg-background" />
     </div>
 })
-const GraphView = dynamic(() => import("./GraphView"), {
+const GraphView = dynamicImport(() => import("./GraphView"), {
     ssr: false,
     loading: () => <div className="h-full w-full bg-background flex justify-center items-center border border-border rounded-lg">
         <Spinning />
@@ -42,7 +44,7 @@ export default function Page() {
     const { setIndicator } = useContext(IndicatorContext);
     const { panel, setPanel } = useContext(PanelContext)
     const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext)
-    const { setData } = useContext(ViewportContext)
+    const { setData } = useContext(ForceGraphContext)
     const {
         graph,
         setGraph,
@@ -54,7 +56,6 @@ export default function Page() {
         setGraphNames,
         runQuery,
         fetchCount,
-        isLoading,
         handleCooldown,
         cooldownTicks,
     } = useContext(GraphContext)
@@ -68,7 +69,7 @@ export default function Page() {
     } = useContext(BrowserSettingsContext)
     const { toast } = useToast()
 
-    const chartRef = useRef<ForceGraphMethods<Node, Link>>()
+    const canvasRef = useRef<GraphRef["current"]>(null)
     const panelRef = useRef<ImperativePanelHandle>(null)
 
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
@@ -184,6 +185,22 @@ export default function Page() {
         setIsQueryLoading(false)
     }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames, setIsQueryLoading])
 
+    const handleSetSelectedElements = useCallback((el: (Node | Link)[] = []) => {
+        setSelectedElements(el)
+
+        if (el.length !== 0) {
+            setPanel("data")
+            setIsAddEdge(false)
+            setIsAddNode(false)
+        } else {
+            setPanel(undefined)
+        }
+    }, [setPanel])
+
+    useEffect(() => {
+        handleSetSelectedElements()
+    }, [graph, handleSetSelectedElements])
+
     const handleSetIsAdd = useCallback((mainSetter: (isAdd: boolean) => void, setter: (isAdd: boolean) => void) => (isAdd: boolean) => {
         mainSetter(isAdd)
 
@@ -216,8 +233,6 @@ export default function Page() {
                 handleSetIsAdd(setIsAddNode, setIsAddEdge)(false)
             } else {
                 const link = graph.extendEdge(json.result.data[0].e, false, false, true)
-                // Calculate curve for the newly created edge
-                link.curve = graph.calculateLinkCurve(link)
                 setRelationships(prev => [...prev.filter(p => p.name !== link.relationship), graph.RelationshipsMap.get(link.relationship)!])
                 handleSetIsAdd(setIsAddEdge, setIsAddNode)(false)
             }
@@ -229,26 +244,12 @@ export default function Page() {
 
         setData({ ...graph.Elements })
 
-        handleCooldown()
-
         return result.ok
-    }, [fetchCount, graph, graphName, handleCooldown, handleSetIsAdd, isAddNode, selectedElements, setData, setIndicator, toast])
-
-    const handleSetSelectedElements = useCallback((el: (Node | Link)[] = []) => {
-        setSelectedElements(el)
-
-        if (el.length !== 0) {
-            setPanel("data")
-            setIsAddEdge(false)
-            setIsAddNode(false)
-        } else {
-            setPanel(undefined)
-        }
-    }, [setPanel])
+    }, [fetchCount, graph, graphName, handleSetIsAdd, isAddNode, selectedElements, setData, setIndicator, toast])
 
     const handleDeleteElement = useCallback(async () => {
         await Promise.all(selectedElements.map(async (element) => {
-            const type = !element.source
+            const type = !("source" in element)
             const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${prepareArg(element.id.toString())}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type })
@@ -319,6 +320,7 @@ export default function Page() {
                     object={selectedElements[selectedElements.length - 1]}
                     onClose={() => handleSetSelectedElements()}
                     setLabels={setLabels}
+                    canvasRef={canvasRef}
                 />
 
             case "add": {
@@ -377,13 +379,12 @@ export default function Page() {
                     <GraphView
                         selectedElements={selectedElements}
                         setSelectedElements={handleSetSelectedElements}
-                        chartRef={chartRef}
+                        canvasRef={canvasRef}
                         handleDeleteElement={handleDeleteElement}
                         setLabels={setLabels}
                         setRelationships={setRelationships}
                         labels={labels}
                         relationships={relationships}
-                        isLoading={isLoading}
                         handleCooldown={handleCooldown}
                         cooldownTicks={cooldownTicks}
                         fetchCount={fetchCount}

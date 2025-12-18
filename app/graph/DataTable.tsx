@@ -1,18 +1,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable no-param-reassign */
 
+'use client'
+
 import { Check, CirclePlus, Info, Pencil, Trash2, X } from "lucide-react"
-import { cn, prepareArg, securedFetch } from "@/lib/utils"
-import { toast } from "@/components/ui/use-toast"
+import { cn, prepareArg, securedFetch, GraphRef } from "@/lib/utils"
+import { useToast } from "@/components/ui/use-toast"
 import { Fragment, MutableRefObject, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useSession } from "next-auth/react"
 import { Switch } from "@/components/ui/switch"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { getNodeDisplayKey } from "@falkordb/canvas"
 import Input from "../components/ui/Input"
 import DialogComponent from "../components/DialogComponent"
 import CloseDialog from "../components/CloseDialog"
 import { Link, Node, Value } from "../api/graph/model"
-import { GraphContext, IndicatorContext, BrowserSettingsContext } from "../components/provider"
+import { BrowserSettingsContext, GraphContext, IndicatorContext } from "../components/provider"
 import ToastButton from "../components/ToastButton"
 import Button from "../components/ui/Button"
 import Combobox from "../components/ui/combobox"
@@ -23,14 +26,15 @@ interface Props {
     object: Node | Link
     type: boolean
     lastObjId: MutableRefObject<number | undefined>
+    canvasRef: GraphRef
     className?: string
 }
 
-export default function DataTable({ object, type, lastObjId, className }: Props) {
+export default function DataTable({ object, type, lastObjId, canvasRef, className }: Props) {
 
+    const { settings: { graphInfo: { displayTextPriority } } } = useContext(BrowserSettingsContext)
     const { graph, graphInfo, setGraphInfo } = useContext(GraphContext)
-    const { settings: { graphInfo: graphInfoSettings } } = useContext(BrowserSettingsContext)
-    const { displayTextPriority } = graphInfoSettings
+    const { toast } = useToast()
 
     const setInputRef = useRef<HTMLInputElement>(null)
     const setTextareaRef = useRef<HTMLTextAreaElement>(null)
@@ -154,39 +158,6 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
         setExpandedAttributes({})
     }, [lastObjId, object, setAttributes, type])
 
-    const getNodeDisplayKey = (node: Node) => {
-        const { data: nodeData } = node;
-
-        const displayText = displayTextPriority.find(({ name, ignore }) => {
-            const key = ignore
-                ? Object.keys(nodeData).find(
-                    (k) => k.toLowerCase() === name.toLowerCase()
-                )
-                : name;
-
-            return (
-                key &&
-                nodeData[key] &&
-                typeof nodeData[key] === "string" &&
-                nodeData[key].trim().length > 0
-            );
-        });
-
-        if (displayText) {
-            const key = displayText.ignore
-                ? Object.keys(nodeData).find(
-                    (k) => k.toLowerCase() === displayText.name.toLowerCase()
-                )
-                : displayText.name;
-
-            if (key) {
-                return key;
-            }
-        }
-
-        return "id";
-    }
-
     const getDefaultVal = (t: ValueType) => {
         switch (t) {
             case "boolean":
@@ -259,11 +230,33 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
 
                 object.data[key] = val
 
-                if (object.labels && getNodeDisplayKey(object as Node) === key) {
-                    object.displayName = ['', '']
-                }
-
                 setAttributes(Object.keys(object.data))
+
+                const canvas = canvasRef.current
+
+                if (canvas) {
+                    const currentData = canvas.getGraphData()
+
+                    if (type) {
+                        const canvasNode = currentData.nodes.find(n => n.id === object.id)
+
+                        if (canvasNode) {
+                            canvasNode.data[key] = val
+
+                            if (getNodeDisplayKey(object as Node, displayTextPriority) === key) {
+                                canvasNode.displayName = ["", ""]
+                            }
+                        }
+                    } else {
+                        const canvasLink = currentData.links.find(l => l.id === object.id)
+
+                        if (canvasLink) {
+                            canvasLink.data[key] = val
+                        }
+                    }
+
+                    canvas.setGraphData({ ...currentData })
+                }
 
                 handleSetEditable("")
                 toast({
@@ -320,13 +313,35 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
 
                 graph.removeProperty(key, id, type)
 
-                if (object.labels && getNodeDisplayKey(object as Node) === key) {
-                    object.displayName = ['', ''];
-                }
-
                 delete object.data[key]
 
                 setAttributes(Object.keys(object.data))
+
+                const canvas = canvasRef.current
+
+                if (canvas) {
+                    const currentData = canvas.getGraphData()
+
+                    if (type) {
+                        const canvasNode = currentData.nodes.find(n => n.id === object.id)
+
+                        if (canvasNode) {
+                            delete canvasNode.data[key]
+
+                            if (getNodeDisplayKey(object as Node, displayTextPriority) === key) {
+                                canvasNode.displayName = ["", ""]
+                            }
+                        }
+                    } else {
+                        const canvasLink = currentData.links.find(l => l.id === object.id)
+
+                        if (canvasLink) {
+                            delete canvasLink.data[key]
+                        }
+                    }
+
+                    canvas.setGraphData({ ...currentData })
+                }
 
                 toast({
                     title: "Success",

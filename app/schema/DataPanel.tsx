@@ -4,7 +4,7 @@
 "use client";
 
 import { Check, Pencil, PlusCircle, Trash2, X } from "lucide-react";
-import { useContext, useEffect, useState, useCallback } from "react";
+import { useContext, useEffect, useState, useCallback, Dispatch, SetStateAction  } from "react";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
@@ -13,7 +13,7 @@ import { prepareArg, securedFetch } from "@/lib/utils";
 import Button from "../components/ui/Button";
 import { ATTRIBUTES, getDefaultAttribute, OPTIONS } from "./CreateElementPanel";
 import Combobox from "../components/ui/combobox";
-import { Label, Graph, Link, Node } from "../api/graph/model";
+import { Label, Graph, Link, Node, GraphData } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import ToastButton from "../components/ToastButton";
 import DialogComponent from "../components/DialogComponent";
@@ -25,9 +25,10 @@ interface Props {
     setObject: (el?: (Node | Link)[]) => void
     schema: Graph
     setLabels: (labels: Label[]) => void
+    setData: Dispatch<SetStateAction<GraphData>>
 }
 
-export default function DataPanel({ object, setObject, schema, setLabels }: Props) {
+export default function DataPanel({ object, setObject, schema, setLabels, setData }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
 
@@ -48,7 +49,7 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
     const [newLabel, setNewLabel] = useState<string>("")
     const [label, setLabel] = useState<string[]>([])
     const [hover, setHover] = useState<string>("")
-    const type = !object.source
+    const type = !("source" in object)
 
     const handleClose = useCallback((e: KeyboardEvent) => {
         if (e.defaultPrevented) return
@@ -68,8 +69,8 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
 
     useEffect(() => {
         setAttributes(Object.entries(object.data).filter(([key, val]) => !(key === "name" && Number(val) === object.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))
-        setLabel(object.source ? [object.relationship] : [...object.labels])
-    }, [object])
+        setLabel(type ? [...object.labels] : [object.relationship])
+    }, [object, type])
 
     const handleSetEditable = ([key, val]: [string, string[]] = getDefaultAttribute()) => {
         if (key !== "") {
@@ -123,6 +124,7 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                         )
                     }
                 }
+                setData({ ...schema.Elements })
                 setAttributes(prev => prev.map((attr) => attr[0] === newAttribute[0] ? newAttribute : attr))
                 handleSetEditable()
                 toast({
@@ -170,6 +172,7 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                         )
                     }
                 }
+                setData({ ...schema.Elements })
                 setAttributes(prev => prev.filter(([k]) => k !== key))
                 toast({
                     title: "Success",
@@ -281,6 +284,7 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
             if (result.ok) {
                 setLabels([...schema.addLabel(newLabel, node, false)])
                 setLabel([...node.labels])
+                setData({ ...schema.Elements })
                 setNewLabel("")
                 setLabelsEditable(false)
             }
@@ -312,6 +316,7 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                 schema.removeLabel(removeLabel, node, false)
                 setLabels([...schema.Labels])
                 setLabel([...node.labels])
+                setData({ ...schema.Elements })
             }
         } finally {
             setIsRemoveLabelLoading(false)

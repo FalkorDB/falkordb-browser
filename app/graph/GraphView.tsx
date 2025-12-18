@@ -2,11 +2,12 @@
 
 'use client'
 
-import { useState, useEffect, Dispatch, SetStateAction, useContext, useCallback } from "react";
+import { useEffect, Dispatch, SetStateAction, useContext, useCallback } from "react";
 import { GitGraph, ScrollText, Table } from "lucide-react"
 import { cn, GraphRef, Tab } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { GraphContext, ViewportContext } from "@/app/components/provider";
+import { GraphContext, ForceGraphContext } from "@/app/components/provider";
+import dynamic from "next/dynamic";
 import { Label, Link, Node, Relationship, HistoryQuery } from "../api/graph/model";
 import Button from "../components/ui/Button";
 import TableView from "./TableView";
@@ -15,19 +16,23 @@ import Controls from "./controls";
 import GraphDetails from "./GraphDetails";
 import Labels from "./labels";
 import MetadataView from "./MetadataView";
-import ForceGraph from "../components/ForceGraph";
+import Spinning from "../components/ui/spinning";
+
+const ForceGraph = dynamic(() => import("../components/ForceGraph"), {
+    ssr: false,
+    loading: () => <div className="h-full w-full flex justify-center items-center"><Spinning /></div>
+});
 
 interface Props {
     selectedElements: (Node | Link)[]
     setSelectedElements: (elements?: (Node | Link)[]) => void
-    chartRef: GraphRef
+    canvasRef: GraphRef
     handleDeleteElement: () => Promise<void>
     setLabels: Dispatch<SetStateAction<Label[]>>
     setRelationships: Dispatch<SetStateAction<Relationship[]>>
     labels: Label[]
     relationships: Relationship[]
-    isLoading: boolean
-    handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void
+    handleCooldown: (ticks?: 0) => void
     cooldownTicks: number | undefined
     fetchCount: () => Promise<void>
     historyQuery: HistoryQuery
@@ -41,13 +46,12 @@ interface Props {
 function GraphView({
     selectedElements,
     setSelectedElements,
-    chartRef,
+    canvasRef,
     handleDeleteElement,
     setLabels,
     setRelationships,
     labels,
     relationships,
-    isLoading,
     handleCooldown,
     cooldownTicks,
     fetchCount,
@@ -59,11 +63,9 @@ function GraphView({
     isAddNode
 }: Props) {
 
-    const { graph, graphName, currentTab, setCurrentTab } = useContext(GraphContext)
-    const { setData, data, isSaved, setViewport, viewport } = useContext(ViewportContext)
+    const { graph, graphName, currentTab, setCurrentTab, isLoading, setIsLoading } = useContext(GraphContext)
+    const { setData, data, graphData, setGraphData, setViewport, viewport } = useContext(ForceGraphContext)
 
-    const [parentHeight, setParentHeight] = useState<number>(0)
-    const [parentWidth, setParentWidth] = useState<number>(0)
     const elementsLength = graph.getElements().length
 
     useEffect(() => {
@@ -101,18 +103,60 @@ function GraphView({
         graph.visibleLinks(label.show)
 
         graph.LabelsMap.set(label.name, label)
-        setData({ ...graph.Elements })
+
+        const canvas = canvasRef.current
+
+        if (canvas) {
+            const currentData = canvas.getGraphData()
+            currentData.nodes.forEach(canvasNode => {
+                const appNode = graph.NodesMap.get(canvasNode.id)
+
+                if (appNode) {
+                    canvasNode.visible = appNode.visible
+                }
+            })
+            currentData.links.forEach(canvasLink => {
+                const appLink = graph.LinksMap.get(canvasLink.id)
+
+                if (appLink) {
+                    canvasLink.visible = appLink.visible
+                }
+            })
+            canvas.setGraphData({ ...currentData })
+        }
+        
+        setLabels([...graph.Labels])
     }
 
     const onRelationshipClick = (relationship: Relationship) => {
         relationship.show = !relationship.show
 
-        relationship.elements.filter((link) => link.source.visible && link.target.visible).forEach((link) => {
+        relationship.elements.filter((link) => graph.NodesMap.get(link.source)?.visible && graph.NodesMap.get(link.target)?.visible).forEach((link) => {
             link.visible = relationship.show
         })
 
         graph.RelationshipsMap.set(relationship.name, relationship)
-        setData({ ...graph.Elements })
+
+        const canvas = canvasRef.current
+
+        if (canvas) {
+            const currentData = canvas.getGraphData()
+            currentData.nodes.forEach(canvasNode => {
+                const appNode = graph.NodesMap.get(canvasNode.id)
+                if (appNode) {
+                    canvasNode.visible = appNode.visible
+                }
+            })
+            currentData.links.forEach(canvasLink => {
+                const appLink = graph.LinksMap.get(canvasLink.id)
+                if (appLink) {
+                    canvasLink.visible = appLink.visible
+                }
+            })
+            canvas.setGraphData({ ...currentData })
+        }
+
+        setRelationships([...graph.Relationships])
     }
 
     return (
@@ -129,8 +173,8 @@ function GraphView({
                                 selectedElements={selectedElements}
                                 setSelectedElements={setSelectedElements}
                                 handleDeleteElement={handleDeleteElement}
-                                chartRef={chartRef}
-                                setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => !!e.labels) ? setIsAddEdge : undefined}
+                                canvasRef={canvasRef}
+                                setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => "labels" in e) ? setIsAddEdge : undefined}
                                 setIsAddNode={setIsAddNode}
                                 isAddEdge={isAddEdge}
                                 isAddNode={isAddNode}
@@ -198,7 +242,7 @@ function GraphView({
                                 <div className="h-full w-px bg-border rounded-full" />
                                 <Controls
                                     graph={graph}
-                                    chartRef={chartRef}
+                                    canvasRef={canvasRef}
                                     disabled={graph.getElements().length === 0}
                                     handleCooldown={handleCooldown}
                                     cooldownTicks={cooldownTicks}
@@ -213,21 +257,18 @@ function GraphView({
                     graph={graph}
                     data={data}
                     setData={setData}
-                    chartRef={chartRef}
+                    graphData={graphData}
+                    setGraphData={setGraphData}
+                    canvasRef={canvasRef}
                     selectedElements={selectedElements}
                     setSelectedElements={setSelectedElements}
                     setRelationships={setRelationships}
-                    parentHeight={parentHeight}
-                    parentWidth={parentWidth}
-                    setParentHeight={setParentHeight}
-                    setParentWidth={setParentWidth}
                     isLoading={isLoading}
-                    handleCooldown={handleCooldown}
+                    setIsLoading={setIsLoading}
                     cooldownTicks={cooldownTicks}
-                    currentTab={currentTab}
+                    handleCooldown={handleCooldown}
                     viewport={viewport}
                     setViewport={setViewport}
-                    isSaved={isSaved}
                 />
             </TabsContent>
             <TabsContent value="Table" className="h-1 grow w-full mt-0 overflow-hidden">

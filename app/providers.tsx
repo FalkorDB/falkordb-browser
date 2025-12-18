@@ -3,15 +3,16 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes'
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, TextPriority } from "@/lib/utils";
+import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage } from "@/lib/utils";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
+import type { GraphData as CanvasData, TextPriority, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphData, GraphInfo, HistoryQuery, MemoryValue, Query } from "./api/graph/model";
 import Header from "./components/Header";
-import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ViewportContext, TableViewContext } from "./components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ForceGraphContext, TableViewContext } from "./components/provider";
 import GraphInfoPanel from "./graph/graphInfo";
 import Tutorial from "./components/Tutorial";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
@@ -65,6 +66,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [schema, setSchema] = useState<Graph>(Graph.empty())
   const [graph, setGraph] = useState<Graph>(Graph.empty())
   const [data, setData] = useState<GraphData>({ ...graph.Elements })
+  const [graphData, setGraphData] = useState<CanvasData>()
   const [graphInfo, setGraphInfo] = useState<GraphInfo>(GraphInfo.empty())
   const [schemaName, setSchemaName] = useState<string>("")
   const [graphName, setGraphName] = useState<string>("")
@@ -107,12 +109,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("tutorial");
     setTutorialOpen(true);
   }, [router]);
-  const [viewport, setViewport] = useState<{ zoom: number; centerX: number; centerY: number }>({ centerX: 0, centerY: 0, zoom: 0 })
+  const [viewport, setViewport] = useState<ViewportState>()
   const [scrollPosition, setScrollPosition] = useState(0)
   const [search, setSearch] = useState("")
   const [expand, setExpand] = useState<Map<number, number>>(new Map())
 
-  const isSaved = data.nodes.some(n => n.x && n.y)
   const dataHash = useMemo(() => JSON.stringify(graph.Data), [graph.Data])
 
   const browserSettingsContext = useMemo(() => ({
@@ -210,8 +211,9 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setViewport,
     data,
     setData,
-    isSaved
-  }), [viewport, data, isSaved])
+    graphData,
+    setGraphData,
+  }), [viewport, data, graphData])
 
   const tableViewContext = useMemo(() => ({
     scrollPosition,
@@ -252,17 +254,9 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     }
   }, [graphName, toast]);
 
-  const handleCooldown = useCallback((ticks?: 0, isSetLoading: boolean = true) => {
+  const handleCooldown = useCallback((ticks?: 0) => {
     if (typeof window !== 'undefined') {
       setCooldownTicks(ticks)
-
-      if (isSetLoading) {
-        setIsLoading(ticks !== 0)
-      }
-
-      const canvas = document.querySelector('.force-graph-container canvas');
-
-      if (canvas) canvas.setAttribute('data-engine-status', ticks === 0 ? 'stop' : 'running');
     }
   }, []);
 
@@ -349,12 +343,9 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       }
 
       setGraph(g)
+      setData({ ...g.Elements })
       fetchCount();
       setLastLimit(limit)
-
-      if (g.Elements.nodes.length > 0) {
-        handleCooldown();
-      }
 
       localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }))
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -398,6 +389,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     handleCooldown,
     cooldownTicks,
     isLoading,
+    setIsLoading
   }), [graph, graphInfo, graphName, graphNames, nodesCount, edgesCount, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading])
 
   useEffect(() => {
@@ -624,7 +616,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                 <IndicatorContext.Provider value={indicatorContext}>
                   <PanelContext.Provider value={panelContext}>
                     <QueryLoadingContext.Provider value={queryLoadingContext}>
-                      <ViewportContext.Provider value={viewportContext}>
+                      <ForceGraphContext.Provider value={viewportContext}>
                         <TableViewContext.Provider value={tableViewContext}>
                           {
                             pathname === "/graph" &&
@@ -678,7 +670,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                             </ResizablePanel>
                           </ResizablePanelGroup>
                         </TableViewContext.Provider>
-                      </ViewportContext.Provider>
+                      </ForceGraphContext.Provider>
                     </QueryLoadingContext.Provider>
                   </PanelContext.Provider>
                 </IndicatorContext.Provider>

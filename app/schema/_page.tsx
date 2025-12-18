@@ -1,12 +1,12 @@
 'use client'
 
 import { useContext, useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { cn, getSSEGraphResult, isTwoNodes, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, getSSEGraphResult, GraphRef, isTwoNodes, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
-import { ForceGraphMethods } from "react-force-graph-2d";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
+import type { GraphData as CanvasData } from "@falkordb/canvas";
 import { Label, Graph, GraphData, Link, Node, Relationship } from "../api/graph/model";
 import { IndicatorContext, SchemaContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
@@ -42,14 +42,15 @@ export default function Page() {
     const { toast } = useToast()
 
     const panelRef = useRef<ImperativePanelHandle>(null)
+    const canvasRef = useRef<GraphRef["current"]>(null)
 
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
     const [labels, setLabels] = useState<Label[]>([])
     const [relationships, setRelationships] = useState<Relationship[]>([])
     const [data, setData] = useState<GraphData>(schema.Elements)
+    const [graphData, setGraphData] = useState<CanvasData>()
     const [isAddEdge, setIsAddEdge] = useState(false)
-    const chartRef = useRef<ForceGraphMethods<Node, Link>>()
     const [edgesCount, setEdgesCount] = useState<number | undefined>()
     const [nodesCount, setNodesCount] = useState<number | undefined>()
     const [isAddNode, setIsAddNode] = useState(false)
@@ -126,15 +127,8 @@ export default function Page() {
         }
     }, [toast, setIndicator, schemaName])
 
-    const handleCooldown = (ticks?: 0, isSetLoading = true) => {
+    const handleCooldown = (ticks?: 0) => {
         setCooldownTicks(ticks)
-
-        if (isSetLoading) setIsCanvasLoading(ticks !== 0)
-        const canvas = document.querySelector('.force-graph-container canvas')
-
-        if (!canvas) return
-
-        canvas.setAttribute('data-engine-status', ticks === 0 ? 'stop' : 'running')
     }
 
     const fetchSchema = useCallback(async () => {
@@ -163,7 +157,7 @@ export default function Page() {
 
         await Promise.all(stateSelectedElements.map(async (element) => {
             const { id } = element
-            const type = !element.source
+            const type = !("source" in element)
             const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(id.toString())}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type }),
@@ -210,7 +204,6 @@ export default function Page() {
         fetchCount()
         setSelectedElements([])
         setData({ ...schema.Elements })
-        handleCooldown()
     }
 
     const handleCreateElement = async (attributes: [string, string[]][], elementLabel: string[]) => {
@@ -229,8 +222,6 @@ export default function Page() {
                 handleSetIsAddNode(false)
             } else {
                 const link = schema.extendEdge(json.result.data[0].e, false, true)
-                // Calculate curve for the newly created edge
-                link.curve = schema.calculateLinkCurve(link)
                 setRelationships(prev => [...prev.filter(p => p.name !== link.relationship), schema.RelationshipsMap.get(link.relationship)!])
                 handleSetIsAddEdge(false)
             }
@@ -241,8 +232,6 @@ export default function Page() {
         }
 
         setData({ ...schema.Elements })
-
-        handleCooldown()
 
         return result.ok
     }
@@ -255,6 +244,7 @@ export default function Page() {
                     setObject={handleSetSelectedElements}
                     schema={schema}
                     setLabels={setLabels}
+                    setData={setData}
                 />
             )
         }
@@ -296,7 +286,7 @@ export default function Page() {
                 selectedElements={selectedElements}
                 setSelectedElements={setSelectedElements}
                 handleDeleteElement={handleDeleteElement}
-                chartRef={chartRef}
+                canvasRef={canvasRef}
                 setIsAddNode={handleSetIsAddNode}
                 setIsAddEdge={handleSetIsAddEdge}
                 setGraph={setSchema}
@@ -315,16 +305,19 @@ export default function Page() {
                         nodesCount={nodesCount}
                         selectedElements={selectedElements}
                         setSelectedElements={handleSetSelectedElements}
-                        chartRef={chartRef}
+                        canvasRef={canvasRef}
                         cooldownTicks={cooldownTicks}
                         handleCooldown={handleCooldown}
                         data={data}
                         setData={setData}
+                        graphData={graphData}
+                        setGraphData={setGraphData}
                         setLabels={setLabels}
                         setRelationships={setRelationships}
                         labels={labels}
                         relationships={relationships}
                         isLoading={isCanvasLoading}
+                        setIsLoading={setIsCanvasLoading}
                     />
                 </ResizablePanel>
                 <ResizableHandle

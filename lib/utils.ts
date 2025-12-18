@@ -6,8 +6,8 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { MutableRefObject } from "react";
-import { ForceGraphMethods } from "react-force-graph-2d";
 import { Node, Link, DataCell, MemoryValue } from "@/app/api/graph/model";
+import type { FalkorDBCanvas } from "@falkordb/canvas";
 
 export const screenSize = {
   sm: 640,
@@ -17,16 +17,9 @@ export const screenSize = {
   "2xl": 1536,
 };
 
-export type GraphRef = MutableRefObject<
-  ForceGraphMethods<Node, Link> | undefined
->;
+export type GraphRef = MutableRefObject<FalkorDBCanvas | null>;
 
 export type Panel = "chat" | "data" | "add" | undefined;
-
-export type TextPriority = {
-  name: string;
-  ignore: boolean;
-};
 
 export type SelectCell = {
   value: string;
@@ -74,12 +67,6 @@ export type Message = {
 };
 
 export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell | LazyCell;
-
-export type ViewportState = {
-  zoom: number;
-  centerX: number;
-  centerY: number;
-};
 
 export interface Row {
   cells: Cell[];
@@ -211,39 +198,6 @@ export function rgbToHSL(hex: string): string {
   return `hsl(${hDeg}, ${sPct}%, ${lPct}%)`;
 }
 
-/**
- * Fits the force-graph view to show all (optionally filtered) nodes within the canvas bounds.
- *
- * The function computes padding as 10% of the smaller canvas dimension, scales it by
- * `paddingMultiplier`, and invokes the graph's `zoomToFit` with a 500ms duration.
- *
- * @param chartRef - Optional reference to the force-graph instance to operate on.
- * @param filter - Optional predicate to include only nodes that should be considered when fitting.
- * @param paddingMultiplier - Multiplier applied to the computed padding (default: 1).
- */
-export function handleZoomToFit(
-  chartRef?: GraphRef,
-  filter?: (node: Node) => boolean,
-  paddingMultiplier = 1
-) {
-  const chart = chartRef?.current;
-  if (chart) {
-    // Get canvas dimensions
-    const canvas = document.querySelector(
-      ".force-graph-container canvas"
-    ) as HTMLCanvasElement;
-
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-
-    // Calculate padding as 10% of the smallest canvas dimension
-    const minDimension = Math.min(rect.width, rect.height);
-    const padding = minDimension * 0.1;
-    chart.zoomToFit(500, padding * paddingMultiplier, filter);
-  }
-}
-
 type MemoryValueType = (string | number | MemoryValueType)[];
 
 const processEntries = (arr: MemoryValueType): Map<string, MemoryValue> => {
@@ -330,39 +284,6 @@ export function getQueryWithLimit(
   return [query, existingLimit];
 }
 
-export const getNodeDisplayText = (node: Node, displayTextPriority: TextPriority[]) => {
-  const { data: nodeData } = node;
-
-  const displayText = displayTextPriority.find(({ name, ignore }) => {
-      const key = ignore
-          ? Object.keys(nodeData).find(
-              (k) => k.toLowerCase() === name.toLowerCase()
-          )
-          : name;
-
-      return (
-          key &&
-          nodeData[key] &&
-          typeof nodeData[key] === "string" &&
-          nodeData[key].trim().length > 0
-      );
-  });
-
-  if (displayText) {
-      const key = displayText.ignore
-          ? Object.keys(nodeData).find(
-              (k) => k.toLowerCase() === displayText.name.toLowerCase()
-          )
-          : displayText.name;
-
-      if (key) {
-          return String(nodeData[key]);
-      }
-  }
-
-  return String(node.id);
-}
-
 export const formatName = (newGraphName: string) =>
   newGraphName === '""' ? "" : newGraphName;
 
@@ -419,5 +340,5 @@ export function getTheme(theme: string | undefined) {
 // Type guard: runtime check that proves elements is [Node, Node]
 export function isTwoNodes(elements: (Node | Link)[]): elements is [Node, Node] {
   return elements.length === 2 &&
-    elements.every((e): e is Node => !!e.labels)
+    elements.every((e): e is Node => "labels" in e)
 }

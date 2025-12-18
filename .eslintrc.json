@@ -41,6 +41,9 @@
         "*.js",
         "*.jsx"
       ],
+      "excludedFiles": [
+        "*.d.ts"
+      ],
       "parserOptions": {
         "project": [
           "./tsconfig.json"
