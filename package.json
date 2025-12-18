@@ -59,6 +59,7 @@
     "eslint-plugin-react-hooks": "^4.6.2",
     "eventsource": "^4.0.0",
     "falkordb": "^6.4.0",
+    "glob": "^10.5.0",
     "jose": "^6.1.0",
     "lodash": "^4.17.21",
     "lucide-react": "^0.475.0",
