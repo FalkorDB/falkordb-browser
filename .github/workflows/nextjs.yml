@@ -81,6 +81,8 @@ jobs:
           push: false
           tags: falkordb/falkordb-browser:test
           load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Run Trivy vulnerability scanner
         id: trivy-scan
