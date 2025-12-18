@@ -44,7 +44,28 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
   
       - name: Build image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: ${{ env.TAGS }}
+          build-args: |
+            CYPHER_VERSION=${{ env.CYPHER_VERSION }}
+          load: true
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: ${{ env.TAGS }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'HIGH,CRITICAL'
+
+      - name: Push image
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
