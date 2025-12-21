@@ -3,11 +3,11 @@
 # Convert CYPHER environment variable to boolean for supervisord
 case "${TEXT_TO_CYPHER:-}" in
     1|true|True|TRUE)
-        export CYPHER="true"
+        export TEXT_TO_CYPHER="true"
         echo "text-to-cypher mode enabled"
         ;;
     *)
-        export CYPHER="false"
+        export TEXT_TO_CYPHER="false"
         echo "text-to-cypher mode disabled"
         ;;
 esac
