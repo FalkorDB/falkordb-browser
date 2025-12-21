@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import authOptions, { getClient } from "../auth/[...nextauth]/options";
+import { User } from "next-auth";
+import { getClient } from "../auth/[...nextauth]/options";
 import { chatRequest, validateBody } from "../validate-body";
 
 const CHAT_URL = process.env.CHAT_URL || "http://localhost:8000/"
@@ -60,17 +60,10 @@ export async function POST(request: NextRequest) {
 
     try {
         // Verify authentication via getClient
-        const clientSession = await getClient()
+        const session = await getClient()
 
-        if (clientSession instanceof NextResponse) {
-            throw new Error(await clientSession.text())
-        }
-
-        // Get session with password from NextAuth
-        const session = await getServerSession(authOptions)
-
-        if (!session?.user) {
-            throw new Error("Not authenticated")
+        if (session instanceof NextResponse) {
+            throw new Error(await session.text())
         }
 
         const body = await request.json()
@@ -81,6 +74,7 @@ export async function POST(request: NextRequest) {
         if (!validation.success) {
             writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(validation.error)}\n\n`))
             writer.close()
+            
             return new Response(readable, {
                 headers: {
                     "Content-Type": "text/event-stream",
@@ -102,7 +96,7 @@ export async function POST(request: NextRequest) {
                 dbConnection = session.user.url;
             } else {
                 // Manual login or JWT - construct from parts
-                const { tls, username: sessionUsername, password, host, port } = session.user;
+                const { tls, username: sessionUsername, password, host, port } = session.user as User;
                 const protocol = tls ? 'falkors' : 'falkor';
                 const username = sessionUsername || 'default';
 
