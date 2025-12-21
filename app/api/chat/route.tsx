@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
     const writer = writable.getWriter()
 
     try {
+        // Get authenticated client (works for both Session and JWT users)
         const session = await getClient()
 
         if (session instanceof NextResponse) {
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
 
         // Validate request body
         const validation = validateBody(chatRequest, body);
-        
+
         if (!validation.success) {
             writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(validation.error)}\n\n`))
             writer.close()
@@ -84,8 +85,21 @@ export async function POST(request: NextRequest) {
         const { messages, graphName, key, model } = validation.data
 
         try {
-            // Get the database connection from the session user
-            const dbConnection = session.user.url || `falkor://${session.user.host}:${session.user.port}`
+            // Build database connection string
+            // falkor[s]://[[username][:password]@][host][:port][/db-number]
+            let dbConnection: string;
+
+            if (session.user.url) {
+                // URL-based login - use directly
+                dbConnection = session.user.url;
+            } else {
+                // Manual login or JWT - construct from parts
+                const protocol = session.user.tls ? 'falkors' : 'falkor';
+                const username = session.user.username || 'default';
+                const password = session.user.password || '';
+                const credentials = password ? `${username}:${password}@` : `${username}@`;
+                dbConnection = `${protocol}://${credentials}${session.user.host}:${session.user.port}`;
+            }
 
             const requestBody: Record<string, unknown> = {
                 "chat_request": {
