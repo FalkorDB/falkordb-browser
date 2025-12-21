@@ -393,7 +393,7 @@ const authOptions: AuthOptions = {
             tls: token.tls as boolean,
             ca: token.ca,
             role: token.role as Role,
-            url: token.url as string,
+            url: token.url as string | undefined,
           },
         };
       }
@@ -465,6 +465,7 @@ export async function getClient() {
         password: user.password,
         tls: String(user.tls),
         ca: user.ca,
+        url: user.url,
       },
       user.id
     );
