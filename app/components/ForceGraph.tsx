@@ -249,13 +249,32 @@ export default function ForceGraph({
         setIsLoading(loading)
     }, [setIsLoading])
 
-    // Update dimensions
+    // Update dimensions with ResizeObserver
     useEffect(() => {
-        if (!canvasRef.current || !parentRef.current || !canvasLoaded) return;
+        if (!canvasRef.current || !parentRef.current || !canvasLoaded) return undefined;
 
-        canvasRef.current.setWidth(parentRef.current.clientWidth);
-        canvasRef.current.setHeight(parentRef.current.clientHeight);
-    }, [parentRef.current?.clientWidth, parentRef.current?.clientHeight, canvasRef, canvasLoaded]);
+        const canvas = canvasRef.current;
+        const parent = parentRef.current;
+
+        // Set initial dimensions
+        canvas.setWidth(parent.clientWidth);
+        canvas.setHeight(parent.clientHeight);
+
+        // Watch for size changes
+        const resizeObserver = new ResizeObserver((entries) => {
+            entries.forEach((entry) => {
+                const { width, height } = entry.contentRect;
+                canvas.setWidth(width);
+                canvas.setHeight(height);
+            });
+        });
+
+        resizeObserver.observe(parent);
+
+        return () => {
+            resizeObserver.disconnect();
+        };
+    }, [canvasRef, canvasLoaded]);
 
     // Update colors
     useEffect(() => {
