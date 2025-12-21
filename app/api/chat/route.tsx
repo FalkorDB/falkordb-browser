@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClient } from "../auth/[...nextauth]/options";
+import { getServerSession } from "next-auth";
+import authOptions, { getClient } from "../auth/[...nextauth]/options";
 import { chatRequest, validateBody } from "../validate-body";
 
 const CHAT_URL = process.env.CHAT_URL || "http://localhost:8000/"
@@ -58,11 +59,18 @@ export async function POST(request: NextRequest) {
     const writer = writable.getWriter()
 
     try {
-        // Get authenticated client (works for both Session and JWT users)
-        const session = await getClient()
+        // Verify authentication via getClient
+        const clientSession = await getClient()
 
-        if (session instanceof NextResponse) {
-            throw new Error(await session.text())
+        if (clientSession instanceof NextResponse) {
+            throw new Error(await clientSession.text())
+        }
+
+        // Get session with password from NextAuth
+        const session = await getServerSession(authOptions)
+
+        if (!session?.user) {
+            throw new Error("Not authenticated")
         }
 
         const body = await request.json()
@@ -94,11 +102,16 @@ export async function POST(request: NextRequest) {
                 dbConnection = session.user.url;
             } else {
                 // Manual login or JWT - construct from parts
-                const protocol = session.user.tls ? 'falkors' : 'falkor';
-                const username = session.user.username || 'default';
-                const password = session.user.password || '';
-                const credentials = password ? `${username}:${password}@` : `${username}@`;
-                dbConnection = `${protocol}://${credentials}${session.user.host}:${session.user.port}`;
+                const { tls, username: sessionUsername, password, host, port } = session.user;
+                const protocol = tls ? 'falkors' : 'falkor';
+                const username = sessionUsername || 'default';
+
+                if (!password) {
+                    throw new Error('Password not available. Chat API is currently only supported for session-based authentication, not JWT tokens.');
+                }
+
+                const credentials = `${username}:${password}@`;
+                dbConnection = `${protocol}://${credentials}${host}:${port}`;
             }
 
             const requestBody: Record<string, unknown> = {

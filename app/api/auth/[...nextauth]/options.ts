@@ -22,7 +22,6 @@ interface CustomJWTPayload {
 interface AuthenticatedUser {
   id: string;
   username?: string;
-  password?: string;
   role: Role;
   host: string;
   port: number;
@@ -193,11 +192,10 @@ function isValidJWTPayload(payload: unknown): payload is CustomJWTPayload {
 /**
  * Creates a user object from JWT payload
  */
-function createUserFromJWTPayload(payload: CustomJWTPayload, password?: string): AuthenticatedUser {
+function createUserFromJWTPayload(payload: CustomJWTPayload): AuthenticatedUser {
   return {
     id: payload.sub,
     username: payload.username,
-    password,
     role: payload.role,
     host: payload.host,
     port: payload.port,
@@ -248,18 +246,14 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
       // Try to reuse existing connection (performance optimization)
       let client = connections.get(payload.sub);
 
-      // Always fetch password for JWT users (needed for chat API)
-      const { getPasswordFromTokenDB } = await import('../tokenUtils');
-      const password = await getPasswordFromTokenDB(payload.jti);
-
       if (client) {
         // Health check: verify connection is still alive
         try {
           const connection = await client.connection;
           await connection.ping();
 
-          // Connection is healthy, reuse it with password included
-          const user = createUserFromJWTPayload(payload, password);
+          // Connection is healthy, reuse it
+          const user = createUserFromJWTPayload(payload);
           return { client, user };
         } catch (pingError) {
           // Connection is dead, remove from pool and recreate
@@ -277,9 +271,13 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
         }
       }
 
-      // No existing connection or health check failed - create new connection
+      // No existing connection or health check failed - fetch password from Token DB and reconnect
       if (!client) {
         try {
+          // Fetch password from Token DB (6380) - NOT from JWT
+          const { getPasswordFromTokenDB } = await import('../tokenUtils');
+          const password = await getPasswordFromTokenDB(payload.jti);
+
           // Create new connection with retrieved password
           const { client: reconnectedClient } = await newClient(
             {
@@ -303,7 +301,7 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
       }
 
       // At this point, client is guaranteed to be defined (either reused or recreated)
-      const user = createUserFromJWTPayload(payload, password);
+      const user = createUserFromJWTPayload(payload);
       return { client, user };
     } catch (error) {
       // Fall back to session auth if JWT fails
