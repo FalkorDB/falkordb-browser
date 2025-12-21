@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Convert CYPHER environment variable to boolean for supervisord
-case "${CYPHER:-}" in
+case "${TEXT_TO_CYPHER:-}" in
     1|true|True|TRUE)
         export CYPHER="true"
         echo "text-to-cypher mode enabled"

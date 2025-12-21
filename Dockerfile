@@ -59,16 +59,17 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 
 # Set the correct permission for prerender cache
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
+RUN mkdir .next && \
+    mkdir -p /text-to-cypher
+RUN chown nextjs:nodejs .next && \
+    chown -R nextjs:nodejs /text-to-cypher
 
 # Automatically leverage output traces to reduce image size
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/.env.local.template ./.env.local
-COPY --from=cypher --chown=nextjs:nodejs /app/text-to-cypher /app/text-to-cypher
-COPY --from=cypher --chown=nextjs:nodejs /app/templates /app/templates
+COPY --from=cypher --chown=nextjs:nodejs /app /text-to-cypher
 
 
 # Create supervisor directories and copy config
@@ -82,7 +83,7 @@ EXPOSE 3000 8080 3001
 ENV PORT=3000
 ENV REST_PORT=8080
 ENV MCP_PORT=3001
-ENV CYPHER=1
+ENV TEXT_TO_CYPHER=1
 ENV HOSTNAME="0.0.0.0"
 
 # Use root to run supervisord (it will drop privileges for individual services)
