@@ -36,7 +36,7 @@ export async function GET() {
 
             // Gracefully handle missing endpoint or server unavailability
             // Return empty object to allow chat to be displayed
-            if (message.includes("fetch failed") || message.includes("404") || message.includes("Not Found")) {
+            if (message.includes("fetch failed") || message.includes("404") || message.includes("Not Found") || message.includes("NOT_FOUND") || message.includes("could not be found")) {
                 return NextResponse.json({}, { status: 200 })
             }
 
