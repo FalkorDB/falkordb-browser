@@ -7,8 +7,6 @@ const nextConfig = {
   images: {
     unoptimized: true
   },
-  // Keep falkordb server-only to avoid bundling BigInt in client/runtime
-  serverExternalPackages: ['falkordb'],
   async headers() {
     return [
       {
@@ -42,6 +40,17 @@ const nextConfig = {
       }
     ];
   },
+  // Turbopack configuration for Next.js 16
+  turbopack: {
+    rules: {
+      // Handle SVG imports as React components (equivalent to @svgr/webpack)
+      '*.svg': {
+        loaders: ['@svgr/webpack'],
+        as: '*.js',
+      },
+    },
+  },
+  // Webpack fallback for development/build with --webpack flag
   webpack(config) {
     // Grab the existing rule that handles SVG imports
     const fileLoaderRule = config.module.rules.find((rule) =>
