@@ -13,9 +13,9 @@ export async function GET() {
     const { client } = session;
 
     try {
+      // result: [module name, module version]
       const result = await (await client.connection).moduleList();
-      console.log(result);
-      
+
       return NextResponse.json({ result: [result[0][1], result[0][3]] }, { status: 200 });
     } catch (error) {
       console.error(error);
