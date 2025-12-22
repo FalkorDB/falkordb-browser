@@ -38,7 +38,7 @@ export async function GET(
       );
     }
 
-    const [name, version] = (await res.json()).result || ["", 0];
+    const [name, version] = (await res.json()).result;
 
     if (name !== "graph" || version < MEMORY_USAGE_VERSION_THRESHOLD) {
       return NextResponse.json(
