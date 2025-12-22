@@ -39,7 +39,7 @@ export async function GET() {
             // Gracefully handle missing endpoint or server unavailability
             // Return empty object to allow chat to be displayed
             if (message.includes("fetch failed") || message.includes("Not Found") || message.includes("NOT_FOUND") || message.includes("could not be found")) {
-                return NextResponse.json({}, { status: 200 })
+                return NextResponse.json({ message }, { status: 200 })
             }
 
             console.error(error)
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
         if (!validation.success) {
             writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(validation.error)}\n\n`))
             writer.close()
-            
+
             return new Response(readable, {
                 headers: {
                     "Content-Type": "text/event-stream",

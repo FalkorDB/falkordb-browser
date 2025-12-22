@@ -457,7 +457,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       if (result.ok) {
         const json = await result.json()
 
-        if (!json.message) setDisplayChat(true)
+        if (json.message) return
+
+        setDisplayChat(true)
+        
         if (!json.model && json.error) {
           setNavigateToSettings(true)
         }
@@ -470,7 +473,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     securedFetch("/api/status", {
       method: "GET",
     }, toast, setIndicator)
-  }, [])
+  }, [toast])
 
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined
