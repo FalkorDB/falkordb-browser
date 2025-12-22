@@ -22,11 +22,6 @@ export async function GET() {
             })
 
             if (!response.ok) {
-                // If endpoint doesn't exist (404), still allow chat but without model info
-                if (response.status === 404) {
-                    return NextResponse.json({}, { status: 200 })
-                }
-
                 throw new Error(await response.text())
             }
 
