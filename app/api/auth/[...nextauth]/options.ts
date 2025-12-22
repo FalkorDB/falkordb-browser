@@ -251,7 +251,7 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
         try {
           const connection = await client.connection;
           await connection.ping();
-          
+
           // Connection is healthy, reuse it
           const user = createUserFromJWTPayload(payload);
           return { client, user };
@@ -260,13 +260,13 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
           // eslint-disable-next-line no-console
           console.warn("Connection health check failed, recreating:", pingError);
           connections.delete(payload.sub);
-          
+
           try {
             await client.close();
           } catch (closeError) {
             // Ignore close errors on dead connections
           }
-          
+
           client = undefined; // Will be recreated below
         }
       }
@@ -277,7 +277,7 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
           // Fetch password from Token DB (6380) - NOT from JWT
           const { getPasswordFromTokenDB } = await import('../tokenUtils');
           const password = await getPasswordFromTokenDB(payload.jti);
-          
+
           // Create new connection with retrieved password
           const { client: reconnectedClient } = await newClient(
             {
@@ -290,7 +290,7 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
             },
             payload.sub
           );
-          
+
           client = reconnectedClient;
           // Connection is already cached in connections Map by newClient()
         } catch (connectionError) {
@@ -370,6 +370,7 @@ const authOptions: AuthOptions = {
           tls: user.tls,
           ca: user.ca,
           role: user.role,
+          url: user.url,
         };
       }
 
@@ -392,6 +393,7 @@ const authOptions: AuthOptions = {
             tls: token.tls as boolean,
             ca: token.ca,
             role: token.role as Role,
+            url: token.url as string | undefined,
           },
         };
       }
@@ -463,6 +465,7 @@ export async function getClient() {
         password: user.password,
         tls: String(user.tls),
         ca: user.ca,
+        url: user.url,
       },
       user.id
     );

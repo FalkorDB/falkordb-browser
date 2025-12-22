@@ -157,28 +157,16 @@ export default function Chat({ onClose }: Props) {
                             ]);
                             break;
 
-                        case "ModelOutputChunk":
-                            setMessages(prev => {
-                                const lastMessage = prev[prev.length - 1]
-
-                                if (lastMessage.role === "assistant" && lastMessage.type === "Result") {
-                                    return [...prev.slice(0, -1), {
-                                        ...lastMessage,
-                                        content: `${lastMessage.content} ${eventData.trim()}`
-                                    }]
-                                }
-
-                                return [...prev, {
-                                    role: "assistant",
-                                    type: "Result",
-                                    content: eventData.trim()
-                                }]
-                            })
-                            break;
-
                         case "Result":
+                            setMessages(prev => [
+                                ...prev,
+                                {
+                                    role: "assistant",
+                                    content: eventData.trim(),
+                                    type: eventType
+                                }
+                            ]);
                             isResult = true
-
                             break;
 
                         case "Error":
