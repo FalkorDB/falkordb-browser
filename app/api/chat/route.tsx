@@ -14,7 +14,7 @@ export async function GET() {
         }
 
         try {
-            const response = await fetch(`${CHAT_URL}/configured-model`, {
+            const response = await fetch(`${CHAT_URL}configured-model`, {
                 method: "GET",
                 headers: {
                     "Content-Type": "application/json",
