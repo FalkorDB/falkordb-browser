@@ -27,32 +27,37 @@ export async function GET(
       return session;
     }
 
-    const res = await getDBVersion();
+    try {
+      const res = await getDBVersion();
 
-    if (!res.ok) {
-      const err = await res.text();
+      if (!res.ok) {
+        const err = await res.text();
 
-      let message;
+        let message;
 
-      try {
-        message = JSON.parse(err).message;
-      } catch {
-        message = err;
+        try {
+          message = JSON.parse(err).message;
+        } catch {
+          message = err;
+        }
+
+        return NextResponse.json(
+          { message: `Failed to retrieve database version: ${message}` },
+          { status: 400 }
+        );
       }
 
-      throw new Error(`Failed to retrieve database version: ${message}`);
-    }
+      const [name, version] = (await res.json()).result;
 
-    const [name, version] = (await res.json()).result;
+      if (name !== "graph" || version < MEMORY_USAGE_VERSION_THRESHOLD) {
+        return NextResponse.json(
+          { message: `Memory usage feature requires graph module version ${MEMORY_USAGE_VERSION_THRESHOLD} or higher. Current version: ${version}` },
+          { status: 400 }
+        );
+      }
 
-    if (name !== "graph" || version < MEMORY_USAGE_VERSION_THRESHOLD) {
-      throw new Error(`Memory usage feature requires graph module version ${MEMORY_USAGE_VERSION_THRESHOLD} or higher. Current version: ${version}`);
-    }
-
-    const { client } = session;
-    const { graph } = await params;
-
-    try {
+      const { client } = session;
+      const { graph } = await params;
       const result = await client.selectGraph(graph).memoryUsage();
 
       return NextResponse.json({ result }, { status: 200 });

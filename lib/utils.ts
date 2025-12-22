@@ -145,14 +145,12 @@ export async function securedFetch(
   const response = await fetch(input, init);
   const { status } = response;
   if (status >= 300) {
-    const err = await response.text();
-
-    let message;
+    let message = await response.text();
 
     try {
-      message = JSON.parse(err).message;
+      message = JSON.parse(message).message;
     } catch {
-      message = err;
+      // message is already text
     }
 
     toast({
@@ -160,6 +158,7 @@ export async function securedFetch(
       description: message,
       variant: "destructive",
     });
+    
     if (status === 401 || status >= 500) {
       setIndicator("offline");
     }
