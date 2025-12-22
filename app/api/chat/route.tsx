@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
                 requestBody.key = key
             }
 
-            const response = await fetch(`${CHAT_URL}api/text_to_cypher`, {
+            const response = await fetch(`${CHAT_URL}text-to-cypher`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
