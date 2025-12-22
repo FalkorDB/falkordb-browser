@@ -830,8 +830,8 @@ export class Graph {
 
   public loadLabelStyle(label: Label): void {
     if (typeof window === "undefined") return;
-    
-    const storageKey = `labelStyle_${this.id}_${label.name}`;
+
+    const storageKey = `labelStyle_${label.name}`;
     const savedStyle = localStorage.getItem(storageKey);
     
     if (savedStyle) {

@@ -38,9 +38,9 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
     );
 
     const saveStyleToStorage = useCallback((labelName: string, style: LabelStyle) => {
-        const storageKey = `labelStyle_${graph.Id}_${labelName}`;
+        const storageKey = `labelStyle_${labelName}`;
         localStorage.setItem(storageKey, JSON.stringify(style));
-    }, [graph.Id]);
+    }, []);
 
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
