@@ -103,21 +103,23 @@ jobs:
           ls -la
           echo "Checking for .next directory..."
           if [ ! -d ".next" ]; then
-            echo "❌ Error: .next directory does not exist"
+            echo "Error: .next directory does not exist"
             exit 1
           fi
           if [ -z "$(ls -A .next 2>/dev/null)" ]; then
-            echo "❌ Error: .next directory is empty"
+            echo "Error: .next directory is empty"
             exit 1
           fi
-          echo "✅ Build output verified successfully"
+          echo "Build output verified successfully"
           echo "Contents of .next directory:"
           ls -la .next/ | head -20
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: build-output
-          path: .next
+          path: |
+            .next/**
+            !.next/cache/**
           retention-days: 1
           if-no-files-found: error
 
