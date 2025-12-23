@@ -814,7 +814,7 @@ export class Graph {
         };
 
         // Load saved style from localStorage
-        this.loadLabelStyle(c);
+        Graph.loadLabelStyle(c);
 
         this.labelsMap.set(c.name, c);
         this.labels.push(c);
@@ -828,7 +828,7 @@ export class Graph {
     });
   }
 
-  public loadLabelStyle(label: Label): void {
+  public static loadLabelStyle(label: Label): void {
     if (typeof window === "undefined") return;
 
     const storageKey = `labelStyle_${label.name}`;
