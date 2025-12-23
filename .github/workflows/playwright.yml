@@ -99,6 +99,7 @@ jobs:
       - name: Verify build output
         run: |
           pwd
+          echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
           echo "Current directory:"
           ls -la
           echo "Checking for .next directory..."
@@ -112,16 +113,15 @@ jobs:
           fi
           echo "Build output verified successfully"
           echo "Contents of .next directory:"
-          ls -la .next/ | head -20
+          ls -la .next/
+          echo "Full path to .next:"
+          realpath .next
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: build-output
-          path: |
-            .next/**
-            !.next/cache/**
+          path: ${{ github.workspace }}/.next/
           retention-days: 1
-          if-no-files-found: error
 
   test-part-1:
     name: Run tests part 1 (except settings)
