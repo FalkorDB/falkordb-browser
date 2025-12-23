@@ -21,7 +21,7 @@ export async function GET() {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: (error as Error).message.includes("NOPERM") ? 200 : 400 }
+        { status: 400 }
       );
     }
   } catch (err) {
