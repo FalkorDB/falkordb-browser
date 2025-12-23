@@ -71,14 +71,6 @@ jobs:
           done
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium firefox
-      - name: Build application
-        run: npm run build
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-output
-          path: .next/
-          retention-days: 1
 
   test-part-1:
     name: Run tests part 1 (except settings)
@@ -107,11 +99,8 @@ jobs:
             ~/.cache/ms-playwright
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
           fail-on-cache-miss: true
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-output
-          path: .next/
+      - name: Build application
+        run: npm run build
       - name: Run Playwright tests (shard 1 of 2)
         run: |
           export CHAT_URL="http://localhost:8080/"
@@ -171,11 +160,8 @@ jobs:
             ~/.cache/ms-playwright
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
           fail-on-cache-miss: true
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-output
-          path: .next/
+      - name: Build application
+        run: npm run build
       - name: Run Playwright tests (shard 2 of 2)
         run: |
           export CHAT_URL="http://localhost:8080/"
@@ -239,11 +225,8 @@ jobs:
             ~/.cache/ms-playwright
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
           fail-on-cache-miss: true
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-output
-          path: .next/
+      - name: Build application
+        run: npm run build
       - name: Run token tests
         env:
           NEXTAUTH_SECRET: SECRET
@@ -309,11 +292,8 @@ jobs:
             ~/.cache/ms-playwright
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
           fail-on-cache-miss: true
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-output
-          path: .next/
+      - name: Build application
+        run: npm run build
       - name: Run only config test
         run: |
           export CHAT_URL="http://localhost:8080/"
@@ -371,11 +351,8 @@ jobs:
             ~/.cache/ms-playwright
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
           fail-on-cache-miss: true
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-output
-          path: .next/
+      - name: Build application
+        run: npm run build
       - name: Setup TLS certificates
         run: |
           mkdir -p tls
@@ -504,11 +481,8 @@ jobs:
             ~/.cache/ms-playwright
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
           fail-on-cache-miss: true
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-output
-          path: .next/
+      - name: Build application
+        run: npm run build
       - name: Start FalkorDB cluster nodes
         run: |
           echo "Starting 3 FalkorDB cluster nodes..."
