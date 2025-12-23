@@ -6,7 +6,7 @@
 
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
-import { securedFetch, GraphRef, handleZoomToFit, getTheme, Tab, ViewportState, getNodeDisplayText } from "@/lib/utils"
+import { securedFetch, GraphRef, handleZoomToFit, getTheme, Tab, ViewportState, getNodeDisplayText, getContrastTextColor } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
 import { useTheme } from "next-themes"
@@ -483,7 +483,8 @@ export default function ForceGraph({
                     ctx.strokeStyle = foreground;
                     ctx.stroke();
 
-                    ctx.fillStyle = 'black';
+                    // Set text color based on node background color for better contrast
+                    ctx.fillStyle = getContrastTextColor(node.color);
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.font = `400 2px SofiaSans`;

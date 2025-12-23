@@ -128,22 +128,30 @@ export const DEFAULT_COLORS = [
 
 // Color palette for node customization
 export const STYLE_COLORS = [
-  "#FDE047", // Yellow
-  "#C084FC", // Purple
-  "#FB923C", // Orange
-  "#67E8F9", // Cyan
+  // Reds & Pinks
   "#FB7185", // Rose
-  "#FDE68A", // Light Yellow
-  "#86EFAC", // Green
-  "#E9D5FF", // Light Purple
-  "#60A5FA", // Blue
-  "#FBBF24", // Amber
   "#F472B6", // Pink
+  // Oranges & Ambers
+  "#FB923C", // Orange
+  "#FBBF24", // Amber
+  // Yellows
+  "#FDE047", // Yellow
+  "#FDE68A", // Light Yellow
+  // Greens
+  "#86EFAC", // Green
   "#6EE7B7", // Emerald
+  // Cyans & Teals
+  "#67E8F9", // Cyan
+  "#14B8A6", // Teal
+  // Blues
+  "#60A5FA", // Blue
+  "#818CF8", // Indigo
+  // Purples
+  "#C084FC", // Purple
+  "#E9D5FF", // Light Purple
+  // Grays
   "#A3A3A3", // Gray
   "#E5E5E5", // Light Gray
-  "#818CF8", // Indigo
-  "#14B8A6", // Teal
 ];
 
 // Size options for node customization (relative to base NODE_SIZE)

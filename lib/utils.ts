@@ -17,6 +17,28 @@ export const screenSize = {
   "2xl": 1536,
 };
 
+/**
+ * Calculates the appropriate text color (black or white) based on background color brightness
+ * Uses the relative luminance formula from WCAG guidelines
+ * @param bgColor Background color in hex format (e.g., "#ff5733")
+ * @returns "white" for dark backgrounds, "black" for light backgrounds
+ */
+export const getContrastTextColor = (bgColor: string): string => {
+  // Remove # if present
+  const hex = bgColor.replace('#', '');
+
+  // Convert to RGB
+  const r = parseInt(hex.substring(0, 2), 16) / 255;
+  const g = parseInt(hex.substring(2, 4), 16) / 255;
+  const b = parseInt(hex.substring(4, 6), 16) / 255;
+
+  // Calculate relative luminance
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+  // Return white for dark backgrounds, black for light backgrounds
+  return luminance > 0.5 ? 'black' : 'white';
+};
+
 export type GraphRef = MutableRefObject<
   ForceGraphMethods<Node, Link> | undefined
 >;

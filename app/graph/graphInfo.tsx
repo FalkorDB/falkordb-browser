@@ -1,7 +1,7 @@
 import { useContext, useState } from "react";
 import { Loader2, X, Palette } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
+import { cn, getContrastTextColor } from "@/lib/utils";
 import Button from "../components/ui/Button";
 import { BrowserSettingsContext, GraphContext, QueryLoadingContext } from "../components/provider";
 import { Label } from "../api/graph/model";
@@ -97,11 +97,15 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                         const label = graph.LabelsMap.get(infoLabel.name);
                         if (!label) return null;
                         
+                        const labelColor = label.style?.customColor || label.color;
                         return (
-                            <li key={`${label.name}-${label.style?.customColor || label.color}`} className="max-w-full flex gap-1">
+                            <li key={`${label.name}-${labelColor}`} className="max-w-full flex gap-1">
                                 <Button
-                                    style={{ backgroundColor: label.style?.customColor || label.color }}
-                                    className="h-6 w-full p-2 rounded-full flex justify-center items-center text-black SofiaSans"
+                                    style={{
+                                        backgroundColor: labelColor,
+                                        color: getContrastTextColor(labelColor)
+                                    }}
+                                    className="h-6 w-full p-2 rounded-full flex justify-center items-center SofiaSans"
                                     data-testid={`graphInfo${label.name}Node`}
                                     label={label.name}
                                     onClick={() => runQuery(`MATCH (n:${label.name}) RETURN n`)}
@@ -163,8 +167,11 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                     {Array.from(Relationships.values()).map(({ name, color }) => (
                         <li key={name} className="max-w-full">
                             <Button
-                                style={{ backgroundColor: color }}
-                                className="h-6 w-full p-2 rounded-full flex justify-center items-center text-black SofiaSans"
+                                style={{
+                                    backgroundColor: color,
+                                    color: getContrastTextColor(color)
+                                }}
+                                className="h-6 w-full p-2 rounded-full flex justify-center items-center SofiaSans"
                                 data-testid={`graphInfo${name}Edge`}
                                 label={name}
                                 onClick={() => runQuery(`MATCH p=()-[:${name}]-() RETURN p`)}
