@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { User } from "next-auth";
 import { getClient } from "../auth/[...nextauth]/options";
 import { chatRequest, validateBody } from "../validate-body";
 
@@ -14,7 +13,7 @@ export async function GET() {
         }
 
         try {
-            const response = await fetch(`${CHAT_URL}api/configured-model`, {
+            const response = await fetch(`${CHAT_URL}configured-model`, {
                 method: "GET",
                 headers: {
                     "Content-Type": "application/json",
@@ -83,35 +82,10 @@ export async function POST(request: NextRequest) {
         const { messages, graphName, key, model } = validation.data
 
         try {
-            // Build database connection string
-            // falkor[s]://[[username][:password]@][host][:port][/db-number]
-            let dbConnection: string;
-
-            if (session.user.url) {
-                // URL-based login - use directly
-                dbConnection = session.user.url;
-            } else {
-                // Manual login or JWT - construct from parts
-                const { tls, username: sessionUsername, password, host, port } = session.user as User;
-                const protocol = tls ? 'falkors' : 'falkor';
-                const username = sessionUsername || 'default';
-
-                if (!password) {
-                    throw new Error('Password not available. Chat API is currently only supported for session-based authentication, not JWT tokens.');
-                }
-
-                const credentials = `${username}:${password}@`;
-                dbConnection = `${protocol}://${credentials}${host}:${port}`;
-            }
-
             const requestBody: Record<string, unknown> = {
-                "chat_request": {
-                    messages,
-                },
+                chat_request: { messages },
                 "graph_name": graphName,
-                "model": model || "gpt-4o-mini", // Default model if not provided
-                "falkordb_connection": dbConnection, // Send database connection for full execution
-                "stream": true // Enable streaming for real-time progress updates
+                "model": model || "gpt-4o-mini",
             }
 
             // Only add key if provided
@@ -119,7 +93,7 @@ export async function POST(request: NextRequest) {
                 requestBody.key = key
             }
 
-            const response = await fetch(`${CHAT_URL}api/text_to_cypher`, {
+            const response = await fetch(`${CHAT_URL}text_to_cypher`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
