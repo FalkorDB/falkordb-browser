@@ -73,62 +73,9 @@ jobs:
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium firefox
 
-  build:
-    name: Build application
-    needs: setup-dependencies
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
-          cache: 'npm'
-      - name: Restore dependencies cache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/.npm
-            node_modules
-            ~/.cache/ms-playwright
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
-          restore-keys: |
-            ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
-            ${{ runner.os }}-node-
-      - name: Build application
-        run: npm run build
-      - name: Verify build output
-        run: |
-          pwd
-          echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
-          echo "Current directory:"
-          ls -la
-          echo "Checking for .next directory..."
-          if [ ! -d ".next" ]; then
-            echo "Error: .next directory does not exist"
-            exit 1
-          fi
-          if [ -z "$(ls -A .next 2>/dev/null)" ]; then
-            echo "Error: .next directory is empty"
-            exit 1
-          fi
-          echo "Build output verified successfully"
-          echo "Contents of .next directory:"
-          ls -la .next/
-          echo "Full path to .next:"
-          realpath .next
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-output
-          path: |
-            .next/**
-            !.next/cache/**
-          retention-days: 1
-          if-no-files-found: error
-
   test-part-1:
     name: Run tests part 1 (except settings)
-    needs: [setup-dependencies, build]
+    needs: setup-dependencies
     timeout-minutes: 60
     runs-on: ubuntu-latest
 
@@ -155,24 +102,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
             ${{ runner.os }}-node-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-output
-          path: .next/
-      - name: Verify downloaded artifacts
-        run: |
-          echo "Checking downloaded build artifacts..."
-          if [ ! -d ".next" ]; then
-            echo "❌ Error: .next directory does not exist after download"
-            exit 1
-          fi
-          if [ -z "$(ls -A .next 2>/dev/null)" ]; then
-            echo "❌ Error: .next directory is empty after download"
-            exit 1
-          fi
-          echo "✅ Build artifacts verified"
-          ls -la .next/ | head -10
+      - name: Build application
+        run: npm run build
       - name: Run Playwright tests (shard 1 of 3)
         run: |
           export CHAT_URL="http://localhost:8080/"
@@ -208,7 +139,7 @@ jobs:
 
   test-part-2:
     name: Run tests part 2 (except settings)
-    needs: [setup-dependencies, build]
+    needs: setup-dependencies
     timeout-minutes: 60
     runs-on: ubuntu-latest
 
@@ -235,11 +166,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
             ${{ runner.os }}-node-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-output
-          path: .next/
+      - name: Build application
+        run: npm run build
       - name: Run Playwright tests (shard 2 of 3)
         run: |
           export CHAT_URL="http://localhost:8080/"
@@ -275,7 +203,7 @@ jobs:
 
   test-part-3:
     name: Run tests part 3 (except settings)
-    needs: [setup-dependencies, build]
+    needs: setup-dependencies
     timeout-minutes: 60
     runs-on: ubuntu-latest
 
@@ -302,11 +230,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
             ${{ runner.os }}-node-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-output
-          path: .next/
+      - name: Build application
+        run: npm run build
       - name: Run Playwright tests (shard 3 of 3)
         run: |
           export CHAT_URL="http://localhost:8080/"
@@ -342,7 +267,7 @@ jobs:
 
   run-token-tests:
     name: Run token tests
-    needs: [setup-dependencies, build]
+    needs: setup-dependencies
     timeout-minutes: 60
     runs-on: ubuntu-latest
 
@@ -373,11 +298,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
             ${{ runner.os }}-node-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-output
-          path: .next/
+      - name: Build application
+        run: npm run build
       - name: Run token tests
         env:
           NEXTAUTH_SECRET: SECRET
@@ -419,7 +341,7 @@ jobs:
 
   run-settings-tests:
     name: Run settings tests
-    needs: [setup-dependencies, build]
+    needs: setup-dependencies
     runs-on: ubuntu-latest
 
     services:
@@ -445,11 +367,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
             ${{ runner.os }}-node-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-output
-          path: .next/
+      - name: Build application
+        run: npm run build
       - name: Run only config test
         run: |
           export CHAT_URL="http://localhost:8080/"
@@ -489,7 +408,7 @@ jobs:
 
   run-tls-tests:
     name: Run TLS tests
-    needs: [setup-dependencies, build]
+    needs: setup-dependencies
     timeout-minutes: 60
     runs-on: ubuntu-latest
 
@@ -510,11 +429,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
             ${{ runner.os }}-node-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-output
-          path: .next/
+      - name: Build application
+        run: npm run build
       - name: Setup TLS certificates
         run: |
           mkdir -p tls
@@ -625,7 +541,7 @@ jobs:
 
   run-cluster-tests:
     name: Run cluster tests
-    needs: [setup-dependencies, build]
+    needs: setup-dependencies
     timeout-minutes: 60
     runs-on: ubuntu-latest
 
@@ -646,11 +562,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
             ${{ runner.os }}-node-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-output
-          path: .next/
+      - name: Build application
+        run: npm run build
       - name: Start FalkorDB cluster nodes
         run: |
           echo "Starting 3 FalkorDB cluster nodes..."
