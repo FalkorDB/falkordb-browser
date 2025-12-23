@@ -120,8 +120,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-output
-          path: .next
+          path: |
+            .next/**
+            !.next/cache/**
           retention-days: 1
+          if-no-files-found: error
 
   test-part-1:
     name: Run tests part 1 (except settings)
