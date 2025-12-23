@@ -57,10 +57,14 @@ jobs:
             CYPHER_VERSION=${{ env.CYPHER_VERSION }}
           load: true
 
+      - name: Extract Trivy tag
+        run: |
+          echo "TRIVY_TAG=$(echo '${{ env.TAGS }}' | cut -d',' -f1)" >> $GITHUB_ENV
+
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@22438a435773de8c97dc0958cc0b823c45b064ac
+        uses: aquasecurity/trivy-action@0.33.1
         with:
-          image-ref: ${{ env.TAGS }}
+          image-ref: ${{ env.TRIVY_TAG }}
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true
