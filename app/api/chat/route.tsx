@@ -29,11 +29,13 @@ export async function GET() {
             return NextResponse.json(data)
         } catch (error) {
             const { message } = (error as Error)
-            
-            if (message.includes("fetch failed")) {
-                return NextResponse.json({ message: "Server is not available" }, { status: 200 })
+
+            // Gracefully handle missing endpoint or server unavailability
+            // Return empty object to allow chat to be displayed
+            if (message.includes("fetch failed") || message.includes("Not Found") || message.includes("NOT_FOUND") || message.includes("could not be found")) {
+                return NextResponse.json({ message }, { status: 200 })
             }
-            
+
             console.error(error)
             return NextResponse.json({ error: message }, { status: 400 })
         }
@@ -52,6 +54,7 @@ export async function POST(request: NextRequest) {
     const writer = writable.getWriter()
 
     try {
+        // Verify authentication via getClient
         const session = await getClient()
 
         if (session instanceof NextResponse) {
@@ -62,10 +65,11 @@ export async function POST(request: NextRequest) {
 
         // Validate request body
         const validation = validateBody(chatRequest, body);
-        
+
         if (!validation.success) {
             writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(validation.error)}\n\n`))
             writer.close()
+
             return new Response(readable, {
                 headers: {
                     "Content-Type": "text/event-stream",
@@ -78,14 +82,15 @@ export async function POST(request: NextRequest) {
         const { messages, graphName, key, model } = validation.data
 
         try {
-
-            const requestBody = {
-                "chat_request": {
-                    messages,
-                },
+            const requestBody: Record<string, unknown> = {
+                chat_request: { messages },
                 "graph_name": graphName,
-                key,
-                model,
+                "model": model || "gpt-4o-mini",
+            }
+
+            // Only add key if provided
+            if (key) {
+                requestBody.key = key
             }
 
             const response = await fetch(`${CHAT_URL}text_to_cypher`, {
@@ -100,6 +105,7 @@ export async function POST(request: NextRequest) {
                 throw new Error(`Error: ${await response.text()}`);
             }
 
+            // Handle streaming SSE response from text-to-cypher
             const reader = response.body?.getReader();
             const decoder = new TextDecoder();
 
@@ -107,31 +113,39 @@ export async function POST(request: NextRequest) {
                 if (!reader) return;
 
                 const { done, value } = await reader.read();
-                if (done) return;
+                if (done) {
+                    writer.close();
+                    return;
+                }
 
                 const chunk = decoder.decode(value, { stream: true });
-
                 const lines = chunk.split('\n').filter(line => line);
-                let isResult = false
-
+                let isResult = false;
 
                 lines.forEach(line => {
-                    const data = JSON.parse(line.split("data:")[1])
-                    const type: EventType = Object.keys(data)[0] as EventType
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6)); // Remove 'data: ' prefix
+                            const type: EventType = Object.keys(data)[0] as EventType
 
-                    isResult = type === "Result" || type === "Error"
+                            isResult = type === "Result" || type === "Error"
 
-                    writer.write(encoder.encode(`event: ${type} data: ${data[type]}\n\n`))
-                })
+                            writer.write(encoder.encode(`event: ${type} data: ${data[type]}\n\n`))
+                        } catch (parseError) {
+                            console.error("Failed to parse SSE data:", line, parseError)
+                        }
+                    }
+                });
 
+                // Continue processing the stream unless we received Result or Error
                 if (!isResult) {
-                    processStream();
+                    await processStream();
                 } else {
                     writer.close();
                 }
             };
 
-            processStream()
+            await processStream();
         } catch (error) {
             console.error(error)
             writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify((error as Error).message)}\n\n`))

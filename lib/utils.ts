@@ -64,13 +64,13 @@ export type Message = {
   role: "user" | "assistant";
   content: string;
   type:
-    | "Text"
-    | "Result"
-    | "Error"
-    | "Status"
-    | "CypherQuery"
-    | "CypherResult"
-    | "Schema";
+  | "Text"
+  | "Result"
+  | "Error"
+  | "Status"
+  | "CypherQuery"
+  | "CypherResult"
+  | "Schema";
 };
 
 export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell | LazyCell;
@@ -145,12 +145,20 @@ export async function securedFetch(
   const response = await fetch(input, init);
   const { status } = response;
   if (status >= 300) {
-    const err = await response.text();
+    let message = await response.text();
+
+    try {
+      message = JSON.parse(message).message;
+    } catch {
+      // message is already text
+    }
+
     toast({
       title: "Error",
-      description: err,
+      description: message,
       variant: "destructive",
     });
+    
     if (status === 401 || status >= 500) {
       setIndicator("offline");
     }
@@ -334,30 +342,30 @@ export const getNodeDisplayText = (node: Node, displayTextPriority: TextPriority
   const { data: nodeData } = node;
 
   const displayText = displayTextPriority.find(({ name, ignore }) => {
-      const key = ignore
-          ? Object.keys(nodeData).find(
-              (k) => k.toLowerCase() === name.toLowerCase()
-          )
-          : name;
+    const key = ignore
+      ? Object.keys(nodeData).find(
+        (k) => k.toLowerCase() === name.toLowerCase()
+      )
+      : name;
 
-      return (
-          key &&
-          nodeData[key] &&
-          typeof nodeData[key] === "string" &&
-          nodeData[key].trim().length > 0
-      );
+    return (
+      key &&
+      nodeData[key] &&
+      typeof nodeData[key] === "string" &&
+      nodeData[key].trim().length > 0
+    );
   });
 
   if (displayText) {
-      const key = displayText.ignore
-          ? Object.keys(nodeData).find(
-              (k) => k.toLowerCase() === displayText.name.toLowerCase()
-          )
-          : displayText.name;
+    const key = displayText.ignore
+      ? Object.keys(nodeData).find(
+        (k) => k.toLowerCase() === displayText.name.toLowerCase()
+      )
+      : displayText.name;
 
-      if (key) {
-          return String(nodeData[key]);
-      }
+    if (key) {
+      return String(nodeData[key]);
+    }
   }
 
   return String(node.id);

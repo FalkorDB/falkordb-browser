@@ -13,7 +13,7 @@ import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Combobox from "../components/ui/combobox";
 
-const MODELS = ["gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-4.1"]
+const MODELS = ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"]
 
 export default function BrowserSettings() {
     const {
