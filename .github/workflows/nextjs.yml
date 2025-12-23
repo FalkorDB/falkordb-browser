@@ -86,7 +86,7 @@ jobs:
 
       - name: Run Trivy vulnerability scanner
         id: trivy-scan
-        uses: aquasecurity/trivy-action@22438a4
+        uses: aquasecurity/trivy-action@22438a435773de8c97dc0958cc0b823c45b064ac
         continue-on-error: true
         with:
           image-ref: 'falkordb/falkordb-browser:test'
@@ -105,7 +105,7 @@ jobs:
 
       - name: Generate Trivy report for PR
         if: github.event_name == 'pull_request'
-        uses: aquasecurity/trivy-action@22438a4
+        uses: aquasecurity/trivy-action@22438a435773de8c97dc0958cc0b823c45b064ac
         continue-on-error: true
         with:
           image-ref: 'falkordb/falkordb-browser:test'
