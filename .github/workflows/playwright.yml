@@ -1,6 +1,7 @@
 name: Playwright Tests
 permissions:
   contents: read
+  actions: read
 on:
   push:
     branches: [ main, staging ]
@@ -95,12 +96,26 @@ jobs:
             ${{ runner.os }}-node-
       - name: Build application
         run: npm run build
+      - name: Verify build output
+        run: |
+          if [ ! -d ".next" ]; then
+            echo "Error: .next directory does not exist"
+            exit 1
+          fi
+          if [ -z "$(ls -A .next 2>/dev/null)" ]; then
+            echo "Error: .next directory is empty"
+            exit 1
+          fi
+          echo "Build output verified successfully"
+          echo "Build artifacts:"
+          ls -la .next/ | head -20
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: build-output
           path: .next/
           retention-days: 1
+          if-no-files-found: error
 
   test-part-1:
     name: Run tests part 1 (except settings)
@@ -136,6 +151,19 @@ jobs:
         with:
           name: build-output
           path: .next/
+      - name: Verify downloaded artifacts
+        run: |
+          echo "Checking downloaded build artifacts..."
+          if [ ! -d ".next" ]; then
+            echo "❌ Error: .next directory does not exist after download"
+            exit 1
+          fi
+          if [ -z "$(ls -A .next 2>/dev/null)" ]; then
+            echo "❌ Error: .next directory is empty after download"
+            exit 1
+          fi
+          echo "✅ Build artifacts verified"
+          ls -la .next/ | head -10
       - name: Run Playwright tests (shard 1 of 3)
         run: |
           export CHAT_URL="http://localhost:8080/"
