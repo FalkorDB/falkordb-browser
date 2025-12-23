@@ -47,6 +47,26 @@ export default class CustomizeStylePage extends GraphInfoPage {
     return this.page.locator('button[title="Close"]').first();
   }
 
+  private get saveStyleButton(): Locator {
+    return this.page.getByTestId("saveStyleChanges");
+  }
+
+  private get cancelStyleButton(): Locator {
+    return this.page.getByTestId("cancelStyleChanges");
+  }
+
+  private get rgbPickerButton(): Locator {
+    return this.page.getByTestId("rgbColorPickerButton");
+  }
+
+  private get rgbColorInput(): Locator {
+    return this.page.getByTestId("rgbColorInput");
+  }
+
+  private get rgbColorHexInput(): Locator {
+    return this.page.getByTestId("rgbColorHexInput");
+  }
+
   async isCustomizeStyleButtonVisible(label: string): Promise<boolean> {
     return waitForElementToBeVisible(this.customizeStyleButton(label));
   }
@@ -188,5 +208,52 @@ export default class CustomizeStylePage extends GraphInfoPage {
     // displayName is a tuple [line1, line2]
     const [line1, line2] = node.displayName || ["", ""];
     return [line1, line2].filter(Boolean).join(" ");
+  }
+
+  async clickSaveStyleButton(): Promise<void> {
+    await interactWhenVisible(
+      this.saveStyleButton,
+      (el) => el.click(),
+      "Save Style Button"
+    );
+  }
+
+  async clickCancelStyleButton(): Promise<void> {
+    await interactWhenVisible(
+      this.cancelStyleButton,
+      (el) => el.click(),
+      "Cancel Style Button"
+    );
+  }
+
+  async isSaveButtonVisible(): Promise<boolean> {
+    return waitForElementToBeVisible(this.saveStyleButton);
+  }
+
+  async clickRgbPickerButton(): Promise<void> {
+    await interactWhenVisible(
+      this.rgbPickerButton,
+      (el) => el.click(),
+      "RGB Picker Button"
+    );
+  }
+
+  async setRgbColorHexInput(hexColor: string): Promise<void> {
+    await interactWhenVisible(
+      this.rgbColorHexInput,
+      async (el) => {
+        await el.clear();
+        await el.fill(hexColor);
+      },
+      "RGB Hex Input"
+    );
+  }
+
+  async getRgbColorHexInputValue(): Promise<string> {
+    return this.rgbColorHexInput.inputValue();
+  }
+
+  async isRgbPickerPanelVisible(): Promise<boolean> {
+    return this.rgbColorInput.isVisible();
   }
 }
