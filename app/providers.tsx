@@ -654,13 +654,18 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                               defaultSize={panelSize}
                               collapsible
                               minSize={15}
-                              maxSize={30}
+                              maxSize={50}
                               onCollapse={() => setIsCollapsed(true)}
                               onExpand={() => setIsCollapsed(false)}
                               data-testid="graphInfoPanel"
                             >
                               <GraphInfoPanel
                                 onClose={onExpand}
+                                onCustomizeModeChange={(isCustomizing) => {
+                                  if (isCustomizing && panelRef.current) {
+                                    panelRef.current.resize(20);
+                                  }
+                                }}
                               />
                             </ResizablePanel>
                             <ResizableHandle withHandle onMouseUp={() => isCollapsed && onExpand()} className={cn("w-0", isCollapsed && "hidden")} />

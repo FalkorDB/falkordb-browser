@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useState, useEffect } from "react";
 import { Loader2, X, Palette } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn, getContrastTextColor } from "@/lib/utils";
@@ -11,10 +11,15 @@ import CustomizeStylePanel from "./CustomizeStylePanel";
  * Render a side panel showing graph metadata and interactive controls to run representative queries.
  *
  * @param onClose - Callback invoked when the panel's close button is clicked
+ * @param onCustomizeModeChange - Callback invoked when customize mode changes
  * @returns The Graph Info panel React element containing graph name, memory usage, node/edge counts, property keys, and query buttons
  */
-export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
+export default function GraphInfoPanel({ onClose, onCustomizeModeChange }: { onClose: () => void; onCustomizeModeChange?: (isCustomizing: boolean) => void }) {
     const [customizingLabel, setCustomizingLabel] = useState<Label | null>(null);
+
+    useEffect(() => {
+        onCustomizeModeChange?.(customizingLabel !== null);
+    }, [customizingLabel, onCustomizeModeChange]);
     const { graph, graphInfo: { Labels, Relationships, PropertyKeys, MemoryUsage }, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext)
     const { settings: { graphInfo: { showMemoryUsage } } } = useContext(BrowserSettingsContext)
