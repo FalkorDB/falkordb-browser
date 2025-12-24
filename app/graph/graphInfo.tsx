@@ -164,21 +164,29 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                             disabled={isQueryLoading}
                         />
                     </li>
-                    {Array.from(Relationships.values()).map(({ name, color }) => (
-                        <li key={name} className="max-w-full">
-                            <Button
-                                style={{
-                                    backgroundColor: color,
-                                    color: getContrastTextColor(color)
-                                }}
-                                className="h-6 w-full p-2 rounded-full flex justify-center items-center SofiaSans"
-                                data-testid={`graphInfo${name}Edge`}
-                                label={name}
-                                onClick={() => runQuery(`MATCH p=()-[:${name}]-() RETURN p`)}
-                                disabled={isQueryLoading}
-                            />
-                        </li>
-                    ))}
+                    {Array.from(Relationships.values()).map((infoRelationship) => {
+                        // Get the full Relationship object from the graph
+                        const relationship = graph.RelationshipsMap.get(infoRelationship.name);
+                        if (!relationship) return null;
+                        
+                        const relationshipColor = relationship.color;
+                        const textColor = getContrastTextColor(relationshipColor);
+                        return (
+                            <li key={infoRelationship.name} className="max-w-full">
+                                <Button
+                                    style={{
+                                        backgroundColor: relationshipColor,
+                                        color: textColor
+                                    }}
+                                    className="h-6 w-full p-2 rounded-full flex justify-center items-center SofiaSans"
+                                    data-testid={`graphInfo${infoRelationship.name}Edge`}
+                                    label={infoRelationship.name}
+                                    onClick={() => runQuery(`MATCH p=()-[:${infoRelationship.name}]-() RETURN p`)}
+                                    disabled={isQueryLoading}
+                                />
+                            </li>
+                        );
+                    })}
                 </ul>
             </div>
             <div className="flex flex-col gap-2 overflow-hidden">
