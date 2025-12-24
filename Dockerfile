@@ -45,6 +45,10 @@ WORKDIR /app
 # Install supervisor
 RUN apk add --no-cache supervisor
 
+# Remove npm to reduce attack surface (Next.js standalone doesn't need it)
+RUN npm cache clean --force && \
+    rm -rf /usr/local/lib/node_modules/npm
+
 ENV NODE_ENV production
 # Uncomment the following line in case you want to disable telemetry during runtime.
 # ENV NEXT_TELEMETRY_DISABLED 1

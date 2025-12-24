@@ -178,7 +178,6 @@ export default function Chat({ onClose }: Props) {
 
                         case "Result":
                             isResult = true
-
                             break;
 
                         case "Error":

@@ -13,13 +13,15 @@ export async function GET() {
     const { client } = session;
 
     try {
+      // result: [module name, module version]
       const result = await (await client.connection).moduleList();
-      return NextResponse.json({ result: [result[1][1], result[1][3]] }, { status: 200 });
+
+      return NextResponse.json({ result: [result[0][1], result[0][3]] }, { status: 200 });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: (error as Error).message.includes("NOPERM") ? 200 : 400 }
+        { status: 400 }
       );
     }
   } catch (err) {
