@@ -230,15 +230,17 @@ test.describe("Customize Style Tests", () => {
     await graph.selectColorByIndex(newColorIndex);
     await graph.selectSizeByIndex(newSizeIndex);
 
-    // Get the selected values
+    // Get the selected color
     const selectedColor = await graph.getLabelButtonColor("person1");
-    const selectedStyle = await graph.getLabelStyleFromLocalStorage("person1");
 
     // Verify Save button is visible
     expect(await graph.isSaveButtonVisible()).toBeTruthy();
 
     // Click Save to persist changes
     await graph.clickSaveStyleButton();
+
+    // Get the saved style from localStorage after saving
+    const selectedStyle = await graph.getLabelStyleFromLocalStorage("person1");
 
     // Close panel
     await graph.closePanelWithEscape();
@@ -372,5 +374,68 @@ test.describe("Customize Style Tests", () => {
     expect(styleAfterRefresh?.customCaption).toBe(originalStyle?.customCaption);
 
     await apiCall.removeGraph(graphName);
+  });
+
+  test(`@readwrite Validate label styles are independent across different graphs`, async () => {
+    const graphName1 = getRandomString("graph");
+    const graphName2 = getRandomString("graph");
+
+    // Create two graphs
+    await apiCall.addGraph(graphName1);
+    await apiCall.addGraph(graphName2);
+
+    const graph = await browser.createNewPage(CustomizeStylePage, urls.graphUrl);
+    await browser.setPageToFullScreen();
+
+    // Setup first graph with the same query
+    await graph.selectGraphByName(graphName1);
+    await graph.insertQuery(CREATE_QUERY);
+    await graph.clickRunQuery();
+    await graph.openGraphInfoButton();
+
+    // Customize person1 label in first graph
+    await graph.clickCustomizeStyleButton("person1");
+
+    const initialColorIndex = await graph.getSelectedColorButtonIndex();
+    const initialSizeIndex = await graph.getSelectedSizeButtonIndex();
+
+    const newColorIndex = initialColorIndex === 0 ? 2 : 0;
+    const newSizeIndex = initialSizeIndex === 3 ? 5 : 3;
+
+    await graph.selectColorByIndex(newColorIndex);
+    await graph.selectSizeByIndex(newSizeIndex);
+
+    // Save changes for graph1
+    await graph.clickSaveStyleButton();
+
+    // Get the customized style from graph1
+    const graph1Color = await graph.getLabelButtonColor("person1");
+    const graph1Style = await graph.getLabelStyleFromLocalStorage("person1");
+
+    // Close panel
+    await graph.closePanelWithEscape();
+
+    // Refresh page to clear state before switching graphs
+    await graph.refreshPage();
+    await graph.waitForPageIdle();
+
+    // Switch to second graph with the same query
+    await graph.selectGraphByName(graphName2);
+    await graph.insertQuery(CREATE_QUERY);
+    await graph.clickRunQuery();
+    await graph.openGraphInfoButton();
+
+    // Get the style from graph2 for person1 label
+    const graph2Color = await graph.getLabelButtonColor("person1");
+    const graph2Style = await graph.getLabelStyleFromLocalStorage("person1");
+
+    // Verify that graph2's person1 label has the same style as graph1
+    // (Label styles should be global, not graph-scoped)
+    expect(graph2Color).toBe(graph1Color);
+    expect(graph2Style?.customSize).toBe(graph1Style?.customSize);
+
+    // Cleanup
+    await apiCall.removeGraph(graphName1);
+    await apiCall.removeGraph(graphName2);
   });
 });
