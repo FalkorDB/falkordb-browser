@@ -184,8 +184,12 @@ test.describe("Graph Info Panel Tests", () => {
     await graph.openGraphInfoButton();
     expect(await graph.isGraphInfoNodeButtonNotVisible("person3")).toBeTruthy();
     await graph.clickClearEditorInput();
-    await graph.insertQuery("CREATE (d:person3 { name: 'Diana' })");
-    await graph.clickRunQuery(false);
+    await graph.insertQuery("CREATE (d:person3 { name: 'Diana' }) RETURN d");
+    await graph.clickRunQuery();
+
+    // Reopen the panel to see the updated labels
+    await graph.openGraphInfoButton();
+
     expect(await graph.isGraphInfoNodeButtonVisible("person3")).toBeTruthy();
     await apiCall.removeGraph(graphName);
   });
