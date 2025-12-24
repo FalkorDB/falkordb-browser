@@ -14,11 +14,11 @@ import CustomizeStylePanel from "./CustomizeStylePanel";
  * @param onCustomizeModeChange - Callback invoked when customize mode changes
  * @returns The Graph Info panel React element containing graph name, memory usage, node/edge counts, property keys, and query buttons
  */
-export default function GraphInfoPanel({ onClose, onCustomizeModeChange }: { onClose: () => void; onCustomizeModeChange?: (isCustomizing: boolean) => void }) {
+export default function GraphInfoPanel({ onClose, onCustomizeModeChange = () => {} }: { onClose: () => void; onCustomizeModeChange: (isCustomizing: boolean) => void }) {
     const [customizingLabel, setCustomizingLabel] = useState<Label | null>(null);
 
     useEffect(() => {
-        onCustomizeModeChange?.(customizingLabel !== null);
+        onCustomizeModeChange(customizingLabel !== null);
     }, [customizingLabel, onCustomizeModeChange]);
     const { graph, graphInfo: { Labels, Relationships, PropertyKeys, MemoryUsage }, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext)
