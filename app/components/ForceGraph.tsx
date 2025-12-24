@@ -444,9 +444,14 @@ export default function ForceGraph({
                 nodeLabel={(node) => type === "graph" ? handleGetNodeDisplayText(node) : node.labels[0]}
                 graphData={data}
                 nodeRelSize={NODE_SIZE}
+                nodeVal={(node) => {
+                    // Return the square of customSize because library uses Math.sqrt(nodeVal)
+                    const label = getLabelWithFewestElements(node.labels.map(l => graph.LabelsMap.get(l) || graph.createLabel([l])[0]));
+                    const customSize = label.style?.customSize || 1;
+                    return customSize * customSize; // Squared because library will sqrt it
+                }}
                 nodeCanvasObjectMode={() => 'replace'}
                 linkCanvasObjectMode={() => 'after'}
-                linkDirectionalArrowRelPos={1}
                 linkDirectionalArrowLength={(link) => {
                     let length = 0;
 
@@ -456,6 +461,7 @@ export default function ForceGraph({
 
                     return length;
                 }}
+                linkDirectionalArrowRelPos={1}
                 linkDirectionalArrowColor={(link) => link.color}
                 linkWidth={(link) => isLinkSelected(link) ? 2 : 1}
                 nodeCanvasObject={(node, ctx) => {
