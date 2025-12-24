@@ -9,6 +9,7 @@ import {
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import CustomizeStylePage from "../logic/POM/customizeStylePage";
+import DataPanel from "../logic/POM/dataPanelComponent";
 import urls from "../config/urls.json";
 
 test.describe("Customize Style Tests", () => {
@@ -437,5 +438,60 @@ test.describe("Customize Style Tests", () => {
     // Cleanup
     await apiCall.removeGraph(graphName1);
     await apiCall.removeGraph(graphName2);
+  });
+
+  test(`@readwrite Validate node color updates when label is changed`, async () => {
+    const graphName = getRandomString("graph");
+    const newLabel = `label${Date.now()}`;
+    await apiCall.addGraph(graphName);
+
+    const dataGraph = await browser.createNewPage(DataPanel, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await dataGraph.selectGraphByName(graphName);
+    await dataGraph.insertQuery(CREATE_QUERY);
+    await dataGraph.clickRunQuery();
+
+    // Get initial canvas nodes - find the node with person1 label
+    let nodes = await dataGraph.getNodesScreenPositions("graph");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const targetNode = nodes.find((n: any) => n.labels?.includes("person1"));
+    expect(targetNode).toBeTruthy();
+
+    // Store the initial node color (person1's default color)
+    const initialNodeColor = targetNode.color;
+
+    // Click on the person1 node (node with name "a")
+    await dataGraph.searchElementInCanvas("a");
+
+    // Verify the node has person1 label
+    expect(await dataGraph.isVisibleLabel("person1")).toBeTruthy();
+
+    // Add new random label to the node
+    await dataGraph.addLabel(newLabel, true);
+
+    // Verify both labels are now on the node
+    expect(await dataGraph.isVisibleLabel("person1")).toBeTruthy();
+    expect(await dataGraph.isVisibleLabel(newLabel)).toBeTruthy();
+
+    // Remove person1 label from the node
+    await dataGraph.removeLabel("person1");
+
+    // Verify only the new label remains
+    expect(await dataGraph.isVisibleLabel(newLabel)).toBeTruthy();
+
+    // Close the data panel to refresh the canvas view
+    await dataGraph.closeDataPanel();
+
+    // Get updated canvas nodes and verify the color changed
+    nodes = await dataGraph.getNodesScreenPositions("graph");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const updatedNode = nodes.find((n: any) => n.labels?.includes(newLabel));
+    expect(updatedNode).toBeTruthy();
+
+    // CRITICAL: Verify that the node color on canvas changed from person1 to the new label
+    const updatedNodeColor = updatedNode.color;
+    expect(updatedNodeColor).not.toBe(initialNodeColor);
+
+    await apiCall.removeGraph(graphName);
   });
 });

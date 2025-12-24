@@ -1064,6 +1064,12 @@ export class Graph {
       const [emptyCategory] = this.createLabel([""], selectedElement);
       selectedElement.labels.push(emptyCategory.name);
       selectedElement.color = emptyCategory.color;
+    } else {
+      // Update node color to reflect the remaining label
+      const remainingLabel = this.LabelsMap.get(selectedElement.labels[0]);
+      if (remainingLabel) {
+        selectedElement.color = remainingLabel.color;
+      }
     }
   }
 
@@ -1122,6 +1128,9 @@ export class Graph {
     }
 
     selectedElement.labels.push(label);
+
+    // Update node color to reflect the new label
+    selectedElement.color = category.color;
 
     return this.labels;
   }
