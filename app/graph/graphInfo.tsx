@@ -1,9 +1,11 @@
-import { useContext } from "react";
-import { Loader2, X } from "lucide-react";
+import { useContext, useState } from "react";
+import { Loader2, X, Palette } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
+import { cn, getContrastTextColor } from "@/lib/utils";
 import Button from "../components/ui/Button";
 import { BrowserSettingsContext, GraphContext, QueryLoadingContext } from "../components/provider";
+import { Label } from "../api/graph/model";
+import CustomizeStylePanel from "./CustomizeStylePanel";
 
 /**
  * Render a side panel showing graph metadata and interactive controls to run representative queries.
@@ -12,7 +14,8 @@ import { BrowserSettingsContext, GraphContext, QueryLoadingContext } from "../co
  * @returns The Graph Info panel React element containing graph name, memory usage, node/edge counts, property keys, and query buttons
  */
 export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
-    const { graphInfo: { Labels, Relationships, PropertyKeys, MemoryUsage }, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
+    const [customizingLabel, setCustomizingLabel] = useState<Label | null>(null);
+    const { graph, graphInfo: { Labels, Relationships, PropertyKeys, MemoryUsage }, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext)
     const { settings: { graphInfo: { showMemoryUsage } } } = useContext(BrowserSettingsContext)
 
@@ -89,18 +92,43 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                             disabled={isQueryLoading}
                         />
                     </li>
-                    {Array.from(Labels.values()).filter(({ name }) => !!name).map(({ name, color }) => (
-                        <li key={name} className="max-w-full">
-                            <Button
-                                style={{ backgroundColor: color }}
-                                className="h-6 w-full p-2 rounded-full flex justify-center items-center text-black SofiaSans"
-                                data-testid={`graphInfo${name}Node`}
-                                label={name}
-                                onClick={() => runQuery(`MATCH (n:${name}) RETURN n`)}
-                                disabled={isQueryLoading}
-                            />
-                        </li>
-                    ))}
+                    {Array.from(Labels.values()).filter(({ name }) => !!name).map((infoLabel) => {
+                        // Get the full Label object from the graph
+                        const label = graph.LabelsMap.get(infoLabel.name);
+                        if (!label) return null;
+                        
+                        const labelColor = label.style?.customColor || label.color;
+                        return (
+                            <li key={`${label.name}-${labelColor}`} className="max-w-full flex gap-1">
+                                <Button
+                                    style={{
+                                        backgroundColor: labelColor,
+                                        color: getContrastTextColor(labelColor)
+                                    }}
+                                    className="h-6 w-full p-2 rounded-full flex justify-center items-center SofiaSans"
+                                    data-testid={`graphInfo${label.name}Node`}
+                                    label={label.name}
+                                    onClick={() => runQuery(`MATCH (n:${label.name}) RETURN n`)}
+                                    disabled={isQueryLoading}
+                                />
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            className="h-6 w-6 p-1 rounded-full flex justify-center items-center bg-muted hover:bg-muted/80"
+                                            data-testid={`customizeStyle${label.name}`}
+                                            title="Customize Style"
+                                            onClick={() => setCustomizingLabel(label)}
+                                        >
+                                            <Palette className="h-3 w-3" />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        Customize Style
+                                    </TooltipContent>
+                                </Tooltip>
+                            </li>
+                        );
+                    })}
                 </ul>
             </div>
             <div className="flex flex-col gap-2 overflow-hidden">
@@ -136,18 +164,29 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                             disabled={isQueryLoading}
                         />
                     </li>
-                    {Array.from(Relationships.values()).map(({ name, color }) => (
-                        <li key={name} className="max-w-full">
-                            <Button
-                                style={{ backgroundColor: color }}
-                                className="h-6 w-full p-2 rounded-full flex justify-center items-center text-black SofiaSans"
-                                data-testid={`graphInfo${name}Edge`}
-                                label={name}
-                                onClick={() => runQuery(`MATCH p=()-[:${name}]-() RETURN p`)}
-                                disabled={isQueryLoading}
-                            />
-                        </li>
-                    ))}
+                    {Array.from(Relationships.values()).map((infoRelationship) => {
+                        // Get the full Relationship object from the graph
+                        const relationship = graph.RelationshipsMap.get(infoRelationship.name);
+                        if (!relationship) return null;
+                        
+                        const relationshipColor = relationship.color;
+                        const textColor = getContrastTextColor(relationshipColor);
+                        return (
+                            <li key={infoRelationship.name} className="max-w-full">
+                                <Button
+                                    style={{
+                                        backgroundColor: relationshipColor,
+                                        color: textColor
+                                    }}
+                                    className="h-6 w-full p-2 rounded-full flex justify-center items-center SofiaSans"
+                                    data-testid={`graphInfo${infoRelationship.name}Edge`}
+                                    label={infoRelationship.name}
+                                    onClick={() => runQuery(`MATCH p=()-[:${infoRelationship.name}]-() RETURN p`)}
+                                    disabled={isQueryLoading}
+                                />
+                            </li>
+                        );
+                    })}
                 </ul>
             </div>
             <div className="flex flex-col gap-2 overflow-hidden">
@@ -188,6 +227,15 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                         ))}
                 </ul>
             </div>
+            
+            {customizingLabel && (
+                <div className="absolute inset-0 bg-background z-20">
+                    <CustomizeStylePanel
+                        label={customizingLabel}
+                        onClose={() => setCustomizingLabel(null)}
+                    />
+                </div>
+            )}
         </div>
     )
 }

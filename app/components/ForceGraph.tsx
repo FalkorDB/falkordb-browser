@@ -6,11 +6,11 @@
 
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
-import { securedFetch, GraphRef, handleZoomToFit, getTheme, Tab, ViewportState, getNodeDisplayText } from "@/lib/utils"
+import { securedFetch, GraphRef, handleZoomToFit, getTheme, Tab, ViewportState, getNodeDisplayText, getContrastTextColor } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
 import { useTheme } from "next-themes"
-import { Link, Node, Relationship, Graph, getLabelWithFewestElements, GraphData } from "../api/graph/model"
+import { Link, Node, Relationship, Graph, getLabelWithFewestElements, GraphData, EMPTY_DISPLAY_NAME } from "../api/graph/model"
 import { BrowserSettingsContext, IndicatorContext } from "./provider"
 import Spinning from "./ui/spinning"
 
@@ -294,10 +294,12 @@ export default function ForceGraph({
                 });
         }
 
-        // Add collision force to prevent node overlap (scale radius by node degree)
+        // Add collision force to prevent node overlap (scale radius by node degree and custom size)
         chartRef.current.d3Force('collision', d3.forceCollide((node: Node) => {
             const degree = nodeDegreeMap.get(node.id) || 0;
-            return COLLISION_BASE_RADIUS + Math.sqrt(degree) * HIGH_DEGREE_PADDING;
+            const label = getLabelWithFewestElements(node.labels.map(l => graph.LabelsMap.get(l) || graph.createLabel([l])[0]));
+            const customSize = label.style?.customSize || 1;
+            return (COLLISION_BASE_RADIUS * customSize) + Math.sqrt(degree) * HIGH_DEGREE_PADDING;
         }).strength(COLLISION_STRENGTH).iterations(2));
 
         // Center force to keep graph centered
@@ -324,7 +326,8 @@ export default function ForceGraph({
     // Clear cached display names when displayTextPriority changes
     useEffect(() => {
         data.nodes.forEach(node => {
-            node.displayName = ['', ''];
+            // eslint-disable-next-line no-param-reassign
+            node.displayName = [...EMPTY_DISPLAY_NAME];
         });
         // Force a re-render by reheating the simulation
         if (chartRef.current) {
@@ -441,9 +444,14 @@ export default function ForceGraph({
                 nodeLabel={(node) => type === "graph" ? handleGetNodeDisplayText(node) : node.labels[0]}
                 graphData={data}
                 nodeRelSize={NODE_SIZE}
-                nodeCanvasObjectMode={() => 'after'}
+                nodeVal={(node) => {
+                    // Return the square of customSize because library uses Math.sqrt(nodeVal)
+                    const label = getLabelWithFewestElements(node.labels.map(l => graph.LabelsMap.get(l) || graph.createLabel([l])[0]));
+                    const customSize = label.style?.customSize || 1;
+                    return customSize * customSize; // Squared because library will sqrt it
+                }}
+                nodeCanvasObjectMode={() => 'replace'}
                 linkCanvasObjectMode={() => 'after'}
-                linkDirectionalArrowRelPos={1}
                 linkDirectionalArrowLength={(link) => {
                     let length = 0;
 
@@ -453,6 +461,7 @@ export default function ForceGraph({
 
                     return length;
                 }}
+                linkDirectionalArrowRelPos={1}
                 linkDirectionalArrowColor={(link) => link.color}
                 linkWidth={(link) => isLinkSelected(link) ? 2 : 1}
                 nodeCanvasObject={(node, ctx) => {
@@ -462,17 +471,26 @@ export default function ForceGraph({
                         node.y = 0
                     }
 
+                    // Get label style customization
+                    const label = getLabelWithFewestElements(node.labels.map(l => graph.LabelsMap.get(l) || graph.createLabel([l])[0]));
+                    const customSize = label.style?.customSize || 1;
+                    const nodeSize = NODE_SIZE * customSize;
+
+                    // Draw the node circle with custom color and size
+                    ctx.fillStyle = node.color;
+                    ctx.beginPath();
+                    ctx.arc(node.x, node.y, nodeSize, 0, 2 * Math.PI, false);
+                    ctx.fill();
+
+                    // Draw the border
                     ctx.lineWidth = ((selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !el.source)))
                         || (hoverElement && !hoverElement.source && hoverElement.id === node.id)
                         ? 1.5 : 0.5
                     ctx.strokeStyle = foreground;
-
-                    ctx.beginPath();
-                    ctx.arc(node.x, node.y, NODE_SIZE, 0, 2 * Math.PI, false);
                     ctx.stroke();
-                    ctx.fill();
 
-                    ctx.fillStyle = 'black';
+                    // Set text color based on node background color for better contrast
+                    ctx.fillStyle = getContrastTextColor(node.color);
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.font = `400 2px SofiaSans`;
@@ -485,13 +503,27 @@ export default function ForceGraph({
                         let text = '';
 
                         if (type === "graph") {
-                            text = handleGetNodeDisplayText(node);
+                            // Check if label has custom caption property
+                            const customCaption = label.style?.customCaption;
+                            if (customCaption) {
+                                if (customCaption === "Description") {
+                                    text = handleGetNodeDisplayText(node);
+                                } else if (customCaption === "id") {
+                                    text = String(node.id);
+                                } else if (node.data[customCaption]) {
+                                    text = String(node.data[customCaption]);
+                                } else {
+                                    text = handleGetNodeDisplayText(node);
+                                }
+                            } else {
+                                text = handleGetNodeDisplayText(node);
+                            }
                         } else {
-                            text = getLabelWithFewestElements(node.labels.map(label => graph.LabelsMap.get(label) || graph.createLabel([label])[0])).name;
+                            text = label.name;
                         }
 
                         // Calculate text wrapping for circular node
-                        const textRadius = NODE_SIZE - PADDING / 2; // Leave some padding inside the circle
+                        const textRadius = nodeSize - PADDING / 2; // Leave some padding inside the circle
                         [line1, line2] = wrapTextForCircularNode(ctx, text, textRadius);
 
                         // Cache the result
