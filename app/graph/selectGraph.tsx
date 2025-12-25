@@ -120,7 +120,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const loadNodesCount = useCallback((opt: string) =>
         async () => {
-            const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes`, toast, setIndicator);
+            const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes`, toast, setIndicator) as { nodes?: number };
 
             if (!result) return "";
 
@@ -129,7 +129,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const loadEdgesCount = useCallback((opt: string) =>
         async () => {
-            const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges`, toast, setIndicator);
+            const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges`, toast, setIndicator) as { edges?: number };
 
             if (!result) return "";
 
