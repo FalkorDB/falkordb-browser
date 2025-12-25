@@ -16,7 +16,7 @@ export default class CustomizeStylePage extends GraphInfoPage {
   }
 
   private get panelTitle(): Locator {
-    return this.page.getByText("Customize Style");
+    return this.page.getByText("Style Settings");
   }
 
   private get colorSection(): Locator {
