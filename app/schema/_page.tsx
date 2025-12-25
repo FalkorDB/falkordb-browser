@@ -122,7 +122,7 @@ export default function Page() {
             setEdgesCount(edges)
             setNodesCount(nodes)
         } catch (error) {
-            console.debug(error)
+            console.error(error)
         }
     }, [toast, setIndicator, schemaName])
 

@@ -248,7 +248,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setEdgesCount(edges);
       setNodesCount(nodes);
     } catch (error) {
-      console.debug(error)
+      console.error(error)
     }
   }, [graphName, toast]);
 
@@ -361,7 +361,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       // @ts-ignore
       window.graph = g
     } catch (error) {
-      console.debug(error)
+      console.error(error)
     } finally {
       const newQueries = handelGetNewQueries(newQuery)
 
