@@ -163,7 +163,8 @@ export default function Page() {
             if (content) {
                 const { graphName: name, query } = JSON.parse(content)
 
-                if (!graph.Id && !graphName && graphNames.includes(name) && contentPersistence) {
+
+                if (!graph.Id && !graphName && graphNames.includes(name)) {
                     setGraphName(name)
                     runQuery(query, name)
                     return

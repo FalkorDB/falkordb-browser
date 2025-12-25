@@ -25,12 +25,12 @@ test.describe('Query history Tests', () => {
         const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectGraphByName(graphName);
-        const query = "CREATE (n:Person { name: 'Alice' }) RETURN n"
+        const query = "CREATE (n:Person { name: 'Alice' }) RETURN n";
         await graph.insertQuery(query);
         await graph.clickRunQuery();
         await graph.clickQueryHistoryButton();
         expect(await graph.getQueryHistory(query)).toBe(true);
-        await apicalls.removeGraph(graphName);         
+        await apicalls.removeGraph(graphName);
     });
 
     test(`@admin Validate that executing a query from the query history correctly displays the results in the canvas`, async () => {
@@ -39,7 +39,7 @@ test.describe('Query history Tests', () => {
         const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectGraphByName(graphName);
-        const query = "CREATE (n:Person { name: 'Alice' }) RETURN n"
+        const query = "CREATE (n:Person { name: 'Alice' }) RETURN n";
         await graph.insertQuery(query);
         await graph.clickRunQuery();
         await graph.runAQueryFromHistory(query);
@@ -47,7 +47,7 @@ test.describe('Query history Tests', () => {
         await graph.searchElementInCanvas(searchQuery);
         await graph.hoverAtCanvasCenter();
         expect(await graph.getNodeCanvasToolTip()).toBe(searchQuery);
-        await apicalls.removeGraph(graphName);        
+        await apicalls.removeGraph(graphName);
     });
 
     test(`@admin verify query selection from history displays the correct query`, async () => {
@@ -55,7 +55,7 @@ test.describe('Query history Tests', () => {
         await browser.setPageToFullScreen();
         const graphName = getRandomString('queryhistory');
         await graph.addGraph(graphName);
-        const query = "CREATE (n:Person { name: 'Alice' }) RETURN n"
+        const query = "CREATE (n:Person { name: 'Alice' }) RETURN n";
         await graph.insertQuery(query);
         await graph.clickRunQuery(false);
         await graph.clickQueryHistoryButton();
