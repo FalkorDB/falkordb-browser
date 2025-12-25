@@ -84,7 +84,8 @@ function GraphView({
         if (elementsLength === 0 && graph.Data.length !== 0) defaultChecked = "Table"
 
         setCurrentTab(defaultChecked);
-    }, [graph, graph.Id, elementsLength, graph.Data.length, setCurrentTab, isTabEnabled, currentTab])
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [graph, graph.Id, elementsLength, graph.Data.length, setCurrentTab, isTabEnabled])
 
     useEffect(() => {
         setSelectedElements([])
