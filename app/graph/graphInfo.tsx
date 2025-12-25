@@ -15,6 +15,7 @@ import CustomizeStylePanel from "./CustomizeStylePanel";
  */
 export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
     const [customizingLabel, setCustomizingLabel] = useState<Label | null>(null);
+
     const { graph, graphInfo: { Labels, Relationships, PropertyKeys, MemoryUsage }, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext)
     const { settings: { graphInfo: { showMemoryUsage } } } = useContext(BrowserSettingsContext)
