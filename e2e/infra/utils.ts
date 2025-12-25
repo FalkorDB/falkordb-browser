@@ -15,6 +15,15 @@ export const CREATE_QUERY =
   'CREATE (a:person1 {name: "a"})-[c:KNOWS {name: "knows"}]->(b:person2) RETURN *';
 
 /**
+ * Normalize URL by removing trailing slash for comparison
+ * @param url - The URL to normalize
+ * @returns URL without trailing slash
+ */
+export function normalizeUrl(url: string | null | undefined): string {
+  return url?.replace(/\/$/, '') || '';
+}
+
+/**
  * Initialize localStorage with default values required by the application
  * This prevents initialization errors in CI environments
  */
