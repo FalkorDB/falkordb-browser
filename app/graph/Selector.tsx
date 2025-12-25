@@ -131,8 +131,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
             ...prev,
             query: prev.counter ? prev.queries[prev.counter - 1].text : prev.currentQuery.text
         }))
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [historyQuery?.counter])
+    }, [historyQuery?.counter, setHistoryQuery])
 
     const afterSearchCallback = useCallback((newFilteredList: Query[]) => {
         if (!historyQuery || !setHistoryQuery) return
