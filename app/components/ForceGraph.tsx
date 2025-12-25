@@ -76,7 +76,6 @@ export default function ForceGraph({
     const { background, foreground } = getTheme(theme)
 
     const lastClick = useRef<{ date: Date, id: number }>({ date: new Date(), id: -1 })
-    const parentRef = useRef<HTMLDivElement>(null)
 
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
     const [canvasLoaded, setCanvasLoaded] = useState(false);
@@ -249,33 +248,6 @@ export default function ForceGraph({
         setIsLoading(loading)
     }, [setIsLoading])
 
-    // Update dimensions with ResizeObserver
-    useEffect(() => {
-        if (!canvasRef.current || !parentRef.current || !canvasLoaded) return undefined;
-
-        const canvas = canvasRef.current;
-        const parent = parentRef.current;
-
-        // Set initial dimensions
-        canvas.setWidth(parent.clientWidth);
-        canvas.setHeight(parent.clientHeight);
-
-        // Watch for size changes
-        const resizeObserver = new ResizeObserver((entries) => {
-            entries.forEach((entry) => {
-                const { width, height } = entry.contentRect;
-                canvas.setWidth(width);
-                canvas.setHeight(height);
-            });
-        });
-
-        resizeObserver.observe(parent);
-
-        return () => {
-            resizeObserver.disconnect();
-        };
-    }, [canvasRef, canvasLoaded]);
-
     // Update colors
     useEffect(() => {
         if (!canvasRef.current || !canvasLoaded) return;
@@ -340,8 +312,6 @@ export default function ForceGraph({
     }, [canvasRef, data, setGraphData, canvasLoaded])
 
     return (
-        <div ref={parentRef} className="w-full h-full relative">
-            <falkordb-canvas ref={canvasRef} />
-        </div>
+        <falkordb-canvas ref={canvasRef} />
     )
 }
