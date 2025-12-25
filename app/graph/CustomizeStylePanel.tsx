@@ -22,7 +22,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
         new Set(
             label.elements.flatMap(node => Object.keys(node.data || {}))
         )
-    ).sort();
+    ).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
     // Add special options
     const captionOptions = ["Description", ...availableProperties, "id"];
@@ -130,7 +130,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
         onClose();
     };
 
-    const handleCancel = () => {
+    const handleCancel = useCallback(() => {
         // Revert to original values in state
         setSelectedColor(originalColor);
         setSelectedSize(originalSize);
@@ -138,47 +138,46 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
 
         // Revert graph to original values
         applyStylesToGraph(originalColor, originalSize, originalCaption);
-    };
+    }, [originalColor, originalSize, originalCaption, applyStylesToGraph]);
 
-    const handleClose = () => {
-        // If there are unsaved changes, revert them before closing
-        if (hasChanges) {
-            applyStylesToGraph(originalColor, originalSize, originalCaption);
-        }
+    const handleClose = useCallback(() => {
+        // Just close the panel without reverting changes
         onClose();
-    };
+    }, [onClose]);
 
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
             if (e.key === "Escape") {
-                handleClose();
+                handleCancel();
             }
         };
 
         window.addEventListener("keydown", handleEscape);
         return () => window.removeEventListener("keydown", handleEscape);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [handleCancel]);
 
     return (
-        <div className="relative h-full w-full p-4 flex flex-col gap-4 border-r border-border bg-background">
-            <Button
-                className="absolute top-2 right-2 z-10"
-                title="Close"
-                onClick={handleClose}
-            >
-                <X className="h-4 w-4" />
-            </Button>
+        <div className="relative h-full w-full flex flex-col border-r border-border bg-background">
+            {/* Scrollable Content Area */}
+            <div className="flex-1 overflow-y-auto p-4 pb-2">
+                <Button
+                    className="absolute top-2 right-2 z-10"
+                    title="Close"
+                    onClick={handleClose}
+                >
+                    <X className="h-4 w-4" />
+                </Button>
 
-            <h1 className="text-2xl font-semibold">Customize Style</h1>
+                <div className="flex flex-col gap-4">
+                    <h1 className="text-2xl font-semibold">Customize Style</h1>
 
-            <div className="flex items-center gap-2">
-                <div
-                    style={{ backgroundColor: selectedColor }}
-                    className="w-8 h-8 rounded-full"
-                />
-                <span className="text-lg font-medium SofiaSans">{label.name}</span>
-            </div>
+                    <div className="flex items-center gap-2">
+                        <div
+                            style={{ backgroundColor: selectedColor }}
+                            className="w-8 h-8 rounded-full"
+                        />
+                        <span className="text-lg font-medium SofiaSans">{label.name}</span>
+                    </div>
 
             {/* Color Selection */}
             <div className="flex flex-col gap-2">
@@ -328,9 +327,9 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
             </div>
 
             {/* Caption Selection */}
-            <div className="flex flex-col gap-2 flex-1">
+            <div className="flex flex-col gap-2">
                 <h2 className="text-base font-semibold">Caption:</h2>
-                <div className="flex flex-col gap-2 p-2 bg-muted/10 rounded-lg max-h-[300px] overflow-y-auto">
+                <div className="flex flex-col gap-2 p-2 bg-muted/10 rounded-lg max-h-[200px] overflow-y-auto">
                     {captionOptions.map((option) => (
                         <button
                             key={option}
@@ -346,30 +345,34 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
                     ))}
                 </div>
             </div>
+                </div>
+            </div>
 
-            {/* Save/Cancel Buttons - Only show when there are changes */}
+            {/* Sticky Save/Cancel Buttons - Only show when there are changes */}
             {hasChanges && (
-                <div className="flex gap-3 pt-4 mt-auto border-t border-border">
-                    <button
-                        type="button"
-                        data-testid="cancelStyleChanges"
-                        className="flex-1 px-4 py-2.5 rounded-lg font-medium transition-all
-                                   bg-muted/50 hover:bg-muted text-foreground
-                                   border border-border hover:border-foreground/20"
-                        onClick={handleCancel}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        data-testid="saveStyleChanges"
-                        className="flex-1 px-4 py-2.5 rounded-lg font-semibold transition-all
-                                   bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800
-                                   text-white shadow-md hover:shadow-lg"
-                        onClick={handleSave}
-                    >
-                        Save Changes
-                    </button>
+                <div className="flex-shrink-0 p-3 pt-2 border-t border-border bg-background">
+                    <div className="flex gap-2 justify-center">
+                        <button
+                            type="button"
+                            data-testid="cancelStyleChanges"
+                            className="px-3 py-1.5 rounded-md text-sm font-medium transition-all
+                                       bg-muted/50 hover:bg-muted text-foreground
+                                       border border-border hover:border-foreground/20"
+                            onClick={handleCancel}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            data-testid="saveStyleChanges"
+                            className="px-3 py-1.5 rounded-md text-sm font-semibold transition-all
+                                       bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800
+                                       text-white shadow-md hover:shadow-lg"
+                            onClick={handleSave}
+                        >
+                            Save Changes
+                        </button>
+                    </div>
                 </div>
             )}
         </div>

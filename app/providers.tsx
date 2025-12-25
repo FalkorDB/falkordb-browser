@@ -434,7 +434,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setModel(localStorage.getItem("model") || "")
   }, [status])
 
-  const panelSize = useMemo(() => isCollapsed ? 0 : 15, [isCollapsed])
+  const panelSize = useMemo(() => isCollapsed ? 0 : 20, [isCollapsed])
 
   useEffect(() => {
     const currentPanel = panelRef.current
@@ -654,14 +654,17 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                               defaultSize={panelSize}
                               collapsible
                               minSize={15}
-                              maxSize={30}
+                              maxSize={50}
                               onCollapse={() => setIsCollapsed(true)}
                               onExpand={() => setIsCollapsed(false)}
                               data-testid="graphInfoPanel"
                             >
-                              <GraphInfoPanel
-                                onClose={onExpand}
-                              />
+                              {!isCollapsed && (
+                                <GraphInfoPanel
+                                  key={graphName}
+                                  onClose={onExpand}
+                                />
+                              )}
                             </ResizablePanel>
                             <ResizableHandle withHandle onMouseUp={() => isCollapsed && onExpand()} className={cn("w-0", isCollapsed && "hidden")} />
                             <ResizablePanel

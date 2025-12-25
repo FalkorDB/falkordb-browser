@@ -181,7 +181,7 @@ test.describe("Customize Style Tests", () => {
     await apiCall.removeGraph(graphName);
   });
 
-  test(`@readwrite Validate ESC key closes customization panel`, async () => {
+  test(`@readwrite Validate ESC key reverts changes in customization panel`, async () => {
     const graphName = getRandomString("graph");
     await apiCall.addGraph(graphName);
     const graph = await browser.createNewPage(CustomizeStylePage, urls.graphUrl);
@@ -194,15 +194,29 @@ test.describe("Customize Style Tests", () => {
     // Click customize style button
     await graph.clickCustomizeStyleButton("person1");
 
-    // Verify panel is visible
-    expect(await graph.isPanelVisible()).toBeTruthy();
+    // Get initial selections
+    const initialColorIndex = await graph.getSelectedColorButtonIndex();
+    const initialSizeIndex = await graph.getSelectedSizeButtonIndex();
 
-    // Press ESC key
+    // Make changes
+    const newColorIndex = initialColorIndex === 0 ? 2 : 0;
+    const newSizeIndex = initialSizeIndex === 3 ? 5 : 3;
+    await graph.selectColorByIndex(newColorIndex);
+    await graph.selectSizeByIndex(newSizeIndex);
+
+    // Verify changes were made
+    expect(await graph.getSelectedColorButtonIndex()).toBe(newColorIndex);
+    expect(await graph.getSelectedSizeButtonIndex()).toBe(newSizeIndex);
+
+    // Press ESC key - should revert changes but keep panel open
     await graph.closePanelWithEscape();
 
-    // Verify panel is closed - graph info should be visible again
-    expect(await graph.isPanelNotVisible()).toBeTruthy();
-    expect(await graph.isGraphInfoPanelContainerVisible()).toBeTruthy();
+    // Verify panel is still visible
+    expect(await graph.isPanelVisible()).toBeTruthy();
+
+    // Verify changes were reverted
+    expect(await graph.getSelectedColorButtonIndex()).toBe(initialColorIndex);
+    expect(await graph.getSelectedSizeButtonIndex()).toBe(initialSizeIndex);
 
     await apiCall.removeGraph(graphName);
   });
