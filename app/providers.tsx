@@ -9,7 +9,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import LoginVerification from "./loginVerification";
-import { Graph, GraphData, GraphInfo, HistoryQuery, MemoryValue, Query } from "./api/graph/model";
+import { Graph, GraphData, GraphInfo, HistoryQuery, MemoryValue, Query, Data } from "./api/graph/model";
 import Header from "./components/Header";
 import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ViewportContext, TableViewContext } from "./components/provider";
 import GraphInfoPanel from "./graph/graphInfo";
@@ -239,7 +239,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setNodesCount(undefined);
 
     try {
-      const result = await getSSEGraphResult(`api/graph/${prepareArg(graphName)}/count`, toast, setIndicator);
+      const result = await getSSEGraphResult(`api/graph/${prepareArg(graphName)}/count`, toast, setIndicator) as { nodes?: number; edges?: number };
 
       if (!result) return;
 
@@ -248,7 +248,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setEdgesCount(edges);
       setNodesCount(nodes);
     } catch (error) {
-      console.debug(error)
+      console.error(error)
     }
   }, [graphName, toast]);
 
@@ -306,7 +306,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
       const [query, existingLimit] = getQueryWithLimit(q, limit)
       const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}`;
-      const result = await getSSEGraphResult(url, toast, setIndicator);
+      const result = await getSSEGraphResult(url, toast, setIndicator) as { data: Data; metadata: string[] };
 
       if (!result) throw new Error()
 
@@ -361,7 +361,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       // @ts-ignore
       window.graph = g
     } catch (error) {
-      console.debug(error)
+      console.error(error)
     } finally {
       const newQueries = handelGetNewQueries(newQuery)
 
@@ -434,7 +434,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setModel(localStorage.getItem("model") || "")
   }, [status])
 
-  const panelSize = useMemo(() => isCollapsed ? 0 : 15, [isCollapsed])
+  const panelSize = useMemo(() => isCollapsed ? 0 : 20, [isCollapsed])
 
   useEffect(() => {
     const currentPanel = panelRef.current
