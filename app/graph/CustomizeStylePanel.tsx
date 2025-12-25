@@ -169,7 +169,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
                 </Button>
 
                 <div className="flex flex-col gap-4">
-                    <h1 className="text-2xl font-semibold">Customize Style</h1>
+                    <h1 className="text-2xl">Style Settings</h1>
 
                     <div className="flex items-center gap-2">
                         <div
@@ -329,7 +329,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
             {/* Caption Selection */}
             <div className="flex flex-col gap-2">
                 <h2 className="text-base font-semibold">Caption:</h2>
-                <div className="flex flex-col gap-2 p-2 bg-muted/10 rounded-lg max-h-[200px] overflow-y-auto">
+                <div className="flex flex-col gap-1 p-2 bg-muted/10 rounded-lg max-h-[200px] overflow-y-auto">
                     {captionOptions.map((option) => (
                         <button
                             key={option}

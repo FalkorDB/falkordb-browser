@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // eslint-disable-next-line import/prefer-default-export
 
 "use client";
@@ -8,6 +7,14 @@ import { twMerge } from "tailwind-merge";
 import { MutableRefObject } from "react";
 import { ForceGraphMethods } from "react-force-graph-2d";
 import { Node, Link, DataCell, MemoryValue } from "@/app/api/graph/model";
+
+export type ToastArguments = {
+  title: string;
+  description: string;
+  variant: "destructive" | "default";
+};
+
+export type ToastFn = (args: ToastArguments) => void;
 
 export const screenSize = {
   sm: 640,
@@ -158,11 +165,9 @@ export function cn(...inputs: ClassValue[]) {
 
 export async function getSSEGraphResult(
   url: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  toast: any,
+  toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): Promise<any> {
+): Promise<unknown> {
   return new Promise((resolve, reject) => {
     let handled = false;
 
@@ -204,7 +209,7 @@ export async function getSSEGraphResult(
 export async function securedFetch(
   input: string,
   init: RequestInit,
-  toast: any,
+  toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void
 ): Promise<Response> {
   const response = await fetch(input, init);
@@ -339,7 +344,7 @@ const processEntries = (arr: MemoryValueType): Map<string, MemoryValue> => {
 
 export const getMemoryUsage = async (
   name: string,
-  toast: any,
+  toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void
 ): Promise<Map<string, MemoryValue>> => {
   const result = await securedFetch(
@@ -441,7 +446,7 @@ export const formatName = (newGraphName: string) =>
 
 export async function fetchOptions(
   type: "Graph" | "Schema",
-  toast: any,
+  toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void,
   indicator: "online" | "offline",
   setSelectedValue: (value: string) => void,

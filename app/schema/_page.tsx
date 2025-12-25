@@ -113,7 +113,7 @@ export default function Page() {
         setNodesCount(undefined)
 
         try {
-            const result = await getSSEGraphResult(`api/schema/${prepareArg(schemaName)}/count`, toast, setIndicator)
+            const result = await getSSEGraphResult(`api/schema/${prepareArg(schemaName)}/count`, toast, setIndicator) as { nodes?: number; edges?: number };
 
             if (!result) return
 
