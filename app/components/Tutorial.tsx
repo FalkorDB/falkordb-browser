@@ -438,8 +438,8 @@ function TutorialPortal({
                         // Advance the tutorial on the specified event type. Use a short delay
                         // so the forwarded event can reach the underlying element's handlers first.
                         setTimeout(() => {
-                            onNext()
-                        }, 200)
+                            onNext();
+                        }, 200);
                     }
 
                     // Get the overlay and target element positions to adjust coordinates
