@@ -72,11 +72,11 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                                         data-testid="nodesCount"
                                         className="truncate pointer-events-auto SofiaSans"
                                     >
-                                        ({nodesCount})
+                                        ({nodesCount.toLocaleString()})
                                     </p>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    {nodesCount}
+                                    {nodesCount.toLocaleString()}
                                 </TooltipContent>
                             </Tooltip>
                             : <Loader2 data-testid="nodesCountLoader" className="animate-spin" />
@@ -97,7 +97,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                         // Get the full Label object from the graph
                         const label = graph.LabelsMap.get(infoLabel.name);
                         if (!label) return null;
-                        
+
                         const labelColor = label.style?.customColor || label.color;
                         return (
                             <li key={`${label.name}-${labelColor}`} className="max-w-full flex gap-1">
@@ -143,11 +143,11 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                                         data-testid="edgesCount"
                                         className="truncate pointer-events-auto SofiaSans"
                                     >
-                                        ({edgesCount})
+                                        ({edgesCount.toLocaleString()})
                                     </p>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    {edgesCount}
+                                    {edgesCount.toLocaleString()}
                                 </TooltipContent>
                             </Tooltip>
                             :
@@ -169,7 +169,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                         // Get the full Relationship object from the graph
                         const relationship = graph.RelationshipsMap.get(infoRelationship.name);
                         if (!relationship) return null;
-                        
+
                         const relationshipColor = relationship.color;
                         const textColor = getContrastTextColor(relationshipColor);
                         return (
@@ -201,11 +201,11 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                                         data-testid="propertyKeysCount"
                                         className="truncate pointer-events-auto SofiaSans"
                                     >
-                                        ({PropertyKeys.length})
+                                        ({PropertyKeys.length.toLocaleString()})
                                     </p>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    {PropertyKeys.length}
+                                    {PropertyKeys.length.toLocaleString()}
                                 </TooltipContent>
                             </Tooltip>
                             :
@@ -228,7 +228,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                         ))}
                 </ul>
             </div>
-            
+
             {customizingLabel && (
                 <div className="absolute inset-0 bg-background z-20">
                     <CustomizeStylePanel
