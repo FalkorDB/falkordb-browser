@@ -15,7 +15,7 @@ interface Props {
     graph: Graph,
     disabled: boolean,
     canvasRef: GraphRef,
-    handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void,
+    handleCooldown: (ticks?: 0) => void,
     cooldownTicks: number | undefined
 }
 
@@ -51,7 +51,7 @@ export default function Controls({
                                 className="pointer-events-auto data-[state=unchecked]:bg-border"
                                 checked={cooldownTicks === undefined}
                                 onCheckedChange={() => {
-                                    handleCooldown(cooldownTicks === undefined ? 0 : undefined, false)
+                                    handleCooldown(cooldownTicks === undefined ? 0 : undefined)
                                 }}
                             />
                         </div>
