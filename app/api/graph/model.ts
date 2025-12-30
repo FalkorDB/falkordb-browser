@@ -322,9 +322,8 @@ export class GraphInfo {
       return this.colors[index];
     }
 
-    const newColor = `hsl(${
-      (index - Math.min(DEFAULT_COLORS.length, this.colors.length)) * 20
-    }, 100%, 70%)`;
+    const newColor = `hsl(${(index - Math.min(DEFAULT_COLORS.length, this.colors.length)) * 20
+      }, 100%, 70%)`;
 
     this.colors.push(newColor);
 
@@ -831,12 +830,12 @@ export class Graph {
 
     const storageKey = `labelStyle_${label.name}`;
     const savedStyle = localStorage.getItem(storageKey);
-    
+
     if (savedStyle) {
       try {
         const style = JSON.parse(savedStyle);
         label.style = style;
-        
+
         // Apply custom color if present
         if (style.customColor) {
           label.color = style.customColor;
@@ -868,8 +867,8 @@ export class Graph {
       if (
         this.RelationshipsMap.get(link.relationship)!.show &&
         visible &&
-        this.elements.nodes.find((n) => n.id === link.source)?.visible &&
-        this.elements.nodes.find((n) => n.id === link.target)?.visible
+        this.nodesMap.get(link.source)?.visible &&
+        this.nodesMap.get(link.target)?.visible
       ) {
         // eslint-disable-next-line no-param-reassign
         link.visible = true;
@@ -877,10 +876,10 @@ export class Graph {
 
       if (
         !visible &&
-        (this.elements.nodes.find((n) => n.id === link.source)?.visible ===
+        (this.nodesMap.get(link.source)?.visible ===
           false ||
-          this.elements.nodes.find((n) => n.id === link.target)?.visible ===
-            false)
+          this.nodesMap.get(link.target)?.visible ===
+          false)
       ) {
         // eslint-disable-next-line no-param-reassign
         link.visible = false;
@@ -899,8 +898,8 @@ export class Graph {
         .map((link) => {
           if (
             (ids.length !== 0 && !links.includes(link)) ||
-            (this.elements.nodes.map((n) => n.id).includes(link.source) &&
-              this.elements.nodes.map((n) => n.id).includes(link.target))
+            (this.nodesMap.has(link.source) &&
+              this.nodesMap.has(link.target))
           ) {
             return link;
           }
