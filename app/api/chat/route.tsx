@@ -13,7 +13,7 @@ export async function GET() {
         }
 
         try {
-            const response = await fetch(`${CHAT_URL}api/configured-model`, {
+            const response = await fetch(`${CHAT_URL}configured-model`, {
                 method: "GET",
                 headers: {
                     "Content-Type": "application/json",
@@ -21,10 +21,6 @@ export async function GET() {
             })
 
             if (!response.ok) {
-                // If endpoint doesn't exist (404), still allow chat but without model info
-                if (response.status === 404) {
-                    return NextResponse.json({}, { status: 200 })
-                }
                 throw new Error(await response.text())
             }
 
@@ -36,8 +32,8 @@ export async function GET() {
 
             // Gracefully handle missing endpoint or server unavailability
             // Return empty object to allow chat to be displayed
-            if (message.includes("fetch failed") || message.includes("404") || message.includes("Not Found")) {
-                return NextResponse.json({}, { status: 200 })
+            if (message.includes("fetch failed") || message.includes("Not Found") || message.includes("NOT_FOUND") || message.includes("could not be found")) {
+                return NextResponse.json({ message }, { status: 200 })
             }
 
             console.error(error)
@@ -58,6 +54,7 @@ export async function POST(request: NextRequest) {
     const writer = writable.getWriter()
 
     try {
+        // Verify authentication via getClient
         const session = await getClient()
 
         if (session instanceof NextResponse) {
@@ -68,10 +65,11 @@ export async function POST(request: NextRequest) {
 
         // Validate request body
         const validation = validateBody(chatRequest, body);
-        
+
         if (!validation.success) {
             writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(validation.error)}\n\n`))
             writer.close()
+
             return new Response(readable, {
                 headers: {
                     "Content-Type": "text/event-stream",
@@ -84,17 +82,10 @@ export async function POST(request: NextRequest) {
         const { messages, graphName, key, model } = validation.data
 
         try {
-            // Get the database connection from the session user
-            const dbConnection = session.user.url || `falkor://${session.user.host}:${session.user.port}`
-
             const requestBody: Record<string, unknown> = {
-                "chat_request": {
-                    messages,
-                },
+                chat_request: { messages },
                 "graph_name": graphName,
-                "model": model || "gpt-4o-mini", // Default model if not provided
-                "falkordb_connection": dbConnection, // Send database connection for full execution
-                "stream": true // Enable streaming for real-time progress updates
+                "model": model || "gpt-4o-mini",
             }
 
             // Only add key if provided
@@ -102,7 +93,7 @@ export async function POST(request: NextRequest) {
                 requestBody.key = key
             }
 
-            const response = await fetch(`${CHAT_URL}api/text_to_cypher`, {
+            const response = await fetch(`${CHAT_URL}text_to_cypher`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

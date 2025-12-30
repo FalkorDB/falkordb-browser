@@ -114,7 +114,7 @@ export default function Page() {
         setNodesCount(undefined)
 
         try {
-            const result = await getSSEGraphResult(`api/schema/${prepareArg(schemaName)}/count`, toast, setIndicator)
+            const result = await getSSEGraphResult(`api/schema/${prepareArg(schemaName)}/count`, toast, setIndicator) as { nodes?: number; edges?: number };
 
             if (!result) return
 
@@ -123,7 +123,7 @@ export default function Page() {
             setEdgesCount(edges)
             setNodesCount(nodes)
         } catch (error) {
-            console.debug(error)
+            console.error(error)
         }
     }, [toast, setIndicator, schemaName])
 

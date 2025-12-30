@@ -27,6 +27,9 @@ The search bar now indexes schema, nodes, and metadata. Results are ranked more 
 #### Expanded Settings & User Controls  
 New options let you fine-tune database behavior, toggle visual preferences, and manage users without falling back to CLI tools.
 
+#### Node Style Customization  
+Customize the visual appearance of nodes per label. Select custom colors from a palette, adjust node sizes, and choose which property to display as the node caption. All customizations are saved per graph and persist across sessions.
+
 
 
 | ![image (4)](https://github.com/user-attachments/assets/658fa59f-5316-475c-8bd7-b26651e9902c) | ![FalkorDB browser 06-25](https://github.com/user-attachments/assets/ee907fa6-038c-462b-9240-456a2d2c2a99) |

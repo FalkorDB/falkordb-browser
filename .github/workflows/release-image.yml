@@ -1,5 +1,8 @@
 name: Release image to DockerHub
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
     inputs:
@@ -44,7 +47,32 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
   
       - name: Build image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: ${{ env.TAGS }}
+          build-args: |
+            CYPHER_VERSION=${{ env.CYPHER_VERSION }}
+          load: true
+
+      - name: Extract Trivy tag
+        run: |
+          echo "TRIVY_TAG=$(echo '${{ env.TAGS }}' | cut -d',' -f1)" >> $GITHUB_ENV
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@22438a435773de8c97dc0958cc0b823c45b064ac
+        with:
+          image-ref: ${{ env.TRIVY_TAG }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'HIGH,CRITICAL'
+
+      - name: Push image
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile

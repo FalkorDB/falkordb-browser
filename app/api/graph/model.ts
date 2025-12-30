@@ -50,6 +50,9 @@ const getSchemaValue = (value: string): string[] => {
   return [type, description, unique, required];
 };
 
+// Constant for empty display name
+export const EMPTY_DISPLAY_NAME: [string, string] = ['', ''];
+
 export type Node = {
   id: number;
   labels: string[];
@@ -116,16 +119,54 @@ export const DEFAULT_COLORS = [
   "hsl(180, 66%, 70%)",
 ];
 
+// Color palette for node customization
+export const STYLE_COLORS = [
+  // Reds & Pinks
+  "#FB7185", // Rose
+  "#F472B6", // Pink
+  // Oranges & Ambers
+  "#FB923C", // Orange
+  "#FBBF24", // Amber
+  // Yellows
+  "#FDE047", // Yellow
+  "#FDE68A", // Light Yellow
+  // Greens
+  "#86EFAC", // Green
+  "#6EE7B7", // Emerald
+  // Cyans & Teals
+  "#67E8F9", // Cyan
+  "#14B8A6", // Teal
+  // Blues
+  "#60A5FA", // Blue
+  "#818CF8", // Indigo
+  // Purples
+  "#C084FC", // Purple
+  "#E9D5FF", // Light Purple
+  // Grays
+  "#A3A3A3", // Gray
+  "#E5E5E5", // Light Gray
+];
+
+// Size options for node customization (relative to base NODE_SIZE)
+export const NODE_SIZE_OPTIONS = [0.5, 0.7, 0.85, 1, 1.15, 1.3, 1.5, 1.7, 2, 2.3, 2.6];
+
 export interface InfoLabel {
   name: string;
   color: string;
   show: boolean;
 }
 
+export interface LabelStyle {
+  customColor?: string; // Custom color override
+  customSize?: number; // Custom size multiplier (1 = default)
+  customCaption?: string; // Custom property to display as caption
+}
+
 export interface Label extends InfoLabel {
   elements: Node[];
   textWidth?: number;
   textHeight?: number;
+  style?: LabelStyle; // Style customization
 }
 
 export interface InfoRelationship {
@@ -744,7 +785,8 @@ export class Graph {
             (l) => this.labelsMap.get(l) || this.createLabel([l])[0]
           )
         );
-        node.color = label.color;
+        // Use custom color if available, otherwise use default label color
+        node.color = label.style?.customColor || label.color;
       });
 
     // remove empty category if there are no more empty nodes category
@@ -769,6 +811,9 @@ export class Graph {
           elements: [],
         };
 
+        // Load saved style from localStorage
+        Graph.loadLabelStyle(c);
+
         this.labelsMap.set(c.name, c);
         this.labels.push(c);
       }
@@ -779,6 +824,27 @@ export class Graph {
 
       return c;
     });
+  }
+
+  public static loadLabelStyle(label: Label): void {
+    if (typeof window === "undefined") return;
+
+    const storageKey = `labelStyle_${label.name}`;
+    const savedStyle = localStorage.getItem(storageKey);
+    
+    if (savedStyle) {
+      try {
+        const style = JSON.parse(savedStyle);
+        label.style = style;
+        
+        // Apply custom color if present
+        if (style.customColor) {
+          label.color = style.customColor;
+        }
+      } catch (e) {
+        // Ignore invalid JSON
+      }
+    }
   }
 
   public createRelationship(relationship: string): Relationship {
@@ -986,6 +1052,12 @@ export class Graph {
       const [emptyCategory] = this.createLabel([""], selectedElement);
       selectedElement.labels.push(emptyCategory.name);
       selectedElement.color = emptyCategory.color;
+    } else {
+      // Update node color to reflect the remaining label
+      const remainingLabel = this.LabelsMap.get(selectedElement.labels[0]);
+      if (remainingLabel) {
+        selectedElement.color = remainingLabel.color;
+      }
     }
   }
 
@@ -1044,6 +1116,9 @@ export class Graph {
     }
 
     selectedElement.labels.push(label);
+
+    // Update node color to reflect the new label
+    selectedElement.color = category.color;
 
     return this.labels;
   }
