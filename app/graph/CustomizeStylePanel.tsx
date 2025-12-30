@@ -3,8 +3,8 @@
 import { useContext, useState, useEffect, useCallback, useRef } from "react";
 import { X, Palette } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { GraphContext, ViewportContext } from "@/app/components/provider";
-import { Label, STYLE_COLORS, NODE_SIZE_OPTIONS, LabelStyle, EMPTY_DISPLAY_NAME } from "@/app/api/graph/model";
+import { GraphContext, ForceGraphContext } from "@/app/components/provider";
+import { Label, STYLE_COLORS, NODE_SIZE_OPTIONS, LabelStyle } from "@/app/api/graph/model";
 import Button from "@/app/components/ui/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -15,7 +15,7 @@ interface Props {
 
 export default function CustomizeStylePanel({ label, onClose }: Props) {
     const { graph } = useContext(GraphContext);
-    const { setData } = useContext(ViewportContext);
+    const { setData } = useContext(ForceGraphContext);
 
     // Get available properties from nodes with this label
     const availableProperties = Array.from(
@@ -76,9 +76,6 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
             updatedLabel.elements.forEach(n => {
                 // eslint-disable-next-line no-param-reassign
                 n.color = color;
-                // Clear cached display names to force recalculation
-                // eslint-disable-next-line no-param-reassign
-                n.displayName = [...EMPTY_DISPLAY_NAME];
             });
 
             // Trigger canvas re-render
