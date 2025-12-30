@@ -246,7 +246,7 @@ export default class Page extends BasePage {
     await this.page.waitForFunction(
       ({ selector }) => {
         const canvas = document.querySelector(selector);
-        return canvas?.getAttribute("data-engine-status") === "stop";
+        return canvas?.getAttribute("data-engine-status") === "stopped";
       },
       { selector: ".force-graph-container canvas" },
       { timeout }
