@@ -1,5 +1,5 @@
 import { createContext, Dispatch, SetStateAction } from "react";
-import { Panel, Tab } from "@/lib/utils";
+import { GraphRef, Panel, Tab } from "@/lib/utils";
 import type { GraphData as CanvasData, TextPriority, ViewportState } from "@falkordb/canvas";
 import { Graph, GraphData, GraphInfo, HistoryQuery } from "../api/graph/model";
 
@@ -138,6 +138,7 @@ type QueryLoadingContextType = {
 };
 
 type ForceGraphContextType = {
+  canvasRef: GraphRef;
   viewport: ViewportState;
   setViewport: Dispatch<SetStateAction<ViewportState>>;
   data: GraphData;
@@ -295,6 +296,7 @@ export const QueryLoadingContext = createContext<QueryLoadingContextType>({
 });
 
 export const ForceGraphContext = createContext<ForceGraphContextType>({
+  canvasRef: { current: null },
   viewport: { centerX: 0, centerY: 0, zoom: 0 },
   setViewport: () => {},
   data: { nodes: [], links: [] },

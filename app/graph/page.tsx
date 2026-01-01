@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { cn, getMemoryUsage, GraphRef, isTwoNodes, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, getMemoryUsage, isTwoNodes, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamicImport from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -44,7 +44,7 @@ export default function Page() {
     const { setIndicator } = useContext(IndicatorContext);
     const { panel, setPanel } = useContext(PanelContext)
     const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext)
-    const { setData } = useContext(ForceGraphContext)
+    const { setData, canvasRef } = useContext(ForceGraphContext)
     const {
         graph,
         setGraph,
@@ -69,7 +69,6 @@ export default function Page() {
     } = useContext(BrowserSettingsContext)
     const { toast } = useToast()
 
-    const canvasRef = useRef<GraphRef["current"]>(null)
     const panelRef = useRef<ImperativePanelHandle>(null)
 
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
@@ -128,9 +127,8 @@ export default function Page() {
             fetchInfo("(relationship type)"),
             fetchInfo("(property key)"),
         ]).then(async ([newLabels, newRelationships, newPropertyKeys]) => {
-            const colorsArr = localStorage.getItem(graphName)
             const memoryUsage = showMemoryUsage ? await getMemoryUsage(graphName, toast, setIndicator) : new Map<string, MemoryValue>()
-            const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, colorsArr ? JSON.parse(colorsArr) : undefined)
+            const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage)
             setGraphInfo(gi)
             fetchCount()
         }).catch((error) => {

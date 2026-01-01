@@ -93,30 +93,33 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                             disabled={isQueryLoading}
                         />
                     </li>
-                    {Array.from(Labels.values()).filter(({ name }) => !!name).map((infoLabel) => {
+                    {Array.from(Labels.values()).map((infoLabel) => {
                         // Get the full Label object from the graph
                         const label = graph.LabelsMap.get(infoLabel.name);
-                        if (!label) return null;
                         
-                        const labelColor = label.style?.customColor || label.color;
+                        if (!label) return null;
+
+                        const name = label.name || "Empty";
+                        const labelColor = label.style.color;
+                        
                         return (
-                            <li key={`${label.name}-${labelColor}`} className="max-w-full flex gap-1">
+                            <li key={`${name}-${labelColor}`} className="max-w-full flex gap-1">
                                 <Button
                                     style={{
                                         backgroundColor: labelColor,
                                         color: getContrastTextColor(labelColor)
                                     }}
                                     className="h-6 w-full p-2 rounded-full flex justify-center items-center SofiaSans"
-                                    data-testid={`graphInfo${label.name}Node`}
-                                    label={label.name}
-                                    onClick={() => runQuery(`MATCH (n:${label.name}) RETURN n`)}
+                                    data-testid={`graphInfo${name}Node`}
+                                    label={name}
+                                    onClick={() => runQuery(`MATCH (n:${name}) RETURN n`)}
                                     disabled={isQueryLoading}
                                 />
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <Button
                                             className="h-6 w-6 p-1 rounded-full flex justify-center items-center bg-muted hover:bg-muted/80"
-                                            data-testid={`customizeStyle${label.name}`}
+                                            data-testid={`customizeStyle${name}`}
                                             title="Customize Style"
                                             onClick={() => setCustomizingLabel(label)}
                                         >
@@ -170,7 +173,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                         const relationship = graph.RelationshipsMap.get(infoRelationship.name);
                         if (!relationship) return null;
                         
-                        const relationshipColor = relationship.color;
+                        const relationshipColor = relationship.style.color;
                         const textColor = getContrastTextColor(relationshipColor);
                         return (
                             <li key={infoRelationship.name} className="max-w-full">

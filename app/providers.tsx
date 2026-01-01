@@ -3,7 +3,7 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes'
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage } from "@/lib/utils";
+import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef } from "@/lib/utils";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -57,6 +57,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   const panelRef = useRef<ImperativePanelHandle>(null)
+  const canvasRef = useRef<GraphRef["current"]>(null)
 
   const [historyQuery, setHistoryQuery] = useState<HistoryQuery>(defaultQueryHistory)
   const [indicator, setIndicator] = useState<"online" | "offline">("online")
@@ -206,14 +207,15 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setIsQueryLoading,
   }), [isQueryLoading])
 
-  const viewportContext = useMemo(() => ({
+  const forceGraphContext = useMemo(() => ({
+    canvasRef,
     viewport,
     setViewport,
     data,
     setData,
     graphData,
     setGraphData,
-  }), [viewport, data, graphData])
+  }), [canvasRef, viewport, data, graphData])
 
   const tableViewContext = useMemo(() => ({
     scrollPosition,
@@ -309,9 +311,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         fetchInfo("(relationship type)", n),
         fetchInfo("(property key)", n),
       ]).then(async ([newLabels, newRelationships, newPropertyKeys]) => {
-        const colorsArr = localStorage.getItem(n)
         const memoryUsage = showMemoryUsage ? await getMemoryUsage(n, toast, setIndicator) : new Map<string, MemoryValue>()
-        const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, colorsArr ? JSON.parse(colorsArr) : undefined)
+        const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage)
         setGraphInfo(gi)
         return gi
       }).catch((error) => {
@@ -452,7 +453,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         if (json.message) return
 
         setDisplayChat(true)
-        
+
         if (!json.model && json.error) {
           setNavigateToSettings(true)
         }
@@ -619,7 +620,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                 <IndicatorContext.Provider value={indicatorContext}>
                   <PanelContext.Provider value={panelContext}>
                     <QueryLoadingContext.Provider value={queryLoadingContext}>
-                      <ForceGraphContext.Provider value={viewportContext}>
+                      <ForceGraphContext.Provider value={forceGraphContext}>
                         <TableViewContext.Provider value={tableViewContext}>
                           {
                             pathname === "/graph" &&

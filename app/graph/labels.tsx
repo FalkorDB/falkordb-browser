@@ -34,7 +34,7 @@ export default function Labels<T extends Label | Relationship>({ labels, onClick
                                         onClick(l)
                                     }}
                                 >
-                                    <div style={{ backgroundColor: l.color }} className={cn("min-w-6 min-h-6 rounded-full")} />
+                                    <div style={{ backgroundColor: l.style.color }} className={cn("min-w-6 min-h-6 rounded-full")} />
                                 </Button>
                             </li>
                         ))

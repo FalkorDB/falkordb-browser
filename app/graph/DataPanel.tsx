@@ -92,14 +92,19 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
             graph.GraphInfo = newGraphInfo
 
             const canvas = canvasRef.current
+            
             if (canvas) {
                 const currentData = canvas.getGraphData()
+
                 currentData.nodes.forEach(canvasNode => {
-                    const appNode = graph.NodesMap.get(canvasNode.id)
-                    if (appNode) {
-                        canvasNode.labels.push(newLabel)
+                    if (canvasNode.id === node.id) {
+                        canvasNode.labels = [...node.labels]
+                        canvasNode.color = node.color
+                        canvasNode.size = node.size
+                        canvasNode.caption = node.caption
                     }
                 })
+
                 canvas.setGraphData({ ...currentData })
             }
 
@@ -139,15 +144,18 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
             const canvas = canvasRef.current
             if (canvas) {
                 const currentData = canvas.getGraphData()
+
                 currentData.nodes.forEach(canvasNode => {
-                    const appNode = graph.NodesMap.get(canvasNode.id)
-                    if (appNode) {
-                        canvasNode.labels.splice(
-                            canvasNode.labels.findIndex((l) => l === removeLabel),
-                            1
-                        );
+                    if (canvasNode.id === node.id) {
+
+                        // Update canvas node to match the updated graph node
+                        canvasNode.labels = [...node.labels]
+                        canvasNode.color = node.color
+                        canvasNode.size = node.size
+                        canvasNode.caption = node.caption
                     }
                 })
+
                 canvas.setGraphData({ ...currentData })
             }
 
