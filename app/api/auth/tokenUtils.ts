@@ -96,6 +96,10 @@ export async function getPasswordFromTokenDB(tokenId: string): Promise<string> {
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("Error fetching password from Token DB:", error);
+    // Re-throw the original error if it has a meaningful message (like ENCRYPTION_KEY missing)
+    if (error instanceof Error && error.message.includes("ENCRYPTION_KEY")) {
+      throw error;
+    }
     throw new Error(`Failed to retrieve password for token: ${tokenId}`);
   }
 }
