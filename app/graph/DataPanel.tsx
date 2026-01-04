@@ -100,7 +100,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
                     if (canvasNode.id === node.id) {
                         canvasNode.labels = [...node.labels]
                         canvasNode.color = node.color
-                        canvasNode.size = node.size
+                        canvasNode.size = node.size || canvasNode.size
                         canvasNode.caption = node.caption
                     }
                 })
@@ -151,7 +151,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
                         // Update canvas node to match the updated graph node
                         canvasNode.labels = [...node.labels]
                         canvasNode.color = node.color
-                        canvasNode.size = node.size
+                        canvasNode.size = node.size || canvasNode.size
                         canvasNode.caption = node.caption
                     }
                 })

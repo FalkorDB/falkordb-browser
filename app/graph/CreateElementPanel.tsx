@@ -14,7 +14,7 @@ import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Combobox from "../components/ui/combobox";
 import { Node, Value } from "../api/graph/model";
-import { BrowserSettingsContext, IndicatorContext } from "../components/provider";
+import { IndicatorContext } from "../components/provider";
 import AddLabel from "./addLabel";
 import RemoveLabel from "./RemoveLabel";
 import DialogComponent from "../components/DialogComponent";
@@ -43,7 +43,6 @@ export default function CreateElementPanel(props: Props) {
     const setSelectedNodes = !type ? props.setSelectedNodes : undefined;
 
     const { indicator } = useContext(IndicatorContext)
-    const { settings: { graphInfo: { displayTextPriority } } } = useContext(BrowserSettingsContext)
     const { toast } = useToast()
 
     const setInputRef = useRef<HTMLInputElement>(null)
@@ -155,7 +154,7 @@ export default function CreateElementPanel(props: Props) {
         }
     }, [editable])
 
-    const handleGetNodeTextPriority = useCallback((node: Node) => getNodeDisplayText(node, displayTextPriority), [displayTextPriority])
+    const handleGetNodeTextPriority = useCallback((node: Node) => getNodeDisplayText(node), [])
 
     const getDefaultVal = (t: ValueType): Value => {
         switch (t) {
