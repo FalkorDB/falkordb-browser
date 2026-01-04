@@ -9,7 +9,7 @@ import type { Data, GraphLink, GraphNode, GraphData as CanvasData, ViewportState
 import { securedFetch, getTheme, GraphRef } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import { Link, Node, Relationship, Graph, GraphData } from "../api/graph/model"
-import { BrowserSettingsContext, IndicatorContext } from "./provider"
+import { IndicatorContext } from "./provider"
 
 interface Props {
     graph: Graph
@@ -69,7 +69,6 @@ export default function ForceGraph({
 }: Props) {
 
     const { setIndicator } = useContext(IndicatorContext)
-    const { settings: { graphInfo: { displayTextPriority } } } = useContext(BrowserSettingsContext)
 
     const { theme } = useTheme()
     const { toast } = useToast()
@@ -258,12 +257,6 @@ export default function ForceGraph({
         if (!canvasRef.current || !canvasLoaded) return;
         canvasRef.current.setForegroundColor(foreground);
     }, [canvasRef, foreground, canvasLoaded]);
-
-    // Update text priority
-    useEffect(() => {
-        if (!canvasRef.current || !canvasLoaded) return;
-        canvasRef.current.setDisplayTextPriority(displayTextPriority);
-    }, [canvasRef, displayTextPriority, canvasLoaded]);
 
     // Update loading state
     useEffect(() => {

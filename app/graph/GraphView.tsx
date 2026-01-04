@@ -7,7 +7,7 @@ import { GitGraph, ScrollText, Table } from "lucide-react"
 import { cn, GraphRef, Tab } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GraphContext, ForceGraphContext } from "@/app/components/provider";
-import dynamic from "next/dynamic";
+import ForceGraph from "@/app/components/ForceGraph";
 import { Label, Link, Node, Relationship, HistoryQuery } from "../api/graph/model";
 import Button from "../components/ui/Button";
 import TableView from "./TableView";
@@ -16,12 +16,6 @@ import Controls from "./controls";
 import GraphDetails from "./GraphDetails";
 import Labels from "./labels";
 import MetadataView from "./MetadataView";
-import Spinning from "../components/ui/spinning";
-
-const ForceGraph = dynamic(() => import("../components/ForceGraph"), {
-    ssr: false,
-    loading: () => <div className="h-full w-full flex justify-center items-center"><Spinning /></div>
-});
 
 interface Props {
     selectedElements: (Node | Link)[]

@@ -8,7 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
-import type { GraphData as CanvasData, TextPriority, ViewportState } from "@falkordb/canvas";
+import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphData, GraphInfo, HistoryQuery, MemoryValue, Query, Data } from "./api/graph/model";
 import Header from "./components/Header";
@@ -32,13 +32,6 @@ const defaultQueryHistory: HistoryQuery = {
   },
   counter: 0
 }
-
-const DISPLAY_TEXT_PRIORITY = [
-  { name: "name", ignore: false },
-  { name: "title", ignore: false },
-  { name: "label", ignore: false },
-  { name: "id", ignore: false }
-]
 
 /**
  * Wraps application UI with authentication-aware providers, state, and layout for graph and schema views.
@@ -83,8 +76,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [newContentPersistence, setNewContentPersistence] = useState(false)
   const [refreshInterval, setRefreshInterval] = useState(10)
   const [newRefreshInterval, setNewRefreshInterval] = useState(0)
-  const [displayTextPriority, setDisplayTextPriority] = useState<TextPriority[]>([])
-  const [newDisplayTextPriority, setNewDisplayTextPriority] = useState<TextPriority[]>([])
   const [currentTab, setCurrentTab] = useState<Tab>("Graph")
   const [newSecretKey, setNewSecretKey] = useState("")
   const [newModel, setNewModel] = useState("")
@@ -125,7 +116,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       defaultQuerySettings: { newDefaultQuery, setNewDefaultQuery },
       contentPersistenceSettings: { newContentPersistence, setNewContentPersistence },
       chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel },
-      graphInfo: { newRefreshInterval, setNewRefreshInterval, newDisplayTextPriority, setNewDisplayTextPriority }
+      graphInfo: { newRefreshInterval, setNewRefreshInterval }
     },
     settings: {
       limitSettings: { limit, setLimit, lastLimit, setLastLimit },
@@ -134,7 +125,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       defaultQuerySettings: { defaultQuery, setDefaultQuery },
       contentPersistenceSettings: { contentPersistence, setContentPersistence },
       chatSettings: { secretKey, setSecretKey, model, setModel, displayChat, navigateToSettings },
-      graphInfo: { showMemoryUsage, refreshInterval, setRefreshInterval, displayTextPriority, setDisplayTextPriority }
+      graphInfo: { showMemoryUsage, refreshInterval, setRefreshInterval }
     },
     hasChanges,
     setHasChanges,
@@ -148,7 +139,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       localStorage.setItem("defaultQuery", newDefaultQuery);
       localStorage.setItem("limit", newLimit.toString());
       localStorage.setItem("refreshInterval", newRefreshInterval.toString())
-      localStorage.setItem("displayTextPriority", JSON.stringify(newDisplayTextPriority))
       localStorage.setItem("model", newModel)
       localStorage.setItem("secretKey", newSecretKey)
 
@@ -162,7 +152,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setSecretKey(newSecretKey);
       setModel(newModel);
       setRefreshInterval(newRefreshInterval)
-      setDisplayTextPriority(newDisplayTextPriority)
       // Reset has changes
       setHasChanges(false);
 
@@ -181,11 +170,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setNewSecretKey(secretKey)
       setNewModel(model)
       setNewRefreshInterval(refreshInterval)
-      setNewDisplayTextPriority(displayTextPriority)
       setHasChanges(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [displayChat, navigateToSettings, contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, displayTextPriority, newDisplayTextPriority, replayTutorial, tutorialOpen, showMemoryUsage])
+  }), [displayChat, navigateToSettings, contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, replayTutorial, tutorialOpen, showMemoryUsage])
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -422,7 +410,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setContentPersistence(localStorage.getItem("contentPersistence") !== "false");
     setTutorialOpen(localStorage.getItem("tutorial") !== "false")
     setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30))
-    setDisplayTextPriority(JSON.parse(localStorage.getItem("displayTextPriority") || JSON.stringify(DISPLAY_TEXT_PRIORITY)))
     setSecretKey(localStorage.getItem("secretKey") || "")
     setModel(localStorage.getItem("model") || "")
   }, [status])

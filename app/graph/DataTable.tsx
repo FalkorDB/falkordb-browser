@@ -15,7 +15,7 @@ import Input from "../components/ui/Input"
 import DialogComponent from "../components/DialogComponent"
 import CloseDialog from "../components/CloseDialog"
 import { Link, Node, Value } from "../api/graph/model"
-import { BrowserSettingsContext, GraphContext, IndicatorContext } from "../components/provider"
+import { GraphContext, IndicatorContext } from "../components/provider"
 import ToastButton from "../components/ToastButton"
 import Button from "../components/ui/Button"
 import Combobox from "../components/ui/combobox"
@@ -32,7 +32,6 @@ interface Props {
 
 export default function DataTable({ object, type, lastObjId, canvasRef, className }: Props) {
 
-    const { settings: { graphInfo: { displayTextPriority } } } = useContext(BrowserSettingsContext)
     const { graph, graphInfo, setGraphInfo } = useContext(GraphContext)
     const { toast } = useToast()
 
@@ -243,7 +242,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                         if (canvasNode) {
                             canvasNode.data[key] = val
 
-                            if (getNodeDisplayKey(object as Node, displayTextPriority) === key) {
+                            if (getNodeDisplayKey(object as Node) === key) {
                                 canvasNode.displayName = ["", ""]
                             }
                         }
@@ -328,7 +327,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                         if (canvasNode) {
                             delete canvasNode.data[key]
 
-                            if (getNodeDisplayKey(object as Node, displayTextPriority) === key) {
+                            if (getNodeDisplayKey(object as Node) === key) {
                                 canvasNode.displayName = ["", ""]
                             }
                         }

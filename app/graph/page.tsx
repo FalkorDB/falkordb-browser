@@ -10,7 +10,10 @@ import { Label, Graph, Link, Node, Relationship, GraphInfo, Value, MemoryValue }
 import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ForceGraphContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
-import DataPanel from "./DataPanel";
+
+const DataPanel = dynamicImport(() => import("./DataPanel"), {
+    ssr: false,
+});
 
 const CreateElementPanel = dynamicImport(() => import("./CreateElementPanel"), {
     ssr: false,

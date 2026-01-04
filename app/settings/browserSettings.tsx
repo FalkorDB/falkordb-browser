@@ -3,12 +3,11 @@ import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
 import { useRouter } from "next/navigation";
 import { cn, getDefaultQuery } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
-import { RotateCcw, PlusCircle, Trash2, ChevronUp, ChevronDown, MonitorPlay, ChevronRight } from "lucide-react";
+import { RotateCcw, MonitorPlay, ChevronRight } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { TextPriority } from "@falkordb/canvas";
 import { BrowserSettingsContext } from "../components/provider";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -25,7 +24,7 @@ export default function BrowserSettings() {
             timeoutSettings: { newTimeout, setNewTimeout },
             limitSettings: { newLimit, setNewLimit },
             chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel },
-            graphInfo: { newRefreshInterval, setNewRefreshInterval, newDisplayTextPriority, setNewDisplayTextPriority }
+            graphInfo: { newRefreshInterval, setNewRefreshInterval }
         },
         settings: {
             contentPersistenceSettings: { contentPersistence },
@@ -34,7 +33,7 @@ export default function BrowserSettings() {
             timeoutSettings: { timeout: timeoutValue },
             limitSettings: { limit },
             chatSettings: { secretKey, model, displayChat },
-            graphInfo: { refreshInterval, displayTextPriority }
+            graphInfo: { refreshInterval }
         },
         hasChanges,
         setHasChanges,
@@ -49,7 +48,6 @@ export default function BrowserSettings() {
     const router = useRouter()
 
     const [isResetting, setIsResetting] = useState(false)
-    const [newPriorityField, setNewPriorityField] = useState<TextPriority>({ name: "", ignore: false })
     const [expandedSections, setExpandedSections] = useState({
         queryExecution: false,
         environment: false,
@@ -70,8 +68,7 @@ export default function BrowserSettings() {
         setNewSecretKey(secretKey)
         setNewModel(model)
         setNewRefreshInterval(refreshInterval)
-        setNewDisplayTextPriority(displayTextPriority)
-    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, model, setNewModel, setNewRefreshInterval, refreshInterval, displayTextPriority, setNewDisplayTextPriority])
+    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, model, setNewModel, setNewRefreshInterval, refreshInterval])
 
     useEffect(() => {
         setHasChanges(
@@ -82,10 +79,9 @@ export default function BrowserSettings() {
             newRunDefaultQuery !== runDefaultQuery ||
             newSecretKey !== secretKey ||
             newModel !== model ||
-            refreshInterval !== newRefreshInterval ||
-            JSON.stringify(newDisplayTextPriority) !== JSON.stringify(displayTextPriority)
+            refreshInterval !== newRefreshInterval
         )
-    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey, newModel, model, refreshInterval, newRefreshInterval, displayTextPriority, newDisplayTextPriority])
+    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey, newModel, model, refreshInterval, newRefreshInterval])
 
     const handleSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
         e?.preventDefault()
@@ -433,129 +429,6 @@ export default function BrowserSettings() {
                                     <h3 className="text-lg font-semibold">Content Persistence</h3>
                                     <p className="text-sm text-muted-foreground">Enable this function to &apos;Auto-Save&apos; your data in your next Browser session.</p>
                                 </div>
-                            </div>
-
-                            {/* Display Text Priority */}
-                            <div className="flex flex-col gap-4 p-4 bg-muted/10 rounded-lg">
-                                <div className="flex flex-col gap-2">
-                                    <h3 className="text-lg font-semibold">Display Text Priority</h3>
-                                    <p className="text-sm text-muted-foreground">
-                                        Configure the priority order for displaying node text in graph visualizations. The graph will use the first available property from this list.
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        Note: In case the property field is used in different cases (user / USER), activate ignore case selection.
-                                    </p>
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                    <Input
-                                        placeholder="Add new property field"
-                                        value={newPriorityField.name}
-                                        onChange={(e) => setNewPriorityField(prev => ({ ...prev, name: e.target.value }))}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                                e.preventDefault()
-                                                if (newPriorityField.name.trim() && !newDisplayTextPriority.some(field => field.name === newPriorityField.name.trim())) {
-                                                    setNewDisplayTextPriority([...newDisplayTextPriority, newPriorityField])
-                                                    setNewPriorityField({ name: "", ignore: false })
-                                                }
-                                            }
-                                        }}
-                                        className="flex-1"
-                                    />
-                                    <Button
-                                        variant="Secondary"
-                                        onClick={() => {
-                                            if (newPriorityField.name.trim() && !newDisplayTextPriority.some(field => field.name === newPriorityField.name.trim())) {
-                                                setNewDisplayTextPriority([...newDisplayTextPriority, newPriorityField])
-                                                setNewPriorityField({ name: "", ignore: false })
-                                            }
-                                        }}
-                                        disabled={!newPriorityField.name.trim() || newDisplayTextPriority.some(field => field.name === newPriorityField.name.trim())}
-                                    >
-                                        <PlusCircle size={20} />
-                                    </Button>
-                                </div>
-
-                                <ul className="flex flex-col gap-2 overflow-y-auto p-2 max-h-[300px] bg-background rounded-md border border-border">
-                                    {
-                                        newDisplayTextPriority.map(({ name, ignore }, index) => (
-                                            <li key={name} className="flex items-center gap-3 p-3 bg-muted/10 rounded-md hover:bg-muted/20 transition-colors">
-                                                <span className="text-sm font-medium w-8 text-muted-foreground">{index + 1}.</span>
-                                                <span className="flex-1 font-medium">{name}</span>
-                                                <div className="flex gap-2">
-                                                    <Button
-                                                        variant="Secondary"
-                                                        onClick={() => {
-                                                            if (index > 0) {
-                                                                setNewDisplayTextPriority(prev => {
-                                                                    const newPriority = [...prev];
-                                                                    [newPriority[index], newPriority[index - 1]] = [newPriority[index - 1], newPriority[index]]
-                                                                    return newPriority
-                                                                })
-                                                            }
-                                                        }}
-                                                        disabled={index === 0}
-                                                        title="Move up"
-                                                    >
-                                                        <ChevronUp size={16} />
-                                                    </Button>
-                                                    <Button
-                                                        variant="Secondary"
-                                                        onClick={() => {
-                                                            if (index < newDisplayTextPriority.length - 1) {
-                                                                setNewDisplayTextPriority(prev => {
-                                                                    const newPriority = [...prev];
-                                                                    [newPriority[index], newPriority[index + 1]] = [newPriority[index + 1], newPriority[index]]
-                                                                    return newPriority
-                                                                })
-                                                            }
-                                                        }}
-                                                        disabled={index === newDisplayTextPriority.length - 1}
-                                                        title="Move down"
-                                                    >
-                                                        <ChevronDown size={16} />
-                                                    </Button>
-                                                    <Tooltip>
-                                                        <TooltipTrigger
-                                                            disabled={name === "id"}
-                                                            asChild
-                                                        >
-                                                            <div>
-                                                                <Switch
-                                                                    checked={ignore}
-                                                                    disabled={name === "id"}
-                                                                    className={!ignore ? "bg-border" : "bg-primary"}
-                                                                    onCheckedChange={(checked) => {
-                                                                        setNewDisplayTextPriority(prev => {
-                                                                            const newPriority = [...prev]
-                                                                            newPriority[index] = { ...newPriority[index], ignore: checked }
-                                                                            return newPriority
-                                                                        })
-                                                                    }}
-                                                                />
-                                                            </div>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>
-                                                            <p>Ignore Case</p>
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                    <Button
-                                                        variant="Secondary"
-                                                        disabled={name === "id"}
-                                                        className="text-destructive hover:text-destructive/80"
-                                                        onClick={() => {
-                                                            setNewDisplayTextPriority(prev => prev.filter((_, i) => i !== index))
-                                                        }}
-                                                        title="Delete"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </Button>
-                                                </div>
-                                            </li>
-                                        ))
-                                    }
-                                </ul>
                             </div>
                         </CardContent>
                     )}

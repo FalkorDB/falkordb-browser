@@ -1,6 +1,6 @@
 import { createContext, Dispatch, SetStateAction } from "react";
 import { GraphRef, Panel, Tab } from "@/lib/utils";
-import type { GraphData as CanvasData, TextPriority, ViewportState } from "@falkordb/canvas";
+import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
 import { Graph, GraphData, GraphInfo, HistoryQuery } from "../api/graph/model";
 
 type BrowserSettingsContextType = {
@@ -34,8 +34,6 @@ type BrowserSettingsContextType = {
     graphInfo: {
       newRefreshInterval: number;
       setNewRefreshInterval: Dispatch<SetStateAction<number>>;
-      newDisplayTextPriority: TextPriority[];
-      setNewDisplayTextPriority: Dispatch<SetStateAction<TextPriority[]>>;
     };
   };
   settings: {
@@ -73,8 +71,6 @@ type BrowserSettingsContextType = {
       showMemoryUsage: boolean;
       refreshInterval: number;
       setRefreshInterval: Dispatch<SetStateAction<number>>;
-      displayTextPriority: TextPriority[];
-      setDisplayTextPriority: Dispatch<SetStateAction<TextPriority[]>>;
     };
   };
   hasChanges: boolean;
@@ -183,8 +179,6 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
       graphInfo: {
         newRefreshInterval: 0,
         setNewRefreshInterval: () => {},
-        newDisplayTextPriority: [],
-        setNewDisplayTextPriority: () => {},
       },
     },
     settings: {
@@ -216,8 +210,6 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         showMemoryUsage: false,
         refreshInterval: 0,
         setRefreshInterval: () => {},
-        displayTextPriority: [],
-        setDisplayTextPriority: () => {},
       },
     },
     hasChanges: false,
