@@ -149,9 +149,9 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
     }, [originalColor, originalSize, originalCaption, applyStylesToGraph]);
 
     const handleClose = useCallback(() => {
+        handleCancel();
         // Just close the panel without reverting changes
         onClose();
-        handleCancel();
     }, [onClose, handleCancel]);
 
     useEffect(() => {

@@ -790,7 +790,7 @@ export class Graph {
           )
         );
         // Use custom color if available, otherwise use default label color
-        node.color = label.style?.color || label.style.color;
+        node.color = label.style.color;
       });
 
     // remove empty category if there are no more empty nodes category
