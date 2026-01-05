@@ -252,7 +252,7 @@ export default class Page extends BasePage {
       if (status === "stopped") {
         return;
       }
-      await this.page.waitForTimeout(100); // Poll every 100ms
+      await this.page.waitForTimeout(500); // Poll every 500ms
     }
     throw new Error(`Canvas animation did not stop within ${timeout}ms`);
   }
