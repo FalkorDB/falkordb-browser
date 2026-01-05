@@ -2,20 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { renameGraph, validateBody } from "../../validate-body";
 
-// CORS headers helper
-function corsHeaders() {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  };
-}
-
-// Handle preflight requests
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders() });
-}
-
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ graph: string }> }
@@ -39,21 +25,20 @@ export async function DELETE(
 
         return NextResponse.json(
           { message: `${graphId} graph deleted` },
-          { headers: corsHeaders() }
         );
       }
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400, headers: corsHeaders() }
+        { status: 400 }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500, headers: corsHeaders() }
+      { status: 500 }
     );
   }
 }
@@ -81,20 +66,20 @@ export async function POST(
 
       return NextResponse.json(
         { message: "Graph created successfully" },
-        { status: 200, headers: corsHeaders() }
+        { status: 200 }
       );
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400, headers: corsHeaders() }
+        { status: 400 }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500, headers: corsHeaders() }
+      { status: 500 }
     );
   }
 }
@@ -123,7 +108,7 @@ export async function PATCH(
       if (!validation.success) {
         return NextResponse.json(
           { message: validation.error },
-          { status: 400, headers: corsHeaders() }
+          { status: 400 }
         );
       }
 
@@ -134,19 +119,19 @@ export async function PATCH(
 
       if (!data) throw new Error(`${graphId} already exists`);
 
-      return NextResponse.json({ data }, { headers: corsHeaders() });
+      return NextResponse.json({ data });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400, headers: corsHeaders() }
+        { status: 400 }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500, headers: corsHeaders() }
+      { status: 500 }
     );
   }
 }
@@ -261,7 +246,6 @@ export async function GET(
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
-      ...corsHeaders(),
     },
   });
 }
