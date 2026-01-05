@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /* eslint-disable react/require-default-props */
 
@@ -27,15 +27,15 @@ export default function Controls({
     cooldownTicks,
 }: Props) {
 
-    const { indicator } = useContext(IndicatorContext)
+    const { indicator } = useContext(IndicatorContext);
 
     const handleZoomClick = (changeFactor: number) => {
-        canvasRef.current?.zoom(canvasRef.current.getZoom() * changeFactor)
-    }
+        canvasRef.current?.zoom(canvasRef.current.getZoom() * changeFactor);
+    };
 
     const handleCenterClick = () => {
-        canvasRef.current?.zoomToFit()
-    }
+        canvasRef.current?.zoomToFit();
+    };
 
 
     return (
@@ -51,7 +51,7 @@ export default function Controls({
                                 className="pointer-events-auto data-[state=unchecked]:bg-border"
                                 checked={cooldownTicks === undefined}
                                 onCheckedChange={() => {
-                                    handleCooldown(cooldownTicks === undefined ? 0 : undefined)
+                                    handleCooldown(cooldownTicks === undefined ? 0 : undefined);
                                 }}
                             />
                         </div>
@@ -92,5 +92,5 @@ export default function Controls({
                 <Shrink size={20} />
             </Button>
         </div>
-    )
+    );
 }

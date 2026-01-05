@@ -13,7 +13,7 @@ import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Combobox from "../components/ui/combobox";
 
-const MODELS = ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"]
+const MODELS = ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"];
 
 export default function BrowserSettings() {
     const {
@@ -40,35 +40,35 @@ export default function BrowserSettings() {
         resetSettings,
         saveSettings,
         replayTutorial,
-    } = useContext(BrowserSettingsContext)
+    } = useContext(BrowserSettingsContext);
 
-    const scrollableContainerRef = useRef<HTMLFormElement>(null)
+    const scrollableContainerRef = useRef<HTMLFormElement>(null);
 
-    const { toast } = useToast()
-    const router = useRouter()
+    const { toast } = useToast();
+    const router = useRouter();
 
-    const [isResetting, setIsResetting] = useState(false)
+    const [isResetting, setIsResetting] = useState(false);
     const [expandedSections, setExpandedSections] = useState({
         queryExecution: false,
         environment: false,
         graphInfo: false,
         userExperience: false
-    })
+    });
 
     const toggleSection = (section: keyof typeof expandedSections) => {
-        setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }))
-    }
+        setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+    };
 
     useEffect(() => {
-        setNewContentPersistence(contentPersistence)
-        setNewRunDefaultQuery(runDefaultQuery)
-        setNewDefaultQuery(defaultQuery)
-        setNewTimeout(timeoutValue)
-        setNewLimit(limit)
-        setNewSecretKey(secretKey)
-        setNewModel(model)
-        setNewRefreshInterval(refreshInterval)
-    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, model, setNewModel, setNewRefreshInterval, refreshInterval])
+        setNewContentPersistence(contentPersistence);
+        setNewRunDefaultQuery(runDefaultQuery);
+        setNewDefaultQuery(defaultQuery);
+        setNewTimeout(timeoutValue);
+        setNewLimit(limit);
+        setNewSecretKey(secretKey);
+        setNewModel(model);
+        setNewRefreshInterval(refreshInterval);
+    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, model, setNewModel, setNewRefreshInterval, refreshInterval]);
 
     useEffect(() => {
         setHasChanges(
@@ -80,60 +80,60 @@ export default function BrowserSettings() {
             newSecretKey !== secretKey ||
             newModel !== model ||
             refreshInterval !== newRefreshInterval
-        )
-    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey, newModel, model, refreshInterval, newRefreshInterval])
+        );
+    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey, newModel, model, refreshInterval, newRefreshInterval]);
 
     const handleSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
-        e?.preventDefault()
+        e?.preventDefault();
 
-        saveSettings()
-    }, [saveSettings])
+        saveSettings();
+    }, [saveSettings]);
 
     const navigateBack = useCallback((e: KeyboardEvent) => {
         if (e.key === "Escape") {
-            e.preventDefault()
+            e.preventDefault();
 
             if (hasChanges) {
                 getQuerySettingsNavigationToast(toast, () => {
-                    handleSubmit()
-                    router.back()
+                    handleSubmit();
+                    router.back();
                 }, () => {
-                    resetSettings()
-                    router.back()
-                })
+                    resetSettings();
+                    router.back();
+                });
             } else {
-                router.back()
+                router.back();
             }
         }
-    }, [hasChanges, toast, handleSubmit, router, resetSettings])
+    }, [hasChanges, toast, handleSubmit, router, resetSettings]);
 
     useEffect(() => {
-        window.addEventListener("keydown", navigateBack)
+        window.addEventListener("keydown", navigateBack);
 
         return () => {
-            window.removeEventListener("keydown", navigateBack)
-        }
-    }, [hasChanges, navigateBack])
+            window.removeEventListener("keydown", navigateBack);
+        };
+    }, [hasChanges, navigateBack]);
 
     const handleScrollTo = (elementId?: string) => {
         if (elementId) {
             // Find the element by ID and scroll to it
             setTimeout(() => {
-                const el = document.getElementById(elementId)
+                const el = document.getElementById(elementId);
                 if (el) {
-                    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
-            }, 0)
+            }, 0);
         } else {
-            scrollableContainerRef.current?.scrollIntoView()
+            scrollableContainerRef.current?.scrollIntoView();
         }
-    }
+    };
 
     // Generic function to handle input changes with scroll
     const createChangeHandler = <T,>(setter: (value: T) => void) => (value: T, elementId?: string) => {
-        setter(value)
-        handleScrollTo(elementId)
-    }
+        setter(value);
+        handleScrollTo(elementId);
+    };
 
     // Handle numeric inputs with infinity support (for timeout and limit)
     const handleInfinityNumberChange = (
@@ -142,27 +142,27 @@ export default function BrowserSettings() {
         elementId: string,
         replacements: string[] = []
     ) => {
-        let cleanValue = inputValue.replace('∞', '')
+        let cleanValue = inputValue.replace('∞', '');
         replacements.forEach(replacement => {
-            cleanValue = cleanValue.replace(replacement, '')
-        })
+            cleanValue = cleanValue.replace(replacement, '');
+        });
 
-        const value = parseInt(cleanValue, 10)
+        const value = parseInt(cleanValue, 10);
 
         if (!value) {
-            createChangeHandler(setter)(0, elementId)
-            return
+            createChangeHandler(setter)(0, elementId);
+            return;
         }
 
-        if (value < 0 || Number.isNaN(value)) return
+        if (value < 0 || Number.isNaN(value)) return;
 
-        createChangeHandler(setter)(value, elementId)
-    }
+        createChangeHandler(setter)(value, elementId);
+    };
 
     // Wrapper for model combobox to handle scroll
     const handleModelChange = (value: string) => {
-        createChangeHandler(setNewModel)(value, 'secretKeyInput')
-    }
+        createChangeHandler(setNewModel)(value, 'secretKeyInput');
+    };
 
     return (
         <div className="grow basis-0 w-full flex flex-col gap-6 overflow-hidden">
@@ -373,20 +373,20 @@ export default function BrowserSettings() {
                                             id="runDefaultQueryResetBtn"
                                             variant="Secondary"
                                             onClick={async () => {
-                                                setIsResetting(true)
+                                                setIsResetting(true);
                                                 try {
                                                     // add a delay to the reset to show the animation
-                                                    await new Promise(resolve => { setTimeout(resolve, 1000) })
-                                                    const q = getDefaultQuery()
-                                                    setDefaultQuery(q)
-                                                    setNewDefaultQuery(q)
-                                                    localStorage.setItem("defaultQuery", q)
+                                                    await new Promise(resolve => { setTimeout(resolve, 1000); });
+                                                    const q = getDefaultQuery();
+                                                    setDefaultQuery(q);
+                                                    setNewDefaultQuery(q);
+                                                    localStorage.setItem("defaultQuery", q);
                                                     toast({
                                                         title: "Default query reset",
                                                         description: "Your default query has been reset.",
-                                                    })
+                                                    });
                                                 } finally {
-                                                    setIsResetting(false)
+                                                    setIsResetting(false);
                                                 }
                                             }}
                                             title="Reset"
@@ -456,5 +456,5 @@ export default function BrowserSettings() {
                 }
             </form >
         </div >
-    )
+    );
 }

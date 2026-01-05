@@ -2,7 +2,7 @@
 /* eslint-disable no-param-reassign */
 /* eslint-disable react/require-default-props */
 
-'use client'
+'use client';
 
 import { prepareArg, securedFetch, GraphRef } from "@/lib/utils";
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
@@ -24,106 +24,106 @@ interface Props {
 }
 
 export default function DataPanel({ object, onClose, setLabels, canvasRef }: Props) {
-    const { setIndicator } = useContext(IndicatorContext)
-    const { graph, setGraphInfo } = useContext(GraphContext)
+    const { setIndicator } = useContext(IndicatorContext);
+    const { graph, setGraphInfo } = useContext(GraphContext);
 
-    const lastObjId = useRef<number | undefined>(undefined)
-    const labelsListRef = useRef<HTMLUListElement>(null)
+    const lastObjId = useRef<number | undefined>(undefined);
+    const labelsListRef = useRef<HTMLUListElement>(null);
 
-    const { toast } = useToast()
-    const { data: session } = useSession()
+    const { toast } = useToast();
+    const { data: session } = useSession();
 
-    const [labelsHover, setLabelsHover] = useState(false)
+    const [labelsHover, setLabelsHover] = useState(false);
     const [label, setLabel] = useState<string[]>([]);
-    const type = !("source" in object)
+    const type = !("source" in object);
 
     const handleClose = useCallback((e: KeyboardEvent) => {
         if (e.key === "Escape") {
-            onClose()
+            onClose();
         }
-    }, [onClose])
+    }, [onClose]);
 
     useEffect(() => {
-        window.addEventListener("keydown", handleClose)
+        window.addEventListener("keydown", handleClose);
 
         return () => {
-            window.removeEventListener("keydown", handleClose)
-        }
-    }, [handleClose])
+            window.removeEventListener("keydown", handleClose);
+        };
+    }, [handleClose]);
 
     useEffect(() => {
         if (lastObjId.current !== object.id) {
-            setLabelsHover(false)
+            setLabelsHover(false);
         }
         setLabel(type ? [...(object as Node).labels.filter((c) => c !== "")] : [object.relationship]);
-        lastObjId.current = object.id
+        lastObjId.current = object.id;
     }, [object, type]);
 
     const handleAddLabel = async (newLabel: string) => {
-        const node = object as Node
+        const node = object as Node;
         if (newLabel === "") {
             toast({
                 title: "Error",
                 description: "Please fill the label",
                 variant: "destructive"
-            })
-            return false
+            });
+            return false;
         }
         if (label.includes(newLabel)) {
             toast({
                 title: "Error",
                 description: "Label already exists",
                 variant: "destructive"
-            })
-            return false
+            });
+            return false;
         }
         const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label`, {
             method: "POST",
             body: JSON.stringify({
                 label: newLabel
             })
-        }, toast, setIndicator)
+        }, toast, setIndicator);
 
         if (result.ok) {
-            setLabels([...graph.addLabel(newLabel, node)])
-            setLabel([...node.labels])
-            const newGraphInfo = graph.GraphInfo.clone()
-            setGraphInfo(newGraphInfo)
-            graph.GraphInfo = newGraphInfo
+            setLabels([...graph.addLabel(newLabel, node)]);
+            setLabel([...node.labels]);
+            const newGraphInfo = graph.GraphInfo.clone();
+            setGraphInfo(newGraphInfo);
+            graph.GraphInfo = newGraphInfo;
 
-            const canvas = canvasRef.current
+            const canvas = canvasRef.current;
             
             if (canvas) {
-                const currentData = canvas.getGraphData()
+                const currentData = canvas.getGraphData();
 
                 currentData.nodes.forEach(canvasNode => {
                     if (canvasNode.id === node.id) {
-                        canvasNode.labels = [...node.labels]
-                        canvasNode.color = node.color
-                        canvasNode.size = node.size || canvasNode.size
-                        canvasNode.caption = node.caption
+                        canvasNode.labels = [...node.labels];
+                        canvasNode.color = node.color;
+                        canvasNode.size = node.size || canvasNode.size;
+                        canvasNode.caption = node.caption;
                     }
-                })
+                });
 
-                canvas.setGraphData({ ...currentData })
+                canvas.setGraphData({ ...currentData });
             }
 
-            return true
+            return true;
         }
 
-        return false
-    }
+        return false;
+    };
 
     const handleRemoveLabel = async (removeLabel: string) => {
-        const node = object as Node
+        const node = object as Node;
 
         if (removeLabel === "") {
             toast({
                 title: "Error",
                 description: "You cannot remove the default label",
                 variant: "destructive"
-            })
-            return false
+            });
+            return false;
         }
 
         const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label`, {
@@ -131,39 +131,39 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
             body: JSON.stringify({
                 label: removeLabel
             })
-        }, toast, setIndicator)
+        }, toast, setIndicator);
 
         if (result.ok) {
-            graph.removeLabel(removeLabel, node)
-            setLabels([...graph.Labels])
-            setLabel([...node.labels])
-            const newGraphInfo = graph.GraphInfo.clone()
-            setGraphInfo(newGraphInfo)
-            graph.GraphInfo = newGraphInfo
+            graph.removeLabel(removeLabel, node);
+            setLabels([...graph.Labels]);
+            setLabel([...node.labels]);
+            const newGraphInfo = graph.GraphInfo.clone();
+            setGraphInfo(newGraphInfo);
+            graph.GraphInfo = newGraphInfo;
 
-            const canvas = canvasRef.current
+            const canvas = canvasRef.current;
             if (canvas) {
-                const currentData = canvas.getGraphData()
+                const currentData = canvas.getGraphData();
 
                 currentData.nodes.forEach(canvasNode => {
                     if (canvasNode.id === node.id) {
 
                         // Update canvas node to match the updated graph node
-                        canvasNode.labels = [...node.labels]
-                        canvasNode.color = node.color
-                        canvasNode.size = node.size || canvasNode.size
-                        canvasNode.caption = node.caption
+                        canvasNode.labels = [...node.labels];
+                        canvasNode.color = node.color;
+                        canvasNode.size = node.size || canvasNode.size;
+                        canvasNode.caption = node.caption;
                     }
-                })
+                });
 
-                canvas.setGraphData({ ...currentData })
+                canvas.setGraphData({ ...currentData });
             }
 
-            return true
+            return true;
         }
 
-        return false
-    }
+        return false;
+    };
 
     return (
         <div data-testid="DataPanel" className="DataPanel p-4">
@@ -242,5 +242,5 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
                 canvasRef={canvasRef}
             />
         </div >
-    )
+    );
 }

@@ -1,6 +1,6 @@
 /* eslint-disable no-param-reassign */
 
-'use client'
+'use client';
 
 import { useContext, useState, useEffect, useCallback, useRef } from "react";
 import { X, Palette } from "lucide-react";

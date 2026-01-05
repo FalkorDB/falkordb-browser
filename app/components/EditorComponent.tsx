@@ -4,8 +4,8 @@
 "use client";
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { Editor, Monaco } from "@monaco-editor/react"
-import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext, useMemo } from "react"
+import { Editor, Monaco } from "@monaco-editor/react";
+import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext, useMemo } from "react";
 import * as monaco from "monaco-editor";
 import { Minimize2, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
@@ -42,8 +42,8 @@ export const setTheme = (monacoI: Monaco, themeName: string, backgroundColor: st
         },
     });
 
-    monacoI.editor.setTheme(themeName)
-}
+    monacoI.editor.setTheme(themeName);
+};
 
 interface Props {
     graph: Graph
@@ -57,9 +57,9 @@ interface Props {
     isQueryLoading: boolean
 }
 
-const MAX_HEIGHT = 20
-const LINE_HEIGHT = 22
-const PLACEHOLDER = "Type your query here to start"
+const MAX_HEIGHT = 20;
+const LINE_HEIGHT = 22;
+const PLACEHOLDER = "Type your query here to start";
 const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     renderLineHighlight: "none",
     glyphMargin: false,
@@ -112,7 +112,7 @@ const KEYWORDS = [
     "FOREACH",
     "CALL",
     "YIELD",
-]
+];
 
 const FUNCTIONS = [
     "all",
@@ -207,7 +207,7 @@ const FUNCTIONS = [
     "vecf32",
     "vec.euclideanDistance",
     "vec.cosineDistance",
-]
+];
 
 const SUGGESTIONS: monaco.languages.CompletionItem[] = [
     ...KEYWORDS.map(key => ({
@@ -225,104 +225,104 @@ const SUGGESTIONS: monaco.languages.CompletionItem[] = [
         range: new monaco.Range(1, 1, 1, 1),
         detail: "(function)"
     }))
-]
+];
 
 export default function EditorComponent({ graph, graphName, historyQuery, maximize, setMaximize, runQuery, setHistoryQuery, editorKey, isQueryLoading }: Props) {
-    const { indicator, setIndicator } = useContext(IndicatorContext)
-    const { tutorialOpen } = useContext(BrowserSettingsContext)
+    const { indicator, setIndicator } = useContext(IndicatorContext);
+    const { tutorialOpen } = useContext(BrowserSettingsContext);
 
-    const { toast } = useToast()
-    const { theme } = useTheme()
-    const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
-    const dialogEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
-    const placeholderRef = useRef<HTMLDivElement>(null)
-    const submitQuery = useRef<HTMLButtonElement>(null)
-    const containerRef = useRef<HTMLDivElement>(null)
-    const indicatorRef = useRef(indicator)
-    const graphIdRef = useRef(graph.Id)
-    const graphNameRef = useRef(graphName)
-    const queryRef = useRef(historyQuery.query)
-    const tutorialOpenRef = useRef(tutorialOpen)
+    const { toast } = useToast();
+    const { theme } = useTheme();
+    const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+    const dialogEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+    const placeholderRef = useRef<HTMLDivElement>(null);
+    const submitQuery = useRef<HTMLButtonElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const indicatorRef = useRef(indicator);
+    const graphIdRef = useRef(graph.Id);
+    const graphNameRef = useRef(graphName);
+    const queryRef = useRef(historyQuery.query);
+    const tutorialOpenRef = useRef(tutorialOpen);
 
-    const [monacoEditor, setMonacoEditor] = useState<Monaco | null>(null)
-    const [sugDisposed, setSugDisposed] = useState<monaco.IDisposable>()
-    const [lineNumber, setLineNumber] = useState(1)
-    const [blur, setBlur] = useState(false)
+    const [monacoEditor, setMonacoEditor] = useState<Monaco | null>(null);
+    const [sugDisposed, setSugDisposed] = useState<monaco.IDisposable>();
+    const [lineNumber, setLineNumber] = useState(1);
+    const [blur, setBlur] = useState(false);
 
-    const { background, currentTheme } = getTheme(theme)
+    const { background, currentTheme } = getTheme(theme);
 
     const editorHeight = useMemo(() => blur
         ? LINE_HEIGHT
         : Math.min(lineNumber * LINE_HEIGHT, document.body.clientHeight / 100 * MAX_HEIGHT),
-        [blur, lineNumber])
+        [blur, lineNumber]);
 
     useEffect(() => {
-        tutorialOpenRef.current = tutorialOpen
-    }, [tutorialOpen])
+        tutorialOpenRef.current = tutorialOpen;
+    }, [tutorialOpen]);
 
     useEffect(() => {
-        graphNameRef.current = graphName
-    }, [graphName])
+        graphNameRef.current = graphName;
+    }, [graphName]);
 
     useEffect(() => {
-        queryRef.current = historyQuery.query
-    }, [historyQuery.query])
+        queryRef.current = historyQuery.query;
+    }, [historyQuery.query]);
 
     useEffect(() => {
-        indicatorRef.current = indicator
-    }, [indicator])
+        indicatorRef.current = indicator;
+    }, [indicator]);
 
     useEffect(() => {
         if (historyQuery.query && placeholderRef.current) {
-            placeholderRef.current.style.display = "none"
+            placeholderRef.current.style.display = "none";
         } else if (!historyQuery.query && placeholderRef.current && blur) {
-            placeholderRef.current.style.display = "block"
+            placeholderRef.current.style.display = "block";
         }
-    }, [historyQuery.query])
+    }, [historyQuery.query]);
 
     useEffect(() => {
-        graphIdRef.current = graph.Id
-    }, [graph.Id])
+        graphIdRef.current = graph.Id;
+    }, [graph.Id]);
 
     useEffect(() => () => {
-        sugDisposed?.dispose()
-    }, [sugDisposed])
+        sugDisposed?.dispose();
+    }, [sugDisposed]);
 
     useEffect(() => {
-        if (!containerRef.current) return
+        if (!containerRef.current) return;
 
         const handleResize = () => {
-            editorRef.current?.layout()
-        }
+            editorRef.current?.layout();
+        };
 
-        window.addEventListener("resize", handleResize)
+        window.addEventListener("resize", handleResize);
 
-        const observer = new ResizeObserver(handleResize)
+        const observer = new ResizeObserver(handleResize);
 
-        observer.observe(containerRef.current)
+        observer.observe(containerRef.current);
 
         return () => {
-            window.removeEventListener("resize", handleResize)
-            observer.disconnect()
-        }
-    }, [containerRef.current])
+            window.removeEventListener("resize", handleResize);
+            observer.disconnect();
+        };
+    }, [containerRef.current]);
 
     useEffect(() => {
-        setLineNumber(historyQuery.query.split("\n").length)
-    }, [historyQuery.query])
+        setLineNumber(historyQuery.query.split("\n").length);
+    }, [historyQuery.query]);
 
     const fetchSuggestions = async (detail: string): Promise<monaco.languages.CompletionItem[]> => {
-        if (indicator === "offline") return []
+        if (indicator === "offline") return [];
 
         const result = await securedFetch(`api/graph/${graphIdRef.current}/info?type=${prepareArg(detail)}`, {
             method: 'GET',
-        }, toast, setIndicator)
+        }, toast, setIndicator);
 
-        if (!result) return []
+        if (!result) return [];
 
-        const json = await result.json()
+        const json = await result.json();
 
-        if (json.result.data.length === 0) return []
+        if (json.result.data.length === 0) return [];
 
         return json.result.data.map(({ info }: { info: string }) => ({
             insertTextRules: detail === '(function)' ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet : undefined,
@@ -340,15 +340,15 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
             })(),
             range: new monaco.Range(1, 1, 1, 1),
             detail
-        }))
-    }
+        }));
+    };
 
     const getSuggestions = async () => (await Promise.all([
         fetchSuggestions('(function)'),
         fetchSuggestions('(property key)'),
         fetchSuggestions('(label)'),
         fetchSuggestions('(relationship type)')
-    ])).flat()
+    ])).flat();
 
     const addSuggestions = async (monacoI: Monaco) => {
         const sug = [
@@ -356,17 +356,17 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
             ...(graphIdRef.current ? await getSuggestions() : [])
         ];
 
-        const functions = sug.filter(({ detail }) => detail === "(function)")
+        const functions = sug.filter(({ detail }) => detail === "(function)");
 
         const namespaces = new Set(
             functions
                 .filter(({ label }) => (label as string).includes("."))
                 .map(({ label }) => {
-                    const newNamespaces = (label as string).split(".")
-                    newNamespaces.pop()
-                    return newNamespaces
+                    const newNamespaces = (label as string).split(".");
+                    newNamespaces.pop();
+                    return newNamespaces;
                 }).flat()
-        )
+        );
 
         monacoI.languages.setMonarchTokensProvider('custom-language', {
             tokenizer: {
@@ -376,10 +376,10 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                     [
                         new RegExp(`\\b(${functions.map(({ label }) => {
                             if ((label as string).includes(".")) {
-                                const labels = (label as string).split(".")
-                                return labels[labels.length - 1]
+                                const labels = (label as string).split(".");
+                                return labels[labels.length - 1];
                             }
-                            return label
+                            return label;
                         }).join('|')})\\b`),
                         "function"
                     ],
@@ -411,25 +411,25 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                 ],
             },
             ignoreCase: true,
-        })
+        });
 
-        return sug
-    }
+        return sug;
+    };
 
     useEffect(() => {
         if (monacoEditor) {
-            addSuggestions(monacoEditor)
+            addSuggestions(monacoEditor);
         }
-    }, [monacoEditor, graphIdRef.current])
+    }, [monacoEditor, graphIdRef.current]);
 
     const handleSubmit = async () => {
-        runQuery(historyQuery.query.trim())
-    }
+        runQuery(historyQuery.query.trim());
+    };
 
     const handleEditorWillMount = async (monacoI: Monaco) => {
-        setMonacoEditor(monacoI)
+        setMonacoEditor(monacoI);
 
-        monacoI.languages.register({ id: "custom-language" })
+        monacoI.languages.register({ id: "custom-language" });
 
         monacoI.languages.setMonarchTokensProvider('custom-language', {
             tokenizer: {
@@ -454,9 +454,9 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                 ],
             },
             ignoreCase: true,
-        })
+        });
 
-        setTheme(monacoI, "editor-theme", background, currentTheme === "dark")
+        setTheme(monacoI, "editor-theme", background, currentTheme === "dark");
 
         monacoI.languages.setLanguageConfiguration('custom-language', {
             brackets: [
@@ -480,20 +480,20 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
             ]
         });
 
-        addSuggestions(monacoI)
+        addSuggestions(monacoI);
 
         const provider = monacoI.languages.registerCompletionItemProvider("custom-language", {
             provideCompletionItems: async (model, position) => {
-                const word = model.getWordUntilPosition(position)
-                const range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn)
+                const word = model.getWordUntilPosition(position);
+                const range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
                 return {
                     suggestions: (await addSuggestions(monacoI)).map(s => ({ ...s, range }))
-                }
+                };
             },
-        })
+        });
 
-        setSugDisposed(provider)
-    }
+        setSugDisposed(provider);
+    };
 
     const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
         const updatePlaceholderVisibility = () => {
@@ -508,13 +508,13 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                 placeholderRef.current.style.display = 'none';
             }
 
-            setBlur(false)
+            setBlur(false);
         });
 
         e.onDidBlurEditorText(() => {
             updatePlaceholderVisibility();
 
-            setBlur(true)
+            setBlur(true);
         });
 
         updatePlaceholderVisibility();
@@ -537,7 +537,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                 const textarea = domNode.querySelector('textarea');
                 if (textarea) (textarea as HTMLTextAreaElement).blur();
             }
-        })
+        });
 
         // eslint-disable-next-line no-bitwise
         e.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
@@ -546,7 +546,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
 
         // eslint-disable-next-line no-bitwise
         e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-            if (indicatorRef.current === "offline" || !queryRef.current || !graphNameRef.current || tutorialOpenRef.current) return
+            if (indicatorRef.current === "offline" || !queryRef.current || !graphNameRef.current || tutorialOpenRef.current) return;
             submitQuery.current?.click();
         });
 
@@ -557,8 +557,8 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
             keybindings: [monaco.KeyCode.Enter],
             contextMenuOrder: 1.5,
             run: async () => {
-                if (indicatorRef.current === "offline" || !queryRef.current || !graphNameRef.current || tutorialOpenRef.current) return
-                submitQuery.current?.click()
+                if (indicatorRef.current === "offline" || !queryRef.current || !graphNameRef.current || tutorialOpenRef.current) return;
+                submitQuery.current?.click();
             },
             precondition: '!suggestWidgetVisible',
         });
@@ -582,8 +582,8 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                     return {
                         ...prev,
                         counter
-                    }
-                })
+                    };
+                });
             },
             precondition: 'isFirstLine && !suggestWidgetVisible',
         });
@@ -595,21 +595,21 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
             contextMenuOrder: 1.5,
             run: async () => {
                 setHistoryQuery(prev => {
-                    if (prev.queries.length === 0) return prev
+                    if (prev.queries.length === 0) return prev;
 
-                    let counter
+                    let counter;
 
                     if (prev.counter) {
-                        counter = prev.counter + 1 > prev.queries.length ? 0 : prev.counter + 1
+                        counter = prev.counter + 1 > prev.queries.length ? 0 : prev.counter + 1;
                     } else {
-                        counter = 0
+                        counter = 0;
                     }
 
                     return {
                         ...prev,
                         counter
-                    }
-                })
+                    };
+                });
             },
             precondition: 'isLastLine && !suggestWidgetVisible',
         });
@@ -617,13 +617,13 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
         // Override the default Ctrl + F keybinding
         // eslint-disable-next-line no-bitwise
         e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => { });
-    }
+    };
 
     const getLabel = () => {
-        if (!graphName) return "Select a graph first"
-        if (!historyQuery.query) return "You need to type a query first"
-        return "Press Enter to run the query"
-    }
+        if (!graphName) return "Select a graph first";
+        if (!historyQuery.query) return "You need to type a query first";
+        return "Press Enter to run the query";
+    };
 
     return (
         <div data-testid="editor" style={{ height: editorHeight + 18 }} className="absolute w-full flex items-start gap-8 border border-border rounded-lg overflow-hidden bg-background p-2">
@@ -648,19 +648,19 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                                         text: val || "",
                                     },
                                     query: val || "",
-                                }))
+                                }));
                             } else {
                                 setHistoryQuery(prev => ({
                                     ...prev,
                                     query: val || "",
-                                }))
+                                }));
                             }
                         }}
                         theme="editor-theme"
                         beforeMount={handleEditorWillMount}
                         onMount={(e) => {
-                            handleEditorDidMount(e)
-                            editorRef.current = e
+                            handleEditorDidMount(e);
+                            editorRef.current = e;
                         }}
                     />
                     <span ref={placeholderRef} className="w-full top-0 left-0 absolute pointer-events-none truncate SofiaSans">
@@ -677,8 +677,8 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                                 setHistoryQuery(prev => ({
                                     ...prev,
                                     query: "",
-                                }))
-                                editorRef.current?.focus()
+                                }));
+                                editorRef.current?.focus();
                             }}
                         >
                             <X />
@@ -720,8 +720,8 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                                             setHistoryQuery(prev => ({
                                                 ...prev,
                                                 query: "",
-                                            }))
-                                            dialogEditorRef.current?.focus()
+                                            }));
+                                            dialogEditorRef.current?.focus();
                                         }}
                                     >
                                         <X />
@@ -744,8 +744,8 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                             key={`${editorKey}-${currentTheme}`}
                             className="w-full h-full"
                             onMount={(e) => {
-                                handleEditorDidMount(e)
-                                dialogEditorRef.current = e
+                                handleEditorDidMount(e);
+                                dialogEditorRef.current = e;
                             }}
                             theme="editor-theme"
                             options={{
@@ -764,7 +764,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                                     setHistoryQuery(prev => ({
                                         ...prev,
                                         query: val || ""
-                                    }))
+                                    }));
                                 } else {
                                     setHistoryQuery(prev => ({
                                         ...prev,
@@ -773,7 +773,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                                             ...prev.currentQuery,
                                             text: val || "",
                                         },
-                                    }))
+                                    }));
                                 }
                             }}
                             language="custom-language"
@@ -782,5 +782,5 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                 </DialogContent>
             </Dialog>
         </div>
-    )
+    );
 }

@@ -17,8 +17,8 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
     const [customizingLabel, setCustomizingLabel] = useState<Label | null>(null);
 
     const { graph, graphInfo: { Labels, Relationships, PropertyKeys, MemoryUsage }, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
-    const { isQueryLoading } = useContext(QueryLoadingContext)
-    const { settings: { graphInfo: { showMemoryUsage } } } = useContext(BrowserSettingsContext)
+    const { isQueryLoading } = useContext(QueryLoadingContext);
+    const { settings: { graphInfo: { showMemoryUsage } } } = useContext(BrowserSettingsContext);
 
     return (
         <div className={cn(`relative h-full w-full p-2 grid grid-rows-[max-content_max-content_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)] gap-8 border-r border-border`)}>
@@ -243,5 +243,5 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                 )
             }
         </div>
-    )
+    );
 }

@@ -1,17 +1,17 @@
 /* eslint-disable no-param-reassign */
 
-'use client'
+'use client';
 
-import { useEffect, useContext, Dispatch, SetStateAction } from "react"
-import { GraphRef } from "@/lib/utils"
-import type { GraphData as CanvasData } from "@falkordb/canvas"
-import dynamic from "next/dynamic"
-import Labels from "../graph/labels"
-import { Label, Link, Node, GraphData, Relationship } from "../api/graph/model"
-import { SchemaContext } from "../components/provider"
-import Controls from "../graph/controls"
-import GraphDetails from "../graph/GraphDetails"
-import Spinning from "../components/ui/spinning"
+import { useEffect, useContext, Dispatch, SetStateAction } from "react";
+import { GraphRef } from "@/lib/utils";
+import type { GraphData as CanvasData } from "@falkordb/canvas";
+import dynamic from "next/dynamic";
+import Labels from "../graph/labels";
+import { Label, Link, Node, GraphData, Relationship } from "../api/graph/model";
+import { SchemaContext } from "../components/provider";
+import Controls from "../graph/controls";
+import GraphDetails from "../graph/GraphDetails";
+import Spinning from "../components/ui/spinning";
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), {
     ssr: false,
@@ -57,41 +57,41 @@ export default function SchemaView({
     isLoading,
     setIsLoading
 }: Props) {
-    const { schema, schemaName } = useContext(SchemaContext)
+    const { schema, schemaName } = useContext(SchemaContext);
 
     useEffect(() => {
-        setRelationships([...schema.Relationships])
-        setLabels([...schema.Labels])
-    }, [schema.Id, schema.Relationships.length, schema.Labels.length, setRelationships, schema.Relationships, schema.Labels, setLabels])
+        setRelationships([...schema.Relationships]);
+        setLabels([...schema.Labels]);
+    }, [schema.Id, schema.Relationships.length, schema.Labels.length, setRelationships, schema.Relationships, schema.Labels, setLabels]);
 
     useEffect(() => {
-        setSelectedElements([])
-    }, [schema.Id, setSelectedElements])
+        setSelectedElements([]);
+    }, [schema.Id, setSelectedElements]);
 
     const onLabelClick = (label: Label) => {
-        label.show = !label.show
+        label.show = !label.show;
 
         schema.Elements.nodes.forEach((node) => {
-            if (!label.show && node.labels.some(c => schema.LabelsMap.get(c)?.show !== label.show)) return
-            node.visible = label.show
-        })
+            if (!label.show && node.labels.some(c => schema.LabelsMap.get(c)?.show !== label.show)) return;
+            node.visible = label.show;
+        });
 
-        schema.visibleLinks(label.show)
-        schema.LabelsMap.set(label.name, label)
-        setData({ ...schema.Elements })
-    }
+        schema.visibleLinks(label.show);
+        schema.LabelsMap.set(label.name, label);
+        setData({ ...schema.Elements });
+    };
 
     const onRelationshipClick = (label: Relationship) => {
-        label.show = !label.show
+        label.show = !label.show;
 
         schema.Elements.links.forEach((link) => {
-            if (link.relationship !== label.name) return
-            link.visible = label.show
-        })
+            if (link.relationship !== label.name) return;
+            link.visible = label.show;
+        });
 
-        schema.RelationshipsMap.set(label.name, label)
-        setData({ ...schema.Elements })
-    }
+        schema.RelationshipsMap.set(label.name, label);
+        setData({ ...schema.Elements });
+    };
 
     return (
         <div className="relative w-full h-full border border-border rounded-lg overflow-hidden">
@@ -147,5 +147,5 @@ export default function SchemaView({
                 />
             </div>
         </div>
-    )
+    );
 }

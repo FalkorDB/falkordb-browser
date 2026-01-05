@@ -417,5 +417,5 @@ export function getTheme(theme: string | undefined) {
 // Type guard: runtime check that proves elements is [Node, Node]
 export function isTwoNodes(elements: (Node | Link)[]): elements is [Node, Node] {
   return elements.length === 2 &&
-    elements.every((e): e is Node => "labels" in e)
+    elements.every((e): e is Node => "labels" in e);
 }

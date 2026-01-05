@@ -5,7 +5,7 @@ import { expect, test } from "@playwright/test";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import GraphPage from "../logic/POM/graphPage";
-import urls from '../config/urls.json'
+import urls from '../config/urls.json';
 import { BATCH_CREATE_PERSONS } from "../config/constants";
 import { CREATE_NODE_QUERY, CREATE_QUERY, CREATE_TWO_NODES_QUERY, getRandomString } from "../infra/utils";
 
@@ -16,11 +16,11 @@ test.describe('Canvas Tests', () => {
     test.beforeEach(async () => {
         browser = new BrowserWrapper();
         apicalls = new ApiCalls();
-    })
+    });
 
     test.afterEach(async () => {
         await browser.closeBrowser();
-    })
+    });
 
     const testNodes = [1, 5, 10];
     testNodes.forEach(async (node) => {
@@ -156,7 +156,7 @@ test.describe('Canvas Tests', () => {
         await graph.searchElementInCanvas("Bob");
         await graph.waitForCanvasAnimationToEnd();
         await graph.hoverAtCanvasCenter();
-        expect(await graph.isNodeCanvasToolTipVisible())
+        expect(await graph.isNodeCanvasToolTipVisible());
         expect(await graph.getNodeCanvasToolTip()).toBe("Bob");
         await apicalls.removeGraph(graphName);
     });
@@ -348,4 +348,4 @@ test.describe('Canvas Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-})
+});

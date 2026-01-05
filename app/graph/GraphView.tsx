@@ -1,9 +1,9 @@
 /* eslint-disable no-param-reassign */
 
-'use client'
+'use client';
 
 import { useEffect, Dispatch, SetStateAction, useContext, useCallback } from "react";
-import { GitGraph, ScrollText, Table } from "lucide-react"
+import { GitGraph, ScrollText, Table } from "lucide-react";
 import { cn, GraphRef, Tab } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GraphContext, ForceGraphContext } from "@/app/components/provider";
@@ -57,101 +57,101 @@ function GraphView({
     isAddNode
 }: Props) {
 
-    const { graph, graphName, currentTab, setCurrentTab, isLoading, setIsLoading } = useContext(GraphContext)
-    const { setData, data, graphData, setGraphData, setViewport, viewport } = useContext(ForceGraphContext)
+    const { graph, graphName, currentTab, setCurrentTab, isLoading, setIsLoading } = useContext(GraphContext);
+    const { setData, data, graphData, setGraphData, setViewport, viewport } = useContext(ForceGraphContext);
 
-    const elementsLength = graph.getElements().length
+    const elementsLength = graph.getElements().length;
 
     useEffect(() => {
-        setRelationships([...graph.Relationships])
-        setLabels([...graph.Labels])
-    }, [graph, graph.Relationships, graph.Labels, setRelationships, setLabels])
+        setRelationships([...graph.Relationships]);
+        setLabels([...graph.Labels]);
+    }, [graph, graph.Relationships, graph.Labels, setRelationships, setLabels]);
 
     const isTabEnabled = useCallback((tab: Tab) => {
-        if (tab === "Table") return graph.Data.length !== 0
-        if (tab === "Metadata") return historyQuery.currentQuery && historyQuery.currentQuery.metadata.length > 0 && graph.Metadata.length > 0 && historyQuery.currentQuery.explain.length > 0
-        return true
-    }, [graph, historyQuery.currentQuery])
+        if (tab === "Table") return graph.Data.length !== 0;
+        if (tab === "Metadata") return historyQuery.currentQuery && historyQuery.currentQuery.metadata.length > 0 && graph.Metadata.length > 0 && historyQuery.currentQuery.explain.length > 0;
+        return true;
+    }, [graph, historyQuery.currentQuery]);
 
     useEffect(() => {
-        if (currentTab !== "Metadata" && isTabEnabled(currentTab)) return
+        if (currentTab !== "Metadata" && isTabEnabled(currentTab)) return;
 
-        let defaultChecked: Tab = "Graph"
-        if (elementsLength === 0 && graph.Data.length !== 0) defaultChecked = "Table"
+        let defaultChecked: Tab = "Graph";
+        if (elementsLength === 0 && graph.Data.length !== 0) defaultChecked = "Table";
 
         setCurrentTab(defaultChecked);
-    }, [graph, graph.Id, elementsLength, graph.Data.length, currentTab, setCurrentTab, isTabEnabled])
+    }, [graph, graph.Id, elementsLength, graph.Data.length, currentTab, setCurrentTab, isTabEnabled]);
 
     useEffect(() => {
-        setSelectedElements([])
-    }, [graph.Id, setSelectedElements])
+        setSelectedElements([]);
+    }, [graph.Id, setSelectedElements]);
 
     const onLabelClick = (label: Label) => {
-        label.show = !label.show
+        label.show = !label.show;
 
         label.elements.forEach((node) => {
-            if (!label.show && node.labels.some(c => graph.LabelsMap.get(c)?.show !== label.show)) return
-            node.visible = label.show
-        })
+            if (!label.show && node.labels.some(c => graph.LabelsMap.get(c)?.show !== label.show)) return;
+            node.visible = label.show;
+        });
 
-        graph.visibleLinks(label.show)
+        graph.visibleLinks(label.show);
 
-        graph.LabelsMap.set(label.name, label)
+        graph.LabelsMap.set(label.name, label);
 
-        const canvas = canvasRef.current
+        const canvas = canvasRef.current;
 
         if (canvas) {
-            const currentData = canvas.getGraphData()
+            const currentData = canvas.getGraphData();
             currentData.nodes.forEach(canvasNode => {
-                const appNode = graph.NodesMap.get(canvasNode.id)
+                const appNode = graph.NodesMap.get(canvasNode.id);
 
                 if (appNode) {
-                    canvasNode.visible = appNode.visible
+                    canvasNode.visible = appNode.visible;
                 }
-            })
+            });
             currentData.links.forEach(canvasLink => {
-                const appLink = graph.LinksMap.get(canvasLink.id)
+                const appLink = graph.LinksMap.get(canvasLink.id);
 
                 if (appLink) {
-                    canvasLink.visible = appLink.visible
+                    canvasLink.visible = appLink.visible;
                 }
-            })
-            canvas.setGraphData({ ...currentData })
+            });
+            canvas.setGraphData({ ...currentData });
         }
         
-        setLabels([...graph.Labels])
-    }
+        setLabels([...graph.Labels]);
+    };
 
     const onRelationshipClick = (relationship: Relationship) => {
-        relationship.show = !relationship.show
+        relationship.show = !relationship.show;
 
         relationship.elements.filter((link) => graph.NodesMap.get(link.source)?.visible && graph.NodesMap.get(link.target)?.visible).forEach((link) => {
-            link.visible = relationship.show
-        })
+            link.visible = relationship.show;
+        });
 
-        graph.RelationshipsMap.set(relationship.name, relationship)
+        graph.RelationshipsMap.set(relationship.name, relationship);
 
-        const canvas = canvasRef.current
+        const canvas = canvasRef.current;
 
         if (canvas) {
-            const currentData = canvas.getGraphData()
+            const currentData = canvas.getGraphData();
             currentData.nodes.forEach(canvasNode => {
-                const appNode = graph.NodesMap.get(canvasNode.id)
+                const appNode = graph.NodesMap.get(canvasNode.id);
                 if (appNode) {
-                    canvasNode.visible = appNode.visible
+                    canvasNode.visible = appNode.visible;
                 }
-            })
+            });
             currentData.links.forEach(canvasLink => {
-                const appLink = graph.LinksMap.get(canvasLink.id)
+                const appLink = graph.LinksMap.get(canvasLink.id);
                 if (appLink) {
-                    canvasLink.visible = appLink.visible
+                    canvasLink.visible = appLink.visible;
                 }
-            })
-            canvas.setGraphData({ ...currentData })
+            });
+            canvas.setGraphData({ ...currentData });
         }
 
-        setRelationships([...graph.Relationships])
-    }
+        setRelationships([...graph.Relationships]);
+    };
 
     return (
         <Tabs data-testid="graphView" value={currentTab} onValueChange={(value) => setCurrentTab(value as Tab)} className={cn("h-full w-full relative border border-border rounded-lg overflow-hidden", currentTab === "Table" && "flex flex-col-reverse")}>
@@ -275,18 +275,18 @@ function GraphView({
                             const newQuery = {
                                 ...prev.currentQuery,
                                 profile: profile || []
-                            }
+                            };
 
-                            const newQueries = prev.queries.map(q => q.text === newQuery.text ? newQuery : q)
+                            const newQueries = prev.queries.map(q => q.text === newQuery.text ? newQuery : q);
 
-                            localStorage.setItem("query history", JSON.stringify(newQueries))
+                            localStorage.setItem("query history", JSON.stringify(newQueries));
 
                             return {
                                 ...prev,
                                 currentQuery: newQuery,
                                 queries: newQueries
-                            }
-                        })
+                            };
+                        });
                     }}
                     graphName={graph.Id}
                     query={historyQuery.currentQuery}
@@ -294,7 +294,7 @@ function GraphView({
                 />
             </TabsContent>
         </Tabs>
-    )
+    );
 }
 
 GraphView.displayName = "GraphView";

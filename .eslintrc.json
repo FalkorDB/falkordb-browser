@@ -11,6 +11,8 @@
     "plugin:react/recommended"
   ],
   "rules": {
+    "semi": ["error", "always"],
+    "@typescript-eslint/semi": ["error", "always"],
     "react/react-in-jsx-scope": "off",
     "import/no-extraneous-dependencies": [
       "error",

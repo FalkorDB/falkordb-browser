@@ -1,7 +1,7 @@
 /* eslint-disable react/destructuring-assignment */
 /* eslint-disable react/no-array-index-key */
 
-'use client'
+'use client';
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useState } from "react";
@@ -30,64 +30,64 @@ type Props =
       selectedNodes: [Node, Node]
       setSelectedNodes: Dispatch<SetStateAction<(Node | Link)[]>>
       type: false
-    }
+    };
 
-export const ATTRIBUTES = ["Type", "Description", "Unique", "Required"]
+export const ATTRIBUTES = ["Type", "Description", "Unique", "Required"];
 
-export const OPTIONS = ["String", "Integer", "Float", "Geospatial", "Boolean"]
+export const OPTIONS = ["String", "Integer", "Float", "Geospatial", "Boolean"];
 
-export const getDefaultAttribute = (): [string, string[]] => ["", ["", "", "false", "false"]]
+export const getDefaultAttribute = (): [string, string[]] => ["", ["", "", "false", "false"]];
 
 export default function SchemaCreateElement(props: Props) {
-  const { onCreate, setIsAdd, type } = props
+  const { onCreate, setIsAdd, type } = props;
 
-  const selectedNodes = !type ? props.selectedNodes : undefined
-  const setSelectedNodes = !type ? props.setSelectedNodes : undefined
+  const selectedNodes = !type ? props.selectedNodes : undefined;
+  const setSelectedNodes = !type ? props.setSelectedNodes : undefined;
 
-  const { indicator } = useContext(IndicatorContext)
+  const { indicator } = useContext(IndicatorContext);
 
-  const { toast } = useToast()
+  const { toast } = useToast();
 
-  const [newAttribute, setNewAttribute] = useState<[string, string[]]>(getDefaultAttribute())
-  const [attribute, setAttribute] = useState<[string, string[]]>(getDefaultAttribute())
-  const [attributes, setAttributes] = useState<[string, string[]][]>([])
-  const [labelsHover, setLabelsHover] = useState<boolean>(false)
-  const [isLoading, setIsLoading] = useState<boolean>(false)
-  const [editable, setEditable] = useState<string>("")
-  const [label, setLabel] = useState<string[]>([])
-  const [hover, setHover] = useState<string>("")
+  const [newAttribute, setNewAttribute] = useState<[string, string[]]>(getDefaultAttribute());
+  const [attribute, setAttribute] = useState<[string, string[]]>(getDefaultAttribute());
+  const [attributes, setAttributes] = useState<[string, string[]][]>([]);
+  const [labelsHover, setLabelsHover] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [editable, setEditable] = useState<string>("");
+  const [label, setLabel] = useState<string[]>([]);
+  const [hover, setHover] = useState<string>("");
 
   const handleClose = useCallback((e: KeyboardEvent) => {
-    if (e.defaultPrevented) return
+    if (e.defaultPrevented) return;
 
     if (e.key === "Escape") {
-      setIsAdd(false)
+      setIsAdd(false);
     }
-  }, [setIsAdd])
+  }, [setIsAdd]);
 
   useEffect(() => {
-    window.addEventListener("keydown", handleClose)
+    window.addEventListener("keydown", handleClose);
     return () => {
-      window.removeEventListener("keydown", handleClose)
-    }
-  }, [handleClose])
+      window.removeEventListener("keydown", handleClose);
+    };
+  }, [handleClose]);
 
   const handleSetEditable = (att: [string, string[]] = getDefaultAttribute()) => {
-    setAttribute(att)
-    setEditable(att[0])
-  }
+    setAttribute(att);
+    setEditable(att[0]);
+  };
 
   const handleAddAttribute = (att?: [string, string[]]) => {
-    const newAtt = att || newAttribute
+    const newAtt = att || newAttribute;
 
     if (!newAtt[0] || newAtt[1].some((v) => !v)) {
       toast({
         title: "Error",
         description: "You must type a key, type and a description in order to add a new property",
         variant: "destructive"
-      })
+      });
 
-      return
+      return;
     }
 
     if (attributes.some(([key]) => key === newAtt[0])) {
@@ -95,30 +95,30 @@ export default function SchemaCreateElement(props: Props) {
         title: "Error",
         description: "An attribute with this key already exists",
         variant: "destructive"
-      })
-      return
+      });
+      return;
     }
 
-    setAttributes(prev => [...prev, newAtt])
-    setNewAttribute(getDefaultAttribute())
-  }
+    setAttributes(prev => [...prev, newAtt]);
+    setNewAttribute(getDefaultAttribute());
+  };
 
   const handleSetAttribute = (isUndo: boolean, att?: [string, string[]]) => {
-    const newAtt = att || attribute
+    const newAtt = att || attribute;
 
     if (!newAtt[0] || newAtt[1].some((v) => !v)) {
       toast({
         title: "Error",
         description: "You must type a key, type and a description in order to edit a property",
         variant: "destructive"
-      })
-      return
+      });
+      return;
     }
 
-    const oldAttribute = attributes.find(([k]) => k === newAtt[0])
-    setAttributes(prev => prev.map(([key, val]) => key === newAtt[0] ? newAtt : [key, val]))
-    setAttribute(getDefaultAttribute())
-    handleSetEditable()
+    const oldAttribute = attributes.find(([k]) => k === newAtt[0]);
+    setAttributes(prev => prev.map(([key, val]) => key === newAtt[0] ? newAtt : [key, val]));
+    setAttribute(getDefaultAttribute());
+    handleSetEditable();
     toast({
       title: "Success",
       description: "Attribute set",
@@ -128,36 +128,36 @@ export default function SchemaCreateElement(props: Props) {
           onClick={() => handleSetAttribute(false, oldAttribute)}
         />
         : undefined
-    })
-  }
+    });
+  };
 
   const handleSetKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.code === "Escape") {
-      e.preventDefault()
-      handleSetEditable()
-      return
+      e.preventDefault();
+      handleSetEditable();
+      return;
     }
 
-    if (e.key !== 'Enter') return
+    if (e.key !== 'Enter') return;
 
-    e.preventDefault()
+    e.preventDefault();
 
-    handleSetAttribute(true)
-  }
+    handleSetAttribute(true);
+  };
 
   const handleAddKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.code === "Escape") {
-      e.preventDefault()
-      setNewAttribute(getDefaultAttribute())
-      return
+      e.preventDefault();
+      setNewAttribute(getDefaultAttribute());
+      return;
     }
 
-    if (e.key !== 'Enter') return
+    if (e.key !== 'Enter') return;
 
-    e.preventDefault()
+    e.preventDefault();
 
-    handleAddAttribute()
-  }
+    handleAddAttribute();
+  };
 
   const handleOnCreate = async () => {
     if (!type) {
@@ -166,30 +166,30 @@ export default function SchemaCreateElement(props: Props) {
           title: "Error",
           description: "You must type a label",
           variant: "destructive"
-        })
+        });
 
-        return
+        return;
       }
     }
 
     try {
-      setIsLoading(true)
-      const ok = await onCreate(attributes, label)
+      setIsLoading(true);
+      const ok = await onCreate(attributes, label);
 
-      if (!ok) return
+      if (!ok) return;
 
-      setAttributes([])
-      setAttribute(getDefaultAttribute())
-      setLabel([])
+      setAttributes([]);
+      setAttribute(getDefaultAttribute());
+      setLabel([]);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleRemoveLabel = async (removeLabel: string) => {
-    setLabel(prev => prev.filter(l => l !== removeLabel))
-    return true
-  }
+    setLabel(prev => prev.filter(l => l !== removeLabel));
+    return true;
+  };
 
   const handleAddLabel = async (newLabel: string) => {
     if (newLabel === "") {
@@ -197,8 +197,8 @@ export default function SchemaCreateElement(props: Props) {
         title: "Error",
         description: "Label cannot be empty",
         variant: "destructive"
-      })
-      return false
+      });
+      return false;
     }
 
     if (label.includes(newLabel)) {
@@ -206,26 +206,26 @@ export default function SchemaCreateElement(props: Props) {
         title: "Error",
         description: "Label already exists",
         variant: "destructive"
-      })
+      });
 
-      return false
+      return false;
     }
 
-    setLabel(prev => [...prev, newLabel])
-    return true
-  }
+    setLabel(prev => [...prev, newLabel]);
+    return true;
+  };
 
   const onClose = () => {
     if (setSelectedNodes) {
-      setSelectedNodes([])
+      setSelectedNodes([]);
     }
-    setAttributes([])
-    setLabel([])
-    setNewAttribute(getDefaultAttribute())
-    setAttribute(getDefaultAttribute())
-    setEditable("")
-    setIsAdd(false)
-  }
+    setAttributes([]);
+    setLabel([]);
+    setNewAttribute(getDefaultAttribute());
+    setAttribute(getDefaultAttribute());
+    setEditable("");
+    setIsAdd(false);
+  };
 
   return (
     <div className="DataPanel">
@@ -304,8 +304,8 @@ export default function SchemaCreateElement(props: Props) {
                 <TableRow
                   className="cursor-pointer p-2 h-20"
                   onClick={() => {
-                    if (editable === key) return
-                    handleSetEditable([key, [...val]])
+                    if (editable === key) return;
+                    handleSetEditable([key, [...val]]);
                   }}
                   // onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && handleSetEditable()}
                   onMouseEnter={() => setHover(key)}
@@ -323,9 +323,9 @@ export default function SchemaCreateElement(props: Props) {
                           <Combobox
                             options={OPTIONS}
                             setSelectedValue={(v) => setAttribute(prev => {
-                              const p: [string, string[]] = [...prev]
-                              p[1][0] = v
-                              return p
+                              const p: [string, string[]] = [...prev];
+                              p[1][0] = v;
+                              return p;
                             })}
                             inTable
                             label="Type"
@@ -337,9 +337,9 @@ export default function SchemaCreateElement(props: Props) {
                             className="w-full"
                             onKeyDown={handleSetKeyDown}
                             onChange={(e) => setAttribute(prev => {
-                              const p: [string, string[]] = [...prev]
-                              p[1][1] = e.target.value
-                              return p
+                              const p: [string, string[]] = [...prev];
+                              p[1][1] = e.target.value;
+                              return p;
                             })}
                             value={attribute[1][1]}
                           />
@@ -348,9 +348,9 @@ export default function SchemaCreateElement(props: Props) {
                           <Switch
                             className="data-[state=unchecked]:bg-border"
                             onCheckedChange={(checked) => setAttribute(prev => {
-                              const p: [string, string[]] = [...prev]
-                              p[1][2] = checked ? "true" : "false"
-                              return p
+                              const p: [string, string[]] = [...prev];
+                              p[1][2] = checked ? "true" : "false";
+                              return p;
                             })}
                             checked={attribute[1][2] === "true"}
                           />
@@ -359,9 +359,9 @@ export default function SchemaCreateElement(props: Props) {
                           <Switch
                             className="data-[state=unchecked]:bg-border"
                             onCheckedChange={(checked) => setAttribute(prev => {
-                              const p: [string, string[]] = [...prev]
-                              p[1][3] = checked ? "true" : "false"
-                              return p
+                              const p: [string, string[]] = [...prev];
+                              p[1][3] = checked ? "true" : "false";
+                              return p;
                             })}
                             checked={attribute[1][3] === "true"}
                           />
@@ -382,8 +382,8 @@ export default function SchemaCreateElement(props: Props) {
                               title="Save the attribute changes"
                               data-testid="saveAttributeButton"
                               onClick={(e) => {
-                                e.stopPropagation()
-                                handleSetAttribute(true)
+                                e.stopPropagation();
+                                handleSetAttribute(true);
                               }}
                             >
                               <Check size={20} />
@@ -394,8 +394,8 @@ export default function SchemaCreateElement(props: Props) {
                               title="Discard the attribute changes"
                               data-testid="cancelAttributeButton"
                               onClick={(e) => {
-                                e.stopPropagation()
-                                handleSetEditable()
+                                e.stopPropagation();
+                                handleSetEditable();
                               }}
                             >
                               <X size={20} />
@@ -408,9 +408,9 @@ export default function SchemaCreateElement(props: Props) {
                               label="Remove"
                               title="Delete this attribute"
                               onClick={(e) => {
-                                e.stopPropagation()
-                                const oldAttribute = attributes.find(([k]) => k === key)
-                                setAttributes(prev => prev.filter(([k]) => k !== key))
+                                e.stopPropagation();
+                                const oldAttribute = attributes.find(([k]) => k === key);
+                                setAttributes(prev => prev.filter(([k]) => k !== key));
                                 toast({
                                   title: "Success",
                                   description: "Attribute removed",
@@ -419,7 +419,7 @@ export default function SchemaCreateElement(props: Props) {
                                       showUndo
                                       onClick={() => handleAddAttribute(oldAttribute)}
                                     />
-                                })
+                                });
                               }}
                             >
                               <Trash2 size={20} />
@@ -429,8 +429,8 @@ export default function SchemaCreateElement(props: Props) {
                               label="Edit"
                               title="Modify this attribute"
                               onClick={(e) => {
-                                e.stopPropagation()
-                                handleSetEditable([key, [...val]])
+                                e.stopPropagation();
+                                handleSetEditable([key, [...val]]);
                               }}
                             >
                               <Pencil size={20} />
@@ -448,9 +448,9 @@ export default function SchemaCreateElement(props: Props) {
                   className="w-full"
                   onKeyDown={handleAddKeyDown}
                   onChange={(e) => setNewAttribute(prev => {
-                    const p: [string, string[]] = [...prev]
-                    p[0] = e.target.value
-                    return p
+                    const p: [string, string[]] = [...prev];
+                    p[0] = e.target.value;
+                    return p;
                   })}
                   value={newAttribute[0]}
                 />
@@ -459,9 +459,9 @@ export default function SchemaCreateElement(props: Props) {
                 <Combobox
                   options={OPTIONS}
                   setSelectedValue={(v) => setNewAttribute(prev => {
-                    const p: [string, string[]] = [...prev]
-                    p[1][0] = v
-                    return p
+                    const p: [string, string[]] = [...prev];
+                    p[1][0] = v;
+                    return p;
                   })}
                   inTable
                   label="Type"
@@ -473,9 +473,9 @@ export default function SchemaCreateElement(props: Props) {
                   className="w-full"
                   onKeyDown={handleAddKeyDown}
                   onChange={(e) => setNewAttribute(prev => {
-                    const p: [string, string[]] = [...prev]
-                    p[1][1] = e.target.value
-                    return p
+                    const p: [string, string[]] = [...prev];
+                    p[1][1] = e.target.value;
+                    return p;
                   })}
                   value={newAttribute[1][1]}
                 />
@@ -484,9 +484,9 @@ export default function SchemaCreateElement(props: Props) {
                 <Switch
                   className="data-[state=unchecked]:bg-border"
                   onCheckedChange={(checked) => setNewAttribute(prev => {
-                    const p: [string, string[]] = [...prev]
-                    p[1][2] = checked ? "true" : "false"
-                    return p
+                    const p: [string, string[]] = [...prev];
+                    p[1][2] = checked ? "true" : "false";
+                    return p;
                   })}
                   checked={newAttribute[1][2] === "true"}
                 />
@@ -495,9 +495,9 @@ export default function SchemaCreateElement(props: Props) {
                 <Switch
                   className="data-[state=unchecked]:bg-border"
                   onCheckedChange={(checked) => setNewAttribute(prev => {
-                    const p: [string, string[]] = [...prev]
-                    p[1][3] = checked ? "true" : "false"
-                    return p
+                    const p: [string, string[]] = [...prev];
+                    p[1][3] = checked ? "true" : "false";
+                    return p;
                   })}
                   checked={newAttribute[1][3] === "true"}
                 />
@@ -510,8 +510,8 @@ export default function SchemaCreateElement(props: Props) {
                     title="Add a new attribute"
                     data-testid="addAttributeButton"
                     onClick={(e) => {
-                      e.stopPropagation()
-                      handleAddAttribute()
+                      e.stopPropagation();
+                      handleAddAttribute();
                     }}
                   >
                     <Plus size={20} />
@@ -522,8 +522,8 @@ export default function SchemaCreateElement(props: Props) {
                     title="Discard the new attribute"
                     data-testid="cancelNewAttributeButton"
                     onClick={(e) => {
-                      e.stopPropagation()
-                      setNewAttribute(getDefaultAttribute())
+                      e.stopPropagation();
+                      setNewAttribute(getDefaultAttribute());
                     }}
                   >
                     <X size={20} />
@@ -633,8 +633,8 @@ export default function SchemaCreateElement(props: Props) {
                 title="Swap the order of selected nodes"
                 data-testid="swapSelectedNodesButton"
                 onClick={() => setSelectedNodes && setSelectedNodes(prev => {
-                  const nodes = prev.filter((e): e is Node => "labels" in e)
-                  return [nodes[1], nodes[0]]
+                  const nodes = prev.filter((e): e is Node => "labels" in e);
+                  return [nodes[1], nodes[0]];
                 })}
               >
                 <ArrowRightLeft size={20} />
@@ -663,5 +663,5 @@ export default function SchemaCreateElement(props: Props) {
         </div>
       </div>
     </div>
-  )
+  );
 }

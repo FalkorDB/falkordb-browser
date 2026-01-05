@@ -1052,7 +1052,7 @@ export class Graph {
     if (selectedElement.labels.length === 0) {
       const [emptyCategory] = this.createLabel([""], selectedElement);
       selectedElement.labels.push(emptyCategory.name);
-      const { color, size, caption } = emptyCategory.style
+      const { color, size, caption } = emptyCategory.style;
       selectedElement.color = color;
       selectedElement.size = size;
       selectedElement.caption = caption;

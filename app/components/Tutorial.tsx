@@ -215,16 +215,16 @@ function TutorialPortal({
     // Calculate position based on target element
     useEffect(() => {
         if (!targetSelector) {
-            setCurrentPosition({ ...position, transform: "translate(-50%, -50%)" })
-            return () => { }
+            setCurrentPosition({ ...position, transform: "translate(-50%, -50%)" });
+            return () => { };
         }
 
         const element = document.querySelector(targetSelector);
-        const currentTooltip = tooltipRef.current
+        const currentTooltip = tooltipRef.current;
 
         if (!element || !currentTooltip) {
-            setCurrentPosition({ ...position, transform: "translate(-50%, -50%)" })
-            return () => { }
+            setCurrentPosition({ ...position, transform: "translate(-50%, -50%)" });
+            return () => { };
         }
 
         // Get actual tooltip dimensions from ref
@@ -306,7 +306,7 @@ function TutorialPortal({
 
             setCurrentPosition(calculatedPosition);
             setDirection(computedDirection);
-        }
+        };
 
         updatePosition();
 
@@ -327,7 +327,7 @@ function TutorialPortal({
     }, [placementAxis, position, step, targetSelector]);
 
     useEffect(() => {
-        const forwardArr = [...(forward || []), advanceOn].filter(ev => !!ev)
+        const forwardArr = [...(forward || []), advanceOn].filter(ev => !!ev);
 
         // Highlight target element and add click listener
         if (targetSelector) {
@@ -386,17 +386,17 @@ function TutorialPortal({
                     overlay.style.height = `${bottom - top}px`;
                 };
 
-                const resizeObserver = new ResizeObserver(updateOverlayPosition)
+                const resizeObserver = new ResizeObserver(updateOverlayPosition);
 
                 const cleanup = () => {
                     element.classList.remove('tutorial-highlight');
-                    resizeObserver.disconnect()
+                    resizeObserver.disconnect();
                     window.removeEventListener('resize', updateOverlayPosition);
                     if (wheelHandler) {
                         overlay.removeEventListener('wheel', wheelHandler, { passive: true } as EventListenerOptions);
                     }
                     overlay.remove();
-                }
+                };
 
                 updateOverlayPosition();
                 resizeObserver.observe(element);
@@ -438,8 +438,8 @@ function TutorialPortal({
                         // Advance the tutorial on the specified event type. Use a short delay
                         // so the forwarded event can reach the underlying element's handlers first.
                         setTimeout(() => {
-                            onNext()
-                        }, 200)
+                            onNext();
+                        }, 200);
                     }
 
                     // Get the overlay and target element positions to adjust coordinates
@@ -542,7 +542,7 @@ function TutorialPortal({
                 return () => {
                     removeForwarders();
                     cleanup();
-                }
+                };
             }
         }
 
@@ -723,12 +723,12 @@ function TutorialSpotlight({ targetSelector, spotlightSelector }: { targetSelect
         updateSpotlight();
 
         // Update on window resize
-        const resizeObserver = new ResizeObserver(updateSpotlight)
-        resizeObserver.observe(element)
+        const resizeObserver = new ResizeObserver(updateSpotlight);
+        resizeObserver.observe(element);
         window.addEventListener('resize', updateSpotlight);
 
         return () => {
-            resizeObserver.disconnect()
+            resizeObserver.disconnect();
             window.removeEventListener('resize', updateSpotlight);
         };
     }, [targetSelector, spotlightSelector]);

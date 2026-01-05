@@ -1,8 +1,8 @@
 /* eslint-disable no-param-reassign */
 
-"use client"
+"use client";
 
-import { FormEvent, useEffect, useState } from "react"
+import { FormEvent, useEffect, useState } from "react";
 import { PlusCircle } from "lucide-react";
 import { CreateUser } from "@/app/api/user/model";
 import Button from "@/app/components/ui/Button";
@@ -13,22 +13,22 @@ import { Drawer, DrawerDescription, DrawerContent, DrawerTitle, DrawerTrigger } 
 export default function AddUser({ onAddUser }: {
     onAddUser: (user: CreateUser) => Promise<void>
 }) {
-    const [open, setOpen] = useState(false)
-    const [username, setUsername] = useState("")
-    const [password, setPassword] = useState("")
-    const [confirmPassword, setConfirmPassword] = useState("")
-    const [role, setRole] = useState("Admin")
+    const [open, setOpen] = useState(false);
+    const [username, setUsername] = useState("");
+    const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [role, setRole] = useState("Admin");
 
     const handleClose = () => {
-        setPassword("")
-        setConfirmPassword("")
-        setUsername("")
-        setRole("")
-    }
+        setPassword("");
+        setConfirmPassword("");
+        setUsername("");
+        setRole("");
+    };
 
     useEffect(() => {
-        if (!open) handleClose()
-    }, [open])
+        if (!open) handleClose();
+    }, [open]);
 
     const fields: Field[] = [
         {
@@ -111,16 +111,16 @@ export default function AddUser({ onAddUser }: {
                 }
             ]
         }
-    ]
+    ];
 
     const handleAddUser = async (e: FormEvent) => {
         e.preventDefault();
 
-        await onAddUser({ username, password, role })
+        await onAddUser({ username, password, role });
 
-        setOpen(false)
+        setOpen(false);
 
-        handleClose()
+        handleClose();
     };
 
     return (
@@ -147,5 +147,5 @@ export default function AddUser({ onAddUser }: {
                 />
             </DrawerContent>
         </Drawer>
-    )
+    );
 }
