@@ -151,7 +151,8 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
     const handleClose = useCallback(() => {
         // Just close the panel without reverting changes
         onClose();
-    }, [onClose]);
+        handleCancel();
+    }, [onClose, handleCancel]);
 
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
