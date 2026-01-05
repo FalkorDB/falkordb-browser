@@ -419,7 +419,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                 } else if (evt.type === "click") {
                                                     setHistoryQuery(prev => ({
                                                         ...prev,
-                                                        counter: index === historyQuery.counter ? 0 : index + 1
+                                                        counter: index + 1 === historyQuery.counter ? 0 : index + 1
                                                     }))
                                                 }
                                             }}
