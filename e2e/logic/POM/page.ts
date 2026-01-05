@@ -216,9 +216,7 @@ export default class Page extends BasePage {
 
   // CANVAS
   public get canvasElement(): Locator {
-    return this.page.locator(
-      "//div[contains(@class, 'force-graph-container')]//canvas"
-    );
+    return this.page.locator("falkordb-canvas").locator("canvas").first();
   }
 
   // TOAST
@@ -243,14 +241,20 @@ export default class Page extends BasePage {
   // 1500 is extra timeout to ensure the animation is over
   async waitForCanvasAnimationToEnd(timeout = 4500): Promise<void> {
     await waitForElementToBeVisible(this.skeleton);
-    await this.page.waitForFunction(
-      ({ selector }) => {
-        const canvas = document.querySelector(selector);
-        return canvas?.getAttribute("data-engine-status") === "stopped";
-      },
-      { selector: ".force-graph-container canvas" },
-      { timeout }
-    );
+
+    // Wait for the web component to be loaded (it's imported asynchronously)
+    await this.canvasElement.waitFor({ state: "attached", timeout: 10000 });
+
+    // Poll the canvas element's data-engine-status attribute using the locator
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeout) {
+      const status = await this.canvasElement.getAttribute("data-engine-status");
+      if (status === "stopped") {
+        return;
+      }
+      await this.page.waitForTimeout(100); // Poll every 100ms
+    }
+    throw new Error(`Canvas animation did not stop within ${timeout}ms`);
   }
 
   async getCanvasScaling(): Promise<{ scaleX: number; scaleY: number }> {
