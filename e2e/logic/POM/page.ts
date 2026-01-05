@@ -211,7 +211,7 @@ export default class Page extends BasePage {
 
   // CANVAS TOOLTIP
   public get nodeCanvasToolTip(): Locator {
-    return this.page.locator("//div[contains(@class, 'float-tooltip-kap')]");
+    return this.page.locator("div[class='float-tooltip-kap']");
   }
 
   // CANVAS
