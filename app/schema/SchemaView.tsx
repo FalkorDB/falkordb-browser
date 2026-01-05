@@ -25,7 +25,7 @@ interface Props {
     setSelectedElements: (elements?: (Node | Link)[]) => void
     canvasRef: GraphRef
     cooldownTicks: number | undefined
-    handleCooldown: (ticks?: 0) => void
+    handleCooldown: (ticks?: number) => void
     data: GraphData
     setData: Dispatch<SetStateAction<GraphData>>
     graphData: CanvasData | undefined

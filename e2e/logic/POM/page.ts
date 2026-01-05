@@ -304,10 +304,7 @@ export default class Page extends BasePage {
     await this.page.waitForTimeout(1500); // Allow some time for the canvas to render properly
 
     // Get canvas element and its properties
-    const canvasInfo = await this.page.evaluate((selector) => {
-      const canvasElement = document.querySelector(
-        selector
-      ) as HTMLCanvasElement;
+    const canvasInfo = await this.canvasElement.evaluate((canvasElement: HTMLCanvasElement) => {
       if (!canvasElement) return null;
       const rect = canvasElement.getBoundingClientRect();
       const ctx = canvasElement.getContext("2d");
@@ -331,7 +328,9 @@ export default class Page extends BasePage {
             }
           : null,
       };
-    }, ".force-graph-container canvas");
+    });
+
+    console.log(canvasInfo);
 
     if (!canvasInfo || !canvasInfo.transform) return [];
 
@@ -421,10 +420,7 @@ export default class Page extends BasePage {
     await this.waitForCanvasAnimationToEnd();
 
     // Get canvas element and its properties
-    const canvasInfo = await this.page.evaluate((selector) => {
-      const canvasElement = document.querySelector(
-        selector
-      ) as HTMLCanvasElement;
+    const canvasInfo = await this.canvasElement.evaluate((canvasElement: HTMLCanvasElement) => {
       if (!canvasElement) return null;
       const rect = canvasElement.getBoundingClientRect();
       const ctx = canvasElement.getContext("2d");
@@ -448,7 +444,7 @@ export default class Page extends BasePage {
             }
           : null,
       };
-    }, ".force-graph-container canvas");
+    });
 
     if (!canvasInfo || !canvasInfo.transform) return [];
 

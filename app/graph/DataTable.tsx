@@ -14,7 +14,7 @@ import { getNodeDisplayKey } from "@falkordb/canvas";
 import Input from "../components/ui/Input";
 import DialogComponent from "../components/DialogComponent";
 import CloseDialog from "../components/CloseDialog";
-import { Link, Node, Value } from "../api/graph/model";
+import { EMPTY_DISPLAY_NAME, Link, Node, Value } from "../api/graph/model";
 import { GraphContext, IndicatorContext } from "../components/provider";
 import ToastButton from "../components/ToastButton";
 import Button from "../components/ui/Button";
@@ -243,7 +243,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                             canvasNode.data[key] = val;
 
                             if (getNodeDisplayKey(object as Node) === key) {
-                                canvasNode.displayName = ["", ""];
+                                canvasNode.displayName = EMPTY_DISPLAY_NAME;
                             }
                         }
                     } else {
@@ -328,7 +328,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                             delete canvasNode.data[key];
 
                             if (getNodeDisplayKey(object as Node) === key) {
-                                canvasNode.displayName = ["", ""];
+                                canvasNode.displayName = EMPTY_DISPLAY_NAME;
                             }
                         }
                     } else {

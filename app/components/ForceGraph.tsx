@@ -239,12 +239,16 @@ export default function ForceGraph({
 
     const handleEngineStop = useCallback(() => {
         const canvas = canvasRef.current;
-        if (cooldownTicks === 0 || !canvas) return;
 
-        handleCooldown(0);
+        if (!canvas) return;
 
+        const d = canvas.getGraphData();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any)[type] = canvas.getGraphData();
+        (window as any)[type] = d;
+
+        if (cooldownTicks === 0) return;
+        
+        handleCooldown(0);
     }, [canvasRef, cooldownTicks, handleCooldown, type]);
 
     const handleLoadingChange = useCallback((loading: boolean) => {

@@ -4,6 +4,7 @@ import {
   interactWhenVisible,
   waitForElementToNotBeVisible,
 } from "@/e2e/infra/utils";
+import { EMPTY_DISPLAY_NAME } from "@/app/api/graph/model";
 import GraphInfoPage from "./graphInfoPage";
 
 export default class CustomizeStylePage extends GraphInfoPage {
@@ -206,7 +207,7 @@ export default class CustomizeStylePage extends GraphInfoPage {
       throw new Error(`Node with id ${nodeId} not found`);
     }
     // displayName is a tuple [line1, line2]
-    const [line1, line2] = node.displayName || ["", ""];
+    const [line1, line2] = node.displayName || EMPTY_DISPLAY_NAME;
     return [line1, line2].filter(Boolean).join(" ");
   }
 
