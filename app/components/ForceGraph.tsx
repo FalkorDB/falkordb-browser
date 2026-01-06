@@ -242,12 +242,11 @@ export default function ForceGraph({
 
         if (!canvas) return;
 
-        const d = canvas.getGraphData();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any)[type] = d;
+        (window as any)[type] = () => canvas.getGraphData();
 
         if (cooldownTicks === 0) return;
-        
+
         handleCooldown(0);
     }, [canvasRef, cooldownTicks, handleCooldown, type]);
 

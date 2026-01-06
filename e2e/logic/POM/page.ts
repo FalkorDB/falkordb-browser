@@ -308,7 +308,7 @@ export default class Page extends BasePage {
     // Wait for the graph data to be available on window object (set by handleEngineStop)
     await this.page.waitForFunction(
       (key) => {
-        const data = (window as any)[key];
+        const data = (window as any)[key]?.();
         // Check both possible structures: { nodes } or { elements: { nodes } }
         return (data && ((Array.isArray(data.nodes) && data.nodes.length > 0) ||
                         (data.elements && Array.isArray(data.elements.nodes) && data.elements.nodes.length > 0)));
@@ -348,7 +348,7 @@ export default class Page extends BasePage {
 
     // Get graph data from window object
     const graphData = await this.page.evaluate(
-      (key) => (window as any)[key],
+      (key) => (window as any)[key]?.(),
       windowKey
     );
 
@@ -438,7 +438,7 @@ export default class Page extends BasePage {
     // Wait for the graph data to be available on window object (set by handleEngineStop)
     await this.page.waitForFunction(
       (key) => {
-        const data = (window as any)[key];
+        const data = (window as any)[key]?.();
         // Check both possible structures: { links } or { elements: { links } }
         return (data && ((Array.isArray(data.links) && data.links.length > 0) ||
                         (data.elements && Array.isArray(data.elements.links) && data.elements.links.length > 0)));
@@ -478,7 +478,7 @@ export default class Page extends BasePage {
 
     // Get graph data from window object
     const graphData = await this.page.evaluate(
-      (key) => (window as any)[key],
+      (key) => (window as any)[key]?.(),
       windowKey
     );
 
