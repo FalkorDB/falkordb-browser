@@ -3,7 +3,7 @@
  * Uses Web Crypto API with AES-GCM encryption
  */
 
-const ENCRYPTION_KEY_STORAGE_KEY = 'app_encryption_key';
+const ENCRYPTION_KEY_STORAGE_KEY = 'key';
 const ENCRYPTION_ALGORITHM = 'AES-GCM';
 const KEY_LENGTH = 256;
 const ENCRYPTED_PREFIX = 'enc:'; // Marker to identify encrypted values
