@@ -4,6 +4,7 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef } from "@/lib/utils";
+import { encryptValue, decryptValue, isCryptoAvailable, isEncrypted } from "@/lib/encryption";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -131,7 +132,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setHasChanges,
     replayTutorial,
     tutorialOpen,
-    saveSettings: () => {
+    saveSettings: async () => {
       // Save settings to local storage
       localStorage.setItem("runDefaultQuery", newRunDefaultQuery.toString());
       localStorage.setItem("contentPersistence", newContentPersistence.toString());
@@ -140,7 +141,37 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       localStorage.setItem("limit", newLimit.toString());
       localStorage.setItem("refreshInterval", newRefreshInterval.toString());
       localStorage.setItem("model", newModel);
-      localStorage.setItem("secretKey", newSecretKey);
+      
+      // Only encrypt and save secret key if it has changed
+      if (newSecretKey !== secretKey) {
+        if (newSecretKey) {
+          // Key has a value - encrypt it
+          if (!isCryptoAvailable()) {
+            toast({
+              title: "Error",
+              description: "Encryption not available in this browser. Cannot save secret key.",
+              variant: "destructive",
+            });
+            return; // Stop saving if crypto not available
+          }
+          
+          try {
+            const encryptedKey = await encryptValue(newSecretKey);
+            localStorage.setItem("secretKey", encryptedKey);
+          } catch (error) {
+            console.error('Failed to encrypt secret key:', error);
+            toast({
+              title: "Error",
+              description: "Could not encrypt secret key. Please try again.",
+              variant: "destructive",
+            });
+            return; // Stop saving if encryption fails
+          }
+        } else {
+          // Key is empty - remove it from storage
+          localStorage.removeItem("secretKey");
+        }
+      }
 
       // Update context
       setContentPersistence(newContentPersistence);
@@ -397,18 +428,48 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (status !== "authenticated") return;
 
-    setHistoryQuery({ ...defaultQueryHistory, queries: JSON.parse(localStorage.getItem("query history") || "[]") });
-    setTimeout(parseInt(localStorage.getItem("timeout") || "0", 10));
-    const l = parseInt(localStorage.getItem("limit") || "300", 10);
-    setLimit(l);
-    setLastLimit(l);
-    setDefaultQuery(getDefaultQuery(localStorage.getItem("defaultQuery") || undefined));
-    setRunDefaultQuery(localStorage.getItem("runDefaultQuery") !== "false");
-    setContentPersistence(localStorage.getItem("contentPersistence") !== "false");
-    setTutorialOpen(localStorage.getItem("tutorial") !== "false");
-    setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30));
-    setSecretKey(localStorage.getItem("secretKey") || "");
-    setModel(localStorage.getItem("model") || "");
+    (async () => {
+      setHistoryQuery({ ...defaultQueryHistory, queries: JSON.parse(localStorage.getItem("query history") || "[]") });
+      setTimeout(parseInt(localStorage.getItem("timeout") || "0", 10));
+      const l = parseInt(localStorage.getItem("limit") || "300", 10);
+      setLimit(l);
+      setLastLimit(l);
+      setDefaultQuery(getDefaultQuery(localStorage.getItem("defaultQuery") || undefined));
+      setRunDefaultQuery(localStorage.getItem("runDefaultQuery") !== "false");
+      setContentPersistence(localStorage.getItem("contentPersistence") !== "false");
+      setTutorialOpen(localStorage.getItem("tutorial") !== "false");
+      setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30));
+      
+      // Decrypt secret key if encrypted, or migrate plain text keys to encrypted format
+      const storedSecretKey = localStorage.getItem("secretKey") || "";
+      if (storedSecretKey) {
+        if (!isCryptoAvailable()) {
+          console.error('Encryption not available - cannot decrypt secret key');
+          setSecretKey('');
+        } else if (isEncrypted(storedSecretKey)) {
+          // Already encrypted - decrypt it
+          try {
+            const decryptedKey = await decryptValue(storedSecretKey);
+            setSecretKey(decryptedKey);
+          } catch (error) {
+            console.error('Failed to decrypt secret key:', error);
+            setSecretKey('');
+          }
+        } else {
+          // Plain text key from existing users - migrate to encrypted
+          try {
+            setSecretKey(storedSecretKey);
+            const encryptedKey = await encryptValue(storedSecretKey);
+            localStorage.setItem("secretKey", encryptedKey);
+          } catch (error) {
+            console.error('Failed to encrypt plain text key:', error);
+            setSecretKey('');
+          }
+        }
+      }
+      
+      setModel(localStorage.getItem("model") || "");
+    })();
   }, [status]);
 
   const panelSize = useMemo(() => isCollapsed ? 0 : 20, [isCollapsed]);
