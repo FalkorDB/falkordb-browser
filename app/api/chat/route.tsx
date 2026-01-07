@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { textToCypherService } from "@/lib/text-to-cypher";
+import { TextToCypher } from "@falkordb/text-to-cypher";
 import { getClient } from "../auth/[...nextauth]/options";
 import { chatRequest, validateBody } from "../validate-body";
 
@@ -89,21 +89,35 @@ export async function POST(request: NextRequest) {
             // Build FalkorDB connection URL from user session
             const falkordbConnection = buildFalkorDBConnection(session.user);
 
-            // Stream events from text-to-cypher service
-            const eventStream = textToCypherService.textToCypherStream(
-                graphName,
-                messages,
-                {
-                    model: model || "gpt-4o-mini",
-                    apiKey: key,
-                    falkordbConnection,
-                }
-            );
+            // Create TextToCypher client
+            const textToCypher = new TextToCypher({
+                falkordbConnection,
+                model: model || "gpt-4o-mini",
+                apiKey: key,
+            });
 
-            // Process and forward events to client
-            // eslint-disable-next-line no-restricted-syntax
-            for await (const event of eventStream) {
-                writer.write(encoder.encode(`event: ${event.type} data: ${event.data}\n\n`))
+            // Get the last user message
+            const lastMessage = messages[messages.length - 1];
+            const question = lastMessage.content;
+
+            // Call textToCypher and get the result
+            const result = await textToCypher.textToCypher(graphName, question);
+
+            // Send result events
+            if (result.schema) {
+                writer.write(encoder.encode(`event: Schema data: ${JSON.stringify(result.schema)}\n\n`));
+            }
+
+            if (result.cypherQuery) {
+                writer.write(encoder.encode(`event: CypherQuery data: ${result.cypherQuery}\n\n`));
+            }
+
+            if (result.cypherResult) {
+                writer.write(encoder.encode(`event: CypherResult data: ${JSON.stringify(result.cypherResult)}\n\n`));
+            }
+
+            if (result.answer) {
+                writer.write(encoder.encode(`event: Result data: ${result.answer}\n\n`));
             }
 
             writer.close()
