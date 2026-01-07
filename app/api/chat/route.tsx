@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { textToCypherService } from "@/lib/text-to-cypher";
 import { getClient } from "../auth/[...nextauth]/options";
 import { chatRequest, validateBody } from "../validate-body";
-
-const CHAT_URL = process.env.CHAT_URL || "http://localhost:8000/"
 
 export async function GET() {
     try {
@@ -12,33 +11,9 @@ export async function GET() {
             throw new Error(await session.text())
         }
 
-        try {
-            const response = await fetch(`${CHAT_URL}configured-model`, {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-            })
-
-            if (!response.ok) {
-                throw new Error(await response.text())
-            }
-
-            const data = await response.json()
-
-            return NextResponse.json(data)
-        } catch (error) {
-            const { message } = (error as Error)
-
-            // Gracefully handle missing endpoint or server unavailability
-            // Return empty object to allow chat to be displayed
-            if (message.includes("fetch failed") || message.includes("Not Found") || message.includes("NOT_FOUND") || message.includes("could not be found")) {
-                return NextResponse.json({ message }, { status: 200 })
-            }
-
-            console.error(error)
-            return NextResponse.json({ error: message }, { status: 400 })
-        }
+        // Return empty object to allow chat to be displayed
+        // The actual model configuration is provided by the user in the frontend
+        return NextResponse.json({}, { status: 200 })
     } catch (error) {
         console.error(error)
         return NextResponse.json({ error: (error as Error).message }, { status: 500 })
@@ -46,6 +21,21 @@ export async function GET() {
 }
 
 export type EventType = "Status" | "Schema" | "CypherQuery" | "CypherResult" | "ModelOutputChunk" | "Result" | "Error"
+
+/**
+ * Build FalkorDB connection URL from user session
+ */
+function buildFalkorDBConnection(user: { host: string; port: number; url?: string; username?: string; password?: string }): string {
+    // Use URL if provided
+    if (user.url) {
+        return user.url;
+    }
+
+    // Build falkor:// URL from host and port
+    const protocol = "falkor://";
+    const auth = user.username && user.password ? `${user.username}:${user.password}@` : "";
+    return `${protocol}${auth}${user.host}:${user.port}`;
+}
 
 // eslint-disable-next-line import/prefer-default-export
 export async function POST(request: NextRequest) {
@@ -81,71 +71,42 @@ export async function POST(request: NextRequest) {
 
         const { messages, graphName, key, model } = validation.data
 
-        try {
-            const requestBody: Record<string, unknown> = {
-                chat_request: { messages },
-                "graph_name": graphName,
-                "model": model || "gpt-4o-mini",
-            }
+        // Validate required parameters
+        if (!key) {
+            writer.write(encoder.encode(`event: error status: ${400} data: "API key is required. Please configure it in Settings."\n\n`))
+            writer.close()
 
-            // Only add key if provided
-            if (key) {
-                requestBody.key = key
-            }
-
-            const response = await fetch(`${CHAT_URL}text_to_cypher`, {
-                method: "POST",
+            return new Response(readable, {
                 headers: {
-                    "Content-Type": "application/json",
+                    "Content-Type": "text/event-stream",
+                    "Cache-Control": "no-cache",
+                    Connection: "keep-alive",
                 },
-                body: JSON.stringify(requestBody)
-            });
+            })
+        }
 
-            if (!response.ok) {
-                throw new Error(`Error: ${await response.text()}`);
+        try {
+            // Build FalkorDB connection URL from user session
+            const falkordbConnection = buildFalkorDBConnection(session.user);
+
+            // Stream events from text-to-cypher service
+            const eventStream = textToCypherService.textToCypherStream(
+                graphName,
+                messages,
+                {
+                    model: model || "gpt-4o-mini",
+                    apiKey: key,
+                    falkordbConnection,
+                }
+            );
+
+            // Process and forward events to client
+            // eslint-disable-next-line no-restricted-syntax
+            for await (const event of eventStream) {
+                writer.write(encoder.encode(`event: ${event.type} data: ${event.data}\n\n`))
             }
 
-            // Handle streaming SSE response from text-to-cypher
-            const reader = response.body?.getReader();
-            const decoder = new TextDecoder();
-
-            const processStream = async () => {
-                if (!reader) return;
-
-                const { done, value } = await reader.read();
-                if (done) {
-                    writer.close();
-                    return;
-                }
-
-                const chunk = decoder.decode(value, { stream: true });
-                const lines = chunk.split('\n').filter(line => line);
-                let isResult = false;
-
-                lines.forEach(line => {
-                    if (line.startsWith('data: ')) {
-                        try {
-                            const data = JSON.parse(line.slice(6)); // Remove 'data: ' prefix
-                            const type: EventType = Object.keys(data)[0] as EventType
-
-                            isResult = type === "Result" || type === "Error"
-
-                            writer.write(encoder.encode(`event: ${type} data: ${data[type]}\n\n`))
-                        } catch (parseError) {
-                            console.error("Failed to parse SSE data:", line, parseError)
-                        }
-                    }
-                });
-
-                // Continue processing the stream unless we received Result or Error
-                if (!isResult) {
-                    await processStream();
-                } else {
-                    writer.close();
-                }
-            };
-
-            await processStream();
+            writer.close()
         } catch (error) {
             console.error(error)
             writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify((error as Error).message)}\n\n`))
