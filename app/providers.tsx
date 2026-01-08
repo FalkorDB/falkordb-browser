@@ -3,6 +3,7 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef } from "@/lib/utils";
 import { encryptValue, decryptValue, isCryptoAvailable, isEncrypted } from "@/lib/encryption";
 import { usePathname, useRouter } from "next/navigation";
@@ -14,9 +15,12 @@ import LoginVerification from "./loginVerification";
 import { Graph, GraphData, GraphInfo, HistoryQuery, MemoryValue, Query, Data } from "./api/graph/model";
 import Header from "./components/Header";
 import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ForceGraphContext, TableViewContext } from "./components/provider";
-import GraphInfoPanel from "./graph/graphInfo";
 import Tutorial from "./components/Tutorial";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
+
+const GraphInfoPanel = dynamic(() => import("./graph/graphInfo"), {
+  ssr: false,
+});
 
 const defaultQueryHistory: HistoryQuery = {
   queries: [],

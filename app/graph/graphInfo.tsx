@@ -1,7 +1,8 @@
 import { useContext, useState } from "react";
 import { Loader2, X, Palette } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn, getContrastTextColor } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { getContrastTextColor } from "@falkordb/canvas";
 import Button from "../components/ui/Button";
 import { BrowserSettingsContext, GraphContext, QueryLoadingContext } from "../components/provider";
 import { Label } from "../api/graph/model";
