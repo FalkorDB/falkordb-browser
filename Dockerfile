@@ -2,11 +2,6 @@ ARG CYPHER_VERSION=latest
 
 FROM node:22-alpine AS base
 
-<<<<<<< HEAD
-FROM falkordb/text-to-cypher:${CYPHER_VERSION} AS cypher
-
-=======
->>>>>>> parent of 45fcaac1 (Add supervisord configuration and entrypoint script for process management)
 # Install dependencies only when needed
 FROM base AS deps
 # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
@@ -45,16 +40,6 @@ RUN \
 FROM base AS runner
 WORKDIR /app
 
-<<<<<<< HEAD
-# Install supervisor
-RUN apk add --no-cache supervisor
-
-# Remove npm to reduce attack surface (Next.js standalone doesn't need it)
-RUN npm cache clean --force && \
-    rm -rf /usr/local/lib/node_modules/npm
-
-=======
->>>>>>> parent of 45fcaac1 (Add supervisord configuration and entrypoint script for process management)
 ENV NODE_ENV production
 # Uncomment the following line in case you want to disable telemetry during runtime.
 # ENV NEXT_TELEMETRY_DISABLED 1
@@ -75,26 +60,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/.env.local.template ./.env.local
 
 
-<<<<<<< HEAD
-# Create supervisor directories and copy config
-RUN mkdir -p /etc/supervisor/conf.d /var/log/supervisor
-COPY ./entrypoint.sh /entrypoint.sh
-COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-RUN chmod +x /entrypoint.sh
-
-EXPOSE 3000 8080 3001
-
-ENV PORT=3000
-ENV REST_PORT=8080
-ENV MCP_PORT=3001
-ENV CYPHER=1
-ENV HOSTNAME="0.0.0.0"
-
-# Use root to run supervisord (it will drop privileges for individual services)
-USER root
-=======
 USER nextjs
->>>>>>> parent of 45fcaac1 (Add supervisord configuration and entrypoint script for process management)
 
 EXPOSE 3000
 
