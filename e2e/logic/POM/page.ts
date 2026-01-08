@@ -242,6 +242,15 @@ export default class Page extends BasePage {
   async waitForCanvasAnimationToEnd(timeout = 4500): Promise<void> {
     await waitForElementToBeVisible(this.skeleton);
 
+    // Check if canvas exists before waiting for it
+    const canvasContainer = this.page.locator("falkordb-canvas");
+    const canvasCount = await canvasContainer.count();
+
+    if (canvasCount === 0) {
+      // Canvas doesn't exist - might be empty graph or deleted all elements
+      return;
+    }
+
     // Wait for the web component to be loaded (it's imported asynchronously)
     await this.canvasElement.waitFor({ state: "attached", timeout: 10000 });
 
