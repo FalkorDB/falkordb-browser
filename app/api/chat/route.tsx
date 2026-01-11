@@ -99,6 +99,9 @@ export async function POST(request: NextRequest) {
             });
 
             // Get the last user message
+            if (messages.length === 0) {
+                throw new Error('No messages provided');
+            }
             const lastMessage = messages[messages.length - 1];
             const question = lastMessage.content;
 
