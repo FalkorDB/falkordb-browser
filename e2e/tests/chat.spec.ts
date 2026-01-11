@@ -74,7 +74,7 @@ test.describe("Chat Feature Tests", () => {
     await apiCall.removeGraph(graphName);
   });
 
-  test.only(`@readwrite Verify complete chat flow with API key: send question, check loading state, verify responses`, async () => {
+  test(`@readwrite Verify complete chat flow with API key: send question, check loading state, verify responses`, async () => {
     const graphName = getRandomString("chat");
     await apiCall.addGraph(graphName);
     await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
