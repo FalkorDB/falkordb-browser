@@ -1,16 +1,16 @@
-'use client'
+'use client';
 
-import { ArrowDownToLine } from 'lucide-react'
-import React, { useCallback, useState } from 'react'
-import { useDropzone } from 'react-dropzone'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { cn } from '@/lib/utils'
+import { ArrowDownToLine } from 'lucide-react';
+import React, { useCallback, useState } from 'react';
+import { useDropzone } from 'react-dropzone';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { cn } from '@/lib/utils';
 
 type TableFile = {
     name: string
     size: number
     type: string
-}
+};
 
 /* eslint-disable react/require-default-props */
 interface Props {
@@ -25,11 +25,11 @@ const FileProps = [
     "Name",
     "Size",
     "Type",
-]
+];
 
 function Dropzone({ filesCount = false, className = "", withTable = false, disabled = false, onFileDrop }: Props) {
 
-    const [files, setFiles] = useState<TableFile[]>([])
+    const [files, setFiles] = useState<TableFile[]>([]);
 
     const onDrop = useCallback((acceptedFiles: File[]) => {
         const newFiles = acceptedFiles.map((file: File) => ({
@@ -37,11 +37,11 @@ function Dropzone({ filesCount = false, className = "", withTable = false, disab
             size: file.size,
             type: file.type,
         }));
-        setFiles(newFiles)
-        onFileDrop(acceptedFiles)
-    }, [onFileDrop])
+        setFiles(newFiles);
+        onFileDrop(acceptedFiles);
+    }, [onFileDrop]);
 
-    const { getRootProps, getInputProps } = useDropzone({ onDrop, disabled })
+    const { getRootProps, getInputProps } = useDropzone({ onDrop, disabled });
 
     return (
         <div className={cn('flex gap-4 grow', className)}>
@@ -101,7 +101,7 @@ function Dropzone({ filesCount = false, className = "", withTable = false, disab
                 </div>
             }
         </div>
-    )
+    );
 }
 
-export default Dropzone
+export default Dropzone;

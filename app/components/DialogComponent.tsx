@@ -62,7 +62,7 @@ export default function DialogComponent({
                 {children}
             </DialogContent>
         </Dialog>
-    )
+    );
 }
 
 DialogComponent.defaultProps = {
@@ -72,4 +72,4 @@ DialogComponent.defaultProps = {
     label: "",
     preventOutsideClose: undefined,
     className: undefined,
-}
+};

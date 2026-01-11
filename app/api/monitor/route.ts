@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 
-const fileds = ["used_memory", "used_memory_rss"];
+const fields = ["used_memory", "used_memory_rss"];
 // eslint-disable-next-line import/prefer-default-export
 export async function GET() {
   try {
@@ -24,7 +24,7 @@ export async function GET() {
           return { name, series };
         })
         .filter((item: { name: string; series: string }) =>
-          fileds.find((filed) => filed === item.name)
+          fields.find((field) => field === item.name)
         );
       const dataGraph: { name: string; series: number }[] = [];
       for (let i = 0; i < infoGraph.length; i += 2) {

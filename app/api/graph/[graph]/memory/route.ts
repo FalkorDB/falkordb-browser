@@ -1,6 +1,6 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
-import { GET as getDBVersion } from "@/app/api/auth/DBVersion/route";
+import { GET as getDBVersion } from "@/app/api/DBVersion/route";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "@/app/utils";
 
 /**

@@ -81,7 +81,7 @@ test.describe("Graph Tests", () => {
            expect(await graph.getNotificationErrorToast()).toBe(true);
            await apiCall.removeGraph(graphName);
        });
-   })
+   });
 
   test(`@admin Validate that modifying the graph name updates it correctly`, async () => {
     const graphName = getRandomString("graph");
