@@ -177,14 +177,26 @@ export default function Chat({ onClose }: Props) {
                             break;
 
                         case "Result":
-                            setMessages(prev => [
-                                ...prev,
-                                {
-                                    role: "assistant",
-                                    content: JSON.parse(eventData.trim()),
-                                    type: eventType
-                                }
-                            ]);
+                            try {
+                                setMessages(prev => [
+                                    ...prev,
+                                    {
+                                        role: "assistant",
+                                        content: JSON.parse(eventData.trim()),
+                                        type: eventType
+                                    }
+                                ]);
+                            } catch (error) {
+                                console.error("Failed to parse Result event data:", error);
+                                setMessages(prev => [
+                                    ...prev,
+                                    {
+                                        role: "assistant",
+                                        content: eventData.trim(),
+                                        type: "Error"
+                                    }
+                                ]);
+                            }
                             isResult = true
                             break;
 
