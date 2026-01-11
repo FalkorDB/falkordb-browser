@@ -264,7 +264,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 }}
                 hideClose
                 preventOutsideClose={tutorialOpen}
-                className="flex flex-col border-none rounded-lg max-w-none h-[90dvh] w-[40dvw] p-2"
+                className="flex flex-col border-none rounded-lg max-w-none h-[90dvh] min-w-[40dvw] max-w-[80dvw] p-2"
             >
                 <DialogHeader className="flex-row justify-between items-center border-b border-border pb-4">
                     <DialogTitle className="text-2xl font-medium">Manage Graphs</DialogTitle>

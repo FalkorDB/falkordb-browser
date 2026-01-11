@@ -1,5 +1,5 @@
 import { createContext, Dispatch, SetStateAction } from "react";
-import { GraphRef, Panel, Tab } from "@/lib/utils";
+import { ConnectionType, GraphRef, Panel, Tab } from "@/lib/utils";
 import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
 import { Graph, GraphData, GraphInfo, HistoryQuery } from "../api/graph/model";
 
@@ -151,6 +151,13 @@ type TableViewContextType = {
   expand: Map<number, number>;
   setExpand: Dispatch<SetStateAction<Map<number, number>>>;
   dataHash: string;
+};
+
+type ConnectionContextType = {
+  connectionType: ConnectionType;
+  setConnectionType: Dispatch<SetStateAction<ConnectionType>>;
+  dbVersion: string;
+  setDbVersion: Dispatch<SetStateAction<string>>;
 };
 
 export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
@@ -306,3 +313,10 @@ export const TableViewContext = createContext<TableViewContextType>({
   setExpand: () => {},
   dataHash: "",
 });
+
+export const ConnectionContext = createContext<ConnectionContextType>({
+  connectionType: "Standalone",
+  setConnectionType: () => {},
+  dbVersion: "",
+  setDbVersion: () => {},
+}); 

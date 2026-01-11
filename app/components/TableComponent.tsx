@@ -420,12 +420,12 @@ export default function TableComponent({
                                 <TableHead
                                     className={cn(
                                         i + 1 !== headers.length && "border-r",
-                                        "font-bold text-lg border-border",
+                                        "border-border",
                                         i === 0 && (label === "Graphs" || label === "Schemas" || label === "Users") && "w-full"
                                     )}
                                     key={header}
                                 >
-                                    <div className="flex gap-2 justify-between">
+                                    <div className="flex gap-2 justify-between items-center">
                                         <p>{header}</p>
                                         {
                                             visibleRows.some(r => r.cells[i].type === "object") &&
