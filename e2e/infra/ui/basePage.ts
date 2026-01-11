@@ -35,4 +35,8 @@ export default class BasePage {
   async evaluate(expression: () => unknown) {
     return this.page.evaluate(expression);
   }
+
+  async waitForTimeout(timeout: number) {
+    await this.page.waitForTimeout(timeout);
+  }
 }
