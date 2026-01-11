@@ -98,6 +98,11 @@ export default class HeaderComponent extends BasePage {
         await waitForURL(this.page, urls.loginUrl);
     }
 
+    async getFalkorDBLogoHref(): Promise<string | null> {
+        await this.waitForPageIdle();
+        return await this.falkorDBLogo.getAttribute('href');
+    }
+
     async clickOnFalkor(): Promise<Page> {
         await this.waitForPageIdle();
         // Start listening for popup BEFORE triggering the click to avoid race condition
@@ -105,6 +110,12 @@ export default class HeaderComponent extends BasePage {
         await this.clickFalkorDBLogo();
         const newPage = await popupPromise;
         return newPage;
+    }
+
+    async getDocumentationLinkHref(): Promise<string | null> {
+        await this.waitForPageIdle();
+        await this.clickOnHelpBtn();
+        return await this.documentationButton.getAttribute('href');
     }
 
     async clickOnDocumentation(): Promise<Page> {
@@ -117,12 +128,24 @@ export default class HeaderComponent extends BasePage {
         return newPage;
     }
 
+    async getApiDocumentationLinkHref(): Promise<string | null> {
+        await this.waitForPageIdle();
+        await this.clickOnHelpBtn();
+        return await this.apiDocumentationButton.getAttribute('href');
+    }
+
     async clickOnApiDocumentation(): Promise<Page> {
         await this.waitForPageIdle();
         await this.clickOnHelpBtn();
         await this.clickOnApiDocumentationBtn();
         await this.page.waitForURL('**/docs**', { timeout: 5000 });
         return this.page;
+    }
+
+    async getSupportLinkHref(): Promise<string | null> {
+        await this.waitForPageIdle();
+        await this.clickOnHelpBtn();
+        return await this.supportButton.getAttribute('href');
     }
 
     async clickOnSupport(): Promise<Page> {

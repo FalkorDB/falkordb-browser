@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import urls from "../config/urls.json";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import NavBarComponent from "../logic/POM/headerComponent";
+import { normalizeUrl } from "../infra/utils";
 
 test.describe(`Header tests`, () => {
   let browser: BrowserWrapper;
@@ -16,8 +17,8 @@ test.describe(`Header tests`, () => {
 
   test(`@admin Verify clicking on FalkorDB logo redirects to specified URL`, async () => {
     const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl);
-    const page = await navBar.clickOnFalkor();
-    expect(page.url()).toBe(urls.falkorDBWeb);
+    const href = await navBar.getFalkorDBLogoHref();
+    expect(normalizeUrl(href)).toBe(normalizeUrl(urls.falkorDBWeb));
   });
 
   test(`@admin Verify clicking on Graphs button redirects to specified URL`, async () => {
@@ -36,20 +37,20 @@ test.describe(`Header tests`, () => {
 
   test(`@admin Verify clicking on help -> Documentation redirects to specified URL`, async () => {
     const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl);
-    const page = await navBar.clickOnDocumentation();
-    expect(page.url()).toBe(urls.documentationUrl);
+    const href = await navBar.getDocumentationLinkHref();
+    expect(href).toBe(urls.documentationUrl);
   });
 
   test(`@admin Verify clicking on help -> API Documentation redirects to specified URL`, async () => {
     const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl);
-    const page = await navBar.clickOnApiDocumentation();
-    expect(page.url()).toContain('/docs');
+    const href = await navBar.getApiDocumentationLinkHref();
+    expect(href).toContain('/docs');
   });
 
   test(`@admin Verify clicking on help -> Support redirects to specified URL`, async () => {
     const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl);
-    const page = await navBar.clickOnSupport();
-    expect(page.url()).toBe(urls.supportUrl);
+    const href = await navBar.getSupportLinkHref();
+    expect(href).toBe(urls.supportUrl);
   });
 
   test(`@admin Verify Help -> About Popup opens and closes correctly`, async () => {

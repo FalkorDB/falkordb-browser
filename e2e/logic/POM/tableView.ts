@@ -38,4 +38,23 @@ export default class TableView extends GraphPage {
         const rows = await this.tableViewTableRows.count();
         return rows;
     }
+
+    private get exportTableViewButton(): Locator {
+        return this.page.getByTestId("exportTableViewButton");
+    }
+
+    public async isExportButtonVisible(): Promise<boolean> {
+        try {
+            await this.exportTableViewButton.waitFor({ state: 'visible', timeout: 5000 });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    public async clickExportButton(): Promise<void> {
+        await interactWhenVisible(this.exportTableViewButton, async (el: Locator) => {
+            await el.click();
+        }, 'Export Table View Button');
+    }
 }

@@ -229,7 +229,10 @@ export async function POST(request: NextRequest) {
     } catch (storageError) {
       // eslint-disable-next-line no-console
       console.error('Failed to store token:', storageError);
-      // Continue - token will still work but can't be managed via UI
+      return NextResponse.json(
+        { message: storageError instanceof Error ? storageError.message : "Failed to store token" },
+        { status: 500 }
+      );
     }
 
     // 8. Return success response
