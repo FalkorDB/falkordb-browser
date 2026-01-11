@@ -246,7 +246,7 @@ function GraphView({
                     </div>
                 </div>
             </div>
-            <TabsContent value="Graph" className="h-full w-full mt-0 overflow-hidden">
+            <TabsContent data-testid="graphView" value="Graph" className="h-full w-full mt-0 overflow-hidden">
                 <ForceGraph
                     graph={graph}
                     data={data}

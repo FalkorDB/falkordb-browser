@@ -122,7 +122,7 @@ const tutorialSteps: TutorialStep[] = [
         title: "Graph Visualization",
         description: "Query results containing nodes and edges will be visualized here as an interactive graph. You can drag, zoom, and explore the relationships.",
         placementAxis: "x",
-        targetSelector: '.force-graph-container canvas',
+        targetSelector: 'falkordb-canvas',
         spotlightSelector: '[data-testid="graphView"]',
         forward: ["mousedown", "mouseup", "mousemove", "mouseenter", "mouseleave", "mouseover", "mouseout", "contextmenu", "pointerdown", "pointerup", "pointermove", "pointerenter", "pointerleave", "wheel"],
         hidePrev: true

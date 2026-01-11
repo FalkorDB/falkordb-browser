@@ -145,7 +145,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       localStorage.setItem("limit", newLimit.toString());
       localStorage.setItem("refreshInterval", newRefreshInterval.toString());
       localStorage.setItem("model", newModel);
-      
+
       // Only encrypt and save secret key if it has changed
       if (newSecretKey !== secretKey) {
         if (newSecretKey) {
@@ -158,7 +158,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
             });
             return; // Stop saving if crypto not available
           }
-          
+
           try {
             const encryptedKey = await encryptValue(newSecretKey);
             localStorage.setItem("secretKey", encryptedKey);
@@ -443,7 +443,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setContentPersistence(localStorage.getItem("contentPersistence") !== "false");
       setTutorialOpen(localStorage.getItem("tutorial") !== "false");
       setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30));
-      
+
       // Decrypt secret key if encrypted, or migrate plain text keys to encrypted format
       const storedSecretKey = localStorage.getItem("secretKey") || "";
       if (storedSecretKey) {
@@ -476,7 +476,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
           }
         }
       }
-      
+
       setModel(localStorage.getItem("model") || "");
     })();
   }, [status]);
@@ -574,7 +574,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setTutorialOpen(false);
   };
 
-  const handleLoadDemoGraphs = async () => {
+  const handleLoadDemoGraphs = useCallback(async () => {
+    debugger
     try {
       // Store current user graphs
       setUserGraphsBeforeTutorial(graphNames);
@@ -609,6 +610,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       // Update graph list to only show demo graphs
       setGraphNames(["social-demo", "social-demo-test"]);
       setGraphName("");
+      setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }));
+      setGraph(Graph.empty());
 
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -619,9 +622,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         variant: "destructive",
       });
     }
-  };
+  }, [graphName, graphNames, toast]);
 
-  const handleCleanupDemoGraphs = async () => {
+  const handleCleanupDemoGraphs = useCallback(async () => {
+    debugger
     try {
       // Delete demo graphs
       await securedFetch("/api/graph/social-demo", {
@@ -662,7 +666,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setGraphNames(userGraphsBeforeTutorial);
     setUserGraphsBeforeTutorial([]);
     setUserGraphBeforeTutorial("");
-  };
+  }, [runQuery, runDefaultQuery, defaultQuery, toast, userGraphBeforeTutorial, userGraphsBeforeTutorial]);
 
   return (
     <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange>
