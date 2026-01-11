@@ -575,7 +575,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   };
 
   const handleLoadDemoGraphs = useCallback(async () => {
-    debugger
     try {
       // Store current user graphs
       setUserGraphsBeforeTutorial(graphNames);
@@ -625,7 +624,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   }, [graphName, graphNames, toast]);
 
   const handleCleanupDemoGraphs = useCallback(async () => {
-    debugger
     try {
       // Delete demo graphs
       await securedFetch("/api/graph/social-demo", {
