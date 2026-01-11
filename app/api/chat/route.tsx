@@ -33,7 +33,9 @@ function buildFalkorDBConnection(user: { host: string; port: number; url?: strin
 
     // Build falkor:// URL from host and port
     const protocol = "falkor://";
-    const auth = user.username && user.password ? `${user.username}:${user.password}@` : "";
+    const auth = user.username && user.password
+        ? `${encodeURIComponent(user.username)}:${encodeURIComponent(user.password)}@`
+        : "";
     return `${protocol}${auth}${user.host}:${user.port}`;
 }
 
@@ -109,7 +111,7 @@ export async function POST(request: NextRequest) {
             }
 
             if (result.cypherQuery) {
-                writer.write(encoder.encode(`event: CypherQuery data: ${result.cypherQuery}\n\n`));
+                writer.write(encoder.encode(`event: CypherQuery data: ${JSON.stringify(result.cypherQuery)}\n\n`));
             }
 
             if (result.cypherResult) {
@@ -117,7 +119,7 @@ export async function POST(request: NextRequest) {
             }
 
             if (result.answer) {
-                writer.write(encoder.encode(`event: Result data: ${result.answer}\n\n`));
+                writer.write(encoder.encode(`event: Result data: ${JSON.stringify(result.answer)}\n\n`));
             }
 
             writer.close()
