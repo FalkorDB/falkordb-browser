@@ -105,6 +105,8 @@ jobs:
       - name: Build application
         run: npm run build
       - name: Run Playwright tests (shard 1 of 3)
+        env:
+          OPENAI_TOKEN: ${{ secrets.OPENAI_TOKEN }}
         run: |
           export CHAT_URL="http://localhost:8080/"
           export NEXTAUTH_URL="http://localhost:3000/"
@@ -169,6 +171,8 @@ jobs:
       - name: Build application
         run: npm run build
       - name: Run Playwright tests (shard 2 of 3)
+        env:
+          OPENAI_TOKEN: ${{ secrets.OPENAI_TOKEN }}
         run: |
           export CHAT_URL="http://localhost:8080/"
           export NEXTAUTH_URL="http://localhost:3000/"
@@ -233,6 +237,8 @@ jobs:
       - name: Build application
         run: npm run build
       - name: Run Playwright tests (shard 3 of 3)
+        env:
+          OPENAI_TOKEN: ${{ secrets.OPENAI_TOKEN }}
         run: |
           export CHAT_URL="http://localhost:8080/"
           export NEXTAUTH_URL="http://localhost:3000/"
