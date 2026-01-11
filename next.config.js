@@ -3,7 +3,8 @@ const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
   // Keep falkordb server-only to avoid bundling BigInt in client/runtime
-  serverExternalPackages: ['falkordb'],
+  // Keep text-to-cypher external to avoid bundling native .node binaries
+  serverExternalPackages: ['falkordb', '@falkordb/text-to-cypher'],
   images: {
     unoptimized: true
   },

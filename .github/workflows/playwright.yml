@@ -54,7 +54,7 @@ jobs:
           # Install with retry logic
           for i in {1..5}; do
             echo "Attempt $i: Installing dependencies..."
-            if npm ci --prefer-offline --no-audit --progress=false --loglevel=error; then
+            if npm install --prefer-offline --no-audit --progress=false --loglevel=error; then
               echo "Dependencies installed successfully on attempt $i"
               break
             else
