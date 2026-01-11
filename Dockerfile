@@ -1,6 +1,6 @@
 ARG CYPHER_VERSION=latest
 
-FROM node:22-alpine AS base
+FROM node:24-alpine AS base
 
 FROM falkordb/text-to-cypher:${CYPHER_VERSION} AS cypher
 

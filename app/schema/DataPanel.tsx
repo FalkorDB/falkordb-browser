@@ -4,7 +4,7 @@
 "use client";
 
 import { Check, Pencil, PlusCircle, Trash2, X } from "lucide-react";
-import { useContext, useEffect, useState, useCallback } from "react";
+import { useContext, useEffect, useState, useCallback, Dispatch, SetStateAction  } from "react";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
@@ -13,7 +13,7 @@ import { prepareArg, securedFetch } from "@/lib/utils";
 import Button from "../components/ui/Button";
 import { ATTRIBUTES, getDefaultAttribute, OPTIONS } from "./CreateElementPanel";
 import Combobox from "../components/ui/combobox";
-import { Label, Graph, Link, Node } from "../api/graph/model";
+import { Label, Graph, Link, Node, GraphData } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import ToastButton from "../components/ToastButton";
 import DialogComponent from "../components/DialogComponent";
@@ -25,85 +25,86 @@ interface Props {
     setObject: (el?: (Node | Link)[]) => void
     schema: Graph
     setLabels: (labels: Label[]) => void
+    setData: Dispatch<SetStateAction<GraphData>>
 }
 
-export default function DataPanel({ object, setObject, schema, setLabels }: Props) {
+export default function DataPanel({ object, setObject, schema, setLabels, setData }: Props) {
 
-    const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { indicator, setIndicator } = useContext(IndicatorContext);
 
-    const { data: session } = useSession()
-    const { toast } = useToast()
+    const { data: session } = useSession();
+    const { toast } = useToast();
 
-    const [attribute, setAttribute] = useState<[string, string[]]>(getDefaultAttribute())
-    const [isRemoveLabelLoading, setIsRemoveLabelLoading] = useState<boolean>(false)
-    const [attributes, setAttributes] = useState<[string, string[]][]>([])
-    const [isRemoveLoading, setIsRemoveLoading] = useState<boolean>(false)
-    const [labelsEditable, setLabelsEditable] = useState<boolean>(false)
-    const [isLabelLoading, setIsLabelLoading] = useState<boolean>(false)
-    const [isAddLoading, setIsAddLoading] = useState<boolean>(false)
-    const [isSetLoading, setIsSetLoading] = useState<boolean>(false)
-    const [labelsHover, setLabelsHover] = useState<boolean>(false)
-    const [isAddValue, setIsAddValue] = useState<boolean>(false)
-    const [editable, setEditable] = useState<string>("")
-    const [newLabel, setNewLabel] = useState<string>("")
-    const [label, setLabel] = useState<string[]>([])
-    const [hover, setHover] = useState<string>("")
-    const type = !object.source
+    const [attribute, setAttribute] = useState<[string, string[]]>(getDefaultAttribute());
+    const [isRemoveLabelLoading, setIsRemoveLabelLoading] = useState<boolean>(false);
+    const [attributes, setAttributes] = useState<[string, string[]][]>([]);
+    const [isRemoveLoading, setIsRemoveLoading] = useState<boolean>(false);
+    const [labelsEditable, setLabelsEditable] = useState<boolean>(false);
+    const [isLabelLoading, setIsLabelLoading] = useState<boolean>(false);
+    const [isAddLoading, setIsAddLoading] = useState<boolean>(false);
+    const [isSetLoading, setIsSetLoading] = useState<boolean>(false);
+    const [labelsHover, setLabelsHover] = useState<boolean>(false);
+    const [isAddValue, setIsAddValue] = useState<boolean>(false);
+    const [editable, setEditable] = useState<string>("");
+    const [newLabel, setNewLabel] = useState<string>("");
+    const [label, setLabel] = useState<string[]>([]);
+    const [hover, setHover] = useState<string>("");
+    const type = !("source" in object);
 
     const handleClose = useCallback((e: KeyboardEvent) => {
-        if (e.defaultPrevented) return
+        if (e.defaultPrevented) return;
 
         if (e.key === "Escape") {
-            setObject()
+            setObject();
         }
-    }, [setObject])
+    }, [setObject]);
 
     useEffect(() => {
-        window.addEventListener("keydown", handleClose)
+        window.addEventListener("keydown", handleClose);
 
         return () => {
-            window.removeEventListener("keydown", handleClose)
-        }
-    }, [handleClose])
+            window.removeEventListener("keydown", handleClose);
+        };
+    }, [handleClose]);
 
     useEffect(() => {
-        setAttributes(Object.entries(object.data).filter(([key, val]) => !(key === "name" && Number(val) === object.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))
-        setLabel(object.source ? [object.relationship] : [...object.labels])
-    }, [object])
+        setAttributes(Object.entries(object.data).filter(([key, val]) => !(key === "name" && Number(val) === object.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]));
+        setLabel(type ? [...object.labels] : [object.relationship]);
+    }, [object, type]);
 
     const handleSetEditable = ([key, val]: [string, string[]] = getDefaultAttribute()) => {
         if (key !== "") {
-            setIsAddValue(false)
+            setIsAddValue(false);
         }
 
-        setAttribute([key, val])
-        setEditable(key)
-    }
+        setAttribute([key, val]);
+        setEditable(key);
+    };
 
     const onSetAttribute = async (att: [string, string[]]) => {
         const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/${prepareArg(att[0])}`, {
             method: "POST",
             body: JSON.stringify({ type, attribute: att[1] })
-        }, toast, setIndicator)
+        }, toast, setIndicator);
 
-        return ok
-    }
+        return ok;
+    };
 
     const handleSetAttribute = async (isUndo: boolean, att?: [string, string[]]) => {
-        const newAttribute = att || attribute
+        const newAttribute = att || attribute;
 
         if (newAttribute[0] === "" || newAttribute[1].some(v => v === "")) {
             toast({
                 title: "Error",
                 description: "Please fill all the fields",
-            })
-            return
+            });
+            return;
         }
 
         try {
-            setIsSetLoading(true)
-            const ok = await onSetAttribute(attribute)
-            const oldAttribute = attributes.find(([key]) => key === newAttribute[0])
+            setIsSetLoading(true);
+            const ok = await onSetAttribute(attribute);
+            const oldAttribute = attributes.find(([key]) => key === newAttribute[0]);
 
             if (ok) {
                 if (type) {
@@ -113,7 +114,7 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                         nodes: schema.Elements.nodes.map(element =>
                             element.id === object.id ? { ...element, data: { ...element.data, [newAttribute[0]]: newAttribute[1] } } : element
                         )
-                    }
+                    };
                 } else {
                     // eslint-disable-next-line no-param-reassign
                     schema.Elements = {
@@ -121,10 +122,11 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                         links: schema.Elements.links.map(element =>
                             element.id === object.id ? { ...element, data: { ...element.data, [newAttribute[0]]: newAttribute[1] } } : element
                         )
-                    }
+                    };
                 }
-                setAttributes(prev => prev.map((attr) => attr[0] === newAttribute[0] ? newAttribute : attr))
-                handleSetEditable()
+                setData({ ...schema.Elements });
+                setAttributes(prev => prev.map((attr) => attr[0] === newAttribute[0] ? newAttribute : attr));
+                handleSetEditable();
                 toast({
                     title: "Success",
                     description: `Property set`,
@@ -134,25 +136,25 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                             onClick={() => handleSetAttribute(false, oldAttribute)}
                         />
                         : undefined,
-                })
+                });
             }
 
         } finally {
-            setIsSetLoading(false)
+            setIsSetLoading(false);
         }
-    }
+    };
 
     const handleRemoveAttribute = async (key: string) => {
         try {
-            setIsRemoveLoading(true)
+            setIsRemoveLoading(true);
 
             const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/${prepareArg(key)}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type })
-            }, toast, setIndicator)
+            }, toast, setIndicator);
 
             if (ok) {
-                const att = attributes.find(([k]) => k === key)
+                const att = attributes.find(([k]) => k === key);
                 if (type) {
                     // eslint-disable-next-line no-param-reassign
                     schema.Elements = {
@@ -160,7 +162,7 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                         nodes: schema.Elements.nodes.map(element =>
                             element.id === object.id ? { ...element, data: { ...Object.fromEntries(Object.entries(element.data).filter(([k]) => k !== key)), [key]: [] } } : element
                         )
-                    }
+                    };
                 } else {
                     // eslint-disable-next-line no-param-reassign
                     schema.Elements = {
@@ -168,9 +170,10 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                         links: schema.Elements.links.map(element =>
                             element.id === object.id ? { ...element, data: { ...Object.fromEntries(Object.entries(element.data).filter(([k]) => k !== key)), [key]: [] } } : element
                         )
-                    }
+                    };
                 }
-                setAttributes(prev => prev.filter(([k]) => k !== key))
+                setData({ ...schema.Elements });
+                setAttributes(prev => prev.filter(([k]) => k !== key));
                 toast({
                     title: "Success",
                     description: "Attribute removed",
@@ -179,87 +182,87 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                             showUndo
                             onClick={() => handleAddAttribute(att)}
                         />,
-                })
-                setAttribute(getDefaultAttribute())
+                });
+                setAttribute(getDefaultAttribute());
             }
 
-            return ok
+            return ok;
         } finally {
-            setIsRemoveLoading(false)
+            setIsRemoveLoading(false);
         }
 
-    }
+    };
 
     const handleAddAttribute = async (att?: [string, string[]]) => {
-        const newAttribute = att || attribute
+        const newAttribute = att || attribute;
         if (newAttribute[0] === "" || newAttribute[1].some(v => v === "")) {
             toast({
                 title: "Error",
                 description: "Please fill all the fields",
                 variant: "destructive"
-            })
-            return
+            });
+            return;
         }
         try {
-            setIsAddLoading(true)
-            const ok = await onSetAttribute(newAttribute)
+            setIsAddLoading(true);
+            const ok = await onSetAttribute(newAttribute);
             if (ok) {
                 if (type) {
                     // eslint-disable-next-line no-param-reassign
                     schema.Elements = {
                         ...schema.Elements,
                         nodes: [...schema.Elements.nodes, { ...object as Node, data: { ...object.data, [newAttribute[0]]: newAttribute[1] } }]
-                    }
+                    };
                 } else {
                     // eslint-disable-next-line no-param-reassign
                     schema.Elements = {
                         ...schema.Elements,
                         links: [...schema.Elements.links, { ...object as Link, data: { ...object.data, [newAttribute[0]]: newAttribute[1] } }]
-                    }
+                    };
                 }
-                setAttributes(prev => [...prev, newAttribute])
-                setAttribute(getDefaultAttribute())
-                setIsAddValue(false)
+                setAttributes(prev => [...prev, newAttribute]);
+                setAttribute(getDefaultAttribute());
+                setIsAddValue(false);
             }
         } finally {
-            setIsAddLoading(false)
+            setIsAddLoading(false);
         }
-    }
+    };
 
     const handleSetKeyDown = (evt: React.KeyboardEvent) => {
         if (evt.code === "Escape") {
-            evt.preventDefault()
-            handleSetEditable()
+            evt.preventDefault();
+            handleSetEditable();
         }
 
-        if (evt.code !== "Enter" || isSetLoading || indicator === "offline") return
+        if (evt.code !== "Enter" || isSetLoading || indicator === "offline") return;
 
-        evt.preventDefault()
-        handleSetAttribute(true)
-    }
+        evt.preventDefault();
+        handleSetAttribute(true);
+    };
 
     const handleAddKeyDown = (evt: React.KeyboardEvent) => {
         if (evt.code === "Escape") {
-            evt.preventDefault()
-            handleSetEditable()
+            evt.preventDefault();
+            handleSetEditable();
         }
 
-        if (evt.code !== "Enter" || isAddLoading || indicator === "offline") return
+        if (evt.code !== "Enter" || isAddLoading || indicator === "offline") return;
 
-        evt.preventDefault()
-        handleAddAttribute()
-    }
+        evt.preventDefault();
+        handleAddAttribute();
+    };
 
     const handleAddLabel = async () => {
-        const node = object as Node
+        const node = object as Node;
 
         if (newLabel === "") {
             toast({
                 title: "Error",
                 description: "Please fill the label",
                 variant: "destructive"
-            })
-            return
+            });
+            return;
         }
 
         if (label.includes(newLabel)) {
@@ -267,56 +270,58 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                 title: "Error",
                 description: "Label already exists",
                 variant: "destructive"
-            })
-            return
+            });
+            return;
         }
         try {
-            setIsLabelLoading(true)
+            setIsLabelLoading(true);
 
             const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/label`, {
                 method: "POST",
                 body: JSON.stringify({ label: newLabel })
-            }, toast, setIndicator)
+            }, toast, setIndicator);
 
             if (result.ok) {
-                setLabels([...schema.addLabel(newLabel, node, false)])
-                setLabel([...node.labels])
-                setNewLabel("")
-                setLabelsEditable(false)
+                setLabels([...schema.addLabel(newLabel, node, false)]);
+                setLabel([...node.labels]);
+                setData({ ...schema.Elements });
+                setNewLabel("");
+                setLabelsEditable(false);
             }
         } finally {
-            setIsLabelLoading(false)
+            setIsLabelLoading(false);
         }
-    }
+    };
 
     const handleRemoveLabel = async (removeLabel: string) => {
-        const node = object as Node
+        const node = object as Node;
 
         if (removeLabel === "") {
             toast({
                 title: "Error",
                 description: "You cannot remove the default label",
                 variant: "destructive"
-            })
-            return
+            });
+            return;
         }
 
         try {
-            setIsRemoveLabelLoading(true)
+            setIsRemoveLabelLoading(true);
             const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/label`, {
                 method: "DELETE",
                 body: JSON.stringify({ label: removeLabel })
-            }, toast, setIndicator)
+            }, toast, setIndicator);
 
             if (result.ok) {
-                schema.removeLabel(removeLabel, node, false)
-                setLabels([...schema.Labels])
-                setLabel([...node.labels])
+                schema.removeLabel(removeLabel, node, false);
+                setLabels([...schema.Labels]);
+                setLabel([...node.labels]);
+                setData({ ...schema.Elements });
             }
         } finally {
-            setIsRemoveLabelLoading(false)
+            setIsRemoveLabelLoading(false);
         }
-    }
+    };
 
     return (
         <div className="DataPanel">
@@ -374,15 +379,15 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                                     onKeyDown={(e) => {
 
                                         if (e.key === "Escape") {
-                                            e.preventDefault()
-                                            setLabelsEditable(false)
-                                            setNewLabel("")
+                                            e.preventDefault();
+                                            setLabelsEditable(false);
+                                            setNewLabel("");
                                         }
 
-                                        if (e.key !== "Enter" || isLabelLoading || indicator === "offline") return
+                                        if (e.key !== "Enter" || isLabelLoading || indicator === "offline") return;
 
-                                        e.preventDefault()
-                                        handleAddLabel()
+                                        e.preventDefault();
+                                        handleAddLabel();
                                     }}
                                 />
                                 <Button
@@ -406,8 +411,8 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                                         title="Discard the new label"
                                         data-testid="cancelLabelButton"
                                         onClick={() => {
-                                            setLabelsEditable(false)
-                                            setNewLabel("")
+                                            setLabelsEditable(false);
+                                            setNewLabel("");
                                         }}
                                     >
                                         <X size={15} />
@@ -443,8 +448,8 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                             <TableRow
                                 className="cursor-pointer p-2 h-20"
                                 onClick={() => {
-                                    if (editable === key) return
-                                    handleSetEditable([key, [...val]])
+                                    if (editable === key) return;
+                                    handleSetEditable([key, [...val]]);
                                 }}
                                 // onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && handleSetEditable()}
                                 onMouseEnter={() => setHover(key)}
@@ -462,9 +467,9 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                                                 <Combobox
                                                     options={OPTIONS}
                                                     setSelectedValue={(v) => setAttribute(prev => {
-                                                        const p: [string, string[]] = [...prev]
-                                                        p[1][0] = v
-                                                        return p
+                                                        const p: [string, string[]] = [...prev];
+                                                        p[1][0] = v;
+                                                        return p;
                                                     })}
                                                     inTable
                                                     label="Type"
@@ -476,9 +481,9 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                                                     className="w-full"
                                                     onKeyDown={handleSetKeyDown}
                                                     onChange={(e) => setAttribute(prev => {
-                                                        const p: [string, string[]] = [...prev]
-                                                        p[1][1] = e.target.value
-                                                        return p
+                                                        const p: [string, string[]] = [...prev];
+                                                        p[1][1] = e.target.value;
+                                                        return p;
                                                     })}
                                                     value={attribute[1][1]}
                                                 />
@@ -487,9 +492,9 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                                                 <Switch
                                                     className="data-[state=unchecked]:bg-border"
                                                     onCheckedChange={(checked) => setAttribute(prev => {
-                                                        const p: [string, string[]] = [...prev]
-                                                        p[1][2] = checked ? "true" : "false"
-                                                        return p
+                                                        const p: [string, string[]] = [...prev];
+                                                        p[1][2] = checked ? "true" : "false";
+                                                        return p;
                                                     })}
                                                     checked={attribute[1][2] === "true"}
                                                 />
@@ -498,9 +503,9 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                                                 <Switch
                                                     className="data-[state=unchecked]:bg-border"
                                                     onCheckedChange={(checked) => setAttribute(prev => {
-                                                        const p: [string, string[]] = [...prev]
-                                                        p[1][3] = checked ? "true" : "false"
-                                                        return p
+                                                        const p: [string, string[]] = [...prev];
+                                                        p[1][3] = checked ? "true" : "false";
+                                                        return p;
                                                     })}
                                                     checked={attribute[1][3] === "true"}
                                                 />
@@ -523,8 +528,8 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                                                             title="Save the attribute changes"
                                                             data-testid="saveEditAttributeButton"
                                                             onClick={(e) => {
-                                                                e.stopPropagation()
-                                                                handleSetAttribute(true)
+                                                                e.stopPropagation();
+                                                                handleSetAttribute(true);
                                                             }}
                                                             isLoading={isSetLoading}
                                                         >
@@ -539,8 +544,8 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                                                                 title="Discard the attribute changes"
                                                                 data-testid="cancelEditAttributeButton"
                                                                 onClick={(e) => {
-                                                                    e.stopPropagation()
-                                                                    handleSetEditable()
+                                                                    e.stopPropagation();
+                                                                    handleSetEditable();
 
                                                                 }}
                                                             >
@@ -554,7 +559,7 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                                                             trigger={
                                                                 <Button
                                                                     onClick={(e) => {
-                                                                        e.stopPropagation()
+                                                                        e.stopPropagation();
                                                                     }}
                                                                     variant="button"
                                                                     title="Delete Attribute"
@@ -574,8 +579,8 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                                                                     title="Confirm the deletion of the attribute"
                                                                     data-testid="confirmRemoveAttributeButton"
                                                                     onClick={(e) => {
-                                                                        e.stopPropagation()
-                                                                        handleRemoveAttribute(key)
+                                                                        e.stopPropagation();
+                                                                        handleRemoveAttribute(key);
                                                                     }}
                                                                     isLoading={isRemoveLoading}
                                                                 />
@@ -596,8 +601,8 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                                                             title="Modify this attribute"
                                                             data-testid="editAttributeButton"
                                                             onClick={(e) => {
-                                                                e.stopPropagation()
-                                                                handleSetEditable([key, [...val]])
+                                                                e.stopPropagation();
+                                                                handleSetEditable([key, [...val]]);
                                                             }}
                                                         >
                                                             <Pencil size={20} />
@@ -619,9 +624,9 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                                     onKeyDown={handleAddKeyDown}
                                     data-testid="addAttributeKeyInput"
                                     onChange={(e) => setAttribute(prev => {
-                                        const p: [string, string[]] = [...prev]
-                                        p[0] = e.target.value
-                                        return p
+                                        const p: [string, string[]] = [...prev];
+                                        p[0] = e.target.value;
+                                        return p;
                                     })}
                                     value={attribute[0]}
                                 />
@@ -630,9 +635,9 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                                 <Combobox
                                     options={OPTIONS}
                                     setSelectedValue={(v) => setAttribute(prev => {
-                                        const p: [string, string[]] = [...prev]
-                                        p[1][0] = v
-                                        return p
+                                        const p: [string, string[]] = [...prev];
+                                        p[1][0] = v;
+                                        return p;
                                     })}
                                     inTable
                                     label="Type"
@@ -645,9 +650,9 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                                     onKeyDown={handleAddKeyDown}
                                     data-testid="addAttributeValueInput"
                                     onChange={(e) => setAttribute(prev => {
-                                        const p: [string, string[]] = [...prev]
-                                        p[1][1] = e.target.value
-                                        return p
+                                        const p: [string, string[]] = [...prev];
+                                        p[1][1] = e.target.value;
+                                        return p;
                                     })}
                                     value={attribute[1][1]}
                                 />
@@ -656,9 +661,9 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                                 <Switch
                                     className="data-[state=unchecked]:bg-border"
                                     onCheckedChange={(checked) => setAttribute(prev => {
-                                        const p: [string, string[]] = [...prev]
-                                        p[1][2] = checked ? "true" : "false"
-                                        return p
+                                        const p: [string, string[]] = [...prev];
+                                        p[1][2] = checked ? "true" : "false";
+                                        return p;
                                     })}
                                     checked={attribute[1][2] === "true"}
                                 />
@@ -667,9 +672,9 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                                 <Switch
                                     className="data-[state=unchecked]:bg-border"
                                     onCheckedChange={(checked) => setAttribute(prev => {
-                                        const p: [string, string[]] = [...prev]
-                                        p[1][3] = checked ? "true" : "false"
-                                        return p
+                                        const p: [string, string[]] = [...prev];
+                                        p[1][3] = checked ? "true" : "false";
+                                        return p;
                                     })}
                                     checked={attribute[1][3] === "true"}
                                 />
@@ -683,8 +688,8 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                                         label="Save"
                                         title="Save the new attribute"
                                         onClick={(e) => {
-                                            e.stopPropagation()
-                                            handleAddAttribute()
+                                            e.stopPropagation();
+                                            handleAddAttribute();
                                         }}
                                         isLoading={isAddLoading}
                                         data-testid="saveAddValueButton"
@@ -697,9 +702,9 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                                         label="Cancel"
                                         title="Discard the new attribute"
                                         onClick={(e) => {
-                                            e.stopPropagation()
-                                            handleSetEditable()
-                                            setIsAddValue(false)
+                                            e.stopPropagation();
+                                            handleSetEditable();
+                                            setIsAddValue(false);
                                         }}
                                         data-testid="cancelAddValueButton"
                                     >
@@ -727,5 +732,5 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
                 </TableCaption>
             </Table>
         </div>
-    )
+    );
 }

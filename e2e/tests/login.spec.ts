@@ -28,7 +28,7 @@ test.describe(`Login tests`, () => {
         await login.Logout();
         await browser.setPageToFullScreen();
         await login.connectWithCredentials("readonlyuser", user.password);
-        await login.waitForUrl(urls.graphUrl)
+        await login.waitForUrl(urls.graphUrl);
         expect(login.getCurrentURL()).toBe(urls.graphUrl);
     });
 
@@ -45,7 +45,7 @@ test.describe(`Login tests`, () => {
             if (login.getCurrentURL() === urls.graphUrl) await login.Logout();
             await browser.setPageToFullScreen();
             await login.connectWithCredentials(username, password, host, port);
-            await new Promise((res) => { setTimeout(res, 500) });
+            await new Promise((res) => { setTimeout(res, 500); });
             expect(login.getCurrentURL()).not.toBe(urls.graphUrl);
         });
     });
@@ -103,4 +103,4 @@ test.describe(`Login tests`, () => {
             expect(login.getCurrentURL()).not.toBe(urls.graphUrl);
         });
     });
-})
+});

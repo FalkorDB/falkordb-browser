@@ -1,15 +1,15 @@
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable no-await-in-loop */
-import { test as setup, request as playwrightRequest } from "@playwright/test"
-import urls from '../config/urls.json'
+import { test as setup, request as playwrightRequest } from "@playwright/test";
+import urls from '../config/urls.json';
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import LoginPage from "../logic/POM/loginPage";
-import { user } from '../config/user.json'
+import { user } from '../config/user.json';
 import ApiCalls from "../logic/api/apiCalls";
 
-const adminAuthFile = 'playwright/.auth/admin.json'
-const readWriteAuthFile = 'playwright/.auth/readwriteuser.json'
-const readOnlyAuthFile = 'playwright/.auth/readonlyuser.json'
+const adminAuthFile = 'playwright/.auth/admin.json';
+const readWriteAuthFile = 'playwright/.auth/readwriteuser.json';
+const readOnlyAuthFile = 'playwright/.auth/readonlyuser.json';
 
 setup("setup authentication", async () => {
     try {

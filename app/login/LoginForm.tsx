@@ -20,7 +20,7 @@ type LoginMode = "manual" | "url";
 
 export default function LoginForm() {
   const { theme } = useTheme();
-  const { currentTheme } = getTheme(theme)
+  const { currentTheme } = getTheme(theme);
   const router = useRouter();
 
   const [mounted, setMounted] = useState(false);
@@ -46,12 +46,12 @@ export default function LoginForm() {
     [{
       value: falkordbUrl,
       onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
-        setFalkordbUrl(e.target.value)
+        setFalkordbUrl(e.target.value);
         setError(prev => ({
           ...prev,
           show: false
-        }))
-        return true
+        }));
+        return true;
       },
       label: "FalkorDB URL",
       type: "text",
@@ -61,12 +61,12 @@ export default function LoginForm() {
       {
         value: host,
         onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
-          setHost(e.target.value)
+          setHost(e.target.value);
           setError(prev => ({
             ...prev,
             show: false
-          }))
-          return true
+          }));
+          return true;
         },
         label: "Host",
         type: "text",
@@ -76,12 +76,12 @@ export default function LoginForm() {
       {
         value: port,
         onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
-          setPort(e.target.value)
+          setPort(e.target.value);
           setError(prev => ({
             ...prev,
             show: false
-          }))
-          return true
+          }));
+          return true;
         },
         label: "Port",
         type: "text",
@@ -91,12 +91,12 @@ export default function LoginForm() {
       {
         value: username,
         onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
-          setUsername(e.target.value)
+          setUsername(e.target.value);
           setError(prev => ({
             ...prev,
             show: false
-          }))
-          return true
+          }));
+          return true;
         },
         label: "Username",
         placeholder: "Default",
@@ -107,12 +107,12 @@ export default function LoginForm() {
       {
         value: password,
         onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
-          setPassword(e.target.value)
+          setPassword(e.target.value);
           setError(prev => ({
             ...prev,
             show: false
-          }))
-          return true
+          }));
+          return true;
         },
         label: "Password",
         placeholder: "Default",
@@ -123,8 +123,8 @@ export default function LoginForm() {
     ];
 
   useEffect(() => {
-    setMounted(true)
-  }, [])
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const hostParam = searchParams.get("host");
@@ -135,7 +135,7 @@ export default function LoginForm() {
     setHost(decodeURIComponent(hostParam || ""));
     setPort(decodeURIComponent(portParam || ""));
     setUsername(decodeURIComponent(usernameParam ?? ""));
-    setTLS(tls === "true")
+    setTLS(tls === "true");
   }, [searchParams]);
 
   const onSubmit = async (e: FormEvent) => {
@@ -180,7 +180,7 @@ export default function LoginForm() {
         setError(prev => ({
           ...prev,
           show: true
-        }))
+        }));
       } else {
         router.push("/graph");
       }
@@ -188,23 +188,23 @@ export default function LoginForm() {
   };
 
   const onFileDrop = (acceptedFiles: File[]) => {
-    const reader = new FileReader()
+    const reader = new FileReader();
 
     reader.onload = () => {
       setError(prev => ({
         ...prev,
         show: false
-      }))
-      setCA((reader.result as string).split(',').pop())
-      setUploadedFileName(acceptedFiles[0].name)
+      }));
+      setCA((reader.result as string).split(',').pop());
+      setUploadedFileName(acceptedFiles[0].name);
       setError(prev => ({
         ...prev,
         show: false
-      }))
-    }
+      }));
+    };
 
-    reader.readAsDataURL(acceptedFiles[0])
-  }
+    reader.readAsDataURL(acceptedFiles[0]);
+  };
 
   return (
     <div className="relative h-full w-full flex flex-col">
@@ -248,15 +248,15 @@ export default function LoginForm() {
                     className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
                     checked={TLS}
                     onCheckedChange={(checked) => {
-                      setTLS(checked as boolean)
+                      setTLS(checked as boolean);
                       setError(prev => ({
                         ...prev,
                         show: false
-                      }))
+                      }));
                       if (!checked) {
                         // Clear certificate when TLS is disabled
-                        setCA(undefined)
-                        setUploadedFileName("")
+                        setCA(undefined);
+                        setUploadedFileName("");
                       }
                     }}
                     data-testid="tls-checkbox"
@@ -302,9 +302,9 @@ export default function LoginForm() {
                               setError(prev => ({
                                 ...prev,
                                 show: false
-                              }))
-                              setCA(undefined)
-                              setUploadedFileName("")
+                              }));
+                              setCA(undefined);
+                              setUploadedFileName("");
                             }}
                             className="flex-shrink-0 p-1 text-muted hover:text-foreground hover:bg-primary/20 rounded transition-colors duration-200"
                             title="Remove certificate"

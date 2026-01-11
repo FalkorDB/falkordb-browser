@@ -211,14 +211,12 @@ export default class Page extends BasePage {
 
   // CANVAS TOOLTIP
   public get nodeCanvasToolTip(): Locator {
-    return this.page.locator("//div[contains(@class, 'float-tooltip-kap')]");
+    return this.page.locator("div[class*='float-tooltip-kap']");
   }
 
   // CANVAS
   public get canvasElement(): Locator {
-    return this.page.locator(
-      "//div[contains(@class, 'force-graph-container')]//canvas"
-    );
+    return this.page.locator("falkordb-canvas").locator("canvas").first();
   }
 
   // TOAST
@@ -243,14 +241,29 @@ export default class Page extends BasePage {
   // 1500 is extra timeout to ensure the animation is over
   async waitForCanvasAnimationToEnd(timeout = 4500): Promise<void> {
     await waitForElementToBeVisible(this.skeleton);
-    await this.page.waitForFunction(
-      ({ selector }) => {
-        const canvas = document.querySelector(selector);
-        return canvas?.getAttribute("data-engine-status") === "stop";
-      },
-      { selector: ".force-graph-container canvas" },
-      { timeout }
-    );
+
+    // Check if canvas exists before waiting for it
+    const canvasContainer = this.page.locator("falkordb-canvas");
+    const canvasCount = await canvasContainer.count();
+
+    if (canvasCount === 0) {
+      // Canvas doesn't exist - might be empty graph or deleted all elements
+      return;
+    }
+
+    // Wait for the web component to be loaded (it's imported asynchronously)
+    await this.canvasElement.waitFor({ state: "attached", timeout: 10000 });
+
+    // Poll the canvas element's data-engine-status attribute using the locator
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeout) {
+      const status = await this.canvasElement.getAttribute("data-engine-status");
+      if (status === "stopped") {
+        return;
+      }
+      await this.page.waitForTimeout(500); // Poll every 500ms
+    }
+    throw new Error(`Canvas animation did not stop within ${timeout}ms`);
   }
 
   async getCanvasScaling(): Promise<{ scaleX: number; scaleY: number }> {
@@ -297,13 +310,24 @@ export default class Page extends BasePage {
   async getNodesScreenPositions(windowKey: "graph" | "schema"): Promise<any[]> {
     // Wait for canvas to be ready and animations to settle
     await this.waitForCanvasAnimationToEnd();
-    await this.page.waitForTimeout(1500); // Allow some time for the canvas to render properly
+
+    // Give a small buffer for handleEngineStop callback to execute and populate window data
+    await this.page.waitForTimeout(500);
+
+    // Wait for the graph data to be available on window object (set by handleEngineStop)
+    await this.page.waitForFunction(
+      (key) => {
+        const data = (window as any)[key]?.();
+        // Check both possible structures: { nodes } or { elements: { nodes } }
+        return (data && ((Array.isArray(data.nodes) && data.nodes.length > 0) ||
+                        (data.elements && Array.isArray(data.elements.nodes) && data.elements.nodes.length > 0)));
+      },
+      windowKey,
+      { timeout: 5000 }
+    );
 
     // Get canvas element and its properties
-    const canvasInfo = await this.page.evaluate((selector) => {
-      const canvasElement = document.querySelector(
-        selector
-      ) as HTMLCanvasElement;
+    const canvasInfo = await this.canvasElement.evaluate((canvasElement: HTMLCanvasElement) => {
       if (!canvasElement) return null;
       const rect = canvasElement.getBoundingClientRect();
       const ctx = canvasElement.getContext("2d");
@@ -327,17 +351,18 @@ export default class Page extends BasePage {
             }
           : null,
       };
-    }, ".force-graph-container canvas");
+    });
 
     if (!canvasInfo || !canvasInfo.transform) return [];
 
     // Get graph data from window object
     const graphData = await this.page.evaluate(
-      (key) => (window as any)[key],
+      (key) => (window as any)[key]?.(),
       windowKey
     );
 
-    if (!graphData?.elements?.nodes) return [];
+    const nodes = graphData?.nodes || graphData?.elements?.nodes;
+    if (!nodes || !Array.isArray(nodes)) return [];
 
     const {
       a: scaleX,
@@ -346,7 +371,7 @@ export default class Page extends BasePage {
       f: translateY,
     } = canvasInfo.transform;
 
-    return graphData.elements.nodes.map((node: any) => {
+    return nodes.map((node: any) => {
       // Apply canvas transform matrix to node coordinates
       // Transform: screenX = node.x * scaleX + translateX, screenY = node.y * scaleY + translateY
       const transformedX = node.x * scaleX + translateX;
@@ -416,11 +441,23 @@ export default class Page extends BasePage {
     // Wait for canvas to be ready and animations to settle
     await this.waitForCanvasAnimationToEnd();
 
+    // Give a small buffer for handleEngineStop callback to execute and populate window data
+    await this.page.waitForTimeout(500);
+
+    // Wait for the graph data to be available on window object (set by handleEngineStop)
+    await this.page.waitForFunction(
+      (key) => {
+        const data = (window as any)[key]?.();
+        // Check both possible structures: { links } or { elements: { links } }
+        return (data && ((Array.isArray(data.links) && data.links.length > 0) ||
+                        (data.elements && Array.isArray(data.elements.links) && data.elements.links.length > 0)));
+      },
+      windowKey,
+      { timeout: 5000 }
+    );
+
     // Get canvas element and its properties
-    const canvasInfo = await this.page.evaluate((selector) => {
-      const canvasElement = document.querySelector(
-        selector
-      ) as HTMLCanvasElement;
+    const canvasInfo = await this.canvasElement.evaluate((canvasElement: HTMLCanvasElement) => {
       if (!canvasElement) return null;
       const rect = canvasElement.getBoundingClientRect();
       const ctx = canvasElement.getContext("2d");
@@ -444,17 +481,19 @@ export default class Page extends BasePage {
             }
           : null,
       };
-    }, ".force-graph-container canvas");
+    });
 
     if (!canvasInfo || !canvasInfo.transform) return [];
 
     // Get graph data from window object
     const graphData = await this.page.evaluate(
-      (key) => (window as any)[key],
+      (key) => (window as any)[key]?.(),
       windowKey
     );
 
-    if (!graphData?.elements?.links || !graphData?.elements?.nodes) return [];
+    const links = graphData?.links || graphData?.elements?.links;
+    const nodesData = graphData?.nodes || graphData?.elements?.nodes;
+    if (!links || !Array.isArray(links) || !nodesData || !Array.isArray(nodesData)) return [];
 
     const {
       a: scaleX,
@@ -463,16 +502,16 @@ export default class Page extends BasePage {
       f: translateY,
     } = canvasInfo.transform;
 
-    return graphData.elements.links.map((link: any) => {
+    return links.map((link: any) => {
       const sourceId =
         typeof link.source === "object" ? link.source.id : link.source;
       const targetId =
         typeof link.target === "object" ? link.target.id : link.target;
 
-      const source = graphData.elements.nodes.find(
+      const source = nodesData.find(
         (n: any) => n.id === sourceId
       );
-      const target = graphData.elements.nodes.find(
+      const target = nodesData.find(
         (n: any) => n.id === targetId
       );
 

@@ -5,6 +5,7 @@ import { expect, test } from "@playwright/test";
 import {
   getRandomString,
   CREATE_QUERY,
+  CREATE_PERSON_RELATIONSHIP
 } from "../infra/utils";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
@@ -155,15 +156,15 @@ test.describe("Customize Style Tests", () => {
     const graph = await browser.createNewPage(CustomizeStylePage, urls.graphUrl);
     await browser.setPageToFullScreen();
     await graph.selectGraphByName(graphName);
-    await graph.insertQuery(CREATE_QUERY);
+    await graph.insertQuery(CREATE_PERSON_RELATIONSHIP);
     await graph.clickRunQuery();
     await graph.openGraphInfoButton();
 
     // Click customize style button
-    await graph.clickCustomizeStyleButton("person1");
+    await graph.clickCustomizeStyleButton("person2");
 
-    // Select caption "id"
-    await graph.selectCaption("id");
+    // Select caption "name"
+    await graph.selectCaption("occupation");
 
     // Verify Save button is visible
     expect(await graph.isSaveButtonVisible()).toBeTruthy();
@@ -175,8 +176,8 @@ test.describe("Customize Style Tests", () => {
     await graph.waitForCanvasAnimationToEnd();
 
     // Verify the caption change persisted in localStorage
-    const savedStyle = await graph.getLabelStyleFromLocalStorage("person1");
-    expect(savedStyle?.customCaption).toBe("id");
+    const savedStyle = await graph.getLabelStyleFromLocalStorage("person2");
+    expect(savedStyle?.caption).toBe("occupation");
 
     await apiCall.removeGraph(graphName);
   });
@@ -245,9 +246,6 @@ test.describe("Customize Style Tests", () => {
     await graph.selectColorByIndex(newColorIndex);
     await graph.selectSizeByIndex(newSizeIndex);
 
-    // Get the selected color
-    const selectedColor = await graph.getLabelButtonColor("person1");
-
     // Verify Save button is visible
     expect(await graph.isSaveButtonVisible()).toBeTruthy();
 
@@ -259,6 +257,9 @@ test.describe("Customize Style Tests", () => {
 
     // Close panel
     await graph.closePanelWithEscape();
+
+    // Get the selected color after closing the panel
+    const selectedColor = await graph.getLabelButtonColor("person1");
 
     // Refresh the page
     await graph.refreshPage();
@@ -276,7 +277,7 @@ test.describe("Customize Style Tests", () => {
 
     // Verify size persisted after refresh
     const styleAfterRefresh = await graph.getLabelStyleFromLocalStorage("person1");
-    expect(styleAfterRefresh?.customSize).toBe(selectedStyle?.customSize);
+    expect(styleAfterRefresh?.size).toBe(selectedStyle?.size);
 
     await apiCall.removeGraph(graphName);
   });
@@ -308,28 +309,24 @@ test.describe("Customize Style Tests", () => {
     const hexValue = await graph.getRgbColorHexInputValue();
     expect(hexValue.toUpperCase()).toBe(customColor.toUpperCase());
 
-    // Verify the color is applied to the label button
-    const labelColor = await graph.getLabelButtonColor("person1");
-    // Convert hex to rgb for comparison
-    const expectedRgb = "rgb(255, 87, 51)"; // #FF5733 in RGB
-    expect(labelColor).toBe(expectedRgb);
-
     // Verify Save button is visible
     expect(await graph.isSaveButtonVisible()).toBeTruthy();
 
     // Click Save to persist changes
     await graph.clickSaveStyleButton();
 
-    // Reopen the panel to verify persistence
-    await graph.clickCustomizeStyleButton("person1");
-
     // Verify the custom color persists in localStorage
     const savedStyle = await graph.getLabelStyleFromLocalStorage("person1");
-    expect(savedStyle?.customColor?.toUpperCase()).toBe(customColor.toUpperCase());
+    expect(savedStyle?.color?.toUpperCase()).toBe(customColor.toUpperCase());
 
-    // Verify the color still shows on the label button
-    const colorAfterReopen = await graph.getLabelButtonColor("person1");
-    expect(colorAfterReopen).toBe(expectedRgb);
+    // Close the panel to verify the color on the label button
+    await graph.closePanelWithEscape();
+
+    // Verify the color is applied to the label button
+    const labelColor = await graph.getLabelButtonColor("person1");
+    // Convert hex to rgb for comparison
+    const expectedRgb = "rgb(255, 87, 51)"; // #FF5733 in RGB
+    expect(labelColor).toBe(expectedRgb);
 
     await apiCall.removeGraph(graphName);
   });
@@ -361,7 +358,7 @@ test.describe("Customize Style Tests", () => {
     // Select different color and size
     await graph.selectColorByIndex(newColorIndex);
     await graph.selectSizeByIndex(newSizeIndex);
-    await graph.selectCaption("id");
+    await graph.selectCaption("ID");
 
     // Verify Save button is visible (changes were made)
     expect(await graph.isSaveButtonVisible()).toBeTruthy();
@@ -385,8 +382,8 @@ test.describe("Customize Style Tests", () => {
 
     // Verify style in localStorage did NOT change
     const styleAfterRefresh = await graph.getLabelStyleFromLocalStorage("person1");
-    expect(styleAfterRefresh?.customSize).toBe(originalStyle?.customSize);
-    expect(styleAfterRefresh?.customCaption).toBe(originalStyle?.customCaption);
+    expect(styleAfterRefresh?.size).toBe(originalStyle?.size);
+    expect(styleAfterRefresh?.caption).toBe(originalStyle?.caption);
 
     await apiCall.removeGraph(graphName);
   });
@@ -447,7 +444,7 @@ test.describe("Customize Style Tests", () => {
     // Verify that graph2's person1 label has the same style as graph1
     // (Label styles should be global, not graph-scoped)
     expect(graph2Color).toBe(graph1Color);
-    expect(graph2Style?.customSize).toBe(graph1Style?.customSize);
+    expect(graph2Style?.size).toBe(graph1Style?.size);
 
     // Cleanup
     await apiCall.removeGraph(graphName1);

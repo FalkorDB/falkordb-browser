@@ -9,12 +9,12 @@ import { useEffect, useState } from "react";
 
 export default function Home() {
   const { theme } = useTheme();
-  const { currentTheme } = getTheme(theme)
+  const { currentTheme } = getTheme(theme);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true)
-  }, [])
+    setMounted(true);
+  }, []);
 
   return (
     <div className="h-full w-full bg-background flex flex-col gap-4">
@@ -28,5 +28,5 @@ export default function Home() {
       </div>
       <div className="h-5 Gradient" />
     </div>
-  )
+  );
 }

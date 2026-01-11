@@ -11,11 +11,11 @@ import { Query } from "../api/graph/model";
 
 const renderValue = (v: any) => (
     <span className="SofiaSans">{v}</span>
-)
+);
 
 const renderLabel = (l: any) => (
     <span className="SofiaSans">{l[0]}:</span>
-)
+);
 
 export function Profile({ graphName, query, setQuery, fetchCount, background }: {
     graphName: string,
@@ -25,36 +25,36 @@ export function Profile({ graphName, query, setQuery, fetchCount, background }: 
     background: string
 }) {
 
-    const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { indicator, setIndicator } = useContext(IndicatorContext);
 
-    const { toast } = useToast()
-    const { theme } = useTheme()
-    const { foreground } = useMemo(() => getTheme(theme), [theme])
+    const { toast } = useToast();
+    const { theme } = useTheme();
+    const { foreground } = useMemo(() => getTheme(theme), [theme]);
 
-    const [profile, setProfile] = useState<string[]>(query.profile || [])
-    const [isLoading, setIsLoading] = useState(false)
+    const [profile, setProfile] = useState<string[]>(query.profile || []);
+    const [isLoading, setIsLoading] = useState(false);
 
 
     const handleProfile = async () => {
-        setIsLoading(true)
+        setIsLoading(true);
         try {
             const result = await securedFetch(`/api/graph/${graphName}/profile?query=${prepareArg(query.text)}`, {
                 method: "GET",
-            }, toast, setIndicator)
+            }, toast, setIndicator);
 
-            if (!result.ok) return
+            if (!result.ok) return;
 
-            const json = await result.json()
-            setProfile(json.result)
+            const json = await result.json();
+            setProfile(json.result);
             setQuery({
                 ...query,
                 profile: json.result
-            })
-            fetchCount()
+            });
+            fetchCount();
         } finally {
-            setIsLoading(false)
+            setIsLoading(false);
         }
-    }
+    };
 
     return (
         <>
@@ -105,7 +105,7 @@ export function Profile({ graphName, query, setQuery, fetchCount, background }: 
                 </div>
             }
         </>
-    )
+    );
 }
 
 export function Metadata({ query }: {
@@ -121,7 +121,7 @@ export function Metadata({ query }: {
                 ))}
             </ul>
         </>
-    )
+    );
 }
 
 export function Explain({ query, background }: {
@@ -129,8 +129,8 @@ export function Explain({ query, background }: {
     background: string
 }) {
 
-    const { theme } = useTheme()
-    const { foreground } = useMemo(() => getTheme(theme), [theme])
+    const { theme } = useTheme();
+    const { foreground } = useMemo(() => getTheme(theme), [theme]);
 
     return (
         <>
@@ -163,7 +163,7 @@ export function Explain({ query, background }: {
                 />
             </div>
         </>
-    )
+    );
 }
 
 
@@ -174,8 +174,8 @@ export default function MetadataView({ graphName, query, setQuery, fetchCount }:
     fetchCount: () => Promise<void>
 }) {
 
-    const { theme } = useTheme()
-    const { background } = getTheme(theme)
+    const { theme } = useTheme();
+    const { background } = getTheme(theme);
 
     return (
         <div className="h-full grid grid-cols-2 grid-rows-3 overflow-hidden">
@@ -189,5 +189,5 @@ export default function MetadataView({ graphName, query, setQuery, fetchCount }:
                 <Explain background={background} query={query} />
             </div>
         </div>
-    )
+    );
 }

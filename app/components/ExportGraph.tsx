@@ -1,10 +1,10 @@
-import React, { useContext, useEffect, useState } from "react"
-import { prepareArg, securedFetch } from "@/lib/utils"
-import { useToast } from "@/components/ui/use-toast"
-import DialogComponent from "./DialogComponent"
-import Button from "./ui/Button"
-import CloseDialog from "./CloseDialog"
-import { IndicatorContext } from "./provider"
+import React, { useContext, useEffect, useState } from "react";
+import { prepareArg, securedFetch } from "@/lib/utils";
+import { useToast } from "@/components/ui/use-toast";
+import DialogComponent from "./DialogComponent";
+import Button from "./ui/Button";
+import CloseDialog from "./CloseDialog";
+import { IndicatorContext } from "./provider";
 
 interface Props {
     selectedValues: string[]
@@ -13,51 +13,51 @@ interface Props {
 
 export default function ExportGraph({ selectedValues, type }: Props) {
 
-    const [open, setOpen] = useState(false)
-    const [isLoading, setIsLoading] = useState(false)
-    const { toast } = useToast()
-    const { indicator, setIndicator } = useContext(IndicatorContext)
+    const [open, setOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const { toast } = useToast();
+    const { indicator, setIndicator } = useContext(IndicatorContext);
 
     useEffect(() => {
         if (!open) {
-            setIsLoading(false)
+            setIsLoading(false);
         }
-    }, [open])
+    }, [open]);
 
     const handleExport = async () => {
         try {
-            setIsLoading(true)
+            setIsLoading(true);
             await Promise.all(selectedValues.map(async value => {
-                const name = `${value}${type === "Schema" ? "_schema" : ""}`
+                const name = `${value}${type === "Schema" ? "_schema" : ""}`;
                 const result = await securedFetch(`api/graph/${prepareArg(name)}/export`, {
                     method: "GET"
-                }, toast, setIndicator)
+                }, toast, setIndicator);
 
-                if (!result.ok) return
+                if (!result.ok) return;
 
-                const blob = await result.blob()
-                const url = window.URL.createObjectURL(blob)
+                const blob = await result.blob();
+                const url = window.URL.createObjectURL(blob);
                 try {
-                    const link = document.createElement('a')
-                    link.href = url
-                    link.setAttribute('download', `${name}.dump`)
-                    document.body.appendChild(link)
-                    link.click()
-                    link.parentNode?.removeChild(link)
-                    window.URL.revokeObjectURL(url)
-                    setOpen(false)
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.setAttribute('download', `${name}.dump`);
+                    document.body.appendChild(link);
+                    link.click();
+                    link.parentNode?.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                    setOpen(false);
                 } catch (e) {
                     toast({
                         title: "Error",
                         description: "Error while exporting data",
                         variant: "destructive"
-                    })
+                    });
                 }
-            }))
+            }));
         } finally {
-            setIsLoading(false)
+            setIsLoading(false);
         }
-    }
+    };
 
 
     return (
@@ -94,5 +94,5 @@ export default function ExportGraph({ selectedValues, type }: Props) {
                 />
             </div>
         </DialogComponent>
-    )
+    );
 }

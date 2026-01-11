@@ -1,9 +1,9 @@
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { useContext } from "react"
-import { Info, Loader2 } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Graph } from "../api/graph/model"
-import { BrowserSettingsContext } from "../components/provider"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useContext } from "react";
+import { Info, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Graph } from "../api/graph/model";
+import { BrowserSettingsContext } from "../components/provider";
 
 export default function GraphDetails({
     graph,
@@ -22,15 +22,15 @@ export default function GraphDetails({
         settings: {
             limitSettings: { limit, lastLimit },
         }
-    } = useContext(BrowserSettingsContext)
+    } = useContext(BrowserSettingsContext);
 
     // Check if any content should be displayed
-    const hasLimitWarning = graph.CurrentLimit && graph.Data.length >= graph.CurrentLimit
-    const hasLimitChangeWarning = graph.CurrentLimit && lastLimit !== limit
-    const hasGraphDetails = graph.Id && tabsValue === "Graph" && graphName !== undefined && nodesCount !== -1 && edgesCount !== -1
+    const hasLimitWarning = graph.CurrentLimit && graph.Data.length >= graph.CurrentLimit;
+    const hasLimitChangeWarning = graph.CurrentLimit && lastLimit !== limit;
+    const hasGraphDetails = graph.Id && tabsValue === "Graph" && graphName !== undefined && nodesCount !== -1 && edgesCount !== -1;
 
     if (!hasLimitWarning && !hasLimitChangeWarning && !hasGraphDetails) {
-        return null
+        return null;
     }
 
     return (
@@ -102,7 +102,7 @@ export default function GraphDetails({
                 </div >
             }
         </div>
-    )
+    );
 }
 
 GraphDetails.defaultProps = {
@@ -110,4 +110,4 @@ GraphDetails.defaultProps = {
     nodesCount: -1,
     edgesCount: -1,
     graphName: undefined,
-}
+};

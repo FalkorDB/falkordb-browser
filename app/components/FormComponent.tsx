@@ -1,20 +1,20 @@
 /* eslint-disable react/no-array-index-key */
 /* eslint-disable no-param-reassign */
 
-"use client"
+"use client";
 
-import { useState } from "react"
-import { EyeIcon, EyeOffIcon, InfoIcon } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import Button from "./ui/Button"
-import Combobox from "./ui/combobox"
-import Input from "./ui/Input"
+import { useState } from "react";
+import { EyeIcon, EyeOffIcon, InfoIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import Button from "./ui/Button";
+import Combobox from "./ui/combobox";
+import Input from "./ui/Input";
 
 export type Error = {
     message: string
     condition: (value: string, password?: string) => boolean
-}
+};
 
 export type DefaultField = {
     value: string
@@ -25,26 +25,26 @@ export type DefaultField = {
     description?: string
     errors?: Error[]
     info?: string
-}
+};
 
 export type SelectField = DefaultField & {
     type: "select"
     options: string[]
     selectType: "Role"
     onChange: (value: string) => void
-}
+};
 
 export type PasswordField = DefaultField & {
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
     type: "password"
-}
+};
 
 export type TextField = DefaultField & {
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
     type: "text"
-}
+};
 
-export type Field = SelectField | PasswordField | TextField
+export type Field = SelectField | PasswordField | TextField;
 
 interface Props {
     handleSubmit: (e: React.FormEvent<HTMLFormElement>) => Promise<void>
@@ -64,34 +64,34 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
     const [isLoading, setIsLoading] = useState(false);
 
     const onHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
+        e.preventDefault();
 
-        const newErrors: { [key: string]: boolean } = {}
+        const newErrors: { [key: string]: boolean } = {};
         fields.forEach(field => {
             if (field.errors) {
-                newErrors[field.label] = field.errors.some(err => err.condition(field.value))
+                newErrors[field.label] = field.errors.some(err => err.condition(field.value));
             }
-        })
+        });
 
-        setErrors(newErrors)
+        setErrors(newErrors);
 
         if (Object.values(newErrors).some(value => value)) {
-            return
+            return;
         }
 
         try {
-            setIsLoading(true)
-            await handleSubmit(e)
+            setIsLoading(true);
+            await handleSubmit(e);
         } finally {
-            setIsLoading(false)
+            setIsLoading(false);
         }
-    }
+    };
 
     return (
         <form className={cn("flex flex-col gap-4 w-full", className)} onSubmit={onHandleSubmit}>
             {
                 fields.map((field) => {
-                    const passwordType = show[field.label] ? "text" : "password"
+                    const passwordType = show[field.label] ? "text" : "password";
                     return (
                         <div className="flex flex-col gap-2" key={field.label}>
                             <div className={cn(field.info && "flex gap-2 items-center")}>
@@ -117,7 +117,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                             setShow(prev => ({
                                                 ...prev,
                                                 [field.label]: !prev[field.label]
-                                            }))
+                                            }));
                                         }}
                                     >
                                         {
@@ -143,21 +143,21 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                             placeholder={field.placeholder}
                                             value={field.value}
                                             onChange={(e) => {
-                                                field.onChange(e)
+                                                field.onChange(e);
                                                 if (field.type === "password") {
-                                                    const confirmPasswordField = fields.find(f => f.label === "Confirm Password")
+                                                    const confirmPasswordField = fields.find(f => f.label === "Confirm Password");
                                                     if (confirmPasswordField && confirmPasswordField.errors) {
                                                         setErrors(prev => ({
                                                             ...prev,
                                                             "Confirm Password": confirmPasswordField.errors!.some(err => err.condition(confirmPasswordField.value, e.target.value))
-                                                        }))
+                                                        }));
                                                     }
                                                 }
                                                 if (field.errors) {
                                                     setErrors(prev => ({
                                                         ...prev,
                                                         [field.label]: field.errors!.some(err => err.condition(e.target.value))
-                                                    }))
+                                                    }));
                                                 }
                                             }} />
                                 }
@@ -170,7 +170,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                 </div>
                             </div>
                         </div>
-                    )
+                    );
                 })
             }
             {children}
@@ -188,7 +188,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                 />
             </div>
         </form>
-    )
+    );
 }
 
 FormComponent.defaultProps = {
@@ -196,4 +196,4 @@ FormComponent.defaultProps = {
     error: undefined,
     submitButtonLabel: "Submit",
     className: ""
-}
+};

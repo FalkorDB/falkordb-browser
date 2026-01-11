@@ -15,18 +15,18 @@ test.describe('Metadata Tests', () => {
         apiCalls = new APICalls();
         GRAPH_NAME = getRandomString('metadata');
         await apiCalls.addGraph(GRAPH_NAME);
-    })
+    });
     
     test.afterEach(async () => {
         await apiCalls.removeGraph(GRAPH_NAME);
         await browser.closeBrowser();
-    })
+    });
 
     test('@admin check metadata view tab is disabled when there is no metadata', async () => {
         const metadataView = await browser.createNewPage(MetadataView, urls.graphUrl);
         const isMetadataViewTabEnabled = await metadataView.GetIsMetadataViewTabEnabled();
         expect(isMetadataViewTabEnabled).toBe(false);
-    })
+    });
 
     test('@admin check metadata view tab is enabled when there is metadata', async () => {
         const metadataView = await browser.createNewPage(MetadataView, urls.graphUrl);
@@ -35,5 +35,5 @@ test.describe('Metadata Tests', () => {
         await metadataView.clickRunQuery();
         const isMetadataViewTabEnabled = await metadataView.GetIsMetadataViewTabEnabled();
         expect(isMetadataViewTabEnabled).toBe(true);
-    })
-})
+    });
+});
