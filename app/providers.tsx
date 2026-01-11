@@ -452,22 +452,27 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
           setSecretKey('');
         } else if (isEncrypted(storedSecretKey)) {
           // Already encrypted - decrypt it
-          try {
-            const decryptedKey = await decryptValue(storedSecretKey);
+          const decryptedKey = await decryptValue(storedSecretKey);
+          if (decryptedKey) {
             setSecretKey(decryptedKey);
-          } catch (error) {
-            console.error('Failed to decrypt secret key:', error);
+          } else {
+            // Decryption failed (corrupted or key mismatch) - clear it
+            console.warn('Clearing corrupted encrypted secret key');
             setSecretKey('');
+            localStorage.removeItem("secretKey");
           }
         } else {
           // Plain text key from existing users - migrate to encrypted
           try {
             setSecretKey(storedSecretKey);
             const encryptedKey = await encryptValue(storedSecretKey);
-            localStorage.setItem("secretKey", encryptedKey);
+            if (encryptedKey) {
+              localStorage.setItem("secretKey", encryptedKey);
+            } else {
+              console.error('Failed to encrypt plain text key');
+            }
           } catch (error) {
             console.error('Failed to encrypt plain text key:', error);
-            setSecretKey('');
           }
         }
       }

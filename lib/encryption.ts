@@ -142,7 +142,8 @@ export async function decryptValue(encryptedValue: string): Promise<string> {
   
   // Check if value has encryption prefix
   if (!encryptedValue.startsWith(ENCRYPTED_PREFIX)) {
-    throw new Error('Value is not encrypted');
+    console.warn('Value is not encrypted, returning empty string');
+    return '';
   }
   
   try {
@@ -168,7 +169,8 @@ export async function decryptValue(encryptedValue: string): Promise<string> {
     const decoder = new TextDecoder();
     return decoder.decode(decryptedData);
   } catch (error) {
-    console.error('Error decrypting value:', error);
+    console.warn('Failed to decrypt value - possibly due to key mismatch or corrupted data. Clearing stored value.', error);
+    // Clear the corrupted encrypted value from localStorage if possible
     // Return empty string on error
     return '';
   }

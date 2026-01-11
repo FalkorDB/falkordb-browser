@@ -22,7 +22,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
     const { settings: { graphInfo: { showMemoryUsage } } } = useContext(BrowserSettingsContext);
 
     return (
-        <div className={cn(`relative h-full w-full p-2 grid grid-rows-[max-content_max-content_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)] gap-8 border-r border-border`)}>
+        <div aria-disabled={!nodesCount || !edgesCount} data-testid="graphInfoPanel" className={cn(`relative h-full w-full p-2 grid grid-rows-[max-content_max-content_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)] gap-8 border-r border-border`)}>
             {
                 !customizingLabel ? (
                     <>
@@ -100,7 +100,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                                 {Array.from(Labels.values()).map((infoLabel) => {
                                     // Get the full Label object from the graph
                                     const label = graph.LabelsMap.get(infoLabel.name);
-                                    
+
                                     if (!label) return null;
 
                                     const name = label.name || "Empty";
@@ -173,12 +173,9 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                                     />
                                 </li>
                                 {Array.from(Relationships.values()).map((infoRelationship) => {
-                                    // Get the full Relationship object from the graph
-                                    const relationship = graph.RelationshipsMap.get(infoRelationship.name);
-                                    if (!relationship) return null;
-
-                                    const relationshipColor = relationship.style.color;
+                                    const relationshipColor = infoRelationship.style.color;
                                     const textColor = getContrastTextColor(relationshipColor);
+                                    
                                     return (
                                         <li key={infoRelationship.name} className="max-w-full">
                                             <Button

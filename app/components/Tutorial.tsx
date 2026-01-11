@@ -337,7 +337,8 @@ function TutorialPortal({
                 // Check if the element is disabled
                 const isDisabled = element instanceof HTMLButtonElement || element instanceof HTMLInputElement
                     ? element.disabled
-                    : element.hasAttribute('disabled') ||
+                    : element.getAttribute('disabled') === 'true' ||
+                    element.getAttribute('aria-disabled') === 'true' ||
                     element.classList.contains('disabled') ||
                     window.getComputedStyle(element).pointerEvents === 'none';
 
