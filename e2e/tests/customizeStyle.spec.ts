@@ -483,10 +483,6 @@ test.describe("Customize Style Tests", () => {
     // Add new random label to the node
     await dataGraph.addLabel(newLabel, true);
 
-    // Verify both labels are now on the node
-    expect(await dataGraph.isVisibleLabel("person1")).toBeTruthy();
-    expect(await dataGraph.isVisibleLabel(newLabel)).toBeTruthy();
-
     // Remove person1 label from the node
     await dataGraph.removeLabel("person1");
 

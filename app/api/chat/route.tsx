@@ -123,7 +123,17 @@ export async function POST(request: NextRequest) {
             writer.close()
         } catch (error) {
             console.error(error)
-            writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify((error as Error).message)}\n\n`))
+            const errorMessage = (error as Error).message;
+
+            // Check if it's an API key error
+            let userFriendlyMessage = errorMessage;
+            if (errorMessage.includes('401 Unauthorized') || errorMessage.includes('invalid_api_key') || errorMessage.includes('Incorrect API key')) {
+                userFriendlyMessage = 'Invalid API key. Please check your API key in Settings and ensure it is correct.';
+            } else if (errorMessage.includes('API key')) {
+                userFriendlyMessage = 'API key error. Please verify your API key in Settings.';
+            }
+
+            writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(userFriendlyMessage)}\n\n`))
             writer.close()
         }
     } catch (error) {
