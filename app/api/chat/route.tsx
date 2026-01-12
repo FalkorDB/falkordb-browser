@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
             }
 
             if (result.cypherQuery) {
-                writer.write(encoder.encode(`event: CypherQuery data: ${JSON.stringify(result.cypherQuery)}\n\n`));
+                writer.write(encoder.encode(`event: CypherQuery data: ${result.cypherQuery}\n\n`));
             }
 
             if (result.cypherResult) {
