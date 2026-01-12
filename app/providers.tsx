@@ -395,6 +395,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         counter: 0
       }));
       setIsQueryLoading(false);
+      setViewport(undefined);
+      setGraphData(undefined);
+      setSearch("");
+      setScrollPosition(0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graphName, limit, timeout, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries, showMemoryUsage]);
