@@ -229,8 +229,8 @@ test.describe("Chat Feature Tests", () => {
     // Reopen chat
     await chat.openChat();
     const inputValue = await chat.getChatInputValue();
-    // Verify behavior - input value after reopen
-    expect(inputValue).toBeDefined();
+    // Verify the message persisted after reopening
+    expect(inputValue).toBe(testMessage);
     
     await apiCall.removeGraph(graphName);
   });
@@ -274,17 +274,11 @@ test.describe("Chat Feature Tests", () => {
       await chat.waitForTimeout(500);
       
       // Get clipboard content and verify it's a valid Cypher query
-      // Note: Firefox requires different clipboard permissions, so we use try-catch
-      try {
-        const clipboardContent = await chat.getClipboardContent();
-        expect(clipboardContent).toBeDefined();
-        expect(clipboardContent.length).toBeGreaterThan(0);
-        // Check that it contains Cypher query keywords
-        expect(clipboardContent.toUpperCase()).toMatch(/MATCH|RETURN|WHERE|OPTIONAL/);
-      } catch (error) {
-        // If clipboard read fails (e.g., in Firefox), just verify the button was clickable
-        // The copy functionality itself works in the browser, but test automation has limitations
-      }
+      const clipboardContent = await chat.getClipboardContent();
+      expect(clipboardContent).toBeDefined();
+      expect(clipboardContent.length).toBeGreaterThan(0);
+      // Check that it contains Cypher query keywords
+      expect(clipboardContent.toUpperCase()).toMatch(/MATCH|RETURN|WHERE|OPTIONAL/);
     }
     
     await apiCall.removeGraph(graphName);
