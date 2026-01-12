@@ -4,6 +4,7 @@ import {
   interactWhenVisible,
   waitForElementToNotBeVisible,
 } from "@/e2e/infra/utils";
+import { EMPTY_DISPLAY_NAME } from "@/app/api/graph/model";
 import GraphInfoPage from "./graphInfoPage";
 
 export default class CustomizeStylePage extends GraphInfoPage {
@@ -16,7 +17,7 @@ export default class CustomizeStylePage extends GraphInfoPage {
   }
 
   private get panelTitle(): Locator {
-    return this.page.getByText("Customize Style");
+    return this.page.getByText("Style Settings");
   }
 
   private get colorSection(): Locator {
@@ -40,7 +41,7 @@ export default class CustomizeStylePage extends GraphInfoPage {
   }
 
   private captionOption(caption: string): Locator {
-    return this.page.getByText(caption).last();
+    return this.page.getByRole('button', { name: caption, exact: true });
   }
 
   private get closeButton(): Locator {
@@ -152,16 +153,20 @@ export default class CustomizeStylePage extends GraphInfoPage {
   }
 
   async getLabelButtonColor(label: string): Promise<string> {
-    const color = await this.labelButton(label).evaluate((el: HTMLElement) =>
-      window.getComputedStyle(el).backgroundColor
-    );
+    // Wait for the button to be visible first
+    await waitForElementToBeVisible(this.labelButton(label));
+
+    // Get the color from the inline style attribute which is the source of truth
+    const color = await this.labelButton(label).evaluate((el: HTMLElement) => {
+      return el.style.backgroundColor || window.getComputedStyle(el).backgroundColor;
+    });
     return color;
   }
 
   async getLabelStyleFromLocalStorage(label: string): Promise<{
-    customColor?: string;
-    customSize?: number;
-    customCaption?: string;
+    color?: string;
+    size?: number;
+    caption?: string;
   } | null> {
     const style = await this.page.evaluate((labelName) => {
       const stored = localStorage.getItem(`labelStyle_${labelName}`);
@@ -206,7 +211,7 @@ export default class CustomizeStylePage extends GraphInfoPage {
       throw new Error(`Node with id ${nodeId} not found`);
     }
     // displayName is a tuple [line1, line2]
-    const [line1, line2] = node.displayName || ["", ""];
+    const [line1, line2] = node.displayName || EMPTY_DISPLAY_NAME;
     return [line1, line2].filter(Boolean).join(" ");
   }
 

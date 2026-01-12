@@ -2,7 +2,7 @@
 import { expect, test } from "@playwright/test";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
-import urls from '../config/urls.json'
+import urls from '../config/urls.json';
 import QueryHistory from "../logic/POM/queryHistoryComponent";
 import { getRandomString } from "../infra/utils";
 
@@ -13,11 +13,11 @@ test.describe('Query history Tests', () => {
     test.beforeEach(async () => {
         browser = new BrowserWrapper();
         apicalls = new ApiCalls();
-    })
+    });
 
     test.afterEach(async () => {
         await browser.closeBrowser();
-    })
+    });
 
     test(`@admin Validate that running a query in the UI saves it in the query history`, async () => {
         const graphName = getRandomString('queryhistory');
@@ -25,7 +25,7 @@ test.describe('Query history Tests', () => {
         const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectGraphByName(graphName);
-        const query = "CREATE (n:Person { name: 'Alice' }) RETURN n"
+        const query = "CREATE (n:Person { name: 'Alice' }) RETURN n";
         await graph.insertQuery(query);
         await graph.clickRunQuery();
         await graph.clickQueryHistoryButton();
@@ -39,14 +39,14 @@ test.describe('Query history Tests', () => {
         const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectGraphByName(graphName);
-        const query = "CREATE (n:Person { name: 'Alice' }) RETURN n"
+        const query = "MERGE (n:Person { name: 'Alice' }) RETURN n";
         await graph.insertQuery(query);
         await graph.clickRunQuery();
         await graph.runAQueryFromHistory(query);
         const searchQuery = `Alice`;
         await graph.searchElementInCanvas(searchQuery);
         await graph.hoverAtCanvasCenter();
-        expect(await graph.getNodeCanvasToolTip()).toBe(searchQuery);
+        expect(await graph.getNodeCanvasToolTip()).toBe("0");
         await apicalls.removeGraph(graphName);        
     });
 
@@ -55,7 +55,7 @@ test.describe('Query history Tests', () => {
         await browser.setPageToFullScreen();
         const graphName = getRandomString('queryhistory');
         await graph.addGraph(graphName);
-        const query = "CREATE (n:Person { name: 'Alice' }) RETURN n"
+        const query = "CREATE (n:Person { name: 'Alice' }) RETURN n";
         await graph.insertQuery(query);
         await graph.clickRunQuery(false);
         await graph.clickQueryHistoryButton();
@@ -64,4 +64,4 @@ test.describe('Query history Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-})
+});

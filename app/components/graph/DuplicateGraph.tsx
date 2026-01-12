@@ -16,48 +16,48 @@ export default function DuplicateGraph({ open, onOpenChange, selectedValue, onDu
 }) {
 
     const [duplicateName, setDuplicateName] = useState("");
-    const [isLoading, setIsLoading] = useState(false)
-    const { toast } = useToast()
-    const { indicator, setIndicator } = useContext(IndicatorContext)
+    const [isLoading, setIsLoading] = useState(false);
+    const { toast } = useToast();
+    const { indicator, setIndicator } = useContext(IndicatorContext);
 
     useEffect(() => {
         if (!open) {
-            setDuplicateName("")
-            setIsLoading(false)
+            setDuplicateName("");
+            setIsLoading(false);
         }
-    }, [open])
+    }, [open]);
 
     const handleDuplicate = async (e: FormEvent) => {
-        e.preventDefault()
+        e.preventDefault();
 
         if (duplicateName === "") {
             toast({
                 title: "Error",
                 description: "Graph name cannot be empty",
-            })
-            return
+            });
+            return;
         }
 
         try {
-            setIsLoading(true)
+            setIsLoading(true);
             const result = await securedFetch(`api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(duplicateName)}/duplicate`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ sourceName: selectedValue })
-            }, toast, setIndicator)
+            }, toast, setIndicator);
 
-            if (!result.ok) return
+            if (!result.ok) return;
 
-            onDuplicate(duplicateName)
-            onOpenChange(false)
+            onDuplicate(duplicateName);
+            onOpenChange(false);
             toast({
                 title: `${type} duplicated successfully`,
                 description: `The ${type} has been duplicated successfully`,
-            })
+            });
         } finally {
-            setIsLoading(false)
+            setIsLoading(false);
         }
-    }
+    };
 
     return (
         <DialogComponent
@@ -102,5 +102,5 @@ export default function DuplicateGraph({ open, onOpenChange, selectedValue, onDu
                 </div>
             </form>
         </DialogComponent>
-    )
+    );
 }

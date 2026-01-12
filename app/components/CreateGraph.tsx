@@ -1,17 +1,17 @@
 /* eslint-disable react/require-default-props */
 
-"use client"
+"use client";
 
-import React, { useState, useContext, useEffect } from "react"
-import { InfoIcon, PlusCircle } from "lucide-react"
-import { prepareArg, securedFetch } from "@/lib/utils"
-import { useToast } from "@/components/ui/use-toast"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import DialogComponent from "./DialogComponent"
-import Button from "./ui/Button"
-import CloseDialog from "./CloseDialog"
-import Input from "./ui/Input"
-import { IndicatorContext } from "./provider"
+import React, { useState, useContext, useEffect } from "react";
+import { InfoIcon, PlusCircle } from "lucide-react";
+import { prepareArg, securedFetch } from "@/lib/utils";
+import { useToast } from "@/components/ui/use-toast";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import DialogComponent from "./DialogComponent";
+import Button from "./ui/Button";
+import CloseDialog from "./CloseDialog";
+import Input from "./ui/Input";
+import { IndicatorContext } from "./provider";
 
 interface Props {
     onSetGraphName: (name: string) => void
@@ -37,59 +37,59 @@ export default function CreateGraph({
     ),
 }: Props) {
 
-    const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { indicator, setIndicator } = useContext(IndicatorContext);
 
-    const { toast } = useToast()
+    const { toast } = useToast();
 
-    const [isLoading, setIsLoading] = useState(false)
-    const [graphName, setGraphName] = useState("")
-    const [open, setOpen] = useState(false)
+    const [isLoading, setIsLoading] = useState(false);
+    const [graphName, setGraphName] = useState("");
+    const [open, setOpen] = useState(false);
 
     useEffect(() => {
         if (!open) {
-            setGraphName("")
-            setIsLoading(false)
+            setGraphName("");
+            setIsLoading(false);
         }
-    }, [open])
+    }, [open]);
 
     const handleCreateGraph = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
+        e.preventDefault();
         try {
-            setIsLoading(true)
-            const name = graphName.trim()
+            setIsLoading(true);
+            const name = graphName.trim();
             if (!name) {
                 toast({
                     title: "Error",
                     description: `${type} name cannot be empty`,
                     variant: "destructive"
-                })
-                return
+                });
+                return;
             }
             if (graphNames.includes(name)) {
                 toast({
                     title: "Error",
                     description: `${type} name already exists`,
                     variant: "destructive"
-                })
-                return
+                });
+                return;
             }
             const result = await securedFetch(`api/${type === "Schema" ? "schema" : "graph"}/${prepareArg(name)}`, {
                 method: "POST",
-            }, toast, setIndicator)
+            }, toast, setIndicator);
 
-            if (!result.ok) return
+            if (!result.ok) return;
 
-            onSetGraphName(name)
-            setGraphName("")
-            setOpen(false)
+            onSetGraphName(name);
+            setGraphName("");
+            setOpen(false);
             toast({
                 title: `${type} created successfully`,
                 description: `The ${type.toLowerCase()} has been created successfully`,
-            })
+            });
         } finally {
-            setIsLoading(false)
+            setIsLoading(false);
         }
-    }
+    };
 
     return (
         <DialogComponent
@@ -135,5 +135,5 @@ export default function CreateGraph({
                 </div>
             </form>
         </DialogComponent>
-    )
+    );
 }

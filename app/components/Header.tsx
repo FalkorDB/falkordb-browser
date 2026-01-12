@@ -1,6 +1,6 @@
 /* eslint-disable react/require-default-props */
 
-'use client'
+'use client';
 
 import { ArrowUpRight, Database, FileCode, LogOut, Monitor, Moon, Settings, Sun } from "lucide-react";
 import { useCallback, useContext, useState, useEffect } from "react";
@@ -30,54 +30,54 @@ interface Props {
 }
 
 function getPathType(pathname: string): "Schema" | "Graph" | undefined {
-    if (pathname.includes("/schema")) return "Schema"
-    if (pathname.includes("/graph")) return "Graph"
-    return undefined
+    if (pathname.includes("/schema")) return "Schema";
+    if (pathname.includes("/graph")) return "Graph";
+    return undefined;
 }
 
-const iconSize = 30
+const iconSize = 30;
 
 export default function Header({ onSetGraphName, graphNames, graphName, onOpenGraphInfo, navigateToSettings }: Props) {
 
-    const { indicator } = useContext(IndicatorContext)
-    const { setPanel } = useContext(PanelContext)
-    const { hasChanges, saveSettings, resetSettings, settings: { chatSettings: { model, secretKey, displayChat } } } = useContext(BrowserSettingsContext)
+    const { indicator } = useContext(IndicatorContext);
+    const { setPanel } = useContext(PanelContext);
+    const { hasChanges, saveSettings, resetSettings, settings: { chatSettings: { model, secretKey, displayChat } } } = useContext(BrowserSettingsContext);
 
-    const { theme, setTheme } = useTheme()
-    const { currentTheme } = getTheme(theme)
-    const { data: session } = useSession()
-    const pathname = usePathname()
-    const router = useRouter()
-    const { toast } = useToast()
+    const { theme, setTheme } = useTheme();
+    const { currentTheme } = getTheme(theme);
+    const { data: session } = useSession();
+    const pathname = usePathname();
+    const router = useRouter();
+    const { toast } = useToast();
 
-    const [mounted, setMounted] = useState(false)
+    const [mounted, setMounted] = useState(false);
 
-    const type = getPathType(pathname)
-    const showCreate = type && session?.user.role && session.user.role !== "Read-Only"
+    const type = getPathType(pathname);
+    const showCreate = type && session?.user.role && session.user.role !== "Read-Only";
 
     useEffect(() => {
-        setMounted(true)
-    }, [])
+        setMounted(true);
+    }, []);
 
     const navigateBack = useCallback(() => {
         if (hasChanges) {
             getQuerySettingsNavigationToast(toast, () => {
-                saveSettings()
-                router.back()
+                saveSettings();
+                router.back();
             }, () => {
-                resetSettings()
-                router.back()
-            })
+                resetSettings();
+                router.back();
+            });
         } else {
-            router.back()
+            router.back();
         }
-    }, [hasChanges, resetSettings, saveSettings, router, toast])
+    }, [hasChanges, resetSettings, saveSettings, router, toast]);
 
     const handleSetCurrentPanel = useCallback((newPanel: Panel) => {
-        setPanel(prev => prev === newPanel ? undefined : newPanel)
-    }, [setPanel])
+        setPanel(prev => prev === newPanel ? undefined : newPanel);
+    }, [setPanel]);
 
-    const separator = <div className="h-px w-[80%] bg-border rounded-full" />
+    const separator = <div className="h-px w-[80%] bg-border rounded-full" />;
 
     return (
         <div className="py-5 px-2 flex flex-col justify-between items-center border-r border-border">
@@ -139,22 +139,23 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                     <>
                         {separator}
                         <Button
+                            data-testid="chatToggleButton"
                             className="Gradient bg-clip-text text-transparent font-semibold text-xl"
                             indicator={indicator}
-                            title={`Use English to query the graph. 
+                            title={`Use English to query the graph.
                                 The feature requires LLM model and API key.
                                 Update local user parameters in Settings.`}
                             label="CHAT"
                             onClick={() => {
                                 if (navigateToSettings && (!model || !secretKey)) {
-                                    router.push("/settings")
+                                    router.push("/settings");
                                     toast({
                                         title: "Incomplete Chat Settings",
                                         description: "Please complete the chat settings to use the chat feature.",
                                         variant: "destructive",
-                                    })
+                                    });
                                 } else {
-                                    handleSetCurrentPanel("chat")
+                                    handleSetCurrentPanel("chat");
                                 }
                             }}
                         />
@@ -248,11 +249,11 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                             data-testid="themeToggle"
                             title={`Toggle theme current theme: ${theme}`}
                             onClick={() => {
-                                let newTheme = ""
-                                if (theme === "dark") newTheme = "light"
-                                else if (theme === "light") newTheme = "system"
-                                else newTheme = "dark"
-                                setTheme(newTheme)
+                                let newTheme = "";
+                                if (theme === "dark") newTheme = "light";
+                                else if (theme === "light") newTheme = "system";
+                                else newTheme = "dark";
+                                setTheme(newTheme);
                             }}
                         >
                             {theme === "dark" && <Sun size={iconSize} />}
@@ -287,5 +288,5 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                 </Button>
             </div>
         </div >
-    )
+    );
 }

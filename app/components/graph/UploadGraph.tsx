@@ -11,32 +11,32 @@ export default function UploadGraph({ disabled, open, onOpenChange }: {
     onOpenChange?: (open: boolean) => void
 }) {
 
-    const [files, setFiles] = useState<File[]>([])
-    const isControlled = typeof open === "boolean" && typeof onOpenChange === "function"
-    const [internalOpen, setInternalOpen] = useState(false)
+    const [files, setFiles] = useState<File[]>([]);
+    const isControlled = typeof open === "boolean" && typeof onOpenChange === "function";
+    const [internalOpen, setInternalOpen] = useState(false);
     const dialogOpen = useMemo(
         () => (isControlled ? (open as boolean) : internalOpen),
         [isControlled, open, internalOpen]
-    )
+    );
 
     const handleOpenChange = (nextOpen: boolean) => {
         if (onOpenChange) {
-            onOpenChange(nextOpen)
+            onOpenChange(nextOpen);
         } else {
-            setInternalOpen(nextOpen)
+            setInternalOpen(nextOpen);
         }
-    }
+    };
 
     useEffect(() => {
         if (!dialogOpen) {
-            setFiles([])
+            setFiles([]);
         }
-    }, [dialogOpen])
+    }, [dialogOpen]);
 
     const onUploadData = () => {
-        if (!files.length) return
-        setFiles([])
-    }
+        if (!files.length) return;
+        setFiles([]);
+    };
 
     return (
         <Dialog open={dialogOpen} onOpenChange={handleOpenChange}>
@@ -66,5 +66,5 @@ export default function UploadGraph({ disabled, open, onOpenChange }: {
                 </form>
             </DialogContent>
         </Dialog>
-    )
+    );
 }

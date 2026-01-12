@@ -26,7 +26,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: 24
           cache: 'npm'
       - name: Cache node modules
         id: cache-npm
@@ -54,7 +54,7 @@ jobs:
           # Install with retry logic
           for i in {1..5}; do
             echo "Attempt $i: Installing dependencies..."
-            if npm ci --prefer-offline --no-audit --progress=false --loglevel=error; then
+            if npm install --prefer-offline --no-audit --progress=false --loglevel=error; then
               echo "Dependencies installed successfully on attempt $i"
               break
             else
@@ -89,7 +89,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: 24
           cache: 'npm'
       - name: Restore dependencies cache
         uses: actions/cache/restore@v4
@@ -105,6 +105,8 @@ jobs:
       - name: Build application
         run: npm run build
       - name: Run Playwright tests (shard 1 of 3)
+        env:
+          OPENAI_TOKEN: ${{ secrets.OPENAI_TOKEN }}
         run: |
           export CHAT_URL="http://localhost:8080/"
           export NEXTAUTH_URL="http://localhost:3000/"
@@ -153,7 +155,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: 24
           cache: 'npm'
       - name: Restore dependencies cache
         uses: actions/cache/restore@v4
@@ -169,6 +171,8 @@ jobs:
       - name: Build application
         run: npm run build
       - name: Run Playwright tests (shard 2 of 3)
+        env:
+          OPENAI_TOKEN: ${{ secrets.OPENAI_TOKEN }}
         run: |
           export CHAT_URL="http://localhost:8080/"
           export NEXTAUTH_URL="http://localhost:3000/"
@@ -217,7 +221,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: 24
           cache: 'npm'
       - name: Restore dependencies cache
         uses: actions/cache/restore@v4
@@ -233,6 +237,8 @@ jobs:
       - name: Build application
         run: npm run build
       - name: Run Playwright tests (shard 3 of 3)
+        env:
+          OPENAI_TOKEN: ${{ secrets.OPENAI_TOKEN }}
         run: |
           export CHAT_URL="http://localhost:8080/"
           export NEXTAUTH_URL="http://localhost:3000/"
@@ -285,7 +291,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: 24
           cache: 'npm'
       - name: Restore dependencies cache
         uses: actions/cache/restore@v4
@@ -354,7 +360,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: 24
           cache: 'npm'
       - name: Restore dependencies cache
         uses: actions/cache/restore@v4
@@ -416,7 +422,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: 24
           cache: 'npm'
       - name: Restore dependencies cache
         uses: actions/cache/restore@v4
@@ -549,7 +555,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: 24
           cache: 'npm'
       - name: Restore dependencies cache
         uses: actions/cache/restore@v4
