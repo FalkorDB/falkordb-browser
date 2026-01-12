@@ -334,7 +334,7 @@ export default function Chat({ onClose }: Props) {
                             if (Array.isArray(message)) {
                                 const [m, collapse] = message;
                                 return (
-                                    <li className={cn("w-full flex gap-1 justify-start status-group")} key={index}>
+                                    <li className={cn("w-full flex gap-1 justify-start status-group")} key={index} data-key={index}>
                                         <div className="flex gap-1 items-center h-fit">
                                             {m.some(me => messages[messages.length - 1] === me) && !collapse ?
                                                 <Loader2 className="animate-spin" size={15} />
@@ -344,7 +344,7 @@ export default function Chat({ onClose }: Props) {
                                                 onClick={() => {
                                                     setMessagesList(prev => prev.map((me, i) => i === index && Array.isArray(me) ? [me[0], !me[1]] : me));
                                                     setTimeout(() => {
-                                                        const statusGroup = document.querySelector(`.status-group[key="${index}"]`);
+                                                        const statusGroup = document.querySelector(`.status-group[data-key="${index}"]`);
                                                         if (statusGroup) {
                                                             statusGroup.scrollIntoView({ behavior: "smooth" });
                                                         }
