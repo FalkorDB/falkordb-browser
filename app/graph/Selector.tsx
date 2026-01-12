@@ -333,7 +333,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
             query: nextQuery
         }));
         setDeleteElements([]);
-        setFilteredQueries(current => current.filter(query => !deleteElements.some((removeIndex) => historyQuery.queries[removeIndex].timestamp !== query.timestamp)));
+        setFilteredQueries(current => current.filter(query => deleteElements.some((removeIndex) => historyQuery.queries[removeIndex].timestamp === query.timestamp)));
     }, [historyQuery, setHistoryQuery, deleteElements]);
 
     const separator = <div className="h-[80%] w-0.5 bg-border rounded-full" />;
