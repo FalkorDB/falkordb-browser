@@ -4,7 +4,7 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef } from "@/lib/utils";
+import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef, ConnectionType } from "@/lib/utils";
 import { encryptValue, decryptValue, isCryptoAvailable, isEncrypted } from "@/lib/encryption";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
@@ -14,7 +14,7 @@ import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphData, GraphInfo, HistoryQuery, MemoryValue, Query, Data } from "./api/graph/model";
 import Header from "./components/Header";
-import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ForceGraphContext, TableViewContext } from "./components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ForceGraphContext, TableViewContext, ConnectionContext } from "./components/provider";
 import Tutorial from "./components/Tutorial";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 
@@ -100,6 +100,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>([]);
   const [userGraphBeforeTutorial, setUserGraphBeforeTutorial] = useState<string>("");
   const [showMemoryUsage, setShowMemoryUsage] = useState(false);
+  const [dbVersion, setDbVersion] = useState<string>("");
+  const [connectionType, setConnectionType] = useState<ConnectionType>("Standalone");
 
   const replayTutorial = useCallback(() => {
     router.push("/graph");
@@ -250,6 +252,13 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     dataHash
   }), [scrollPosition, search, expand, dataHash]);
 
+  const connectionContext = useMemo(() => ({
+    connectionType,
+    setConnectionType,
+    dbVersion,
+    setDbVersion
+  }), [connectionType, dbVersion]);
+
   const schemaContext = useMemo(() => ({
     schema,
     setSchema,
@@ -386,6 +395,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         counter: 0
       }));
       setIsQueryLoading(false);
+      setViewport(undefined);
+      setGraphData(undefined);
+      setSearch("");
+      setScrollPosition(0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graphName, limit, timeout, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries, showMemoryUsage]);
@@ -417,7 +430,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     if (status !== "authenticated") return;
 
     (async () => {
-      const result = await securedFetch("/api/auth/DBVersion", {
+      const result = await securedFetch("/api/DBVersion", {
         method: "GET",
       }, toast, setIndicator);
 
@@ -425,7 +438,30 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
       const [name, version] = (await result.json()).result || ["", 0];
 
+      setDbVersion(String(version));
       setShowMemoryUsage(name === "graph" && version >= MEMORY_USAGE_VERSION_THRESHOLD);
+    })();
+  }, [status, toast]);
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
+
+    (async () => {
+      const result = await securedFetch("/api/info", {
+        method: "GET",
+      }, toast, setIndicator);
+
+      if (!result.ok) return;
+
+      const json = await result.json();
+
+      setConnectionType(() => {
+        switch (true) {
+          case json.result.includes("redis_mode:sentinel"): return "Sentinel";
+          case json.result.includes("redis_mode:cluster"): return "Cluster";
+          default: return "Standalone";
+        }
+      });
     })();
   }, [status, toast]);
 
@@ -678,57 +714,59 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                     <QueryLoadingContext.Provider value={queryLoadingContext}>
                       <ForceGraphContext.Provider value={forceGraphContext}>
                         <TableViewContext.Provider value={tableViewContext}>
-                          {
-                            pathname === "/graph" &&
-                            <Tutorial
-                              open={tutorialOpen}
-                              onClose={handleCloseTutorial}
-                              onLoadDemoGraphs={handleLoadDemoGraphs}
-                              onCleanupDemoGraphs={handleCleanupDemoGraphs}
-                            />
-                          }
-                          {
-                            pathname !== "/" && pathname !== "/login" &&
-                            <Header
-                              graphName={graphName}
-                              graphNames={pathname.includes("/schema") ? schemaNames : graphNames}
-                              onSetGraphName={handleOnSetGraphName}
-                              onOpenGraphInfo={onExpand}
-                              navigateToSettings={navigateToSettings}
-                            />
-                          }
-                          <ResizablePanelGroup direction="horizontal" className="w-1 grow">
-                            <ResizablePanel
-                              ref={panelRef}
-                              defaultSize={panelSize}
-                              collapsible
-                              minSize={15}
-                              maxSize={30}
-                              onCollapse={() => setIsCollapsed(true)}
-                              onExpand={() => setIsCollapsed(false)}
-                              data-testid="graphInfoPanel"
-                            >
-                              <GraphInfoPanel
-                                onClose={onExpand}
+                          <ConnectionContext.Provider value={connectionContext}>
+                            {
+                              pathname === "/graph" &&
+                              <Tutorial
+                                open={tutorialOpen}
+                                onClose={handleCloseTutorial}
+                                onLoadDemoGraphs={handleLoadDemoGraphs}
+                                onCleanupDemoGraphs={handleCleanupDemoGraphs}
                               />
-                            </ResizablePanel>
-                            <ResizableHandle withHandle onMouseUp={() => isCollapsed && onExpand()} className={cn("w-0", isCollapsed && "hidden")} />
-                            <ResizablePanel
-                              defaultSize={100 - panelSize}
-                              minSize={70}
-                              maxSize={100}
-                            >
-                              {
-                                (pathname === "/graph" || pathname === "/schema") ?
-                                  <div className="h-full w-full flex flex-col">
-                                    {children}
-                                    <div className="h-4 w-full Gradient" />
-                                  </div>
-                                  :
-                                  children
-                              }
-                            </ResizablePanel>
-                          </ResizablePanelGroup>
+                            }
+                            {
+                              pathname !== "/" && pathname !== "/login" &&
+                              <Header
+                                graphName={graphName}
+                                graphNames={pathname.includes("/schema") ? schemaNames : graphNames}
+                                onSetGraphName={handleOnSetGraphName}
+                                onOpenGraphInfo={onExpand}
+                                navigateToSettings={navigateToSettings}
+                              />
+                            }
+                            <ResizablePanelGroup direction="horizontal" className="w-1 grow">
+                              <ResizablePanel
+                                ref={panelRef}
+                                defaultSize={panelSize}
+                                collapsible
+                                minSize={15}
+                                maxSize={30}
+                                onCollapse={() => setIsCollapsed(true)}
+                                onExpand={() => setIsCollapsed(false)}
+                                data-testid="graphInfoPanel"
+                              >
+                                <GraphInfoPanel
+                                  onClose={onExpand}
+                                />
+                              </ResizablePanel>
+                              <ResizableHandle withHandle onMouseUp={() => isCollapsed && onExpand()} className={cn("w-0", isCollapsed && "hidden")} />
+                              <ResizablePanel
+                                defaultSize={100 - panelSize}
+                                minSize={70}
+                                maxSize={100}
+                              >
+                                {
+                                  (pathname === "/graph" || pathname === "/schema") ?
+                                    <div className="h-full w-full flex flex-col">
+                                      {children}
+                                      <div className="h-4 w-full Gradient" />
+                                    </div>
+                                    :
+                                    children
+                                }
+                              </ResizablePanel>
+                            </ResizablePanelGroup>
+                          </ConnectionContext.Provider>
                         </TableViewContext.Provider>
                       </ForceGraphContext.Provider>
                     </QueryLoadingContext.Provider>

@@ -19,7 +19,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useTheme } from "next-themes";
 import Button from "./ui/Button";
 import CreateGraph from "./CreateGraph";
-import { IndicatorContext, PanelContext, BrowserSettingsContext } from "./provider";
+import { IndicatorContext, PanelContext, BrowserSettingsContext, ConnectionContext } from "./provider";
 
 interface Props {
     onSetGraphName: (newGraphName: string) => void
@@ -37,9 +37,30 @@ function getPathType(pathname: string): "Schema" | "Graph" | undefined {
 
 const iconSize = 30;
 
+/**
+ * Format version number to include dots (e.g., "11111" -> "1.11.11")
+ */
+function formatVersion(version: string | undefined): string {
+    if (!version) return '';
+
+    // If already formatted with dots, return as is
+    if (version.includes('.')) return version;
+
+    // Format as Major.Minor.Patch (e.g., "11111" -> "1.11.11")
+    if (version.length >= 5) {
+        const major = version.slice(0, 1);
+        const minor = version.slice(1, 3);
+        const patch = version.slice(3);
+        return `${major}.${minor}.${patch}`;
+    }
+
+    return version;
+}
+
 export default function Header({ onSetGraphName, graphNames, graphName, onOpenGraphInfo, navigateToSettings }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
+    const { connectionType, dbVersion } = useContext(ConnectionContext);
     const { setPanel } = useContext(PanelContext);
     const { hasChanges, saveSettings, resetSettings, settings: { chatSettings: { model, secretKey, displayChat } } } = useContext(BrowserSettingsContext);
 
@@ -93,6 +114,51 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                         <Image style={{ width: 'auto', height: '48px' }} priority src={`/icons/F-${currentTheme}.svg`} alt="FalkorDB Logo" width={0} height={0} />
                     </Link>
                 }
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <h2>{session?.user.username || "Default"}</h2>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>User Name</p>
+                    </TooltipContent>
+                </Tooltip>
+                {
+                    session?.user.role === "Admin" &&
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <h2>v{formatVersion(dbVersion)}</h2>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>FalkorDB Server Version</p>
+                        </TooltipContent>
+                    </Tooltip>
+                }
+                <div className="flex gap-1">
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div className={cn("h-6 w-6 rounded-full bg-yellow-500 text-center", connectionType !== "Standalone" && "opacity-25")}>Si</div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Single</p>
+                        </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div className={cn("h-6 w-6 rounded-full bg-green-500 text-center", connectionType !== "Sentinel" && "opacity-25")}>Se</div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Sentinel</p>
+                        </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div className={cn("h-6 w-6 rounded-full bg-green-700 text-center", connectionType !== "Cluster" && "opacity-25")}>C</div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Cluster</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </div>
                 {
                     showCreate &&
                     <>

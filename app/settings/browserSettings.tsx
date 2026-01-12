@@ -1,3 +1,5 @@
+"use client";
+
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
 import { useRouter } from "next/navigation";

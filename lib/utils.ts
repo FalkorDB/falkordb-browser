@@ -73,6 +73,8 @@ export type Message = {
   | "Schema";
 };
 
+export type ConnectionType = "Standalone" | "Cluster" | "Sentinel";
+
 export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell | LazyCell;
 
 export interface Row {
