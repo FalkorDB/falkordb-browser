@@ -178,7 +178,7 @@ export default function Chat({ onClose }: Props) {
                                     }
                                 ]);
                             }
-                            isResult = true
+                            isResult = true;
                             break;
 
                         case "Error":
