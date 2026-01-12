@@ -69,47 +69,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     useEffect(() => {
         setOpen(false);
     }, [selectedValue]);
-
+    
     const getOptions = useCallback(async () =>
         fetchOptions(type, toast, setIndicator, indicator, setSelectedValue, setOptions, contentPersistence)
-        , [type, toast, setIndicator, indicator, setSelectedValue, setOptions, contentPersistence]);
-
-
-    const handleSetOption = useCallback(async (option: string, optionName: string) => {
-        const result = await securedFetch(
-            `api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(option)}`,
-            {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ sourceName: optionName })
-            },
-            toast,
-            setIndicator
-        );
-
-        if (result.ok) {
-            const newOptions = options.map((opt) => (opt === optionName ? option : opt));
-            setOptions!(newOptions);
-
-            if (setSelectedValue && optionName === selectedValue) setSelectedValue(option);
-
-            // Rebuild rows to reflect the updated option names
-            setRows(
-                newOptions.map(opt =>
-                    sessionRole === "Admin"
-                        ? ({
-                            checked: false,
-                            name: opt,
-                            cells: [{ value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" }]
-                        })
-                        : ({ checked: false, name: opt, cells: [{ value: opt, type: "readonly" }] })
-                )
-            );
-        }
-
-        return result.ok;
-    }, [type, toast, setIndicator, options, setOptions, setSelectedValue, selectedValue, setRows, sessionRole]);
-
+    , [type, toast, setIndicator, indicator, setSelectedValue, setOptions, contentPersistence]);
+    
     const loadMemory = useCallback((opt: string) =>
         async () => {
             const memoryMap = await getMemoryUsage(opt, toast, setIndicator);
@@ -135,6 +99,52 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
             return Number(result.edges).toLocaleString();
         }, [toast, setIndicator]);
+
+    const handleSetOption = useCallback(async (option: string, optionName: string) => {
+        const result = await securedFetch(
+            `api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(option)}`,
+            {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sourceName: optionName })
+            },
+            toast,
+            setIndicator
+        );
+
+        if (result.ok) {
+            const newOptions = options.map((opt) => (opt === optionName ? option : opt));
+            setOptions!(newOptions);
+
+            if (setSelectedValue && optionName === selectedValue) setSelectedValue(option);
+
+            // Rebuild rows to reflect the updated option names
+            setRows(newOptions.map((opt) => {
+            const baseCell = sessionRole === "Admin"
+                ? { value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" as const }
+                : { value: opt, type: "readonly" as const };
+
+            const cells: Row["cells"] = [baseCell];
+
+            if (showMemoryUsage) {
+                cells.push({ loadCell: loadMemory(opt), type: "readonly" });
+            }
+
+            cells.push(
+                { loadCell: loadNodesCount(opt), type: "readonly" },
+                { loadCell: loadEdgesCount(opt), type: "readonly" }
+            );
+
+            return {
+                checked: false,
+                name: opt,
+                cells
+            };
+        }));
+        }
+
+        return result.ok;
+    }, [type, toast, setIndicator, options, setOptions, setSelectedValue, selectedValue, sessionRole, showMemoryUsage, loadNodesCount, loadEdgesCount, loadMemory]);
 
     const handleSetRows = useCallback((opts: string[]) => {
         setRows(opts.map((opt) => {
@@ -293,7 +303,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         <>
                             <DeleteGraph
                                 type={type}
-                                rows={rows}
+                                rows={rows.filter(opt => opt.checked)}
                                 handleSetRows={handleSetRows}
                                 selectedValue={selectedValue}
                                 setGraphName={setSelectedValue}
