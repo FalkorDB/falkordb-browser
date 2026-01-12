@@ -10,7 +10,6 @@ import Labels from "../graph/labels";
 import { Label, Link, Node, GraphData, Relationship } from "../api/graph/model";
 import { SchemaContext } from "../components/provider";
 import Controls from "../graph/controls";
-import GraphDetails from "../graph/GraphDetails";
 import Spinning from "../components/ui/spinning";
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), {
@@ -19,8 +18,6 @@ const ForceGraph = dynamic(() => import("../components/ForceGraph"), {
 });
 
 interface Props {
-    edgesCount: number | undefined
-    nodesCount: number | undefined
     selectedElements: (Node | Link)[]
     setSelectedElements: (elements?: (Node | Link)[]) => void
     canvasRef: GraphRef
@@ -39,8 +36,6 @@ interface Props {
 }
 
 export default function SchemaView({
-    edgesCount,
-    nodesCount,
     selectedElements,
     setSelectedElements,
     canvasRef,
@@ -57,7 +52,7 @@ export default function SchemaView({
     isLoading,
     setIsLoading
 }: Props) {
-    const { schema, schemaName } = useContext(SchemaContext);
+    const { schema } = useContext(SchemaContext);
 
     useEffect(() => {
         setRelationships([...schema.Relationships]);
@@ -107,12 +102,6 @@ export default function SchemaView({
                     }
                 </div>
                 <div className="flex gap-6">
-                    <GraphDetails
-                        graph={schema}
-                        graphName={schemaName}
-                        edgesCount={edgesCount}
-                        nodesCount={nodesCount}
-                    />
                     {
                         schema.getElements().length > 0 && !isLoading &&
                         <>

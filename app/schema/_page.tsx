@@ -1,7 +1,7 @@
 'use client';
 
 import { useContext, useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { cn, getSSEGraphResult, GraphRef, isTwoNodes, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, GraphRef, isTwoNodes, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -51,8 +51,6 @@ export default function Page() {
     const [data, setData] = useState<GraphData>(schema.Elements);
     const [graphData, setGraphData] = useState<CanvasData>();
     const [isAddEdge, setIsAddEdge] = useState(false);
-    const [edgesCount, setEdgesCount] = useState<number | undefined>();
-    const [nodesCount, setNodesCount] = useState<number | undefined>();
     const [isAddNode, setIsAddNode] = useState(false);
     const [isCanvasLoading, setIsCanvasLoading] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(true);
@@ -109,24 +107,6 @@ export default function Page() {
         else currentPanel.collapse();
     }, []);
 
-    const fetchCount = useCallback(async () => {
-        setEdgesCount(undefined);
-        setNodesCount(undefined);
-
-        try {
-            const result = await getSSEGraphResult(`api/schema/${prepareArg(schemaName)}/count`, toast, setIndicator) as { nodes?: number; edges?: number };
-
-            if (!result) return;
-
-            const { edges, nodes } = result;
-
-            setEdgesCount(edges);
-            setNodesCount(nodes);
-        } catch (error) {
-            console.error(error);
-        }
-    }, [toast, setIndicator, schemaName]);
-
     const handleCooldown = (ticks?: 0) => {
         setCooldownTicks(ticks);
     };
@@ -139,8 +119,7 @@ export default function Page() {
         const json = await result.json();
         const schemaGraph = Graph.create(schemaName, json.result, false, true, 0);
         setSchema(schemaGraph);
-        fetchCount();
-    }, [fetchCount, setIndicator, setSchema, toast, schemaName]);
+    }, [setIndicator, setSchema, toast, schemaName]);
 
     useEffect(() => {
         if (!schemaName) return;
@@ -197,7 +176,6 @@ export default function Page() {
         }));
 
         setRelationships(schema.removeLinks(selectedElements.map((element) => element.id)));
-        fetchCount();
         setSelectedElements([]);
         setData({ ...schema.Elements });
     };
@@ -221,8 +199,6 @@ export default function Page() {
                 setRelationships(prev => [...prev.filter(p => p.name !== link.relationship), schema.RelationshipsMap.get(link.relationship)!]);
                 handleSetIsAddEdge(false);
             }
-
-            fetchCount();
 
             setSelectedElements([]);
         }
@@ -297,8 +273,6 @@ export default function Page() {
                     minSize={30}
                 >
                     <SchemaView
-                        edgesCount={edgesCount}
-                        nodesCount={nodesCount}
                         selectedElements={selectedElements}
                         setSelectedElements={handleSetSelectedElements}
                         canvasRef={canvasRef}
