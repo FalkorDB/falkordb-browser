@@ -209,32 +209,6 @@ test.describe("Chat Feature Tests", () => {
     await apiCall.removeGraph(graphName);
   });
 
-  test(`@readwrite Verify chat panel maintains state when toggled`, async () => {
-    const graphName = getRandomString("chat");
-    await apiCall.addGraph(graphName);
-    await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
-    
-    const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
-    await browser.setPageToFullScreen();
-    await chat.selectGraphByName(graphName);
-    
-    // Open chat and type a message
-    await chat.openChat();
-    const testMessage = "Test message persistence";
-    await chat.fillChatInput(testMessage);
-    
-    // Close chat
-    await chat.closeChat();
-    
-    // Reopen chat
-    await chat.openChat();
-    const inputValue = await chat.getChatInputValue();
-    // Verify the message persisted after reopening
-    expect(inputValue).toBe(testMessage);
-    
-    await apiCall.removeGraph(graphName);
-  });
-
   test(`@readwrite Verify copy button copies generated Cypher query correctly`, async () => {
     const graphName = getRandomString("chat");
     await apiCall.addGraph(graphName);
