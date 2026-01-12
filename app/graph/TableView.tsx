@@ -1,17 +1,17 @@
 /* eslint-disable react/no-array-index-key */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useContext, useMemo, useEffect, useRef } from "react"
-import { Download } from "lucide-react"
+import { useContext, useMemo, useEffect, useRef } from "react";
+import { Download } from "lucide-react";
 import { Row } from "@/lib/utils";
-import TableComponent from "../components/TableComponent"
-import { GraphContext, TableViewContext } from "../components/provider"
-import Button from "../components/ui/Button"
+import TableComponent from "../components/TableComponent";
+import { GraphContext, TableViewContext } from "../components/provider";
+import Button from "../components/ui/Button";
 
 export default function TableView() {
-    const { graph } = useContext(GraphContext)
-    const { scrollPosition, setScrollPosition, search, setSearch, expand, setExpand, dataHash } = useContext(TableViewContext)
-    const previousDataHash = useRef<string>("")
+    const { graph } = useContext(GraphContext);
+    const { scrollPosition, setScrollPosition, search, setSearch, expand, setExpand, dataHash } = useContext(TableViewContext);
+    const previousDataHash = useRef<string>("");
 
     const tableData = useMemo(() => {
         if (graph.Data.length === 0) return undefined;
@@ -87,7 +87,7 @@ export default function TableView() {
         window.URL.revokeObjectURL(url);
     };
 
-    if (tableData === undefined) return undefined
+    if (tableData === undefined) return undefined;
 
     return (
         <TableComponent
@@ -114,5 +114,5 @@ export default function TableView() {
                 <Download size={20} />
             </Button>
         </TableComponent>
-    )
+    );
 }

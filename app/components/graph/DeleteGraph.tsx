@@ -31,63 +31,63 @@ export default function DeleteGraph({
   setGraphNames
 }: Props) {
 
-  const [open, setOpen] = useState(false)
-  const [closeManage, setCloseManage] = useState(false)
-  const { toast } = useToast()
-  const [isLoading, setIsLoading] = useState(false)
-  const { indicator, setIndicator } = useContext(IndicatorContext)
+  const [open, setOpen] = useState(false);
+  const [closeManage, setCloseManage] = useState(false);
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const { indicator, setIndicator } = useContext(IndicatorContext);
 
   useEffect(() => {
     if (!open && closeManage) {
-      setOpenMenage(false)
-      setCloseManage(false)
+      setOpenMenage(false);
+      setCloseManage(false);
     }
-  }, [open, closeManage, setOpenMenage])
+  }, [open, closeManage, setOpenMenage]);
 
   useEffect(() => {
     if (!open) {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [open])
+  }, [open]);
 
   const handleDelete = async (deleteGraphNames: string[]) => {
-    setIsLoading(true)
-    let newGraphNames
+    setIsLoading(true);
+    let newGraphNames;
     try {
       const [failedDeletedGraphs, successDeletedGraphs] = await Promise.all(deleteGraphNames
         .map(async (name) => {
           const result = await securedFetch(`api/${type === "Schema" ? "schema" : "graph"}/${prepareArg(name)}`, {
             method: "DELETE"
-          }, toast, setIndicator)
+          }, toast, setIndicator);
 
-          if (result.ok) return ""
+          if (result.ok) return "";
 
-          return name
+          return name;
 
-        })).then(result => [result.filter(n => n !== ""), deleteGraphNames.filter(n => !result.includes(n))])
+        })).then(result => [result.filter(n => n !== ""), deleteGraphNames.filter(n => !result.includes(n))]);
 
-      newGraphNames = graphNames.filter(n => !successDeletedGraphs.includes(n))
+      newGraphNames = graphNames.filter(n => !successDeletedGraphs.includes(n));
 
-      setGraphNames(newGraphNames)
+      setGraphNames(newGraphNames);
 
       if (successDeletedGraphs.includes(selectedValue)) {
-        setGraphName(successDeletedGraphs.length > 0 ? newGraphNames[successDeletedGraphs.length - 1] : "")
-        setGraph(Graph.empty())
+        setGraphName(successDeletedGraphs.length > 0 ? newGraphNames[successDeletedGraphs.length - 1] : "");
+        setGraph(Graph.empty());
       }
 
-      handleSetRows(successDeletedGraphs)
+      handleSetRows(successDeletedGraphs);
       toast({
         title: "Graph(s) deleted successfully",
         description: successDeletedGraphs.length > 0 && `The graph(s) ${successDeletedGraphs.join(", ")} have been deleted successfully${failedDeletedGraphs.length > 0 && `The graph(s) ${failedDeletedGraphs.join(", ")} have not been deleted`}`,
-      })
+      });
     } finally {
-      setIsLoading(false)
-      setOpen(false)
+      setIsLoading(false);
+      setOpen(false);
       if (typeof newGraphNames !== "undefined" && newGraphNames.length === 0) {
-        setCloseManage(true)
+        setCloseManage(true);
       }
     }
-  }
+  };
 
   return (
     <DialogComponent

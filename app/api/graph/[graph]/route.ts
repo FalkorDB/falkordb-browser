@@ -23,7 +23,9 @@ export async function DELETE(
 
         await graph.delete();
 
-        return NextResponse.json({ message: `${graphId} graph deleted` });
+        return NextResponse.json(
+          { message: `${graphId} graph deleted` },
+        );
       }
     } catch (error) {
       console.error(error);

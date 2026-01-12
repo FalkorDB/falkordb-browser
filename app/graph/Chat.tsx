@@ -1,72 +1,72 @@
 /* eslint-disable no-case-declarations */
 /* eslint-disable react/no-array-index-key */
-import { cn, Message } from "@/lib/utils"
-import { useContext, useEffect, useState } from "react"
-import { ChevronDown, ChevronRight, CircleArrowUp, Copy, Loader2, Play, Search, X } from "lucide-react"
-import { useToast } from "@/components/ui/use-toast"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import Button from "../components/ui/Button"
-import Input from "../components/ui/Input"
-import { GraphContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext } from "../components/provider"
-import { EventType } from "../api/chat/route"
+import { cn, Message } from "@/lib/utils";
+import { useContext, useEffect, useState } from "react";
+import { ChevronDown, ChevronRight, CircleArrowUp, Copy, Loader2, Play, Search, X } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import Button from "../components/ui/Button";
+import Input from "../components/ui/Input";
+import { GraphContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext } from "../components/provider";
+import { EventType } from "../api/chat/route";
 
 interface Props {
     onClose: () => void
 }
 
 export default function Chat({ onClose }: Props) {
-    const { setIndicator } = useContext(IndicatorContext)
-    const { graphName, runQuery } = useContext(GraphContext)
-    const { isQueryLoading } = useContext(QueryLoadingContext)
-    const { settings: { chatSettings: { secretKey, model } } } = useContext(BrowserSettingsContext)
+    const { setIndicator } = useContext(IndicatorContext);
+    const { graphName, runQuery } = useContext(GraphContext);
+    const { isQueryLoading } = useContext(QueryLoadingContext);
+    const { settings: { chatSettings: { secretKey, model } } } = useContext(BrowserSettingsContext);
 
-    const { toast } = useToast()
+    const { toast } = useToast();
 
-    const [messages, setMessages] = useState<Message[]>([])
-    const [messagesList, setMessagesList] = useState<(Message | [Message[], boolean])[]>([])
-    const [newMessage, setNewMessage] = useState("")
-    const [isLoading, setIsLoading] = useState(false)
-    const [queryCollapse, setQueryCollapse] = useState<{ [key: string]: boolean }>({})
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [messagesList, setMessagesList] = useState<(Message | [Message[], boolean])[]>([]);
+    const [newMessage, setNewMessage] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+    const [queryCollapse, setQueryCollapse] = useState<{ [key: string]: boolean }>({});
 
     useEffect(() => {
-        let statusGroup: Message[]
+        let statusGroup: Message[];
 
         const newMessagesList = messages.map((message, i): Message | [Message[], boolean] | undefined => {
             if (message.type === "Status") {
                 if (messages[i - 1]?.type !== "Status") {
-                    if (messages[i + 1]?.type !== "Status") return message
-                    statusGroup = [message]
+                    if (messages[i + 1]?.type !== "Status") return message;
+                    statusGroup = [message];
                 } else {
-                    statusGroup.push(message)
-                    if (messages[i + 1]?.type !== "Status") return [statusGroup, false]
+                    statusGroup.push(message);
+                    if (messages[i + 1]?.type !== "Status") return [statusGroup, false];
                 }
             } else {
-                return message
+                return message;
             }
 
-            return undefined
-        }).filter(m => !!m)
+            return undefined;
+        }).filter(m => !!m);
 
-        setMessagesList(newMessagesList)
-    }, [messages])
+        setMessagesList(newMessagesList);
+    }, [messages]);
 
     const scrollToBottom = () => {
-        const chatContainer = document.querySelector(".chat-container")
+        const chatContainer = document.querySelector(".chat-container");
         if (chatContainer) {
-            chatContainer.scrollTop = chatContainer.scrollHeight
+            chatContainer.scrollTop = chatContainer.scrollHeight;
         }
-    }
+    };
 
     const handleSubmit = async (e?: React.FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>) => {
-        e?.preventDefault()
+        e?.preventDefault();
 
         if (isLoading) {
             toast({
                 title: "Please wait",
                 description: "You are already sending a message",
                 variant: "destructive",
-            })
-            return
+            });
+            return;
         }
 
         if (newMessage.trim() === "") {
@@ -74,17 +74,17 @@ export default function Chat({ onClose }: Props) {
                 title: "Please enter a message",
                 description: "You cannot send an empty message",
                 variant: "destructive",
-            })
-            return
+            });
+            return;
         }
 
-        setIsLoading(true)
+        setIsLoading(true);
 
-        const newMessages = [...messages, { role: "user", type: "Text", content: newMessage } as const]
+        const newMessages = [...messages, { role: "user", type: "Text", content: newMessage } as const];
 
-        setMessages(newMessages)
-        setTimeout(scrollToBottom, 0)
-        setNewMessage("")
+        setMessages(newMessages);
+        setTimeout(scrollToBottom, 0);
+        setNewMessage("");
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const body: any = {
@@ -93,14 +93,14 @@ export default function Chat({ onClose }: Props) {
                 content
             })),
             graphName,
-        }
+        };
 
         if (model) {
-            body.model = model
+            body.model = model;
         }
 
         if (secretKey) {
-            body.key = secretKey
+            body.key = secretKey;
         }
 
         try {
@@ -129,24 +129,24 @@ export default function Chat({ onClose }: Props) {
                 const chunk = decoder.decode(value, { stream: true });
 
                 const lines = chunk.split('event:').filter(line => line);
-                let isResult = false
+                let isResult = false;
 
                 lines.forEach(line => {
-                    const eventType: EventType | "error" = line.split(" ")[1] as EventType | "error"
-                    const eventData = line.split("data:")[1]
+                    const eventType: EventType | "error" = line.split(" ")[1] as EventType | "error";
+                    const eventData = line.split("data:")[1];
                     switch (eventType) {
                         case "Status":
                             const message = {
                                 role: "assistant" as const,
                                 content: eventData.trim(),
                                 type: eventType
-                            }
+                            };
 
-                            setMessages(prev => [...prev, message])
+                            setMessages(prev => [...prev, message]);
                             break;
 
                         case "CypherQuery":
-                            setQueryCollapse(prev => ({ ...prev, [messages.length]: false }))
+                            setQueryCollapse(prev => ({ ...prev, [messages.length]: false }));
                             setMessages(prev => [
                                 ...prev,
                                 {
@@ -155,25 +155,6 @@ export default function Chat({ onClose }: Props) {
                                     type: eventType
                                 }
                             ]);
-                            break;
-
-                        case "ModelOutputChunk":
-                            setMessages(prev => {
-                                const lastMessage = prev[prev.length - 1]
-
-                                if (lastMessage.role === "assistant" && lastMessage.type === "Result") {
-                                    return [...prev.slice(0, -1), {
-                                        ...lastMessage,
-                                        content: `${lastMessage.content} ${eventData.trim()}`
-                                    }]
-                                }
-
-                                return [...prev, {
-                                    role: "assistant",
-                                    type: "Result",
-                                    content: eventData.trim()
-                                }]
-                            })
                             break;
 
                         case "Result":
@@ -197,7 +178,7 @@ export default function Chat({ onClose }: Props) {
                                     }
                                 ]);
                             }
-                            isResult = true
+                            isResult = true;
                             break;
 
                         case "Error":
@@ -209,21 +190,21 @@ export default function Chat({ onClose }: Props) {
                                     type: eventType
                                 }
                             ]);
-                            isResult = true
+                            isResult = true;
                             break;
 
                         case "error":
-                            const statusCode = Number(line.split("status:")[1].split(" ")[0])
+                            const statusCode = Number(line.split("status:")[1].split(" ")[0]);
 
-                            if (statusCode === 401 || statusCode >= 500) setIndicator("offline")
+                            if (statusCode === 401 || statusCode >= 500) setIndicator("offline");
 
                             toast({
                                 title: "Error",
                                 description: eventData,
                                 variant: "destructive",
-                            })
+                            });
 
-                            isResult = true
+                            isResult = true;
                             break;
 
                         case "Schema":
@@ -231,15 +212,15 @@ export default function Chat({ onClose }: Props) {
                             break;
 
                         default:
-                            throw new Error(`Unknown event type: ${eventType}`)
+                            throw new Error(`Unknown event type: ${eventType}`);
                     }
                 });
 
-                setTimeout(scrollToBottom, 0)
+                setTimeout(scrollToBottom, 0);
 
                 if (!isResult) await processStream();
 
-                setIsLoading(false)
+                setIsLoading(false);
             };
 
             processStream();
@@ -248,9 +229,9 @@ export default function Chat({ onClose }: Props) {
                 title: "Error",
                 description: (error as Error).message,
                 variant: "destructive",
-            })
+            });
         }
-    }
+    };
 
     const getMessage = (message: Message, index?: number) => {
         switch (message.type) {
@@ -261,7 +242,7 @@ export default function Chat({ onClose }: Props) {
                         <Loader2 className="animate-spin" size={15} />
                     }
                     <p className="text-sm">{message.content}</p>
-                </>
+                </>;
 
                 return index !== undefined ? (
                     <li className="flex gap-2 items-center" key={index}>
@@ -271,15 +252,15 @@ export default function Chat({ onClose }: Props) {
                     <div className="flex gap-2 items-center">
                         {content}
                     </div>
-                )
+                );
             case "CypherQuery":
-                const i = messages.findIndex(m => m === message)
+                const i = messages.findIndex(m => m === message);
 
                 return (
                     <div className="flex gap-2 items-start">
                         <Button
                             onClick={() => {
-                                setQueryCollapse(prev => ({ ...prev, [i]: !prev[i] }))
+                                setQueryCollapse(prev => ({ ...prev, [i]: !prev[i] }));
                             }}
                             className="p-1 min-w-8 min-h-8"
                         >
@@ -316,24 +297,24 @@ export default function Chat({ onClose }: Props) {
                                 data-testid="chatCopyQueryButton"
                                 title="Copy Query"
                                 onClick={() => {
-                                    navigator.clipboard.writeText(message.content)
+                                    navigator.clipboard.writeText(message.content);
                                     toast({
                                         title: "Copied to clipboard",
                                         description: "The query has been copied to your clipboard",
-                                    })
+                                    });
                                 }}
                             >
                                 <Copy size={20} />
                             </Button>
                         </div>
                     </div>
-                )
+                );
             default:
                 return (
                     <p className="text-wrap whitespace-pre-wrap">{message.content}</p>
-                )
+                );
         }
-    }
+    };
 
     return (
         <div data-testid="chatPanel" className="border-Gradient-rounded h-full w-full">
@@ -351,9 +332,9 @@ export default function Chat({ onClose }: Props) {
                     {
                         messagesList.map((message, index) => {
                             if (Array.isArray(message)) {
-                                const [m, collapse] = message
+                                const [m, collapse] = message;
                                 return (
-                                    <li className={cn("w-full flex gap-1 justify-start status-group")} key={index}>
+                                    <li className={cn("w-full flex gap-1 justify-start status-group")} key={index} data-key={index}>
                                         <div className="flex gap-1 items-center h-fit">
                                             {m.some(me => messages[messages.length - 1] === me) && !collapse ?
                                                 <Loader2 className="animate-spin" size={15} />
@@ -361,13 +342,13 @@ export default function Chat({ onClose }: Props) {
                                             <p className="text-sm">Status</p>
                                             <Button
                                                 onClick={() => {
-                                                    setMessagesList(prev => prev.map((me, i) => i === index && Array.isArray(me) ? [me[0], !me[1]] : me))
+                                                    setMessagesList(prev => prev.map((me, i) => i === index && Array.isArray(me) ? [me[0], !me[1]] : me));
                                                     setTimeout(() => {
-                                                        const statusGroup = document.querySelector(`.status-group[key="${index}"]`)
+                                                        const statusGroup = document.querySelector(`.status-group[data-key="${index}"]`);
                                                         if (statusGroup) {
-                                                            statusGroup.scrollIntoView({ behavior: "smooth" })
+                                                            statusGroup.scrollIntoView({ behavior: "smooth" });
                                                         }
-                                                    }, 0)
+                                                    }, 0);
                                                 }}
                                             >
                                                 {collapse ? <ChevronDown size={25} /> : <ChevronRight size={25} />}
@@ -382,20 +363,20 @@ export default function Chat({ onClose }: Props) {
                                             </ul>
                                         }
                                     </li>
-                                )
+                                );
                             }
                             if (message.type === "Status") {
                                 return (
                                     <li className={cn("w-full flex gap-1 justify-start")} key={index}>
                                         {getMessage(message)}
                                     </li>
-                                )
+                                );
                             }
-                            const isUser = message.role === "user"
-                            const assistantBg = message.type === "Error" ? "bg-destructive" : "bg-secondary"
+                            const isUser = message.role === "user";
+                            const assistantBg = message.type === "Error" ? "bg-destructive" : "bg-secondary";
                             const avatar = <div className={cn("h-8 w-8 rounded-full flex items-center justify-center", isUser ? "bg-primary" : assistantBg)}>
                                 <p className="text-foreground text-sm truncate text-center">{message.role.charAt(0).toUpperCase()}</p>
-                            </div>
+                            </div>;
                             return (
                                 <li
                                     data-testid={isUser ? "chatUserMessage" : `chatAssistantMessage-${message.type}`}
@@ -412,7 +393,7 @@ export default function Chat({ onClose }: Props) {
                                         isUser && avatar
                                     }
                                 </li>
-                            )
+                            );
                         })
                     }
                 </ul>
@@ -436,5 +417,5 @@ export default function Chat({ onClose }: Props) {
                 </form>
             </div>
         </div>
-    )
+    );
 }

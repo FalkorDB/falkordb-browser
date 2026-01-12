@@ -1,5 +1,5 @@
 import test, { expect } from "playwright/test";
-import urls from '../config/urls.json'
+import urls from '../config/urls.json';
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import PreferencesView from "../logic/POM/preferencesView";
 import ApiCalls from "../logic/api/apiCalls";
@@ -12,11 +12,11 @@ test.skip('Preferences Tests', () => {
     test.beforeEach(async () => {
         browser = new BrowserWrapper();
         apicalls = new ApiCalls();
-    })
+    });
 
     test.afterEach(async () => {
         await browser.closeBrowser();
-    })
+    });
 
     test(`@admin remove color via UI -> verify color is removed via UI`, async () => {
         const graphName = getRandomString('preferences');
@@ -29,7 +29,7 @@ test.skip('Preferences Tests', () => {
         const removedColorsCount = await preferencesPage.getColorsCount();
         expect(removedColorsCount).toBe(colorsCount - 1);
         await apicalls.removeGraph(graphName);
-    })
+    });
 
     test(`@admin Modify color via UI -> verify color is modified via UI`, async () => {
         const graphName = getRandomString('preferences');
@@ -41,7 +41,7 @@ test.skip('Preferences Tests', () => {
         const modifiedColor = await preferencesPage.getColorText();
         expect(modifiedColor).not.toBe(color);
         await apicalls.removeGraph(graphName);
-    })
+    });
 
     test(`@admin Add color via UI -> reset colors via UI -> verify color is reset via UI`, async () => {
         const graphName = getRandomString('preferences');
@@ -54,6 +54,6 @@ test.skip('Preferences Tests', () => {
         const resetColorsCount = await preferencesPage.getColorsCount();
         expect(resetColorsCount).toBe(colorsCount);
         await apicalls.removeGraph(graphName);
-    })
+    });
 
-})
+});

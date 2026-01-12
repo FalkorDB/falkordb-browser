@@ -252,8 +252,8 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
     test("@admin Revoke multiple tokens", async () => {
       const tokenName1 = getRandomString(`admin-revoke-multi`);
       const tokenName2 = getRandomString(`admin-revoke-multi`);
-      await apiCall.generateToken({ name: tokenName1 })
-      await apiCall.generateToken({ name: tokenName2 })
+      await apiCall.generateToken({ name: tokenName1 });
+      await apiCall.generateToken({ name: tokenName2 });
     
       const settingsTokensPage = await browser.createNewPage(
         SettingsTokensPage,
