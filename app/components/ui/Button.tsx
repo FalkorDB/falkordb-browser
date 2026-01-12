@@ -39,13 +39,13 @@ const getClassName = (variant: Variant, disable: boolean | undefined, open: bool
             );
             break;
         case "Secondary":
-            className = cn("px-12 py-2 bg-transparent border-2 border-primary", className);
+            className = cn("px-12 py-2 bg-transparent border-2 border-primary text-primary", className);
             break;
         case "Cancel":
             className = cn("px-12 py-2 bg-transparent border-2 border-border", className);
             break;
         case "Delete":
-            className = cn("px-4 py-[10px] bg-transparent border-2 border-destructive", className);
+            className = cn("px-4 py-[10px] bg-transparent border-2 border-destructive text-destructive", className);
             break;
         default:
     }

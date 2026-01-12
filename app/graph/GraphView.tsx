@@ -13,7 +13,6 @@ import Button from "../components/ui/Button";
 import TableView from "./TableView";
 import Toolbar from "./toolbar";
 import Controls from "./controls";
-import GraphDetails from "./GraphDetails";
 import Labels from "./labels";
 import MetadataView from "./MetadataView";
 
@@ -185,10 +184,6 @@ function GraphView({
                     }
                 </div>
                 <div className="flex flex-col gap-4">
-                    <GraphDetails
-                        graph={graph}
-                        tabsValue={currentTab}
-                    />
                     <div className="flex gap-2 items-center">
                         <TabsList className="bg-transparent flex gap-2 pointer-events-auto p-0">
                             <TabsTrigger

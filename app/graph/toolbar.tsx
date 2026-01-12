@@ -7,7 +7,7 @@ import { Graph, Link, Node } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import DeleteElement from "./DeleteElement";
-import { GraphContext } from "../components/provider";
+import { BrowserSettingsContext, GraphContext } from "../components/provider";
 
 interface Props {
     graph: Graph
@@ -44,6 +44,12 @@ export default function Toolbar({
 }: Props) {
 
     const { isLoading: isLoadingGraph } = useContext(GraphContext);
+    const {
+        settings: {
+            limitSettings: { limit, lastLimit },
+        }
+    } = useContext(BrowserSettingsContext);
+
 
     const suggestionRef = useRef<HTMLDivElement>(null);
     const { data: session } = useSession();
@@ -57,6 +63,9 @@ export default function Toolbar({
     const [topFakeItemHeight, setTopFakeItemHeight] = useState(0);
     const [bottomFakeItemHeight, setBottomFakeItemHeight] = useState(0);
     const [visibleSuggestions, setVisibleSuggestions] = useState<(Node | Link)[]>([]);
+
+    const hasLimitWarning = graph.CurrentLimit && graph.Data.length >= graph.CurrentLimit;
+    const hasLimitChangeWarning = graph.CurrentLimit && lastLimit !== limit;
 
     const isLoading = isLoadingSchema || isLoadingGraph;
 
@@ -280,8 +289,8 @@ export default function Toolbar({
                     <>
                         <Button
                             data-testid={`elementCanvasInfo${label}`}
-                            className="pointer-events-auto bg-background cursor-default border-primary"
-                            variant="Delete"
+                            className="p-1 pointer-events-auto bg-background cursor-default border-primary"
+                            variant="Secondary"
                             tooltipVariant="Primary"
                             tooltipSide="bottom"
                             title={`Select And Show Properties (Right Click)
@@ -291,28 +300,40 @@ export default function Toolbar({
                             <Info size={20} />
                         </Button>
                         <Button
+                            data-testid={`elementCanvasInfo${label}`}
+                            className="p-1 pointer-events-auto bg-background cursor-default border-orange-300"
+                            variant="Secondary"
+                            tooltipVariant="Primary"
+                            tooltipSide="bottom"
+                            title={`${hasLimitWarning ? `Data currently limited to ${graph.Data.length} rows` : ""}
+                            ${hasLimitChangeWarning ? "Rerun the query to apply the new limit." : ""}`}
+                        >
+                            <Info className="text-orange-300" size={20} />
+                        </Button>
+
+                        <Button
                             data-testid={`elementCanvasAddNode${label}`}
-                            className="pointer-events-auto bg-background border-green-900"
-                            variant="Delete"
+                            className="p-1 pointer-events-auto bg-background border-green-900"
+                            variant="Secondary"
                             tooltipVariant="Primary"
                             tooltipSide="bottom"
                             title="Add Node"
                             onClick={() => setIsAddNode(!isAddNode)}
                         >
-                            <Circle size={20} />
+                            <Circle className="text-green-900" size={20} />
                         </Button>
                         {
                             setIsAddEdge &&
                             <Button
                                 data-testid={`elementCanvasAddEdge${label}`}
-                                className="pointer-events-auto bg-background border-green-900"
-                                variant="Delete"
+                                className="p-1 pointer-events-auto bg-background border-green-900"
+                                variant="Secondary"
                                 tooltipVariant="Primary"
                                 tooltipSide="bottom"
                                 title="Add Edge"
                                 onClick={() => setIsAddEdge(!isAddEdge)}
                             >
-                                <ArrowRight size={20} />
+                                <ArrowRight className="text-green-900" size={20} />
                             </Button>
                         }
                         {
