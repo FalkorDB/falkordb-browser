@@ -208,7 +208,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setHasChanges(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [displayChat, navigateToSettings, contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, replayTutorial, tutorialOpen, showMemoryUsage]);
+  }), [displayChat, navigateToSettings, contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, replayTutorial, tutorialOpen, showMemoryUsage]);
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,

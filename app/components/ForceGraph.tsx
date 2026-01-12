@@ -212,7 +212,7 @@ export default function ForceGraph({
         if (!fullElement) return;
 
         if (evt.ctrlKey) {
-            if (selectedElements.find(e => ("source" in e && "source" in fullElement) || (!("source" in e) && !("source" in fullElement)) && e.id === fullElement.id)) {
+            if (selectedElements.find(e => (("source" in e && "source" in fullElement) || (!("source" in e) && !("source" in fullElement))) && e.id === fullElement.id)) {
                 setSelectedElements(selectedElements.filter((el) => el !== fullElement));
             } else {
                 setSelectedElements([...selectedElements, fullElement]);
@@ -305,7 +305,6 @@ export default function ForceGraph({
             setGraphData(undefined);
         } else {
             const canvasData = convertToCanvasData(data);
-            console.log(canvasData);
             
             canvas.setData(canvasData);
         }
