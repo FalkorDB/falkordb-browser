@@ -282,7 +282,7 @@ test.describe("Customize Style Tests", () => {
     await apiCall.removeGraph(graphName);
   });
 
-  test.only(`@readwrite Validate RGB color picker functionality`, async () => {
+  test(`@readwrite Validate RGB color picker functionality`, async () => {
     const graphName = getRandomString("graph");
     await apiCall.addGraph(graphName);
     const graph = await browser.createNewPage(CustomizeStylePage, urls.graphUrl);

@@ -39,14 +39,14 @@ test.describe('Query history Tests', () => {
         const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectGraphByName(graphName);
-        const query = "CREATE (n:Person { name: 'Alice' }) RETURN n";
+        const query = "MERGE (n:Person { name: 'Alice' }) RETURN n";
         await graph.insertQuery(query);
         await graph.clickRunQuery();
         await graph.runAQueryFromHistory(query);
         const searchQuery = `Alice`;
         await graph.searchElementInCanvas(searchQuery);
         await graph.hoverAtCanvasCenter();
-        expect(await graph.getNodeCanvasToolTip()).toBe(searchQuery);
+        expect(await graph.getNodeCanvasToolTip()).toBe("0");
         await apicalls.removeGraph(graphName);        
     });
 

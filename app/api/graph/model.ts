@@ -895,8 +895,8 @@ export class Graph {
     this.elements = {
       nodes: this.elements.nodes,
       links: this.elements.links
-        .map((link) => {
-          if (
+      .map((link) => {
+        if (
             (ids.length !== 0 && !links.includes(link)) ||
             (this.nodesMap.has(link.source) &&
               this.nodesMap.has(link.target))
@@ -940,6 +940,7 @@ export class Graph {
           this.elements.nodes.findIndex((n) => n.id === id),
           1
         );
+        this.nodesMap.delete(id);
         const category = this.labelsMap.get(element.labels[0]);
 
         if (category) {
@@ -957,6 +958,7 @@ export class Graph {
           this.elements.links.findIndex((l) => l.id === id),
           1
         );
+        this.linksMap.delete(id);
         const category = this.relationshipsMap.get(element.relationship);
 
         if (category) {

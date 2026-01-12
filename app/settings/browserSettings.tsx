@@ -194,6 +194,7 @@ export default function BrowserSettings() {
                 {/* Environment Section */}
                 <Card className="border-border shadow-sm">
                     <CardHeader
+                        data-testid="environmentSectionHeader"
                         className="cursor-pointer hover:bg-muted/50 transition-colors"
                         onClick={() => toggleSection('environment')}
                     >
@@ -211,6 +212,7 @@ export default function BrowserSettings() {
                                 <div className="flex items-center gap-2">
                                     <span className="text-sm font-medium whitespace-nowrap">Model</span>
                                     <Combobox
+                                        data-testid="chatModelSelect"
                                         disabled={!displayChat}
                                         className="p-1"
                                         label="Model"
@@ -224,6 +226,7 @@ export default function BrowserSettings() {
                                     {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                                     <label htmlFor="secretKeyInput" className="text-sm font-medium whitespace-nowrap">Secret Key</label>
                                     <Input
+                                        data-testid="chatApiKeyInput"
                                         disabled={!displayChat}
                                         className="flex-1"
                                         id="secretKeyInput"
@@ -441,6 +444,7 @@ export default function BrowserSettings() {
                     hasChanges &&
                     <div className="bg-background flex gap-4 px-4 py-4 sticky -bottom-8 justify-center border-t border-border shadow-lg rounded-t-lg">
                         <Button
+                            data-testid="cancelSettingsButton"
                             id="cancelQuerySettingsBtn"
                             variant="Secondary"
                             onClick={resetSettings}
@@ -448,6 +452,7 @@ export default function BrowserSettings() {
                             <p>Cancel Changes</p>
                         </Button>
                         <Button
+                            data-testid="saveSettingsButton"
                             id="saveQuerySettingsBtn"
                             variant="Primary"
                             type="submit"

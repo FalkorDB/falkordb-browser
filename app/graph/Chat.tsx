@@ -157,26 +157,27 @@ export default function Chat({ onClose }: Props) {
                             ]);
                             break;
 
-                        case "ModelOutputChunk":
-                            setMessages(prev => {
-                                const lastMessage = prev[prev.length - 1];
-
-                                if (lastMessage.role === "assistant" && lastMessage.type === "Result") {
-                                    return [...prev.slice(0, -1), {
-                                        ...lastMessage,
-                                        content: `${lastMessage.content} ${eventData.trim()}`
-                                    }];
-                                }
-
-                                return [...prev, {
-                                    role: "assistant",
-                                    type: "Result",
-                                    content: eventData.trim()
-                                }];
-                            });
-                            break;
-
                         case "Result":
+                            try {
+                                setMessages(prev => [
+                                    ...prev,
+                                    {
+                                        role: "assistant",
+                                        content: JSON.parse(eventData.trim()),
+                                        type: eventType
+                                    }
+                                ]);
+                            } catch (error) {
+                                console.error("Failed to parse Result event data:", error);
+                                setMessages(prev => [
+                                    ...prev,
+                                    {
+                                        role: "assistant",
+                                        content: eventData.trim(),
+                                        type: "Error"
+                                    }
+                                ]);
+                            }
                             isResult = true;
                             break;
 
@@ -285,6 +286,7 @@ export default function Chat({ onClose }: Props) {
                         </div>
                         <div className="flex flex-col gap-2">
                             <Button
+                                data-testid="chatRunQueryButton"
                                 title="Run Query"
                                 onClick={() => runQuery(message.content)}
                                 isLoading={isQueryLoading}
@@ -292,6 +294,7 @@ export default function Chat({ onClose }: Props) {
                                 <Play size={20} />
                             </Button>
                             <Button
+                                data-testid="chatCopyQueryButton"
                                 title="Copy Query"
                                 onClick={() => {
                                     navigator.clipboard.writeText(message.content);
@@ -314,9 +317,10 @@ export default function Chat({ onClose }: Props) {
     };
 
     return (
-        <div className="border-Gradient-rounded h-full w-full">
+        <div data-testid="chatPanel" className="border-Gradient-rounded h-full w-full">
             <div className="bg-background relative h-full w-full flex flex-col gap-4 items-center rounded-lg p-4">
                 <Button
+                    data-testid="chatCloseButton"
                     className="absolute top-2 right-2"
                     title="Close"
                     onClick={onClose}
@@ -324,13 +328,13 @@ export default function Chat({ onClose }: Props) {
                     <X className="h-4 w-4" />
                 </Button>
                 <h1 className="mt-6 text-center">Chat with your database in natural language</h1>
-                <ul className="w-full h-1 grow flex flex-col gap-6 overflow-x-hidden overflow-y-auto chat-container">
+                <ul data-testid="chatMessagesList" className="w-full h-1 grow flex flex-col gap-6 overflow-x-hidden overflow-y-auto chat-container">
                     {
                         messagesList.map((message, index) => {
                             if (Array.isArray(message)) {
                                 const [m, collapse] = message;
                                 return (
-                                    <li className={cn("w-full flex gap-1 justify-start status-group")} key={index}>
+                                    <li className={cn("w-full flex gap-1 justify-start status-group")} key={index} data-key={index}>
                                         <div className="flex gap-1 items-center h-fit">
                                             {m.some(me => messages[messages.length - 1] === me) && !collapse ?
                                                 <Loader2 className="animate-spin" size={15} />
@@ -340,7 +344,7 @@ export default function Chat({ onClose }: Props) {
                                                 onClick={() => {
                                                     setMessagesList(prev => prev.map((me, i) => i === index && Array.isArray(me) ? [me[0], !me[1]] : me));
                                                     setTimeout(() => {
-                                                        const statusGroup = document.querySelector(`.status-group[key="${index}"]`);
+                                                        const statusGroup = document.querySelector(`.status-group[data-key="${index}"]`);
                                                         if (statusGroup) {
                                                             statusGroup.scrollIntoView({ behavior: "smooth" });
                                                         }
@@ -374,7 +378,11 @@ export default function Chat({ onClose }: Props) {
                                 <p className="text-foreground text-sm truncate text-center">{message.role.charAt(0).toUpperCase()}</p>
                             </div>;
                             return (
-                                <li className={cn("w-full flex gap-1", isUser ? "justify-end" : "justify-start")} key={index}>
+                                <li
+                                    data-testid={isUser ? "chatUserMessage" : `chatAssistantMessage-${message.type}`}
+                                    className={cn("w-full flex gap-1", isUser ? "justify-end" : "justify-start")}
+                                    key={index}
+                                >
                                     {
                                         !isUser && avatar
                                     }
@@ -389,14 +397,16 @@ export default function Chat({ onClose }: Props) {
                         })
                     }
                 </ul>
-                <form className="flex gap-2 items-center border border-border rounded-lg w-full p-2" onSubmit={handleSubmit}>
+                <form data-testid="chatForm" className="flex gap-2 items-center border border-border rounded-lg w-full p-2" onSubmit={handleSubmit}>
                     <Input
+                        data-testid="chatInput"
                         className="w-1 grow bg-transparent border-none text-foreground text-lg SofiaSans"
                         placeholder="Type your message here..."
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
                     />
                     <Button
+                        data-testid="chatSendButton"
                         disabled={newMessage.trim() === ""}
                         title={newMessage.trim() === "" ? "Please enter a message" : "Send"}
                         onClick={handleSubmit}
