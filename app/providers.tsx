@@ -351,7 +351,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         method: "GET"
       }, toast, setIndicator);
 
-      if (!explain.ok) throw new Error();
+      if (!explain.ok) throw new Error("Failed to fetch explain plan");
 
       const explainJson = await explain.json();
       const g = Graph.create(n, result, false, false, existingLimit, graphI);

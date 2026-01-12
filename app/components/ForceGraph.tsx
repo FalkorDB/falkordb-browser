@@ -305,6 +305,8 @@ export default function ForceGraph({
             setGraphData(undefined);
         } else {
             const canvasData = convertToCanvasData(data);
+            console.log(canvasData);
+            
             canvas.setData(canvasData);
         }
 

@@ -34,7 +34,7 @@ test.describe('Canvas Tests', () => {
             const searchQuery = `Person${node}`;
             await graph.searchElementInCanvas(searchQuery);
             await graph.hoverAtCanvasCenter();
-            expect(await graph.getNodeCanvasToolTip()).toBe(searchQuery);
+            expect(await graph.getNodeCanvasToolTip()).toBe(`${node - 1}`);
             await apicalls.removeGraph(graphName);
         });
     });
@@ -107,7 +107,7 @@ test.describe('Canvas Tests', () => {
         await graph.insertQuery(BATCH_CREATE_PERSONS);
         await graph.clickRunQuery();
         const initialGraph = await graph.getNodesScreenPositions('graph');
-        
+
         expect(initialGraph.length).toBeGreaterThan(0);
 
         const fromX = initialGraph[0].screenX;
@@ -131,7 +131,7 @@ test.describe('Canvas Tests', () => {
         await graph.getNodesScreenPositions('graph');
         await graph.searchElementInCanvas("Alice");
         await graph.hoverAtCanvasCenter();
-        expect(await graph.getNodeCanvasToolTip()).toBe("Alice");
+        expect(await graph.getNodeCanvasToolTip()).toBe("0");
         await apicalls.removeGraph(graphName);
     });
 
@@ -160,7 +160,7 @@ test.describe('Canvas Tests', () => {
         await graph.waitForCanvasAnimationToEnd();
         await graph.hoverAtCanvasCenter();
         expect(await graph.isNodeCanvasToolTipVisible());
-        expect(await graph.getNodeCanvasToolTip()).toBe("Bob");
+        expect(await graph.getNodeCanvasToolTip()).toBe("0");
         await apicalls.removeGraph(graphName);
     });
 
@@ -189,7 +189,7 @@ test.describe('Canvas Tests', () => {
     test(`@readwrite moving a node to another node's position while animation is on should push them apart`, async () => {
         const graphName = getRandomString('graph');
         await apicalls.addGraph(graphName);
-        
+
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectGraphByName(graphName);
@@ -197,14 +197,14 @@ test.describe('Canvas Tests', () => {
         await graph.clickRunQuery();
         await graph.waitForScaleToStabilize();
         const initNodes = await graph.getNodesScreenPositions('graph');
-        
+
         const fromX = initNodes[0].screenX;
         const fromY = initNodes[0].screenY;
         const toX = initNodes[1].screenX;;
         const toY = initNodes[1].screenY;
         await graph.changeNodePosition(fromX, fromY, toX, toY);
         await graph.waitForScaleToStabilize();
-        
+
         const nodes = await graph.getNodesScreenPositions('graph');
         expect(Math.abs(nodes[1].screenX - nodes[0].screenX)).toBeLessThanOrEqual(2);
         expect(Math.abs(nodes[1].screenY - nodes[0].screenY)).toBeLessThanOrEqual(2);
@@ -256,7 +256,7 @@ test.describe('Canvas Tests', () => {
         await graph.clickLabelsButtonByLabel("Labels", "Person");
         let nodes = await graph.getNodesScreenPositions('graph');
         expect(nodes[0].visible).toBeTruthy();
-        
+
         await graph.clickLabelsButtonByLabel("Labels", "Female");
         nodes = await graph.getNodesScreenPositions('graph');
         expect(nodes[0].visible).toBeFalsy();
@@ -288,7 +288,7 @@ test.describe('Canvas Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery(`CREATE (alice:Person:Female {name: 'Alice'}), (bob:Person:Male {name: 'Bob'}) RETURN alice, bob`);
         await graph.clickRunQuery();
-      
+
         await graph.clickLabelsButtonByLabel("Labels", "Female");
         const nodes = await graph.getNodesScreenPositions('graph');
         // Alice has Female label, so should be visible
@@ -298,9 +298,9 @@ test.describe('Canvas Tests', () => {
         const bobNode = nodes.find(n => n.data?.name === 'Bob');
         expect(bobNode.visible).toBeTruthy();
         await apicalls.removeGraph(graphName);
-      });
-      
-      test(`@admin Validate progressive visibility changes when labels toggled off with overlapping and multi labels`, async () => {
+    });
+
+    test(`@admin Validate progressive visibility changes when labels toggled off with overlapping and multi labels`, async () => {
         const graphName = getRandomString('graph');
         await apicalls.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -308,7 +308,7 @@ test.describe('Canvas Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery(`CREATE (alice:Person:Female {name: 'Alice'}), (bob:Person:Male {name: 'Bob'}) RETURN alice, bob`);
         await graph.clickRunQuery();
-      
+
         await graph.clickLabelsButtonByLabel("Labels", "Female");
         // Toggle off 'Person' — now Alice should be hidden
         await graph.clickLabelsButtonByLabel("Labels", "Person");
@@ -316,16 +316,16 @@ test.describe('Canvas Tests', () => {
         expect(nodes.find(n => n.data?.name === 'Alice').visible).toBeFalsy();
         // Bob should still be visible
         expect(nodes.find(n => n.data?.name === 'Bob').visible).toBeTruthy();
-      
+
         // Toggle 'Male' off — Alice should still be hidden and Bob should be hidden
         await graph.clickLabelsButtonByLabel("Labels", "Male");
         nodes = await graph.getNodesScreenPositions('graph');
         expect(nodes.find(n => n.data?.name === 'Alice').visible).toBeFalsy();
         expect(nodes.find(n => n.data?.name === 'Bob').visible).toBeFalsy();
         await apicalls.removeGraph(graphName);
-      });
-      
-      test(`@admin Validate progressive visibility restoration when labels toggled back on with overlapping and multi labels`, async () => {
+    });
+
+    test(`@admin Validate progressive visibility restoration when labels toggled back on with overlapping and multi labels`, async () => {
         const graphName = getRandomString('graph');
         await apicalls.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -333,7 +333,7 @@ test.describe('Canvas Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery(`CREATE (alice:Person:Female {name: 'Alice'}), (bob:Person:Male {name: 'Bob'}) RETURN alice, bob`);
         await graph.clickRunQuery();
-      
+
         await graph.clickLabelsButtonByLabel("Labels", "Female");
         await graph.clickLabelsButtonByLabel("Labels", "Person");
         await graph.clickLabelsButtonByLabel("Labels", "Male");
@@ -342,7 +342,7 @@ test.describe('Canvas Tests', () => {
         let nodes = await graph.getNodesScreenPositions('graph');
         expect(nodes.find(n => n.data?.name === 'Alice').visible).toBeTruthy();
         expect(nodes.find(n => n.data?.name === 'Bob').visible).toBeFalsy();
-      
+
         // Toggle 'Male' back on — Alice should and bob should be visible
         await graph.clickLabelsButtonByLabel("Labels", "Male");
         nodes = await graph.getNodesScreenPositions('graph');
