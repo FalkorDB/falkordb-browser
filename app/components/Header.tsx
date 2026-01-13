@@ -1,6 +1,6 @@
 /* eslint-disable react/require-default-props */
 
-'use client'
+'use client';
 
 import { ArrowUpRight, Database, FileCode, LogOut, Monitor, Moon, Settings, Sun } from "lucide-react";
 import { useCallback, useContext, useState, useEffect } from "react";
@@ -19,7 +19,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useTheme } from "next-themes";
 import Button from "./ui/Button";
 import CreateGraph from "./CreateGraph";
-import { IndicatorContext, PanelContext, BrowserSettingsContext } from "./provider";
+import { IndicatorContext, PanelContext, BrowserSettingsContext, ConnectionContext } from "./provider";
 
 interface Props {
     onSetGraphName: (newGraphName: string) => void
@@ -30,54 +30,75 @@ interface Props {
 }
 
 function getPathType(pathname: string): "Schema" | "Graph" | undefined {
-    if (pathname.includes("/schema")) return "Schema"
-    if (pathname.includes("/graph")) return "Graph"
-    return undefined
+    if (pathname.includes("/schema")) return "Schema";
+    if (pathname.includes("/graph")) return "Graph";
+    return undefined;
 }
 
-const iconSize = 30
+const iconSize = 30;
+
+/**
+ * Format version number to include dots (e.g., "11111" -> "1.11.11")
+ */
+function formatVersion(version: string | undefined): string {
+    if (!version) return '';
+
+    // If already formatted with dots, return as is
+    if (version.includes('.')) return version;
+
+    // Format as Major.Minor.Patch (e.g., "11111" -> "1.11.11")
+    if (version.length >= 5) {
+        const major = version.slice(0, 1);
+        const minor = version.slice(1, 3);
+        const patch = version.slice(3);
+        return `${major}.${minor}.${patch}`;
+    }
+
+    return version;
+}
 
 export default function Header({ onSetGraphName, graphNames, graphName, onOpenGraphInfo, navigateToSettings }: Props) {
 
-    const { indicator } = useContext(IndicatorContext)
-    const { setPanel } = useContext(PanelContext)
-    const { hasChanges, saveSettings, resetSettings, settings: { chatSettings: { model, secretKey, displayChat } } } = useContext(BrowserSettingsContext)
+    const { indicator } = useContext(IndicatorContext);
+    const { connectionType, dbVersion } = useContext(ConnectionContext);
+    const { setPanel } = useContext(PanelContext);
+    const { hasChanges, saveSettings, resetSettings, settings: { chatSettings: { model, secretKey, displayChat } } } = useContext(BrowserSettingsContext);
 
-    const { theme, setTheme } = useTheme()
-    const { currentTheme } = getTheme(theme)
-    const { data: session } = useSession()
-    const pathname = usePathname()
-    const router = useRouter()
-    const { toast } = useToast()
+    const { theme, setTheme } = useTheme();
+    const { currentTheme } = getTheme(theme);
+    const { data: session } = useSession();
+    const pathname = usePathname();
+    const router = useRouter();
+    const { toast } = useToast();
 
-    const [mounted, setMounted] = useState(false)
+    const [mounted, setMounted] = useState(false);
 
-    const type = getPathType(pathname)
-    const showCreate = type && session?.user.role && session.user.role !== "Read-Only"
+    const type = getPathType(pathname);
+    const showCreate = type && session?.user.role && session.user.role !== "Read-Only";
 
     useEffect(() => {
-        setMounted(true)
-    }, [])
+        setMounted(true);
+    }, []);
 
     const navigateBack = useCallback(() => {
         if (hasChanges) {
             getQuerySettingsNavigationToast(toast, () => {
-                saveSettings()
-                router.back()
+                saveSettings();
+                router.back();
             }, () => {
-                resetSettings()
-                router.back()
-            })
+                resetSettings();
+                router.back();
+            });
         } else {
-            router.back()
+            router.back();
         }
-    }, [hasChanges, resetSettings, saveSettings, router, toast])
+    }, [hasChanges, resetSettings, saveSettings, router, toast]);
 
     const handleSetCurrentPanel = useCallback((newPanel: Panel) => {
-        setPanel(prev => prev === newPanel ? undefined : newPanel)
-    }, [setPanel])
+        setPanel(prev => prev === newPanel ? undefined : newPanel);
+    }, [setPanel]);
 
-    const separator = <div className="h-px w-[80%] bg-border rounded-full" />
+    const separator = <div className="h-px w-[80%] bg-border rounded-full" />;
 
     return (
         <div className="py-5 px-2 flex flex-col justify-between items-center border-r border-border">
@@ -93,6 +114,51 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                         <Image style={{ width: 'auto', height: '48px' }} priority src={`/icons/F-${currentTheme}.svg`} alt="FalkorDB Logo" width={0} height={0} />
                     </Link>
                 }
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <h2>{session?.user.username || "Default"}</h2>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>User Name</p>
+                    </TooltipContent>
+                </Tooltip>
+                {
+                    session?.user.role === "Admin" &&
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <h2>v{formatVersion(dbVersion)}</h2>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>FalkorDB Server Version</p>
+                        </TooltipContent>
+                    </Tooltip>
+                }
+                <div className="flex gap-1">
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div className={cn("h-6 w-6 rounded-full bg-yellow-500 text-center", connectionType !== "Standalone" && "opacity-25")}>Si</div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Single</p>
+                        </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div className={cn("h-6 w-6 rounded-full bg-green-500 text-center", connectionType !== "Sentinel" && "opacity-25")}>Se</div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Sentinel</p>
+                        </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div className={cn("h-6 w-6 rounded-full bg-green-700 text-center", connectionType !== "Cluster" && "opacity-25")}>C</div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Cluster</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </div>
                 {
                     showCreate &&
                     <>
@@ -139,22 +205,23 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                     <>
                         {separator}
                         <Button
+                            data-testid="chatToggleButton"
                             className="Gradient bg-clip-text text-transparent font-semibold text-xl"
                             indicator={indicator}
-                            title={`Use English to query the graph. 
+                            title={`Use English to query the graph.
                                 The feature requires LLM model and API key.
                                 Update local user parameters in Settings.`}
                             label="CHAT"
                             onClick={() => {
                                 if (navigateToSettings && (!model || !secretKey)) {
-                                    router.push("/settings")
+                                    router.push("/settings");
                                     toast({
                                         title: "Incomplete Chat Settings",
                                         description: "Please complete the chat settings to use the chat feature.",
                                         variant: "destructive",
-                                    })
+                                    });
                                 } else {
-                                    handleSetCurrentPanel("chat")
+                                    handleSetCurrentPanel("chat");
                                 }
                             }}
                         />
@@ -248,11 +315,11 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                             data-testid="themeToggle"
                             title={`Toggle theme current theme: ${theme}`}
                             onClick={() => {
-                                let newTheme = ""
-                                if (theme === "dark") newTheme = "light"
-                                else if (theme === "light") newTheme = "system"
-                                else newTheme = "dark"
-                                setTheme(newTheme)
+                                let newTheme = "";
+                                if (theme === "dark") newTheme = "light";
+                                else if (theme === "light") newTheme = "system";
+                                else newTheme = "dark";
+                                setTheme(newTheme);
                             }}
                         >
                             {theme === "dark" && <Sun size={iconSize} />}
@@ -287,5 +354,5 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                 </Button>
             </div>
         </div >
-    )
+    );
 }

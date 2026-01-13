@@ -25,5 +25,5 @@ export default function CloseDialog({ className, label, children, ...props }: Pr
                 {children}
             </Button>
         </DialogClose>
-    )
+    );
 }
