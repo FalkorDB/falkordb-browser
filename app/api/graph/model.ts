@@ -839,7 +839,7 @@ export class Graph {
     if (savedStyle) {
       try {
         const style = JSON.parse(savedStyle);
-        label.style = style;
+        label.style = { ...label.style, ...style };
       } catch (e) {
         // Ignore invalid JSON
       }
