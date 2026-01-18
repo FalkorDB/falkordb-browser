@@ -1,12 +1,12 @@
-import { cn } from "@/lib/utils"
-import { Fragment, KeyboardEvent, MouseEvent, useEffect, useRef, useState } from "react"
-import { Check, Circle, Loader2, X } from "lucide-react"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import Button from "./ui/Button"
-import { Query } from "../api/graph/model"
-import Input from "./ui/Input"
+import { cn } from "@/lib/utils";
+import { Fragment, KeyboardEvent, MouseEvent, useEffect, useRef, useState } from "react";
+import { Check, Circle, Loader2, X } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import Button from "./ui/Button";
+import { Query } from "../api/graph/model";
+import Input from "./ui/Input";
 
-type Item = string | Query
+type Item = string | Query;
 
 type ElementItem = {
     content: React.ReactNode;
@@ -25,34 +25,34 @@ const getLastRun = (timestamp: number) => {
     }
 
     return date.toLocaleString([], { hour12: false });
-}
+};
 
-const getExecutionTime = (metadata: string[]) => metadata.find(value => value.startsWith("Query internal execution time:"))?.split(":")[1].replace(" milliseconds", "ms")
+const getExecutionTime = (metadata: string[]) => metadata.find(value => value.startsWith("Query internal execution time:"))?.split(":")[1].replace(" milliseconds", "ms");
 
 const getItemClassName = (selected: boolean, deleteSelected: boolean, hover: boolean, prefix: "text" | "bg" = "text") => {
-    if (selected) return `${prefix}-primary border-primary`
-    if (deleteSelected) return `${prefix}-destructive border-destructive`
-    if (hover) return `${prefix}-foreground border-foreground`
-    return `${prefix}-border border-border`
-}
+    if (selected) return `${prefix}-primary border-primary`;
+    if (deleteSelected) return `${prefix}-destructive border-destructive`;
+    if (hover) return `${prefix}-foreground border-foreground`;
+    return `${prefix}-border border-border`;
+};
 
 const getSeparator = (selected: boolean, deleteSelected: boolean, hover: boolean) => (
     <div
         className={cn("h-2/3 w-px rounded-full", getItemClassName(selected, deleteSelected, hover, "bg"))}
     />
-)
+);
 
 const getStatusIcon = (status: Query["status"]) => {
-    const size = 20
+    const size = 20;
     switch (status) {
         case "Empty":
-            return <Circle color="orange" size={size} />
+            return <Circle color="orange" size={size} />;
         case "Failed":
-            return <X size={size} color="red" />
+            return <X size={size} color="red" />;
         default:
-            return <Check size={size} color="green" />
+            return <Check size={size} color="green" />;
     }
-}
+};
 
 const getQueryElement = (item: Query, selected: boolean, deleteSelected: boolean, hover: boolean) => {
     const executionTime = getExecutionTime(item.metadata);
@@ -116,7 +116,7 @@ const getQueryElement = (item: Query, selected: boolean, deleteSelected: boolean
             ))}
         </div>
     );
-}
+};
 
 interface Props<T extends Item> {
     list: T[]
@@ -134,74 +134,74 @@ interface Props<T extends Item> {
 
 export default function PaginationList<T extends Item>({ list, onClick, dataTestId, afterSearchCallback, isSelected, isDeleteSelected, label, isLoading, className, children, searchRef }: Props<T>) {
 
-    const [filteredList, setFilteredList] = useState<T[]>([...list])
-    const [hoverIndex, setHoverIndex] = useState<number>(0)
-    const [stepCounter, setStepCounter] = useState(0)
-    const [pageCount, setPageCount] = useState(0)
-    const [search, setSearch] = useState("")
-    const [itemsPerPage, setItemsPerPage] = useState(1)
+    const [filteredList, setFilteredList] = useState<T[]>([...list]);
+    const [hoverIndex, setHoverIndex] = useState<number>(0);
+    const [stepCounter, setStepCounter] = useState(0);
+    const [pageCount, setPageCount] = useState(0);
+    const [search, setSearch] = useState("");
+    const [itemsPerPage, setItemsPerPage] = useState(1);
 
-    const containerRef = useRef<HTMLUListElement>(null)
+    const containerRef = useRef<HTMLUListElement>(null);
 
-    const startIndex = stepCounter * itemsPerPage
-    const endIndex = Math.min(startIndex + itemsPerPage, filteredList.length)
-    const items = filteredList.slice(startIndex, endIndex)
-    const itemHeight = typeof items[0] === "string" ? 30 : 50
-
-    useEffect(() => {
-        setStepCounter(0)
-    }, [filteredList])
+    const startIndex = stepCounter * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, filteredList.length);
+    const items = filteredList.slice(startIndex, endIndex);
+    const itemHeight = typeof items[0] === "string" ? 30 : 50;
 
     useEffect(() => {
-        const newPageCount = Math.ceil(filteredList.length / itemsPerPage)
-        setPageCount(newPageCount)
-        if (newPageCount < stepCounter + 1) setStepCounter(0)
-    }, [filteredList, itemsPerPage, stepCounter])
+        setStepCounter(0);
+    }, [filteredList]);
+
+    useEffect(() => {
+        const newPageCount = Math.ceil(filteredList.length / itemsPerPage);
+        setPageCount(newPageCount);
+        if (newPageCount < stepCounter + 1) setStepCounter(0);
+    }, [filteredList, itemsPerPage, stepCounter]);
 
     useEffect(() => {
         const calculateItemsPerPage = () => {
             if (containerRef.current) {
-                const containerHeight = containerRef.current.clientHeight
-                const calculatedItems = Math.floor(containerHeight / itemHeight)
-                setItemsPerPage(Math.max(1, calculatedItems))
+                const containerHeight = containerRef.current.clientHeight;
+                const calculatedItems = Math.floor(containerHeight / itemHeight);
+                setItemsPerPage(Math.max(1, calculatedItems));
             }
-        }
+        };
 
-        calculateItemsPerPage()
+        calculateItemsPerPage();
 
         const resizeObserver = new ResizeObserver(() => {
-            calculateItemsPerPage()
-        })
+            calculateItemsPerPage();
+        });
 
         if (containerRef.current) {
-            resizeObserver.observe(containerRef.current)
+            resizeObserver.observe(containerRef.current);
         }
 
         return () => {
-            resizeObserver.disconnect()
-        }
-    }, [itemHeight, items, items.length])
+            resizeObserver.disconnect();
+        };
+    }, [itemHeight, items, items.length]);
 
     useEffect(() => {
         const timeout = setTimeout(() => {
-            const newFilteredList = list.filter((item) => !search || (typeof item === "string" ? item.toLowerCase().includes(search.toLowerCase()) : item.text.toLowerCase().includes(search.toLowerCase()))) || []
+            const newFilteredList = list.filter((item) => !search || (typeof item === "string" ? item.toLowerCase().includes(search.toLowerCase()) : item.text.toLowerCase().includes(search.toLowerCase()))) || [];
             if (JSON.stringify(newFilteredList) !== JSON.stringify(filteredList)) {
-                setFilteredList([...newFilteredList])
-                afterSearchCallback([...newFilteredList])
-                setStepCounter(0)
-                setHoverIndex(0)
+                setFilteredList([...newFilteredList]);
+                afterSearchCallback([...newFilteredList]);
+                setStepCounter(0);
+                setHoverIndex(0);
             }
-        }, 500)
+        }, 500);
 
         return () => {
-            clearTimeout(timeout)
-        }
-    }, [afterSearchCallback, list, search, filteredList])
+            clearTimeout(timeout);
+        };
+    }, [afterSearchCallback, list, search, filteredList]);
 
     const handleSetStepCounter = (callback: ((prev: number) => number) | number) => {
-        setStepCounter(callback)
-        searchRef.current?.focus()
-    }
+        setStepCounter(callback);
+        searchRef.current?.focus();
+    };
 
     return (
         <div className={cn("w-full flex flex-col gap-2 p-3", className)}>
@@ -216,25 +216,25 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                     onChange={(e) => setSearch(e.target.value)}
                     onKeyDown={(e) => {
                         if (e.key === "Escape") {
-                            e.preventDefault()
-                            setSearch("")
+                            e.preventDefault();
+                            setSearch("");
                         }
 
                         if (e.key === "ArrowUp" || (e.shiftKey && e.key === "Tab" && hoverIndex > 0)) {
-                            e.preventDefault()
+                            e.preventDefault();
 
-                            setHoverIndex(prev => prev ? prev - 1 : prev)
+                            setHoverIndex(prev => prev ? prev - 1 : prev);
                         }
 
                         if (e.key === "ArrowDown" || (!e.shiftKey && e.key === "Tab" && hoverIndex < items.length - 1)) {
-                            e.preventDefault()
+                            e.preventDefault();
 
-                            setHoverIndex(prev => prev < items.length - 1 ? prev + 1 : prev)
+                            setHoverIndex(prev => prev < items.length - 1 ? prev + 1 : prev);
                         }
 
                         if (e.key === "Enter") {
-                            e.preventDefault()
-                            onClick(typeof items[hoverIndex] === "string" ? items[hoverIndex] : items[hoverIndex].text, e)
+                            e.preventDefault();
+                            onClick(typeof items[hoverIndex] === "string" ? items[hoverIndex] : items[hoverIndex].text, e);
                         }
                     }}
                     onFocus={() => setHoverIndex(0)}
@@ -249,11 +249,11 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
             >
                 {
                     items.map((item, index) => {
-                        const selected = isSelected ? isSelected(item) : false
-                        const deleteSelected = isDeleteSelected ? isDeleteSelected(item) : false
-                        const hover = hoverIndex === index
-                        const isString = typeof item === "string"
-                        const text = isString ? item : item.text
+                        const selected = isSelected ? isSelected(item) : false;
+                        const deleteSelected = isDeleteSelected ? isDeleteSelected(item) : false;
+                        const hover = hoverIndex === index;
+                        const isString = typeof item === "string";
+                        const text = isString ? item : item.text;
 
                         const content = (
                             <>
@@ -263,7 +263,7 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                                 }
                                 <p data-testid={`${dataTestId}${text}Text`} className={cn("truncate w-full text-left", !isString && "h-1 grow")}>{text}</p>
                             </>
-                        )
+                        );
 
                         return (
                             <li
@@ -284,15 +284,15 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                                             data-testid={`${dataTestId}${text}Button`}
                                             title={text}
                                             onClick={(e) => {
-                                                onClick(text, e)
+                                                onClick(text, e);
                                             }}
                                             onContextMenu={(e) => {
-                                                e.preventDefault()
+                                                e.preventDefault();
                                                 const syntheticEvent = {
                                                     ...e,
                                                     type: "rightclick" as const
-                                                } as typeof e & { type: "rightclick" }
-                                                onClick(text, syntheticEvent)
+                                                } as typeof e & { type: "rightclick" };
+                                                onClick(text, syntheticEvent);
                                             }}
                                             tabIndex={-1}
                                         >
@@ -301,7 +301,7 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                                         : content
                                 }
                             </li>
-                        )
+                        );
                     })
                 }
             </ul>
@@ -329,7 +329,7 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                                     label={`[${index + 1}]`}
                                     title={`Page ${index + 1}`}
                                     onClick={() => {
-                                        handleSetStepCounter(index)
+                                        handleSetStepCounter(index);
                                     }}
                                 />
                             </li>
@@ -341,7 +341,7 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                 </li>
             </ul>
         </div>
-    )
+    );
 }
 
 PaginationList.defaultProps = {
@@ -349,4 +349,4 @@ PaginationList.defaultProps = {
     children: undefined,
     isLoading: undefined,
     isDeleteSelected: undefined,
-}
+};

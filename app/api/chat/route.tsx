@@ -5,22 +5,22 @@ import { chatRequest, validateBody } from "../validate-body";
 
 export async function GET() {
     try {
-        const session = await getClient()
+        const session = await getClient();
 
         if (session instanceof NextResponse) {
-            throw new Error(await session.text())
+            throw new Error(await session.text());
         }
 
         // Return empty object to allow chat to be displayed
         // The actual model configuration is provided by the user in the frontend
-        return NextResponse.json({}, { status: 200 })
+        return NextResponse.json({}, { status: 200 });
     } catch (error) {
-        console.error(error)
-        return NextResponse.json({ error: (error as Error).message }, { status: 500 })
+        console.error(error);
+        return NextResponse.json({ error: (error as Error).message }, { status: 500 });
     }
 }
 
-export type EventType = "Status" | "Schema" | "CypherQuery" | "CypherResult" | "ModelOutputChunk" | "Result" | "Error"
+export type EventType = "Status" | "Schema" | "CypherQuery" | "CypherResult" | "ModelOutputChunk" | "Result" | "Error";
 
 /**
  * Build FalkorDB connection URL from user session
@@ -41,26 +41,26 @@ function buildFalkorDBConnection(user: { host: string; port: number; url?: strin
 
 // eslint-disable-next-line import/prefer-default-export
 export async function POST(request: NextRequest) {
-    const encoder = new TextEncoder()
-    const { readable, writable } = new TransformStream()
-    const writer = writable.getWriter()
+    const encoder = new TextEncoder();
+    const { readable, writable } = new TransformStream();
+    const writer = writable.getWriter();
 
     try {
         // Verify authentication via getClient
-        const session = await getClient()
+        const session = await getClient();
 
         if (session instanceof NextResponse) {
-            throw new Error(await session.text())
+            throw new Error(await session.text());
         }
 
-        const body = await request.json()
+        const body = await request.json();
 
         // Validate request body
         const validation = validateBody(chatRequest, body);
 
         if (!validation.success) {
-            writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(validation.error)}\n\n`))
-            writer.close()
+            writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(validation.error)}\n\n`));
+            writer.close();
 
             return new Response(readable, {
                 headers: {
@@ -68,15 +68,15 @@ export async function POST(request: NextRequest) {
                     "Cache-Control": "no-cache",
                     Connection: "keep-alive",
                 },
-            })
+            });
         }
 
-        const { messages, graphName, key, model } = validation.data
+        const { messages, graphName, key, model } = validation.data;
 
         // Validate required parameters
         if (!key) {
-            writer.write(encoder.encode(`event: error status: ${400} data: "API key is required. Please configure it in Settings."\n\n`))
-            writer.close()
+            writer.write(encoder.encode(`event: error status: ${400} data: "API key is required. Please configure it in Settings."\n\n`));
+            writer.close();
 
             return new Response(readable, {
                 headers: {
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
                     "Cache-Control": "no-cache",
                     Connection: "keep-alive",
                 },
-            })
+            });
         }
 
         try {
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
             }
 
             if (result.cypherQuery) {
-                writer.write(encoder.encode(`event: CypherQuery data: ${JSON.stringify(result.cypherQuery)}\n\n`));
+                writer.write(encoder.encode(`event: CypherQuery data: ${result.cypherQuery}\n\n`));
             }
 
             if (result.cypherResult) {
@@ -125,9 +125,9 @@ export async function POST(request: NextRequest) {
                 writer.write(encoder.encode(`event: Result data: ${JSON.stringify(result.answer)}\n\n`));
             }
 
-            writer.close()
+            writer.close();
         } catch (error) {
-            console.error(error)
+            console.error(error);
             const errorMessage = (error as Error).message;
 
             // Check if it's an API key error
@@ -138,18 +138,18 @@ export async function POST(request: NextRequest) {
                 userFriendlyMessage = 'API key error. Please verify your API key in Settings.';
             }
 
-            writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(userFriendlyMessage)}\n\n`))
-            writer.close()
+            writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(userFriendlyMessage)}\n\n`));
+            writer.close();
         }
     } catch (error) {
-        console.error(error)
-        writer.write(encoder.encode(`event: error status: ${500} data: ${JSON.stringify((error as Error).message)}\n\n`))
-        writer.close()
+        console.error(error);
+        writer.write(encoder.encode(`event: error status: ${500} data: ${JSON.stringify((error as Error).message)}\n\n`));
+        writer.close();
     }
 
     request.signal.addEventListener("abort", () => {
-        writer.close()
-    })
+        writer.close();
+    });
 
     return new Response(readable, {
         headers: {
@@ -157,5 +157,5 @@ export async function POST(request: NextRequest) {
             "Cache-Control": "no-cache",
             Connection: "keep-alive",
         },
-    })
+    });
 }

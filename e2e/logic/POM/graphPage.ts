@@ -830,7 +830,6 @@ export default class GraphPage extends Page {
   }
 
   async rightClickElement(x: number, y: number): Promise<void> {
-    console.log(`Right-clicking element at position (${x}, ${y})`);
     await this.page.mouse.click(x, y, { button: "right" });
     await this.page.waitForTimeout(500);
   }

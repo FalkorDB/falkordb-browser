@@ -13,6 +13,9 @@ export const CREATE_TWO_NODES_QUERY =
 export const CREATE_NODE_QUERY = 'CREATE (a:person1 {name: "a"}) RETURN *';
 export const CREATE_QUERY =
   'CREATE (a:person1 {name: "a"})-[c:KNOWS {name: "knows"}]->(b:person2) RETURN *';
+export const CREATE_PERSON_RELATIONSHIP =
+  'CREATE (a:person1 {name: "a", age: 30, gender: "male", occupation: "engineer"})-[c:KNOWS {name: "knows", since: 2020, strength: "strong"}]->(b:person2 {name: "b", age: 28, gender: "female", occupation: "designer"}) RETURN *';
+
 
 /**
  * Normalize URL by removing trailing slash for comparison

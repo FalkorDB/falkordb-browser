@@ -23,28 +23,28 @@ export default function RemoveLabel({
     </Button>,
     onRemoveLabel,
 }: Props) {
-    const { indicator } = useContext(IndicatorContext)
+    const { indicator } = useContext(IndicatorContext);
     
-    const [open, setOpen] = useState(false)
-    const [isLoading, setIsLoading] = useState(false)
+    const [open, setOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
         if (!open) {
-            setIsLoading(false)
+            setIsLoading(false);
         }
-    }, [open])
+    }, [open]);
 
     const handleRemoveLabel = async () => {
-        setIsLoading(true)
+        setIsLoading(true);
         try {
-            const success = await onRemoveLabel(selectedLabel)
+            const success = await onRemoveLabel(selectedLabel);
             if (success) {
-                setOpen(false)
+                setOpen(false);
             }
         } finally {
-            setIsLoading(false)
+            setIsLoading(false);
         }
-    }
+    };
 
     return (
         <DialogComponent
@@ -72,9 +72,9 @@ export default function RemoveLabel({
                 />
             </div>
         </DialogComponent>
-    )
+    );
 }
 
 RemoveLabel.defaultProps = {
     trigger: undefined
-}
+};

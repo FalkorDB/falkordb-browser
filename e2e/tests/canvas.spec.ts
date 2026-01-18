@@ -5,7 +5,7 @@ import { expect, test } from "@playwright/test";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import GraphPage from "../logic/POM/graphPage";
-import urls from '../config/urls.json'
+import urls from '../config/urls.json';
 import { BATCH_CREATE_PERSONS } from "../config/constants";
 import { CREATE_NODE_QUERY, CREATE_QUERY, CREATE_TWO_NODES_QUERY, getRandomString } from "../infra/utils";
 
@@ -34,7 +34,7 @@ test.describe('Canvas Tests', () => {
             const searchQuery = `Person${node}`;
             await graph.searchElementInCanvas(searchQuery);
             await graph.hoverAtCanvasCenter();
-            expect(await graph.getNodeCanvasToolTip()).toBe(searchQuery);
+            expect(await graph.getNodeCanvasToolTip()).toBe(`${node - 1}`);
             await apicalls.removeGraph(graphName);
         });
     });
@@ -107,6 +107,9 @@ test.describe('Canvas Tests', () => {
         await graph.insertQuery(BATCH_CREATE_PERSONS);
         await graph.clickRunQuery();
         const initialGraph = await graph.getNodesScreenPositions('graph');
+
+        expect(initialGraph.length).toBeGreaterThan(0);
+
         const fromX = initialGraph[0].screenX;
         const fromY = initialGraph[0].screenY;
         const toX = fromX + 100;
@@ -128,7 +131,7 @@ test.describe('Canvas Tests', () => {
         await graph.getNodesScreenPositions('graph');
         await graph.searchElementInCanvas("Alice");
         await graph.hoverAtCanvasCenter();
-        expect(await graph.getNodeCanvasToolTip()).toBe("Alice");
+        expect(await graph.getNodeCanvasToolTip()).toBe("0");
         await apicalls.removeGraph(graphName);
     });
 
@@ -157,7 +160,7 @@ test.describe('Canvas Tests', () => {
         await graph.waitForCanvasAnimationToEnd();
         await graph.hoverAtCanvasCenter();
         expect(await graph.isNodeCanvasToolTipVisible());
-        expect(await graph.getNodeCanvasToolTip()).toBe("Bob");
+        expect(await graph.getNodeCanvasToolTip()).toBe("0");
         await apicalls.removeGraph(graphName);
     });
 
@@ -348,4 +351,4 @@ test.describe('Canvas Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-})
+});

@@ -1,6 +1,6 @@
 import test, { expect } from "@playwright/test";
 import path from 'path';
-import urls from '../config/urls.json'
+import urls from '../config/urls.json';
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import LoginPage from "../logic/POM/loginPage";
 
