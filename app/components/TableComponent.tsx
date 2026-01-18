@@ -248,9 +248,16 @@ export default function TableComponent({
         }
 
         const timeout = setTimeout(() => {
-            setFilteredRows([...rows].filter((row) => row.cells.some(cell =>
-                handleSearchFilter(cell)
-            )));
+            setFilteredRows(prev => [...rows].filter((row) => {
+                const is = row.cells.some(cell => handleSearchFilter(cell));
+                
+                // If using row selection, uncheck rows that no longer match the search
+                if (!is) {
+                    row.checked = prev.every(r => r.checked);
+                }
+
+                return is;
+            }));
         }, 500);
 
         return () => {
@@ -402,11 +409,15 @@ export default function TableComponent({
                                     <Checkbox
                                         data-testid={`tableCheckbox${label}`}
                                         className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
-                                        checked={rows.length > 0 && rows.every(row => row.checked)}
+                                        checked={filteredRows.length > 0 && filteredRows.every(row => row.checked)}
                                         onCheckedChange={() => {
-                                            const checked = rows.every(row => row.checked);
+                                            const checked = filteredRows.every(row => row.checked);
+
                                             setRows(rows.map((row) => {
-                                                row.checked = !checked;
+                                                if (filteredRows.some(r => r.name === row.name)) {
+                                                    row.checked = !checked;
+                                                }
+
                                                 return row;
                                             }));
                                         }}
