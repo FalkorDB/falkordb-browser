@@ -165,18 +165,10 @@ export default function Page() {
             if (content) {
                 const { graphName: name, query } = JSON.parse(content);
 
-<<<<<<< HEAD
-
-                if (!graph.Id && !graphName && graphNames.includes(name)) {
-                    setGraphName(name)
-                    runQuery(query, name)
-                    return
-=======
                 if (!graph.Id && !graphName && graphNames.includes(name) && contentPersistence) {
                     setGraphName(name);
                     runQuery(query, name);
                     return;
->>>>>>> origin/staging
                 }
             }
         }

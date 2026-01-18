@@ -461,7 +461,7 @@ export async function getClient() {
   const { client } = await newClient(
     {
       host: user.host,
-      port: user.port.toString() ?? "6379",
+      port: (user.port || 6379).toString(),
       username: user.username,
       password: user.password,
       tls: String(user.tls),
