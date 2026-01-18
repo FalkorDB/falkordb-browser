@@ -76,11 +76,11 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                                                     data-testid="nodesCount"
                                                     className="truncate pointer-events-auto SofiaSans"
                                                 >
-                                                    ({nodesCount})
+                                                    ({nodesCount.toLocaleString()})
                                                 </p>
                                             </TooltipTrigger>
                                             <TooltipContent>
-                                                {nodesCount}
+                                                {nodesCount.toLocaleString()}
                                             </TooltipContent>
                                         </Tooltip>
                                         : <Loader2 data-testid="nodesCountLoader" className="animate-spin" />
@@ -150,11 +150,11 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                                                     data-testid="edgesCount"
                                                     className="truncate pointer-events-auto SofiaSans"
                                                 >
-                                                    ({edgesCount})
+                                                    ({edgesCount.toLocaleString()})
                                                 </p>
                                             </TooltipTrigger>
                                             <TooltipContent>
-                                                {edgesCount}
+                                                {edgesCount.toLocaleString()}
                                             </TooltipContent>
                                         </Tooltip>
                                         :
@@ -205,11 +205,11 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                                                     data-testid="propertyKeysCount"
                                                     className="truncate pointer-events-auto SofiaSans"
                                                 >
-                                                    ({PropertyKeys.length})
+                                                    ({PropertyKeys.length.toLocaleString()})
                                                 </p>
                                             </TooltipTrigger>
                                             <TooltipContent>
-                                                {PropertyKeys.length}
+                                                {PropertyKeys.length.toLocaleString()}
                                             </TooltipContent>
                                         </Tooltip>
                                         :
