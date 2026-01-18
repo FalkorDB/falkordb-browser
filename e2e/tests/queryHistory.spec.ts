@@ -30,7 +30,7 @@ test.describe('Query history Tests', () => {
         await graph.clickRunQuery();
         await graph.clickQueryHistoryButton();
         expect(await graph.getQueryHistory(query)).toBe(true);
-        await apicalls.removeGraph(graphName);         
+        await apicalls.removeGraph(graphName);
     });
 
     test(`@admin Validate that executing a query from the query history correctly displays the results in the canvas`, async () => {

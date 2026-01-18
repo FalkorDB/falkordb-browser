@@ -56,27 +56,27 @@ export async function newClient(
     connectionOptions =
       credentials.tls === "true"
         ? {
-            socket: {
-              host: credentials.host ?? "localhost",
-              port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-              tls: credentials.tls === "true",
-              checkServerIdentity: () => undefined,
-              ca:
-                !credentials.ca || credentials.ca === "undefined"
-                  ? undefined
-                  : [Buffer.from(credentials.ca, "base64").toString("utf8")],
-            },
-            password: credentials.password ?? undefined,
-            username: credentials.username ?? undefined,
-          }
+          socket: {
+            host: credentials.host ?? "localhost",
+            port: credentials.port ? parseInt(credentials.port, 10) : 6379,
+            tls: credentials.tls === "true",
+            checkServerIdentity: () => undefined,
+            ca:
+              !credentials.ca || credentials.ca === "undefined"
+                ? undefined
+                : [Buffer.from(credentials.ca, "base64").toString("utf8")],
+          },
+          password: credentials.password ?? undefined,
+          username: credentials.username ?? undefined,
+        }
         : {
-            socket: {
-              host: credentials.host || "localhost",
-              port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-            },
-            password: credentials.password ?? undefined,
-            username: credentials.username ?? undefined,
-          };
+          socket: {
+            host: credentials.host || "localhost",
+            port: credentials.port ? parseInt(credentials.port, 10) : 6379,
+          },
+          password: credentials.password ?? undefined,
+          username: credentials.username ?? undefined,
+        };
   }
 
   const client = await FalkorDB.connect(connectionOptions);
@@ -224,7 +224,7 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
 
       // Validate token is active in FalkorDB (not revoked)
       const tokenActive = await isTokenActive(token);
-      
+
       if (!tokenActive) {
         // eslint-disable-next-line no-console
         console.warn("JWT authentication failed: token is not active (revoked or expired)");
@@ -272,44 +272,46 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
       }
 
       // No existing connection or health check failed - fetch password from Token DB and reconnect
-      if (!client) {
-        try {
-          // Fetch password from Token DB (6380) - NOT from JWT
-          const { getPasswordFromTokenDB } = await import('../tokenUtils');
-          const password = await getPasswordFromTokenDB(payload.jti);
+      try {
+        // Fetch password from Token DB (6380) - NOT from JWT
+        const { getPasswordFromTokenDB } = await import('../tokenUtils');
+        const password = await getPasswordFromTokenDB(payload.jti);
 
-          // Create new connection with retrieved password
-          const { client: reconnectedClient } = await newClient(
-            {
-              host: payload.host,
-              port: payload.port.toString(),
-              username: payload.username || '',
-              password,
-              tls: payload.tls.toString(),
-              ca: payload.ca || undefined,
-            },
-            payload.sub
-          );
+        // Create new connection with retrieved password
+        const { client: reconnectedClient } = await newClient(
+          {
+            host: payload.host,
+            port: payload.port.toString(),
+            username: payload.username || '',
+            password,
+            tls: payload.tls.toString(),
+            ca: payload.ca || undefined,
+          },
+          payload.sub
+        );
 
-          client = reconnectedClient;
-          // Connection is already cached in connections Map by newClient()
-        } catch (connectionError) {
-          // eslint-disable-next-line no-console
-          console.error("Failed to create connection from Token DB:", connectionError);
-          return null;
-        }
+        client = reconnectedClient;
+        // Connection is already cached in connections Map by newClient()
+      } catch (connectionError) {
+        // eslint-disable-next-line no-console
+        console.error("Failed to create connection from Token DB:", connectionError);
+
+        return null;
       }
 
       // At this point, client is guaranteed to be defined (either reused or recreated)
       const user = createUserFromJWTPayload(payload);
+
       return { client, user };
     } catch (error) {
       // Fall back to session auth if JWT fails
       // eslint-disable-next-line no-console
       console.warn("JWT authentication failed, falling back to session:", error);
+
       return null;
     }
   }
+
   return null;
 }
 
@@ -405,7 +407,7 @@ const authOptions: AuthOptions = {
 export async function getClient() {
   // Check if this is a JWT-only request (from /docs)
   const jwtOnlyRequired = await isJWTOnlyRequest();
-  
+
   // Try JWT authentication first
   const jwtResult = await tryJWTAuthentication();
   if (jwtResult) {
@@ -414,8 +416,8 @@ export async function getClient() {
 
   // If JWT-only is required and JWT failed, return 401 immediately
   if (jwtOnlyRequired) {
-    return NextResponse.json({ 
-      message: "JWT authentication required for API documentation. Please use the login endpoint to get a token and authorize in Swagger UI." 
+    return NextResponse.json({
+      message: "JWT authentication required for API documentation. Please use the login endpoint to get a token and authorize in Swagger UI."
     }, { status: 401 });
   }
 
@@ -456,28 +458,18 @@ export async function getClient() {
   }
 
   // No existing connection or health check failed - create new one
-  if (!connection) {
-    const { client } = await newClient(
-      {
-        host: user.host,
-        port: user.port.toString() ?? "6379",
-        username: user.username,
-        password: user.password,
-        tls: String(user.tls),
-        ca: user.ca,
-        url: user.url,
-      },
-      user.id
-    );
-
-    connection = client;
-  }
-
-  const client = connection;
-
-  if (!client) {
-    return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
-  }
+  const { client } = await newClient(
+    {
+      host: user.host,
+      port: (user.port || 6379).toString(),
+      username: user.username,
+      password: user.password,
+      tls: String(user.tls),
+      ca: user.ca,
+      url: user.url,
+    },
+    user.id
+  );
 
   return { client, user };
 }

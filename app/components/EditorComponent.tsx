@@ -535,6 +535,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
             const domNode = e.getDomNode();
             if (domNode) {
                 const textarea = domNode.querySelector('textarea');
+
                 if (textarea) (textarea as HTMLTextAreaElement).blur();
             }
         });
