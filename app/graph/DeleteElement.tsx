@@ -53,7 +53,7 @@ export default function DeleteElement({
             trigger={(
                 <Button
                     data-testid={`deleteElement${label}`}
-                    className="pointer-events-auto bg-background"
+                    className="pointer-events-auto bg-background p-1.5"
                     variant="Delete"
                     tooltipSide="bottom"
                     title="Delete Element(s)"
