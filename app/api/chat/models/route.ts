@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TextToCypher } from "@falkordb/text-to-cypher";
 import { getClient } from "../../auth/[...nextauth]/options";
+import { buildFalkorDBConnection } from "../../utils";
 
 /**
  * GET endpoint to fetch available AI models
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
 
         // Create a TextToCypher instance (API key can be placeholder for listing models)
         const textToCypher = new TextToCypher({
-            falkordbConnection: `falkor://${session.user.host}:${session.user.port}`,
+            falkordbConnection: buildFalkorDBConnection(session.user),
             model: "gpt-4o-mini",
             apiKey: "placeholder-for-listing-models",
         });

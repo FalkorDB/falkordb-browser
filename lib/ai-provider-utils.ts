@@ -134,9 +134,12 @@ export function detectProviderFromModel(model: string): AIProvider {
  */
 export function formatModelDisplayName(modelValue: string): string {
     // Remove provider prefix (e.g., "anthropic:", "gemini:", "ollama:")
-    const withoutPrefix = modelValue.includes(':')
-        ? modelValue.split(':')[1]
-        : modelValue;
+    let withoutPrefix = modelValue;
+    if (modelValue.includes(':')) {
+        const parts = modelValue.split(':');
+        // Handle edge case where model ends with colon or has multiple colons
+        withoutPrefix = parts.slice(1).join(':') || modelValue;
+    }
 
     // Remove date suffixes (e.g., "-20241022", "-20240229")
     const withoutDate = withoutPrefix.replace(/-\d{8}$/, '');

@@ -3,6 +3,7 @@ import { TextToCypher } from "@falkordb/text-to-cypher";
 import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { getClient } from "../auth/[...nextauth]/options";
 import { chatRequest, validateBody } from "../validate-body";
+import { buildFalkorDBConnection } from "../utils";
 
 export async function GET() {
     try {
@@ -24,27 +25,10 @@ export async function GET() {
 export type EventType = "Status" | "Schema" | "CypherQuery" | "CypherResult" | "ModelOutputChunk" | "Result" | "Error";
 
 /**
- * Build FalkorDB connection URL from user session
- */
-function buildFalkorDBConnection(user: { host: string; port: number; url?: string; username?: string; password?: string }): string {
-    // Use URL if provided
-    if (user.url) {
-        return user.url;
-    }
-
-    // Build falkor:// URL from host and port
-    const protocol = "falkor://";
-    const auth = user.username && user.password
-        ? `${encodeURIComponent(user.username)}:${encodeURIComponent(user.password)}@`
-        : "";
-    return `${protocol}${auth}${user.host}:${user.port}`;
-}
-
-/**
  * Create user-friendly error message
  */
-function createUserFriendlyErrorMessage(error: Error, model: string, apiKey: string): string {
-    const errorMessage = error.message;
+function createUserFriendlyErrorMessage(error: unknown, model: string, apiKey: string): string {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     const modelProvider = detectProviderFromModel(model);
     const keyProvider = detectProviderFromApiKey(apiKey);
 

@@ -34,6 +34,7 @@ const categorizeModels = (models: string[]) => {
         Anthropic: [],
         Google: [],
         Ollama: [],
+        Other: [],
     };
 
     models.forEach((model) => {
@@ -45,6 +46,9 @@ const categorizeModels = (models: string[]) => {
             categories.Google.push(model);
         } else if (model.includes("llama") || model.includes("mixtral") || model.includes("phi")) {
             categories.Ollama.push(model);
+        } else {
+            // Add unknown models to "Other" category
+            categories.Other.push(model);
         }
     });
 

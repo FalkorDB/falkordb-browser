@@ -79,14 +79,13 @@ export default function BrowserSettings() {
                 if (result.ok) {
                     const { models } = await result.json();
 
-                    // Create display names and mapping
-                    const displayNames = models.map((m: string) => formatModelDisplayName(m));
+                    // Create mapping using raw model value as key to avoid collisions
                     const mapping: Record<string, string> = {};
-                    models.forEach((m: string, index: number) => {
-                        mapping[displayNames[index]] = m;
+                    models.forEach((m: string) => {
+                        mapping[m] = m;
                     });
 
-                    setModelDisplayNames(displayNames);
+                    setModelDisplayNames(models);
                     setModelMapping(mapping);
                 } else {
                     // Fallback to gpt-4o-mini if fetch fails

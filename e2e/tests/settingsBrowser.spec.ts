@@ -201,7 +201,7 @@ test.describe('@browser Browser Settings tests', () => {
         expect(isPreviousSelected).toBe(false);
     });
 
-    test.only('@readwrite Verify model/API key mismatch shows error toast in chat', async () => {
+    test('@readwrite Verify model/API key mismatch shows error toast in chat', async () => {
         // Create a graph first
         const graphName = getRandomString("chat");
         await apiCall.addGraph(graphName);
