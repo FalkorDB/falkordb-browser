@@ -151,10 +151,15 @@ export default class SettingsBrowserPage extends BasePage {
   async setChatApiKeyAndSave(apiKey: string, modelName?: string): Promise<void> {
     await this.expandEnvironmentSection();
     await this.waitForChatApiKeyInputEnabled();
-    
+
+    // Select model if provided
+    if (modelName) {
+      await this.selectModel(modelName);
+    }
+
     // Fill the API key
     await this.fillChatApiKey(apiKey);
-    
+
     // Save settings
     await this.waitForSaveSettingsButton();
     await this.clickSaveSettingsButton();
