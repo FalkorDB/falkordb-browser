@@ -229,13 +229,19 @@ export default function Page() {
             const json = await result.json();
 
             if (isAddNode) {
-                const { labels: ls } = graph.extendNode(json.result.data[0].n, false, false, true);
-                setLabels(prev => [...prev, ...ls.filter(c => !prev.some(p => p.name === c)).map(c => graph.LabelsMap.get(c)!)]);
-                handleSetIsAdd(setIsAddNode, setIsAddEdge)(false);
+                const node = graph.extendNode(json.result.data[0].n, false, false, true);
+
+                if (node) {
+                    setLabels(prev => [...prev, ...node.labels.filter(c => !prev.some(p => p.name === c)).map(c => graph.LabelsMap.get(c)!)]);
+                    handleSetIsAdd(setIsAddNode, setIsAddEdge)(false);
+                }
             } else {
                 const link = graph.extendEdge(json.result.data[0].e, false, false, true);
-                setRelationships(prev => [...prev.filter(p => p.name !== link.relationship), graph.RelationshipsMap.get(link.relationship)!]);
-                handleSetIsAdd(setIsAddEdge, setIsAddNode)(false);
+                
+                if (link) {
+                    setRelationships(prev => [...prev.filter(p => p.name !== link.relationship), graph.RelationshipsMap.get(link.relationship)!]);
+                    handleSetIsAdd(setIsAddEdge, setIsAddNode)(false);
+                }
             }
 
             fetchCount();

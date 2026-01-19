@@ -343,8 +343,6 @@ export class Graph {
 
   private data: Data;
 
-  private metadata: any[];
-
   private currentLimit: number;
 
   private labels: Label[];
@@ -378,7 +376,6 @@ export class Graph {
     this.id = id;
     this.columns = [];
     this.data = [];
-    this.metadata = [];
     this.labels = labels;
     this.relationships = relationships;
     this.elements = elements;
@@ -448,10 +445,6 @@ export class Graph {
 
   set Data(data: Data) {
     this.data = data;
-  }
-
-  get Metadata(): any[] {
-    return this.metadata;
   }
 
   get GraphInfo(): GraphInfo {
@@ -568,7 +561,7 @@ export class Graph {
       return node;
     }
 
-    if (currentNode.labels[0] === "") {
+    if (currentNode.data.fake) {
       currentNode.id = cell.id;
       currentNode.labels = labels.map((l) => l.name);
       currentNode.color = isColor
@@ -596,10 +589,13 @@ export class Graph {
         }
       }
 
+      delete currentNode.data.fake;
+
       return currentNode;
     }
 
-    return currentNode;
+    // Node already exists
+    return undefined;
   }
 
   public extendEdge(
@@ -627,7 +623,9 @@ export class Graph {
             expand: false,
             collapsed,
             visible: true,
-            data: {},
+            data: {
+              fake: true
+            },
           };
 
           label.elements.push(source);
@@ -662,7 +660,9 @@ export class Graph {
             expand: false,
             collapsed,
             visible: true,
-            data: {},
+            data: {
+              fake: true
+            },
           };
 
           label!.elements.push(source);
@@ -678,7 +678,9 @@ export class Graph {
             expand: false,
             collapsed,
             visible: true,
-            data: {},
+            data: {
+              fake: true
+            },
           };
 
           label!.elements.push(target);
@@ -709,7 +711,8 @@ export class Graph {
       return link;
     }
 
-    return currentEdge;
+    // Edge already exists
+    return undefined;
   }
 
   public extendCell(cell: any, collapsed: boolean, isSchema: boolean) {
@@ -741,18 +744,17 @@ export class Graph {
     isSchema = false
   ): (Node | Link)[] {
     const newElements: (Node | Link)[] = [];
-    const data = results?.data;
+    const { data } = results;
 
     if (data?.length) {
       if (data[0] instanceof Object) {
         this.columns = Object.keys(data[0]);
       }
 
-      this.data = data;
+      this.data = { ...data, ...this.data };
     }
 
-    this.metadata = results.metadata;
-    this.data.forEach((row: DataRow) => {
+    data.forEach((row: DataRow) => {
       Object.values(row).forEach((cell: any) => {
         if (Array.isArray(cell) && cell[0] instanceof Object) {
           cell.forEach((c: any) => {
@@ -895,8 +897,8 @@ export class Graph {
     this.elements = {
       nodes: this.elements.nodes,
       links: this.elements.links
-      .map((link) => {
-        if (
+        .map((link) => {
+          if (
             (ids.length !== 0 && !links.includes(link)) ||
             (this.nodesMap.has(link.source) &&
               this.nodesMap.has(link.target))
@@ -1041,7 +1043,7 @@ export class Graph {
           this.Labels.findIndex((c) => c.name === category.name),
           1
         );
-        
+
         this.LabelsMap.delete(category.name);
       }
     }

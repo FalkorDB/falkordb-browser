@@ -97,14 +97,10 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                                         disabled={isQueryLoading}
                                     />
                                 </li>
-                                {Array.from(Labels.values()).map((infoLabel) => {
-                                    // Get the full Label object from the graph
-                                    const label = graph.LabelsMap.get(infoLabel.name);
-
-                                    if (!label) return null;
-
+                                {Array.from(Labels.values()).map((label) => {
                                     const name = label.name || "Empty";
                                     const labelColor = label.style.color;
+                                    const graphLabel = graph.LabelsMap.get(label.name);
 
                                     return (
                                         <li key={`${name}-${labelColor}`} className="max-w-full flex gap-1">
@@ -119,21 +115,24 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                                                 onClick={() => runQuery(`MATCH (n:${name}) RETURN n`)}
                                                 disabled={isQueryLoading}
                                             />
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Button
-                                                        className="h-6 w-6 p-1 rounded-full flex justify-center items-center bg-muted hover:bg-muted/80"
-                                                        data-testid={`customizeStyle${name}`}
-                                                        title="Customize Style"
-                                                        onClick={() => setCustomizingLabel(label)}
-                                                    >
-                                                        <Palette className="h-3 w-3" />
-                                                    </Button>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    Customize Style
-                                                </TooltipContent>
-                                            </Tooltip>
+                                            {
+                                                graphLabel &&
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <Button
+                                                            className="h-6 w-6 p-1 rounded-full flex justify-center items-center bg-muted hover:bg-muted/80"
+                                                            data-testid={`customizeStyle${name}`}
+                                                            title="Customize Style"
+                                                            onClick={() => setCustomizingLabel(graphLabel)}
+                                                        >
+                                                            <Palette className="h-3 w-3" />
+                                                        </Button>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        Customize Style
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            }
                                         </li>
                                     );
                                 })}
@@ -172,21 +171,21 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                                         disabled={isQueryLoading}
                                     />
                                 </li>
-                                {Array.from(Relationships.values()).map((infoRelationship) => {
-                                    const relationshipColor = infoRelationship.style.color;
+                                {Array.from(Relationships.values()).map((relationship) => {
+                                    const relationshipColor = relationship.style.color;
                                     const textColor = getContrastTextColor(relationshipColor);
-                                    
+
                                     return (
-                                        <li key={infoRelationship.name} className="max-w-full">
+                                        <li key={relationship.name} className="max-w-full">
                                             <Button
                                                 style={{
                                                     backgroundColor: relationshipColor,
                                                     color: textColor
                                                 }}
                                                 className="h-6 w-full p-2 rounded-full flex justify-center items-center SofiaSans"
-                                                data-testid={`graphInfo${infoRelationship.name}Edge`}
-                                                label={infoRelationship.name}
-                                                onClick={() => runQuery(`MATCH p=()-[:${infoRelationship.name}]-() RETURN p`)}
+                                                data-testid={`graphInfo${relationship.name}Edge`}
+                                                label={relationship.name}
+                                                onClick={() => runQuery(`MATCH p=()-[:${relationship.name}]-() RETURN p`)}
                                                 disabled={isQueryLoading}
                                             />
                                         </li>

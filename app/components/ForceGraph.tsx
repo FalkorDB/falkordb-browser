@@ -6,6 +6,7 @@
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import type { Data, GraphLink, GraphNode, GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
+import { dataToGraphData } from "@falkordb/canvas";
 import { securedFetch, getTheme, GraphRef } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Link, Node, Relationship, Graph, GraphData } from "../api/graph/model";
@@ -25,7 +26,7 @@ interface Props {
     setIsLoading: (loading: boolean) => void
     cooldownTicks: number | undefined
     type?: "schema" | "graph"
-    handleCooldown: (ticks?: 0) => void
+    handleCooldown: (ticks?: number) => void
     viewport?: ViewportState
     setViewport?: Dispatch<SetStateAction<ViewportState>>
 }
@@ -52,7 +53,6 @@ const convertToCanvasData = (graphData: GraphData): Data => ({
 export default function ForceGraph({
     graph,
     data,
-    setData,
     graphData,
     setGraphData,
     canvasRef,
@@ -108,7 +108,10 @@ export default function ForceGraph({
         };
     }, [canvasRef, graph.Id, setGraphData, setViewport, canvasLoaded]);
 
-    const onFetchNode = useCallback(async (node: Node) => {
+    const onFetchNode = useCallback(async (node: Node, clickedNode: GraphNode) => {
+        const canvas = canvasRef.current;
+        if (!canvas || !canvasLoaded) return;
+
         const result = await securedFetch(`/api/${type}/${graph.Id}/${node.id}`, {
             method: 'GET',
             headers: {
@@ -119,39 +122,68 @@ export default function ForceGraph({
         if (result.ok) {
             const json = await result.json();
             const elements = graph.extend(json.result, true);
+
             if (elements.length === 0) {
                 toast({
                     title: `No neighbors found`,
                     description: `No neighbors found`,
                 });
             } else {
-                setData({ ...graph.Elements });
+                const currentData = canvas.getGraphData();
+
+                // Get existing IDs
+                const existingNodeIds = new Set(currentData.nodes.map(n => n.id));
+                const existingLinkIds = new Set(currentData.links.map(l => l.id));
+
+                // Get only new elements from graph
+                const dataElements: Data = {
+                    nodes: graph.Elements.nodes
+                        .map(({ id, labels, color, visible, data: nodeData }) => ({ id, labels, color, visible, data: nodeData })),
+                    links: graph.Elements.links
+                        .map(({ id, relationship, color, visible, source, target, data: linkData }) => ({
+                            id, relationship, color, visible, source, target, data: linkData
+                        }))
+                };
+
+                const newDataElements: Data = {
+                    nodes: dataElements.nodes.filter(n => !existingNodeIds.has(n.id)),
+                    links: dataElements.links.filter(l => !existingLinkIds.has(l.id))
+                };
+                // Convert only new data to GraphData format
+                const newGraphData = dataToGraphData(newDataElements, { x: clickedNode.x, y: clickedNode.y }, new Map(currentData.nodes.map(n => [n.id, n])));
+
+                // Merge with existing data
+                canvas.setGraphData({
+                    nodes: [...currentData.nodes, ...newGraphData.nodes],
+                    links: [...currentData.links, ...newGraphData.links]
+                });
+
+                handleCooldown();
             }
         }
-    }, [type, graph, toast, setIndicator, setData]);
+    }, [canvasRef, canvasLoaded, type, graph, toast, setIndicator, handleCooldown]);
 
     const deleteNeighbors = useCallback((nodes: Node[]) => {
         if (nodes.length === 0) return;
 
+        const canvas = canvasRef.current;
+
+        if (!canvas || !canvasLoaded) return;
+
         const expandedNodes: Node[] = [];
+        const nodeIdsToRemove = new Set();
 
         graph.Elements = {
             nodes: graph.Elements.nodes.filter(node => {
-                if (!node.collapsed) return true;
-
-                const isTarget = graph.Elements.links.some(link => {
-                    const targetId = link.target;
-                    const sourceId = link.source;
-                    return targetId === node.id && nodes.some(n => n.id === sourceId);
-                });
-
-                if (!isTarget) return true;
+                if (!node.collapsed || !graph.Elements.links.some(link => (link.target === node.id || nodes.some(n => n.id === link.target)) && (link.source === node.id || nodes.some(n => n.id === link.source)))) return true;
 
                 const deleted = graph.NodesMap.delete(Number(node.id));
 
                 if (deleted && node.expand) {
                     expandedNodes.push(node);
                 }
+
+                nodeIdsToRemove.add(node.id);
 
                 return false;
             }),
@@ -161,11 +193,20 @@ export default function ForceGraph({
         deleteNeighbors(expandedNodes);
 
         setRelationships(graph.removeLinks(nodes.map(n => n.id)));
-        setData({ ...graph.Elements });
-    }, [graph, setRelationships, setData]);
+
+        const currentData = canvas.getGraphData();
+        const updatedNodes = currentData.nodes.filter(n => !nodeIdsToRemove.has(n.id));
+        const updatedLinks = currentData.links.filter(l =>
+            !nodeIdsToRemove.has(l.source.id) && !nodeIdsToRemove.has(l.target.id)
+        );
+
+        canvas.setGraphData({ nodes: updatedNodes, links: updatedLinks });
+        handleCooldown();
+    }, [canvasRef, canvasLoaded, graph, setRelationships, handleCooldown]);
 
     const handleNodeClick = useCallback(async (node: GraphNode) => {
         const fullNode = graph.NodesMap.get(node.id);
+
         if (!fullNode) return;
 
         const now = new Date();
@@ -174,15 +215,14 @@ export default function ForceGraph({
 
         if (now.getTime() - date.getTime() < 1000 && name === node.id) {
             if (!fullNode.expand) {
-                await onFetchNode(fullNode);
+                await onFetchNode(fullNode, node);
             } else {
                 deleteNeighbors([fullNode]);
             }
 
             fullNode.expand = !fullNode.expand;
-            setData({ ...graph.Elements });
         }
-    }, [graph, onFetchNode, deleteNeighbors, setData]);
+    }, [graph.NodesMap, onFetchNode, deleteNeighbors]);
 
     const handleHover = useCallback((element: GraphNode | GraphLink | null) => {
         if (element === null) {
@@ -245,7 +285,7 @@ export default function ForceGraph({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any)[type] = () => canvas.getGraphData();
 
-        if (cooldownTicks === 0) return;
+        if (cooldownTicks !== -1) return;
 
         handleCooldown(0);
     }, [canvasRef, cooldownTicks, handleCooldown, type]);
@@ -281,6 +321,7 @@ export default function ForceGraph({
     useEffect(() => {
         if (!canvasRef.current || !canvasLoaded) return;
         canvasRef.current.setConfig({
+            autoStopOnSettle: false,
             onNodeClick: handleNodeClick,
             onNodeRightClick: handleRightClick,
             onLinkRightClick: handleRightClick,
@@ -305,7 +346,7 @@ export default function ForceGraph({
             setGraphData(undefined);
         } else {
             const canvasData = convertToCanvasData(data);
-            
+
             canvas.setData(canvasData);
         }
 

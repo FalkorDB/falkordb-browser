@@ -288,7 +288,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     }
   }, [graphName, toast]);
 
-  const handleCooldown = useCallback((ticks?: 0) => {
+  const handleCooldown = useCallback((ticks?: number) => {
     if (typeof window !== 'undefined') {
       setCooldownTicks(ticks);
     }
@@ -344,6 +344,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         fetchInfo("(property key)", n),
       ]).then(async ([newLabels, newRelationships, newPropertyKeys]) => {
         const memoryUsage = showMemoryUsage ? await getMemoryUsage(n, toast, setIndicator) : new Map<string, MemoryValue>();
+        
         const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage);
         setGraphInfo(gi);
         return gi;
@@ -399,6 +400,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setGraphData(undefined);
       setSearch("");
       setScrollPosition(0);
+      handleCooldown(-1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graphName, limit, timeout, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries, showMemoryUsage]);
