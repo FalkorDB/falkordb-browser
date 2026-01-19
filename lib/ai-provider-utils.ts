@@ -104,6 +104,24 @@ export function getProviderApiKeyInfo(provider: AIProvider): {
 }
 
 /**
+ * Detects the provider from a model name
+ *
+ * @param model - The model name (e.g., "gpt-4o-mini", "anthropic:claude-3-5-sonnet-20241022")
+ * @returns The provider type
+ *
+ * @example
+ * detectProviderFromModel("gpt-4o-mini") // returns "openai"
+ * detectProviderFromModel("anthropic:claude-3-5-sonnet-20241022") // returns "anthropic"
+ */
+export function detectProviderFromModel(model: string): AIProvider {
+    if (model.startsWith("gpt")) return "openai";
+    if (model.includes("claude") || model.startsWith("anthropic:")) return "anthropic";
+    if (model.includes("gemini") || model.startsWith("gemini:")) return "gemini";
+    if (model.includes("llama") || model.includes("mixtral") || model.includes("phi") || model.startsWith("ollama:")) return "ollama";
+    return "unknown";
+}
+
+/**
  * Formats model names for better display in the UI
  *
  * @param modelValue - The internal model value (e.g., "anthropic:claude-3-5-sonnet-20241022")

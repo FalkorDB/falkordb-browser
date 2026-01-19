@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TextToCypher } from "@falkordb/text-to-cypher";
+import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { getClient } from "../auth/[...nextauth]/options";
 import { chatRequest, validateBody } from "../validate-body";
 
@@ -37,6 +38,58 @@ function buildFalkorDBConnection(user: { host: string; port: number; url?: strin
         ? `${encodeURIComponent(user.username)}:${encodeURIComponent(user.password)}@`
         : "";
     return `${protocol}${auth}${user.host}:${user.port}`;
+}
+
+/**
+ * Create user-friendly error message
+ */
+function createUserFriendlyErrorMessage(error: Error, model: string, apiKey: string): string {
+    const errorMessage = error.message;
+    const modelProvider = detectProviderFromModel(model);
+    const keyProvider = detectProviderFromApiKey(apiKey);
+
+    // Get display names for providers
+    const modelProviderName = getProviderDisplayName(modelProvider);
+    const keyProviderName = getProviderDisplayName(keyProvider);
+
+    // Check for provider mismatch (critical error - show first)
+    if (modelProvider !== "unknown" && keyProvider !== "unknown" && modelProvider !== keyProvider) {
+        // Ollama doesn't need an API key match
+        if (modelProvider !== "ollama") {
+            return `Model/API key mismatch: You selected a ${modelProviderName} model but provided a ${keyProviderName} API key. Please update your API key in Settings to match your selected model.`;
+        }
+    }
+
+    // Check for 404 model not found errors
+    if (errorMessage.includes("404") && errorMessage.includes("model") && errorMessage.includes("not found")) {
+        if (modelProvider === "ollama") {
+            const modelName = model.replace("ollama:", "");
+            return `Ollama model "${modelName}" not found. Please ensure Ollama is running locally and the model is pulled. Run: ollama pull ${modelName}`;
+        }
+        return `Model "${model}" not found. Please check if this model is available for your ${modelProviderName} account or select a different model in Settings.`;
+    }
+
+    // Check for authentication errors
+    if (errorMessage.includes("401") || errorMessage.includes("invalid_api_key") || errorMessage.includes("Incorrect API key")) {
+        const provider = keyProvider !== "unknown" ? keyProviderName : "";
+        return `Invalid ${provider} API key. Please check your API key in Settings and ensure it is correct.`;
+    }
+
+    // Check for other API key errors
+    if (errorMessage.includes("API key") || errorMessage.includes("api_key")) {
+        return "API key error. Please verify your API key in Settings matches your selected model provider.";
+    }
+
+    // Check for network/connection errors
+    if (errorMessage.includes("fetch failed") || errorMessage.includes("ECONNREFUSED")) {
+        if (modelProvider === "ollama") {
+            return "Cannot connect to Ollama. Please ensure Ollama is running locally on your machine.";
+        }
+        return "Network error. Please check your internet connection and try again.";
+    }
+
+    // Default: return original error message
+    return errorMessage;
 }
 
 // eslint-disable-next-line import/prefer-default-export
@@ -128,15 +181,9 @@ export async function POST(request: NextRequest) {
             writer.close();
         } catch (error) {
             console.error(error);
-            const errorMessage = (error as Error).message;
 
-            // Check if it's an API key error
-            let userFriendlyMessage = errorMessage;
-            if (errorMessage.includes('401 Unauthorized') || errorMessage.includes('invalid_api_key') || errorMessage.includes('Incorrect API key')) {
-                userFriendlyMessage = 'Invalid API key. Please check your API key in Settings and ensure it is correct.';
-            } else if (errorMessage.includes('API key')) {
-                userFriendlyMessage = 'API key error. Please verify your API key in Settings.';
-            }
+            // Create user-friendly error message
+            const userFriendlyMessage = createUserFriendlyErrorMessage(error as Error, model || "gpt-4o-mini", key);
 
             writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(userFriendlyMessage)}\n\n`));
             writer.close();
