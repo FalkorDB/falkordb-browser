@@ -1,21 +1,20 @@
 "use client";
 
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
-import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
 import { useRouter } from "next/navigation";
-import { cn, getDefaultQuery } from "@/lib/utils";
-import { useToast } from "@/components/ui/use-toast";
 import { RotateCcw, MonitorPlay, ChevronRight } from "lucide-react";
+import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
+import { cn, getDefaultQuery, securedFetch } from "@/lib/utils";
+import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BrowserSettingsContext } from "../components/provider";
+import { formatModelDisplayName } from "@/lib/ai-provider-utils";
+import { BrowserSettingsContext, IndicatorContext } from "../components/provider";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
-import Combobox from "../components/ui/combobox";
-
-const MODELS = ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"];
+import ModelSelector from "./ModelSelector";
 
 export default function BrowserSettings() {
     const {
@@ -44,12 +43,16 @@ export default function BrowserSettings() {
         replayTutorial,
     } = useContext(BrowserSettingsContext);
 
+    const { setIndicator } = useContext(IndicatorContext);
     const scrollableContainerRef = useRef<HTMLFormElement>(null);
 
     const { toast } = useToast();
     const router = useRouter();
 
     const [isResetting, setIsResetting] = useState(false);
+    const [modelDisplayNames, setModelDisplayNames] = useState<string[]>([]);
+    const [modelMapping, setModelMapping] = useState<Record<string, string>>({});
+    const [isLoadingModels, setIsLoadingModels] = useState(false);
     const [expandedSections, setExpandedSections] = useState({
         queryExecution: false,
         environment: false,
@@ -60,6 +63,46 @@ export default function BrowserSettings() {
     const toggleSection = (section: keyof typeof expandedSections) => {
         setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
     };
+
+    // Fetch all available models once on mount
+    useEffect(() => {
+        const fetchModels = async () => {
+            setIsLoadingModels(true);
+            try {
+                const result = await securedFetch(
+                    "/api/chat/models",
+                    { method: "GET" },
+                    toast,
+                    setIndicator
+                );
+
+                if (result.ok) {
+                    const { models } = await result.json();
+
+                    // Create display names and mapping
+                    const displayNames = models.map((m: string) => formatModelDisplayName(m));
+                    const mapping: Record<string, string> = {};
+                    models.forEach((m: string, index: number) => {
+                        mapping[displayNames[index]] = m;
+                    });
+
+                    setModelDisplayNames(displayNames);
+                    setModelMapping(mapping);
+                } else {
+                    // Fallback to gpt-4o-mini if fetch fails
+                    setModelDisplayNames(["gpt-4o-mini"]);
+                    setModelMapping({ "gpt-4o-mini": "gpt-4o-mini" });
+                }
+            } catch (error) {
+                setModelDisplayNames(["gpt-4o-mini"]);
+                setModelMapping({ "gpt-4o-mini": "gpt-4o-mini" });
+            } finally {
+                setIsLoadingModels(false);
+            }
+        };
+
+        fetchModels();
+    }, [toast, setIndicator]);
 
     useEffect(() => {
         setNewContentPersistence(contentPersistence);
@@ -161,9 +204,17 @@ export default function BrowserSettings() {
         createChangeHandler(setter)(value, elementId);
     };
 
-    // Wrapper for model combobox to handle scroll
-    const handleModelChange = (value: string) => {
-        createChangeHandler(setNewModel)(value, 'secretKeyInput');
+    // Wrapper for model combobox to handle scroll and mapping
+    const handleModelChange = (displayName: string) => {
+        // Convert display name back to actual model value
+        const actualModel = modelMapping[displayName] || displayName;
+        createChangeHandler(setNewModel)(actualModel, 'secretKeyInput');
+    };
+
+    // Get display name for current model value
+    const getCurrentModelDisplayName = () => {
+        const displayName = formatModelDisplayName(newModel);
+        return displayName;
     };
 
     return (
@@ -208,21 +259,21 @@ export default function BrowserSettings() {
                     </CardHeader>
                     {expandedSections.environment && (
                         <CardContent className="pt-2">
-                            <div className="flex flex-col sm:flex-row gap-4 p-4 bg-muted/10 rounded-lg">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium whitespace-nowrap">Model</span>
-                                    <Combobox
-                                        data-testid="chatModelSelect"
+                            <div className="flex flex-col gap-4 p-4 bg-muted/10 rounded-lg">
+                                <div className="flex flex-col gap-2">
+                                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+                                    <label className="text-sm font-medium">
+                                        {isLoadingModels ? "Model (Loading...)" : "Model"}
+                                    </label>
+                                    <ModelSelector
+                                        models={modelDisplayNames.length > 0 ? modelDisplayNames : ["gpt-4o-mini"]}
+                                        selectedModel={getCurrentModelDisplayName()}
+                                        onModelSelect={handleModelChange}
                                         disabled={!displayChat}
-                                        className="p-1"
-                                        label="Model"
-                                        options={MODELS}
-                                        selectedValue={newModel}
-                                        setSelectedValue={handleModelChange}
-                                        inTable
+                                        isLoading={isLoadingModels}
                                     />
                                 </div>
-                                <div className="flex-1 flex items-center gap-2">
+                                <div className="flex-1 flex flex-col gap-2">
                                     {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                                     <label htmlFor="secretKeyInput" className="text-sm font-medium whitespace-nowrap">Secret Key</label>
                                     <Input
