@@ -63,7 +63,7 @@ export default function Page() {
 
     const handleSetSelectedElements = useCallback((el: (Node | Link)[] = []) => {
         setSelectedElements(el);
-        
+
         if (el.length !== 0) {
             setIsAddNode(false);
             setIsAddEdge(false);
@@ -107,7 +107,7 @@ export default function Page() {
         else currentPanel.collapse();
     }, []);
 
-    const handleCooldown = (ticks?: 0) => {
+    const handleCooldown = (ticks?: number) => {
         setCooldownTicks(ticks);
     };
 
@@ -191,13 +191,17 @@ export default function Page() {
             const json = await result.json();
 
             if (isAddNode) {
-                const { labels: ls } = schema.extendNode(json.result.data[0].n, false, true, true);
-                setLabels(prev => [...prev, ...ls.filter(c => !prev.some(p => p.name === c)).map(c => schema.LabelsMap.get(c)!)]);
-                handleSetIsAddNode(false);
+                const node = schema.extendNode(json.result.data[0].n, false, true, true);
+                if (node) {
+                    setLabels(prev => [...prev, ...node.labels.filter(c => !prev.some(p => p.name === c)).map(c => schema.LabelsMap.get(c)!)]);
+                    handleSetIsAddNode(false);
+                }
             } else {
                 const link = schema.extendEdge(json.result.data[0].e, false, true);
-                setRelationships(prev => [...prev.filter(p => p.name !== link.relationship), schema.RelationshipsMap.get(link.relationship)!]);
-                handleSetIsAddEdge(false);
+                if (link) {
+                    setRelationships(prev => [...prev.filter(p => p.name !== link.relationship), schema.RelationshipsMap.get(link.relationship)!]);
+                    handleSetIsAddEdge(false);
+                }
             }
 
             setSelectedElements([]);
