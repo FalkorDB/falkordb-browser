@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 
@@ -13,10 +14,11 @@ export async function GET() {
     const { client } = session;
 
     try {
-      // result: [module name, module version]
-      const result = await (await client.connection).moduleList();
+      const result = await (await client.connection).moduleList() as any;
 
-      return NextResponse.json({ result: [result[0][1], result[0][3]] }, { status: 200 });
+      const data = result.find((arr: any[]) => arr.some((mod: string) => mod === "ver"));
+
+      return NextResponse.json({ result: [data[data.findIndex((mod: string) => mod === "name") + 1], data[data.findIndex((mod: string) => mod === "ver") + 1]] }, { status: 200 });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
