@@ -300,7 +300,7 @@ export default function Toolbar({
                             <Info size={20} />
                         </Button>
                         {
-                            hasLimitWarning || hasLimitChangeWarning &&
+                            (hasLimitWarning || hasLimitChangeWarning) &&
                             <Button
                             data-testid={`elementCanvasInfo${label}`}
                             className="p-1 pointer-events-auto bg-background cursor-default border-orange-300"
