@@ -193,6 +193,7 @@ test.describe('@browser Browser Settings tests', () => {
 
         // Select Anthropic model
         await settingsBrowserPage.selectModel("claude-3-5-sonnet");
+        await settingsBrowserPage.waitForTimeout(500); // Wait for selection to register
         isSelected = await settingsBrowserPage.isModelSelected("claude-3-5-sonnet");
         expect(isSelected).toBe(true);
 
@@ -214,7 +215,7 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.expandEnvironmentSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
-        // Select Anthropic model (claude-3-5-sonnet)
+        // Select Anthropic model
         await settingsBrowserPage.selectModel("claude-3-5-sonnet");
 
         // Use OpenAI API key (mismatch - starts with sk- but not sk-ant-)
