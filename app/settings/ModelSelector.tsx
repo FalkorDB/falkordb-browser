@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Search, Check, Sparkles, Zap, Brain, Globe, Server } from "lucide-react";
 import Input from "../components/ui/Input";
+import { formatModelDisplayName } from "@/lib/ai-provider-utils";
 
 interface ModelSelectorProps {
     models: string[];
@@ -147,6 +148,7 @@ export default function ModelSelector({
                                                 key={model}
                                                 type="button"
                                                 data-testid={`selectModel${model}`}
+                                                data-selected={isSelected}
                                                 onClick={() => handleModelClick(model)}
                                                 disabled={disabled}
                                                 className={cn(
@@ -160,7 +162,7 @@ export default function ModelSelector({
                                                     "font-medium truncate",
                                                     isSelected ? "text-primary" : "text-foreground"
                                                 )}>
-                                                    {model}
+                                                    {formatModelDisplayName(model)}
                                                 </span>
 
                                                 {isSelected && (

@@ -204,16 +204,9 @@ export default function BrowserSettings() {
     };
 
     // Wrapper for model combobox to handle scroll and mapping
-    const handleModelChange = (displayName: string) => {
-        // Convert display name back to actual model value
-        const actualModel = modelMapping[displayName] || displayName;
-        createChangeHandler(setNewModel)(actualModel, 'secretKeyInput');
-    };
-
-    // Get display name for current model value
-    const getCurrentModelDisplayName = () => {
-        const displayName = formatModelDisplayName(newModel);
-        return displayName;
+    const handleModelChange = (modelValue: string) => {
+        // Model value is already the raw model name from the API
+        createChangeHandler(setNewModel)(modelValue, 'secretKeyInput');
     };
 
     return (
@@ -266,7 +259,7 @@ export default function BrowserSettings() {
                                     </label>
                                     <ModelSelector
                                         models={modelDisplayNames.length > 0 ? modelDisplayNames : ["gpt-4o-mini"]}
-                                        selectedModel={getCurrentModelDisplayName()}
+                                        selectedModel={newModel}
                                         onModelSelect={handleModelChange}
                                         disabled={!displayChat}
                                         isLoading={isLoadingModels}
