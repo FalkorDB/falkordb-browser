@@ -240,46 +240,30 @@ export default class Page extends BasePage {
   // 1000 is the timeout for the fit to size animation
   // 1500 is extra timeout to ensure the animation is over
   async waitForCanvasAnimationToEnd(timeout = 4500): Promise<void> {
-    try {
-      await waitForElementToBeVisible(this.skeleton);
+    await waitForElementToBeVisible(this.skeleton);
 
-      // Check if canvas exists before waiting for it
-      const canvasContainer = this.page.locator("falkordb-canvas");
-      const canvasCount = await canvasContainer.count();
+    // Check if canvas exists before waiting for it
+    const canvasContainer = this.page.locator("falkordb-canvas");
+    const canvasCount = await canvasContainer.count();
 
-      if (canvasCount === 0) {
-        // Canvas doesn't exist - might be empty graph or deleted all elements
-        return;
-      }
-    } catch (error) {
-      // Handle case where page/context/browser has been closed
-      if (error instanceof Error && error.message.includes("Target page, context or browser has been closed")) {
-        return;
-      }
-      throw error;
+    if (canvasCount === 0) {
+      // Canvas doesn't exist - might be empty graph or deleted all elements
+      return;
     }
 
-    try {
-      // Wait for the web component to be loaded (it's imported asynchronously)
-      await this.canvasElement.waitFor({ state: "attached", timeout: 10000 });
+    // Wait for the web component to be loaded (it's imported asynchronously)
+    await this.canvasElement.waitFor({ state: "attached", timeout: 10000 });
 
-      // Poll the canvas element's data-engine-status attribute using the locator
-      const startTime = Date.now();
-      while (Date.now() - startTime < timeout) {
-        const status = await this.canvasElement.getAttribute("data-engine-status");
-        if (status === "stopped") {
-          return;
-        }
-        await this.page.waitForTimeout(500); // Poll every 500ms
-      }
-      throw new Error(`Canvas animation did not stop within ${timeout}ms`);
-    } catch (error) {
-      // Handle case where page/context/browser has been closed
-      if (error instanceof Error && error.message.includes("Target page, context or browser has been closed")) {
+    // Poll the canvas element's data-engine-status attribute using the locator
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeout) {
+      const status = await this.canvasElement.getAttribute("data-engine-status");
+      if (status === "stopped") {
         return;
       }
-      throw error;
+      await this.page.waitForTimeout(500); // Poll every 500ms
     }
+    throw new Error(`Canvas animation did not stop within ${timeout}ms`);
   }
 
   async getCanvasScaling(): Promise<{ scaleX: number; scaleY: number }> {
@@ -336,7 +320,7 @@ export default class Page extends BasePage {
         const data = (window as any)[key]?.();
         // Check both possible structures: { nodes } or { elements: { nodes } }
         return (data && ((Array.isArray(data.nodes) && data.nodes.length > 0) ||
-                        (data.elements && Array.isArray(data.elements.nodes) && data.elements.nodes.length > 0)));
+          (data.elements && Array.isArray(data.elements.nodes) && data.elements.nodes.length > 0)));
       },
       windowKey,
       { timeout: 5000 }
@@ -358,13 +342,13 @@ export default class Page extends BasePage {
         devicePixelRatio: window.devicePixelRatio || 1,
         transform: transform
           ? {
-              a: transform.a,
-              b: transform.b,
-              c: transform.c,
-              d: transform.d,
-              e: transform.e,
-              f: transform.f,
-            }
+            a: transform.a,
+            b: transform.b,
+            c: transform.c,
+            d: transform.d,
+            e: transform.e,
+            f: transform.f,
+          }
           : null,
       };
     });
@@ -466,7 +450,7 @@ export default class Page extends BasePage {
         const data = (window as any)[key]?.();
         // Check both possible structures: { links } or { elements: { links } }
         return (data && ((Array.isArray(data.links) && data.links.length > 0) ||
-                        (data.elements && Array.isArray(data.elements.links) && data.elements.links.length > 0)));
+          (data.elements && Array.isArray(data.elements.links) && data.elements.links.length > 0)));
       },
       windowKey,
       { timeout: 5000 }
@@ -488,13 +472,13 @@ export default class Page extends BasePage {
         devicePixelRatio: window.devicePixelRatio || 1,
         transform: transform
           ? {
-              a: transform.a,
-              b: transform.b,
-              c: transform.c,
-              d: transform.d,
-              e: transform.e,
-              f: transform.f,
-            }
+            a: transform.a,
+            b: transform.b,
+            c: transform.c,
+            d: transform.d,
+            e: transform.e,
+            f: transform.f,
+          }
           : null,
       };
     });
