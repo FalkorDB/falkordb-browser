@@ -83,6 +83,7 @@ export default function BrowserSettings() {
                 }
             } catch (error) {
                 setModelDisplayNames(["gpt-4o-mini"]);
+                setIndicator("offline");
             } finally {
                 setIsLoadingModels(false);
             }

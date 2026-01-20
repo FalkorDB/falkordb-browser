@@ -102,6 +102,7 @@ export default function ModelSelector({
                         placeholder="Search models..."
                         onChange={(e) => setSearch(e.target.value)}
                         disabled={disabled || isLoading}
+                        aria-label="Search models"
                     />
                 </div>
             </div>
