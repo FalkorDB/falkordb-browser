@@ -10,7 +10,6 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatModelDisplayName } from "@/lib/ai-provider-utils";
 import { BrowserSettingsContext, IndicatorContext } from "../components/provider";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -51,7 +50,6 @@ export default function BrowserSettings() {
 
     const [isResetting, setIsResetting] = useState(false);
     const [modelDisplayNames, setModelDisplayNames] = useState<string[]>([]);
-    const [modelMapping, setModelMapping] = useState<Record<string, string>>({});
     const [isLoadingModels, setIsLoadingModels] = useState(false);
     const [expandedSections, setExpandedSections] = useState({
         queryExecution: false,
@@ -78,23 +76,13 @@ export default function BrowserSettings() {
 
                 if (result.ok) {
                     const { models } = await result.json();
-
-                    // Create mapping using raw model value as key to avoid collisions
-                    const mapping: Record<string, string> = {};
-                    models.forEach((m: string) => {
-                        mapping[m] = m;
-                    });
-
                     setModelDisplayNames(models);
-                    setModelMapping(mapping);
                 } else {
                     // Fallback to gpt-4o-mini if fetch fails
                     setModelDisplayNames(["gpt-4o-mini"]);
-                    setModelMapping({ "gpt-4o-mini": "gpt-4o-mini" });
                 }
             } catch (error) {
                 setModelDisplayNames(["gpt-4o-mini"]);
-                setModelMapping({ "gpt-4o-mini": "gpt-4o-mini" });
             } finally {
                 setIsLoadingModels(false);
             }

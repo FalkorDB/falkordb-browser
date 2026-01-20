@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { formatModelDisplayName } from "@/lib/ai-provider-utils";
 import { Search, Check, Sparkles, Zap, Brain, Globe, Server } from "lucide-react";
 import Input from "../components/ui/Input";
-import { formatModelDisplayName } from "@/lib/ai-provider-utils";
 
 interface ModelSelectorProps {
     models: string[];
