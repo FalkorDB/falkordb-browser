@@ -176,7 +176,7 @@ test.describe('Canvas Tests', () => {
         const initNodes = await graph.getNodesScreenPositions('graph');
         const fromX = initNodes[0].screenX;
         const fromY = initNodes[0].screenY;
-        const toX = initNodes[1].screenX;;
+        const toX = initNodes[1].screenX;
         const toY = initNodes[1].screenY;
         await graph.changeNodePosition(fromX, fromY, toX, toY);
         await graph.waitForScaleToStabilize();
