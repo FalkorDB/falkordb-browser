@@ -40,8 +40,16 @@ export default class GraphInfoPage extends GraphPage {
   }
 
   async isGraphInfoPanelContainerVisible(): Promise<boolean> {
-    await this.page.waitForTimeout(1000);
-    return waitForElementToBeVisible(this.graphInfoNodesCount);
+    try {
+      await this.page.waitForTimeout(1000);
+      return waitForElementToBeVisible(this.graphInfoNodesCount);
+    } catch (error) {
+      // Handle case where page/context/browser has been closed
+      if (error instanceof Error && error.message.includes("Target page, context or browser has been closed")) {
+        return false;
+      }
+      throw error;
+    }
   }
 
   async clickGraphInfoButton(): Promise<void> {

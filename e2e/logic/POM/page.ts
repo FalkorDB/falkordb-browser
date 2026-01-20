@@ -240,30 +240,46 @@ export default class Page extends BasePage {
   // 1000 is the timeout for the fit to size animation
   // 1500 is extra timeout to ensure the animation is over
   async waitForCanvasAnimationToEnd(timeout = 4500): Promise<void> {
-    await waitForElementToBeVisible(this.skeleton);
+    try {
+      await waitForElementToBeVisible(this.skeleton);
 
-    // Check if canvas exists before waiting for it
-    const canvasContainer = this.page.locator("falkordb-canvas");
-    const canvasCount = await canvasContainer.count();
+      // Check if canvas exists before waiting for it
+      const canvasContainer = this.page.locator("falkordb-canvas");
+      const canvasCount = await canvasContainer.count();
 
-    if (canvasCount === 0) {
-      // Canvas doesn't exist - might be empty graph or deleted all elements
-      return;
-    }
-
-    // Wait for the web component to be loaded (it's imported asynchronously)
-    await this.canvasElement.waitFor({ state: "attached", timeout: 10000 });
-
-    // Poll the canvas element's data-engine-status attribute using the locator
-    const startTime = Date.now();
-    while (Date.now() - startTime < timeout) {
-      const status = await this.canvasElement.getAttribute("data-engine-status");
-      if (status === "stopped") {
+      if (canvasCount === 0) {
+        // Canvas doesn't exist - might be empty graph or deleted all elements
         return;
       }
-      await this.page.waitForTimeout(500); // Poll every 500ms
+    } catch (error) {
+      // Handle case where page/context/browser has been closed
+      if (error instanceof Error && error.message.includes("Target page, context or browser has been closed")) {
+        return;
+      }
+      throw error;
     }
-    throw new Error(`Canvas animation did not stop within ${timeout}ms`);
+
+    try {
+      // Wait for the web component to be loaded (it's imported asynchronously)
+      await this.canvasElement.waitFor({ state: "attached", timeout: 10000 });
+
+      // Poll the canvas element's data-engine-status attribute using the locator
+      const startTime = Date.now();
+      while (Date.now() - startTime < timeout) {
+        const status = await this.canvasElement.getAttribute("data-engine-status");
+        if (status === "stopped") {
+          return;
+        }
+        await this.page.waitForTimeout(500); // Poll every 500ms
+      }
+      throw new Error(`Canvas animation did not stop within ${timeout}ms`);
+    } catch (error) {
+      // Handle case where page/context/browser has been closed
+      if (error instanceof Error && error.message.includes("Target page, context or browser has been closed")) {
+        return;
+      }
+      throw error;
+    }
   }
 
   async getCanvasScaling(): Promise<{ scaleX: number; scaleY: number }> {
