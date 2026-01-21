@@ -661,18 +661,10 @@ export default class GraphPage extends Page {
   }
 
   async clickRunQuery(waitForAnimation = true): Promise<void> {
-    try {
-      await this.clickEditorRun();
-      await waitForElementToBeEnabled(this.editorRun);
-      if (waitForAnimation) {
-        await this.waitForCanvasAnimationToEnd();
-      }
-    } catch (error) {
-      // Handle case where page/context/browser has been closed
-      if (error instanceof Error && error.message.includes("Target page, context or browser has been closed")) {
-        return;
-      }
-      throw error;
+    await this.clickEditorRun();
+    await waitForElementToBeEnabled(this.editorRun);
+    if (waitForAnimation) {
+      await this.waitForCanvasAnimationToEnd();
     }
   }
 
@@ -760,17 +752,9 @@ export default class GraphPage extends Page {
   }
 
   async getNodeCanvasToolTip(): Promise<string | null> {
-    try {
       await this.page.waitForTimeout(1000);
       const toolTipText = await this.getNodeCanvasToolTipContent();
       return toolTipText;
-    } catch (error) {
-      // Handle case where page/context/browser has been closed
-      if (error instanceof Error && error.message.includes("Target page, context or browser has been closed")) {
-        return null;
-      }
-      throw error;
-    }
   }
 
   // eslint-disable-next-line class-methods-use-this
