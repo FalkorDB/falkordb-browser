@@ -16,8 +16,6 @@ export async function GET() {
     try {
       const result = await (await client.connection).moduleList() as any;
 
-      console.log(result);
-
       const data = result.find((arr: any[]) => arr.some((mod: string, index: number) => mod === "name" && arr[index + 1] === "graph"));
 
       return NextResponse.json({ result: [data[data.findIndex((mod: string) => mod === "name") + 1], data[data.findIndex((mod: string) => mod === "ver") + 1]] }, { status: 200 });
