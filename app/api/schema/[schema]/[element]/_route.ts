@@ -8,6 +8,10 @@ import {
 import { corsHeaders } from "@/app/api/utils";
 import { formatAttributes } from "./utils";
 
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders() });
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ schema: string; element: string }> }
