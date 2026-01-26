@@ -177,8 +177,6 @@ test.describe("Customize Style Tests", () => {
 
     // Verify the caption change persisted in localStorage
     const savedStyle = await graph.getLabelStyleFromLocalStorage("person2");
-    console.log("here: ",savedStyle);
-    
     expect(savedStyle?.caption).toBe("occupation");
 
     await apiCall.removeGraph(graphName);
@@ -262,7 +260,6 @@ test.describe("Customize Style Tests", () => {
 
     // Refresh the page
     await graph.refreshPage();
-    await graph.waitForPageIdle();
 
     // Select the same graph again and query existing nodes
     await graph.selectGraphByName(graphName);
@@ -272,13 +269,11 @@ test.describe("Customize Style Tests", () => {
 
     // Verify color persisted after refresh
     const colorAfterRefresh = await graph.getLabelButtonColor("person1");
-    console.log("Selected color:", selectedColor, "Color after refresh:", colorAfterRefresh);
     
     expect(colorAfterRefresh).toBe(selectedColor);
 
     // Verify size persisted after refresh
     const styleAfterRefresh = await graph.getLabelStyleFromLocalStorage("person1");
-    console.log("Selected size:", selectedStyle?.size, "Size after refresh:", styleAfterRefresh?.size);
     expect(styleAfterRefresh?.size).toBe(selectedStyle?.size);
 
     await apiCall.removeGraph(graphName);
@@ -442,8 +437,6 @@ test.describe("Customize Style Tests", () => {
     // Get the style from graph2 for person1 label
     const graph2Color = await graph.getLabelButtonColor("person1");
     const graph2Style = await graph.getLabelStyleFromLocalStorage("person1");
-    console.log("Graph1 color:", graph1Color, "Graph2 color:", graph2Color);
-    console.log("Graph1 Style:", graph1Style, "Graph2 Style:", graph2Style);
 
     // Verify that graph2's person1 label has the same style as graph1
     // (Label styles should be global, not graph-scoped)

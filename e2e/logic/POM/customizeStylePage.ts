@@ -157,9 +157,9 @@ export default class CustomizeStylePage extends GraphInfoPage {
     await waitForElementToBeVisible(this.labelButton(label));
 
     // Get the color from the inline style attribute which is the source of truth
-    const color = await this.labelButton(label).evaluate((el: HTMLElement) => {
-      return el.style.backgroundColor || window.getComputedStyle(el).backgroundColor;
-    });
+    const color = await this.labelButton(label).evaluate((el: HTMLElement) =>
+      el.style.backgroundColor || window.getComputedStyle(el).backgroundColor
+    );
     return color;
   }
 
