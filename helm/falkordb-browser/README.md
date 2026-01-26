@@ -10,14 +10,18 @@ This Helm chart deploys the FalkorDB Browser application to a Kubernetes cluster
 
 ## Installation
 
-### Install from GitHub Container Registry (Recommended)
+### Install from Helm Repository (Recommended)
 
 ```bash
+# Add the FalkorDB Helm repository
+helm repo add falkordb https://falkordb.github.io/helm-charts
+helm repo update
+
 # Install the latest version
-helm install falkordb-browser oci://ghcr.io/falkordb/charts/falkordb-browser
+helm install falkordb-browser falkordb/falkordb-browser
 
 # Or install a specific version
-helm install falkordb-browser oci://ghcr.io/falkordb/charts/falkordb-browser --version 1.6.7
+helm install falkordb-browser falkordb/falkordb-browser --version 1.6.7
 ```
 
 ### Install from local chart
@@ -34,8 +38,8 @@ helm install falkordb-browser ./falkordb-browser
 ### Install with custom values
 
 ```bash
-# From GHCR
-helm install falkordb-browser oci://ghcr.io/falkordb/charts/falkordb-browser \
+# From Helm repository
+helm install falkordb-browser falkordb/falkordb-browser \
   --set env.nextauthUrl=https://your-domain.com \
   --set env.nextauthSecret=your-secret-here \
   --set ingress.enabled=true \
@@ -303,12 +307,11 @@ After deploying the browser, you'll need to configure it to connect to your Falk
 
 ## Publishing and CI/CD
 
-This chart is automatically published to GitHub Container Registry (GHCR) via GitHub Actions.
+This chart is automatically published to the FalkorDB Helm charts repository via GitHub Actions.
 
-For maintainers setting up the CI/CD pipeline, see the setup documentation:
-[Helm Chart CI/CD Setup](../../.github/workflows/HELM_CHART_SETUP.md)
+The workflow publishes charts to the [FalkorDB/helm-charts](https://github.com/FalkorDB/helm-charts) repository, which is served via GitHub Pages at `https://falkordb.github.io/helm-charts`.
 
-The workflow requires a `GHCR_TOKEN` secret with `write:packages` permission to publish charts to `ghcr.io/falkordb/charts`.
+The workflow requires a `GHCR_TOKEN` or `GITHUB_TOKEN` secret with write access to the FalkorDB/helm-charts repository.
 
 ## Support
 
