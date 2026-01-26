@@ -3,7 +3,7 @@ name: falkordb-browser
 description: A Helm chart for deploying FalkorDB Browser to Kubernetes
 type: application
 version: 1.6.7
-appVersion: "1.6.7"
+appVersion: "v1.6.7"
 keywords:
   - falkordb
   - browser
