@@ -1,0 +1,182 @@
+name: Helm Chart CI/CD
+
+on:
+  push:
+    branches: ["main", "staging"]
+    tags: ["v*.*.*"]
+    paths:
+      - 'helm/**'
+      - '.github/workflows/helm-chart.yml'
+  pull_request:
+    paths:
+      - 'helm/**'
+      - '.github/workflows/helm-chart.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+
+      - name: Lint Helm chart
+        run: |
+          helm lint helm/falkordb-browser
+
+      - name: Template Helm chart
+        run: |
+          helm template test-release helm/falkordb-browser > /dev/null
+          echo "✅ Helm chart templates rendered successfully"
+
+      - name: Template with various configurations
+        run: |
+          echo "Testing with ingress enabled..."
+          helm template test helm/falkordb-browser --set ingress.enabled=true > /dev/null
+          
+          echo "Testing with persistence enabled..."
+          helm template test helm/falkordb-browser --set persistence.enabled=true > /dev/null
+          
+          echo "Testing with autoscaling enabled..."
+          helm template test helm/falkordb-browser --set autoscaling.enabled=true > /dev/null
+          
+          echo "Testing with serviceAccount.create=false..."
+          helm template test helm/falkordb-browser --set serviceAccount.create=false > /dev/null
+          
+          echo "✅ All configuration tests passed"
+
+  kind-test:
+    runs-on: ubuntu-latest
+    needs: lint-test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+
+      - name: Create Kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: kind
+          wait: 120s
+
+      - name: Install Helm chart
+        run: |
+          helm install test-release helm/falkordb-browser \
+            --wait \
+            --timeout 5m \
+            --set env.nextauthSecret=test-secret-for-ci
+
+      - name: Verify deployment
+        run: |
+          kubectl get all -l app.kubernetes.io/name=falkordb-browser
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=falkordb-browser --timeout=300s
+
+      - name: Test service
+        run: |
+          kubectl get svc test-release-falkordb-browser
+          echo "✅ Service is running"
+
+      - name: Run basic connectivity test
+        run: |
+          kubectl run test-pod --image=busybox:1.36 --rm -i --restart=Never -- \
+            wget -O- --timeout=10 http://test-release-falkordb-browser:3000 || true
+          echo "✅ Connectivity test completed"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          helm uninstall test-release || true
+
+  package-publish:
+    runs-on: ubuntu-latest
+    needs: [lint-test, kind-test]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+
+      - name: Login to GitHub Container Registry
+        run: |
+          echo ${{ secrets.GITHUB_TOKEN }} | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Set chart version
+        run: |
+          if [[ "${{ github.ref }}" =~ ^refs/tags/v ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"  # Remove 'v' prefix
+            echo "CHART_VERSION=$VERSION" >> $GITHUB_ENV
+            echo "Publishing version: $VERSION"
+          else
+            # For main branch, use version from Chart.yaml
+            VERSION=$(grep '^version:' helm/falkordb-browser/Chart.yaml | awk '{print $2}')
+            echo "CHART_VERSION=$VERSION" >> $GITHUB_ENV
+            echo "Publishing version from Chart.yaml: $VERSION"
+          fi
+
+      - name: Update chart version if tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          sed -i "s/^version:.*/version: ${{ env.CHART_VERSION }}/" helm/falkordb-browser/Chart.yaml
+          sed -i "s/^appVersion:.*/appVersion: \"${{ env.CHART_VERSION }}\"/" helm/falkordb-browser/Chart.yaml
+
+      - name: Package Helm chart
+        run: |
+          helm package helm/falkordb-browser --destination .helm-charts
+
+      - name: Push Helm chart to GHCR
+        run: |
+          CHART_FILE=$(ls .helm-charts/*.tgz)
+          helm push $CHART_FILE oci://ghcr.io/${{ github.repository_owner }}/charts
+          echo "✅ Helm chart pushed to ghcr.io/${{ github.repository_owner }}/charts"
+
+      - name: Generate installation instructions
+        run: |
+          cat << EOF > installation-instructions.txt
+          # FalkorDB Browser Helm Chart Installation
+          
+          ## Install from GitHub Container Registry
+          
+          helm install falkordb-browser oci://ghcr.io/${{ github.repository_owner }}/charts/falkordb-browser --version ${{ env.CHART_VERSION }}
+          
+          ## Or with custom values
+          
+          helm install falkordb-browser oci://ghcr.io/${{ github.repository_owner }}/charts/falkordb-browser \\
+            --version ${{ env.CHART_VERSION }} \\
+            --set env.nextauthUrl=https://your-domain.com \\
+            --set env.nextauthSecret=your-secret-here
+          
+          ## Verify installation
+          
+          kubectl get pods -l app.kubernetes.io/name=falkordb-browser
+          EOF
+          
+          cat installation-instructions.txt
+
+      - name: Upload package as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: helm-chart
+          path: .helm-charts/*.tgz
+          retention-days: 30

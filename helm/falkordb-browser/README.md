@@ -10,12 +10,14 @@ This Helm chart deploys the FalkorDB Browser application to a Kubernetes cluster
 
 ## Installation
 
-### Add the repository (if published)
+### Install from GitHub Container Registry (Recommended)
 
 ```bash
-# If published to a Helm repository
-helm repo add falkordb https://charts.falkordb.com
-helm repo update
+# Install the latest version
+helm install falkordb-browser oci://ghcr.io/falkordb/charts/falkordb-browser
+
+# Or install a specific version
+helm install falkordb-browser oci://ghcr.io/falkordb/charts/falkordb-browser --version 1.6.7
 ```
 
 ### Install from local chart
@@ -32,6 +34,14 @@ helm install falkordb-browser ./falkordb-browser
 ### Install with custom values
 
 ```bash
+# From GHCR
+helm install falkordb-browser oci://ghcr.io/falkordb/charts/falkordb-browser \
+  --set env.nextauthUrl=https://your-domain.com \
+  --set env.nextauthSecret=your-secret-here \
+  --set ingress.enabled=true \
+  --set ingress.hosts[0].host=your-domain.com
+
+# Or from local chart
 helm install falkordb-browser ./falkordb-browser \
   --set env.nextauthUrl=https://your-domain.com \
   --set env.nextauthSecret=your-secret-here \

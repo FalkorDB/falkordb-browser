@@ -71,6 +71,16 @@ docker run -p 6379:6379 -it --rm falkordb/falkordb:latest
 Deploy the FalkorDB Browser to your Kubernetes cluster using Helm:
 
 ```bash
+# Install from GitHub Container Registry
+helm install falkordb-browser oci://ghcr.io/falkordb/charts/falkordb-browser
+
+# Access via port-forward
+kubectl port-forward svc/falkordb-browser 3000:3000
+```
+
+Or install from source:
+
+```bash
 # Clone the repository
 git clone https://github.com/FalkorDB/falkordb-browser.git
 cd falkordb-browser
