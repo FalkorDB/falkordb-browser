@@ -175,11 +175,6 @@ export default class CustomizeStylePage extends GraphInfoPage {
     return style;
   }
 
-  async hoverOnNode(x: number, y: number): Promise<void> {
-    await this.page.mouse.move(x, y);
-    await this.page.waitForTimeout(500);
-  }
-
   async getSelectedSizeButtonIndex(): Promise<number> {
     const selectedIndex = await this.page.evaluate(() => {
       const sizeButtons = Array.from(
