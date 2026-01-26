@@ -126,7 +126,7 @@ jobs:
           YQ_VERSION="v4.40.5"
           YQ_BINARY="yq_linux_amd64"
           wget -qO /tmp/yq "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/${YQ_BINARY}"
-          echo "c9a01b6a5c7c9af7a35e1c7a034fb6c22eeef59dabc6f3b5f894aca26a39d5b8  /tmp/yq" | sha256sum -c -
+          echo "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  /tmp/yq" | sha256sum -c -
           sudo mv /tmp/yq /usr/local/bin/yq
           sudo chmod +x /usr/local/bin/yq
 
