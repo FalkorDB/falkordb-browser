@@ -1,7 +1,7 @@
 import CredentialsProvider from "next-auth/providers/credentials";
 import { AuthOptions, Role, User, getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
-import type { FalkorDB, FalkorDBOptions } from "falkordb";
+import { FalkorDB, type FalkorDBOptions } from "falkordb";
 import { v4 as uuidv4 } from "uuid";
 import crypto from "crypto";
 import { isTokenActive } from "../tokenUtils";
@@ -30,12 +30,6 @@ interface AuthenticatedUser {
 }
 
 const connections = new Map<string, FalkorDB>();
-
-// Dynamic import helper for FalkorDB to avoid bundling BigInt in client
-async function getFalkorDBClass() {
-  const { FalkorDB } = await import("falkordb");
-  return FalkorDB;
-}
 
 export async function newClient(
   credentials: {
@@ -84,8 +78,7 @@ export async function newClient(
         };
   }
 
-  const FalkorDBClass = await getFalkorDBClass();
-  const client = await FalkorDBClass.connect(connectionOptions);
+  const client = await FalkorDB.connect(connectionOptions);
 
   // Save connection in connections map for later use
   connections.set(id, client);
