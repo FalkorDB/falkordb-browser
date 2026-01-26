@@ -126,9 +126,10 @@ env:
   # Base URL for the browser (should match your ingress/service URL)
   nextauthUrl: "http://localhost:3000/"
   # Secret for NextAuth.js authentication
-  # WARNING: Change this value in production! Generate a secure random string.
+  # WARNING: This MUST be changed in production! Generate a secure random string.
   # You can generate one with: openssl rand -base64 32
-  nextauthSecret: "SECRET"
+  # IMPORTANT: Do not use the default value in production environments!
+  nextauthSecret: "CHANGE_ME_IN_PRODUCTION"
   # Google Analytics ID (optional)
   googleAnalytics: ""
   # Main browser port
