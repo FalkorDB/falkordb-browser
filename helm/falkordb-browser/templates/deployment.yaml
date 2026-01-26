@@ -59,22 +59,26 @@ spec:
           {{- toYaml .Values.readinessProbe | nindent 12 }}
         resources:
           {{- toYaml .Values.resources | nindent 12 }}
-        {{- if .Values.persistence.enabled }}
+        {{- if or .Values.persistence.enabled .Values.volumeMounts }}
         volumeMounts:
+        {{- if .Values.persistence.enabled }}
         - name: data
           mountPath: {{ .Values.persistence.mountPath }}
         {{- end }}
         {{- with .Values.volumeMounts }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-      {{- if .Values.persistence.enabled }}
+        {{- end }}
+      {{- if or .Values.persistence.enabled .Values.volumes }}
       volumes:
+      {{- if .Values.persistence.enabled }}
       - name: data
         persistentVolumeClaim:
           claimName: {{ if .Values.persistence.existingClaim }}{{ .Values.persistence.existingClaim }}{{- else }}{{ include "falkordb-browser.fullname" . }}{{- end }}
       {{- end }}
       {{- with .Values.volumes }}
       {{- toYaml . | nindent 6 }}
+      {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
