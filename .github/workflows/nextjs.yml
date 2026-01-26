@@ -98,7 +98,7 @@ jobs:
           output: 'trivy-results.sarif'
           exit-code: '1'
           ignore-unfixed: true
-          vuln-type: 'os,library'
+          pkg-types: 'os,library'
           severity: 'HIGH,CRITICAL'
 
       - name: Upload Trivy results to GitHub Security tab
@@ -116,7 +116,7 @@ jobs:
           format: 'table'
           output: 'trivy-results.txt'
           ignore-unfixed: true
-          vuln-type: 'os,library'
+          pkg-types: 'os,library'
           severity: 'HIGH,CRITICAL'
 
       - name: Comment PR with Trivy results
