@@ -46,6 +46,11 @@ service:
   # Additional ports for text-to-cypher REST API and MCP
   restPort: 8080
   mcpPort: 3001
+  # Session affinity for sticky sessions (uncomment to enable)
+  # sessionAffinity: ClientIP
+  # sessionAffinityConfig:
+  #   clientIP:
+  #     timeoutSeconds: 10800  # 3 hours
 
 ingress:
   enabled: false
@@ -53,6 +58,17 @@ ingress:
   annotations: {}
     # kubernetes.io/ingress.class: nginx
     # kubernetes.io/tls-acme: "true"
+    # 
+    # Sticky sessions for NGINX Ingress:
+    # nginx.ingress.kubernetes.io/affinity: "cookie"
+    # nginx.ingress.kubernetes.io/affinity-mode: "persistent"
+    # nginx.ingress.kubernetes.io/session-cookie-name: "falkordb-browser-session"
+    # nginx.ingress.kubernetes.io/session-cookie-max-age: "10800"
+    # nginx.ingress.kubernetes.io/session-cookie-secure: "true"
+    # 
+    # Sticky sessions for Traefik:
+    # traefik.ingress.kubernetes.io/service.sticky.cookie: "true"
+    # traefik.ingress.kubernetes.io/service.sticky.cookie.name: "falkordb-browser-session"
   hosts:
     - host: falkordb-browser.local
       paths:

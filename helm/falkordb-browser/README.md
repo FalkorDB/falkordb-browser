@@ -153,6 +153,139 @@ resources:
     memory: 256Mi
 ```
 
+## Sticky Sessions
+
+When running multiple replicas of FalkorDB Browser, you may need to configure sticky sessions (session affinity) to ensure users consistently connect to the same pod. This is important for maintaining session state and authentication.
+
+### Service-Level Sticky Sessions
+
+Enable session affinity at the service level by adding the following to your values file:
+
+```yaml
+replicaCount: 2
+
+service:
+  type: ClusterIP
+  port: 3000
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800  # 3 hours
+```
+
+**Note**: Service-level session affinity uses client IP, which works well for internal services but may have limitations with proxies or load balancers.
+
+### Ingress-Level Sticky Sessions
+
+For production deployments with ingress, configure sticky sessions using ingress annotations. The configuration varies by ingress controller:
+
+#### NGINX Ingress Controller
+
+```yaml
+replicaCount: 3
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    # Enable sticky sessions
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/affinity-mode: "persistent"
+    nginx.ingress.kubernetes.io/session-cookie-name: "falkordb-browser-session"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "10800"
+    nginx.ingress.kubernetes.io/session-cookie-expires: "10800"
+    # Optional: secure cookie settings
+    nginx.ingress.kubernetes.io/session-cookie-secure: "true"
+    nginx.ingress.kubernetes.io/session-cookie-samesite: "Lax"
+  hosts:
+    - host: falkordb-browser.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: falkordb-browser-tls
+      hosts:
+        - falkordb-browser.example.com
+
+env:
+  nextauthUrl: https://falkordb-browser.example.com
+  nextauthSecret: "your-secure-secret-here"
+```
+
+#### Traefik Ingress Controller
+
+```yaml
+replicaCount: 3
+
+ingress:
+  enabled: true
+  className: traefik
+  annotations:
+    # Enable sticky sessions
+    traefik.ingress.kubernetes.io/service.sticky.cookie: "true"
+    traefik.ingress.kubernetes.io/service.sticky.cookie.name: "falkordb-browser-session"
+    traefik.ingress.kubernetes.io/service.sticky.cookie.secure: "true"
+    traefik.ingress.kubernetes.io/service.sticky.cookie.httponly: "true"
+    traefik.ingress.kubernetes.io/service.sticky.cookie.samesite: "lax"
+  hosts:
+    - host: falkordb-browser.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+#### AWS ALB Ingress Controller
+
+```yaml
+replicaCount: 3
+
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    # Enable sticky sessions
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/load-balancer-attributes: stickiness.enabled=true,stickiness.lb_cookie.duration_seconds=10800
+    alb.ingress.kubernetes.io/healthcheck-path: /
+  hosts:
+    - host: falkordb-browser.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+### Verifying Sticky Sessions
+
+After deployment, verify sticky sessions are working:
+
+1. **Check the service** (if using service-level affinity):
+   ```bash
+   kubectl get svc falkordb-browser -o yaml | grep -A 5 sessionAffinity
+   ```
+
+2. **Test with curl** (for ingress-based sticky sessions):
+   ```bash
+   # Make multiple requests and check the session cookie
+   curl -i https://falkordb-browser.example.com/ | grep -i set-cookie
+   
+   # Save cookie and reuse it
+   curl -c cookies.txt https://falkordb-browser.example.com/
+   curl -b cookies.txt https://falkordb-browser.example.com/api/auth/session
+   ```
+
+3. **Monitor pod distribution**:
+   ```bash
+   # Check which pods are receiving requests
+   kubectl logs -l app.kubernetes.io/name=falkordb-browser --tail=100 -f
+   ```
+
+### Recommendations
+
+- **For production**: Use ingress-level sticky sessions with HTTPS and secure cookie settings
+- **Session timeout**: Set to match your application's session duration (default: 3 hours / 10800 seconds)
+- **Cookie security**: Always enable `secure` and `httponly` flags in production
+- **Health checks**: Ensure health check endpoints don't require session affinity
+
 ## Upgrading
 
 ```bash
