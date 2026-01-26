@@ -121,6 +121,11 @@ jobs:
         run: |
           echo ${{ secrets.GITHUB_TOKEN }} | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
 
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
       - name: Set chart version
         run: |
           if [[ "${{ github.ref }}" =~ ^refs/tags/v ]]; then
@@ -130,7 +135,7 @@ jobs:
             echo "Publishing version: $VERSION"
           else
             # For main branch, use version from Chart.yaml
-            VERSION=$(grep '^version:' helm/falkordb-browser/Chart.yaml | awk '{print $2}')
+            VERSION=$(yq '.version' helm/falkordb-browser/Chart.yaml)
             echo "CHART_VERSION=$VERSION" >> $GITHUB_ENV
             echo "Publishing version from Chart.yaml: $VERSION"
           fi
@@ -138,8 +143,8 @@ jobs:
       - name: Update chart version if tag
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
-          sed -i "s/^version:.*/version: ${{ env.CHART_VERSION }}/" helm/falkordb-browser/Chart.yaml
-          sed -i "s/^appVersion:.*/appVersion: \"${{ env.CHART_VERSION }}\"/" helm/falkordb-browser/Chart.yaml
+          yq -i ".version = \"${{ env.CHART_VERSION }}\"" helm/falkordb-browser/Chart.yaml
+          yq -i ".appVersion = \"${{ env.CHART_VERSION }}\"" helm/falkordb-browser/Chart.yaml
 
       - name: Package Helm chart
         run: |
