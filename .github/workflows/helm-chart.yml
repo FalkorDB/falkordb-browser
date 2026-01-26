@@ -93,9 +93,9 @@ jobs:
 
       - name: Run basic connectivity test
         run: |
-          kubectl run test-pod --image=busybox:1.36 --rm -i --restart=Never -- \
-            wget -O- --timeout=10 http://test-release-falkordb-browser:3000 || true
-          echo "✅ Connectivity test completed"
+          echo "Testing service connectivity..."
+          kubectl run test-pod --image=busybox:1.36 --rm -i --restart=Never --command -- \
+            sh -c 'wget -O- --timeout=10 http://test-release-falkordb-browser:3000 && echo "✅ Connectivity test passed"'
 
       - name: Cleanup
         if: always()
@@ -123,7 +123,11 @@ jobs:
 
       - name: Install yq
         run: |
-          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          YQ_VERSION="v4.40.5"
+          YQ_BINARY="yq_linux_amd64"
+          wget -qO /tmp/yq "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/${YQ_BINARY}"
+          echo "c9a01b6a5c7c9af7a35e1c7a034fb6c22eeef59dabc6f3b5f894aca26a39d5b8  /tmp/yq" | sha256sum -c -
+          sudo mv /tmp/yq /usr/local/bin/yq
           sudo chmod +x /usr/local/bin/yq
 
       - name: Set chart version
