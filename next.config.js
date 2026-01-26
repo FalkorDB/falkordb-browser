@@ -5,6 +5,12 @@ const nextConfig = {
   // Keep falkordb server-only to avoid bundling BigInt in client/runtime
   // Keep text-to-cypher external to avoid bundling native .node binaries
   serverExternalPackages: ['falkordb', '@falkordb/text-to-cypher'],
+  // Ensure these packages are not processed by webpack in development
+  transpilePackages: [],
+  experimental: {
+    // Disable optimizations that might interfere with BigInt
+    optimizePackageImports: []
+  },
   images: {
     unoptimized: true
   },
