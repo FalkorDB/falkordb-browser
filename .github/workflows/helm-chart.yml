@@ -188,7 +188,9 @@ jobs:
               else
                 if [ $i -lt 3 ]; then
                   echo "Push failed, retrying... (attempt $i/3)"
-                  if git pull --rebase; then
+                  # Get the default branch name
+                  DEFAULT_BRANCH=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
+                  if git pull --rebase origin ${DEFAULT_BRANCH}; then
                     echo "Rebase successful, retrying push..."
                     sleep 2
                   else
