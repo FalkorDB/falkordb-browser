@@ -1,5 +1,6 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
+import { corsHeaders } from "../../../utils";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
@@ -34,14 +35,14 @@ export async function GET(
     } catch (error) {
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: corsHeaders() }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: corsHeaders() }
     );
   }
 }

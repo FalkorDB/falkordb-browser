@@ -1,5 +1,5 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { runQuery } from "@/app/api/utils";
+import { runQuery, corsHeaders } from "@/app/api/utils";
 import { NextResponse, NextRequest } from "next/server";
 
 /**
@@ -79,6 +79,7 @@ export async function GET(
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
+      ...corsHeaders(),
     },
   });
 }

@@ -3,7 +3,11 @@ import { TextToCypher } from "@falkordb/text-to-cypher";
 import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { getClient } from "../auth/[...nextauth]/options";
 import { chatRequest, validateBody } from "../validate-body";
-import { buildFalkorDBConnection } from "../utils";
+import { buildFalkorDBConnection, corsHeaders } from "../utils";
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders() });
+}
 
 export async function GET() {
     try {
@@ -15,10 +19,10 @@ export async function GET() {
 
         // Return empty object to allow chat to be displayed
         // The actual model configuration is provided by the user in the frontend
-        return NextResponse.json({}, { status: 200 });
+        return NextResponse.json({}, { status: 200, headers: corsHeaders() });
     } catch (error) {
         console.error(error);
-        return NextResponse.json({ error: (error as Error).message }, { status: 500 });
+        return NextResponse.json({ error: (error as Error).message }, { status: 500, headers: corsHeaders() });
     }
 }
 
@@ -104,6 +108,7 @@ export async function POST(request: NextRequest) {
                     "Content-Type": "text/event-stream",
                     "Cache-Control": "no-cache",
                     Connection: "keep-alive",
+                    ...corsHeaders(),
                 },
             });
         }
@@ -120,6 +125,7 @@ export async function POST(request: NextRequest) {
                     "Content-Type": "text/event-stream",
                     "Cache-Control": "no-cache",
                     Connection: "keep-alive",
+                    ...corsHeaders(),
                 },
             });
         }
@@ -187,6 +193,7 @@ export async function POST(request: NextRequest) {
             "Content-Type": "text/event-stream",
             "Cache-Control": "no-cache",
             Connection: "keep-alive",
+            ...corsHeaders(),
         },
     });
 }

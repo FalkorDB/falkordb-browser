@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { User, ROLE } from "./model";
 import { createUser, deleteUsers, validateBody } from "../validate-body";
+import { corsHeaders } from "../utils";
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders() });
+}
 
 export async function GET() {
   try {
@@ -38,19 +43,19 @@ export async function GET() {
           };
         });
 
-      return NextResponse.json({ result }, { status: 200 });
+      return NextResponse.json({ result }, { status: 200, headers: corsHeaders() });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: corsHeaders() }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: corsHeaders() }
     );
   }
 }
@@ -75,7 +80,7 @@ export async function POST(req: NextRequest) {
       if (!validation.success) {
         return NextResponse.json(
           { message: validation.error },
-          { status: 400 }
+          { status: 400, headers: corsHeaders() }
         );
       }
 
@@ -90,7 +95,7 @@ export async function POST(req: NextRequest) {
         if (user) {
           return NextResponse.json(
             { message: `User ${username} already exists` },
-            { status: 409 }
+            { status: 409, headers: corsHeaders() }
           );
         }
       } catch (err: unknown) {
@@ -104,6 +109,7 @@ export async function POST(req: NextRequest) {
           status: 201,
           headers: {
             location: `/api/db/user/${username}`,
+            ...corsHeaders(),
           },
         }
       );
@@ -111,14 +117,14 @@ export async function POST(req: NextRequest) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: corsHeaders() }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: corsHeaders() }
     );
   }
 }
@@ -143,7 +149,7 @@ export async function DELETE(req: NextRequest) {
       if (!validation.success) {
         return NextResponse.json(
           { message: validation.error },
-          { status: 400 }
+          { status: 400, headers: corsHeaders() }
         );
       }
 
@@ -154,19 +160,19 @@ export async function DELETE(req: NextRequest) {
         })
       );
 
-      return NextResponse.json({ message: "Users deleted" }, { status: 200 });
+      return NextResponse.json({ message: "Users deleted" }, { status: 200, headers: corsHeaders() });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: corsHeaders() }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: corsHeaders() }
     );
   }
 }
