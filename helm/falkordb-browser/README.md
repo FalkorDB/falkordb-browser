@@ -301,6 +301,15 @@ After deploying the browser, you'll need to configure it to connect to your Falk
 2. Deploy FalkorDB separately using its Helm chart (if available)
 3. Connect to an external FalkorDB instance
 
+## Publishing and CI/CD
+
+This chart is automatically published to GitHub Container Registry (GHCR) via GitHub Actions.
+
+For maintainers setting up the CI/CD pipeline, see the setup documentation:
+[Helm Chart CI/CD Setup](../../.github/workflows/HELM_CHART_SETUP.md)
+
+The workflow requires a `GHCR_TOKEN` secret with `write:packages` permission to publish charts to `ghcr.io/falkordb/charts`.
+
 ## Support
 
 For issues and questions:

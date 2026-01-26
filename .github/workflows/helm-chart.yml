@@ -1,5 +1,9 @@
 name: Helm Chart CI/CD
 
+# This workflow requires a GHCR_TOKEN secret with packages:write permission
+# to publish Helm charts to ghcr.io/falkordb/charts
+# See: https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry
+
 on:
   push:
     branches: ["main", "staging"]
@@ -119,7 +123,7 @@ jobs:
 
       - name: Login to GitHub Container Registry
         run: |
-          echo ${{ secrets.GITHUB_TOKEN }} | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+          echo ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }} | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Install yq
         run: |
