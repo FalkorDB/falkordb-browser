@@ -125,7 +125,9 @@ env:
   chatUrl: "http://localhost:8080/"
   # Base URL for the browser (should match your ingress/service URL)
   nextauthUrl: "http://localhost:3000/"
-  # Secret for NextAuth.js authentication (change this in production!)
+  # Secret for NextAuth.js authentication
+  # WARNING: Change this value in production! Generate a secure random string.
+  # You can generate one with: openssl rand -base64 32
   nextauthSecret: "SECRET"
   # Google Analytics ID (optional)
   googleAnalytics: ""
