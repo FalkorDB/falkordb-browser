@@ -28,6 +28,7 @@ export async function GET(
       return new NextResponse(result, {
         status: 200,
         headers: {
+          ...corsHeaders(),
           "Content-Type": "application/octet-stream",
           "Content-Disposition": `attachment; filename="${graphId}.dump"`,
         },

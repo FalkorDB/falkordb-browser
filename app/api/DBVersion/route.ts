@@ -23,7 +23,27 @@ export async function GET() {
 
       const data = result.find((arr: any[]) => arr.some((mod: string, index: number) => mod === "name" && arr[index + 1] === "graph"));
 
-      return NextResponse.json({ result: [data[data.findIndex((mod: string) => mod === "name") + 1], data[data.findIndex((mod: string) => mod === "ver") + 1]] }, { status: 200, headers: corsHeaders() });
+      if (!data) {
+        return NextResponse.json(
+          { message: "Graph module not found" },
+          { status: 404, headers: corsHeaders() }
+        );
+      }
+
+      const nameIndex = data.findIndex((mod: string) => mod === "name");
+      const verIndex = data.findIndex((mod: string) => mod === "ver");
+
+      if (nameIndex === -1 || verIndex === -1 || !data[nameIndex + 1] || !data[verIndex + 1]) {
+        return NextResponse.json(
+          { message: "Invalid module metadata format" },
+          { status: 500, headers: corsHeaders() }
+        );
+      }
+
+      return NextResponse.json(
+        { result: [data[nameIndex + 1], data[verIndex + 1]] },
+        { status: 200, headers: corsHeaders() }
+      );
     } catch (error) {
       console.error(error);
       return NextResponse.json(

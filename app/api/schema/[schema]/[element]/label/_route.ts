@@ -1,6 +1,7 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { addSchemaElementLabel, removeSchemaElementLabel, validateBody } from "@/app/api/validate-body";
 import { NextRequest, NextResponse } from "next/server";
+import { corsHeaders } from "@/app/api/utils";
 
 export async function DELETE(
   request: NextRequest,
@@ -25,7 +26,7 @@ export async function DELETE(
       const validation = validateBody(removeSchemaElementLabel, body);
 
       if (!validation.success) {
-        return NextResponse.json({ message: validation.error }, { status: 400 });
+        return NextResponse.json({ message: validation.error }, { status: 400, headers: corsHeaders() });
       }
 
       const { label } = validation.data;
@@ -38,19 +39,19 @@ export async function DELETE(
 
       return NextResponse.json(
         { message: "Label removed successfully" },
-        { status: 200 }
+        { status: 200, headers: corsHeaders() }
       );
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: corsHeaders() }
       );
     }
   } catch (err) {
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: corsHeaders() }
     );
   }
 }
@@ -78,7 +79,7 @@ export async function POST(
       const validation = validateBody(addSchemaElementLabel, body);
 
       if (!validation.success) {
-        return NextResponse.json({ message: validation.error }, { status: 400 });
+        return NextResponse.json({ message: validation.error }, { status: 400, headers: corsHeaders() });
       }
 
       const { label } = validation.data;
@@ -93,19 +94,19 @@ export async function POST(
 
       return NextResponse.json(
         { message: "Label added successfully" },
-        { status: 200 }
+        { status: 200, headers: corsHeaders() }
       );
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: corsHeaders() }
       );
     }
   } catch (err) {
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: corsHeaders() }
     );
   }
 }

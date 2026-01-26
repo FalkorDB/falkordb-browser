@@ -7,6 +7,10 @@ import {
 } from "../../../../validate-body";
 import { corsHeaders } from "../../../../utils";
 
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders() });
+}
+
 export async function POST(
   request: NextRequest,
   {

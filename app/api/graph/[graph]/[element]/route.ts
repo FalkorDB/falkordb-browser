@@ -7,6 +7,10 @@ import {
 } from "../../../validate-body";
 import { corsHeaders } from "../../../utils";
 
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders() });
+}
+
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
   request: NextRequest,
@@ -76,7 +80,7 @@ export async function POST(
       if (!validation.success) {
         return NextResponse.json(
           { message: validation.error },
-          { status: 400 }
+          { status: 400, headers: corsHeaders() }
         );
       }
 
@@ -161,7 +165,7 @@ export async function DELETE(
       if (!validation.success) {
         return NextResponse.json(
           { message: validation.error },
-          { status: 400 }
+          { status: 400, headers: corsHeaders() }
         );
       }
 

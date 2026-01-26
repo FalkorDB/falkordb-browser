@@ -2,6 +2,10 @@ import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
 import { corsHeaders } from "../../../utils";
 
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders() });
+}
+
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
   request: NextRequest,
