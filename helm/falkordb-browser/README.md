@@ -193,7 +193,6 @@ ingress:
     nginx.ingress.kubernetes.io/affinity-mode: "persistent"
     nginx.ingress.kubernetes.io/session-cookie-name: "falkordb-browser-session"
     nginx.ingress.kubernetes.io/session-cookie-max-age: "10800"
-    nginx.ingress.kubernetes.io/session-cookie-expires: "10800"
     # Optional: secure cookie settings
     nginx.ingress.kubernetes.io/session-cookie-secure: "true"
     nginx.ingress.kubernetes.io/session-cookie-samesite: "Lax"
@@ -206,10 +205,6 @@ ingress:
     - secretName: falkordb-browser-tls
       hosts:
         - falkordb-browser.example.com
-
-env:
-  nextauthUrl: https://falkordb-browser.example.com
-  nextauthSecret: "your-secure-secret-here"
 ```
 
 #### Traefik Ingress Controller
