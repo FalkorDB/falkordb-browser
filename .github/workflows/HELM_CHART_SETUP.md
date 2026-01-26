@@ -10,8 +10,13 @@ To publish Helm charts to `ghcr.io/falkordb/charts`, you need a GitHub token wit
 
 ### Step 1: Create a Personal Access Token (PAT)
 
-1. Go to GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
-   - URL: https://github.com/settings/tokens
+1. Navigate to GitHub Settings:
+   - Click your profile picture (top-right)
+   - Select "Settings"
+   - Go to "Developer settings" (left sidebar, bottom)
+   - Click "Personal access tokens"
+   - Select "Tokens (classic)"
+   - Or go directly to: https://github.com/settings/tokens
 2. Click "Generate new token" → "Generate new token (classic)"
 3. Configure the token:
    - **Note**: `Helm Chart Publishing for FalkorDB`
@@ -128,20 +133,44 @@ Published charts are available at:
 oci://ghcr.io/falkordb/charts/falkordb-browser
 ```
 
+### Installing Published Charts
+
+Once published, users can install the chart:
+
+```bash
+# Install the latest version
+helm install falkordb-browser oci://ghcr.io/falkordb/charts/falkordb-browser
+
+# Install a specific version
+helm install falkordb-browser oci://ghcr.io/falkordb/charts/falkordb-browser --version 1.6.7
+
+# Access the application
+kubectl port-forward svc/falkordb-browser 3000:3000
+```
+
 ## Manual Publishing (If Needed)
 
 If you need to manually publish a chart:
 
 ```bash
-# Login to GHCR
-echo $GHCR_TOKEN | helm registry login ghcr.io -u your-github-username --password-stdin
+# Store token securely (avoid exposing in shell history)
+# Option 1: Read from file
+cat ~/.ghcr-token | helm registry login ghcr.io -u your-github-username --password-stdin
+
+# Option 2: Use environment variable (safer)
+echo "${GHCR_TOKEN}" | helm registry login ghcr.io -u your-github-username --password-stdin
 
 # Package the chart
 helm package helm/falkordb-browser
 
 # Push to GHCR
 helm push falkordb-browser-*.tgz oci://ghcr.io/falkordb/charts
+
+# Logout when done
+helm registry logout ghcr.io
 ```
+
+**Security Note**: Never type tokens directly in commands or export them to avoid shell history exposure.
 
 ## References
 
