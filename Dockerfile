@@ -1,6 +1,6 @@
 ARG CYPHER_VERSION=latest
 
-FROM node:24-alpine AS base
+FROM node:24-alpine3.19 AS base
 
 # Install dependencies only when needed
 FROM base AS deps
