@@ -1,6 +1,3 @@
-/* eslint-disable no-restricted-syntax */
-/* eslint-disable no-plusplus */
-/* eslint-disable no-await-in-loop */
 import { expect, test } from "@playwright/test";
 import {
   getRandomString,

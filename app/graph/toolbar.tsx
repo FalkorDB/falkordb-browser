@@ -299,7 +299,9 @@ export default function Toolbar({
                         >
                             <Info size={20} />
                         </Button>
-                        <Button
+                        {
+                            (hasLimitWarning || hasLimitChangeWarning) &&
+                            <Button
                             data-testid={`elementCanvasInfo${label}`}
                             className="p-1 pointer-events-auto bg-background cursor-default border-orange-300"
                             variant="Secondary"
@@ -307,10 +309,10 @@ export default function Toolbar({
                             tooltipSide="bottom"
                             title={`${hasLimitWarning ? `Data currently limited to ${graph.Data.length} rows` : ""}
                             ${hasLimitChangeWarning ? "Rerun the query to apply the new limit." : ""}`}
-                        >
+                            >
                             <Info className="text-orange-300" size={20} />
                         </Button>
-
+                        }
                         <Button
                             data-testid={`elementCanvasAddNode${label}`}
                             className="p-1 pointer-events-auto bg-background border-green-900"

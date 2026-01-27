@@ -752,9 +752,9 @@ export default class GraphPage extends Page {
   }
 
   async getNodeCanvasToolTip(): Promise<string | null> {
-    await this.page.waitForTimeout(1000);
-    const toolTipText = await this.getNodeCanvasToolTipContent();
-    return toolTipText;
+      await this.page.waitForTimeout(1000);
+      const toolTipText = await this.getNodeCanvasToolTipContent();
+      return toolTipText;
   }
 
   // eslint-disable-next-line class-methods-use-this
