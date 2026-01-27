@@ -815,7 +815,7 @@ export class Graph {
     this.linksMap = new Map<number, Link>(this.elements.links.map((l) => [l.id, l]));
 
     newElements
-      .filter((element): element is Node => "labels" in element)
+      .filter((element): element is Node => !!element && "labels" in element)
       .forEach((node) => {
         const label = getLabelWithFewestElements(
           node.labels.map(
