@@ -121,7 +121,7 @@ export default function ForceGraph({
 
         if (result.ok) {
             const json = await result.json();
-            const elements = graph.extend(json.result, true);
+            const elements = graph.extend(json.result, false, true, true);
 
             if (elements.length === 0) {
                 toast({

@@ -117,7 +117,7 @@ export default function Page() {
         }, toast, setIndicator);
         if (!result.ok) return;
         const json = await result.json();
-        const schemaGraph = Graph.create(schemaName, json.result, false, true, 0);
+        const schemaGraph = Graph.create(schemaName, json.result, 0, undefined, true);
         setSchema(schemaGraph);
     }, [setIndicator, setSchema, toast, schemaName]);
 

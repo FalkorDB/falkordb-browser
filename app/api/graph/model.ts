@@ -104,7 +104,7 @@ export type LinkCell = {
   };
 };
 
-export type DataCell = NodeCell | LinkCell | number | string | null;
+export type DataCell = NodeCell | LinkCell | NodeCell[] | LinkCell[] | number | string | null;
 
 export type DataRow = {
   [key: string]: DataCell;
@@ -481,17 +481,16 @@ export class Graph {
   public static create(
     id: string,
     results: { data: Data; metadata: any[] },
-    isCollapsed: boolean,
-    isSchema: boolean,
     currentLimit: number,
-    graphInfo?: GraphInfo
+    graphInfo?: GraphInfo,
+    isSchema = false
   ): Graph {
     const graph = Graph.empty(
       undefined,
       currentLimit,
       graphInfo
     );
-    graph.extend(results, isCollapsed, isSchema);
+    graph.extend(results, isSchema);
     graph.id = id;
     return graph;
   }
@@ -740,8 +739,9 @@ export class Graph {
 
   public extend(
     results: { data: Data; metadata: any[] },
+    isSchema = false,
     collapsed = false,
-    isSchema = false
+    isMerge = false
   ): (Node | Link)[] {
     const newElements: (Node | Link)[] = [];
     const { data } = results;
@@ -751,11 +751,18 @@ export class Graph {
         this.columns = Object.keys(data[0]);
       }
 
-      this.data = { ...data, ...this.data };
+      if (isMerge) {
+        // Only add rows that don't already exist
+        const existingRowsSet = new Set(this.data.map(row => JSON.stringify(row)));
+        const newRows = data.filter(row => !existingRowsSet.has(JSON.stringify(row)));
+        this.data = [...this.data, ...newRows];
+      } else {
+        this.data = [...this.data, ...data];
+      }
     }
 
     data.forEach((row: DataRow) => {
-      Object.values(row).forEach((cell: any) => {
+      Object.values(row).forEach((cell) => {
         if (Array.isArray(cell) && cell[0] instanceof Object) {
           cell.forEach((c: any) => {
             const elements = this.extendCell(c, collapsed, isSchema);
@@ -994,7 +1001,7 @@ export class Graph {
           if (
             cell &&
             typeof cell === "object" &&
-            elements.some((element) => element.id === cell.id)
+            elements.some((element) => Array.isArray(cell) ? cell.some(c => c.id === element.id) : element.id === cell.id)
           ) {
             return [key, undefined];
           }
@@ -1018,13 +1025,22 @@ export class Graph {
             if (
               cell &&
               typeof cell === "object" &&
-              cell.id === selectedElement.id &&
-              "labels" in cell
+              (Array.isArray(cell) ? cell.some(c => c.id === selectedElement.id) : cell.id === selectedElement.id) &&
+              "labels" in (Array.isArray(cell) ? cell[0] : cell)
             ) {
-              const newCell = { ...cell };
-              newCell.labels = newCell.labels.filter((l) => l !== label);
+              const newCell = Array.isArray(cell) ? cell.map(c => ({ ...c }) as NodeCell) : { ...cell } as NodeCell;
+
+              if (Array.isArray(newCell)) {
+                newCell.forEach((c) => {
+                  c.labels = c.labels.filter((l) => l !== label);
+                });
+              } else {
+                newCell.labels = newCell.labels.filter((l) => l !== label);
+              }
+
               return [key, newCell];
             }
+
             return [key, cell];
           })
         )
@@ -1088,13 +1104,22 @@ export class Graph {
             if (
               cell &&
               typeof cell === "object" &&
-              cell.id === selectedElement.id &&
-              "labels" in cell
+              (Array.isArray(cell) ? cell.some(c => c.id === selectedElement.id) : cell.id === selectedElement.id) &&
+              "labels" in (Array.isArray(cell) ? cell[0] : cell)
             ) {
-              const newCell = { ...cell };
-              newCell.labels.push(label);
+              const newCell = Array.isArray(cell) ? cell.map(c => ({ ...c }) as NodeCell) : { ...cell } as NodeCell;
+
+              if (Array.isArray(newCell)) {
+                newCell.forEach((c) => {
+                  c.labels.push(label);
+                });
+              } else {
+                newCell.labels.push(label);
+              }
+
               return [key, newCell];
             }
+
             return [key, cell];
           })
         )
@@ -1149,12 +1174,16 @@ export class Graph {
         if (
           cell &&
           typeof cell === "object" &&
-          cell.id === id &&
-          (type ? !("sourceId" in cell) : "sourceId" in cell)
+          (Array.isArray(cell) ? cell.some(c => c.id === id) : cell.id === id) &&
+          (type === !("labels" in (Array.isArray(cell) ? cell[0] : cell)))
         ) {
-          delete cell.properties[key];
+          if (Array.isArray(cell)) {
+            cell.forEach(c => c.id === id && delete c.properties[key]);
+          } else delete cell.properties[key];
+
           return [k, cell];
         }
+
         return [k, cell];
       });
       return Object.fromEntries(newRow);
@@ -1168,12 +1197,12 @@ export class Graph {
           if (
             cell &&
             typeof cell === "object" &&
-            cell.id === id &&
-            (type ? !("sourceId" in cell) : "sourceId" in cell)
+            (Array.isArray(cell) ? cell.some(c => c.id === id) : cell.id === id) &&
+            (type === !("labels" in (Array.isArray(cell) ? cell[0] : cell)))
           ) {
             return [
               k,
-              { ...cell, properties: { ...cell.properties, [key]: val } },
+              { ...cell, properties: { ...(Array.isArray(cell) ? cell.map(c => c.id === id && c.properties).filter((p) => !!p) : cell.properties), [key]: val } },
             ];
           }
           return [k, cell];

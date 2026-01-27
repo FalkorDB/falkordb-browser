@@ -26,9 +26,9 @@ export async function GET(
       const graph = client.selectGraph(graphId);
 
       // Get node's neighbors
-      const query = `MATCH (src)-[e]-(n)
-                          WHERE ID(src) = $id
-                          RETURN e, n`;
+      const query = `MATCH (n)-[e]-(m)
+                          WHERE ID(n) = $id
+                          RETURN *`;
 
       const result =
         user.role === "Read-Only"
