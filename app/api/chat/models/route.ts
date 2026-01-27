@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TextToCypher } from "@falkordb/text-to-cypher";
 import { getClient } from "../../auth/[...nextauth]/options";
-import { buildFalkorDBConnection } from "../../utils";
+import { buildFalkorDBConnection, corsHeaders } from "../../utils";
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders() });
+}
 
 /**
  * GET endpoint to fetch available AI models
@@ -15,7 +19,7 @@ export async function GET(request: NextRequest) {
         if (session instanceof NextResponse) {
             return NextResponse.json(
                 { error: "Unauthorized" },
-                { status: 401 }
+                { status: 401, headers: corsHeaders() }
             );
         }
 
@@ -39,12 +43,12 @@ export async function GET(request: NextRequest) {
             models = await textToCypher.listModels();
         }
 
-        return NextResponse.json({ models }, { status: 200 });
+        return NextResponse.json({ models }, { status: 200, headers: corsHeaders() });
     } catch (error) {
         console.error("Error fetching models:", error);
         return NextResponse.json(
             { error: (error as Error).message },
-            { status: 500 }
+            { status: 500, headers: corsHeaders() }
         );
     }
 }

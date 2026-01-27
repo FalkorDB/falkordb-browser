@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
+import { corsHeaders } from "@/app/api/utils";
 
 const fields = ["used_memory", "used_memory_rss"];
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders() });
+}
+
 // eslint-disable-next-line import/prefer-default-export
 export async function GET() {
   try {
@@ -35,20 +41,20 @@ export async function GET() {
 
       return NextResponse.json(
         { memory: dataMemory, graph: dataGraph },
-        { status: 200 }
+        { status: 200, headers: corsHeaders() }
       );
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: corsHeaders() }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: corsHeaders() }
     );
   }
 }

@@ -2,6 +2,7 @@ import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
 import { GET as getDBVersion } from "@/app/api/DBVersion/route";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "@/app/utils";
+import { corsHeaders } from "../../../utils";
 
 /**
  * Handle GET requests to return memory usage for the specified graph.
@@ -43,7 +44,7 @@ export async function GET(
 
         return NextResponse.json(
           { message: `Failed to retrieve database version: ${message}` },
-          { status: 400 }
+          { status: 400, headers: corsHeaders() }
         );
       }
 
@@ -52,7 +53,7 @@ export async function GET(
       if (name !== "graph" || version < MEMORY_USAGE_VERSION_THRESHOLD) {
         return NextResponse.json(
           { message: `Memory usage feature requires graph module version ${MEMORY_USAGE_VERSION_THRESHOLD} or higher. Current version: ${version}` },
-          { status: 400 }
+          { status: 400, headers: corsHeaders() }
         );
       }
 
@@ -60,17 +61,17 @@ export async function GET(
       const { graph } = await params;
       const result = await client.selectGraph(graph).memoryUsage();
 
-      return NextResponse.json({ result }, { status: 200 });
+      return NextResponse.json({ result }, { status: 200, headers: corsHeaders() });
     } catch (err) {
       return NextResponse.json(
         { message: (err as Error).message },
-        { status: 400 }
+        { status: 400, headers: corsHeaders() }
       );
     }
   } catch (err) {
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: corsHeaders() }
     );
   }
 }

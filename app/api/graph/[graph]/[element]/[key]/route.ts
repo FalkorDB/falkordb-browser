@@ -5,6 +5,11 @@ import {
   deleteGraphElementAttribute,
   validateBody,
 } from "../../../../validate-body";
+import { corsHeaders } from "../../../../utils";
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders() });
+}
 
 export async function POST(
   request: NextRequest,
@@ -32,7 +37,7 @@ export async function POST(
       if (!validation.success) {
         return NextResponse.json(
           { message: validation.error },
-          { status: 400 }
+          { status: 400, headers: corsHeaders() }
         );
       }
 
@@ -49,20 +54,20 @@ export async function POST(
 
       return NextResponse.json(
         { message: "Attribute updated successfully" },
-        { status: 200 }
+        { status: 200, headers: corsHeaders() }
       );
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: corsHeaders() }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: corsHeaders() }
     );
   }
 }
@@ -94,7 +99,7 @@ export async function DELETE(
       if (!validation.success) {
         return NextResponse.json(
           { message: validation.error },
-          { status: 400 }
+          { status: 400, headers: corsHeaders() }
         );
       }
 
@@ -111,20 +116,20 @@ export async function DELETE(
 
       return NextResponse.json(
         { message: "Attribute deleted successfully" },
-        { status: 200 }
+        { status: 200, headers: corsHeaders() }
       );
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: corsHeaders() }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: corsHeaders() }
     );
   }
 }
