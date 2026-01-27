@@ -72,6 +72,16 @@ function createUserFriendlyErrorMessage(error: unknown, model: string, apiKey: s
         return "Network error. Please check your internet connection and try again.";
     }
 
+    // Check for text-to-cypher query generation failures
+    if (errorMessage.includes("Query validation failed") || errorMessage.includes("Query does not contain valid Cypher keywords")) {
+        return "Failed to convert your question to a valid database query.";
+    }
+
+    // Check for general text-to-cypher failures
+    if (errorMessage.includes("Text-to-Cypher failed") || errorMessage.includes("Failed to generate query")) {
+        return "Unable to generate a database query from your question.";
+    }
+
     // Default: return original error message
     return errorMessage;
 }
@@ -145,6 +155,11 @@ export async function POST(request: NextRequest) {
             // Call textToCypher and get the result
             const result = await textToCypher.textToCypher(graphName, question);
 
+            // Check if the result has an error status
+            if (result.status === 'error') {
+                throw new Error(result.error || 'Text-to-Cypher failed');
+            }
+
             // Send result events
             if (result.schema) {
                 writer.write(encoder.encode(`event: Schema data: ${JSON.stringify(result.schema)}\n\n`));
@@ -164,7 +179,7 @@ export async function POST(request: NextRequest) {
 
             writer.close();
         } catch (error) {
-            console.error(error);
+            console.error('Text-to-Cypher error details:', error);
 
             // Create user-friendly error message
             const userFriendlyMessage = createUserFriendlyErrorMessage(error as Error, model || "gpt-4o-mini", key);
