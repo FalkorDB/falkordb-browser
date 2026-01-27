@@ -1210,7 +1210,7 @@ export class Graph {
           ) {
             return [
               k,
-              { ...cell, properties: { ...(Array.isArray(cell) ? cell.map(c => c.id === id && c.properties).filter((p) => !!p) : cell.properties), [key]: val } },
+              { ...cell, properties: { ...(Array.isArray(cell) ? cell.find(c => c.id === id) : cell)?.properties, [key]: val } },
             ];
           }
           return [k, cell];

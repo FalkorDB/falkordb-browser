@@ -31,21 +31,6 @@ export async function GET() {
       }
 
       return NextResponse.json({ result: [data?.name, data?.ver] }, { status: 200 });
-
-      const nameIndex = data.findIndex((mod: string) => mod === "name");
-      const verIndex = data.findIndex((mod: string) => mod === "ver");
-
-      if (nameIndex === -1 || verIndex === -1 || !data[nameIndex + 1] || !data[verIndex + 1]) {
-        return NextResponse.json(
-          { message: "Invalid module metadata format" },
-          { status: 500, headers: corsHeaders() }
-        );
-      }
-
-      return NextResponse.json(
-        { result: [data[nameIndex + 1], data[verIndex + 1]] },
-        { status: 200, headers: corsHeaders() }
-      );
     } catch (error) {
       console.error(error);
       return NextResponse.json(
