@@ -787,7 +787,7 @@ export class Graph {
 
     data.forEach((row: DataRow) => {
       Object.values(row).forEach((cell) => {
-        if (Array.isArray(cell) && cell[0] instanceof Object) {
+        if (Array.isArray(cell) && cell.length > 0 && cell[0] instanceof Object) {
           cell.forEach((c: any) => {
             const elements = this.extendCell(c, collapsed, isSchema);
             if (elements) {
@@ -1030,11 +1030,14 @@ export class Graph {
       this.Data = this.Data.map((row) =>
         Object.fromEntries(
           Object.entries(row).map(([key, cell]) => {
+            const cellToCheck = Array.isArray(cell) && cell.length > 0 ? cell[0] : cell;
             if (
               cell &&
+              cellToCheck &&
               typeof cell === "object" &&
+              typeof cellToCheck === "object" &&
               (Array.isArray(cell) ? cell.some(c => c.id === selectedElement.id) : cell.id === selectedElement.id) &&
-              "labels" in (Array.isArray(cell) ? cell[0] : cell)
+              "labels" in cellToCheck 
             ) {
               const newCell = Array.isArray(cell) ? cell.map(c => ({ ...c }) as NodeCell) : { ...cell } as NodeCell;
 
@@ -1109,11 +1112,14 @@ export class Graph {
       this.Data = this.Data.map((row) =>
         Object.fromEntries(
           Object.entries(row).map(([key, cell]) => {
+            const cellToCheck = Array.isArray(cell) && cell.length > 0 ? cell[0] : cell;
             if (
               cell &&
+              cellToCheck &&
               typeof cell === "object" &&
+              typeof cellToCheck === "object" &&
               (Array.isArray(cell) ? cell.some(c => c.id === selectedElement.id) : cell.id === selectedElement.id) &&
-              "labels" in (Array.isArray(cell) ? cell[0] : cell)
+              "labels" in cellToCheck
             ) {
               const newCell = Array.isArray(cell) ? cell.map(c => ({ ...c }) as NodeCell) : { ...cell } as NodeCell;
 
@@ -1179,11 +1185,14 @@ export class Graph {
   public removeProperty(key: string, id: number, type: boolean) {
     this.Data = this.Data.map((row) => {
       const newRow = Object.entries(row).map(([k, cell]) => {
+        const cellToCheck = Array.isArray(cell) && cell.length > 0 ? cell[0] : cell;
         if (
           cell &&
+          cellToCheck &&
           typeof cell === "object" &&
+          typeof cellToCheck === "object" &&
           (Array.isArray(cell) ? cell.some(c => c.id === id) : cell.id === id) &&
-          (type === !("labels" in (Array.isArray(cell) ? cell[0] : cell)))
+          (type === !("labels" in cellToCheck))
         ) {
           if (Array.isArray(cell)) {
             cell.forEach(c => c.id === id && delete c.properties[key]);
@@ -1202,11 +1211,14 @@ export class Graph {
     this.Data = this.Data.map((row) =>
       Object.fromEntries(
         Object.entries(row).map(([k, cell]) => {
+          const cellToCheck = Array.isArray(cell) && cell.length > 0 ? cell[0] : cell;
           if (
             cell &&
+            cellToCheck &&
             typeof cell === "object" &&
+            typeof cellToCheck === "object" &&
             (Array.isArray(cell) ? cell.some(c => c.id === id) : cell.id === id) &&
-            (type === !("labels" in (Array.isArray(cell) ? cell[0] : cell)))
+            (type === !("labels" in cellToCheck))
           ) {
             return [
               k,
