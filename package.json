@@ -12,7 +12,6 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "-": "^0.0.1",
     "@falkordb/canvas": "^0.0.26",
     "@falkordb/text-to-cypher": "^0.1.11",
     "@hookform/resolvers": "^3.10.0",
