@@ -493,6 +493,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
             setSecretKey(decryptedKey);
           } else {
             // Decryption failed (corrupted or key mismatch) - clear it
+            // eslint-disable-next-line no-console
             console.warn('Clearing corrupted encrypted secret key');
             setSecretKey('');
             localStorage.removeItem("secretKey");
