@@ -1,5 +1,3 @@
-/* eslint-disable no-await-in-loop */
-
 import test, { expect } from "@playwright/test";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import urls from '../config/urls.json';
