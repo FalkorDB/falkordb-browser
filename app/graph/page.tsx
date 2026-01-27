@@ -359,6 +359,7 @@ export default function Page() {
             default:
                 return undefined;
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [graphName, panel, handleSetSelectedElements, setPanel, isAddNode, selectedElements, handleCreateElement]);
 
     return (
