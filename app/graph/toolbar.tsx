@@ -302,7 +302,7 @@ export default function Toolbar({
                         {
                             (hasLimitWarning || hasLimitChangeWarning) &&
                             <Button
-                                data-testid={`elementCanvasInfo${label}`}
+                                data-testid={`elementCanvasWarning${label}`}
                                 className="p-1 pointer-events-auto bg-background cursor-default border-orange-300"
                                 variant="Secondary"
                                 tooltipVariant="Primary"
