@@ -103,7 +103,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
 
             canvas.setGraphData(currentData);
         }
-    }, [canvasRef, graph.GraphInfo.Labels, graph.LabelsMap, label.name]);
+    }, [canvasRef, graph.GraphInfo.Labels, graph.Labels, graph.LabelsMap, label.name, setLabels]);
 
     const handleColorSelect = (color: string) => {
         setSelectedColor(color);

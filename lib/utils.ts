@@ -1,3 +1,4 @@
+/* eslint-disable no-param-reassign */
 // eslint-disable-next-line import/prefer-default-export
 
 "use client";
@@ -5,7 +6,7 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { MutableRefObject } from "react";
-import { Node, Link, DataCell, MemoryValue } from "@/app/api/graph/model";
+import { Node, Link, DataCell, MemoryValue, Label, InfoLabel } from "@/app/api/graph/model";
 import type { FalkorDBCanvas } from "@falkordb/canvas";
 
 export type ToastArguments = {
@@ -152,7 +153,7 @@ export async function securedFetch(
       description: message,
       variant: "destructive",
     });
-    
+
     if (status === 401 || status >= 500) {
       setIndicator("offline");
     }
@@ -164,6 +165,22 @@ export async function securedFetch(
 
 export function prepareArg(arg: string) {
   return encodeURIComponent(arg.trim());
+}
+
+export function loadLabelStyle(label: Label | InfoLabel): void {
+  if (typeof window === "undefined") return;
+
+  const storageKey = `labelStyle_${label.name}`;
+  const savedStyle = localStorage.getItem(storageKey);
+
+  if (savedStyle) {
+    try {
+      const style = JSON.parse(savedStyle);
+      label.style = style;
+    } catch (e) {
+      // Ignore invalid JSON
+    }
+  }
 }
 
 export const getDefaultQuery = (q?: string) =>

@@ -270,14 +270,16 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setSchemaNames
   }), [schema, schemaName, schemaNames]);
 
-  const fetchCount = useCallback(async () => {
-    if (!graphName) return;
+  const fetchCount = useCallback(async (name?: string) => {
+    const n = name || graphName;
+    
+    if (!n) return;
 
     setEdgesCount(undefined);
     setNodesCount(undefined);
 
     try {
-      const result = await getSSEGraphResult(`api/graph/${prepareArg(graphName)}/count`, toast, setIndicator) as { nodes?: number; edges?: number };
+      const result = await getSSEGraphResult(`api/graph/${prepareArg(n)}/count`, toast, setIndicator) as { nodes?: number; edges?: number };
 
       if (!result) return;
 
@@ -380,7 +382,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
       setGraph(g);
       setData({ ...g.Elements });
-      fetchCount();
+      fetchCount(n);
       setLastLimit(limit);
 
       localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }));

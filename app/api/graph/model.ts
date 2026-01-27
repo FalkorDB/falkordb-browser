@@ -3,6 +3,8 @@
 /* eslint-disable no-param-reassign */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { loadLabelStyle } from "@/lib/utils";
+
 export type Value = string | number | boolean;
 
 export type HistoryQuery = {
@@ -299,6 +301,8 @@ export class GraphInfo {
           },
           show: true,
         };
+
+        loadLabelStyle(c);
 
         this.labels.set(label, c);
         this.colorsCounter += 1;
@@ -765,6 +769,8 @@ export class Graph {
       }
     }
 
+    if (!data || data.length === 0) return [];
+
     data.forEach((row: DataRow) => {
       Object.values(row).forEach((cell) => {
         if (Array.isArray(cell) && cell[0] instanceof Object) {
@@ -829,7 +835,7 @@ export class Graph {
         };
 
         // Load saved style from localStorage
-        Graph.loadLabelStyle(c);
+        loadLabelStyle(c);
 
         this.labelsMap.set(c.name, c);
         this.labels.push(c);
@@ -841,22 +847,6 @@ export class Graph {
 
       return c;
     });
-  }
-
-  public static loadLabelStyle(label: Label): void {
-    if (typeof window === "undefined") return;
-
-    const storageKey = `labelStyle_${label.name}`;
-    const savedStyle = localStorage.getItem(storageKey);
-
-    if (savedStyle) {
-      try {
-        const style = JSON.parse(savedStyle);
-        label.style = style;
-      } catch (e) {
-        // Ignore invalid JSON
-      }
-    }
   }
 
   public createRelationship(relationship: string): Relationship {
