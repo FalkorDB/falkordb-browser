@@ -1,7 +1,7 @@
 import { createContext, Dispatch, SetStateAction } from "react";
 import { ConnectionType, GraphRef, Panel, Tab } from "@/lib/utils";
 import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
-import { Graph, GraphData, GraphInfo, HistoryQuery } from "../api/graph/model";
+import { Graph, GraphData, GraphInfo, HistoryQuery, Label, Relationship } from "../api/graph/model";
 
 type BrowserSettingsContextType = {
   newSettings: {
@@ -90,6 +90,10 @@ type GraphContextType = {
   setGraphName: Dispatch<SetStateAction<string>>;
   graphNames: string[];
   setGraphNames: Dispatch<SetStateAction<string[]>>;
+  labels: Label[];
+  setLabels: Dispatch<SetStateAction<Label[]>>;
+  relationships: Relationship[];
+  setRelationships: Dispatch<SetStateAction<Relationship[]>>;
   nodesCount: number | undefined;
   setNodesCount: Dispatch<SetStateAction<number | undefined>>;
   edgesCount: number | undefined;
@@ -237,6 +241,10 @@ export const GraphContext = createContext<GraphContextType>({
   setGraphName: () => {},
   graphNames: [],
   setGraphNames: () => {},
+  labels: [],
+  setLabels: () => {},
+  relationships: [],
+  setRelationships: () => {},
   nodesCount: undefined,
   setNodesCount: () => {},
   edgesCount: undefined,

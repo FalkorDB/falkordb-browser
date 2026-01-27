@@ -234,6 +234,10 @@ export class GraphInfo {
     return this.labels;
   }
 
+  set Labels(labels: Map<string, InfoLabel>) {
+    this.labels = labels;
+  }
+
   get Relationships(): Map<string, InfoRelationship> {
     return this.relationships;
   }

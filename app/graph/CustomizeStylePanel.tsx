@@ -16,7 +16,7 @@ interface Props {
 }
 
 export default function CustomizeStylePanel({ label, onClose }: Props) {
-    const { graph } = useContext(GraphContext);
+    const { graph, setLabels } = useContext(GraphContext);
     const { canvasRef } = useContext(ForceGraphContext);
 
     // Get available properties from nodes with this label
@@ -59,43 +59,51 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
 
     const applyStylesToGraph = useCallback((color: string, size: number, caption?: string) => {
         const updatedLabel = graph.LabelsMap.get(label.name);
+        const graphInfoLabel = graph.GraphInfo.Labels.get(label.name);
 
-        if (updatedLabel) {
-            updatedLabel.style = {
-                ...updatedLabel.style,
-                color,
-                size,
-                caption,
-            };
+        if (!updatedLabel || !graphInfoLabel) return;
 
-            // Update all nodes with this label
-            updatedLabel.elements.forEach(n => {
-                if (getLabelWithFewestElements(n.labels.map(l => graph.LabelsMap.get(l)).filter(Boolean) as Label[])?.name === label.name) {
-                    n.color = color;
-                    n.size = size;
-                    n.caption = caption;
+        updatedLabel.style = {
+            ...updatedLabel.style,
+            color,
+            size,
+            caption,
+        };
+        graphInfoLabel.style = {
+            ...graphInfoLabel.style,
+            color,
+            size,
+            caption,
+        };
+
+        // Update all nodes with this label
+        updatedLabel.elements.forEach(n => {
+            if (getLabelWithFewestElements(n.labels.map(l => graph.LabelsMap.get(l)).filter(Boolean) as Label[])?.name === label.name) {
+                n.color = color;
+                n.size = size;
+                n.caption = caption;
+            }
+        });
+
+        setLabels([...graph.Labels]);
+
+        const canvas = canvasRef.current;
+
+        if (canvas) {
+            const currentData = canvas.getGraphData();
+
+            currentData.nodes.forEach(node => {
+                if (getLabelWithFewestElements(node.labels.map(l => graph.LabelsMap.get(l)).filter(Boolean) as Label[])?.name === label.name) {
+                    node.color = color;
+                    node.size = size;
+                    node.caption = caption;
+                    node.displayName = EMPTY_DISPLAY_NAME;
                 }
             });
 
-            const canvas = canvasRef.current;
-
-            if (canvas) {
-                const currentData = canvas.getGraphData();
-
-                currentData.nodes.forEach(node => {
-                    if (getLabelWithFewestElements(node.labels.map(l => graph.LabelsMap.get(l)).filter(Boolean) as Label[])?.name === label.name) {
-                        node.color = color;
-                        node.size = size;
-                        node.caption = caption;
-                        node.displayName = EMPTY_DISPLAY_NAME;
-                    }
-                });
-
-                canvas.setGraphData(currentData);
-            }
-
+            canvas.setGraphData(currentData);
         }
-    }, [canvasRef, graph.LabelsMap, label.name]);
+    }, [canvasRef, graph.GraphInfo.Labels, graph.LabelsMap, label.name]);
 
     const handleColorSelect = (color: string) => {
         setSelectedColor(color);
