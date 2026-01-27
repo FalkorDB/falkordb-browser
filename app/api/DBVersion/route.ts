@@ -14,11 +14,18 @@ export async function GET() {
     const { client } = session;
 
     try {
-      const result = await (await client.connection).moduleList() as any;
+      const result = await (await client.connection).moduleList();
 
-      const data = result.find((arr: any[]) => arr.some((mod: string, index: number) => mod === "name" && arr[index + 1] === "graph"));
+      const data = result.find((arr) => arr.name === "graph");
 
-      return NextResponse.json({ result: [data[data.findIndex((mod: string) => mod === "name") + 1], data[data.findIndex((mod: string) => mod === "ver") + 1]] }, { status: 200 });
+      if (!data) {
+        return NextResponse.json(
+          { message: "Graph module not found" },
+          { status: 400 }
+        );
+      }
+
+      return NextResponse.json({ result: [data?.name, data?.ver] }, { status: 200 });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
