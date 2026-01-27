@@ -157,9 +157,9 @@ export default class CustomizeStylePage extends GraphInfoPage {
     await waitForElementToBeVisible(this.labelButton(label));
 
     // Get the color from the inline style attribute which is the source of truth
-    const color = await this.labelButton(label).evaluate((el: HTMLElement) => {
-      return el.style.backgroundColor || window.getComputedStyle(el).backgroundColor;
-    });
+    const color = await this.labelButton(label).evaluate((el: HTMLElement) =>
+      el.style.backgroundColor || window.getComputedStyle(el).backgroundColor
+    );
     return color;
   }
 
@@ -173,11 +173,6 @@ export default class CustomizeStylePage extends GraphInfoPage {
       return stored ? JSON.parse(stored) : null;
     }, label);
     return style;
-  }
-
-  async hoverOnNode(x: number, y: number): Promise<void> {
-    await this.page.mouse.move(x, y);
-    await this.page.waitForTimeout(500);
   }
 
   async getSelectedSizeButtonIndex(): Promise<number> {

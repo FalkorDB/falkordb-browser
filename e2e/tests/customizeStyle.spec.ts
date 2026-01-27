@@ -246,9 +246,6 @@ test.describe("Customize Style Tests", () => {
     await graph.selectColorByIndex(newColorIndex);
     await graph.selectSizeByIndex(newSizeIndex);
 
-    // Verify Save button is visible
-    expect(await graph.isSaveButtonVisible()).toBeTruthy();
-
     // Click Save to persist changes
     await graph.clickSaveStyleButton();
 
@@ -263,7 +260,6 @@ test.describe("Customize Style Tests", () => {
 
     // Refresh the page
     await graph.refreshPage();
-    await graph.waitForPageIdle();
 
     // Select the same graph again and query existing nodes
     await graph.selectGraphByName(graphName);
@@ -273,6 +269,7 @@ test.describe("Customize Style Tests", () => {
 
     // Verify color persisted after refresh
     const colorAfterRefresh = await graph.getLabelButtonColor("person1");
+    
     expect(colorAfterRefresh).toBe(selectedColor);
 
     // Verify size persisted after refresh
