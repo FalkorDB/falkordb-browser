@@ -164,17 +164,6 @@ jobs:
               });
             }
 
-      - name: Check scan outcome
-        run: |
-          echo "Trivy scan outcome: ${{ steps.trivy-scan.outcome }}"
-          echo "Trivy scan conclusion: ${{ steps.trivy-scan.conclusion }}"
-          if [ -f trivy-results.sarif ]; then
-            echo "SARIF file exists, checking for vulnerabilities..."
-            cat trivy-results.sarif
-          else
-            echo "SARIF file not found!"
-          fi
-
       - name: Fail if vulnerabilities found
         if: steps.trivy-scan.outcome == 'failure'
         run: |
