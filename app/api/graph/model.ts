@@ -3,8 +3,6 @@
 /* eslint-disable no-param-reassign */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { loadLabelStyle } from "@/lib/utils";
-
 export type Value = string | number | boolean;
 
 export type HistoryQuery = {
@@ -24,36 +22,6 @@ export type Query = {
   status: "Success" | "Failed" | "Empty";
   elementsCount: number;
 };
-
-const getSchemaValue = (value: string): string[] => {
-  if (typeof value !== "string") {
-    return ["string", "", "false", "false"];
-  }
-
-  let unique, required, type, description;
-  if (value.includes("!")) {
-    value = value.replace("!", "");
-    unique = "true";
-  } else {
-    unique = "false";
-  }
-  if (value.includes("*")) {
-    value = value.replace("*", "");
-    required = "true";
-  } else {
-    required = "false";
-  }
-  if (value.includes("-")) {
-    [type, description] = value.split("-");
-  } else {
-    type = "string";
-    description = "";
-  }
-  return [type, description, unique, required];
-};
-
-// Constant for empty display name
-export const EMPTY_DISPLAY_NAME: [string, string] = ['', ''];
 
 export type Node = {
   id: number;
@@ -116,6 +84,42 @@ export type Data = DataRow[];
 
 export type MemoryValue = number | Map<string, MemoryValue>;
 
+export interface LinkStyle {
+  color: string;
+}
+
+export interface LabelStyle extends LinkStyle {
+  size?: number;
+  caption?: string;
+}
+
+export interface InfoLabel {
+  name: string;
+  style: LabelStyle;
+  show: boolean;
+}
+
+export interface Label extends InfoLabel {
+  elements: Node[];
+  textWidth?: number;
+  textHeight?: number;
+  style: LabelStyle;
+}
+
+export interface InfoRelationship {
+  name: string;
+  style: LinkStyle;
+  show: boolean;
+}
+
+export interface Relationship extends InfoRelationship {
+  elements: Link[];
+  textWidth?: number;
+  textHeight?: number;
+  textAscent?: number;
+  textDescent?: number;
+}
+
 export const DEFAULT_COLORS = [
   "hsl(246, 100%, 70%)",
   "hsl(330, 100%, 70%)",
@@ -154,41 +158,8 @@ export const STYLE_COLORS = [
 // Size options for node customization (relative to base NODE_SIZE)
 export const NODE_SIZE_OPTIONS = [3, 4.2, 5.1, 6, 6.9, 7.8, 9, 10.2, 12, 13.8, 15.6];
 
-export interface LinkStyle {
-  color: string;
-}
-
-export interface LabelStyle extends LinkStyle {
-  size?: number;
-  caption?: string;
-}
-
-export interface InfoLabel {
-  name: string;
-  style: LabelStyle;
-  show: boolean;
-}
-
-export interface Label extends InfoLabel {
-  elements: Node[];
-  textWidth?: number;
-  textHeight?: number;
-  style: LabelStyle;
-}
-
-export interface InfoRelationship {
-  name: string;
-  style: LinkStyle;
-  show: boolean;
-}
-
-export interface Relationship extends InfoRelationship {
-  elements: Link[];
-  textWidth?: number;
-  textHeight?: number;
-  textAscent?: number;
-  textDescent?: number;
-}
+// Constant for empty display name
+export const EMPTY_DISPLAY_NAME: [string, string] = ['', ''];
 
 export const getLabelWithFewestElements = (labels: Label[]): Label =>
   labels.reduce(
@@ -196,6 +167,49 @@ export const getLabelWithFewestElements = (labels: Label[]): Label =>
       label.elements.length < prev.elements.length ? label : prev,
     labels[0]
   );
+
+const getSchemaValue = (value: string): string[] => {
+  if (typeof value !== "string") {
+    return ["string", "", "false", "false"];
+  }
+
+  let unique, required, type, description;
+  if (value.includes("!")) {
+    value = value.replace("!", "");
+    unique = "true";
+  } else {
+    unique = "false";
+  }
+  if (value.includes("*")) {
+    value = value.replace("*", "");
+    required = "true";
+  } else {
+    required = "false";
+  }
+  if (value.includes("-")) {
+    [type, description] = value.split("-");
+  } else {
+    type = "string";
+    description = "";
+  }
+  return [type, description, unique, required];
+};
+
+export function loadLabelStyle(label: Label | InfoLabel): void {
+  if (typeof window === "undefined") return;
+
+  const storageKey = `labelStyle_${label.name}`;
+  const savedStyle = localStorage.getItem(storageKey);
+
+  if (savedStyle) {
+    try {
+      const style = JSON.parse(savedStyle);
+      label.style = style;
+    } catch (e) {
+      // Ignore invalid JSON
+    }
+  }
+}
 
 export class GraphInfo {
   private propertyKeys: string[] | undefined;
