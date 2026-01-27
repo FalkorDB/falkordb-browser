@@ -1,8 +1,7 @@
-import { FalkorDB } from "falkordb";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { AuthOptions, Role, User, getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
-import { FalkorDBOptions } from "falkordb/dist/src/falkordb";
+import { FalkorDB, type FalkorDBOptions } from "falkordb";
 import { v4 as uuidv4 } from "uuid";
 import crypto from "crypto";
 import { corsHeaders } from "../../utils";
