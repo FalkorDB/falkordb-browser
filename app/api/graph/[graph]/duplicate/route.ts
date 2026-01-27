@@ -3,6 +3,10 @@ import { NextResponse, NextRequest } from "next/server";
 import { duplicateGraph, validateBody } from "../../../validate-body";
 import { corsHeaders } from "../../../utils";
 
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders() });
+}
+
 /**
  * Copies data from the source specified by the JSON body property `sourceName` into the destination `graph` provided by route params.
  *
