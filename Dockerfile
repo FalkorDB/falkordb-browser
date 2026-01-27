@@ -1,6 +1,9 @@
 ARG CYPHER_VERSION=latest
 
-FROM node:24-alpine AS base
+FROM node:24-alpine3.20 AS base
+
+# Update Alpine packages to fix security vulnerabilities
+RUN apk upgrade --no-cache busybox libcrypto3 libssl3
 
 # Install dependencies only when needed
 FROM base AS deps

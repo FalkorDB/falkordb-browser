@@ -320,7 +320,7 @@ export default class Page extends BasePage {
         const data = (window as any)[key]?.();
         // Check both possible structures: { nodes } or { elements: { nodes } }
         return (data && ((Array.isArray(data.nodes) && data.nodes.length > 0) ||
-                        (data.elements && Array.isArray(data.elements.nodes) && data.elements.nodes.length > 0)));
+          (data.elements && Array.isArray(data.elements.nodes) && data.elements.nodes.length > 0)));
       },
       windowKey,
       { timeout: 5000 }
@@ -342,13 +342,13 @@ export default class Page extends BasePage {
         devicePixelRatio: window.devicePixelRatio || 1,
         transform: transform
           ? {
-              a: transform.a,
-              b: transform.b,
-              c: transform.c,
-              d: transform.d,
-              e: transform.e,
-              f: transform.f,
-            }
+            a: transform.a,
+            b: transform.b,
+            c: transform.c,
+            d: transform.d,
+            e: transform.e,
+            f: transform.f,
+          }
           : null,
       };
     });
@@ -450,7 +450,7 @@ export default class Page extends BasePage {
         const data = (window as any)[key]?.();
         // Check both possible structures: { links } or { elements: { links } }
         return (data && ((Array.isArray(data.links) && data.links.length > 0) ||
-                        (data.elements && Array.isArray(data.elements.links) && data.elements.links.length > 0)));
+          (data.elements && Array.isArray(data.elements.links) && data.elements.links.length > 0)));
       },
       windowKey,
       { timeout: 5000 }
@@ -472,13 +472,13 @@ export default class Page extends BasePage {
         devicePixelRatio: window.devicePixelRatio || 1,
         transform: transform
           ? {
-              a: transform.a,
-              b: transform.b,
-              c: transform.c,
-              d: transform.d,
-              e: transform.e,
-              f: transform.f,
-            }
+            a: transform.a,
+            b: transform.b,
+            c: transform.c,
+            d: transform.d,
+            e: transform.e,
+            f: transform.f,
+          }
           : null,
       };
     });

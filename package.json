@@ -2,7 +2,7 @@
   "name": "falkordb-browser",
   "author": "FalkorDB",
   "description": "FalkorDB Browser",
-  "version": "1.6.7",
+  "version": "1.7.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -13,8 +13,8 @@
   },
   "dependencies": {
     "-": "^0.0.1",
-    "@falkordb/canvas": "^0.0.25",
-    "@falkordb/text-to-cypher": "^0.1.9",
+    "@falkordb/canvas": "^0.0.26",
+    "@falkordb/text-to-cypher": "^0.1.11",
     "@hookform/resolvers": "^3.10.0",
     "@monaco-editor/react": "^4.6.0",
     "@radix-ui/react-alert-dialog": "^1.1.6",
@@ -62,7 +62,7 @@
     "eventsource": "^4.0.0",
     "falkordb": "^6.4.0",
     "jose": "^6.1.0",
-    "lodash": "^4.17.21",
+    "lodash": "^4.17.23",
     "lucide-react": "^0.475.0",
     "monaco-editor": "^0.47.0",
     "next": "^15.5.9",
