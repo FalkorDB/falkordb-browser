@@ -101,6 +101,18 @@ jobs:
           vuln-type: 'os,library'
           severity: 'HIGH,CRITICAL'
 
+      - name: Check scan outcome
+        if: always()
+        run: |
+          echo "Trivy scan outcome: ${{ steps.trivy-scan.outcome }}"
+          echo "Trivy scan conclusion: ${{ steps.trivy-scan.conclusion }}"
+          if [ -f trivy-results.sarif ]; then
+            echo "SARIF file exists, checking for vulnerabilities..."
+            cat trivy-results.sarif
+          else
+            echo "SARIF file not found!"
+          fi
+
       - name: Upload Trivy results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v4
         if: always()

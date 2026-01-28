@@ -5,10 +5,10 @@ import crypto from "crypto";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
 import { getClient, generateTimeUUID } from "../[...nextauth]/options";
 import { encrypt } from "../encryption";
-import { corsHeaders } from "../../utils";
+import { getCorsHeaders } from "../../utils";
 
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: corsHeaders() });
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
 
 /**
@@ -58,13 +58,13 @@ async function fetchTokens(
     return {
       error: NextResponse.json(
         { message: "Failed to fetch tokens" },
-        { status: 500, headers: corsHeaders() }
+        { status: 500 }
       ),
     };
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     // 1. Authenticate the user making the request
     const session = await getClient();
@@ -95,14 +95,14 @@ export async function GET() {
         count: fetchResult.tokens!.length,
         role: authenticatedUser.role,
       },
-      { status: 200, headers: corsHeaders() }
+      { status: 200, headers: getCorsHeaders(request) }
     );
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("Error fetching tokens:", error);
     return NextResponse.json(
       { message: "Internal server error" },
-      { status: 500, headers: corsHeaders() }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
     if (!process.env.NEXTAUTH_SECRET) {
       return NextResponse.json(
         { message: "Server configuration error" },
-        { status: 500, headers: corsHeaders() }
+        { status: 500, headers: getCorsHeaders(request) }
       );
     }
     const jwtSecret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
     } catch {
       return NextResponse.json(
         { message: "Invalid JSON in request body" },
-        { status: 400, headers: corsHeaders() }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
 
@@ -153,14 +153,14 @@ export async function POST(request: NextRequest) {
       if (expiresAtDate <= new Date()) {
         return NextResponse.json(
           { message: "Expiration date must be in the future" },
-          { status: 400, headers: corsHeaders() }
+          { status: 400, headers: getCorsHeaders(request) }
         );
       }
     }
     if (ttlSeconds !== undefined && (ttlSeconds > 31622400 || ttlSeconds < 1)) {
       return NextResponse.json(
         { message: "Invalid TTL value" },
-        { status: 400, headers: corsHeaders() }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
 
@@ -234,8 +234,8 @@ export async function POST(request: NextRequest) {
       // eslint-disable-next-line no-console
       console.error('Failed to store token:', storageError);
       return NextResponse.json(
-        { message: storageError instanceof Error ? storageError.message : "Failed to store token" },
-        { status: 500, headers: corsHeaders() }
+        { message: "Failed to store token" },
+        { status: 500, headers: getCorsHeaders(request) }
       );
     }
 
@@ -245,14 +245,14 @@ export async function POST(request: NextRequest) {
         message: "Token created successfully",
         token
       },
-      { status: 200, headers: corsHeaders() }
+      { status: 200, headers: getCorsHeaders(request) }
     );
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("Token generation error:", error);
     return NextResponse.json(
       { message: "Internal server error" },
-      { status: 500, headers: corsHeaders() }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }

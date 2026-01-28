@@ -2,7 +2,7 @@ import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
 import { GET as getDBVersion } from "@/app/api/DBVersion/route";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "@/app/utils";
-import { corsHeaders } from "../../../utils";
+import { getCorsHeaders } from "../../../utils";
 
 /**
  * Handle GET requests to return memory usage for the specified graph.
@@ -29,7 +29,7 @@ export async function GET(
     }
 
     try {
-      const res = await getDBVersion();
+      const res = await getDBVersion(request);
 
       if (!res.ok) {
         const err = await res.text();
@@ -44,7 +44,7 @@ export async function GET(
 
         return NextResponse.json(
           { message: `Failed to retrieve database version: ${message}` },
-          { status: 400, headers: corsHeaders() }
+          { status: 400, headers: getCorsHeaders(request) }
         );
       }
 
@@ -53,7 +53,7 @@ export async function GET(
       if (name !== "graph" || version < MEMORY_USAGE_VERSION_THRESHOLD) {
         return NextResponse.json(
           { message: `Memory usage feature requires graph module version ${MEMORY_USAGE_VERSION_THRESHOLD} or higher. Current version: ${version}` },
-          { status: 400, headers: corsHeaders() }
+          { status: 400, headers: getCorsHeaders(request) }
         );
       }
 
@@ -61,17 +61,17 @@ export async function GET(
       const { graph } = await params;
       const result = await client.selectGraph(graph).memoryUsage();
 
-      return NextResponse.json({ result }, { status: 200, headers: corsHeaders() });
+      return NextResponse.json({ result }, { status: 200, headers: getCorsHeaders(request) });
     } catch (err) {
       return NextResponse.json(
         { message: (err as Error).message },
-        { status: 400, headers: corsHeaders() }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500, headers: corsHeaders() }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }

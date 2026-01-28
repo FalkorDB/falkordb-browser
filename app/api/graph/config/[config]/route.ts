@@ -1,10 +1,10 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
 import { updateGraphConfig, validateBody } from "../../../validate-body";
-import { corsHeaders } from "../../../utils";
+import { getCorsHeaders } from "../../../utils";
 
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: corsHeaders() });
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
 
 export async function GET(
@@ -23,19 +23,19 @@ export async function GET(
     const { config: configName } = await params;
     try {
       const config = await client.configGet(configName);
-      return NextResponse.json({ config }, { status: 200, headers: corsHeaders() });
+      return NextResponse.json({ config }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400, headers: corsHeaders() }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500, headers: corsHeaders() }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }
@@ -64,7 +64,7 @@ export async function POST(
       if (!validation.success) {
         return NextResponse.json(
           { message: validation.error },
-          { status: 400, headers: corsHeaders() }
+          { status: 400, headers: getCorsHeaders(request) }
         );
       }
 
@@ -76,19 +76,19 @@ export async function POST(
         throw new Error("Invalid value");
 
       const config = await client.configSet(configName, parsedValue);
-      return NextResponse.json({ config }, { status: 200, headers: corsHeaders() });
+      return NextResponse.json({ config }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400, headers: corsHeaders() }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500, headers: corsHeaders() }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }

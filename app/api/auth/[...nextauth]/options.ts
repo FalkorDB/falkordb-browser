@@ -282,7 +282,7 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
           {
             host: payload.host,
             port: payload.port.toString(),
-            username: payload.username || '',
+            username: payload.username,
             password,
             tls: payload.tls.toString(),
             ca: payload.ca || undefined,
@@ -293,6 +293,11 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
         client = reconnectedClient;
         // Connection is already cached in connections Map by newClient()
       } catch (connectionError) {
+        // Re-throw ENCRYPTION_KEY errors to surface server misconfigurations
+        if (connectionError instanceof Error && connectionError.message.includes("ENCRYPTION_KEY")) {
+          throw connectionError;
+        }
+
         // eslint-disable-next-line no-console
         console.error("Failed to create connection from Token DB:", connectionError);
 

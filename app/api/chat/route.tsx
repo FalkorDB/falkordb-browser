@@ -155,8 +155,11 @@ export async function POST(request: NextRequest) {
             if (messages.length === 0) {
                 throw new Error('No messages provided');
             }
-            const lastMessage = messages[messages.length - 1];
-            const question = lastMessage.content;
+            const lastUserMessage = messages.filter(msg => msg.role === 'user').pop();
+            if (!lastUserMessage) {
+                throw new Error('No user messages found');
+            }
+            const question = lastUserMessage.content;
 
             // Call textToCypher and get the result
             const result = await textToCypher.textToCypher(graphName, question);

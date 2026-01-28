@@ -249,17 +249,17 @@ export default function Page() {
         setData({ ...graph.Elements });
 
         return result.ok;
-    }, [fetchCount, graph, graphName, handleSetIsAdd, isAddNode, selectedElements, setData, setIndicator, toast]);
+    }, [fetchCount, graph, graphName, handleSetIsAdd, isAddNode, selectedElements, setData, setIndicator, setLabels, setRelationships, toast]);
 
     const handleDeleteElement = useCallback(async () => {
-        await Promise.all(selectedElements.map(async (element) => {
+        const deletedElements = (await Promise.all(selectedElements.map(async (element) => {
             const type = !("source" in element);
             const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${prepareArg(element.id.toString())}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type })
             }, toast, setIndicator);
 
-            if (!result.ok) return;
+            if (!result.ok) return undefined;
 
             if (type) {
                 (element as Node).labels.forEach((label) => {
@@ -288,11 +288,13 @@ export default function Page() {
                     }
                 }
             }
-        }));
 
-        graph.removeElements(selectedElements);
+            return element;
+        }))).filter(e => !!e);
 
-        setRelationships(graph.removeLinks(selectedElements.map((element) => element.id)));
+        graph.removeElements(deletedElements);
+
+        setRelationships(graph.removeLinks(deletedElements.map((element) => element.id)));
         setData({ ...graph.Elements });
         fetchCount();
         setSelectedElements([]);
@@ -302,9 +304,10 @@ export default function Page() {
 
         toast({
             title: "Success",
-            description: `${selectedElements.length > 1 ? "Elements" : "Element"} deleted`,
+            description: `${deletedElements.length > 1 ? "Elements" : "Element"} deleted
+            ${selectedElements.length > deletedElements.length ? `, ${selectedElements.length - deletedElements.length} failed` : ""}.`,
         });
-    }, [selectedElements, graph, setData, fetchCount, panel, handleSetSelectedElements, toast, setIndicator]);
+    }, [selectedElements, graph, setRelationships, setData, fetchCount, panel, handleSetSelectedElements, toast, setIndicator]);
 
     const getCurrentPanel = useCallback(() => {
         if (!graphName) return undefined;
@@ -357,7 +360,7 @@ export default function Page() {
                 return undefined;
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [graphName, panel, handleSetSelectedElements, setPanel, isAddNode, selectedElements, handleCreateElement]);
+    }, [graphName, panel, handleSetSelectedElements, setPanel, isAddNode, selectedElements, handleCreateElement, setLabels, canvasRef]);
 
     return (
         <div className="Page p-2 gap-2">
