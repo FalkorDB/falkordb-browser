@@ -30,20 +30,21 @@ export async function DELETE(
 
         return NextResponse.json(
           { message: `${graphId} graph deleted` },
+          { headers: getCorsHeaders(request) }
         );
       }
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }
@@ -71,20 +72,20 @@ export async function POST(
 
       return NextResponse.json(
         { message: "Graph created successfully" },
-        { status: 200 }
+        { status: 200, headers: getCorsHeaders(request) }
       );
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }
@@ -113,7 +114,7 @@ export async function PATCH(
       if (!validation.success) {
         return NextResponse.json(
           { message: validation.error },
-          { status: 400 }
+          { status: 400, headers: getCorsHeaders(request) }
         );
       }
 
