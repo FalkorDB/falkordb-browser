@@ -10,7 +10,7 @@ export async function OPTIONS(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -60,9 +60,9 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     const connection = await client.connection;
 
     try {
-      const body = await req.json();
+      const body = await request.json();
 
       // Validate request body
       const validation = validateBody(createUser, body);
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
       if (!validation.success) {
         return NextResponse.json(
           { message: validation.error },
-          { status: 400, headers: getCorsHeaders(req) }
+          { status: 400, headers: getCorsHeaders(request) }
         );
       }
 
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
         if (user) {
           return NextResponse.json(
             { message: `User ${username} already exists` },
-            { status: 409, headers: getCorsHeaders(req) }
+            { status: 409, headers: getCorsHeaders(request) }
           );
         }
       } catch (err: unknown) {
@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
           status: 201,
           headers: {
             location: `/api/db/user/${username}`,
-            ...getCorsHeaders(req),
+            ...getCorsHeaders(request),
           },
         }
       );
@@ -117,21 +117,21 @@ export async function POST(req: NextRequest) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400, headers: getCorsHeaders(req) }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500, headers: getCorsHeaders(req) }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }
 
-export async function DELETE(req: NextRequest) {
+export async function DELETE(request: NextRequest) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -141,7 +141,7 @@ export async function DELETE(req: NextRequest) {
     const connection = await client.connection;
 
     try {
-      const body = await req.json();
+      const body = await request.json();
 
       // Validate request body
       const validation = validateBody(deleteUsers, body);
@@ -149,7 +149,7 @@ export async function DELETE(req: NextRequest) {
       if (!validation.success) {
         return NextResponse.json(
           { message: validation.error },
-          { status: 400, headers: getCorsHeaders(req) }
+          { status: 400, headers: getCorsHeaders(request) }
         );
       }
 
@@ -160,19 +160,19 @@ export async function DELETE(req: NextRequest) {
         })
       );
 
-      return NextResponse.json({ message: "Users deleted" }, { status: 200, headers: getCorsHeaders(req) });
+      return NextResponse.json({ message: "Users deleted" }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400, headers: getCorsHeaders(req) }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500, headers: getCorsHeaders(req) }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }

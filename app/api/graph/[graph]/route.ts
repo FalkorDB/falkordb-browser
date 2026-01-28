@@ -12,7 +12,7 @@ export async function DELETE(
   { params }: { params: Promise<{ graph: string }> }
 ) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -54,7 +54,7 @@ export async function POST(
   { params }: { params: Promise<{ graph: string }> }
 ) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -95,7 +95,7 @@ export async function PATCH(
   { params }: { params: Promise<{ graph: string }> }
 ) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -153,7 +153,7 @@ export async function GET(
   const writer = writable.getWriter();
 
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       throw new Error(await session.text());

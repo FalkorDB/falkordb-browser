@@ -18,7 +18,8 @@ async function fetchTokens(
   isAdmin: boolean,
   username: string,
   host: string,
-  port: number
+  port: number,
+  request: Request
 ): Promise<{
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tokens?: any[];
@@ -58,7 +59,7 @@ async function fetchTokens(
     return {
       error: NextResponse.json(
         { message: "Failed to fetch tokens" },
-        { status: 500 }
+        { status: 500, headers: getCorsHeaders(request) }
       ),
     };
   }
@@ -67,7 +68,7 @@ async function fetchTokens(
 export async function GET(request: Request) {
   try {
     // 1. Authenticate the user making the request
-    const session = await getClient();
+    const session = await getClient(request);
     if (session instanceof NextResponse) {
       return session;
     }
@@ -81,7 +82,8 @@ export async function GET(request: Request) {
       isAdmin,
       authenticatedUser.username || "default",
       authenticatedUser.host || "localhost",
-      authenticatedUser.port || 6379
+      authenticatedUser.port || 6379,
+      request
     );
 
     if (fetchResult.error) {
@@ -123,7 +125,7 @@ export async function POST(request: NextRequest) {
     const jwtSecret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
 
     // 2. Get authenticated user from session
-    const session = await getClient();
+    const session = await getClient(request);
     if (session instanceof NextResponse) {
       return session; // Returns 401 if not authenticated
     }
