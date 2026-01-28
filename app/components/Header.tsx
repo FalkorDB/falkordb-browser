@@ -123,7 +123,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                     </TooltipContent>
                 </Tooltip>
                 {
-                    session?.user.role === "Admin" &&
+                    formatVersion(dbVersion) &&
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <h2>v{formatVersion(dbVersion)}</h2>
