@@ -40,15 +40,15 @@ function getAllowedOrigins(): string[] {
     if (envOrigins) {
         return envOrigins.split(',').map(origin => origin.trim());
     }
-    
+
     // Default allowed origins for development
     const defaults = ['http://localhost:3000'];
-    
+
     // Add NEXTAUTH_URL if configured
     if (process.env.NEXTAUTH_URL) {
         defaults.push(process.env.NEXTAUTH_URL.replace(/\/$/, '')); // Remove trailing slash
     }
-    
+
     return defaults;
 }
 
@@ -64,13 +64,6 @@ export function corsHeaders(requestOrigin?: string | null): Record<string, strin
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         'Vary': 'Origin',
     };
-
-    // Debug logging (remove in production after testing)
-    if (process.env.NODE_ENV !== 'production' || process.env.CORS_DEBUG === 'true') {
-        console.log('[CORS Debug] Request origin:', requestOrigin);
-        console.log('[CORS Debug] Allowed origins:', allowedOrigins);
-        console.log('[CORS Debug] NODE_ENV:', process.env.NODE_ENV);
-    }
 
     // Check if the request origin is in the allowlist
     if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
