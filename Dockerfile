@@ -2,13 +2,14 @@ ARG CYPHER_VERSION=latest
 
 FROM node:24-alpine3.20 AS base
 
-# Update Alpine packages to fix security vulnerabilities
-RUN apk upgrade --no-cache busybox libcrypto3 libssl3
+# Update all Alpine packages to fix security vulnerabilities
+RUN apk upgrade --no-cache --available
 
 # Install dependencies only when needed
 FROM base AS deps
 # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat && \
+    apk upgrade --no-cache --available
 WORKDIR /app
 
 # Install dependencies based on the preferred package manager
