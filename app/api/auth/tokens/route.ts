@@ -234,7 +234,7 @@ export async function POST(request: NextRequest) {
       // eslint-disable-next-line no-console
       console.error('Failed to store token:', storageError);
       return NextResponse.json(
-        { message: storageError instanceof Error ? storageError.message : "Failed to store token" },
+        { message: "Failed to store token" },
         { status: 500, headers: corsHeaders() }
       );
     }

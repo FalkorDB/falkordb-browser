@@ -8,22 +8,24 @@ export const runQuery = async (graph: Graph, query: string, role: Role) => {
 
 /**
  * Build FalkorDB connection URL from user session
- * Handles URL, authentication credentials, and default falkor:// protocol
+ * Handles URL, authentication credentials, TLS, and default falkor:// protocol
  */
 export function buildFalkorDBConnection(user: {
     host: string;
     port: number;
     url?: string;
     username?: string;
-    password?: string
+    password?: string;
+    tls?: boolean;
+    ca?: string;
 }): string {
     // Use URL if provided
     if (user.url) {
         return user.url;
     }
 
-    // Build falkor:// URL from host and port
-    const protocol = "falkor://";
+    // Build falkor:// or falkors:// URL from host and port
+    const protocol = user.tls ? "falkors://" : "falkor://";
     const auth = user.username && user.password
         ? `${encodeURIComponent(user.username)}:${encodeURIComponent(user.password)}@`
         : "";

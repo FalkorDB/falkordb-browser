@@ -165,6 +165,14 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
           try {
             const encryptedKey = await encryptValue(newSecretKey);
+            if (!encryptedKey) {
+              toast({
+                title: "Error",
+                description: "Could not encrypt secret key. Please try again.",
+                variant: "destructive",
+              });
+              return; // Stop saving if encryption returns empty string
+            }
             localStorage.setItem("secretKey", encryptedKey);
           } catch (error) {
             console.error('Failed to encrypt secret key:', error);
