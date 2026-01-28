@@ -212,6 +212,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
                                         "w-8 h-8 rounded-full transition-all hover:scale-110",
                                         selectedColor === color && "ring-2 ring-foreground ring-offset-2 ring-offset-background"
                                     )}
+                                    data-testid={`colorButton${color}`}
                                     style={{ backgroundColor: color }}
                                     onClick={() => handleColorSelect(color)}
                                     aria-label={`Select color ${color}`}
@@ -315,6 +316,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
                             <TooltipTrigger asChild>
                                 <button
                                     type="button"
+                                    data-testid={`sizeButton${(size / 6).toFixed(2)}x`}
                                     className={cn(
                                         "flex items-center justify-center transition-all hover:bg-muted rounded-md",
                                         selectedSize === size && "bg-muted ring-2 ring-foreground"
@@ -348,6 +350,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
                         <button
                             key={option}
                             type="button"
+                            data-testid={`captionButton${option}`}
                             className={cn(
                                 "px-3 py-2 text-left rounded-md transition-all hover:bg-muted SofiaSans",
                                 selectedCaption === option && "bg-muted font-semibold"
@@ -362,6 +365,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
                             <button
                                 key="__id__"
                                 type="button"
+                                data-testid="captionButtonID"
                                 className={cn(
                                     "px-3 py-2 text-left rounded-md transition-all hover:bg-muted SofiaSans",
                                     selectedCaption === undefined && "bg-muted font-semibold"

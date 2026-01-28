@@ -109,6 +109,54 @@ const tutorialSteps: TutorialStep[] = [
         forward: ["mouseenter", "mouseleave"]
     },
     {
+        title: "Style Person nodes",
+        description: "Click this button to style all nodes of type 'Person' in the graph. This will style all Person nodes for better visualization.",
+        targetSelector: '[data-testid="customizeStylePerson"]',
+        placementAxis: "x",
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave"],
+    },
+    {
+        title: "Change Person Node Color",
+        description: "Click this button to style all nodes of type 'Person' in the graph with a different color. This will style all Person nodes for better visualization.",
+        targetSelector: '[data-testid="rgbColorPickerButton"]',
+        placementAxis: "x",
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave"],
+        hidePrev: true
+    },
+    {
+        title: "Insert new color",
+        description: "Type a new color hex code (e.g., #FF5733) in the input field to change the color of Person nodes.",
+        spotlightSelector: '[data-testid="rgbColorHexInput"]',
+        placementAxis: "x",
+        hidePrev: true
+    },
+    {
+        title: "Select new size",
+        description: "Click this button to style all nodes of type 'Person' in the graph with a different color. This will style all Person nodes for better visualization.",
+        targetSelector: '[data-testid="sizeButton2.00x"]',
+        placementAxis: "x",
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave"]
+    },
+    {
+        title: "Select new caption",
+        description: "Click this button to style all nodes of type 'Person' in the graph with a different color. This will style all Person nodes for better visualization.",
+        targetSelector: '[data-testid="captionButtonage"]',
+        placementAxis: "x",
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave"]
+    },
+    {
+        title: "Save changes",
+        description: "Click this button to style all nodes of type 'Person' in the graph with a different color. This will style all Person nodes for better visualization.",
+        targetSelector: '[data-testid="saveStyleChanges"]',
+        placementAxis: "x",
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave"]
+    },
+    {
         title: "Query Editor",
         description: "Write and execute your Cypher queries here. Try modifying the query by adding a filter, for example: ```MATCH p=()-[r:KNOWS]-() WHERE r.since > 2018 RETURN p```. Then click Run to execute your modified query.",
         targetSelector: '[data-testid="editorRun"]',
@@ -134,6 +182,13 @@ const tutorialSteps: TutorialStep[] = [
         targetSelector: '[data-testid="tableTab"]',
         advanceOn: "mousedown",
         forward: ["mousedown", "mouseenter", "mouseleave"],
+        hidePrev: true
+    },
+    {
+        title: "Export Table Results",
+        description: "Query results can also be displayed as tables. This is useful for viewing properties, aggregations, and other non-graph data.",
+        placementAxis: "y",
+        targetSelector: '[data-testid="exportTableViewButton"]',
         hidePrev: true
     },
     {
@@ -206,26 +261,32 @@ function TutorialPortal({
     const [targetDisabled, setTargetDisabled] = useState(false);
     const tooltipRef = useRef<HTMLDivElement>(null);
     const currentStep = tutorialSteps[step];
-    const { targetSelector, advanceOn, forward, description, position, title, hidePrev, placementAxis } = currentStep;
+    const { targetSelector, spotlightSelector, advanceOn, forward, description, position, title, hidePrev, placementAxis } = currentStep;
 
     useEffect(() => {
         setMounted(true);
     }, []);
 
-    // Calculate position based on target element
+    // Calculate position based on target element or spotlight element as fallback
     useEffect(() => {
-        if (!targetSelector) {
+        // Use targetSelector for positioning, fallback to spotlightSelector if target doesn't exist
+        const positionSelector = targetSelector || spotlightSelector;
+        
+        if (!positionSelector) {
             setCurrentPosition({ ...position, transform: "translate(-50%, -50%)" });
             return () => { };
         }
 
-        const element = document.querySelector(targetSelector);
+        const element = document.querySelector(positionSelector);
         const currentTooltip = tooltipRef.current;
 
         if (!element || !currentTooltip) {
             setCurrentPosition({ ...position, transform: "translate(-50%, -50%)" });
             return () => { };
         }
+
+        // Scroll element into view if needed
+        element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
 
         // Get actual tooltip dimensions from ref
         const tooltipRect = tooltipRef.current.getBoundingClientRect();
@@ -324,16 +385,25 @@ function TutorialPortal({
             tooltipResizeObserver.disconnect();
             window.removeEventListener('resize', updatePosition);
         };
-    }, [placementAxis, position, step, targetSelector]);
+    }, [placementAxis, position, step, targetSelector, spotlightSelector]);
 
+    // Handle target element overlay and interactions
     useEffect(() => {
         const forwardArr = [...(forward || []), advanceOn].filter(ev => !!ev);
+
+        // Only create overlay for target elements (not spotlight-only)
+        if (!targetSelector) {
+            return () => { };
+        }
 
         // Highlight target element and add click listener
         if (targetSelector) {
             const element = document.querySelector(targetSelector);
 
             if (element) {
+                // Scroll element into view if needed
+                element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+
                 // Check if the element is disabled
                 const isDisabled = element instanceof HTMLButtonElement || element instanceof HTMLInputElement
                     ? element.disabled
@@ -432,6 +502,7 @@ function TutorialPortal({
                     'touchcancel',
                 ] as const;
                 const forwardKeyboardEvents = ['keydown', 'keyup', 'keypress'] as const;
+                const forwardInputEvents = ['input', 'change', 'focus', 'blur', 'paste'] as const;
 
                 const forwardEvent = (ev: Event) => {
 
@@ -520,18 +591,28 @@ function TutorialPortal({
                             cancelable: true,
                         });
                         element.dispatchEvent(clone);
+                        return;
+                    }
+
+                    // Handle input-related events (input, change, focus, blur, paste)
+                    if (['input', 'change', 'focus', 'blur', 'paste'].includes(ev.type)) {
+                        const clone = new Event(ev.type, {
+                            bubbles: true,
+                            cancelable: true,
+                        });
+                        element.dispatchEvent(clone);
                     }
                 };
 
                 const addForwarders = () => {
-                    [...forwardMouseEvents, ...forwardPointerEvents, ...forwardTouchEvents, ...forwardKeyboardEvents]
+                    [...forwardMouseEvents, ...forwardPointerEvents, ...forwardTouchEvents, ...forwardKeyboardEvents, ...forwardInputEvents]
                         .filter(e => forwardArr.includes(e))
                         .forEach((type) => {
                             overlay.addEventListener(type, forwardEvent, true);
                         });
                 };
                 const removeForwarders = () => {
-                    [...forwardMouseEvents, ...forwardPointerEvents, ...forwardTouchEvents, ...forwardKeyboardEvents]
+                    [...forwardMouseEvents, ...forwardPointerEvents, ...forwardTouchEvents, ...forwardKeyboardEvents, ...forwardInputEvents]
                         .filter(e => forwardArr.includes(e))
                         .forEach((type) => {
                             overlay.removeEventListener(type, forwardEvent, true);

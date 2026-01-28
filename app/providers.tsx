@@ -671,6 +671,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setGraphName("");
       setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }));
       setGraph(Graph.empty());
+      panelRef.current?.collapse();
 
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -724,6 +725,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setGraphNames(userGraphsBeforeTutorial);
     setUserGraphsBeforeTutorial([]);
     setUserGraphBeforeTutorial("");
+    panelRef.current?.collapse();
   }, [runQuery, runDefaultQuery, defaultQuery, toast, userGraphBeforeTutorial, userGraphsBeforeTutorial]);
 
   return (
