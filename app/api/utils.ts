@@ -65,6 +65,13 @@ export function corsHeaders(requestOrigin?: string | null): Record<string, strin
         'Vary': 'Origin',
     };
 
+    // Debug logging (remove in production after testing)
+    if (process.env.NODE_ENV !== 'production' || process.env.CORS_DEBUG === 'true') {
+        console.log('[CORS Debug] Request origin:', requestOrigin);
+        console.log('[CORS Debug] Allowed origins:', allowedOrigins);
+        console.log('[CORS Debug] NODE_ENV:', process.env.NODE_ENV);
+    }
+
     // Check if the request origin is in the allowlist
     if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
         headers['Access-Control-Allow-Origin'] = requestOrigin;
