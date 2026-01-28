@@ -29,7 +29,7 @@ export async function GET(
     }
 
     try {
-      const res = await getDBVersion();
+      const res = await getDBVersion(request);
 
       if (!res.ok) {
         const err = await res.text();
