@@ -3,7 +3,7 @@ import path from "path";
 import { promisify } from "util";
 import { pipeline } from "stream";
 import fs from "fs";
-import { corsHeaders } from "../utils";
+import { getCorsHeaders } from "../utils";
 
 const pump = promisify(pipeline);
 
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
   const file = formData.get("file") as File;
 
   if (!file) {
-    return NextResponse.json({ error: "No files received." }, { status: 400, headers: corsHeaders() });
+    return NextResponse.json({ error: "No files received." }, { status: 400, headers: getCorsHeaders(request) });
   }
 
   const filename = file.name.replaceAll(" ", "_");
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     console.error(error);
     return NextResponse.json(
       { message: (error as Error).message },
-      { status: 400, headers: corsHeaders() }
+      { status: 400, headers: getCorsHeaders(request) }
     );
   }
 }

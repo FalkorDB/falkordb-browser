@@ -1,6 +1,6 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
-import { corsHeaders } from "../../../utils";
+import { getCorsHeaders } from "../../../utils";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
@@ -46,19 +46,19 @@ export async function GET(
           ? await graph.roQuery(getQuery())
           : await graph.query(getQuery());
 
-      return NextResponse.json({ result }, { status: 200, headers: corsHeaders() });
+      return NextResponse.json({ result }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400, headers: corsHeaders() }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500, headers: corsHeaders() }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }
