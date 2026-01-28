@@ -3,15 +3,15 @@ import { TextToCypher } from "@falkordb/text-to-cypher";
 import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { getClient } from "../auth/[...nextauth]/options";
 import { chatRequest, validateBody } from "../validate-body";
-import { buildFalkorDBConnection, corsHeaders } from "../utils";
+import { buildFalkorDBConnection, corsHeaders, getCorsHeaders } from "../utils";
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders() });
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
-        const session = await getClient();
+        const session = await getClient(request);
 
         if (session instanceof NextResponse) {
             throw new Error(await session.text());
@@ -19,10 +19,10 @@ export async function GET() {
 
         // Return empty object to allow chat to be displayed
         // The actual model configuration is provided by the user in the frontend
-        return NextResponse.json({}, { status: 200, headers: corsHeaders() });
+        return NextResponse.json({}, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
         console.error(error);
-        return NextResponse.json({ error: (error as Error).message }, { status: 500, headers: corsHeaders() });
+        return NextResponse.json({ error: (error as Error).message }, { status: 500, headers: getCorsHeaders(request) });
     }
 }
 
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
 
     try {
         // Verify authentication via getClient
-        const session = await getClient();
+        const session = await getClient(request);
 
         if (session instanceof NextResponse) {
             throw new Error(await session.text());
