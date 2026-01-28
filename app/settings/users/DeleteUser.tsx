@@ -14,11 +14,11 @@ interface DeleteUserProps {
 }
 
 export default function DeleteUser({ users, setUsers, setRows }: DeleteUserProps) {
-    const { toast } = useToast()
-    const { setIndicator } = useContext(IndicatorContext)
+    const { toast } = useToast();
+    const { setIndicator } = useContext(IndicatorContext);
     
     const deleteSelected = async () => {
-        if (!users) return
+        if (!users) return;
 
         const response = await securedFetch("/api/user", {
             method: 'DELETE',
@@ -26,17 +26,17 @@ export default function DeleteUser({ users, setUsers, setRows }: DeleteUserProps
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ users: users.map(user => ({ username: user.username })) })
-        }, toast, setIndicator)
+        }, toast, setIndicator);
 
         if (response.ok) {
             toast({
                 title: "Success",
                 description: "User deleted successfully",
-            })
-            setUsers(prev => prev.filter(user => !users.find(u => user.username === u.username)))
-            setRows(prev => prev.filter(row => !users.find(u => row.cells[0].value === u.username)))
+            });
+            setUsers(prev => prev.filter(user => !users.find(u => user.username === u.username)));
+            setRows(prev => prev.filter(row => !users.find(u => row.cells[0].value === u.username)));
         }
-    }
+    };
 
     return (
         <AlertDialog>

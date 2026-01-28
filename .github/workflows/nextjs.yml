@@ -8,6 +8,10 @@ on:
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+  
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # Build job
@@ -40,7 +44,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: "22"
+          node-version: "24"
           cache: ${{ steps.detect-package-manager.outputs.manager }}
 
       - name: Restore cache
@@ -96,6 +100,18 @@ jobs:
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'HIGH,CRITICAL'
+
+      - name: Check scan outcome
+        if: always()
+        run: |
+          echo "Trivy scan outcome: ${{ steps.trivy-scan.outcome }}"
+          echo "Trivy scan conclusion: ${{ steps.trivy-scan.conclusion }}"
+          if [ -f trivy-results.sarif ]; then
+            echo "SARIF file exists, checking for vulnerabilities..."
+            cat trivy-results.sarif
+          else
+            echo "SARIF file not found!"
+          fi
 
       - name: Upload Trivy results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v4

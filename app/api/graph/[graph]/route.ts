@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { renameGraph, validateBody } from "../../validate-body";
+import { getCorsHeaders } from "../../utils";
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
+}
 
 export async function DELETE(
   request: NextRequest,
@@ -23,7 +28,9 @@ export async function DELETE(
 
         await graph.delete();
 
-        return NextResponse.json({ message: `${graphId} graph deleted` });
+        return NextResponse.json(
+          { message: `${graphId} graph deleted` },
+        );
       }
     } catch (error) {
       console.error(error);
@@ -117,19 +124,19 @@ export async function PATCH(
 
       if (!data) throw new Error(`${graphId} already exists`);
 
-      return NextResponse.json({ data });
+      return NextResponse.json({ data }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: getCorsHeaders(request)  }
     );
   }
 }
@@ -244,6 +251,7 @@ export async function GET(
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
+      ...getCorsHeaders(request),
     },
   });
 }

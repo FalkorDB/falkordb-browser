@@ -1,6 +1,6 @@
 /* eslint-disable no-param-reassign */
 
-'use client'
+'use client';
 
 import { useEffect, useState, useContext, Dispatch, SetStateAction, useRef, useCallback, useMemo } from "react";
 import { cn, GraphRef, formatName, getTheme } from "@/lib/utils";
@@ -20,7 +20,7 @@ import { Explain, Metadata, Profile } from "./MetadataView";
 import PaginationList from "../components/PaginationList";
 import SelectGraph from "./selectGraph";
 
-type Tab = "text" | "metadata" | "explain" | "profile"
+type Tab = "text" | "metadata" | "explain" | "profile";
 
 interface BaseProps<T = "Schema" | "Graph"> {
     type: T
@@ -36,7 +36,7 @@ interface SchemaProps {
     selectedElements: (Node | Link)[];
     setSelectedElements: (el: (Node | Link)[]) => void;
     handleDeleteElement: () => Promise<void>;
-    chartRef: GraphRef;
+    canvasRef: GraphRef;
     setIsAddNode: (isAdd: boolean) => void;
     setIsAddEdge: (isAdd: boolean) => void;
     isAddNode: boolean;
@@ -58,7 +58,7 @@ interface GraphProps {
     selectedElements?: never;
     setSelectedElements?: never;
     handleDeleteElement?: never;
-    chartRef?: never;
+    canvasRef?: never;
     setIsAddNode?: never;
     setIsAddEdge?: never;
     isAddNode?: never;
@@ -71,7 +71,7 @@ type Props<T = "Graph" | "Schema"> =
         T extends "Graph"
         ? GraphProps
         : SchemaProps
-    )
+    );
 
 export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schema">({
     graph,
@@ -86,7 +86,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     selectedElements,
     setSelectedElements,
     handleDeleteElement,
-    chartRef,
+    canvasRef,
     setIsAddNode,
     setIsAddEdge,
     isAddNode,
@@ -97,88 +97,89 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     isQueryLoading
 }: Props<T>) {
 
-    const { indicator } = useContext(IndicatorContext)
-    const { tutorialOpen } = useContext(BrowserSettingsContext)
-    const { graphNames } = useContext(GraphContext)
+    const { indicator } = useContext(IndicatorContext);
+    const { tutorialOpen } = useContext(BrowserSettingsContext);
+    const { graphNames } = useContext(GraphContext);
 
-    const { theme } = useTheme()
-    const { secondary, currentTheme } = getTheme(theme)
+    const { theme } = useTheme();
+    const { secondary, currentTheme } = getTheme(theme);
 
-    const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
-    const submitQuery = useRef<HTMLButtonElement>(null)
-    const searchQueryRef = useRef<HTMLInputElement>(null)
+    const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+    const submitQuery = useRef<HTMLButtonElement>(null);
+    const searchQueryRef = useRef<HTMLInputElement>(null);
 
-    const [queriesOpen, setQueriesOpen] = useState(false)
-    const [filteredQueries, setFilteredQueries] = useState<Query[]>([])
-    const [activeFilters, setActiveFilters] = useState<string[]>([])
-    const [isLoading, setIsLoading] = useState(false)
-    const [maximize, setMaximize] = useState(false)
-    const [tab, setTab] = useState<Tab>("text")
-    const [deleteElements, setDeleteElements] = useState<number[]>([])
+    const [queriesOpen, setQueriesOpen] = useState(false);
+    const [filteredQueries, setFilteredQueries] = useState<Query[]>([]);
+    const [activeFilters, setActiveFilters] = useState<string[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [maximize, setMaximize] = useState(false);
+    const [tab, setTab] = useState<Tab>("text");
+    const [deleteElements, setDeleteElements] = useState<number[]>([]);
 
     const filters = useMemo(() => {
-        const queries = historyQuery?.queries ?? []
+        const queries = historyQuery?.queries ?? [];
         if (graphNames.length + 10 <= queries.length) {
-            return graphNames.filter(name => queries.some(query => query.graphName === name))
+            return graphNames.filter(name => queries.some(query => query.graphName === name));
         }
-        return Array.from(new Set(queries.map(query => query.graphName).filter(name => !!name)))
-    }, [graphNames, historyQuery?.queries])
-    const currentQuery = historyQuery?.counter === 0 ? historyQuery.currentQuery : historyQuery?.queries[historyQuery.counter - 1]
+        return Array.from(new Set(queries.map(query => query.graphName).filter(name => !!name)));
+    }, [graphNames, historyQuery?.queries]);
+    const currentQuery = historyQuery?.counter === 0 ? historyQuery.currentQuery : historyQuery?.queries[historyQuery.counter - 1];
 
     useEffect(() => {
-        if (!historyQuery || !setHistoryQuery) return
+        if (!historyQuery || !setHistoryQuery) return;
         setHistoryQuery(prev => ({
             ...prev,
             query: prev.counter ? prev.queries[prev.counter - 1].text : prev.currentQuery.text
-        }))
-    }, [historyQuery?.counter, setHistoryQuery])
+        }));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [historyQuery?.counter, setHistoryQuery]);
 
     const afterSearchCallback = useCallback((newFilteredList: Query[]) => {
-        if (!historyQuery || !setHistoryQuery) return
+        if (!historyQuery || !setHistoryQuery) return;
 
         // Get the currently selected query based on counter
         const selectedQuery = historyQuery.counter === 0 
             ? historyQuery.currentQuery 
-            : historyQuery.queries[historyQuery.counter - 1]
+            : historyQuery.queries[historyQuery.counter - 1];
 
         // If the selected query is not in the filtered list, reset counter to 0
         if (selectedQuery && newFilteredList.every(q => q.text !== selectedQuery.text)) {
             setHistoryQuery(prev => {
-                if (prev.counter === 0) return prev
+                if (prev.counter === 0) return prev;
                 return {
                     ...prev,
                     counter: 0
-                }
-            })
+                };
+            });
         }
-    }, [historyQuery, setHistoryQuery])
+    }, [historyQuery, setHistoryQuery]);
 
     const resetHistoryFilters = useCallback(() => {
         if (!historyQuery) {
-            setFilteredQueries([])
-            setActiveFilters([])
-            return
+            setFilteredQueries([]);
+            setActiveFilters([]);
+            return;
         }
 
         if (graphName && filters.some(name => name === graphName)) {
-            setActiveFilters([graphName])
+            setActiveFilters([graphName]);
             const scopedQueries = [
                 ...historyQuery.queries.filter(({ graphName: n }) => graphName === n)
-            ].reverse()
+            ].reverse();
 
-            setFilteredQueries(scopedQueries)
-            afterSearchCallback(scopedQueries)
-            return
+            setFilteredQueries(scopedQueries);
+            afterSearchCallback(scopedQueries);
+            return;
         }
 
-        const allQueries = [...historyQuery.queries].reverse()
-        setActiveFilters([])
-        setFilteredQueries(allQueries)
-        afterSearchCallback(allQueries)
-    }, [historyQuery, graphName, filters, afterSearchCallback])
+        const allQueries = [...historyQuery.queries].reverse();
+        setActiveFilters([]);
+        setFilteredQueries(allQueries);
+        afterSearchCallback(allQueries);
+    }, [historyQuery, graphName, filters, afterSearchCallback]);
 
     const handelSetFilteredQueries = useCallback((name?: string) => {
-        if (!historyQuery) return
+        if (!historyQuery) return;
 
         let newActiveFilters = activeFilters;
         if (name) {
@@ -195,20 +196,20 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
             ...historyQuery.queries.filter(({ graphName: n }) =>
                 newActiveFilters.some(f => f === n)
             )
-        ].reverse()
+        ].reverse();
 
-        setFilteredQueries(newFilteredQueries)
-        afterSearchCallback(newFilteredQueries)
+        setFilteredQueries(newFilteredQueries);
+        afterSearchCallback(newFilteredQueries);
     }, [activeFilters, afterSearchCallback, historyQuery]);
 
     useEffect(() => {
         if (!queriesOpen) {
-            setIsLoading(false)
-            setTab("text")
-            searchQueryRef.current?.blur()
+            setIsLoading(false);
+            setTab("text");
+            searchQueryRef.current?.blur();
         }
-        resetHistoryFilters()
-    }, [queriesOpen, resetHistoryFilters])
+        resetHistoryFilters();
+    }, [queriesOpen, resetHistoryFilters]);
 
     const focusEditorAtEnd = () => {
         if (editorRef.current) {
@@ -235,9 +236,9 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     }, [currentQuery]);
 
     useEffect(() => {
-        if (!queriesOpen || !currentQuery || tab === "profile") return
+        if (!queriesOpen || !currentQuery || tab === "profile") return;
 
-        const currentValue = currentQuery?.[tab]
+        const currentValue = currentQuery?.[tab];
 
         if (!currentValue || currentValue.length === 0) {
             const fallbackTab = (Object.keys(currentQuery) as Tab[]).find(isTabEnabled);
@@ -246,20 +247,20 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                 setTab(fallbackTab);
 
                 if (fallbackTab === "text" && !editorRef.current?.hasTextFocus()) {
-                    focusEditorAtEnd()
+                    focusEditorAtEnd();
                 }
             }
         } else if (tab === "text" && !editorRef.current?.hasTextFocus()) {
-            focusEditorAtEnd()
+            focusEditorAtEnd();
         }
-    }, [currentQuery, setTab, queriesOpen, historyQuery?.query, tab, isTabEnabled])
+    }, [currentQuery, setTab, queriesOpen, historyQuery?.query, tab, isTabEnabled]);
 
     const handleOnChange = useCallback((name: string) => {
-        setGraphName(formatName(name))
-    }, [setGraphName])
+        setGraphName(formatName(name));
+    }, [setGraphName]);
 
     const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
-        editorRef.current = e
+        editorRef.current = e;
 
         // eslint-disable-next-line no-bitwise
         e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
@@ -267,7 +268,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
         });
 
         e.addCommand(monaco.KeyCode.Escape, () => {
-            searchQueryRef.current?.focus()
+            searchQueryRef.current?.focus();
         });
 
         // eslint-disable-next-line no-bitwise
@@ -282,61 +283,61 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
             keybindings: [monaco.KeyCode.Enter],
             contextMenuOrder: 1.5,
             run: async () => {
-                submitQuery.current?.click()
+                submitQuery.current?.click();
             },
             precondition: '!suggestWidgetVisible',
         });
-    }
+    };
 
     const handleSubmit = async () => {
         try {
-            setIsLoading(true)
-            await runQuery!(historyQuery!.query.trim())
-            setQueriesOpen(false)
+            setIsLoading(true);
+            await runQuery!(historyQuery!.query.trim());
+            setQueriesOpen(false);
         } finally {
-            setIsLoading(false)
+            setIsLoading(false);
         }
-    }
+    };
 
     const handleDeleteQuery = useCallback(() => {
-        if (!historyQuery || !setHistoryQuery) return
+        if (!historyQuery || !setHistoryQuery) return;
 
-        const newQueries = historyQuery.queries.filter((_, idx) => !deleteElements.some((removeIndex) => idx === removeIndex))
+        const newQueries = historyQuery.queries.filter((_, idx) => !deleteElements.some((removeIndex) => idx === removeIndex));
 
-        if (newQueries.length === 0) localStorage.removeItem("query history")
-        else localStorage.setItem("query history", JSON.stringify(newQueries))
+        if (newQueries.length === 0) localStorage.removeItem("query history");
+        else localStorage.setItem("query history", JSON.stringify(newQueries));
 
         // Check if counter points to a deleted query (counter is 1-indexed, so counter - 1 is the index)
-        const isCounterDeleted = historyQuery.counter > 0 && deleteElements.includes(historyQuery.counter - 1)
+        const isCounterDeleted = historyQuery.counter > 0 && deleteElements.includes(historyQuery.counter - 1);
         
-        let nextCounter: number
+        let nextCounter: number;
         if (isCounterDeleted) {
             // Unselect if counter points to deleted query
-            nextCounter = 0
+            nextCounter = 0;
         } else if (historyQuery.counter > 0) {
             // Adjust counter to account for deleted queries before it
-            const deletedBeforeCount = deleteElements.filter(idx => idx < historyQuery.counter - 1).length
-            nextCounter = Math.max(1, historyQuery.counter - deletedBeforeCount)
+            const deletedBeforeCount = deleteElements.filter(idx => idx < historyQuery.counter - 1).length;
+            nextCounter = Math.max(1, historyQuery.counter - deletedBeforeCount);
             // Clamp to new array length
-            nextCounter = Math.min(nextCounter, newQueries.length)
+            nextCounter = Math.min(nextCounter, newQueries.length);
         } else {
             // Counter is 0 (currentQuery), keep it
-            nextCounter = 0
+            nextCounter = 0;
         }
 
-        const nextQuery = nextCounter ? newQueries[nextCounter - 1].text : historyQuery.currentQuery.text
+        const nextQuery = nextCounter ? newQueries[nextCounter - 1].text : historyQuery.currentQuery.text;
 
         setHistoryQuery(prev => ({
             ...prev,
             queries: newQueries,
             counter: nextCounter,
             query: nextQuery
-        }))
-        setDeleteElements([])
-        setFilteredQueries(current => current.filter(query => !deleteElements.some((removeIndex) => historyQuery.queries[removeIndex].timestamp !== query.timestamp)))
-    }, [historyQuery, setHistoryQuery, deleteElements])
+        }));
+        setDeleteElements([]);
+        setFilteredQueries(current => current.filter(query => deleteElements.some((removeIndex) => historyQuery.queries[removeIndex].timestamp === query.timestamp)));
+    }, [historyQuery, setHistoryQuery, deleteElements]);
 
-    const separator = <div className="h-[80%] w-0.5 bg-border rounded-full" />
+    const separator = <div className="h-[80%] w-0.5 bg-border rounded-full" />;
 
     return (
         <div className="z-20 w-full h-[40px] flex flex-row gap-4 items-center">
@@ -383,7 +384,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                     tabIndex={-1}
                                     onEscapeKeyDown={(e) => {
                                         if (editorRef.current && editorRef.current.hasTextFocus()) {
-                                            e.preventDefault()
+                                            e.preventDefault();
                                         }
                                     }}
                                     onOpenChange={setQueriesOpen}
@@ -408,19 +409,19 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                             dataTestId="queryHistory"
                                             list={filteredQueries}
                                             onClick={(counter, evt) => {
-                                                const index = historyQuery.queries.findIndex(q => q.text === counter)
+                                                const index = historyQuery.queries.findIndex(q => q.text === counter);
 
                                                 if (evt.type === "rightclick") {
                                                     if (evt.ctrlKey) {
-                                                        setDeleteElements(prev => prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index])
+                                                        setDeleteElements(prev => prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]);
                                                     } else {
-                                                        setDeleteElements(prev => prev.includes(index) ? [] : [index])
+                                                        setDeleteElements(prev => prev.includes(index) ? [] : [index]);
                                                     }
                                                 } else if (evt.type === "click") {
                                                     setHistoryQuery(prev => ({
                                                         ...prev,
-                                                        counter: index === historyQuery.counter ? 0 : index + 1
-                                                    }))
+                                                        counter: index + 1 === historyQuery.counter ? 0 : index + 1
+                                                    }));
                                                 }
                                             }}
                                             searchRef={searchQueryRef}
@@ -465,15 +466,15 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                     label="Delete All"
                                                     title="Remove all queries from history"
                                                     onClick={() => {
-                                                        localStorage.removeItem("query history")
+                                                        localStorage.removeItem("query history");
                                                         setHistoryQuery(prev => ({
                                                             ...prev,
                                                             queries: [],
                                                             counter: 0
-                                                        }))
-                                                        setFilteredQueries([])
-                                                        setActiveFilters([])
-                                                        setDeleteElements([])
+                                                        }));
+                                                        setFilteredQueries([]);
+                                                        setActiveFilters([]);
+                                                        setDeleteElements([]);
                                                     }}
                                                     disabled={historyQuery.queries.length === 0}
                                                 />
@@ -530,14 +531,14 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                                             ...prev.currentQuery,
                                                                             text: prev.counter ? prev.currentQuery.text : value || ""
                                                                         }
-                                                                    }
+                                                                    };
 
-                                                                    return newHistoryQuery
-                                                                })
+                                                                    return newHistoryQuery;
+                                                                });
                                                             }}
                                                             onMount={handleEditorDidMount}
                                                             beforeMount={(m) => {
-                                                                setTheme(m, "selector-theme", secondary, currentTheme === "dark")
+                                                                setTheme(m, "selector-theme", secondary, currentTheme === "dark");
                                                             }}
                                                         />
                                                     </>
@@ -556,16 +557,16 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                                     const newQuery = {
                                                                         ...prev.currentQuery,
                                                                         profile: profile || []
-                                                                    }
+                                                                    };
 
-                                                                    const newQueries = prev.queries.map(q => q.text === newQuery.text ? newQuery : q)
+                                                                    const newQueries = prev.queries.map(q => q.text === newQuery.text ? newQuery : q);
 
                                                                     return {
                                                                         ...prev,
                                                                         currentQuery: newQuery,
                                                                         queries: newQueries
-                                                                    }
-                                                                })
+                                                                    };
+                                                                });
                                                             }}
                                                             fetchCount={fetchCount}
                                                         />
@@ -607,7 +608,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                             </Button>
                         </div>
                     </>
-                    : selectedElements && handleDeleteElement && setSelectedElements && setIsAddNode && setIsAddEdge && chartRef && isCanvasLoading !== undefined && <div className="w-full h-full">
+                    : selectedElements && handleDeleteElement && setSelectedElements && setIsAddNode && setIsAddEdge && canvasRef && isCanvasLoading !== undefined && <div className="w-full h-full">
                         <Toolbar
                             graph={graph}
                             graphName={graphName}
@@ -616,8 +617,8 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                             setSelectedElements={setSelectedElements}
                             handleDeleteElement={handleDeleteElement}
                             setIsAddNode={setIsAddNode}
-                            setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => !!e.labels) ? setIsAddEdge : undefined}
-                            chartRef={chartRef}
+                            setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => "labels" in e) ? setIsAddEdge : undefined}
+                            canvasRef={canvasRef}
                             isLoadingSchema={!!isCanvasLoading}
                             isAddNode={isAddNode}
                             isAddEdge={isAddEdge}
@@ -625,5 +626,5 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                     </div>
             }
         </div >
-    )
+    );
 }

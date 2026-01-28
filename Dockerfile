@@ -1,13 +1,15 @@
 ARG CYPHER_VERSION=latest
 
-FROM node:22-alpine AS base
+FROM node:24-alpine3.20 AS base
 
-FROM falkordb/text-to-cypher:${CYPHER_VERSION} AS cypher
+# Update all Alpine packages to fix security vulnerabilities
+RUN apk upgrade --no-cache --available
 
 # Install dependencies only when needed
 FROM base AS deps
 # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat && \
+    apk upgrade --no-cache --available
 WORKDIR /app
 
 # Install dependencies based on the preferred package manager
@@ -42,13 +44,6 @@ RUN \
 FROM base AS runner
 WORKDIR /app
 
-# Install supervisor
-RUN apk add --no-cache supervisor
-
-# Remove npm to reduce attack surface (Next.js standalone doesn't need it)
-RUN npm cache clean --force && \
-    rm -rf /usr/local/lib/node_modules/npm
-
 ENV NODE_ENV production
 # Uncomment the following line in case you want to disable telemetry during runtime.
 # ENV NEXT_TELEMETRY_DISABLED 1
@@ -56,6 +51,9 @@ ENV NODE_ENV production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+RUN npm cache clean --force && \
+    rm -rf /usr/local/lib/node_modules/npm
+    
 COPY --from=builder /app/public ./public
 
 # Set the correct permission for prerender cache
@@ -67,27 +65,16 @@ RUN chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/.env.local.template ./.env.local
-COPY --from=cypher --chown=nextjs:nodejs /app/text-to-cypher /app/text-to-cypher
-COPY --from=cypher --chown=nextjs:nodejs /app/templates /app/templates
 
 
-# Create supervisor directories and copy config
-RUN mkdir -p /etc/supervisor/conf.d /var/log/supervisor
-COPY ./entrypoint.sh /entrypoint.sh
-COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-RUN chmod +x /entrypoint.sh
+USER nextjs
 
-EXPOSE 3000 8080 3001
+EXPOSE 3000
 
-ENV PORT=3000
-ENV REST_PORT=8080
-ENV MCP_PORT=3001
-ENV CYPHER=1
-ENV HOSTNAME="0.0.0.0"
+ENV PORT 3000
 
-# Use root to run supervisord (it will drop privileges for individual services)
-USER root
+ENV HOSTNAME "0.0.0.0"
 
 # server.js is created by next build from the standalone output
 # https://nextjs.org/docs/pages/api-reference/next-config-js/output
-CMD ["/entrypoint.sh"]
+CMD ["node", "server.js"]

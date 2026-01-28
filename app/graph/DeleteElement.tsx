@@ -1,6 +1,6 @@
 /* eslint-disable react/require-default-props */
 
-"use client"
+"use client";
 
 import React, { useState, useContext, useEffect } from "react";
 import { Trash2 } from "lucide-react";
@@ -25,24 +25,24 @@ export default function DeleteElement({
     label = "Graph"
 }: Props) {
 
-    const { indicator } = useContext(IndicatorContext)
-    const [isLoading, setIsLoading] = useState(false)
+    const { indicator } = useContext(IndicatorContext);
+    const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
         if (!open) {
-            setIsLoading(false)
+            setIsLoading(false);
         }
-    }, [open])
+    }, [open]);
 
     const handleDelete = async () => {
         try {
-            setIsLoading(true)
-            await onDeleteElement()
-            setOpen(false)
+            setIsLoading(true);
+            await onDeleteElement();
+            setOpen(false);
         } finally {
-            setIsLoading(false)
+            setIsLoading(false);
         }
-    }
+    };
 
     return (
         <DialogComponent
@@ -53,7 +53,7 @@ export default function DeleteElement({
             trigger={(
                 <Button
                     data-testid={`deleteElement${label}`}
-                    className="pointer-events-auto bg-background"
+                    className="pointer-events-auto bg-background p-1.5"
                     variant="Delete"
                     tooltipSide="bottom"
                     title="Delete Element(s)"
@@ -81,5 +81,5 @@ export default function DeleteElement({
                 />
             </div>
         </DialogComponent>
-    )
+    );
 }

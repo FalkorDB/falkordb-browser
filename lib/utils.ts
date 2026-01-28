@@ -1,3 +1,4 @@
+/* eslint-disable no-param-reassign */
 // eslint-disable-next-line import/prefer-default-export
 
 "use client";
@@ -5,8 +6,8 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { MutableRefObject } from "react";
-import { ForceGraphMethods } from "react-force-graph-2d";
 import { Node, Link, DataCell, MemoryValue } from "@/app/api/graph/model";
+import type { FalkorDBCanvas } from "@falkordb/canvas";
 
 export type ToastArguments = {
   title: string;
@@ -24,81 +25,9 @@ export const screenSize = {
   "2xl": 1536,
 };
 
-/**
- * Calculates the appropriate text color (black or white) based on background color brightness
- * Uses the relative luminance formula from WCAG guidelines
- * @param bgColor Background color in hex format (e.g., "#ff5733")
- * @returns "white" for dark backgrounds, "black" for light backgrounds
- */
-export const getContrastTextColor = (bgColor: string): string => {
-  let r: number;
-  let g: number;
-  let b: number;
-
-  // Handle HSL colors
-  if (bgColor.startsWith('hsl')) {
-    // Parse HSL: hsl(h, s%, l%)
-    const hslMatch = bgColor.match(/hsl\((\d+),\s*([\d.]+)%,\s*([\d.]+)%\)/);
-    if (hslMatch) {
-      const h = parseInt(hslMatch[1], 10) / 360;
-      const s = parseFloat(hslMatch[2]) / 100;
-      const l = parseFloat(hslMatch[3]) / 100;
-
-      // Convert HSL to RGB
-      const hue2rgb = (p: number, q: number, tParam: number) => {
-        let t = tParam;
-        if (t < 0) t += 1;
-        if (t > 1) t -= 1;
-        if (t < 1/6) return p + (q - p) * 6 * t;
-        if (t < 1/2) return q;
-        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-        return p;
-      };
-
-      if (s === 0) {
-        r = l;
-        g = l;
-        b = l; // achromatic
-      } else {
-        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-        const p = 2 * l - q;
-        r = hue2rgb(p, q, h + 1/3);
-        g = hue2rgb(p, q, h);
-        b = hue2rgb(p, q, h - 1/3);
-      }
-    } else {
-      // Fallback if parsing fails
-      return 'white';
-    }
-  } else {
-    // Handle hex colors
-    let hex = bgColor.replace('#', '');
-    // Support 3-digit shorthand hex codes
-    if (hex.length === 3) {
-      hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
-    }
-    r = parseInt(hex.substring(0, 2), 16) / 255;
-    g = parseInt(hex.substring(2, 4), 16) / 255;
-    b = parseInt(hex.substring(4, 6), 16) / 255;
-  }
-
-  // Calculate relative luminance
-  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-
-  // Return white for dark backgrounds, black for light backgrounds
-  return luminance > 0.5 ? 'black' : 'white';
-};
-
-export type GraphRef = MutableRefObject<
-  ForceGraphMethods<Node, Link> | undefined
->;
+export type GraphRef = MutableRefObject<FalkorDBCanvas | null>;
 
 export type Panel = "chat" | "data" | "add" | undefined;
-
-export type TextPriority = {
-  name: string;
-  ignore: boolean;
-};
 
 export type SelectCell = {
   value: string;
@@ -145,13 +74,9 @@ export type Message = {
   | "Schema";
 };
 
-export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell | LazyCell;
+export type ConnectionType = "Standalone" | "Cluster" | "Sentinel";
 
-export type ViewportState = {
-  zoom: number;
-  centerX: number;
-  centerY: number;
-};
+export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell | LazyCell;
 
 export interface Row {
   cells: Cell[];
@@ -228,7 +153,7 @@ export async function securedFetch(
       description: message,
       variant: "destructive",
     });
-    
+
     if (status === 401 || status >= 500) {
       setIndicator("offline");
     }
@@ -287,39 +212,6 @@ export function rgbToHSL(hex: string): string {
   const lPct = Math.round(l * 100);
 
   return `hsl(${hDeg}, ${sPct}%, ${lPct}%)`;
-}
-
-/**
- * Fits the force-graph view to show all (optionally filtered) nodes within the canvas bounds.
- *
- * The function computes padding as 10% of the smaller canvas dimension, scales it by
- * `paddingMultiplier`, and invokes the graph's `zoomToFit` with a 500ms duration.
- *
- * @param chartRef - Optional reference to the force-graph instance to operate on.
- * @param filter - Optional predicate to include only nodes that should be considered when fitting.
- * @param paddingMultiplier - Multiplier applied to the computed padding (default: 1).
- */
-export function handleZoomToFit(
-  chartRef?: GraphRef,
-  filter?: (node: Node) => boolean,
-  paddingMultiplier = 1
-) {
-  const chart = chartRef?.current;
-  if (chart) {
-    // Get canvas dimensions
-    const canvas = document.querySelector(
-      ".force-graph-container canvas"
-    ) as HTMLCanvasElement;
-
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-
-    // Calculate padding as 10% of the smallest canvas dimension
-    const minDimension = Math.min(rect.width, rect.height);
-    const padding = minDimension * 0.1;
-    chart.zoomToFit(500, padding * paddingMultiplier, filter);
-  }
 }
 
 type MemoryValueType = (string | number | MemoryValueType)[];
@@ -408,39 +300,6 @@ export function getQueryWithLimit(
   return [query, existingLimit];
 }
 
-export const getNodeDisplayText = (node: Node, displayTextPriority: TextPriority[]) => {
-  const { data: nodeData } = node;
-
-  const displayText = displayTextPriority.find(({ name, ignore }) => {
-    const key = ignore
-      ? Object.keys(nodeData).find(
-        (k) => k.toLowerCase() === name.toLowerCase()
-      )
-      : name;
-
-    return (
-      key &&
-      nodeData[key] &&
-      typeof nodeData[key] === "string" &&
-      nodeData[key].trim().length > 0
-    );
-  });
-
-  if (displayText) {
-    const key = displayText.ignore
-      ? Object.keys(nodeData).find(
-        (k) => k.toLowerCase() === displayText.name.toLowerCase()
-      )
-      : displayText.name;
-
-    if (key) {
-      return String(nodeData[key]);
-    }
-  }
-
-  return String(node.id);
-}
-
 export const formatName = (newGraphName: string) =>
   newGraphName === '""' ? "" : newGraphName;
 
@@ -497,5 +356,5 @@ export function getTheme(theme: string | undefined) {
 // Type guard: runtime check that proves elements is [Node, Node]
 export function isTwoNodes(elements: (Node | Link)[]): elements is [Node, Node] {
   return elements.length === 2 &&
-    elements.every((e): e is Node => !!e.labels)
+    elements.every((e): e is Node => "labels" in e);
 }

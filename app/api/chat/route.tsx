@@ -1,171 +1,217 @@
 import { NextRequest, NextResponse } from "next/server";
+import { TextToCypher } from "@falkordb/text-to-cypher";
+import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { getClient } from "../auth/[...nextauth]/options";
 import { chatRequest, validateBody } from "../validate-body";
+import { buildFalkorDBConnection, corsHeaders } from "../utils";
 
-const CHAT_URL = process.env.CHAT_URL || "http://localhost:8000/"
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders() });
+}
 
 export async function GET() {
     try {
-        const session = await getClient()
+        const session = await getClient();
 
         if (session instanceof NextResponse) {
-            throw new Error(await session.text())
+            throw new Error(await session.text());
         }
 
-        try {
-            const response = await fetch(`${CHAT_URL}configured-model`, {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-            })
-
-            if (!response.ok) {
-                throw new Error(await response.text())
-            }
-
-            const data = await response.json()
-
-            return NextResponse.json(data)
-        } catch (error) {
-            const { message } = (error as Error)
-
-            // Gracefully handle missing endpoint or server unavailability
-            // Return empty object to allow chat to be displayed
-            if (message.includes("fetch failed") || message.includes("Not Found") || message.includes("NOT_FOUND") || message.includes("could not be found")) {
-                return NextResponse.json({ message }, { status: 200 })
-            }
-
-            console.error(error)
-            return NextResponse.json({ error: message }, { status: 400 })
-        }
+        // Return empty object to allow chat to be displayed
+        // The actual model configuration is provided by the user in the frontend
+        return NextResponse.json({}, { status: 200, headers: corsHeaders() });
     } catch (error) {
-        console.error(error)
-        return NextResponse.json({ error: (error as Error).message }, { status: 500 })
+        console.error(error);
+        return NextResponse.json({ error: (error as Error).message }, { status: 500, headers: corsHeaders() });
     }
 }
 
-export type EventType = "Status" | "Schema" | "CypherQuery" | "CypherResult" | "ModelOutputChunk" | "Result" | "Error"
+export type EventType = "Status" | "Schema" | "CypherQuery" | "CypherResult" | "ModelOutputChunk" | "Result" | "Error";
+
+/**
+ * Create user-friendly error message
+ */
+function createUserFriendlyErrorMessage(error: unknown, model: string, apiKey: string): string {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const modelProvider = detectProviderFromModel(model);
+    const keyProvider = detectProviderFromApiKey(apiKey);
+
+    // Get display names for providers
+    const modelProviderName = getProviderDisplayName(modelProvider);
+    const keyProviderName = getProviderDisplayName(keyProvider);
+
+    // Check for provider mismatch (critical error - show first)
+    if (modelProvider !== "unknown" && keyProvider !== "unknown" && modelProvider !== keyProvider) {
+        // Ollama doesn't need an API key match
+        if (modelProvider !== "ollama") {
+            return `Model/API key mismatch: You selected a ${modelProviderName} model but provided a ${keyProviderName} API key. Please update your API key in Settings to match your selected model.`;
+        }
+    }
+
+    // Check for 404 model not found errors
+    if (errorMessage.includes("404") && errorMessage.includes("model") && errorMessage.includes("not found")) {
+        if (modelProvider === "ollama") {
+            const modelName = model.replace("ollama:", "");
+            return `Ollama model "${modelName}" not found. Please ensure Ollama is running locally and the model is pulled. Run: ollama pull ${modelName}`;
+        }
+        return `Model "${model}" not found. Please check if this model is available for your ${modelProviderName} account or select a different model in Settings.`;
+    }
+
+    // Check for authentication errors
+    if (errorMessage.includes("401") || errorMessage.includes("invalid_api_key") || errorMessage.includes("Incorrect API key")) {
+        const provider = keyProvider !== "unknown" ? keyProviderName : "";
+        return `Invalid ${provider} API key. Please check your API key in Settings and ensure it is correct.`;
+    }
+
+    // Check for other API key errors
+    if (errorMessage.includes("API key") || errorMessage.includes("api_key")) {
+        return "API key error. Please verify your API key in Settings matches your selected model provider.";
+    }
+
+    // Check for network/connection errors
+    if (errorMessage.includes("fetch failed") || errorMessage.includes("ECONNREFUSED")) {
+        if (modelProvider === "ollama") {
+            return "Cannot connect to Ollama. Please ensure Ollama is running locally on your machine.";
+        }
+        return "Network error. Please check your internet connection and try again.";
+    }
+
+    // Check for text-to-cypher query generation failures
+    if (errorMessage.includes("Query validation failed") || errorMessage.includes("Query does not contain valid Cypher keywords")) {
+        return "Failed to convert your question to a valid database query.";
+    }
+
+    // Check for general text-to-cypher failures
+    if (errorMessage.includes("Text-to-Cypher failed") || errorMessage.includes("Failed to generate query")) {
+        return "Unable to generate a database query from your question.";
+    }
+
+    // Default: return original error message
+    return errorMessage;
+}
 
 // eslint-disable-next-line import/prefer-default-export
 export async function POST(request: NextRequest) {
-    const encoder = new TextEncoder()
-    const { readable, writable } = new TransformStream()
-    const writer = writable.getWriter()
+    const encoder = new TextEncoder();
+    const { readable, writable } = new TransformStream();
+    const writer = writable.getWriter();
 
     try {
         // Verify authentication via getClient
-        const session = await getClient()
+        const session = await getClient();
 
         if (session instanceof NextResponse) {
-            throw new Error(await session.text())
+            throw new Error(await session.text());
         }
 
-        const body = await request.json()
+        const body = await request.json();
 
         // Validate request body
         const validation = validateBody(chatRequest, body);
 
         if (!validation.success) {
-            writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(validation.error)}\n\n`))
-            writer.close()
+            writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(validation.error)}\n\n`));
+            writer.close();
 
             return new Response(readable, {
                 headers: {
                     "Content-Type": "text/event-stream",
                     "Cache-Control": "no-cache",
                     Connection: "keep-alive",
+                    ...corsHeaders(),
                 },
-            })
+            });
         }
 
-        const { messages, graphName, key, model } = validation.data
+        const { messages, graphName, key, model } = validation.data;
+
+        // Validate required parameters
+        if (!key) {
+            writer.write(encoder.encode(`event: error status: ${400} data: "API key is required. Please configure it in Settings."\n\n`));
+            writer.close();
+
+            return new Response(readable, {
+                headers: {
+                    "Content-Type": "text/event-stream",
+                    "Cache-Control": "no-cache",
+                    Connection: "keep-alive",
+                    ...corsHeaders(),
+                },
+            });
+        }
 
         try {
-            const requestBody: Record<string, unknown> = {
-                chat_request: { messages },
-                "graph_name": graphName,
-                "model": model || "gpt-4o-mini",
-            }
+            // Build FalkorDB connection URL from user session
+            const falkordbConnection = buildFalkorDBConnection(session.user);
 
-            // Only add key if provided
-            if (key) {
-                requestBody.key = key
-            }
-
-            const response = await fetch(`${CHAT_URL}text_to_cypher`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(requestBody)
+            // Create TextToCypher client
+            const textToCypher = new TextToCypher({
+                falkordbConnection,
+                model: model || "gpt-4o-mini",
+                apiKey: key,
             });
 
-            if (!response.ok) {
-                throw new Error(`Error: ${await response.text()}`);
+            // Get the last user message
+            if (messages.length === 0) {
+                throw new Error('No messages provided');
+            }
+            const lastUserMessage = messages.filter(msg => msg.role === 'user').pop();
+            if (!lastUserMessage) {
+                throw new Error('No user messages found');
+            }
+            const question = lastUserMessage.content;
+
+            // Call textToCypher and get the result
+            const result = await textToCypher.textToCypher(graphName, question);
+
+            // Check if the result has an error status
+            if (result.status === 'error') {
+                throw new Error(result.error || 'Text-to-Cypher failed');
             }
 
-            // Handle streaming SSE response from text-to-cypher
-            const reader = response.body?.getReader();
-            const decoder = new TextDecoder();
+            // Send result events
+            if (result.schema) {
+                writer.write(encoder.encode(`event: Schema data: ${JSON.stringify(result.schema)}\n\n`));
+            }
 
-            const processStream = async () => {
-                if (!reader) return;
+            if (result.cypherQuery) {
+                writer.write(encoder.encode(`event: CypherQuery data: ${result.cypherQuery}\n\n`));
+            }
 
-                const { done, value } = await reader.read();
-                if (done) {
-                    writer.close();
-                    return;
-                }
+            if (result.cypherResult) {
+                writer.write(encoder.encode(`event: CypherResult data: ${JSON.stringify(result.cypherResult)}\n\n`));
+            }
 
-                const chunk = decoder.decode(value, { stream: true });
-                const lines = chunk.split('\n').filter(line => line);
-                let isResult = false;
+            if (result.answer) {
+                writer.write(encoder.encode(`event: Result data: ${JSON.stringify(result.answer)}\n\n`));
+            }
 
-                lines.forEach(line => {
-                    if (line.startsWith('data: ')) {
-                        try {
-                            const data = JSON.parse(line.slice(6)); // Remove 'data: ' prefix
-                            const type: EventType = Object.keys(data)[0] as EventType
-
-                            isResult = type === "Result" || type === "Error"
-
-                            writer.write(encoder.encode(`event: ${type} data: ${data[type]}\n\n`))
-                        } catch (parseError) {
-                            console.error("Failed to parse SSE data:", line, parseError)
-                        }
-                    }
-                });
-
-                // Continue processing the stream unless we received Result or Error
-                if (!isResult) {
-                    await processStream();
-                } else {
-                    writer.close();
-                }
-            };
-
-            await processStream();
+            writer.close();
         } catch (error) {
-            console.error(error)
-            writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify((error as Error).message)}\n\n`))
-            writer.close()
+            console.error('Text-to-Cypher error details:', error);
+
+            // Create user-friendly error message
+            const userFriendlyMessage = createUserFriendlyErrorMessage(error as Error, model || "gpt-4o-mini", key);
+
+            writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(userFriendlyMessage)}\n\n`));
+            writer.close();
         }
     } catch (error) {
-        console.error(error)
-        writer.write(encoder.encode(`event: error status: ${500} data: ${JSON.stringify((error as Error).message)}\n\n`))
-        writer.close()
+        console.error(error);
+        writer.write(encoder.encode(`event: error status: ${500} data: ${JSON.stringify((error as Error).message)}\n\n`));
+        writer.close();
     }
 
     request.signal.addEventListener("abort", () => {
-        writer.close()
-    })
+        writer.close();
+    });
 
     return new Response(readable, {
         headers: {
             "Content-Type": "text/event-stream",
             "Cache-Control": "no-cache",
             Connection: "keep-alive",
+            ...corsHeaders(),
         },
-    })
+    });
 }

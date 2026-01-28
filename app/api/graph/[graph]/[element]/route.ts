@@ -5,6 +5,11 @@ import {
   deleteGraphElement,
   validateBody,
 } from "../../../validate-body";
+import { getCorsHeaders } from "../../../utils";
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
+}
 
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
@@ -26,28 +31,28 @@ export async function GET(
       const graph = client.selectGraph(graphId);
 
       // Get node's neighbors
-      const query = `MATCH (src)-[e]-(n)
-                          WHERE ID(src) = $id
-                          RETURN e, n`;
+      const query = `MATCH (n)-[e]-(m)
+                          WHERE ID(n) = $id
+                          RETURN *`;
 
       const result =
         user.role === "Read-Only"
           ? await graph.roQuery(query, { params: { id: elementId } })
           : await graph.query(query, { params: { id: elementId } });
 
-      return NextResponse.json({ result }, { status: 200 });
+      return NextResponse.json({ result }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }
@@ -75,7 +80,7 @@ export async function POST(
       if (!validation.success) {
         return NextResponse.json(
           { message: validation.error },
-          { status: 400 }
+          { status: 400, headers: getCorsHeaders(request) }
         );
       }
 
@@ -119,19 +124,19 @@ export async function POST(
           ? await graph.roQuery(query, { params: queryParams })
           : await graph.query(query, { params: queryParams });
 
-      return NextResponse.json({ result }, { status: 200 });
+      return NextResponse.json({ result }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }
@@ -160,7 +165,7 @@ export async function DELETE(
       if (!validation.success) {
         return NextResponse.json(
           { message: validation.error },
-          { status: 400 }
+          { status: 400, headers: getCorsHeaders(request) }
         );
       }
 
@@ -176,20 +181,20 @@ export async function DELETE(
 
       return NextResponse.json(
         { message: "Element deleted successfully" },
-        { status: 200 }
+        { status: 200, headers: getCorsHeaders(request) }
       );
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }

@@ -12,7 +12,7 @@ interface Props<T extends Label | Relationship> {
 
 export default function Labels<T extends Label | Relationship>({ labels, onClick, label, type }: Props<T>) {
 
-    const listRef = useRef<HTMLUListElement>(null)
+    const listRef = useRef<HTMLUListElement>(null);
 
     return (
         <div className={cn("flex flex-col gap-2 max-w-1/2 bg-background rounded-lg p-1")}>
@@ -31,10 +31,10 @@ export default function Labels<T extends Label | Relationship>({ labels, onClick
                                     className={cn("w-full SofiaSans", l.show ? "opacity-100" : "opacity-50")}
                                     label={l.name}
                                     onClick={() => {
-                                        onClick(l)
+                                        onClick(l);
                                     }}
                                 >
-                                    <div style={{ backgroundColor: l.color }} className={cn("min-w-6 min-h-6 rounded-full")} />
+                                    <div style={{ backgroundColor: l.style.color }} className={cn("min-w-6 min-h-6 rounded-full")} />
                                 </Button>
                             </li>
                         ))
@@ -42,5 +42,5 @@ export default function Labels<T extends Label | Relationship>({ labels, onClick
                 </ul>
             </div>
         </div>
-    )
+    );
 }

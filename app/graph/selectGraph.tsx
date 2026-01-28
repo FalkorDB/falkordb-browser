@@ -43,7 +43,7 @@ interface Props {
  */
 export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, type, setGraph }: Props) {
 
-    const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { indicator, setIndicator } = useContext(IndicatorContext);
     const {
         settings: {
             contentPersistenceSettings: {
@@ -52,28 +52,53 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             graphInfo: { showMemoryUsage }
         },
         tutorialOpen
-    } = useContext(BrowserSettingsContext)
+    } = useContext(BrowserSettingsContext);
 
-    const inputRef = useRef<HTMLInputElement>(null)
+    const inputRef = useRef<HTMLInputElement>(null);
 
-    const { toast } = useToast()
-    const { data: session } = useSession()
-    const sessionRole = session?.user.role
+    const { toast } = useToast();
+    const { data: session } = useSession();
+    const sessionRole = session?.user.role;
 
-    const [open, setOpen] = useState(false)
-    const [rows, setRows] = useState<Row[]>([])
-    const [openMenage, setOpenMenage] = useState(false)
-    const [openDuplicate, setOpenDuplicate] = useState(false)
-    const [isLoading, setIsLoading] = useState(false)
+    const [open, setOpen] = useState(false);
+    const [rows, setRows] = useState<Row[]>([]);
+    const [openMenage, setOpenMenage] = useState(false);
+    const [openDuplicate, setOpenDuplicate] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
-        setOpen(false)
-    }, [selectedValue])
-
+        setOpen(false);
+    }, [selectedValue]);
+    
     const getOptions = useCallback(async () =>
         fetchOptions(type, toast, setIndicator, indicator, setSelectedValue, setOptions, contentPersistence)
-        , [type, toast, setIndicator, indicator, setSelectedValue, setOptions, contentPersistence])
+    , [type, toast, setIndicator, indicator, setSelectedValue, setOptions, contentPersistence]);
+    
+    const loadMemory = useCallback((opt: string) =>
+        async () => {
+            const memoryMap = await getMemoryUsage(opt, toast, setIndicator);
+            const memoryValue = memoryMap.get("total_graph_sz_mb") || '<1';
 
+            return `${memoryValue} MB`;
+        }, [toast, setIndicator]);
+
+    const loadNodesCount = useCallback((opt: string) =>
+        async () => {
+            const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes`, toast, setIndicator) as { nodes?: number };
+
+            if (!result) return "";
+
+            return Number(result.nodes).toLocaleString();
+        }, [toast, setIndicator]);
+
+    const loadEdgesCount = useCallback((opt: string) =>
+        async () => {
+            const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges`, toast, setIndicator) as { edges?: number };
+
+            if (!result) return "";
+
+            return Number(result.edges).toLocaleString();
+        }, [toast, setIndicator]);
 
     const handleSetOption = useCallback(async (option: string, optionName: string) => {
         const result = await securedFetch(
@@ -85,56 +110,41 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             },
             toast,
             setIndicator
-        )
+        );
 
         if (result.ok) {
-            const newOptions = options.map((opt) => (opt === optionName ? option : opt))
-            setOptions!(newOptions)
+            const newOptions = options.map((opt) => (opt === optionName ? option : opt));
+            setOptions!(newOptions);
 
-            if (setSelectedValue && optionName === selectedValue) setSelectedValue(option)
+            if (setSelectedValue && optionName === selectedValue) setSelectedValue(option);
 
             // Rebuild rows to reflect the updated option names
-            setRows(
-                newOptions.map(opt =>
-                    sessionRole === "Admin"
-                        ? ({
-                            checked: false,
-                            name: opt,
-                            cells: [{ value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" }]
-                        })
-                        : ({ checked: false, name: opt, cells: [{ value: opt, type: "readonly" }] })
-                )
-            )
+            setRows(newOptions.map((opt) => {
+            const baseCell = sessionRole === "Admin"
+                ? { value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" as const }
+                : { value: opt, type: "readonly" as const };
+
+            const cells: Row["cells"] = [baseCell];
+
+            if (showMemoryUsage) {
+                cells.push({ loadCell: loadMemory(opt), type: "readonly" });
+            }
+
+            cells.push(
+                { loadCell: loadNodesCount(opt), type: "readonly" },
+                { loadCell: loadEdgesCount(opt), type: "readonly" }
+            );
+
+            return {
+                checked: false,
+                name: opt,
+                cells
+            };
+        }));
         }
 
-        return result.ok
-    }, [type, toast, setIndicator, options, setOptions, setSelectedValue, selectedValue, setRows, sessionRole])
-
-    const loadMemory = useCallback((opt: string) =>
-        async () => {
-            const memoryMap = await getMemoryUsage(opt, toast, setIndicator);
-            const memoryValue = memoryMap.get("total_graph_sz_mb") || '<1';
-
-            return `${memoryValue} MB`;
-        }, [toast, setIndicator])
-
-    const loadNodesCount = useCallback((opt: string) =>
-        async () => {
-            const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes`, toast, setIndicator) as { nodes?: number };
-
-            if (!result) return "";
-
-            return Number(result.nodes).toLocaleString()
-        }, [toast, setIndicator])
-
-    const loadEdgesCount = useCallback((opt: string) =>
-        async () => {
-            const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges`, toast, setIndicator) as { edges?: number };
-
-            if (!result) return "";
-
-            return Number(result.edges).toLocaleString()
-        }, [toast, setIndicator])
+        return result.ok;
+    }, [type, toast, setIndicator, options, setOptions, setSelectedValue, selectedValue, sessionRole, showMemoryUsage, loadNodesCount, loadEdgesCount, loadMemory]);
 
     const handleSetRows = useCallback((opts: string[]) => {
         setRows(opts.map((opt) => {
@@ -159,36 +169,36 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 cells
             };
         }));
-    }, [sessionRole, handleSetOption, loadMemory, loadNodesCount, loadEdgesCount, showMemoryUsage])
+    }, [sessionRole, handleSetOption, loadMemory, loadNodesCount, loadEdgesCount, showMemoryUsage]);
 
     useEffect(() => {
         if (!openMenage) {
-            setOpenDuplicate(false)
-            handleSetRows(options)
+            setOpenDuplicate(false);
+            handleSetRows(options);
         }
-    }, [openMenage, handleSetRows, options])
+    }, [openMenage, handleSetRows, options]);
 
     useEffect(() => {
-        handleSetRows(options)
-    }, [options, handleSetRows])
+        handleSetRows(options);
+    }, [options, handleSetRows]);
 
     const handleOpenChange = async (o: boolean) => {
-        setOpen(o)
+        setOpen(o);
 
-        if (!o || tutorialOpen) return
+        if (!o || tutorialOpen) return;
 
         try {
-            setIsLoading(true)
-            await getOptions()
+            setIsLoading(true);
+            await getOptions();
         } finally {
-            setIsLoading(false)
+            setIsLoading(false);
         }
-    }
+    };
 
     const handleClick = (value: string) => {
-        setSelectedValue(value)
-        setOpen(false)
-    }
+        setSelectedValue(value);
+        setOpen(false);
+    };
 
     return (
         <Dialog open={openMenage} onOpenChange={setOpenMenage}>
@@ -259,12 +269,12 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 data-testid="manageContent"
                 onEscapeKeyDown={(e) => {
                     if (inputRef.current === document.activeElement) {
-                        e.preventDefault()
+                        e.preventDefault();
                     }
                 }}
                 hideClose
                 preventOutsideClose={tutorialOpen}
-                className="flex flex-col border-none rounded-lg max-w-none h-[90dvh] w-[40dvw] p-2"
+                className="flex flex-col border-none rounded-lg max-w-none h-[90dvh] min-w-[40dvw] max-w-[80dvw] p-2"
             >
                 <DialogHeader className="flex-row justify-between items-center border-b border-border pb-4">
                     <DialogTitle className="text-2xl font-medium">Manage Graphs</DialogTitle>
@@ -293,7 +303,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         <>
                             <DeleteGraph
                                 type={type}
-                                rows={rows}
+                                rows={rows.filter(opt => opt.checked)}
                                 handleSetRows={handleSetRows}
                                 selectedValue={selectedValue}
                                 setGraphName={setSelectedValue}
@@ -312,8 +322,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                 open={openDuplicate}
                                 onOpenChange={setOpenDuplicate}
                                 onDuplicate={(duplicateName) => {
-                                    setSelectedValue(duplicateName)
-                                    setOptions!([...options, duplicateName])
+                                    setSelectedValue(duplicateName);
+                                    setOptions!([...options, duplicateName]);
                                 }}
                                 disabled={rows.filter(opt => opt.checked).length !== 1}
                             />
@@ -322,5 +332,5 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 </TableComponent>
             </DialogContent>
         </Dialog>
-    )
+    );
 }

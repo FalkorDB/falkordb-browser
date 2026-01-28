@@ -1,5 +1,10 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
+import { getCorsHeaders } from "../../../utils";
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
+}
 
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
@@ -24,19 +29,19 @@ export async function GET(
       const graph = client.selectGraph(graphId);
       const result = await graph.explain(query);
 
-      return NextResponse.json({ result });
+      return NextResponse.json({ result }, { headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }

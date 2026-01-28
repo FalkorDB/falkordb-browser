@@ -19,48 +19,48 @@ type SetUser = {
     username: string
     role: string
     oldRole?: string
-}
+};
 
 const ROLES = [
     "Admin",
     "Read-Write",
     "Read-Only"
-]
+];
 
 // Shows the details of a current database connection 
 export default function Users() {
 
-    const [users, setUsers] = useState<User[]>([])
-    const [rows, setRows] = useState<Row[]>([])
-    const [newUser, setNewUser] = useState<SetUser | null>(null)
-    const [open, setOpen] = useState(false)
-    const { toast } = useToast()
+    const [users, setUsers] = useState<User[]>([]);
+    const [rows, setRows] = useState<Row[]>([]);
+    const [newUser, setNewUser] = useState<SetUser | null>(null);
+    const [open, setOpen] = useState(false);
+    const { toast } = useToast();
     const { setIndicator } = useContext(IndicatorContext);
 
     useEffect(() => {
         if (!open) {
-            setNewUser(null)
+            setNewUser(null);
         }
-    }, [open])
+    }, [open]);
 
     const handleSetRole = async (user: SetUser) => {
-        const { username, role, oldRole } = user
+        const { username, role, oldRole } = user;
         const result = await securedFetch(`api/user/${prepareArg(username)}`, {
             method: 'PATCH',
             body: JSON.stringify({ role })
-        }, toast, setIndicator)
+        }, toast, setIndicator);
 
         if (result.ok) {
-            setUsers(prev => prev.map(u => u.username === username ? { ...u, role } : u))
-            setRows(prev => prev.map((row): Row => row.cells[0].value === username ? { ...row, cells: [row.cells[0], { ...row.cells[1], value: role }] } : row))
+            setUsers(prev => prev.map(u => u.username === username ? { ...u, role } : u));
+            setRows(prev => prev.map((row): Row => row.cells[0].value === username ? { ...row, cells: [row.cells[0], { ...row.cells[1], value: role }] } : row));
             toast({
                 title: "Success",
                 description: `${username} role updated successfully`,
                 action: oldRole ? <ToastAction altText="Undo" onClick={() => handleSetRole({ username, role: oldRole })}>Undo</ToastAction> : undefined
-            })
-            setOpen(false)
+            });
+            setOpen(false);
         }
-    }
+    };
 
     useEffect(() => {
         (async () => {
@@ -69,11 +69,11 @@ export default function Users() {
                 headers: {
                     'Content-Type': 'application/json'
                 }
-            }, toast, setIndicator)
+            }, toast, setIndicator);
 
             if (result.ok) {
-                const data = await result.json()
-                setUsers(data.result.map((user: User) => ({ ...user, selected: false })))
+                const data = await result.json();
+                setUsers(data.result.map((user: User) => ({ ...user, selected: false })));
                 setRows(data.result.map(({ username, role }: User): Row => ({
                     name: username,
                     cells: [{
@@ -86,18 +86,18 @@ export default function Users() {
                         value: role,
                         type: "select",
                         onChange: async (value: string) => {
-                            setNewUser({ username, role: value, oldRole: role })
-                            setOpen(true)
-                            return true
+                            setNewUser({ username, role: value, oldRole: role });
+                            setOpen(true);
+                            return true;
                         },
                         options: ROLES,
                         selectType: "Role"
                     }],
                     checked: false,
-                })))
+                })));
             }
-        })()
-    }, [toast, setIndicator])
+        })();
+    }, [toast, setIndicator]);
 
     const handleAddUser = async ({ username, password, role }: CreateUser) => {
         const response = await securedFetch('/api/user/', {
@@ -106,14 +106,14 @@ export default function Users() {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ username, password, role })
-        }, toast, setIndicator)
+        }, toast, setIndicator);
 
         if (response.ok) {
             toast({
                 title: "Success",
                 description: "User added successfully",
-            })
-            setUsers(prev => [...prev, { username, role, selected: false }])
+            });
+            setUsers(prev => [...prev, { username, role, selected: false }]);
             setRows(prev => [...prev, {
                 name: username,
                 cells: [{
@@ -122,18 +122,18 @@ export default function Users() {
                 }, {
                     value: role,
                     onChange: async (value: string) => {
-                        setNewUser({ username, role: value, oldRole: role })
-                        setOpen(true)
-                        return true
+                        setNewUser({ username, role: value, oldRole: role });
+                        setOpen(true);
+                        return true;
                     },
                     type: "select",
                     options: ROLES,
                     selectType: "Role"
                 }],
                 checked: false,
-            }] as Row[])
+            }] as Row[]);
         }
-    }
+    };
 
     return (
         <div className="w-full h-full flex flex-col space-y-4">

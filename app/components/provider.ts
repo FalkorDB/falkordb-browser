@@ -1,6 +1,7 @@
 import { createContext, Dispatch, SetStateAction } from "react";
-import { Panel, Tab, TextPriority, ViewportState } from "@/lib/utils";
-import { Graph, GraphData, GraphInfo, HistoryQuery } from "../api/graph/model";
+import { ConnectionType, GraphRef, Panel, Tab } from "@/lib/utils";
+import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
+import { Graph, GraphData, GraphInfo, HistoryQuery, Label, Relationship } from "../api/graph/model";
 
 type BrowserSettingsContextType = {
   newSettings: {
@@ -33,8 +34,6 @@ type BrowserSettingsContextType = {
     graphInfo: {
       newRefreshInterval: number;
       setNewRefreshInterval: Dispatch<SetStateAction<number>>;
-      newDisplayTextPriority: TextPriority[];
-      setNewDisplayTextPriority: Dispatch<SetStateAction<TextPriority[]>>;
     };
   };
   settings: {
@@ -72,8 +71,6 @@ type BrowserSettingsContextType = {
       showMemoryUsage: boolean;
       refreshInterval: number;
       setRefreshInterval: Dispatch<SetStateAction<number>>;
-      displayTextPriority: TextPriority[];
-      setDisplayTextPriority: Dispatch<SetStateAction<TextPriority[]>>;
     };
   };
   hasChanges: boolean;
@@ -93,6 +90,10 @@ type GraphContextType = {
   setGraphName: Dispatch<SetStateAction<string>>;
   graphNames: string[];
   setGraphNames: Dispatch<SetStateAction<string[]>>;
+  labels: Label[];
+  setLabels: Dispatch<SetStateAction<Label[]>>;
+  relationships: Relationship[];
+  setRelationships: Dispatch<SetStateAction<Relationship[]>>;
   nodesCount: number | undefined;
   setNodesCount: Dispatch<SetStateAction<number | undefined>>;
   edgesCount: number | undefined;
@@ -101,9 +102,10 @@ type GraphContextType = {
   setCurrentTab: Dispatch<SetStateAction<Tab>>;
   runQuery: (query: string, name?: string) => Promise<void>;
   fetchCount: () => Promise<void>;
-  handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void;
+  handleCooldown: (ticks?: number, isSetLoading?: boolean) => void;
   cooldownTicks: number | undefined;
   isLoading: boolean;
+  setIsLoading: (loading: boolean) => void;
 };
 
 type SchemaContextType = {
@@ -135,12 +137,14 @@ type QueryLoadingContextType = {
   setIsQueryLoading: Dispatch<SetStateAction<boolean>>;
 };
 
-type ViewportContextType = {
+type ForceGraphContextType = {
+  canvasRef: GraphRef;
   viewport: ViewportState;
   setViewport: Dispatch<SetStateAction<ViewportState>>;
   data: GraphData;
   setData: Dispatch<SetStateAction<GraphData>>;
-  isSaved: boolean;
+  graphData: CanvasData | undefined;
+  setGraphData: Dispatch<SetStateAction<CanvasData | undefined>>;
 };
 
 type TableViewContextType = {
@@ -151,6 +155,13 @@ type TableViewContextType = {
   expand: Map<number, number>;
   setExpand: Dispatch<SetStateAction<Map<number, number>>>;
   dataHash: string;
+};
+
+type ConnectionContextType = {
+  connectionType: ConnectionType;
+  setConnectionType: Dispatch<SetStateAction<ConnectionType>>;
+  dbVersion: string;
+  setDbVersion: Dispatch<SetStateAction<string>>;
 };
 
 export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
@@ -176,7 +187,10 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         newModel: "",
         setNewModel: () => {},
       },
-      graphInfo: { newRefreshInterval: 0, setNewRefreshInterval: () => {}, newDisplayTextPriority: [], setNewDisplayTextPriority: () => {} },
+      graphInfo: {
+        newRefreshInterval: 0,
+        setNewRefreshInterval: () => {},
+      },
     },
     settings: {
       limitSettings: {
@@ -203,7 +217,11 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         navigateToSettings: false,
         displayChat: false,
       },
-      graphInfo: { showMemoryUsage: false, refreshInterval: 0, setRefreshInterval: () => {}, displayTextPriority: [], setDisplayTextPriority: () => {} },
+      graphInfo: {
+        showMemoryUsage: false,
+        refreshInterval: 0,
+        setRefreshInterval: () => {},
+      },
     },
     hasChanges: false,
     setHasChanges: () => {},
@@ -223,6 +241,10 @@ export const GraphContext = createContext<GraphContextType>({
   setGraphName: () => {},
   graphNames: [],
   setGraphNames: () => {},
+  labels: [],
+  setLabels: () => {},
+  relationships: [],
+  setRelationships: () => {},
   nodesCount: undefined,
   setNodesCount: () => {},
   edgesCount: undefined,
@@ -234,6 +256,7 @@ export const GraphContext = createContext<GraphContextType>({
   handleCooldown: () => {},
   cooldownTicks: undefined,
   isLoading: false,
+  setIsLoading: () => {},
 });
 
 export const SchemaContext = createContext<SchemaContextType>({
@@ -279,12 +302,14 @@ export const QueryLoadingContext = createContext<QueryLoadingContextType>({
   setIsQueryLoading: () => {},
 });
 
-export const ViewportContext = createContext<ViewportContextType>({
+export const ForceGraphContext = createContext<ForceGraphContextType>({
+  canvasRef: { current: null },
   viewport: { centerX: 0, centerY: 0, zoom: 0 },
   setViewport: () => {},
   data: { nodes: [], links: [] },
   setData: () => {},
-  isSaved: false,
+  graphData: { nodes: [], links: [] },
+  setGraphData: () => {},
 });
 
 export const TableViewContext = createContext<TableViewContextType>({
@@ -296,3 +321,10 @@ export const TableViewContext = createContext<TableViewContextType>({
   setExpand: () => {},
   dataHash: "",
 });
+
+export const ConnectionContext = createContext<ConnectionContextType>({
+  connectionType: "Standalone",
+  setConnectionType: () => {},
+  dbVersion: "",
+  setDbVersion: () => {},
+}); 

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
 import { getClient } from "../../[...nextauth]/options";
+import { getCorsHeaders } from "../../../utils";
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
+}
 
 /**
  * Fetches token details by token_id using storage abstraction
@@ -145,14 +150,14 @@ export async function GET(
     // Return token data
     return NextResponse.json(
       { token: fetchResult.tokenData },
-      { status: 200 }
+      { status: 200, headers: getCorsHeaders(request) }
     );
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("Error fetching token:", error);
     return NextResponse.json(
       { message: "Internal server error" },
-      { status: 500 }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }
@@ -186,7 +191,7 @@ export async function DELETE(
     if (!fetchResult.tokenData.is_active) {
       return NextResponse.json(
         { message: "Token is already revoked" },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
 
@@ -208,7 +213,7 @@ export async function DELETE(
     if (!success) {
       return NextResponse.json(
         { message: "Failed to revoke token" },
-        { status: 500 }
+        { status: 500, headers: getCorsHeaders(request) }
       );
     }
 
@@ -218,14 +223,14 @@ export async function DELETE(
         message: "Token revoked successfully",
         tokenId
       },
-      { status: 200 }
+      { status: 200, headers: getCorsHeaders(request) }
     );
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("Error revoking token:", error);
     return NextResponse.json(
       { message: "Internal server error" },
-      { status: 500 }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }

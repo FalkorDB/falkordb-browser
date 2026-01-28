@@ -40,8 +40,8 @@ export default class GraphInfoPage extends GraphPage {
   }
 
   async isGraphInfoPanelContainerVisible(): Promise<boolean> {
-    await this.page.waitForTimeout(1000);
-    return waitForElementToBeVisible(this.graphInfoNodesCount);
+      await this.page.waitForTimeout(1000);
+      return waitForElementToBeVisible(this.graphInfoNodesCount);
   }
 
   async clickGraphInfoButton(): Promise<void> {
@@ -54,7 +54,7 @@ export default class GraphInfoPage extends GraphPage {
 
   async openGraphInfoButton(): Promise<void> {
     if (await this.isGraphInfoPanelContainerVisible()) return;
-    await this.clickGraphInfoButton()
+    await this.clickGraphInfoButton();
   }
 
   async getGraphInfoNodesCount(): Promise<string | null> {
