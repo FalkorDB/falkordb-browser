@@ -12,7 +12,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { ImperativePanelHandle } from "react-resizable-panels";
 import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
-import { Graph, GraphData, GraphInfo, HistoryQuery, MemoryValue, Query, Data } from "./api/graph/model";
+import { Graph, GraphData, GraphInfo, HistoryQuery, MemoryValue, Query, Data, Label, Relationship } from "./api/graph/model";
 import Header from "./components/Header";
 import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ForceGraphContext, TableViewContext, ConnectionContext } from "./components/provider";
 import Tutorial from "./components/Tutorial";
@@ -100,6 +100,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>([]);
   const [userGraphBeforeTutorial, setUserGraphBeforeTutorial] = useState<string>("");
   const [showMemoryUsage, setShowMemoryUsage] = useState(false);
+  const [labels, setLabels] = useState<Label[]>([]);
+  const [relationships, setRelationships] = useState<Relationship[]>([]);
   const [dbVersion, setDbVersion] = useState<string>("");
   const [connectionType, setConnectionType] = useState<ConnectionType>("Standalone");
 
@@ -268,14 +270,16 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setSchemaNames
   }), [schema, schemaName, schemaNames]);
 
-  const fetchCount = useCallback(async () => {
-    if (!graphName) return;
+  const fetchCount = useCallback(async (name?: string) => {
+    const n = name || graphName;
+    
+    if (!n) return;
 
     setEdgesCount(undefined);
     setNodesCount(undefined);
 
     try {
-      const result = await getSSEGraphResult(`api/graph/${prepareArg(graphName)}/count`, toast, setIndicator) as { nodes?: number; edges?: number };
+      const result = await getSSEGraphResult(`api/graph/${prepareArg(n)}/count`, toast, setIndicator) as { nodes?: number; edges?: number };
 
       if (!result) return;
 
@@ -288,7 +292,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     }
   }, [graphName, toast]);
 
-  const handleCooldown = useCallback((ticks?: 0) => {
+  const handleCooldown = useCallback((ticks?: number) => {
     if (typeof window !== 'undefined') {
       setCooldownTicks(ticks);
     }
@@ -344,6 +348,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         fetchInfo("(property key)", n),
       ]).then(async ([newLabels, newRelationships, newPropertyKeys]) => {
         const memoryUsage = showMemoryUsage ? await getMemoryUsage(n, toast, setIndicator) : new Map<string, MemoryValue>();
+
         const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage);
         setGraphInfo(gi);
         return gi;
@@ -363,7 +368,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       if (!explain.ok) throw new Error("Failed to fetch explain plan");
 
       const explainJson = await explain.json();
-      const g = Graph.create(n, result, false, false, existingLimit, graphI);
+      const g = Graph.create(n, result, existingLimit, graphI);
       newQuery = {
         text: q,
         metadata: result.metadata,
@@ -377,7 +382,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
       setGraph(g);
       setData({ ...g.Elements });
-      fetchCount();
+      fetchCount(n);
       setLastLimit(limit);
 
       localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }));
@@ -399,6 +404,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setGraphData(undefined);
       setSearch("");
       setScrollPosition(0);
+      handleCooldown(-1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graphName, limit, timeout, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries, showMemoryUsage]);
@@ -412,6 +418,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setGraphName,
     graphNames,
     setGraphNames,
+    labels,
+    setLabels,
+    relationships,
+    setRelationships,
     nodesCount,
     setNodesCount,
     edgesCount,
@@ -424,7 +434,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     cooldownTicks,
     isLoading,
     setIsLoading
-  }), [graph, graphInfo, graphName, graphNames, nodesCount, edgesCount, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading]);
+  }), [graph, graphInfo, graphName, graphNames, labels, relationships, nodesCount, edgesCount, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading]);
+
+  useEffect(() => {
+    setRelationships([...graph.Relationships]);
+    setLabels([...graph.Labels]);
+  }, [graph, graph.Labels.length, graph.Relationships.length, graph.Labels, graph.Relationships]);
 
   useEffect(() => {
     if (status !== "authenticated") return;

@@ -19,31 +19,18 @@ export async function GET() {
     const { client } = session;
 
     try {
-      const result = await (await client.connection).moduleList() as any;
+      const result = await (await client.connection).moduleList();
 
-      const data = result.find((arr: any[]) => arr.some((mod: string, index: number) => mod === "name" && arr[index + 1] === "graph"));
+      const data = result.find((arr) => arr.name === "graph");
 
       if (!data) {
         return NextResponse.json(
           { message: "Graph module not found" },
-          { status: 404, headers: corsHeaders() }
+          { status: 503, headers: corsHeaders() }
         );
       }
 
-      const nameIndex = data.findIndex((mod: string) => mod === "name");
-      const verIndex = data.findIndex((mod: string) => mod === "ver");
-
-      if (nameIndex === -1 || verIndex === -1 || !data[nameIndex + 1] || !data[verIndex + 1]) {
-        return NextResponse.json(
-          { message: "Invalid module metadata format" },
-          { status: 500, headers: corsHeaders() }
-        );
-      }
-
-      return NextResponse.json(
-        { result: [data[nameIndex + 1], data[verIndex + 1]] },
-        { status: 200, headers: corsHeaders() }
-      );
+      return NextResponse.json({ result: [data?.name, data?.ver] }, { status: 200 });
     } catch (error) {
       console.error(error);
       return NextResponse.json(

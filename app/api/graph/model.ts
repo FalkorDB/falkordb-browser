@@ -23,36 +23,6 @@ export type Query = {
   elementsCount: number;
 };
 
-const getSchemaValue = (value: string): string[] => {
-  if (typeof value !== "string") {
-    return ["string", "", "false", "false"];
-  }
-
-  let unique, required, type, description;
-  if (value.includes("!")) {
-    value = value.replace("!", "");
-    unique = "true";
-  } else {
-    unique = "false";
-  }
-  if (value.includes("*")) {
-    value = value.replace("*", "");
-    required = "true";
-  } else {
-    required = "false";
-  }
-  if (value.includes("-")) {
-    [type, description] = value.split("-");
-  } else {
-    type = "string";
-    description = "";
-  }
-  return [type, description, unique, required];
-};
-
-// Constant for empty display name
-export const EMPTY_DISPLAY_NAME: [string, string] = ['', ''];
-
 export type Node = {
   id: number;
   labels: string[];
@@ -104,7 +74,7 @@ export type LinkCell = {
   };
 };
 
-export type DataCell = NodeCell | LinkCell | number | string | null;
+export type DataCell = NodeCell | LinkCell | NodeCell[] | LinkCell[] | number | string | null;
 
 export type DataRow = {
   [key: string]: DataCell;
@@ -113,6 +83,42 @@ export type DataRow = {
 export type Data = DataRow[];
 
 export type MemoryValue = number | Map<string, MemoryValue>;
+
+export interface LinkStyle {
+  color: string;
+}
+
+export interface LabelStyle extends LinkStyle {
+  size?: number;
+  caption?: string;
+}
+
+export interface InfoLabel {
+  name: string;
+  style: LabelStyle;
+  show: boolean;
+}
+
+export interface Label extends InfoLabel {
+  elements: Node[];
+  textWidth?: number;
+  textHeight?: number;
+  style: LabelStyle;
+}
+
+export interface InfoRelationship {
+  name: string;
+  style: LinkStyle;
+  show: boolean;
+}
+
+export interface Relationship extends InfoRelationship {
+  elements: Link[];
+  textWidth?: number;
+  textHeight?: number;
+  textAscent?: number;
+  textDescent?: number;
+}
 
 export const DEFAULT_COLORS = [
   "hsl(246, 100%, 70%)",
@@ -152,41 +158,8 @@ export const STYLE_COLORS = [
 // Size options for node customization (relative to base NODE_SIZE)
 export const NODE_SIZE_OPTIONS = [3, 4.2, 5.1, 6, 6.9, 7.8, 9, 10.2, 12, 13.8, 15.6];
 
-export interface LinkStyle {
-  color: string;
-}
-
-export interface LabelStyle extends LinkStyle {
-  size?: number;
-  caption?: string;
-}
-
-export interface InfoLabel {
-  name: string;
-  style: LabelStyle;
-  show: boolean;
-}
-
-export interface Label extends InfoLabel {
-  elements: Node[];
-  textWidth?: number;
-  textHeight?: number;
-  style: LabelStyle;
-}
-
-export interface InfoRelationship {
-  name: string;
-  style: LinkStyle;
-  show: boolean;
-}
-
-export interface Relationship extends InfoRelationship {
-  elements: Link[];
-  textWidth?: number;
-  textHeight?: number;
-  textAscent?: number;
-  textDescent?: number;
-}
+// Constant for empty display name
+export const EMPTY_DISPLAY_NAME: [string, string] = ['', ''];
 
 export const getLabelWithFewestElements = (labels: Label[]): Label =>
   labels.reduce(
@@ -194,6 +167,49 @@ export const getLabelWithFewestElements = (labels: Label[]): Label =>
       label.elements.length < prev.elements.length ? label : prev,
     labels[0]
   );
+
+const getSchemaValue = (value: string): string[] => {
+  if (typeof value !== "string") {
+    return ["string", "", "false", "false"];
+  }
+
+  let unique, required, type, description;
+  if (value.includes("!")) {
+    value = value.replace("!", "");
+    unique = "true";
+  } else {
+    unique = "false";
+  }
+  if (value.includes("*")) {
+    value = value.replace("*", "");
+    required = "true";
+  } else {
+    required = "false";
+  }
+  if (value.includes("-")) {
+    [type, description] = value.split("-");
+  } else {
+    type = "string";
+    description = "";
+  }
+  return [type, description, unique, required];
+};
+
+export function loadLabelStyle(label: Label | InfoLabel): void {
+  if (typeof window === "undefined") return;
+
+  const storageKey = `labelStyle_${label.name}`;
+  const savedStyle = localStorage.getItem(storageKey);
+
+  if (savedStyle) {
+    try {
+      const style = JSON.parse(savedStyle);
+      label.style = style;
+    } catch (e) {
+      // Ignore invalid JSON
+    }
+  }
+}
 
 export class GraphInfo {
   private propertyKeys: string[] | undefined;
@@ -232,6 +248,10 @@ export class GraphInfo {
 
   get Labels(): Map<string, InfoLabel> {
     return this.labels;
+  }
+
+  set Labels(labels: Map<string, InfoLabel>) {
+    this.labels = labels;
   }
 
   get Relationships(): Map<string, InfoRelationship> {
@@ -296,6 +316,8 @@ export class GraphInfo {
           show: true,
         };
 
+        loadLabelStyle(c);
+
         this.labels.set(label, c);
         this.colorsCounter += 1;
       }
@@ -343,8 +365,6 @@ export class Graph {
 
   private data: Data;
 
-  private metadata: any[];
-
   private currentLimit: number;
 
   private labels: Label[];
@@ -378,7 +398,6 @@ export class Graph {
     this.id = id;
     this.columns = [];
     this.data = [];
-    this.metadata = [];
     this.labels = labels;
     this.relationships = relationships;
     this.elements = elements;
@@ -450,10 +469,6 @@ export class Graph {
     this.data = data;
   }
 
-  get Metadata(): any[] {
-    return this.metadata;
-  }
-
   get GraphInfo(): GraphInfo {
     return this.graphInfo;
   }
@@ -488,17 +503,16 @@ export class Graph {
   public static create(
     id: string,
     results: { data: Data; metadata: any[] },
-    isCollapsed: boolean,
-    isSchema: boolean,
     currentLimit: number,
-    graphInfo?: GraphInfo
+    graphInfo?: GraphInfo,
+    isSchema = false
   ): Graph {
     const graph = Graph.empty(
       undefined,
       currentLimit,
       graphInfo
     );
-    graph.extend(results, isCollapsed, isSchema);
+    graph.extend(results, isSchema);
     graph.id = id;
     return graph;
   }
@@ -568,7 +582,7 @@ export class Graph {
       return node;
     }
 
-    if (currentNode.labels[0] === "") {
+    if (currentNode.data.fake) {
       currentNode.id = cell.id;
       currentNode.labels = labels.map((l) => l.name);
       currentNode.color = isColor
@@ -596,10 +610,13 @@ export class Graph {
         }
       }
 
+      delete currentNode.data.fake;
+
       return currentNode;
     }
 
-    return currentNode;
+    // Node already exists
+    return undefined;
   }
 
   public extendEdge(
@@ -627,7 +644,9 @@ export class Graph {
             expand: false,
             collapsed,
             visible: true,
-            data: {},
+            data: {
+              fake: true
+            },
           };
 
           label.elements.push(source);
@@ -662,7 +681,9 @@ export class Graph {
             expand: false,
             collapsed,
             visible: true,
-            data: {},
+            data: {
+              fake: true
+            },
           };
 
           label!.elements.push(source);
@@ -678,7 +699,9 @@ export class Graph {
             expand: false,
             collapsed,
             visible: true,
-            data: {},
+            data: {
+              fake: true
+            },
           };
 
           label!.elements.push(target);
@@ -709,7 +732,8 @@ export class Graph {
       return link;
     }
 
-    return currentEdge;
+    // Edge already exists
+    return undefined;
   }
 
   public extendCell(cell: any, collapsed: boolean, isSchema: boolean) {
@@ -737,24 +761,33 @@ export class Graph {
 
   public extend(
     results: { data: Data; metadata: any[] },
+    isSchema = false,
     collapsed = false,
-    isSchema = false
+    isMerge = false
   ): (Node | Link)[] {
     const newElements: (Node | Link)[] = [];
-    const data = results?.data;
+    const { data } = results;
 
     if (data?.length) {
       if (data[0] instanceof Object) {
         this.columns = Object.keys(data[0]);
       }
 
-      this.data = data;
+      if (isMerge) {
+        // Only add rows that don't already exist
+        const existingRowsSet = new Set(this.data.map(row => JSON.stringify(row)));
+        const newRows = data.filter(row => !existingRowsSet.has(JSON.stringify(row)));
+        this.data = [...this.data, ...newRows];
+      } else {
+        this.data = [...this.data, ...data];
+      }
     }
 
-    this.metadata = results.metadata;
-    this.data.forEach((row: DataRow) => {
-      Object.values(row).forEach((cell: any) => {
-        if (Array.isArray(cell) && cell[0] instanceof Object) {
+    if (!data || data.length === 0) return [];
+
+    data.forEach((row: DataRow) => {
+      Object.values(row).forEach((cell) => {
+        if (Array.isArray(cell) && cell.length > 0 && cell[0] instanceof Object) {
           cell.forEach((c: any) => {
             const elements = this.extendCell(c, collapsed, isSchema);
             if (elements) {
@@ -782,7 +815,7 @@ export class Graph {
     this.linksMap = new Map<number, Link>(this.elements.links.map((l) => [l.id, l]));
 
     newElements
-      .filter((element): element is Node => "labels" in element)
+      .filter((element): element is Node => !!element && "labels" in element)
       .forEach((node) => {
         const label = getLabelWithFewestElements(
           node.labels.map(
@@ -816,7 +849,7 @@ export class Graph {
         };
 
         // Load saved style from localStorage
-        Graph.loadLabelStyle(c);
+        loadLabelStyle(c);
 
         this.labelsMap.set(c.name, c);
         this.labels.push(c);
@@ -828,22 +861,6 @@ export class Graph {
 
       return c;
     });
-  }
-
-  public static loadLabelStyle(label: Label): void {
-    if (typeof window === "undefined") return;
-
-    const storageKey = `labelStyle_${label.name}`;
-    const savedStyle = localStorage.getItem(storageKey);
-
-    if (savedStyle) {
-      try {
-        const style = JSON.parse(savedStyle);
-        label.style = style;
-      } catch (e) {
-        // Ignore invalid JSON
-      }
-    }
   }
 
   public createRelationship(relationship: string): Relationship {
@@ -895,8 +912,8 @@ export class Graph {
     this.elements = {
       nodes: this.elements.nodes,
       links: this.elements.links
-      .map((link) => {
-        if (
+        .map((link) => {
+          if (
             (ids.length !== 0 && !links.includes(link)) ||
             (this.nodesMap.has(link.source) &&
               this.nodesMap.has(link.target))
@@ -992,7 +1009,7 @@ export class Graph {
           if (
             cell &&
             typeof cell === "object" &&
-            elements.some((element) => element.id === cell.id)
+            elements.some((element) => Array.isArray(cell) ? cell.some(c => c.id === element.id) : element.id === cell.id)
           ) {
             return [key, undefined];
           }
@@ -1013,16 +1030,28 @@ export class Graph {
       this.Data = this.Data.map((row) =>
         Object.fromEntries(
           Object.entries(row).map(([key, cell]) => {
+            const cellToCheck = Array.isArray(cell) && cell.length > 0 ? cell[0] : cell;
             if (
               cell &&
+              cellToCheck &&
               typeof cell === "object" &&
-              cell.id === selectedElement.id &&
-              "labels" in cell
+              typeof cellToCheck === "object" &&
+              (Array.isArray(cell) ? cell.some(c => c.id === selectedElement.id) : cell.id === selectedElement.id) &&
+              "labels" in cellToCheck 
             ) {
-              const newCell = { ...cell };
-              newCell.labels = newCell.labels.filter((l) => l !== label);
+              const newCell = Array.isArray(cell) ? cell.map(c => ({ ...c }) as NodeCell) : { ...cell } as NodeCell;
+
+              if (Array.isArray(newCell)) {
+                newCell.forEach((c) => {
+                  c.labels = c.labels.filter((l) => l !== label);
+                });
+              } else {
+                newCell.labels = newCell.labels.filter((l) => l !== label);
+              }
+
               return [key, newCell];
             }
+
             return [key, cell];
           })
         )
@@ -1041,7 +1070,7 @@ export class Graph {
           this.Labels.findIndex((c) => c.name === category.name),
           1
         );
-        
+
         this.LabelsMap.delete(category.name);
       }
     }
@@ -1083,16 +1112,28 @@ export class Graph {
       this.Data = this.Data.map((row) =>
         Object.fromEntries(
           Object.entries(row).map(([key, cell]) => {
+            const cellToCheck = Array.isArray(cell) && cell.length > 0 ? cell[0] : cell;
             if (
               cell &&
+              cellToCheck &&
               typeof cell === "object" &&
-              cell.id === selectedElement.id &&
-              "labels" in cell
+              typeof cellToCheck === "object" &&
+              (Array.isArray(cell) ? cell.some(c => c.id === selectedElement.id) : cell.id === selectedElement.id) &&
+              "labels" in cellToCheck
             ) {
-              const newCell = { ...cell };
-              newCell.labels.push(label);
+              const newCell = Array.isArray(cell) ? cell.map(c => ({ ...c }) as NodeCell) : { ...cell } as NodeCell;
+
+              if (Array.isArray(newCell)) {
+                newCell.forEach((c) => {
+                  c.labels.push(label);
+                });
+              } else {
+                newCell.labels.push(label);
+              }
+
               return [key, newCell];
             }
+
             return [key, cell];
           })
         )
@@ -1144,15 +1185,22 @@ export class Graph {
   public removeProperty(key: string, id: number, type: boolean) {
     this.Data = this.Data.map((row) => {
       const newRow = Object.entries(row).map(([k, cell]) => {
+        const cellToCheck = Array.isArray(cell) && cell.length > 0 ? cell[0] : cell;
         if (
           cell &&
+          cellToCheck &&
           typeof cell === "object" &&
-          cell.id === id &&
-          (type ? !("sourceId" in cell) : "sourceId" in cell)
+          typeof cellToCheck === "object" &&
+          (Array.isArray(cell) ? cell.some(c => c.id === id) : cell.id === id) &&
+          (type === !("labels" in cellToCheck))
         ) {
-          delete cell.properties[key];
+          if (Array.isArray(cell)) {
+            cell.forEach(c => c.id === id && delete c.properties[key]);
+          } else delete cell.properties[key];
+
           return [k, cell];
         }
+
         return [k, cell];
       });
       return Object.fromEntries(newRow);
@@ -1163,15 +1211,18 @@ export class Graph {
     this.Data = this.Data.map((row) =>
       Object.fromEntries(
         Object.entries(row).map(([k, cell]) => {
+          const cellToCheck = Array.isArray(cell) && cell.length > 0 ? cell[0] : cell;
           if (
             cell &&
+            cellToCheck &&
             typeof cell === "object" &&
-            cell.id === id &&
-            (type ? !("sourceId" in cell) : "sourceId" in cell)
+            typeof cellToCheck === "object" &&
+            (Array.isArray(cell) ? cell.some(c => c.id === id) : cell.id === id) &&
+            (type === !("labels" in cellToCheck))
           ) {
             return [
               k,
-              { ...cell, properties: { ...cell.properties, [key]: val } },
+              { ...cell, properties: { ...(Array.isArray(cell) ? cell.find(c => c.id === id) : cell)?.properties, [key]: val } },
             ];
           }
           return [k, cell];

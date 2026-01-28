@@ -6,7 +6,7 @@ import { useToast } from "@/components/ui/use-toast";
 import dynamicImport from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
-import { Label, Graph, Link, Node, Relationship, GraphInfo, Value, MemoryValue } from "../api/graph/model";
+import { Graph, Link, Node, GraphInfo, Value, MemoryValue } from "../api/graph/model";
 import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ForceGraphContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
@@ -57,6 +57,10 @@ export default function Page() {
         setGraphName,
         graphNames,
         setGraphNames,
+        labels,
+        setLabels,
+        relationships,
+        setRelationships,
         runQuery,
         fetchCount,
         handleCooldown,
@@ -75,8 +79,6 @@ export default function Page() {
     const panelRef = useRef<ImperativePanelHandle>(null);
 
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
-    const [labels, setLabels] = useState<Label[]>([]);
-    const [relationships, setRelationships] = useState<Relationship[]>([]);
     const [isCollapsed, setIsCollapsed] = useState(true);
     const [isAddNode, setIsAddNode] = useState(false);
     const [isAddEdge, setIsAddEdge] = useState(false);
@@ -152,11 +154,6 @@ export default function Page() {
     }, [fetchCount, fetchInfo, graphName, refreshInterval, setGraphInfo, setIndicator, showMemoryUsage, toast]);
 
     useEffect(() => {
-        setRelationships([...graph.Relationships]);
-        setLabels([...graph.Labels]);
-    }, [graph, graph.Labels.length, graph.Relationships.length, graph.Labels, graph.Relationships]);
-
-    useEffect(() => {
         if (!graphInfo) return;
 
         if (contentPersistence) {
@@ -229,13 +226,19 @@ export default function Page() {
             const json = await result.json();
 
             if (isAddNode) {
-                const { labels: ls } = graph.extendNode(json.result.data[0].n, false, false, true);
-                setLabels(prev => [...prev, ...ls.filter(c => !prev.some(p => p.name === c)).map(c => graph.LabelsMap.get(c)!)]);
-                handleSetIsAdd(setIsAddNode, setIsAddEdge)(false);
+                const node = graph.extendNode(json.result.data[0].n, false, false, true);
+
+                if (node) {
+                    setLabels(prev => [...prev, ...node.labels.filter(c => !prev.some(p => p.name === c)).map(c => graph.LabelsMap.get(c)!)]);
+                    handleSetIsAdd(setIsAddNode, setIsAddEdge)(false);
+                }
             } else {
                 const link = graph.extendEdge(json.result.data[0].e, false, false, true);
-                setRelationships(prev => [...prev.filter(p => p.name !== link.relationship), graph.RelationshipsMap.get(link.relationship)!]);
-                handleSetIsAdd(setIsAddEdge, setIsAddNode)(false);
+                
+                if (link) {
+                    setRelationships(prev => [...prev.filter(p => p.name !== link.relationship), graph.RelationshipsMap.get(link.relationship)!]);
+                    handleSetIsAdd(setIsAddEdge, setIsAddNode)(false);
+                }
             }
 
             fetchCount();

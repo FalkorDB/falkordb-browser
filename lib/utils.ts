@@ -1,3 +1,4 @@
+/* eslint-disable no-param-reassign */
 // eslint-disable-next-line import/prefer-default-export
 
 "use client";
@@ -152,7 +153,7 @@ export async function securedFetch(
       description: message,
       variant: "destructive",
     });
-    
+
     if (status === 401 || status >= 500) {
       setIndicator("offline");
     }

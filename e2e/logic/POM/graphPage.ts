@@ -723,15 +723,14 @@ export default class GraphPage extends Page {
     });
     await this.clickDeleteElement();
     await this.clickDeleteElementConfirm();
-    await waitForElementToNotBeVisible(this.deleteElement("Graph"));
+    await waitForElementToNotBeVisible(this.deleteElementConfirm("Graph"));
   }
 
   async deleteElementByName(name: string): Promise<void> {
     await this.searchElementInCanvas(name);
     await this.clickDeleteElement();
     await this.clickDeleteElementConfirm();
-    await waitForElementToNotBeVisible(this.deleteElement("Graph"));
-    await this.waitForCanvasAnimationToEnd();
+    await waitForElementToNotBeVisible(this.deleteElementConfirm("Graph"));
   }
 
   async getNotificationToast(): Promise<boolean> {

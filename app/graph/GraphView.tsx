@@ -25,7 +25,7 @@ interface Props {
     setRelationships: Dispatch<SetStateAction<Relationship[]>>
     labels: Label[]
     relationships: Relationship[]
-    handleCooldown: (ticks?: 0) => void
+    handleCooldown: (ticks?: number) => void
     cooldownTicks: number | undefined
     fetchCount: () => Promise<void>
     historyQuery: HistoryQuery
@@ -68,12 +68,12 @@ function GraphView({
 
     const isTabEnabled = useCallback((tab: Tab) => {
         if (tab === "Table") return graph.Data.length !== 0;
-        if (tab === "Metadata") return historyQuery.currentQuery && historyQuery.currentQuery.metadata.length > 0 && graph.Metadata.length > 0 && historyQuery.currentQuery.explain.length > 0;
+        if (tab === "Metadata") return historyQuery.currentQuery && historyQuery.currentQuery.metadata.length > 0 && historyQuery.currentQuery.explain.length > 0;
         return true;
     }, [graph, historyQuery.currentQuery]);
 
     useEffect(() => {
-        if (currentTab !== "Metadata" && isTabEnabled(currentTab)) return;
+        if ((currentTab !== "Metadata" && isTabEnabled(currentTab)) || currentTab === "Metadata") return;
 
         let defaultChecked: Tab = "Graph";
         if (elementsLength === 0 && graph.Data.length !== 0) defaultChecked = "Table";
