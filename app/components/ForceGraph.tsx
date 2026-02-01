@@ -201,7 +201,7 @@ export default function ForceGraph({
         const currentData = canvas.getGraphData();
         const updatedNodes = currentData.nodes.filter(n => !nodeIdsToRemove.has(n.id));
         const updatedLinks = currentData.links.filter(l =>
-            !nodeIdsToRemove.has(l.source.id) || !nodeIdsToRemove.has(l.target.id)
+            !nodeIdsToRemove.has(l.source.id) && !nodeIdsToRemove.has(l.target.id)
         );
 
         canvas.setGraphData({ nodes: updatedNodes, links: updatedLinks });
