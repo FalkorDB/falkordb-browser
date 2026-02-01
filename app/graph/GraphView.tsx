@@ -117,7 +117,11 @@ function GraphView({
             });
             canvas.setGraphData({ ...currentData });
         }
-        
+
+        const cooldown = cooldownTicks === undefined ? undefined : -1;
+
+        handleCooldown(cooldown);
+
         setLabels([...graph.Labels]);
     };
 
@@ -148,6 +152,10 @@ function GraphView({
             });
             canvas.setGraphData({ ...currentData });
         }
+
+        const cooldown = cooldownTicks === undefined ? undefined : -1;
+
+        handleCooldown(cooldown);
 
         setRelationships([...graph.Relationships]);
     };
