@@ -14,7 +14,7 @@ export async function OPTIONS(request: Request) {
 export async function GET(request: NextRequest) {
     try {
         // Verify authentication
-        const session = await getClient();
+        const session = await getClient(request);
 
         if (session instanceof NextResponse) {
             return NextResponse.json(
