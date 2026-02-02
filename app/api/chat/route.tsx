@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
         const session = await getClient(request);
 
         if (session instanceof NextResponse) {
-            throw new Error(await session.text());
+            return session;
         }
 
         // Return empty object to allow chat to be displayed
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
         const session = await getClient(request);
 
         if (session instanceof NextResponse) {
-            throw new Error(await session.text());
+            return session;
         }
 
         const body = await request.json();
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
                     "Content-Type": "text/event-stream",
                     "Cache-Control": "no-cache",
                     Connection: "keep-alive",
-                    ...corsHeaders(),
+                    ...getCorsHeaders(request),
                 },
             });
         }
@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
                     "Content-Type": "text/event-stream",
                     "Cache-Control": "no-cache",
                     Connection: "keep-alive",
-                    ...corsHeaders(),
+                    ...getCorsHeaders(request),
                 },
             });
         }
@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
             "Content-Type": "text/event-stream",
             "Cache-Control": "no-cache",
             Connection: "keep-alive",
-            ...corsHeaders(),
+            ...getCorsHeaders(request),
         },
     });
 }
