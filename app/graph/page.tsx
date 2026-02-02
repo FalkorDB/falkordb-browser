@@ -181,7 +181,7 @@ export default function Page() {
         }
 
         setIsQueryLoading(false);
-    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames, setIsQueryLoading, graphInfo, runQuery]);
+    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames, setIsQueryLoading]);
 
     const handleSetSelectedElements = useCallback((el: (Node | Link)[] = []) => {
         setSelectedElements(el);
