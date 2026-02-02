@@ -3,7 +3,6 @@
   "author": "FalkorDB",
   "description": "FalkorDB Browser",
   "version": "1.7.1",
-  "type": "module",
   "private": true,
   "scripts": {
     "dev": "next dev",
