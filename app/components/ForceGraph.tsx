@@ -160,6 +160,9 @@ export default function ForceGraph({
                     links: [...currentData.links, ...newGraphData.links]
                 });
 
+                // Skip zoom to fit on this operation
+                canvas.setSkipNextZoomToFit(true);
+
                 const cooldown = cooldownTicks === undefined ? undefined : -1;
 
                 handleCooldown(cooldown);
@@ -205,6 +208,9 @@ export default function ForceGraph({
         );
 
         canvas.setGraphData({ nodes: updatedNodes, links: updatedLinks });
+
+        // Skip zoom to fit on this operation
+        canvas.setSkipNextZoomToFit(true);
 
         const cooldown = cooldownTicks === undefined ? undefined : -1;
 

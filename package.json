@@ -3,6 +3,7 @@
   "author": "FalkorDB",
   "description": "FalkorDB Browser",
   "version": "1.7.1",
+  "type": "module",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -12,7 +13,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@falkordb/canvas": "^0.0.28",
+    "@falkordb/canvas": "v0.0.29",
     "@falkordb/text-to-cypher": "^0.1.11",
     "@hookform/resolvers": "^3.10.0",
     "@monaco-editor/react": "^4.6.0",
