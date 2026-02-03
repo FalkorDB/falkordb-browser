@@ -9,7 +9,7 @@ export async function OPTIONS(request: Request) {
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(request: Request) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;

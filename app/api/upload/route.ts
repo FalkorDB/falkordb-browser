@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     await pump(file.stream(), fs.createWriteStream(filePath));
-    return NextResponse.json({ path: filePath, status: 200 });
+    return NextResponse.json({ path: filePath, status: 200 }, { headers: getCorsHeaders(request) });
   } catch (error) {
     console.error(error);
     return NextResponse.json(

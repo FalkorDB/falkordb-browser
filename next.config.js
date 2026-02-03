@@ -8,6 +8,8 @@ const nextConfig = {
   images: {
     unoptimized: true
   },
+  // Enable Turbopack with empty config (Next.js 16 default)
+  turbopack: {},
   async headers() {
     return [
       {
