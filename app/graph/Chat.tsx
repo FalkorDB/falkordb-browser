@@ -18,7 +18,7 @@ export default function Chat({ onClose }: Props) {
     const { setIndicator } = useContext(IndicatorContext);
     const { graphName, runQuery } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
-    const { settings: { chatSettings: { secretKey, model } } } = useContext(BrowserSettingsContext);
+    const { settings: { chatSettings: { secretKey, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
 
     const { toast } = useToast();
 
@@ -27,6 +27,21 @@ export default function Chat({ onClose }: Props) {
     const [newMessage, setNewMessage] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [queryCollapse, setQueryCollapse] = useState<{ [key: string]: boolean }>({});
+
+    // Load messages for current graph on mount
+    useEffect(() => {
+        const savedMessages = localStorage.getItem(`chat-${graphName}`);
+        if (savedMessages) {
+            setMessages(JSON.parse(savedMessages));
+        }
+    }, [graphName]); // Re-run when graph changes
+
+    // Save messages on unmount or graph change
+    useEffect(() => () => {
+        if (messages.length > 0) {
+            localStorage.setItem(`chat-${graphName}`, JSON.stringify(messages.splice(-maxSavedMessages)));
+        }
+    }, [graphName, messages, maxSavedMessages]);
 
     useEffect(() => {
         let statusGroup: Message[];

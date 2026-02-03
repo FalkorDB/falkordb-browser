@@ -23,7 +23,7 @@ export default function BrowserSettings() {
             defaultQuerySettings: { newDefaultQuery, setNewDefaultQuery },
             timeoutSettings: { newTimeout, setNewTimeout },
             limitSettings: { newLimit, setNewLimit },
-            chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel },
+            chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages },
             graphInfo: { newRefreshInterval, setNewRefreshInterval }
         },
         settings: {
@@ -32,7 +32,7 @@ export default function BrowserSettings() {
             defaultQuerySettings: { defaultQuery, setDefaultQuery },
             timeoutSettings: { timeout: timeoutValue },
             limitSettings: { limit },
-            chatSettings: { secretKey, model, displayChat },
+            chatSettings: { secretKey, model, displayChat, maxSavedMessages },
             graphInfo: { refreshInterval }
         },
         hasChanges,
@@ -53,7 +53,7 @@ export default function BrowserSettings() {
     const [isLoadingModels, setIsLoadingModels] = useState(false);
     const [expandedSections, setExpandedSections] = useState({
         queryExecution: false,
-        environment: false,
+        chat: false,
         graphInfo: false,
         userExperience: false
     });
@@ -101,7 +101,8 @@ export default function BrowserSettings() {
         setNewSecretKey(secretKey);
         setNewModel(model);
         setNewRefreshInterval(refreshInterval);
-    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, model, setNewModel, setNewRefreshInterval, refreshInterval]);
+        setNewMaxSavedMessages(maxSavedMessages);
+    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, model, setNewModel, setNewRefreshInterval, refreshInterval, setNewMaxSavedMessages, maxSavedMessages]);
 
     useEffect(() => {
         setHasChanges(
@@ -112,9 +113,10 @@ export default function BrowserSettings() {
             newRunDefaultQuery !== runDefaultQuery ||
             newSecretKey !== secretKey ||
             newModel !== model ||
-            refreshInterval !== newRefreshInterval
+            refreshInterval !== newRefreshInterval ||
+            newMaxSavedMessages !== maxSavedMessages
         );
-    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey, newModel, model, refreshInterval, newRefreshInterval]);
+    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey, newModel, model, refreshInterval, newRefreshInterval, newMaxSavedMessages, maxSavedMessages]);
 
     const handleSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
         e?.preventDefault();
@@ -223,22 +225,22 @@ export default function BrowserSettings() {
                 </Tooltip>
             </div>
             <form ref={scrollableContainerRef} className="h-1 grow px-2 overflow-y-auto flex flex-col gap-6 pb-8" onSubmit={handleSubmit}>
-                {/* Environment Section */}
+                {/* Chat Section */}
                 <Card className="border-border shadow-sm">
                     <CardHeader
-                        data-testid="environmentSectionHeader"
+                        data-testid="chatSectionHeader"
                         className="cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() => toggleSection('environment')}
+                        onClick={() => toggleSection('chat')}
                     >
                         <div className="flex items-center justify-between">
                             <div className="space-y-1.5">
-                                <CardTitle className="text-2xl font-semibold">Environment</CardTitle>
+                                <CardTitle className="text-2xl font-semibold">Chat</CardTitle>
                                 <CardDescription className="text-sm">Configure LLM access for chat functionality</CardDescription>
                             </div>
-                            <ChevronRight className={cn("h-5 w-5 transition-transform duration-200", expandedSections.environment && "rotate-90")} />
+                            <ChevronRight className={cn("h-5 w-5 transition-transform duration-200", expandedSections.chat && "rotate-90")} />
                         </div>
                     </CardHeader>
-                    {expandedSections.environment && (
+                    {expandedSections.chat && (
                         <CardContent className="pt-2">
                             <div className="flex flex-col gap-4 p-4 bg-muted/10 rounded-lg">
                                 <div className="flex flex-col gap-2">
@@ -267,6 +269,23 @@ export default function BrowserSettings() {
                                         onChange={(e) => createChangeHandler(setNewSecretKey)(e.target.value, 'secretKeyInput')}
                                     />
                                 </div>
+                            </div>
+                            <div className="flex flex-col gap-4 p-4 bg-muted/10 rounded-lg">
+                                {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+                                <label htmlFor="maxSaveMessagesInput" className="text-sm font-medium whitespace-nowrap">Secret Key</label>
+                                <Input
+                                    id="maxSaveMessagesInput"
+                                    data-testid="maxSaveMessagesInput"
+                                    type="string"
+                                    value={newMaxSavedMessages}
+                                    onChange={(e) => {
+                                        const numberValue = Number(e.target.value || "0");
+
+                                        if (Number.isNaN(numberValue) || numberValue <= 0 || numberValue > 10) return;
+
+                                        createChangeHandler(setNewMaxSavedMessages)(Number(e.target.value), 'maxSaveMessagesInput');
+                                    }}
+                                />
                             </div>
                         </CardContent>
                     )}
