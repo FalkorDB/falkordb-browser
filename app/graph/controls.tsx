@@ -49,7 +49,7 @@ export default function Controls({
                             <Switch
                                 data-testid="animationControl"
                                 className="pointer-events-auto data-[state=unchecked]:bg-border"
-                                checked={cooldownTicks === undefined}
+                                checked={cooldownTicks !== 0}
                                 onCheckedChange={() => {
                                     handleCooldown(cooldownTicks === undefined ? 0 : undefined);
                                 }}
