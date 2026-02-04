@@ -86,6 +86,15 @@ export default function ForceGraph({
         });
     }, []);
 
+    useEffect(() => {
+        const canvas = canvasRef.current;
+
+        if (!canvas) return;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any)[type] = () => canvas.getGraphData();
+    }, [canvasRef, type]);
+
     // Load saved viewport on mount
     useEffect(() => {
         if (!viewport || !canvasRef.current || !canvasLoaded) return;
@@ -285,17 +294,10 @@ export default function ForceGraph({
         , [selectedElements, hoverElement]);
 
     const handleEngineStop = useCallback(() => {
-        const canvas = canvasRef.current;
-
-        if (!canvas) return;
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any)[type] = () => canvas.getGraphData();
-
         if (cooldownTicks !== -1) return;
 
         handleCooldown(0);
-    }, [canvasRef, cooldownTicks, handleCooldown, type]);
+    }, [cooldownTicks, handleCooldown]);
 
     const handleLoadingChange = useCallback((loading: boolean) => {
         setIsLoading(loading);
