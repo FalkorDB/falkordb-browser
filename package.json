@@ -118,6 +118,7 @@
     "refractor": {
       "prismjs": "^1.30.0"
     },
-    "prismjs": "^1.30.0"
+    "prismjs": "^1.30.0",
+    "brace-expansion": "npm:@isaacs/brace-expansion@5.0.1"
   }
 }
