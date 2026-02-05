@@ -15,6 +15,8 @@ import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import ModelSelector from "./ModelSelector";
 
+const DEFAULT_MODEL = "gpt-5-mini";
+
 export default function BrowserSettings() {
     const {
         newSettings: {
@@ -79,10 +81,10 @@ export default function BrowserSettings() {
                     setModelDisplayNames(models);
                 } else {
                     // Fallback to gpt-4o-mini if fetch fails
-                    setModelDisplayNames(["gpt-4o-mini"]);
+                    setModelDisplayNames([DEFAULT_MODEL]);
                 }
             } catch (error) {
-                setModelDisplayNames(["gpt-4o-mini"]);
+                setModelDisplayNames([DEFAULT_MODEL]);
                 setIndicator("offline");
             } finally {
                 setIsLoadingModels(false);
@@ -121,8 +123,17 @@ export default function BrowserSettings() {
     const handleSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
         e?.preventDefault();
 
+        if (newMaxSavedMessages < 5 || newMaxSavedMessages > 10) {
+            toast({
+                title: "Invalid Input",
+                description: "Please set 'Store latest interactions' between 5 and 10.",
+                variant: "destructive",
+            });
+            return;
+        }
+        
         saveSettings();
-    }, [saveSettings]);
+    }, [newMaxSavedMessages, saveSettings, toast]);
 
     const navigateBack = useCallback((e: KeyboardEvent) => {
         if (e.key === "Escape") {
@@ -235,7 +246,7 @@ export default function BrowserSettings() {
                         <div className="flex items-center justify-between">
                             <div className="space-y-1.5">
                                 <CardTitle className="text-2xl font-semibold">Chat</CardTitle>
-                                <CardDescription className="text-sm">Configure LLM access for chat functionality</CardDescription>
+                                <CardDescription className="text-sm">Chat Panel Settings</CardDescription>
                             </div>
                             <ChevronRight className={cn("h-5 w-5 transition-transform duration-200", expandedSections.chat && "rotate-90")} />
                         </div>
@@ -245,18 +256,36 @@ export default function BrowserSettings() {
                             <div className="flex flex-col gap-4 p-4 bg-muted/10 rounded-lg">
                                 <div className="flex flex-col gap-2">
                                     {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+                                    <label htmlFor="maxSaveMessagesInput" className="text-sm font-medium whitespace-nowrap">Store latest interactions (per graph) [5..10]</label>
+                                    <Input
+                                        id="maxSaveMessagesInput"
+                                        data-testid="maxSaveMessagesInput"
+                                        type="string"
+                                        value={newMaxSavedMessages}
+                                        onChange={(e) => {
+                                            const numberValue = Number(e.target.value || "0");
+
+                                            if (Number.isNaN(numberValue)) return;
+
+                                            createChangeHandler(setNewMaxSavedMessages)(Number(e.target.value), 'maxSaveMessagesInput');
+                                        }}
+                                    />
+                                </div>
+                                <h2 className="font-medium">Configure LLM access for chat functionality</h2>
+                                <div className="flex flex-col gap-2">
+                                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                                     <label className="text-sm font-medium">
                                         {isLoadingModels ? "Model (Loading...)" : "Model"}
                                     </label>
                                     <ModelSelector
-                                        models={modelDisplayNames.length > 0 ? modelDisplayNames : ["gpt-4o-mini"]}
+                                        models={modelDisplayNames.length > 0 ? modelDisplayNames : [DEFAULT_MODEL]}
                                         selectedModel={newModel}
                                         onModelSelect={handleModelChange}
                                         disabled={!displayChat}
                                         isLoading={isLoadingModels}
                                     />
                                 </div>
-                                <div className="flex-1 flex flex-col gap-2">
+                                <div className="flex flex-col gap-2">
                                     {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                                     <label htmlFor="secretKeyInput" className="text-sm font-medium whitespace-nowrap">Secret Key</label>
                                     <Input
@@ -269,23 +298,6 @@ export default function BrowserSettings() {
                                         onChange={(e) => createChangeHandler(setNewSecretKey)(e.target.value, 'secretKeyInput')}
                                     />
                                 </div>
-                            </div>
-                            <div className="flex flex-col gap-4 p-4 bg-muted/10 rounded-lg">
-                                {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                                <label htmlFor="maxSaveMessagesInput" className="text-sm font-medium whitespace-nowrap">Secret Key</label>
-                                <Input
-                                    id="maxSaveMessagesInput"
-                                    data-testid="maxSaveMessagesInput"
-                                    type="string"
-                                    value={newMaxSavedMessages}
-                                    onChange={(e) => {
-                                        const numberValue = Number(e.target.value || "0");
-
-                                        if (Number.isNaN(numberValue) || numberValue <= 0 || numberValue > 10) return;
-
-                                        createChangeHandler(setNewMaxSavedMessages)(Number(e.target.value), 'maxSaveMessagesInput');
-                                    }}
-                                />
                             </div>
                         </CardContent>
                     )}

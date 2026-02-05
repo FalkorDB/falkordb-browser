@@ -10,6 +10,25 @@ import Input from "../components/ui/Input";
 import { GraphContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext } from "../components/provider";
 import { EventType } from "../api/chat/route";
 
+// Function to get the last maxSavedMessages user messages and all messages in between
+const getLastUserMessagesWithContext = (allMessages: Message[], maxUserMessages: number) => {
+    // Find indices of all user messages
+    const userMessageIndices = allMessages
+        .map((msg, index) => msg.role === "user" ? index : -1)
+        .filter(index => index !== -1);
+
+    // If there are fewer user messages than maxUserMessages, return all messages
+    if (userMessageIndices.length <= maxUserMessages) {
+        return allMessages;
+    }
+
+    // Get the index of the Nth-from-last user message
+    const startIndex = userMessageIndices[userMessageIndices.length - maxUserMessages];
+
+    // Return all messages from that point forward
+    return allMessages.slice(startIndex);
+};
+
 interface Props {
     onClose: () => void
 }
@@ -31,15 +50,13 @@ export default function Chat({ onClose }: Props) {
     // Load messages for current graph on mount
     useEffect(() => {
         const savedMessages = localStorage.getItem(`chat-${graphName}`);
-        if (savedMessages) {
-            setMessages(JSON.parse(savedMessages));
-        }
+        setMessages(JSON.parse(savedMessages || "[]"));
     }, [graphName]); // Re-run when graph changes
 
     // Save messages on unmount or graph change
     useEffect(() => () => {
         if (messages.length > 0) {
-            localStorage.setItem(`chat-${graphName}`, JSON.stringify(messages.splice(-maxSavedMessages)));
+            localStorage.setItem(`chat-${graphName}`, JSON.stringify(getLastUserMessagesWithContext(messages, maxSavedMessages)));
         }
     }, [graphName, messages, maxSavedMessages]);
 

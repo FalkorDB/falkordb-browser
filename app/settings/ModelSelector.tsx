@@ -129,50 +129,43 @@ export default function ModelSelector({
                 {!isLoading && filteredModels.length > 0 && (
                     <div className="p-2">
                         {categorizedModels.map(([category, categoryModels]) => (
-                            <div key={category} className="mb-4 last:mb-0">
-                                {/* Category Header */}
-                                <div className="px-3 py-2 mb-2 flex items-center gap-2 bg-muted/40 rounded-md border-l-3 border-primary/60">
-                                    <div className="text-primary">
-                                        {getCategoryIcon(category)}
-                                    </div>
-                                    <h3 className="text-sm font-bold text-foreground tracking-wide">
-                                        {category}
-                                    </h3>
+                            <div key={category} className="p-1 mb-2 flex items-center gap-2 bg-muted/40 rounded-md border-l-3 border-primary/60">
+                                <div className="text-primary">
+                                    {getCategoryIcon(category)}
                                 </div>
+                                <h3 className="w-[5%] text-sm font-bold text-foreground tracking-wide">
+                                    {category}
+                                </h3>
+                                {categoryModels.map((model) => {
+                                    const isSelected = model === selectedModel;
+                                    return (
+                                        <button
+                                            key={model}
+                                            type="button"
+                                            data-testid={`selectModel${model}`}
+                                            data-selected={isSelected}
+                                            onClick={() => handleModelClick(model)}
+                                            disabled={disabled}
+                                            className={cn(
+                                                " w-[12%] group relative flex items-center justify-between p-1 rounded-md text-sm transition-all duration-150",
+                                                "hover:bg-muted/80 active:scale-[0.98]",
+                                                isSelected && "bg-primary/10 hover:bg-primary/15 ring-1 ring-primary/30",
+                                                disabled && "opacity-50 cursor-not-allowed"
+                                            )}
+                                        >
+                                            <span className={cn(
+                                                "font-medium truncate",
+                                                isSelected ? "text-primary" : "text-foreground"
+                                            )}>
+                                                {formatModelDisplayName(model)}
+                                            </span>
 
-                                {/* Models in Category */}
-                                <div className="space-y-1">
-                                    {categoryModels.map((model) => {
-                                        const isSelected = model === selectedModel;
-                                        return (
-                                            <button
-                                                key={model}
-                                                type="button"
-                                                data-testid={`selectModel${model}`}
-                                                data-selected={isSelected}
-                                                onClick={() => handleModelClick(model)}
-                                                disabled={disabled}
-                                                className={cn(
-                                                    "w-full group relative flex items-center justify-between px-3 py-2.5 rounded-md text-sm transition-all duration-150",
-                                                    "hover:bg-muted/80 active:scale-[0.98]",
-                                                    isSelected && "bg-primary/10 hover:bg-primary/15 ring-1 ring-primary/30",
-                                                    disabled && "opacity-50 cursor-not-allowed"
-                                                )}
-                                            >
-                                                <span className={cn(
-                                                    "font-medium truncate",
-                                                    isSelected ? "text-primary" : "text-foreground"
-                                                )}>
-                                                    {formatModelDisplayName(model)}
-                                                </span>
-
-                                                {isSelected && (
-                                                    <Check className="h-4 w-4 text-primary flex-shrink-0 ml-2" />
-                                                )}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                                            {isSelected && (
+                                                <Check className="h-4 w-4 text-primary flex-shrink-0 ml-2" />
+                                            )}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         ))}
                     </div>

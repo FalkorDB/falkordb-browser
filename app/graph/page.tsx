@@ -190,10 +190,10 @@ export default function Page() {
             setPanel("data");
             setIsAddEdge(false);
             setIsAddNode(false);
-        } else {
+        } else if (panel !== "chat") {
             setPanel(undefined);
         }
-    }, [setPanel]);
+    }, [panel, setPanel]);
 
     useEffect(() => {
         handleSetSelectedElements();
