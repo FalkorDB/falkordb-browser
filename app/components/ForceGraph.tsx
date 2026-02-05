@@ -32,11 +32,13 @@ interface Props {
 }
 
 const convertToCanvasData = (graphData: GraphData): Data => ({
-    nodes: graphData.nodes.map(({ id, labels, color, visible, data }) => ({
+    nodes: graphData.nodes.map(({ id, labels, color, visible, caption, size, data }) => ({
         id,
         labels,
         color,
         visible,
+        caption,
+        size,
         data
     })),
     links: graphData.links.map(({ id, relationship, color, visible, source, target, data }) => ({
