@@ -33,7 +33,7 @@ const getItemClassName = (selected: boolean, deleteSelected: boolean, hover: boo
     if (selected) return `${prefix}-primary border-primary`;
     if (deleteSelected) return `${prefix}-destructive border-destructive`;
     if (hover) return `${prefix}-foreground border-foreground`;
-    return `${prefix}-border border-border`;
+    return `${prefix}-foreground/50 border-foreground/70`;
 };
 
 const getSeparator = (selected: boolean, deleteSelected: boolean, hover: boolean) => (
