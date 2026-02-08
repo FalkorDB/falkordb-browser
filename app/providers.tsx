@@ -755,6 +755,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                                 graphNames={pathname.includes("/schema") ? schemaNames : graphNames}
                                 onSetGraphName={handleOnSetGraphName}
                                 onOpenGraphInfo={onExpand}
+                                graphInfoOpen={!isCollapsed}
                                 navigateToSettings={navigateToSettings}
                               />
                             }

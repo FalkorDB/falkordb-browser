@@ -371,7 +371,7 @@ export default function TableComponent({
         <span className={cn(valueClassName)}>{l[0]}:</span>
     );
 
-    const getClassName = (index: number, level?: number) => cn("text-border rounded-lg", expandArr.get(index) === level && "bg-background text-foreground");
+    const getClassName = (index: number, level?: number) => cn("text-foreground rounded-lg", expandArr.get(index) === level && "bg-primary text-background");
 
     return (
         <div className={cn("h-full w-full flex flex-col gap-4", className)}>
@@ -692,7 +692,7 @@ export default function TableComponent({
                                                                             }
                                                                         </div>
                                                                     </div>
-                                                                    : <div className="h-full flex items-center gap-2">
+                                                                    : <div className="flex items-center gap-2">
                                                                         <Tooltip>
                                                                             <TooltipTrigger asChild>
                                                                                 <p data-testid={`content${cellTestId}${headers[j]}`} >{cell.value}</p>

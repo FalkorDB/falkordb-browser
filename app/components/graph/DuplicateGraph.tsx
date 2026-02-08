@@ -66,7 +66,7 @@ export default function DuplicateGraph({ open, onOpenChange, selectedValue, onDu
             trigger={<Button
                 variant="Primary"
                 label="Duplicate"
-                title={`Create a copy of the selected ${type}`}
+                title={`Create a copy of the selected ${type} (single graph only)`}
                 disabled={disabled}
                 data-testid="duplicateGraph"
             />}
