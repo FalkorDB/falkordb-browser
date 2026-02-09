@@ -31,7 +31,7 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
         // Select a model
-        const modelToSelect = "gpt-4o";
+        const modelToSelect = "gpt-4o-mini";
         await settingsBrowserPage.selectModel(modelToSelect);
 
         // Fill API key
@@ -118,7 +118,7 @@ test.describe('@browser Browser Settings tests', () => {
         expect(isClaudeVisible).toBe(true);
 
         // Verify other provider models are not visible
-        const isGptVisible = await settingsBrowserPage.isModelVisible("gpt-4o");
+        const isGptVisible = await settingsBrowserPage.isModelVisible("gpt-4o-mini");
         expect(isGptVisible).toBe(false);
     });
 
@@ -175,7 +175,7 @@ test.describe('@browser Browser Settings tests', () => {
 
         // Verify all models are visible again
         isClaudeVisible = await settingsBrowserPage.isModelVisible("claude-3-5-sonnet");
-        const isGptVisible = await settingsBrowserPage.isModelVisible("gpt-4o");
+        const isGptVisible = await settingsBrowserPage.isModelVisible("gpt-4o-mini");
         expect(isClaudeVisible).toBe(true);
         expect(isGptVisible).toBe(true);
     });
