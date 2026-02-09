@@ -626,4 +626,19 @@ export default class ApiCalls {
       );
     }
   }
+
+  async getModelsByProvider(provider: string): Promise<{ models: string[] }> {
+    try {
+      const headers = await getAdminToken();
+      const result = await getRequest(
+        `${urls.api.chatModelsUrl}?provider=${provider}`,
+        headers
+      );
+      return await result.json();
+    } catch (error) {
+      throw new Error(
+        `Failed to get models for provider ${provider}. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
 }

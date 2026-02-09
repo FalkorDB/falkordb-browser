@@ -2,7 +2,7 @@
   "name": "falkordb-browser",
   "author": "FalkorDB",
   "description": "FalkorDB Browser",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -12,8 +12,8 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@falkordb/canvas": "^0.0.28",
-    "@falkordb/text-to-cypher": "^0.1.11",
+    "@falkordb/canvas": "v0.0.29",
+    "@falkordb/text-to-cypher": "^0.1.12",
     "@hookform/resolvers": "^3.10.0",
     "@monaco-editor/react": "^4.6.0",
     "@radix-ui/react-alert-dialog": "^1.1.6",
