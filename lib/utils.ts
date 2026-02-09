@@ -288,12 +288,12 @@ export function getQueryWithLimit(
       return [`CALL { ${query} } RETURN * LIMIT ${limit}`, limit];
     }
 
-    if (query.match(/\bCALL\s*\{(?:[^}]|\n|\r)*\}\s*RETURN\b(?![^;]*?\bLIMIT\b)/i)) {
+    if (query.match(/\bCALL\s*\{[^}]*\}\s*RETURN\b(?![^;]*\bLIMIT\b)/i)) {
       return [`${query} LIMIT ${limit}`, limit];
     }
   }
 
-  if (query.match(/\bRETURN\b(?![^;]*?\bLIMIT\b)/i)) {
+  if (query.match(/\bRETURN\b(?![^;]*\bLIMIT\b)/i)) {
     return [`${query} LIMIT ${limit}`, limit];
   }
 
