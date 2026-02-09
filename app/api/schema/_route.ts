@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "../auth/[...nextauth]/options";
 
 // eslint-disable-next-line import/prefer-default-export
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
