@@ -280,7 +280,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
   const fetchCount = useCallback(async (name?: string) => {
     const n = name || graphName;
-    
+
     if (!n) return;
 
     setEdgesCount(undefined);
@@ -342,6 +342,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setHistoryQuery(prev => ({
         ...prev,
         query: q,
+        currentQuery: newQuery
       }));
 
       const [query, existingLimit] = getQueryWithLimit(q, limit);
@@ -377,15 +378,14 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
       const explainJson = await explain.json();
       const g = Graph.create(n, result, existingLimit, graphI);
+
       newQuery = {
-        text: q,
-        metadata: result.metadata,
+        ...newQuery,
+        elementsCount: g.getElements().length,
         explain: explainJson.result,
-        profile: [],
         graphName: n,
-        timestamp: new Date().getTime(),
+        metadata: result.metadata,
         status: "Success",
-        elementsCount: g.getElements().length
       };
 
       setGraph(g);
@@ -755,6 +755,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                                 graphNames={pathname.includes("/schema") ? schemaNames : graphNames}
                                 onSetGraphName={handleOnSetGraphName}
                                 onOpenGraphInfo={onExpand}
+                                graphInfoOpen={!isCollapsed}
                                 navigateToSettings={navigateToSettings}
                               />
                             }

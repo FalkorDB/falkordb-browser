@@ -2,11 +2,10 @@
 
 'use client';
 
-import { ArrowUpRight, Database, FileCode, LogOut, Monitor, Moon, Settings, Sun } from "lucide-react";
+import { ArrowUpRight, Database, FileCode, LogOut, Monitor, Moon, Sun } from "lucide-react";
 import { useCallback, useContext, useState, useEffect } from "react";
 import Image from "next/image";
 import { cn, getTheme, Panel } from "@/lib/utils";
-import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
 import { useRouter, usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import pkg from '@/package.json';
@@ -26,12 +25,14 @@ interface Props {
     graphNames: string[]
     graphName: string
     onOpenGraphInfo: () => void
+    graphInfoOpen: boolean
     navigateToSettings: boolean
 }
 
-function getPathType(pathname: string): "Schema" | "Graph" | undefined {
+function getPathType(pathname: string): "Schema" | "Graph" | "Settings" | undefined {
     if (pathname.includes("/schema")) return "Schema";
     if (pathname.includes("/graph")) return "Graph";
+    if (pathname.includes("/settings")) return "Settings";
     return undefined;
 }
 
@@ -57,12 +58,12 @@ function formatVersion(version: string | undefined): string {
     return version;
 }
 
-export default function Header({ onSetGraphName, graphNames, graphName, onOpenGraphInfo, navigateToSettings }: Props) {
+export default function Header({ onSetGraphName, graphNames, graphName, onOpenGraphInfo, graphInfoOpen, navigateToSettings }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
     const { connectionType, dbVersion } = useContext(ConnectionContext);
-    const { setPanel } = useContext(PanelContext);
-    const { hasChanges, saveSettings, resetSettings, settings: { chatSettings: { model, secretKey, displayChat } } } = useContext(BrowserSettingsContext);
+    const { setPanel, panel } = useContext(PanelContext);
+    const { settings: { chatSettings: { model, secretKey, displayChat } } } = useContext(BrowserSettingsContext);
 
     const { theme, setTheme } = useTheme();
     const { currentTheme } = getTheme(theme);
@@ -74,25 +75,11 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
     const [mounted, setMounted] = useState(false);
 
     const type = getPathType(pathname);
-    const showCreate = type && session?.user.role && session.user.role !== "Read-Only";
+    const showCreate = type && type !== "Settings" && session?.user.role && session.user.role !== "Read-Only";
 
     useEffect(() => {
         setMounted(true);
     }, []);
-
-    const navigateBack = useCallback(() => {
-        if (hasChanges) {
-            getQuerySettingsNavigationToast(toast, () => {
-                saveSettings();
-                router.back();
-            }, () => {
-                resetSettings();
-                router.back();
-            });
-        } else {
-            router.back();
-        }
-    }, [hasChanges, resetSettings, saveSettings, router, toast]);
 
     const handleSetCurrentPanel = useCallback((newPanel: Panel) => {
         setPanel(prev => prev === newPanel ? undefined : newPanel);
@@ -159,39 +146,48 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                         </TooltipContent>
                     </Tooltip>
                 </div>
+                <div className="p-1 flex flex-col items-center gap-2 bg-secondary rounded-lg">
+                    <Button
+                        data-testid="settings"
+                        className={cn("text-foreground p-1 rounded-lg", type === "Settings" && "text-background bg-primary")}
+                        title="Adjust application settings"
+                        label="SETTINGS"
+                        onClick={() => router.push("/settings")}
+                    />
+                    <Button
+                        label="GRAPHS"
+                        title="View and manage your graphs"
+                        className={cn("text-foreground p-1 rounded-lg", type === "Graph" && "text-background bg-primary")}
+                        onClick={() => router.push("/graph")}
+                        data-testid="GraphsButton"
+                    />
+                </div>
+                {/*
+                <Button
+                label="SCHEMAS"
+                title="View and manage your schemas"
+                className={cn("w-full flex justify-center text-foreground p-1 rounded-lg", type === "Schema" && "text-primary bg-border")}
+                onClick={() => router.push("/schema")}
+                data-testid="SchemasButton"
+                /> 
+                {separator}
+                */}
                 {
                     showCreate &&
-                    <>
-                        <CreateGraph
-                            label="Header"
-                            onSetGraphName={onSetGraphName}
-                            type={type}
-                            graphNames={graphNames}
-                        />
-                        {separator}
-                    </>
+                    <CreateGraph
+                        label="Header"
+                        onSetGraphName={onSetGraphName}
+                        type={type}
+                        graphNames={graphNames}
+                    />
                 }
-                <Button
-                    label="GRAPHS"
-                    title="View and manage your graphs"
-                    className={cn(type === "Graph" ? "text-primary" : "text-foreground")}
-                    onClick={() => router.push("/graph")}
-                    data-testid="GraphsButton"
-                />
-                {/* {separator}
-                <Button
-                    label="SCHEMAS"
-                    title="View and manage your schemas"
-                    className={cn(type === "Schema" ? "text-primary" : "text-foreground")}
-                    onClick={() => router.push("/schema")}
-                    data-testid="SchemasButton"
-                /> */}
                 {
                     type === "Graph" && graphName &&
                     <>
                         {separator}
                         <Button
                             indicator={indicator}
+                            className={cn("text-foreground p-1 rounded-lg", graphInfoOpen && "text-background bg-primary")}
                             title="Graph info"
                             onClick={() => onOpenGraphInfo()}
                             data-testid="graphInfoToggle"
@@ -206,7 +202,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                         {separator}
                         <Button
                             data-testid="chatToggleButton"
-                            className="Gradient bg-clip-text text-transparent font-semibold text-xl"
+                            className={cn("text-foreground font-semibold text-xl p-1 rounded-lg", panel === "chat" && "text-background bg-primary")}
                             indicator={indicator}
                             title={`Use English to query the graph.
                                 The feature requires LLM model and API key.
@@ -229,14 +225,6 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                 }
             </div>
             <div className="w-full flex flex-col gap-4 items-center">
-                <Button
-                    data-testid="settings"
-                    title="Adjust application settings"
-                    onClick={() => pathname.includes("/settings") ? navigateBack() : router.push("/settings")}
-                >
-                    <Settings size={iconSize} />
-                </Button>
-                {separator}
                 <Drawer direction="right">
                     <DropdownMenu>
                         <DropdownMenuTrigger onClick={(e) => e.preventDefault()} asChild>
