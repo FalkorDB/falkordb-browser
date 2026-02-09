@@ -20,7 +20,6 @@ test.describe('@browser Browser Settings tests', () => {
 
     test.beforeAll(async () => {
         // Fetch available models from each provider before running tests
-        const tempBrowser = new BrowserWrapper();
         const tempApiCall = new ApiCalls();
 
         try {
@@ -41,8 +40,6 @@ test.describe('@browser Browser Settings tests', () => {
             openaiModel = 'gpt-4o-mini';
             anthropicModel = 'claude-3-5-sonnet';
             geminiModel = 'gemini-2.0-flash-exp';
-        } finally {
-            await tempBrowser.closeBrowser();
         }
     });
 
