@@ -68,8 +68,6 @@ type BrowserSettingsContextType = {
       setModel: Dispatch<SetStateAction<string>>;
       maxSavedMessages: number;
       setMaxSavedMessages: Dispatch<SetStateAction<number>>;
-      navigateToSettings: boolean;
-      displayChat: boolean;
     };
     graphInfo: {
       showMemoryUsage: boolean;
@@ -220,8 +218,6 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         setSecretKey: () => {},
         model: "",
         setModel: () => {},
-        navigateToSettings: false,
-        displayChat: false,
         maxSavedMessages: 0,
         setMaxSavedMessages: () => {},
       },

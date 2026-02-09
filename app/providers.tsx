@@ -94,9 +94,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0);
   const [panel, setPanel] = useState<Panel>();
   const [isQueryLoading, setIsQueryLoading] = useState(false);
-  const [displayChat, setDisplayChat] = useState(false);
   const [model, setModel] = useState("");
-  const [navigateToSettings, setNavigateToSettings] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>([]);
@@ -135,7 +133,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       runDefaultQuerySettings: { runDefaultQuery, setRunDefaultQuery },
       defaultQuerySettings: { defaultQuery, setDefaultQuery },
       contentPersistenceSettings: { contentPersistence, setContentPersistence },
-      chatSettings: { secretKey, setSecretKey, model, setModel, displayChat, navigateToSettings, maxSavedMessages, setMaxSavedMessages },
+      chatSettings: { secretKey, setSecretKey, model, setModel, maxSavedMessages, setMaxSavedMessages },
       graphInfo: { showMemoryUsage, refreshInterval, setRefreshInterval }
     },
     hasChanges,
@@ -225,7 +223,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setHasChanges(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [displayChat, navigateToSettings, contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, toast]);
+  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, toast]);
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -559,29 +557,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     } else if (currentPanel.isExpanded()) currentPanel.collapse();
   }, [graphName, pathname]);
 
-  useEffect(() => {
-    if (status !== "authenticated") return;
-
-    (async () => {
-      const result = await securedFetch("/api/chat", {
-        method: "GET",
-      }, toast, setIndicator);
-
-      if (result.ok) {
-        const json = await result.json();
-
-        if (json.message) return;
-
-        setDisplayChat(true);
-
-        if (!json.model && json.error) {
-          setNavigateToSettings(true);
-        }
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
-
   const checkStatus = useCallback(() => {
     securedFetch("/api/status", {
       method: "GET",
@@ -762,7 +737,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                                 onSetGraphName={handleOnSetGraphName}
                                 onOpenGraphInfo={onExpand}
                                 graphInfoOpen={!isCollapsed}
-                                navigateToSettings={navigateToSettings}
                               />
                             }
                             <ResizablePanelGroup direction="horizontal" className="w-1 grow">

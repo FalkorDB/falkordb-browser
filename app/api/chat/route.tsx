@@ -6,24 +6,7 @@ import { chatRequest, validateBody } from "../validate-body";
 import { buildFalkorDBConnection, getCorsHeaders } from "../utils";
 
 export async function OPTIONS(request: NextRequest) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
-
-export async function GET(request: NextRequest) {
-    try {
-        const session = await getClient(request);
-
-        if (session instanceof NextResponse) {
-            return session;
-        }
-
-        // Return empty object to allow chat to be displayed
-        // The actual model configuration is provided by the user in the frontend
-        return NextResponse.json({}, { status: 200, headers: getCorsHeaders(request) });
-    } catch (error) {
-        console.error(error);
-        return NextResponse.json({ error: (error as Error).message }, { status: 500, headers: getCorsHeaders(request) });
-    }
+    return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
 
 export type EventType = "Status" | "Schema" | "CypherQuery" | "CypherResult" | "ModelOutputChunk" | "Result" | "Error";
@@ -140,14 +123,22 @@ export async function POST(request: NextRequest) {
             });
         }
 
+        let fallbackModel = "";
+
         try {
             // Build FalkorDB connection URL from user session
             const falkordbConnection = buildFalkorDBConnection(session.user);
 
+            fallbackModel = await new TextToCypher({
+                falkordbConnection,
+                model: "",
+                apiKey: "",
+            }).listModelsByProvider("openai").then(models => models[0]);
+
             // Create TextToCypher client
             const textToCypher = new TextToCypher({
                 falkordbConnection,
-                model: model || "gpt-4o-mini",
+                model: model || fallbackModel,
                 apiKey: key,
             });
 
@@ -191,7 +182,7 @@ export async function POST(request: NextRequest) {
             console.error('Text-to-Cypher error details:', error);
 
             // Create user-friendly error message
-            const userFriendlyMessage = createUserFriendlyErrorMessage(error as Error, model || "gpt-4o-mini", key);
+            const userFriendlyMessage = createUserFriendlyErrorMessage(error as Error, model || fallbackModel, key);
 
             writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(userFriendlyMessage)}\n\n`));
             writer.close();
