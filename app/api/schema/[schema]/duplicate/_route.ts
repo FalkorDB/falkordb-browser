@@ -8,7 +8,7 @@ export async function PATCH(
   { params }: { params: Promise<{ schema: string }> }
 ) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;

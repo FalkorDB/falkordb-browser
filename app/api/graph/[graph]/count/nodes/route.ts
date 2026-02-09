@@ -19,7 +19,7 @@ export async function GET(
   const writer = writable.getWriter();
 
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       throw new Error(await session.text());
