@@ -55,7 +55,7 @@ test.describe('@browser Browser Settings tests', () => {
         await browser.closeBrowser();
     });
 
-    test.only('@readwrite Verify user can select a model and API key then save settings', async () => {
+    test('@readwrite Verify user can select a model and API key then save settings', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
 
         // Expand environment section
