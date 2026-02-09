@@ -562,13 +562,16 @@ export class Graph {
     const currentNode = this.nodesMap.get(cell.id);
 
     if (!currentNode) {
+      const mainLabel = getLabelWithFewestElements(labels);
       const node: Node = {
         id: cell.id,
         labels: labels.map((l) => l.name),
-        color: isColor ? getLabelWithFewestElements(labels).style.color : "",
+        color: isColor ? mainLabel.style.color : "",
         visible: true,
         expand: false,
         collapsed,
+        caption: mainLabel.style.caption,
+        size: mainLabel.style.size,
         data: {},
       };
       Object.entries(cell.properties).forEach(([key, value]) => {
@@ -585,11 +588,14 @@ export class Graph {
     if (currentNode.data.fake) {
       currentNode.id = cell.id;
       currentNode.labels = labels.map((l) => l.name);
+      const mainLabel = getLabelWithFewestElements(labels);
       currentNode.color = isColor
-        ? getLabelWithFewestElements(labels).style.color
+        ? mainLabel.style.color
         : "";
       currentNode.expand = false;
       currentNode.collapsed = collapsed;
+      currentNode.caption = mainLabel.style.caption;
+      currentNode.size = mainLabel.style.size;
       Object.entries(cell.properties).forEach(([key, value]) => {
         currentNode.data[key] = isSchema ? getSchemaValue(value) : value;
       });
@@ -644,6 +650,8 @@ export class Graph {
             expand: false,
             collapsed,
             visible: true,
+            caption: label.style.caption,
+            size: label.style.size,
             data: {
               fake: true
             },
@@ -681,6 +689,8 @@ export class Graph {
             expand: false,
             collapsed,
             visible: true,
+            caption: label!.style.caption,
+            size: label!.style.size,
             data: {
               fake: true
             },
@@ -699,6 +709,8 @@ export class Graph {
             expand: false,
             collapsed,
             visible: true,
+            caption: label!.style.caption,
+            size: label!.style.size,
             data: {
               fake: true
             },
