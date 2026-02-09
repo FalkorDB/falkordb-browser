@@ -34,7 +34,7 @@ export default function BrowserSettings() {
             defaultQuerySettings: { defaultQuery, setDefaultQuery },
             timeoutSettings: { timeout: timeoutValue },
             limitSettings: { limit },
-            chatSettings: { secretKey, model, displayChat, maxSavedMessages },
+            chatSettings: { secretKey, model, maxSavedMessages },
             graphInfo: { refreshInterval }
         },
         hasChanges,
@@ -281,7 +281,6 @@ export default function BrowserSettings() {
                                         models={modelDisplayNames.length > 0 ? modelDisplayNames : [DEFAULT_MODEL]}
                                         selectedModel={newModel}
                                         onModelSelect={handleModelChange}
-                                        disabled={!displayChat}
                                         isLoading={isLoadingModels}
                                     />
                                 </div>
@@ -290,7 +289,6 @@ export default function BrowserSettings() {
                                     <label htmlFor="secretKeyInput" className="text-sm font-medium whitespace-nowrap">Secret Key</label>
                                     <Input
                                         data-testid="chatApiKeyInput"
-                                        disabled={!displayChat}
                                         className="flex-1"
                                         id="secretKeyInput"
                                         placeholder="Enter your API secret key..."
