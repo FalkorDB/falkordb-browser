@@ -133,7 +133,7 @@ export default function ModelSelector({
                     <div className="flex flex-col gap-2 p-2">
                         {categorizedModels.map(([category, categoryModels]) => (
                             // Models Grid with Horizontal Scroll
-                            <div key={category} className="bg-muted/40 rounded-md overflow-x-auto flex-1 grid grid-flow-col auto-cols-[20%] gap-2 items-center">
+                            <div key={category} className="bg-muted/40 rounded-md overflow-x-auto flex-1 grid grid-flow-col auto-cols-[10%] gap-2 items-center">
                                     {/* Category Label */}
                                     <div className="flex items-center gap-2 flex-shrink-0">
                                         {getCategoryIcon(category)}
