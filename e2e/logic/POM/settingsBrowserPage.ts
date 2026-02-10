@@ -8,7 +8,7 @@ import {
 export default class SettingsBrowserPage extends BasePage {
   // Environment Section
   private get environmentSectionHeader(): Locator {
-    return this.page.getByTestId("environmentSectionHeader");
+    return this.page.getByTestId("chatSectionHeader");
   }
 
   private get chatApiKeyInput(): Locator {
