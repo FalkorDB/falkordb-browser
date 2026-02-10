@@ -144,9 +144,10 @@ export default function Chat({ onClose }: Props) {
         const body: any = {
             messages: newMessages.filter(message => message.role === "user" || message.type === "Result").map(({ role, content }) => ({
                 role,
-                content
+                content,
             })),
             graphName,
+            model
         };
 
         if (secretKey) {
@@ -163,7 +164,7 @@ export default function Chat({ onClose }: Props) {
             });
 
             if (!response.ok) {
-                throw new Error(`Something went wrong`);
+                throw new Error(await response.text());
             }
 
             const reader = response.body?.getReader();
@@ -270,7 +271,6 @@ export default function Chat({ onClose }: Props) {
 
                 if (!isResult) await processStream();
 
-                setIsLoading(false);
             };
 
             processStream();
@@ -280,6 +280,8 @@ export default function Chat({ onClose }: Props) {
                 description: (error as Error).message,
                 variant: "destructive",
             });
+        } finally {
+            setIsLoading(false);
         }
     };
 

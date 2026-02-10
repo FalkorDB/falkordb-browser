@@ -93,10 +93,8 @@ export async function POST(request: NextRequest) {
         const validation = validateBody(chatRequest, body);
 
         if (!validation.success) {
-            writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(validation.error)}\n\n`));
-            writer.close();
-
-            return new Response(readable, {
+            return new Response(validation.error, {
+                status: 400,
                 headers: {
                     "Content-Type": "text/event-stream",
                     "Cache-Control": "no-cache",

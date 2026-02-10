@@ -213,11 +213,13 @@ export const chatRequest = z.object({
     .min(1, "Graph name cannot be empty"),
   key: z
     .string({
+      required_error: "API key is required",
       invalid_type_error: "Invalid API key",
     })
     .min(1, "API key cannot be empty"),
   model: z
     .string({
+      required_error: "Model is required",
       invalid_type_error: "Invalid Model",
     })
     .min(1, "Model cannot be empty"),
