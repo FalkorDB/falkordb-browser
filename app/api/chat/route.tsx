@@ -108,37 +108,14 @@ export async function POST(request: NextRequest) {
 
         const { messages, graphName, key, model } = validation.data;
 
-        // Validate required parameters
-        if (!key) {
-            writer.write(encoder.encode(`event: error status: ${400} data: "API key is required. Please configure it in Settings."\n\n`));
-            writer.close();
-
-            return new Response(readable, {
-                headers: {
-                    "Content-Type": "text/event-stream",
-                    "Cache-Control": "no-cache",
-                    Connection: "keep-alive",
-                    ...getCorsHeaders(request),
-                },
-            });
-        }
-
-        let fallbackModel = "";
-
         try {
             // Build FalkorDB connection URL from user session
             const falkordbConnection = buildFalkorDBConnection(session.user);
 
-            fallbackModel = await new TextToCypher({
-                falkordbConnection,
-                model: "",
-                apiKey: "",
-            }).listModelsByProvider("openai").then(models => models[0]);
-
             // Create TextToCypher client
             const textToCypher = new TextToCypher({
                 falkordbConnection,
-                model: model || fallbackModel,
+                model,
                 apiKey: key,
             });
 
@@ -182,7 +159,7 @@ export async function POST(request: NextRequest) {
             console.error('Text-to-Cypher error details:', error);
 
             // Create user-friendly error message
-            const userFriendlyMessage = createUserFriendlyErrorMessage(error as Error, model || fallbackModel, key);
+            const userFriendlyMessage = createUserFriendlyErrorMessage(error as Error, model, key);
 
             writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(userFriendlyMessage)}\n\n`));
             writer.close();

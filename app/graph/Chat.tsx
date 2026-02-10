@@ -9,6 +9,7 @@ import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import { GraphContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext } from "../components/provider";
 import { EventType } from "../api/chat/route";
+import ToastButton from "../components/ToastButton";
 
 // Function to get the last maxSavedMessages user messages and all messages in between
 const getLastUserMessagesWithContext = (allMessages: Message[], maxUserMessages: number) => {
@@ -127,8 +128,25 @@ export default function Chat({ onClose }: Props) {
             graphName,
         };
 
-        if (model) {
-            body.model = model;
+        if (!model) {
+            toast({
+                title: "No model selected",
+                description: "Please select a model in the settings before sending a message",
+                variant: "destructive",
+                action: <ToastButton onClick={() => {
+                    onClose();
+                    setTimeout(() => {
+                        const settingsButton = document.querySelector('[data-testid="settingsButton"]') as HTMLButtonElement;
+                        if (settingsButton) {
+                            settingsButton.click();
+                        }
+                    }, 500);
+                }}>
+                    Go to Settings
+                </ToastButton>
+            });
+            setIsLoading(false);
+            return;
         }
 
         if (secretKey) {

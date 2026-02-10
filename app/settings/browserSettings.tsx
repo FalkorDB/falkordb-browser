@@ -10,12 +10,11 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { detectProviderFromApiKey } from "@/lib/ai-provider-utils";
 import { BrowserSettingsContext, IndicatorContext } from "../components/provider";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import ModelSelector from "./ModelSelector";
-
-const DEFAULT_MODEL = "gpt-5-mini";
 
 export default function BrowserSettings() {
     const {
@@ -34,7 +33,7 @@ export default function BrowserSettings() {
             defaultQuerySettings: { defaultQuery, setDefaultQuery },
             timeoutSettings: { timeout: timeoutValue },
             limitSettings: { limit },
-            chatSettings: { secretKey, model, maxSavedMessages },
+            chatSettings: { secretKey, model, setModel, maxSavedMessages },
             graphInfo: { refreshInterval }
         },
         hasChanges,
@@ -66,33 +65,43 @@ export default function BrowserSettings() {
 
     // Fetch all available models once on mount
     useEffect(() => {
-        const fetchModels = async () => {
+        (async () => {
             setIsLoadingModels(true);
-            try {
-                const result = await securedFetch(
-                    "/api/chat/models",
+            const result = await securedFetch(
+                "/api/chat/models",
+                { method: "GET" },
+                toast,
+                setIndicator
+            );
+
+            if (!result.ok) return;
+
+            const { models } = await result.json();
+            setModelDisplayNames(models);
+
+            setIsLoadingModels(false);
+        })();
+    }, [toast, setIndicator]);
+
+    useEffect(() => {
+        (async () => {
+            if (!model && secretKey) {
+                const res = await securedFetch(
+                    `/api/chat/models?provider=${detectProviderFromApiKey(secretKey)}`,
                     { method: "GET" },
                     toast,
                     setIndicator
                 );
 
-                if (result.ok) {
-                    const { models } = await result.json();
-                    setModelDisplayNames(models);
-                } else {
-                    // Fallback to gpt-4o-mini if fetch fails
-                    setModelDisplayNames([DEFAULT_MODEL]);
-                }
-            } catch (error) {
-                setModelDisplayNames([DEFAULT_MODEL]);
-                setIndicator("offline");
-            } finally {
-                setIsLoadingModels(false);
-            }
-        };
+                if (!res.ok) return;
 
-        fetchModels();
-    }, [toast, setIndicator]);
+                const defaultModel = (await res.json()).models[0];
+                setNewModel(defaultModel);
+                setModel(defaultModel);
+                localStorage.setItem("model", defaultModel);
+            }
+        })();
+    }, [secretKey, model, saveSettings, toast, setIndicator, setNewModel, setModel]);
 
     useEffect(() => {
         setNewContentPersistence(contentPersistence);
@@ -131,7 +140,7 @@ export default function BrowserSettings() {
             });
             return;
         }
-        
+
         saveSettings();
     }, [newMaxSavedMessages, saveSettings, toast]);
 
@@ -278,7 +287,7 @@ export default function BrowserSettings() {
                                         {isLoadingModels ? "Model (Loading...)" : "Model"}
                                     </label>
                                     <ModelSelector
-                                        models={modelDisplayNames.length > 0 ? modelDisplayNames : [DEFAULT_MODEL]}
+                                        models={modelDisplayNames}
                                         selectedModel={newModel}
                                         onModelSelect={handleModelChange}
                                         isLoading={isLoadingModels}

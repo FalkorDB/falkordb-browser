@@ -215,14 +215,12 @@ export const chatRequest = z.object({
     .string({
       invalid_type_error: "Invalid API key",
     })
-    .min(1, "API key cannot be empty")
-    .optional(),
+    .min(1, "API key cannot be empty"),
   model: z
     .string({
       invalid_type_error: "Invalid Model",
     })
-    .min(1, "Model cannot be empty")
-    .optional(),
+    .min(1, "Model cannot be empty"),
 });
 
 // Auth schemas
