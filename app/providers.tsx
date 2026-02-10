@@ -505,7 +505,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setContentPersistence(localStorage.getItem("contentPersistence") !== "false");
       setTutorialOpen(localStorage.getItem("tutorial") !== "false");
       setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30));
-      setMaxSavedMessages(parseInt(localStorage.getItem("maxSavedMessages") || "0", 10));
+      setMaxSavedMessages(parseInt(localStorage.getItem("maxSavedMessages") || "5", 10));
 
       // Decrypt secret key if encrypted, or migrate plain text keys to encrypted format
       const storedSecretKey = localStorage.getItem("secretKey") || "";
