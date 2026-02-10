@@ -111,23 +111,6 @@ export default function Chat({ onClose }: Props) {
             return;
         }
 
-        setIsLoading(true);
-
-        const newMessages = [...messages, { role: "user", type: "Text", content: newMessage } as const];
-
-        setMessages(newMessages);
-        setTimeout(scrollToBottom, 0);
-        setNewMessage("");
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const body: any = {
-            messages: newMessages.filter(message => message.role === "user" || message.type === "Result").map(({ role, content }) => ({
-                role,
-                content
-            })),
-            graphName,
-        };
-
         if (!model) {
             toast({
                 title: "No model selected",
@@ -148,6 +131,23 @@ export default function Chat({ onClose }: Props) {
             setIsLoading(false);
             return;
         }
+
+        setIsLoading(true);
+
+        const newMessages = [...messages, { role: "user", type: "Text", content: newMessage } as const];
+
+        setMessages(newMessages);
+        setTimeout(scrollToBottom, 0);
+        setNewMessage("");
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const body: any = {
+            messages: newMessages.filter(message => message.role === "user" || message.type === "Result").map(({ role, content }) => ({
+                role,
+                content
+            })),
+            graphName,
+        };
 
         if (secretKey) {
             body.key = secretKey;

@@ -67,6 +67,7 @@ export default function BrowserSettings() {
     useEffect(() => {
         (async () => {
             setIsLoadingModels(true);
+            
             const result = await securedFetch(
                 "/api/chat/models",
                 { method: "GET" },
@@ -74,10 +75,10 @@ export default function BrowserSettings() {
                 setIndicator
             );
 
-            if (!result.ok) return;
-
-            const { models } = await result.json();
-            setModelDisplayNames(models);
+            if (result.ok) {
+                const { models } = await result.json();
+                setModelDisplayNames(models);
+            }
 
             setIsLoadingModels(false);
         })();
@@ -96,6 +97,9 @@ export default function BrowserSettings() {
                 if (!res.ok) return;
 
                 const defaultModel = (await res.json()).models[0];
+                
+                if (!defaultModel) return;
+                
                 setNewModel(defaultModel);
                 setModel(defaultModel);
                 localStorage.setItem("model", defaultModel);

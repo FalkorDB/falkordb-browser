@@ -2,8 +2,7 @@ import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { formatModelDisplayName } from "@/lib/ai-provider-utils";
 import { Search, Check, Sparkles, Zap, Brain, Globe, Server } from "lucide-react";
-import { Tooltip } from "@radix-ui/react-tooltip";
-import { TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Input from "../components/ui/Input";
 
 interface ModelSelectorProps {
@@ -135,7 +134,7 @@ export default function ModelSelector({
                             // Models Grid with Horizontal Scroll
                             <div key={category} className="bg-muted/40 rounded-md overflow-x-auto flex-1 grid grid-flow-col auto-cols-[10%] gap-2 items-center">
                                     {/* Category Label */}
-                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                    <div className="flex items-center gap-2">
                                         {getCategoryIcon(category)}
                                         <Tooltip>
                                             <TooltipTrigger asChild>
