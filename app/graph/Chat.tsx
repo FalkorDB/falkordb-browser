@@ -134,7 +134,7 @@ export default function Chat({ onClose }: Props) {
             return;
         }
 
-        if (!model) {
+        if (!secretKey) {
             toast({
                 title: "No Api Key Provided",
                 description: "Please provide a Api Key in the settings before sending a message",

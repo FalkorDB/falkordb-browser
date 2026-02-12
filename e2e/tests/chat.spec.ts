@@ -51,8 +51,18 @@ test.describe("Chat Feature Tests", () => {
     await apiCall.addGraph(graphName);
     await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
     
-    const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
+    const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
     await browser.setPageToFullScreen();
+    await settings.expandChatSection();
+
+    const models = await settings.getAvailableModels();    
+    await settings.selectModel(models[0]); // Select a model to enable the input
+    await settings.fillChatApiKey(""); // Clear API key to simulate missing key
+    await settings.clickSaveSettingsButton();
+    
+    const header = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
+    await header.clickOnGraphsButton();
+    const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
     await chat.selectGraphByName(graphName);
     
     // Open chat panel
@@ -63,9 +73,6 @@ test.describe("Chat Feature Tests", () => {
     // Try to send a message without API key
     await chat.fillChatInput("Who is Alice?");
     await chat.clickChatSendButton();
-    
-    // Verify user message was sent (appears in chat)
-    await chat.waitForChatUserMessage();
     
     // Verify error toast is displayed due to missing/invalid API key
     const isErrorToastVisible = await chat.getNotificationErrorToast();
