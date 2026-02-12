@@ -91,11 +91,11 @@ export default function ForceGraph({
     useEffect(() => {
         const canvas = canvasRef.current;
 
-        if (!canvas) return;
+        if (!canvas || !canvasLoaded) return;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any)[type] = () => canvas.getGraphData();
-    }, [canvasRef, type]);
+    }, [canvasRef, type, canvasLoaded]);
 
     // Load saved viewport on mount
     useEffect(() => {
