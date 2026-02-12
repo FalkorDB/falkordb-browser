@@ -56,7 +56,7 @@ test.describe('@browser Browser Settings tests', () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
 
         // Expand environment section
-        await settingsBrowserPage.expandEnvironmentSection();
+        await settingsBrowserPage.expandChatSection();
 
         // Wait for models to load
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
@@ -87,7 +87,7 @@ test.describe('@browser Browser Settings tests', () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
 
         // Expand environment section and wait for models
-        await settingsBrowserPage.expandEnvironmentSection();
+        await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
         // Select model and fill API key - use first available OpenAI model
@@ -101,7 +101,7 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.reloadPage();
 
         // Expand environment section again
-        await settingsBrowserPage.expandEnvironmentSection();
+        await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
         // Verify model is still selected
@@ -116,7 +116,7 @@ test.describe('@browser Browser Settings tests', () => {
     test('@readwrite Verify model search filters models correctly', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
 
-        await settingsBrowserPage.expandEnvironmentSection();
+        await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
         // Search for "gpt" - should only show OpenAI models
@@ -135,7 +135,7 @@ test.describe('@browser Browser Settings tests', () => {
     test('@readwrite Verify search shows only matching category', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
 
-        await settingsBrowserPage.expandEnvironmentSection();
+        await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
         // Search for "claude" - should only show Anthropic category
@@ -154,7 +154,7 @@ test.describe('@browser Browser Settings tests', () => {
     test('@readwrite Verify empty search state displays correctly', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
 
-        await settingsBrowserPage.expandEnvironmentSection();
+        await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
         // Search for non-existent model
@@ -169,7 +169,7 @@ test.describe('@browser Browser Settings tests', () => {
     test('@readwrite Verify model categories display correctly', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
 
-        await settingsBrowserPage.expandEnvironmentSection();
+        await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
         // Verify all main categories are visible
@@ -194,7 +194,7 @@ test.describe('@browser Browser Settings tests', () => {
     test('@readwrite Verify clearing search shows all models again', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
 
-        await settingsBrowserPage.expandEnvironmentSection();
+        await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
         // Search for specific model
@@ -218,7 +218,7 @@ test.describe('@browser Browser Settings tests', () => {
     test('@readwrite Verify different models from different categories can be selected', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
 
-        await settingsBrowserPage.expandEnvironmentSection();
+        await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
         // Select OpenAI model
@@ -247,7 +247,7 @@ test.describe('@browser Browser Settings tests', () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
         await browser.setPageToFullScreen();
 
-        await settingsBrowserPage.expandEnvironmentSection();
+        await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
         // Select Anthropic model

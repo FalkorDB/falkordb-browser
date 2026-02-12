@@ -137,6 +137,7 @@
 
 ::-webkit-scrollbar {
     width: 10px;
+    height: 10px;
 }
 
 ::-webkit-scrollbar-corner {
@@ -171,4 +172,8 @@ input[type="color"]::-webkit-color-swatch-wrapper {
 
 input[type="color"]::-webkit-color-swatch {
     border: none;
+}
+
+#launcher {
+    z-index: 40 !important;
 }

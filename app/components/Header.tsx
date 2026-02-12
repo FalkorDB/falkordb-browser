@@ -14,11 +14,10 @@ import { Drawer, DrawerContent, DrawerDescription, DrawerTitle, DrawerTrigger } 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
-import { useToast } from "@/components/ui/use-toast";
 import { useTheme } from "next-themes";
 import Button from "./ui/Button";
 import CreateGraph from "./CreateGraph";
-import { IndicatorContext, PanelContext, BrowserSettingsContext, ConnectionContext } from "./provider";
+import { IndicatorContext, PanelContext, ConnectionContext } from "./provider";
 
 interface Props {
     onSetGraphName: (newGraphName: string) => void
@@ -26,7 +25,6 @@ interface Props {
     graphName: string
     onOpenGraphInfo: () => void
     graphInfoOpen: boolean
-    navigateToSettings: boolean
 }
 
 function getPathType(pathname: string): "Schema" | "Graph" | "Settings" | undefined {
@@ -58,19 +56,17 @@ function formatVersion(version: string | undefined): string {
     return version;
 }
 
-export default function Header({ onSetGraphName, graphNames, graphName, onOpenGraphInfo, graphInfoOpen, navigateToSettings }: Props) {
+export default function Header({ onSetGraphName, graphNames, graphName, onOpenGraphInfo, graphInfoOpen }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
     const { connectionType, dbVersion } = useContext(ConnectionContext);
     const { setPanel, panel } = useContext(PanelContext);
-    const { settings: { chatSettings: { model, secretKey, displayChat } } } = useContext(BrowserSettingsContext);
 
     const { theme, setTheme } = useTheme();
     const { currentTheme } = getTheme(theme);
     const { data: session } = useSession();
     const pathname = usePathname();
     const router = useRouter();
-    const { toast } = useToast();
 
     const [mounted, setMounted] = useState(false);
 
@@ -197,7 +193,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                     </>
                 }
                 {
-                    type === "Graph" && graphName && displayChat &&
+                    type === "Graph" && graphName &&
                     <>
                         {separator}
                         <Button
@@ -209,16 +205,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                                 Update local user parameters in Settings.`}
                             label="CHAT"
                             onClick={() => {
-                                if (navigateToSettings && (!model || !secretKey)) {
-                                    router.push("/settings");
-                                    toast({
-                                        title: "Incomplete Chat Settings",
-                                        description: "Please complete the chat settings to use the chat feature.",
-                                        variant: "destructive",
-                                    });
-                                } else {
-                                    handleSetCurrentPanel("chat");
-                                }
+                                handleSetCurrentPanel("chat");
                             }}
                         />
                     </>

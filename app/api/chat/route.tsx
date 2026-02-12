@@ -6,24 +6,7 @@ import { chatRequest, validateBody } from "../validate-body";
 import { buildFalkorDBConnection, getCorsHeaders } from "../utils";
 
 export async function OPTIONS(request: NextRequest) {
-  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
-}
-
-export async function GET(request: NextRequest) {
-    try {
-        const session = await getClient(request);
-
-        if (session instanceof NextResponse) {
-            return session;
-        }
-
-        // Return empty object to allow chat to be displayed
-        // The actual model configuration is provided by the user in the frontend
-        return NextResponse.json({}, { status: 200, headers: getCorsHeaders(request) });
-    } catch (error) {
-        console.error(error);
-        return NextResponse.json({ error: (error as Error).message }, { status: 500, headers: getCorsHeaders(request) });
-    }
+    return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
 
 export type EventType = "Status" | "Schema" | "CypherQuery" | "CypherResult" | "ModelOutputChunk" | "Result" | "Error";
@@ -110,10 +93,8 @@ export async function POST(request: NextRequest) {
         const validation = validateBody(chatRequest, body);
 
         if (!validation.success) {
-            writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(validation.error)}\n\n`));
-            writer.close();
-
-            return new Response(readable, {
+            return new Response(validation.error, {
+                status: 400,
                 headers: {
                     "Content-Type": "text/event-stream",
                     "Cache-Control": "no-cache",
@@ -125,21 +106,6 @@ export async function POST(request: NextRequest) {
 
         const { messages, graphName, key, model } = validation.data;
 
-        // Validate required parameters
-        if (!key) {
-            writer.write(encoder.encode(`event: error status: ${400} data: "API key is required. Please configure it in Settings."\n\n`));
-            writer.close();
-
-            return new Response(readable, {
-                headers: {
-                    "Content-Type": "text/event-stream",
-                    "Cache-Control": "no-cache",
-                    Connection: "keep-alive",
-                    ...getCorsHeaders(request),
-                },
-            });
-        }
-
         try {
             // Build FalkorDB connection URL from user session
             const falkordbConnection = buildFalkorDBConnection(session.user);
@@ -147,7 +113,7 @@ export async function POST(request: NextRequest) {
             // Create TextToCypher client
             const textToCypher = new TextToCypher({
                 falkordbConnection,
-                model: model || "gpt-4o-mini",
+                model,
                 apiKey: key,
             });
 
@@ -191,7 +157,7 @@ export async function POST(request: NextRequest) {
             console.error('Text-to-Cypher error details:', error);
 
             // Create user-friendly error message
-            const userFriendlyMessage = createUserFriendlyErrorMessage(error as Error, model || "gpt-4o-mini", key);
+            const userFriendlyMessage = createUserFriendlyErrorMessage(error as Error, model, key);
 
             writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(userFriendlyMessage)}\n\n`));
             writer.close();
