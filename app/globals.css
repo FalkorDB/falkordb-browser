@@ -173,3 +173,7 @@ input[type="color"]::-webkit-color-swatch-wrapper {
 input[type="color"]::-webkit-color-swatch {
     border: none;
 }
+
+#launcher {
+    z-index: 40 !important;
+}

@@ -457,13 +457,6 @@ export default function Chat({ onClose }: Props) {
                     }
                 </ul>
                 <form data-testid="chatForm" className="flex gap-2 items-center border border-border rounded-lg w-full p-2" onSubmit={handleSubmit}>
-                    <Input
-                        data-testid="chatInput"
-                        className="w-1 grow bg-transparent border-none text-foreground text-lg SofiaSans"
-                        placeholder="Type your message here..."
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                    />
                     <Button
                         data-testid="chatSendButton"
                         disabled={newMessage.trim() === ""}
@@ -473,6 +466,13 @@ export default function Chat({ onClose }: Props) {
                     >
                         <CircleArrowUp size={25} />
                     </Button>
+                    <Input
+                        data-testid="chatInput"
+                        className="w-1 grow bg-transparent border-none text-foreground text-lg SofiaSans"
+                        placeholder="Type your message here..."
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                    />
                 </form>
             </div>
         </div>
