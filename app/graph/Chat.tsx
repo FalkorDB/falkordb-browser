@@ -111,22 +111,35 @@ export default function Chat({ onClose }: Props) {
             return;
         }
 
+        const ToastActionButton = <ToastButton onClick={() => {
+            onClose();
+            setTimeout(() => {
+                const settingsButton = document.querySelector('[data-testid="settingsButton"]') as HTMLButtonElement;
+                if (settingsButton) {
+                    settingsButton.click();
+                }
+            }, 500);
+        }}>
+            Go to Settings
+        </ToastButton>;
+
         if (!model) {
             toast({
                 title: "No model selected",
                 description: "Please select a model in the settings before sending a message",
                 variant: "destructive",
-                action: <ToastButton onClick={() => {
-                    onClose();
-                    setTimeout(() => {
-                        const settingsButton = document.querySelector('[data-testid="settingsButton"]') as HTMLButtonElement;
-                        if (settingsButton) {
-                            settingsButton.click();
-                        }
-                    }, 500);
-                }}>
-                    Go to Settings
-                </ToastButton>
+                action: ToastActionButton
+            });
+            setIsLoading(false);
+            return;
+        }
+
+        if (!model) {
+            toast({
+                title: "No Api Key Provided",
+                description: "Please provide a Api Key in the settings before sending a message",
+                variant: "destructive",
+                action: ToastActionButton
             });
             setIsLoading(false);
             return;
@@ -140,27 +153,21 @@ export default function Chat({ onClose }: Props) {
         setTimeout(scrollToBottom, 0);
         setNewMessage("");
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const body: any = {
-            messages: newMessages.filter(message => message.role === "user" || message.type === "Result").map(({ role, content }) => ({
-                role,
-                content,
-            })),
-            graphName,
-            model
-        };
-
-        if (secretKey) {
-            body.key = secretKey;
-        }
-
         try {
             const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify(body)
+                body: JSON.stringify({
+                    messages: newMessages.filter(message => message.role === "user" || message.type === "Result").map(({ role, content }) => ({
+                        role,
+                        content,
+                    })),
+                    graphName,
+                    model,
+                    key: secretKey
+                })
             });
 
             if (!response.ok) {
