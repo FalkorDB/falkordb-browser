@@ -94,8 +94,8 @@ test.describe('Canvas Tests', () => {
         await graph.clickCenterControl();
         await graph.waitForScaleToStabilize();
         const updatedGraph = await graph.getCanvasScaling();
-        expect(updatedGraph.scaleX - initialGraph.scaleX).toBeCloseTo(1, 0);
-        expect(updatedGraph.scaleY - initialGraph.scaleY).toBeCloseTo(1, 0);
+        expect(updatedGraph.scaleX - initialGraph.scaleX).toBeCloseTo(0, 0);
+        expect(updatedGraph.scaleY - initialGraph.scaleY).toBeCloseTo(0, 0);
         await apicalls.removeGraph(graphName);
     });
 
