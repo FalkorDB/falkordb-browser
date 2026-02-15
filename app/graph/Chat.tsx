@@ -1,7 +1,7 @@
 /* eslint-disable no-case-declarations */
 /* eslint-disable react/no-array-index-key */
 import { cn, Message } from "@/lib/utils";
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { ChevronDown, ChevronRight, CircleArrowUp, Copy, Loader2, Play, Search, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -50,30 +50,19 @@ export default function Chat({ onClose }: Props) {
     const [isLoading, setIsLoading] = useState(false);
     const [queryCollapse, setQueryCollapse] = useState<{ [key: string]: boolean }>({});
 
-    // Track the previous graph name to save messages to the correct graph
-    const prevGraphNameRef = useRef(graphName);
-
     // Load messages for current graph on mount
     useEffect(() => {
         const savedMessages = localStorage.getItem(`chat-${graphName}`);
-        setMessages(JSON.parse(savedMessages || "[]"));
-    }, [graphName]); // Re-run when graph changes
-
-    // Save messages when graph changes or messages update
-    useEffect(() => () => {
-        // When graph changes, save messages for the PREVIOUS graph
-        const prevGraphName = prevGraphNameRef.current;
-
-        if (prevGraphName !== graphName && messages.length > 0) {
-            localStorage.setItem(`chat-${prevGraphName}`, JSON.stringify(getLastUserMessagesWithContext(messages, maxSavedMessages)));
-        }
-
-        // Update ref to current graph name
-        prevGraphNameRef.current = graphName;
-    }, [graphName, messages, maxSavedMessages]);
+        const currentMessages = JSON.parse(savedMessages || "[]");
+        setMessages(currentMessages);
+    }, [graphName, maxSavedMessages]);
 
     useEffect(() => {
         let statusGroup: Message[];
+
+        if (messages.length > 0) {
+            localStorage.setItem(`chat-${graphName}`, JSON.stringify(getLastUserMessagesWithContext(messages, maxSavedMessages)));
+        }
 
         const newMessagesList = messages.map((message, i): Message | [Message[], boolean] | undefined => {
             if (message.type === "Status") {
