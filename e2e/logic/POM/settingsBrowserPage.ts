@@ -6,9 +6,9 @@ import {
 } from "@/e2e/infra/utils";
 
 export default class SettingsBrowserPage extends BasePage {
-  // Environment Section
-  private get environmentSectionHeader(): Locator {
-    return this.page.getByTestId("environmentSectionHeader");
+  // Chat Section
+  private get chatSectionHeader(): Locator {
+    return this.page.getByTestId("chatSectionHeader");
   }
 
   private get chatApiKeyInput(): Locator {
@@ -47,8 +47,8 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   // Wait for Interactive Methods
-  async waitForEnvironmentSection(): Promise<boolean> {
-    return waitForElementToBeVisible(this.environmentSectionHeader);
+  async waitForChatSection(): Promise<boolean> {
+    return waitForElementToBeVisible(this.chatSectionHeader);
   }
 
   async waitForChatApiKeyInput(): Promise<boolean> {
@@ -60,11 +60,11 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   // Click Methods
-  async clickEnvironmentSectionHeader(): Promise<void> {
+  async clickChatSectionHeader(): Promise<void> {
     await interactWhenVisible(
-      this.environmentSectionHeader,
+      this.chatSectionHeader,
       (el) => el.click(),
-      "Environment Section Header"
+      "Chat Section Header"
     );
   }
 
@@ -125,7 +125,7 @@ export default class SettingsBrowserPage extends BasePage {
   async waitForChatApiKeyInputEnabled(): Promise<void> {
     // Wait for input to be attached first
     await this.chatApiKeyInput.waitFor({ state: "attached", timeout: 10000 });
-    
+
     // Wait for the input to be enabled (displayChat must be true)
     // This happens after the /api/chat endpoint is called in the frontend
     await this.page.waitForFunction(
@@ -138,22 +138,22 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   // Combined Actions
-  async expandEnvironmentSection(): Promise<void> {
+  async expandChatSection(): Promise<void> {
     const isInputVisible = await this.chatApiKeyInput.isVisible();
     if (!isInputVisible) {
-      await this.clickEnvironmentSectionHeader();
+      await this.clickChatSectionHeader();
       await this.waitForChatApiKeyInput();
     }
   }
 
   async setChatApiKey(apiKey: string): Promise<void> {
-    await this.expandEnvironmentSection();
+    await this.expandChatSection();
     await this.waitForChatApiKeyInputEnabled();
     await this.fillChatApiKey(apiKey);
   }
 
   async setChatApiKeyAndSave(apiKey: string, modelName?: string): Promise<void> {
-    await this.expandEnvironmentSection();
+    await this.expandChatSection();
     await this.waitForChatApiKeyInputEnabled();
 
     // Select model if provided
@@ -170,7 +170,7 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   async clearChatApiKeyAndSave(): Promise<void> {
-    await this.expandEnvironmentSection();
+    await this.expandChatSection();
     await this.clearChatApiKey();
     await this.waitForSaveSettingsButton();
     await this.clickSaveSettingsButton();
@@ -193,9 +193,9 @@ export default class SettingsBrowserPage extends BasePage {
     );
   }
 
-  async selectModel(modelName: string): Promise<void> {
+  async selectModel(providerName: string): Promise<void> {
     // First check if element exists by testid (raw model name)
-    const modelButton = this.getModelButton(modelName);
+    const modelButton = this.getModelButton(providerName);
     const existsByTestId = await modelButton.count() > 0;
 
     if (existsByTestId) {
@@ -203,22 +203,22 @@ export default class SettingsBrowserPage extends BasePage {
       await interactWhenVisible(
         modelButton,
         (el) => el.click(),
-        `Select Model: ${modelName}`
+        `Select Model: ${providerName}`
       );
     } else {
       // Try by displayed text (formatted name)
-      const buttonByText = this.getModelButtonByDisplayText(modelName);
+      const buttonByText = this.getModelButtonByDisplayText(providerName);
       await interactWhenVisible(
         buttonByText.first(),
         (el) => el.click(),
-        `Select Model by text: ${modelName}`
+        `Select Model by text: ${providerName}`
       );
     }
   }
 
-  async isModelSelected(modelName: string): Promise<boolean> {
+  async isModelSelected(providerName: string): Promise<boolean> {
     // First check if element exists by testid (raw model name)
-    const modelButton = this.getModelButton(modelName);
+    const modelButton = this.getModelButton(providerName);
     const existsByTestId = await modelButton.count() > 0;
 
     if (existsByTestId) {
@@ -232,7 +232,7 @@ export default class SettingsBrowserPage extends BasePage {
     } else {
       // Try by displayed text (formatted name)
       try {
-        const buttonByText = this.getModelButtonByDisplayText(modelName);
+        const buttonByText = this.getModelButtonByDisplayText(providerName);
         const selected = await buttonByText.first().getAttribute("data-selected");
         return selected === "true";
       } catch {
@@ -241,9 +241,9 @@ export default class SettingsBrowserPage extends BasePage {
     }
   }
 
-  async isModelVisible(modelName: string): Promise<boolean> {
+  async isModelVisible(providerName: string): Promise<boolean> {
     // First check if element exists by testid (raw model name)
-    const modelButton = this.getModelButton(modelName);
+    const modelButton = this.getModelButton(providerName);
     const existsByTestId = await modelButton.count() > 0;
 
     if (existsByTestId) {
@@ -256,7 +256,7 @@ export default class SettingsBrowserPage extends BasePage {
     } else {
       // Try by displayed text (formatted name)
       try {
-        const buttonByText = this.getModelButtonByDisplayText(modelName);
+        const buttonByText = this.getModelButtonByDisplayText(providerName);
         return await buttonByText.first().isVisible();
       } catch {
         return false;

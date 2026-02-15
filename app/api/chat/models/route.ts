@@ -14,7 +14,7 @@ export async function OPTIONS(request: Request) {
 export async function GET(request: NextRequest) {
     try {
         // Verify authentication
-        const session = await getClient();
+        const session = await getClient(request);
 
         if (session instanceof NextResponse) {
             return NextResponse.json(
@@ -29,8 +29,8 @@ export async function GET(request: NextRequest) {
         // Create a TextToCypher instance (API key can be placeholder for listing models)
         const textToCypher = new TextToCypher({
             falkordbConnection: buildFalkorDBConnection(session.user),
-            model: "gpt-4o-mini",
-            apiKey: "placeholder-for-listing-models",
+            model: "",
+            apiKey: "",
         });
 
         let models: string[];

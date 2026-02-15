@@ -2,8 +2,11 @@
   "name": "falkordb-browser",
   "author": "FalkorDB",
   "description": "FalkorDB Browser",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -12,8 +15,8 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@falkordb/canvas": "^0.0.26",
-    "@falkordb/text-to-cypher": "^0.1.11",
+    "@falkordb/canvas": "v0.0.30",
+    "@falkordb/text-to-cypher": "^0.1.12",
     "@hookform/resolvers": "^3.10.0",
     "@monaco-editor/react": "^4.6.0",
     "@radix-ui/react-alert-dialog": "^1.1.6",
@@ -64,7 +67,7 @@
     "lodash": "^4.17.23",
     "lucide-react": "^0.475.0",
     "monaco-editor": "^0.47.0",
-    "next": "^15.5.10",
+    "next": "^16.1.6",
     "next-auth": "^4.24.12",
     "next-swagger-doc": "^0.4.1",
     "next-themes": "^0.2.1",

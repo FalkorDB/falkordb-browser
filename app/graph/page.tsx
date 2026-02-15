@@ -154,6 +154,12 @@ export default function Page() {
     }, [fetchCount, fetchInfo, graphName, refreshInterval, setGraphInfo, setIndicator, showMemoryUsage, toast]);
 
     useEffect(() => {
+        if (graphName) return;
+
+        panelRef.current?.collapse();
+    }, [graphName]);
+
+    useEffect(() => {
         if (!graphInfo) return;
 
         if (contentPersistence) {
@@ -181,17 +187,26 @@ export default function Page() {
         }
 
         setIsQueryLoading(false);
-    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames, setIsQueryLoading, graphInfo, runQuery]);
+    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames, setIsQueryLoading]);
 
     const handleSetSelectedElements = useCallback((el: (Node | Link)[] = []) => {
         setSelectedElements(el);
 
+        setPanel(prev => {
+            if (el.length !== 0) {
+                return "data";
+            }
+
+            if (prev !== "chat") {
+                return undefined;
+            }
+
+            return prev;
+        });
+
         if (el.length !== 0) {
-            setPanel("data");
             setIsAddEdge(false);
             setIsAddNode(false);
-        } else {
-            setPanel(undefined);
         }
     }, [setPanel]);
 
@@ -234,7 +249,7 @@ export default function Page() {
                 }
             } else {
                 const link = graph.extendEdge(json.result.data[0].e, false, false, true);
-                
+
                 if (link) {
                     setRelationships(prev => [...prev.filter(p => p.name !== link.relationship), graph.RelationshipsMap.get(link.relationship)!]);
                     handleSetIsAdd(setIsAddEdge, setIsAddNode)(false);
@@ -321,6 +336,7 @@ export default function Page() {
                 );
 
             case "data":
+
                 if (selectedElements.length === 0) return undefined;
 
                 return <DataPanel

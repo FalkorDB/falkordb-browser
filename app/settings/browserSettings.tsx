@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { detectProviderFromApiKey } from "@/lib/ai-provider-utils";
 import { BrowserSettingsContext, IndicatorContext } from "../components/provider";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -23,7 +24,7 @@ export default function BrowserSettings() {
             defaultQuerySettings: { newDefaultQuery, setNewDefaultQuery },
             timeoutSettings: { newTimeout, setNewTimeout },
             limitSettings: { newLimit, setNewLimit },
-            chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel },
+            chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages },
             graphInfo: { newRefreshInterval, setNewRefreshInterval }
         },
         settings: {
@@ -32,7 +33,7 @@ export default function BrowserSettings() {
             defaultQuerySettings: { defaultQuery, setDefaultQuery },
             timeoutSettings: { timeout: timeoutValue },
             limitSettings: { limit },
-            chatSettings: { secretKey, model, displayChat },
+            chatSettings: { secretKey, model, setModel, maxSavedMessages },
             graphInfo: { refreshInterval }
         },
         hasChanges,
@@ -53,7 +54,7 @@ export default function BrowserSettings() {
     const [isLoadingModels, setIsLoadingModels] = useState(false);
     const [expandedSections, setExpandedSections] = useState({
         queryExecution: false,
-        environment: false,
+        chat: false,
         graphInfo: false,
         userExperience: false
     });
@@ -64,33 +65,47 @@ export default function BrowserSettings() {
 
     // Fetch all available models once on mount
     useEffect(() => {
-        const fetchModels = async () => {
+        (async () => {
             setIsLoadingModels(true);
-            try {
-                const result = await securedFetch(
-                    "/api/chat/models",
+            
+            const result = await securedFetch(
+                "/api/chat/models",
+                { method: "GET" },
+                toast,
+                setIndicator
+            );
+
+            if (result.ok) {
+                const { models } = await result.json();
+                setModelDisplayNames(models);
+            }
+
+            setIsLoadingModels(false);
+        })();
+    }, [toast, setIndicator]);
+
+    useEffect(() => {
+        (async () => {
+            if (!model && secretKey) {
+                const res = await securedFetch(
+                    `/api/chat/models?provider=${detectProviderFromApiKey(secretKey)}`,
                     { method: "GET" },
                     toast,
                     setIndicator
                 );
 
-                if (result.ok) {
-                    const { models } = await result.json();
-                    setModelDisplayNames(models);
-                } else {
-                    // Fallback to gpt-4o-mini if fetch fails
-                    setModelDisplayNames(["gpt-4o-mini"]);
-                }
-            } catch (error) {
-                setModelDisplayNames(["gpt-4o-mini"]);
-                setIndicator("offline");
-            } finally {
-                setIsLoadingModels(false);
-            }
-        };
+                if (!res.ok) return;
 
-        fetchModels();
-    }, [toast, setIndicator]);
+                const defaultModel = (await res.json()).models[0];
+                
+                if (!defaultModel) return;
+                
+                setNewModel(defaultModel);
+                setModel(defaultModel);
+                localStorage.setItem("model", defaultModel);
+            }
+        })();
+    }, [secretKey, model, toast, setIndicator, setNewModel, setModel]);
 
     useEffect(() => {
         setNewContentPersistence(contentPersistence);
@@ -101,7 +116,8 @@ export default function BrowserSettings() {
         setNewSecretKey(secretKey);
         setNewModel(model);
         setNewRefreshInterval(refreshInterval);
-    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, model, setNewModel, setNewRefreshInterval, refreshInterval]);
+        setNewMaxSavedMessages(maxSavedMessages);
+    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, model, setNewModel, setNewRefreshInterval, refreshInterval, setNewMaxSavedMessages, maxSavedMessages]);
 
     useEffect(() => {
         setHasChanges(
@@ -112,15 +128,25 @@ export default function BrowserSettings() {
             newRunDefaultQuery !== runDefaultQuery ||
             newSecretKey !== secretKey ||
             newModel !== model ||
-            refreshInterval !== newRefreshInterval
+            refreshInterval !== newRefreshInterval ||
+            newMaxSavedMessages !== maxSavedMessages
         );
-    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey, newModel, model, refreshInterval, newRefreshInterval]);
+    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey, newModel, model, refreshInterval, newRefreshInterval, newMaxSavedMessages, maxSavedMessages]);
 
     const handleSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
         e?.preventDefault();
 
+        if (newMaxSavedMessages < 5 || newMaxSavedMessages > 10) {
+            toast({
+                title: "Invalid Input",
+                description: "Please set 'Store latest interactions' between 5 and 10.",
+                variant: "destructive",
+            });
+            return;
+        }
+
         saveSettings();
-    }, [saveSettings]);
+    }, [newMaxSavedMessages, saveSettings, toast]);
 
     const navigateBack = useCallback((e: KeyboardEvent) => {
         if (e.key === "Escape") {
@@ -223,43 +249,59 @@ export default function BrowserSettings() {
                 </Tooltip>
             </div>
             <form ref={scrollableContainerRef} className="h-1 grow px-2 overflow-y-auto flex flex-col gap-6 pb-8" onSubmit={handleSubmit}>
-                {/* Environment Section */}
+                {/* Chat Section */}
                 <Card className="border-border shadow-sm">
                     <CardHeader
-                        data-testid="environmentSectionHeader"
+                        data-testid="chatSectionHeader"
                         className="cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() => toggleSection('environment')}
+                        onClick={() => toggleSection('chat')}
                     >
                         <div className="flex items-center justify-between">
                             <div className="space-y-1.5">
-                                <CardTitle className="text-2xl font-semibold">Environment</CardTitle>
-                                <CardDescription className="text-sm">Configure LLM access for chat functionality</CardDescription>
+                                <CardTitle className="text-2xl font-semibold">Chat</CardTitle>
+                                <CardDescription className="text-sm">Chat Panel Settings</CardDescription>
                             </div>
-                            <ChevronRight className={cn("h-5 w-5 transition-transform duration-200", expandedSections.environment && "rotate-90")} />
+                            <ChevronRight className={cn("h-5 w-5 transition-transform duration-200", expandedSections.chat && "rotate-90")} />
                         </div>
                     </CardHeader>
-                    {expandedSections.environment && (
+                    {expandedSections.chat && (
                         <CardContent className="pt-2">
                             <div className="flex flex-col gap-4 p-4 bg-muted/10 rounded-lg">
+                                <div className="flex flex-col gap-2">
+                                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+                                    <label htmlFor="maxSaveMessagesInput" className="text-sm font-medium whitespace-nowrap">Store latest interactions (per graph) [5..10]</label>
+                                    <Input
+                                        id="maxSaveMessagesInput"
+                                        data-testid="maxSaveMessagesInput"
+                                        type="text"
+                                        value={newMaxSavedMessages}
+                                        onChange={(e) => {
+                                            const numberValue = Number(e.target.value || "0");
+
+                                            if (Number.isNaN(numberValue)) return;
+
+                                            createChangeHandler(setNewMaxSavedMessages)(Number(e.target.value), 'maxSaveMessagesInput');
+                                        }}
+                                    />
+                                </div>
+                                <h2 className="font-medium">Configure LLM access for chat functionality</h2>
                                 <div className="flex flex-col gap-2">
                                     {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                                     <label className="text-sm font-medium">
                                         {isLoadingModels ? "Model (Loading...)" : "Model"}
                                     </label>
                                     <ModelSelector
-                                        models={modelDisplayNames.length > 0 ? modelDisplayNames : ["gpt-4o-mini"]}
+                                        models={modelDisplayNames}
                                         selectedModel={newModel}
                                         onModelSelect={handleModelChange}
-                                        disabled={!displayChat}
                                         isLoading={isLoadingModels}
                                     />
                                 </div>
-                                <div className="flex-1 flex flex-col gap-2">
+                                <div className="flex flex-col gap-2">
                                     {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                                     <label htmlFor="secretKeyInput" className="text-sm font-medium whitespace-nowrap">Secret Key</label>
                                     <Input
                                         data-testid="chatApiKeyInput"
-                                        disabled={!displayChat}
                                         className="flex-1"
                                         id="secretKeyInput"
                                         placeholder="Enter your API secret key..."

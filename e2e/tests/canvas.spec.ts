@@ -54,8 +54,8 @@ test.describe('Canvas Tests', () => {
         await graph.clickZoomInControl();
         await graph.waitForScaleToStabilize();
         const updatedGraph = await graph.getCanvasScaling();
-        expect(updatedGraph.scaleX - initialGraph.scaleX).toBeGreaterThanOrEqual(1);
-        expect(updatedGraph.scaleY - initialGraph.scaleY).toBeGreaterThanOrEqual(1);
+        expect(updatedGraph.scaleX - initialGraph.scaleX).toBeCloseTo(1, 0);
+        expect(updatedGraph.scaleY - initialGraph.scaleY).toBeCloseTo(1, 0);
         await apicalls.removeGraph(graphName);
     });
 
@@ -74,8 +74,8 @@ test.describe('Canvas Tests', () => {
         await graph.clickZoomOutControl();
         await graph.waitForScaleToStabilize();
         const updatedGraph = await graph.getCanvasScaling();
-        expect(initialGraph.scaleX - updatedGraph.scaleX).toBeGreaterThanOrEqual(1);
-        expect(initialGraph.scaleY - updatedGraph.scaleY).toBeGreaterThanOrEqual(1);
+        expect(initialGraph.scaleX - updatedGraph.scaleX).toBeCloseTo(1, 0);
+        expect(initialGraph.scaleY - updatedGraph.scaleY).toBeCloseTo(1, 0);
 
         await apicalls.removeGraph(graphName);
     });
@@ -94,8 +94,8 @@ test.describe('Canvas Tests', () => {
         await graph.clickCenterControl();
         await graph.waitForScaleToStabilize();
         const updatedGraph = await graph.getCanvasScaling();
-        expect(updatedGraph.scaleX - initialGraph.scaleX).toBeLessThanOrEqual(1);
-        expect(updatedGraph.scaleY - initialGraph.scaleY).toBeLessThanOrEqual(1);
+        expect(updatedGraph.scaleX - initialGraph.scaleX).toBeCloseTo(0, 0);
+        expect(updatedGraph.scaleY - initialGraph.scaleY).toBeCloseTo(0, 0);
         await apicalls.removeGraph(graphName);
     });
 

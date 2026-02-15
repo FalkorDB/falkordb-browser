@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { formatModelDisplayName } from "@/lib/ai-provider-utils";
 import { Search, Check, Sparkles, Zap, Brain, Globe, Server } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Input from "../components/ui/Input";
 
 interface ModelSelectorProps {
@@ -14,15 +15,16 @@ interface ModelSelectorProps {
 
 // Get icon for provider category
 const getCategoryIcon = (category: string) => {
+    const className = "h-3.5 w-3.5 text-primary";
     switch (category) {
         case "OpenAI":
-            return <Zap className="h-3.5 w-3.5" />;
+            return <Zap className={className} />;
         case "Anthropic":
-            return <Brain className="h-3.5 w-3.5" />;
+            return <Brain className={className} />;
         case "Google":
-            return <Globe className="h-3.5 w-3.5" />;
+            return <Globe className={className} />;
         case "Ollama":
-            return <Server className="h-3.5 w-3.5" />;
+            return <Server className={className} />;
         default:
             return null;
     }
@@ -89,6 +91,15 @@ export default function ModelSelector({
         }
     };
 
+    const maxColumns = categorizedModels.length > 0
+        ? categorizedModels.reduce((acc, [, ms]) => Math.max(acc, ms.length), 0) + 1
+        : 1; // +1 for category label
+
+    // Account for gap between columns with minimum 10% width adjusted for gaps
+    const gapSize = 8; // gap in pixels
+    const gapPerColumn = ((maxColumns - 1) * gapSize) / maxColumns;
+    const colWidth = `max(calc(10% - ${gapPerColumn}px), calc((100% - ${(maxColumns - 1) * gapSize}px) / ${maxColumns}))`;
+
     return (
         <div className="relative flex flex-col rounded-lg border border-border bg-background shadow-sm overflow-hidden">
             {/* Search Header */}
@@ -109,77 +120,92 @@ export default function ModelSelector({
 
             {/* Model List */}
             <div className="max-h-[280px] overflow-y-auto custom-scrollbar">
-                {isLoading && (
+                {
+                    isLoading &&
                     <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                         <Sparkles className="h-6 w-6 mb-2 animate-pulse" />
                         <p className="text-sm">Loading models...</p>
                     </div>
-                )}
+                }
 
-                {!isLoading && filteredModels.length === 0 && (
+                {
+                    !isLoading && filteredModels.length === 0 &&
                     <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                         <Search className="h-6 w-6 mb-2 opacity-50" />
                         <p className="text-sm">No models found</p>
-                        {search && (
-                            <p className="text-xs mt-1">Try a different search term</p>
-                        )}
+                        {
+                            search && <p className="text-xs mt-1">Try a different search term</p>
+                        }
                     </div>
-                )}
+                }
 
-                {!isLoading && filteredModels.length > 0 && (
-                    <div className="p-2">
-                        {categorizedModels.map(([category, categoryModels]) => (
-                            <div key={category} className="mb-4 last:mb-0">
-                                {/* Category Header */}
-                                <div className="px-3 py-2 mb-2 flex items-center gap-2 bg-muted/40 rounded-md border-l-3 border-primary/60">
-                                    <div className="text-primary">
+                {
+                    !isLoading && filteredModels.length > 0 &&
+                    <div className="flex flex-col gap-2 p-2">
+                        {
+                            categorizedModels.map(([category, categoryModels]) => (
+                                // Models Grid with Horizontal Scroll
+                                <div key={category} style={{ gridAutoColumns: colWidth, gap: `${gapSize}px` }} className="bg-muted/40 rounded-md overflow-x-auto flex-1 grid grid-flow-col items-center">
+                                    {/* Category Label */}
+                                    <div className="flex items-center gap-2">
                                         {getCategoryIcon(category)}
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <h3 className="text-sm font-bold text-foreground tracking-wide truncate">
+                                                    {category}
+                                                </h3>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>{category}</p>
+                                            </TooltipContent>
+                                        </Tooltip>
                                     </div>
-                                    <h3 className="text-sm font-bold text-foreground tracking-wide">
-                                        {category}
-                                    </h3>
-                                </div>
+                                    {
+                                        categoryModels.map((model) => {
+                                            const isSelected = model === selectedModel;
+                                            return (
+                                                <Tooltip key={model}>
+                                                    <TooltipTrigger asChild>
+                                                        <button
+                                                            type="button"
+                                                            data-testid={`selectModel${model}`}
+                                                            data-selected={isSelected}
+                                                            onClick={() => handleModelClick(model)}
+                                                            disabled={disabled}
+                                                            className={cn(
+                                                                "flex items-center justify-between p-2 rounded-md text-sm transition-all duration-150",
+                                                                "hover:bg-muted/80 active:scale-[0.98]",
+                                                                isSelected && "bg-primary hover:bg-primary",
+                                                                disabled && "opacity-50 cursor-not-allowed"
+                                                            )}
+                                                        >
+                                                            <span className={cn(
+                                                                "font-medium truncate",
+                                                                isSelected ? "text-background" : "text-foreground"
+                                                            )}>
+                                                                {formatModelDisplayName(model)}
+                                                            </span>
 
-                                {/* Models in Category */}
-                                <div className="space-y-1">
-                                    {categoryModels.map((model) => {
-                                        const isSelected = model === selectedModel;
-                                        return (
-                                            <button
-                                                key={model}
-                                                type="button"
-                                                data-testid={`selectModel${model}`}
-                                                data-selected={isSelected}
-                                                onClick={() => handleModelClick(model)}
-                                                disabled={disabled}
-                                                className={cn(
-                                                    "w-full group relative flex items-center justify-between px-3 py-2.5 rounded-md text-sm transition-all duration-150",
-                                                    "hover:bg-muted/80 active:scale-[0.98]",
-                                                    isSelected && "bg-primary/10 hover:bg-primary/15 ring-1 ring-primary/30",
-                                                    disabled && "opacity-50 cursor-not-allowed"
-                                                )}
-                                            >
-                                                <span className={cn(
-                                                    "font-medium truncate",
-                                                    isSelected ? "text-primary" : "text-foreground"
-                                                )}>
-                                                    {formatModelDisplayName(model)}
-                                                </span>
-
-                                                {isSelected && (
-                                                    <Check className="h-4 w-4 text-primary flex-shrink-0 ml-2" />
-                                                )}
-                                            </button>
-                                        );
-                                    })}
+                                                            {isSelected && (
+                                                                <Check className="h-4 w-4 text-background flex-shrink-0 ml-2" />
+                                                            )}
+                                                        </button>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p>{model}</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            );
+                                        })
+                                    }
                                 </div>
-                            </div>
-                        ))}
+                            ))
+                        }
                     </div>
-                )}
+                }
             </div>
 
-        </div>
+        </div >
     );
 }
 

@@ -6,7 +6,8 @@
         "settingsConfig": "http://localhost:3000/api/graph/config/",
         "settingsUsers": "http://localhost:3000/api/user",
         "schemaUrl": "http://localhost:3000/api/schema/",
-        "tokenUrl": "http://localhost:3000/api/auth/"
+        "tokenUrl": "http://localhost:3000/api/auth/",
+        "chatModelsUrl": "http://localhost:3000/api/chat/models"
     },
   
     "falkorDBWeb": "https://www.falkordb.com/",

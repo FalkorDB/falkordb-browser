@@ -5,10 +5,31 @@ import { useContext, useEffect, useState } from "react";
 import { ChevronDown, ChevronRight, CircleArrowUp, Copy, Loader2, Play, Search, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useRouter } from "next/navigation";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import { GraphContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext } from "../components/provider";
 import { EventType } from "../api/chat/route";
+import ToastButton from "../components/ToastButton";
+
+// Function to get the last maxSavedMessages user messages and all messages in between
+const getLastUserMessagesWithContext = (allMessages: Message[], maxUserMessages: number) => {
+    // Find indices of all user messages
+    const userMessageIndices = allMessages
+        .map((msg, index) => msg.role === "user" ? index : -1)
+        .filter(index => index !== -1);
+
+    // If there are fewer user messages than maxUserMessages, return all messages
+    if (userMessageIndices.length <= maxUserMessages) {
+        return allMessages;
+    }
+
+    // Get the index of the Nth-from-last user message
+    const startIndex = userMessageIndices[userMessageIndices.length - maxUserMessages];
+
+    // Return all messages from that point forward
+    return allMessages.slice(startIndex);
+};
 
 interface Props {
     onClose: () => void
@@ -18,9 +39,10 @@ export default function Chat({ onClose }: Props) {
     const { setIndicator } = useContext(IndicatorContext);
     const { graphName, runQuery } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
-    const { settings: { chatSettings: { secretKey, model } } } = useContext(BrowserSettingsContext);
+    const { settings: { chatSettings: { secretKey, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
 
     const { toast } = useToast();
+    const route = useRouter();
 
     const [messages, setMessages] = useState<Message[]>([]);
     const [messagesList, setMessagesList] = useState<(Message | [Message[], boolean])[]>([]);
@@ -28,8 +50,19 @@ export default function Chat({ onClose }: Props) {
     const [isLoading, setIsLoading] = useState(false);
     const [queryCollapse, setQueryCollapse] = useState<{ [key: string]: boolean }>({});
 
+    // Load messages for current graph on mount
+    useEffect(() => {
+        const savedMessages = localStorage.getItem(`chat-${graphName}`);
+        const currentMessages = JSON.parse(savedMessages || "[]");
+        setMessages(currentMessages);
+    }, [graphName, maxSavedMessages]);
+
     useEffect(() => {
         let statusGroup: Message[];
+
+        if (messages.length > 0) {
+            localStorage.setItem(`chat-${graphName}`, JSON.stringify(getLastUserMessagesWithContext(messages, maxSavedMessages)));
+        }
 
         const newMessagesList = messages.map((message, i): Message | [Message[], boolean] | undefined => {
             if (message.type === "Status") {
@@ -78,6 +111,37 @@ export default function Chat({ onClose }: Props) {
             return;
         }
 
+        const ToastActionButton = <ToastButton label="Go to Settings" showUndo={false} onClick={() => {
+            onClose();
+            setTimeout(() => {
+                route.push("/settings");
+            }, 500);
+        }}>
+            Go to Settings
+        </ToastButton>;
+
+        if (!model) {
+            toast({
+                title: "No model selected",
+                description: "Please select a model in the settings before sending a message",
+                variant: "destructive",
+                action: ToastActionButton
+            });
+            setIsLoading(false);
+            return;
+        }
+
+        if (!secretKey) {
+            toast({
+                title: "No Api Key Provided",
+                description: "Please provide a Api Key in the settings before sending a message",
+                variant: "destructive",
+                action: ToastActionButton
+            });
+            setIsLoading(false);
+            return;
+        }
+
         setIsLoading(true);
 
         const newMessages = [...messages, { role: "user", type: "Text", content: newMessage } as const];
@@ -86,34 +150,25 @@ export default function Chat({ onClose }: Props) {
         setTimeout(scrollToBottom, 0);
         setNewMessage("");
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const body: any = {
-            messages: newMessages.filter(message => message.role === "user" || message.type === "Result").map(({ role, content }) => ({
-                role,
-                content
-            })),
-            graphName,
-        };
-
-        if (model) {
-            body.model = model;
-        }
-
-        if (secretKey) {
-            body.key = secretKey;
-        }
-
         try {
             const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify(body)
+                body: JSON.stringify({
+                    messages: newMessages.filter(message => message.role === "user" || message.type === "Result").map(({ role, content }) => ({
+                        role,
+                        content,
+                    })),
+                    graphName,
+                    model,
+                    key: secretKey
+                })
             });
 
             if (!response.ok) {
-                throw new Error(`Something went wrong`);
+                throw new Error(await response.text());
             }
 
             const reader = response.body?.getReader();
@@ -220,7 +275,6 @@ export default function Chat({ onClose }: Props) {
 
                 if (!isResult) await processStream();
 
-                setIsLoading(false);
             };
 
             processStream();
@@ -230,6 +284,8 @@ export default function Chat({ onClose }: Props) {
                 description: (error as Error).message,
                 variant: "destructive",
             });
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -398,13 +454,6 @@ export default function Chat({ onClose }: Props) {
                     }
                 </ul>
                 <form data-testid="chatForm" className="flex gap-2 items-center border border-border rounded-lg w-full p-2" onSubmit={handleSubmit}>
-                    <Input
-                        data-testid="chatInput"
-                        className="w-1 grow bg-transparent border-none text-foreground text-lg SofiaSans"
-                        placeholder="Type your message here..."
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                    />
                     <Button
                         data-testid="chatSendButton"
                         disabled={newMessage.trim() === ""}
@@ -414,6 +463,13 @@ export default function Chat({ onClose }: Props) {
                     >
                         <CircleArrowUp size={25} />
                     </Button>
+                    <Input
+                        data-testid="chatInput"
+                        className="w-1 grow bg-transparent border-none text-foreground text-lg SofiaSans"
+                        placeholder="Type your message here..."
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                    />
                 </form>
             </div>
         </div>

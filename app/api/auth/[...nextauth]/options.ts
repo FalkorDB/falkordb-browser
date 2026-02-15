@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { FalkorDB, type FalkorDBOptions } from "falkordb";
 import { v4 as uuidv4 } from "uuid";
 import crypto from "crypto";
-import { corsHeaders } from "../../utils";
+import { getCorsHeaders } from "../../utils";
 import { isTokenActive } from "../tokenUtils";
 
 interface CustomJWTPayload {
@@ -409,7 +409,7 @@ const authOptions: AuthOptions = {
   },
 };
 
-export async function getClient() {
+export async function getClient(request: Request) {
   // Check if this is a JWT-only request (from /docs)
   const jwtOnlyRequired = await isJWTOnlyRequest();
 
@@ -423,7 +423,7 @@ export async function getClient() {
   if (jwtOnlyRequired) {
     return NextResponse.json({
       message: "JWT authentication required for API documentation. Please use the login endpoint to get a token and authorize in Swagger UI."
-    }, { status: 401, headers: corsHeaders() });
+    }, { status: 401, headers: getCorsHeaders(request) });
   }
 
   // Fall back to session authentication for regular app requests
@@ -431,7 +431,7 @@ export async function getClient() {
   const id = session?.user.id;
 
   if (!id) {
-    return NextResponse.json({ message: "Not authenticated" }, { status: 401, headers: corsHeaders() });
+    return NextResponse.json({ message: "Not authenticated" }, { status: 401, headers: getCorsHeaders(request) });
   }
 
   const { user } = session;

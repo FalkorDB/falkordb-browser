@@ -88,13 +88,13 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [hasChanges, setHasChanges] = useState(false);
   const [nodesCount, setNodesCount] = useState<number>();
   const [edgesCount, setEdgesCount] = useState<number>();
+  const [newMaxSavedMessages, setNewMaxSavedMessages] = useState(0);
+  const [maxSavedMessages, setMaxSavedMessages] = useState(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0);
   const [panel, setPanel] = useState<Panel>();
   const [isQueryLoading, setIsQueryLoading] = useState(false);
-  const [displayChat, setDisplayChat] = useState(false);
   const [model, setModel] = useState("");
-  const [navigateToSettings, setNavigateToSettings] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>([]);
@@ -124,7 +124,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       runDefaultQuerySettings: { newRunDefaultQuery, setNewRunDefaultQuery },
       defaultQuerySettings: { newDefaultQuery, setNewDefaultQuery },
       contentPersistenceSettings: { newContentPersistence, setNewContentPersistence },
-      chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel },
+      chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages },
       graphInfo: { newRefreshInterval, setNewRefreshInterval }
     },
     settings: {
@@ -133,7 +133,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       runDefaultQuerySettings: { runDefaultQuery, setRunDefaultQuery },
       defaultQuerySettings: { defaultQuery, setDefaultQuery },
       contentPersistenceSettings: { contentPersistence, setContentPersistence },
-      chatSettings: { secretKey, setSecretKey, model, setModel, displayChat, navigateToSettings },
+      chatSettings: { secretKey, setSecretKey, model, setModel, maxSavedMessages, setMaxSavedMessages },
       graphInfo: { showMemoryUsage, refreshInterval, setRefreshInterval }
     },
     hasChanges,
@@ -149,6 +149,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       localStorage.setItem("limit", newLimit.toString());
       localStorage.setItem("refreshInterval", newRefreshInterval.toString());
       localStorage.setItem("model", newModel);
+      localStorage.setItem("maxSavedMessages", newMaxSavedMessages.toString());
 
       // Only encrypt and save secret key if it has changed
       if (newSecretKey !== secretKey) {
@@ -199,6 +200,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setSecretKey(newSecretKey);
       setModel(newModel);
       setRefreshInterval(newRefreshInterval);
+      setMaxSavedMessages(newMaxSavedMessages);
       // Reset has changes
       setHasChanges(false);
 
@@ -217,10 +219,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setNewSecretKey(secretKey);
       setNewModel(model);
       setNewRefreshInterval(refreshInterval);
+      setNewMaxSavedMessages(maxSavedMessages);
       setHasChanges(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [displayChat, navigateToSettings, contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, replayTutorial, tutorialOpen, showMemoryUsage]);
+  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, toast]);
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -280,7 +283,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
   const fetchCount = useCallback(async (name?: string) => {
     const n = name || graphName;
-    
+
     if (!n) return;
 
     setEdgesCount(undefined);
@@ -342,6 +345,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setHistoryQuery(prev => ({
         ...prev,
         query: q,
+        currentQuery: newQuery
       }));
 
       const [query, existingLimit] = getQueryWithLimit(q, limit);
@@ -377,15 +381,14 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
       const explainJson = await explain.json();
       const g = Graph.create(n, result, existingLimit, graphI);
+
       newQuery = {
-        text: q,
-        metadata: result.metadata,
+        ...newQuery,
+        elementsCount: g.getElements().length,
         explain: explainJson.result,
-        profile: [],
         graphName: n,
-        timestamp: new Date().getTime(),
+        metadata: result.metadata,
         status: "Success",
-        elementsCount: g.getElements().length
       };
 
       setGraph(g);
@@ -502,6 +505,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setContentPersistence(localStorage.getItem("contentPersistence") !== "false");
       setTutorialOpen(localStorage.getItem("tutorial") !== "false");
       setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30));
+      setMaxSavedMessages(parseInt(localStorage.getItem("maxSavedMessages") || "5", 10));
 
       // Decrypt secret key if encrypted, or migrate plain text keys to encrypted format
       const storedSecretKey = localStorage.getItem("secretKey") || "";
@@ -552,29 +556,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       if (currentPanel.isCollapsed()) currentPanel.expand();
     } else if (currentPanel.isExpanded()) currentPanel.collapse();
   }, [graphName, pathname]);
-
-  useEffect(() => {
-    if (status !== "authenticated") return;
-
-    (async () => {
-      const result = await securedFetch("/api/chat", {
-        method: "GET",
-      }, toast, setIndicator);
-
-      if (result.ok) {
-        const json = await result.json();
-
-        if (json.message) return;
-
-        setDisplayChat(true);
-
-        if (!json.model && json.error) {
-          setNavigateToSettings(true);
-        }
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
 
   const checkStatus = useCallback(() => {
     securedFetch("/api/status", {
@@ -755,7 +736,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                                 graphNames={pathname.includes("/schema") ? schemaNames : graphNames}
                                 onSetGraphName={handleOnSetGraphName}
                                 onOpenGraphInfo={onExpand}
-                                navigateToSettings={navigateToSettings}
+                                graphInfoOpen={!isCollapsed}
                               />
                             }
                             <ResizablePanelGroup direction="horizontal" className="w-1 grow">

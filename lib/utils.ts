@@ -268,6 +268,92 @@ export function createNestedObject(arr: string[]): object {
   return { [first]: createNestedObject(rest) };
 }
 
+/**
+ * Finds the index of the closing brace that matches the opening brace at startIndex.
+ * Properly handles nested braces in Cypher queries (e.g., map literals, nested CALL blocks).
+ * Also handles braces inside string literals (single or double quoted).
+ * 
+ * @param str - The string to search in
+ * @param startIndex - The index of the opening brace
+ * @returns The index of the matching closing brace, or -1 if not found
+ */
+function findMatchingBrace(str: string, startIndex: number): number {
+  let depth = 0;
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  
+  for (let i = startIndex; i < str.length; i += 1) {
+    const char = str[i];
+    const prevChar = i > 0 ? str[i - 1] : '';
+    
+    // Toggle quote state (ignore escaped quotes)
+    if (char === "'" && prevChar !== '\\') {
+      inSingleQuote = !inSingleQuote;
+    } else if (char === '"' && prevChar !== '\\') {
+      inDoubleQuote = !inDoubleQuote;
+    }
+    
+    // Only count braces when not inside a string literal
+    if (!inSingleQuote && !inDoubleQuote) {
+      if (char === '{') {
+        depth += 1;
+      } else if (char === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          return i;
+        }
+      }
+    }
+  }
+  return -1;
+}
+
+/**
+ * Checks if query contains any CALL block followed by RETURN without LIMIT.
+ * Handles nested braces correctly (e.g., map literals like {key: "val"}).
+ * Only matches if RETURN immediately follows the CALL block (before other clauses).
+ * Iterates through ALL CALL blocks to handle multiple subqueries (e.g., UNION queries).
+ * 
+ * @param query - The Cypher query to check
+ * @returns true if any CALL block with RETURN but no LIMIT is found
+ */
+function hasCallBlockWithReturnNoLimit(query: string): boolean {
+  let searchStart = 0;
+  
+  // Iterate through all CALL blocks in the query
+  while (searchStart < query.length) {
+    const callMatch = /\bCALL\s*\{/i.exec(query.substring(searchStart));
+    if (!callMatch) break;
+
+    const absoluteIndex = searchStart + callMatch.index;
+    const openBraceIndex = absoluteIndex + callMatch[0].indexOf('{');
+    const closeBraceIndex = findMatchingBrace(query, openBraceIndex);
+
+    if (closeBraceIndex !== -1) {
+      // Check only the immediate continuation after this CALL block
+      // Stop at the next major clause (UNION, WITH, MATCH, CALL, etc.) or end of query
+      const afterCallBlock = query.substring(closeBraceIndex + 1);
+      const nextClauseMatch = afterCallBlock.match(/\b(UNION|WITH|MATCH|CALL|CREATE|MERGE|DELETE|SET|REMOVE)\b/i);
+      const relevantPart = nextClauseMatch 
+        ? afterCallBlock.substring(0, nextClauseMatch.index)
+        : afterCallBlock;
+
+      // Check if this immediate part has RETURN without LIMIT
+      if (/\bRETURN\b/i.test(relevantPart) && !/\bLIMIT\b/i.test(relevantPart)) {
+        return true;
+      }
+
+      // Move search position past this CALL block
+      searchStart = closeBraceIndex + 1;
+    } else {
+      // If no matching brace found, move past the opening brace and continue
+      searchStart = openBraceIndex + 1;
+    }
+  }
+  
+  return false;
+}
+
 export function getQueryWithLimit(
   query: string,
   limit: number
@@ -275,7 +361,7 @@ export function getQueryWithLimit(
   let existingLimit = 0;
 
   const finalReturnMatch = query.match(
-    /\bRETURN\b(?!\s+.+?\bCALL\b)[^;]*?\bLIMIT\s+(\d+)/
+    /\bRETURN\b(?!\s+.+?\bCALL\b)[^;]*?\bLIMIT\s+(\d+)/is
   );
   if (finalReturnMatch) {
     existingLimit = parseInt(finalReturnMatch[1], 10);
@@ -288,12 +374,12 @@ export function getQueryWithLimit(
       return [`CALL { ${query} } RETURN * LIMIT ${limit}`, limit];
     }
 
-    if (query.match(/\bCALL\s*\{.*?\}\s*RETURN\b(?!\s+.+?\s+\bLIMIT\b)/i)) {
+    if (hasCallBlockWithReturnNoLimit(query)) {
       return [`${query} LIMIT ${limit}`, limit];
     }
   }
 
-  if (query.match(/\bRETURN\b(?!\s+.+?\s+\bLIMIT\b)/i)) {
+  if (query.match(/\bRETURN\b(?![^;]*\bLIMIT\b)/i)) {
     return [`${query} LIMIT ${limit}`, limit];
   }
 

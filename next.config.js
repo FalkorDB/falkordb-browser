@@ -8,6 +8,24 @@ const nextConfig = {
   images: {
     unoptimized: true
   },
+  // Enable Turbopack with SVG handling
+  turbopack: {
+    rules: {
+      // Convert SVG imports to React components using @svgr/webpack
+      // This preserves the behavior from the webpack config below
+      // 
+      // Usage:
+      //   import Logo from './logo.svg'           → React component
+      //   import logoUrl from './logo.svg?url'    → string URL (Next.js built-in handling)
+      // 
+      // Note: Turbopack uses Next.js built-in asset handling for ?url query params,
+      // so *.svg?url imports will return the file URL instead of a React component
+      '*.svg': {
+        loaders: ['@svgr/webpack'],
+        as: '*.js',
+      },
+    },
+  },
   async headers() {
     return [
       {
@@ -41,6 +59,8 @@ const nextConfig = {
       }
     ];
   },
+  // Webpack config (only used when NOT using Turbopack, i.e., webpack build mode)
+  // The SVG handling has been migrated to turbopack.rules above for Turbopack mode
   webpack(config) {
     // Grab the existing rule that handles SVG imports
     const fileLoaderRule = config.module.rules.find((rule) =>
