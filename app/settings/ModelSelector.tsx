@@ -91,6 +91,9 @@ export default function ModelSelector({
         }
     };
 
+    const maxColumns = categorizedModels.reduce((acc, [, ms]) => Math.max(acc, ms.length), 0) + 1; // +1 for category label
+    const colWidth = Math.floor(100 / maxColumns);
+    
     return (
         <div className="relative flex flex-col rounded-lg border border-border bg-background shadow-sm overflow-hidden">
             {/* Search Header */}
@@ -132,64 +135,64 @@ export default function ModelSelector({
                     <div className="flex flex-col gap-2 p-2">
                         {categorizedModels.map(([category, categoryModels]) => (
                             // Models Grid with Horizontal Scroll
-                            <div key={category} className="bg-muted/40 rounded-md overflow-x-auto flex-1 grid grid-flow-col auto-cols-[10%] gap-2 items-center">
-                                    {/* Category Label */}
-                                    <div className="flex items-center gap-2">
-                                        {getCategoryIcon(category)}
-                                        <Tooltip>
+                            <div key={category} style={{gridAutoColumns: `minmax(10%, ${colWidth}%)`}} className="bg-muted/40 rounded-md overflow-x-auto flex-1 grid grid-flow-col gap-2 items-center">
+                                {/* Category Label */}
+                                <div className="flex items-center gap-2">
+                                    {getCategoryIcon(category)}
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <h3 className="text-sm font-bold text-foreground tracking-wide truncate">
+                                                {category}
+                                            </h3>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>{category}</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </div>
+                                {[...categoryModels, "sdsdsd", "aaaa", "sssss", "aasasa", "ASFasdgsdadg"].map((model) => {
+                                    const isSelected = model === selectedModel;
+                                    return (
+                                        <Tooltip key={model}>
                                             <TooltipTrigger asChild>
-                                                <h3 className="text-sm font-bold text-foreground tracking-wide truncate">
-                                                    {category}
-                                                </h3>
+                                                <button
+                                                    type="button"
+                                                    data-testid={`selectModel${model}`}
+                                                    data-selected={isSelected}
+                                                    onClick={() => handleModelClick(model)}
+                                                    disabled={disabled}
+                                                    className={cn(
+                                                        "flex items-center justify-between p-2 rounded-md text-sm transition-all duration-150",
+                                                        "hover:bg-muted/80 active:scale-[0.98]",
+                                                        isSelected && "bg-primary/10 hover:bg-primary/15 ring-1 ring-primary/30",
+                                                        disabled && "opacity-50 cursor-not-allowed"
+                                                    )}
+                                                >
+                                                    <span className={cn(
+                                                        "font-medium truncate",
+                                                        isSelected ? "text-primary" : "text-foreground"
+                                                    )}>
+                                                        {formatModelDisplayName(model)}
+                                                    </span>
+
+                                                    {isSelected && (
+                                                        <Check className="h-4 w-4 text-primary flex-shrink-0 ml-2" />
+                                                    )}
+                                                </button>
                                             </TooltipTrigger>
                                             <TooltipContent>
-                                                <p>{category}</p>
+                                                <p>{model}</p>
                                             </TooltipContent>
                                         </Tooltip>
-                                    </div>
-                                    {categoryModels.map((model) => {
-                                        const isSelected = model === selectedModel;
-                                        return (
-                                            <Tooltip key={model}>
-                                                <TooltipTrigger asChild>
-                                                    <button
-                                                        type="button"
-                                                        data-testid={`selectModel${model}`}
-                                                        data-selected={isSelected}
-                                                        onClick={() => handleModelClick(model)}
-                                                        disabled={disabled}
-                                                        className={cn(
-                                                            "flex items-center justify-between p-2 rounded-md text-sm transition-all duration-150",
-                                                            "hover:bg-muted/80 active:scale-[0.98]",
-                                                            isSelected && "bg-primary/10 hover:bg-primary/15 ring-1 ring-primary/30",
-                                                            disabled && "opacity-50 cursor-not-allowed"
-                                                        )}
-                                                    >
-                                                        <span className={cn(
-                                                            "font-medium truncate",
-                                                            isSelected ? "text-primary" : "text-foreground"
-                                                        )}>
-                                                            {formatModelDisplayName(model)}
-                                                        </span>
-
-                                                        {isSelected && (
-                                                            <Check className="h-4 w-4 text-primary flex-shrink-0 ml-2" />
-                                                        )}
-                                                    </button>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    <p>{model}</p>
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        );
-                                    })}
-                                </div>
+                                    );
+                                })}
+                            </div>
                         ))}
                     </div>
                 )}
             </div>
 
-        </div>
+        </div >
     );
 }
 

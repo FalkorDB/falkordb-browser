@@ -268,6 +268,50 @@ export function createNestedObject(arr: string[]): object {
   return { [first]: createNestedObject(rest) };
 }
 
+/**
+ * Finds the index of the closing brace that matches the opening brace at startIndex.
+ * Properly handles nested braces in Cypher queries (e.g., map literals, nested CALL blocks).
+ * 
+ * @param str - The string to search in
+ * @param startIndex - The index of the opening brace
+ * @returns The index of the matching closing brace, or -1 if not found
+ */
+function findMatchingBrace(str: string, startIndex: number): number {
+  let depth = 0;
+  for (let i = startIndex; i < str.length; i += 1) {
+    if (str[i] === '{') {
+      depth += 1;
+    } else if (str[i] === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        return i;
+      }
+    }
+  }
+  return -1;
+}
+
+/**
+ * Checks if query contains a CALL block followed by RETURN without LIMIT.
+ * Handles nested braces correctly (e.g., map literals like {key: "val"}).
+ * 
+ * @param query - The Cypher query to check
+ * @returns true if CALL block with RETURN but no LIMIT is found
+ */
+function hasCallBlockWithReturnNoLimit(query: string): boolean {
+  const callMatch = /\bCALL\s*\{/i.exec(query);
+  if (!callMatch) return false;
+
+  const openBraceIndex = callMatch.index + callMatch[0].indexOf('{');
+  const closeBraceIndex = findMatchingBrace(query, openBraceIndex);
+
+  if (closeBraceIndex === -1) return false;
+
+  // Check if RETURN exists after the CALL block and no LIMIT in the remaining query
+  const afterCallBlock = query.substring(closeBraceIndex + 1);
+  return /\bRETURN\b/i.test(afterCallBlock) && !/\bLIMIT\b/i.test(afterCallBlock);
+}
+
 export function getQueryWithLimit(
   query: string,
   limit: number
@@ -288,7 +332,7 @@ export function getQueryWithLimit(
       return [`CALL { ${query} } RETURN * LIMIT ${limit}`, limit];
     }
 
-    if (query.match(/\bCALL\s*\{[^}]*\}\s*RETURN\b(?![^;]*\bLIMIT\b)/i)) {
+    if (hasCallBlockWithReturnNoLimit(query)) {
       return [`${query} LIMIT ${limit}`, limit];
     }
   }

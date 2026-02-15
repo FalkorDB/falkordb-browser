@@ -42,7 +42,7 @@ export default function Chat({ onClose }: Props) {
     const { settings: { chatSettings: { secretKey, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
 
     const { toast } = useToast();
-    const route = useRouter(); 
+    const route = useRouter();
 
     const [messages, setMessages] = useState<Message[]>([]);
     const [messagesList, setMessagesList] = useState<(Message | [Message[], boolean])[]>([]);
@@ -60,7 +60,7 @@ export default function Chat({ onClose }: Props) {
     }, [graphName]); // Re-run when graph changes
 
     // Save messages when graph changes or messages update
-    useEffect(() => {
+    useEffect(() => () => {
         // When graph changes, save messages for the PREVIOUS graph
         const prevGraphName = prevGraphNameRef.current;
 

@@ -105,7 +105,7 @@ export default function BrowserSettings() {
                 localStorage.setItem("model", defaultModel);
             }
         })();
-    }, [secretKey, model, saveSettings, toast, setIndicator, setNewModel, setModel]);
+    }, [secretKey, model, toast, setIndicator, setNewModel, setModel]);
 
     useEffect(() => {
         setNewContentPersistence(contentPersistence);
@@ -273,7 +273,7 @@ export default function BrowserSettings() {
                                     <Input
                                         id="maxSaveMessagesInput"
                                         data-testid="maxSaveMessagesInput"
-                                        type="string"
+                                        type="text"
                                         value={newMaxSavedMessages}
                                         onChange={(e) => {
                                             const numberValue = Number(e.target.value || "0");
