@@ -5,6 +5,7 @@ import { useContext, useEffect, useState } from "react";
 import { ChevronDown, ChevronRight, CircleArrowUp, Copy, Loader2, Play, Search, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useRouter } from "next/navigation";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import { GraphContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext } from "../components/provider";
@@ -41,6 +42,7 @@ export default function Chat({ onClose }: Props) {
     const { settings: { chatSettings: { secretKey, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
 
     const { toast } = useToast();
+    const route = useRouter();
 
     const [messages, setMessages] = useState<Message[]>([]);
     const [messagesList, setMessagesList] = useState<(Message | [Message[], boolean])[]>([]);
@@ -51,18 +53,16 @@ export default function Chat({ onClose }: Props) {
     // Load messages for current graph on mount
     useEffect(() => {
         const savedMessages = localStorage.getItem(`chat-${graphName}`);
-        setMessages(JSON.parse(savedMessages || "[]"));
-    }, [graphName]); // Re-run when graph changes
-
-    // Save messages on unmount or graph change
-    useEffect(() => () => {
-        if (messages.length > 0) {
-            localStorage.setItem(`chat-${graphName}`, JSON.stringify(getLastUserMessagesWithContext(messages, maxSavedMessages)));
-        }
-    }, [graphName, messages, maxSavedMessages]);
+        const currentMessages = JSON.parse(savedMessages || "[]");
+        setMessages(currentMessages);
+    }, [graphName, maxSavedMessages]);
 
     useEffect(() => {
         let statusGroup: Message[];
+
+        if (messages.length > 0) {
+            localStorage.setItem(`chat-${graphName}`, JSON.stringify(getLastUserMessagesWithContext(messages, maxSavedMessages)));
+        }
 
         const newMessagesList = messages.map((message, i): Message | [Message[], boolean] | undefined => {
             if (message.type === "Status") {
@@ -111,13 +111,10 @@ export default function Chat({ onClose }: Props) {
             return;
         }
 
-        const ToastActionButton = <ToastButton onClick={() => {
+        const ToastActionButton = <ToastButton label="Go to Settings" showUndo={false} onClick={() => {
             onClose();
             setTimeout(() => {
-                const settingsButton = document.querySelector('[data-testid="settingsButton"]') as HTMLButtonElement;
-                if (settingsButton) {
-                    settingsButton.click();
-                }
+                route.push("/settings");
             }, 500);
         }}>
             Go to Settings

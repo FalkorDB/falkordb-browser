@@ -631,7 +631,7 @@ test.describe("Customize Style Tests", () => {
     await graph.insertQuery(CREATE_PERSON_RELATIONSHIP);
     await graph.clickRunQuery(false);
     
-    // Get initial nodes - find person2 nodes
+    // Get initial nodes - find person1 nodes
     let nodes = await graph.getNodesScreenPositions("graph");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const person1Nodes = nodes.filter((n: any) => n.labels?.includes("person1"));

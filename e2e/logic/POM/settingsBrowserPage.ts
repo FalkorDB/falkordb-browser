@@ -47,7 +47,7 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   // Wait for Interactive Methods
-  async waitForEnvironmentSection(): Promise<boolean> {
+  async waitForChatSection(): Promise<boolean> {
     return waitForElementToBeVisible(this.chatSectionHeader);
   }
 

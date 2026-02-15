@@ -154,6 +154,12 @@ export default function Page() {
     }, [fetchCount, fetchInfo, graphName, refreshInterval, setGraphInfo, setIndicator, showMemoryUsage, toast]);
 
     useEffect(() => {
+        if (graphName) return;
+
+        panelRef.current?.collapse();
+    }, [graphName]);
+
+    useEffect(() => {
         if (!graphInfo) return;
 
         if (contentPersistence) {
@@ -189,8 +195,8 @@ export default function Page() {
         setPanel(prev => {
             if (el.length !== 0) {
                 return "data";
-            } 
-            
+            }
+
             if (prev !== "chat") {
                 return undefined;
             }
