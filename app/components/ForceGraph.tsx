@@ -32,11 +32,13 @@ interface Props {
 }
 
 const convertToCanvasData = (graphData: GraphData): Data => ({
-    nodes: graphData.nodes.map(({ id, labels, color, visible, data }) => ({
+    nodes: graphData.nodes.map(({ id, labels, color, visible, caption, size, data }) => ({
         id,
         labels,
         color,
         visible,
+        caption,
+        size,
         data
     })),
     links: graphData.links.map(({ id, relationship, color, visible, source, target, data }) => ({
@@ -86,6 +88,15 @@ export default function ForceGraph({
         });
     }, []);
 
+    useEffect(() => {
+        const canvas = canvasRef.current;
+
+        if (!canvas || !canvasLoaded) return;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any)[type] = () => canvas.getGraphData();
+    }, [canvasRef, type, canvasLoaded]);
+
     // Load saved viewport on mount
     useEffect(() => {
         if (!viewport || !canvasRef.current || !canvasLoaded) return;
@@ -121,6 +132,7 @@ export default function ForceGraph({
 
         if (result.ok) {
             const json = await result.json();
+
             const elements = graph.extend(json.result, false, true, true);
 
             if (elements.length === 0) {
@@ -149,6 +161,7 @@ export default function ForceGraph({
                     nodes: dataElements.nodes.filter(n => !existingNodeIds.has(n.id)),
                     links: dataElements.links.filter(l => !existingLinkIds.has(l.id))
                 };
+
                 // Convert only new data to GraphData format
                 const newGraphData = dataToGraphData(newDataElements, { x: clickedNode.x, y: clickedNode.y }, new Map(currentData.nodes.map(n => [n.id, n])));
 
@@ -158,10 +171,12 @@ export default function ForceGraph({
                     links: [...currentData.links, ...newGraphData.links]
                 });
 
-                handleCooldown();
+                const cooldown = cooldownTicks === undefined ? undefined : -1;
+
+                handleCooldown(cooldown);
             }
         }
-    }, [canvasRef, canvasLoaded, type, graph, toast, setIndicator, handleCooldown]);
+    }, [canvasRef, canvasLoaded, type, graph, toast, setIndicator, cooldownTicks, handleCooldown]);
 
     const deleteNeighbors = useCallback((nodes: Node[]) => {
         if (nodes.length === 0) return;
@@ -201,8 +216,11 @@ export default function ForceGraph({
         );
 
         canvas.setGraphData({ nodes: updatedNodes, links: updatedLinks });
-        handleCooldown();
-    }, [canvasRef, canvasLoaded, graph, setRelationships, handleCooldown]);
+
+        const cooldown = cooldownTicks === undefined ? undefined : -1;
+
+        handleCooldown(cooldown);
+    }, [canvasRef, canvasLoaded, graph, setRelationships, cooldownTicks, handleCooldown]);
 
     const handleNodeClick = useCallback(async (node: GraphNode) => {
         const fullNode = graph.NodesMap.get(node.id);
@@ -278,17 +296,10 @@ export default function ForceGraph({
         , [selectedElements, hoverElement]);
 
     const handleEngineStop = useCallback(() => {
-        const canvas = canvasRef.current;
-
-        if (!canvas) return;
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any)[type] = () => canvas.getGraphData();
-
         if (cooldownTicks !== -1) return;
 
         handleCooldown(0);
-    }, [canvasRef, cooldownTicks, handleCooldown, type]);
+    }, [cooldownTicks, handleCooldown]);
 
     const handleLoadingChange = useCallback((loading: boolean) => {
         setIsLoading(loading);
@@ -314,7 +325,7 @@ export default function ForceGraph({
     // Update cooldown ticks
     useEffect(() => {
         if (!canvasRef.current || !canvasLoaded) return;
-        canvasRef.current.setCooldownTicks(cooldownTicks);
+        canvasRef.current.setCooldownTicks(cooldownTicks === -1 ? undefined : cooldownTicks);
     }, [canvasRef, cooldownTicks, canvasLoaded]);
 
     // Update event handlers and selection functions

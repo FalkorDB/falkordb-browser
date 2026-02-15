@@ -275,7 +275,7 @@ export function getQueryWithLimit(
   let existingLimit = 0;
 
   const finalReturnMatch = query.match(
-    /\bRETURN\b(?!\s+.+?\bCALL\b)[^;]*?\bLIMIT\s+(\d+)/
+    /\bRETURN\b(?!\s+.+?\bCALL\b)[^;]*?\bLIMIT\s+(\d+)/is
   );
   if (finalReturnMatch) {
     existingLimit = parseInt(finalReturnMatch[1], 10);
@@ -288,12 +288,12 @@ export function getQueryWithLimit(
       return [`CALL { ${query} } RETURN * LIMIT ${limit}`, limit];
     }
 
-    if (query.match(/\bCALL\s*\{.*?\}\s*RETURN\b(?!\s+.+?\s+\bLIMIT\b)/i)) {
+    if (query.match(/\bCALL\s*\{[^}]*\}\s*RETURN\b(?![^;]*\bLIMIT\b)/i)) {
       return [`${query} LIMIT ${limit}`, limit];
     }
   }
 
-  if (query.match(/\bRETURN\b(?!\s+.+?\s+\bLIMIT\b)/i)) {
+  if (query.match(/\bRETURN\b(?![^;]*\bLIMIT\b)/i)) {
     return [`${query} LIMIT ${limit}`, limit];
   }
 

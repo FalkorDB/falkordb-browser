@@ -96,6 +96,10 @@ For detailed configuration options and examples, see the [Helm chart documentati
 
 ### Build and run browser from source
 
+**Prerequisites:**
+- Node.js 20.9.0 or higher
+
+**Steps:**
 * Clone the git repository `git clone git@github.com:FalkorDB/falkordb-browser.git`
 * Create .env.local in the clone directory `cp .env.local.template .env.local`
 * Build the node project `npm -i`

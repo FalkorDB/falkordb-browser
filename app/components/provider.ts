@@ -30,6 +30,8 @@ type BrowserSettingsContextType = {
       setNewSecretKey: Dispatch<SetStateAction<string>>;
       newModel: string;
       setNewModel: Dispatch<SetStateAction<string>>;
+      newMaxSavedMessages: number;
+      setNewMaxSavedMessages: Dispatch<SetStateAction<number>>;
     };
     graphInfo: {
       newRefreshInterval: number;
@@ -64,8 +66,8 @@ type BrowserSettingsContextType = {
       setSecretKey: Dispatch<SetStateAction<string>>;
       model: string;
       setModel: Dispatch<SetStateAction<string>>;
-      navigateToSettings: boolean;
-      displayChat: boolean;
+      maxSavedMessages: number;
+      setMaxSavedMessages: Dispatch<SetStateAction<number>>;
     };
     graphInfo: {
       showMemoryUsage: boolean;
@@ -186,6 +188,8 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         setNewSecretKey: () => {},
         newModel: "",
         setNewModel: () => {},
+        newMaxSavedMessages: 0,
+        setNewMaxSavedMessages: () => {},
       },
       graphInfo: {
         newRefreshInterval: 0,
@@ -214,8 +218,8 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         setSecretKey: () => {},
         model: "",
         setModel: () => {},
-        navigateToSettings: false,
-        displayChat: false,
+        maxSavedMessages: 0,
+        setMaxSavedMessages: () => {},
       },
       graphInfo: {
         showMemoryUsage: false,

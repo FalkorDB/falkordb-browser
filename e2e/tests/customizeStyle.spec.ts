@@ -496,4 +496,195 @@ test.describe("Customize Style Tests", () => {
 
     await apiCall.removeGraph(graphName);
   });
+
+  test(`@readwrite Validate nodes update correctly after color change and refresh`, async () => {
+    const graphName = getRandomString("graph");
+    await apiCall.addGraph(graphName);
+    const graph = await browser.createNewPage(CustomizeStylePage, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(graphName);
+    await graph.insertQuery(CREATE_QUERY);
+    await graph.clickRunQuery(false);
+    
+    // Get initial nodes from window.graph - find person1 nodes
+    let nodes = await graph.getNodesScreenPositions("graph");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const person1Nodes = nodes.filter((n: any) => n.labels?.includes("person1"));
+    expect(person1Nodes.length).toBeGreaterThan(0);
+    
+    // Store initial color of person1 nodes
+    const initialColor = person1Nodes[0].color;
+    expect(initialColor).toBeDefined();
+
+    // Open graph info and customize person1 style
+    await graph.openGraphInfoButton();
+    await graph.clickCustomizeStyleButton("person1");
+
+    // Change color to a different one
+    const initialColorIndex = await graph.getSelectedColorButtonIndex();
+    const newColorIndex = initialColorIndex === 0 ? 2 : 0;
+    await graph.selectColorByIndex(newColorIndex);
+
+    // Save the style changes
+    await graph.clickSaveStyleButton();
+
+    // Get the new color from localStorage
+    const savedStyle = await graph.getLabelStyleFromLocalStorage("person1");
+    const newColor = savedStyle?.color;
+    expect(newColor).toBeDefined();
+    expect(newColor).not.toBe(initialColor);
+
+    // Close the panel
+    await graph.closePanelWithEscape();
+
+    // Refresh the page
+    await graph.refreshPage();
+    await graph.waitForPageIdle();
+
+    // Select graph and re-query to render nodes
+    await graph.selectGraphByName(graphName);
+    await graph.insertQuery("MATCH (n) RETURN n");
+    await graph.clickRunQuery(false);
+
+    // Get nodes after refresh
+    nodes = await graph.getNodesScreenPositions("graph");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const person1NodesAfterRefresh = nodes.filter((n: any) => n.labels?.includes("person1"));
+    expect(person1NodesAfterRefresh.length).toBeGreaterThan(0);
+
+    // Verify that the node caption matches the saved style
+    const colorAfterRefresh = person1NodesAfterRefresh[0].color;
+    expect(colorAfterRefresh).toBe(newColor);
+    expect(colorAfterRefresh).not.toBe(initialColor);
+
+    await apiCall.removeGraph(graphName);
+  });
+
+  test(`@readwrite Validate nodes update correctly after size change and refresh`, async () => {
+    const graphName = getRandomString("graph");
+    await apiCall.addGraph(graphName);
+    const graph = await browser.createNewPage(CustomizeStylePage, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(graphName);
+    await graph.insertQuery(CREATE_QUERY);
+    await graph.clickRunQuery(false);
+    
+    // Get initial nodes - find person1 nodes
+    let nodes = await graph.getNodesScreenPositions("graph");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const person1Nodes = nodes.filter((n: any) => n.labels?.includes("person1"));
+    expect(person1Nodes.length).toBeGreaterThan(0);
+    
+    // Store initial size of person1 nodes
+    const initialSize = person1Nodes[0].size;
+
+    // Open graph info and customize person1 style
+    await graph.openGraphInfoButton();
+    await graph.clickCustomizeStyleButton("person1");
+
+    // Change size to a different one
+    const initialSizeIndex = await graph.getSelectedSizeButtonIndex();
+    const newSizeIndex = initialSizeIndex === 3 ? 5 : 3;
+    await graph.selectSizeByIndex(newSizeIndex);
+
+    // Save the style changes
+    await graph.clickSaveStyleButton();
+
+    // Get the new size from localStorage
+    const savedStyle = await graph.getLabelStyleFromLocalStorage("person1");
+    const newSize = savedStyle?.size;
+    expect(newSize).toBeDefined();
+    expect(newSize).not.toBe(initialSize);
+
+    // Close the panel
+    await graph.closePanelWithEscape();
+
+    // Refresh the page
+    await graph.refreshPage();
+    await graph.waitForPageIdle();
+
+    // Select graph and re-query to render nodes
+    await graph.selectGraphByName(graphName);
+    await graph.insertQuery("MATCH (n) RETURN n");
+    await graph.clickRunQuery(false);
+
+    // Get nodes after refresh
+    nodes = await graph.getNodesScreenPositions("graph");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const person1NodesAfterRefresh = nodes.filter((n: any) => n.labels?.includes("person1"));
+    expect(person1NodesAfterRefresh.length).toBeGreaterThan(0);
+
+    // Verify that the node size matches the saved style
+    const sizeAfterRefresh = person1NodesAfterRefresh[0].size;
+    expect(sizeAfterRefresh).toBe(newSize);
+    expect(sizeAfterRefresh).not.toBe(initialSize);
+
+    await apiCall.removeGraph(graphName);
+  });
+
+  test(`@readwrite Validate nodes update correctly after caption change and refresh`, async () => {
+    const graphName = getRandomString("graph");
+    await apiCall.addGraph(graphName);
+    const graph = await browser.createNewPage(CustomizeStylePage, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(graphName);
+    await graph.insertQuery(CREATE_PERSON_RELATIONSHIP);
+    await graph.clickRunQuery(false);
+    
+    // Get initial nodes - find person2 nodes
+    let nodes = await graph.getNodesScreenPositions("graph");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const person1Nodes = nodes.filter((n: any) => n.labels?.includes("person1"));
+    expect(person1Nodes.length).toBeGreaterThan(0);
+    
+    // Store initial caption and displayName of person1 nodes
+    const initialCaption = person1Nodes[0].caption;
+    const initialDisplayName = person1Nodes[0].displayName;
+
+    // Open graph info and customize person1 style
+    await graph.openGraphInfoButton();
+    await graph.clickCustomizeStyleButton("person1");
+
+    // Change caption to "name"
+    await graph.selectCaption("name");
+
+    // Save the style changes
+    await graph.clickSaveStyleButton();
+
+    // Get the new caption from localStorage
+    const savedStyle = await graph.getLabelStyleFromLocalStorage("person1");
+    const newCaption = savedStyle?.caption;
+    expect(newCaption).toBe("name");
+    expect(newCaption).not.toBe(initialCaption);
+
+    // Close the panel
+    await graph.closePanelWithEscape();
+
+    // Refresh the page
+    await graph.refreshPage();
+    await graph.waitForPageIdle();
+
+    // Select graph and re-query to render nodes
+    await graph.selectGraphByName(graphName);
+    await graph.insertQuery("MATCH (n) RETURN n");
+    await graph.clickRunQuery(false);
+
+    // Get nodes after refresh
+    nodes = await graph.getNodesScreenPositions("graph");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const person1NodesAfterRefresh = nodes.filter((n: any) => n.labels?.includes("person1"));
+    expect(person1NodesAfterRefresh.length).toBeGreaterThan(0);
+
+    // Verify that the node caption matches the saved style
+    const captionAfterRefresh = person1NodesAfterRefresh[0].caption;
+    expect(captionAfterRefresh).toBe(newCaption);
+    expect(captionAfterRefresh).toBe("name");
+
+    // Verify that displayName also changed (displayName should reflect the caption change)
+    const displayNameAfterRefresh = person1NodesAfterRefresh[0].displayName;
+    expect(displayNameAfterRefresh).toBeDefined();
+    expect(displayNameAfterRefresh).not.toEqual(initialDisplayName);
+
+    await apiCall.removeGraph(graphName);
+  });
 });

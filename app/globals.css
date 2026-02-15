@@ -34,8 +34,8 @@
 @layer components {
 
     @font-face {
-        font-family: 'Inter';
-        src: url('/fonts/Inter.ttf') format('truetype');
+        font-family: 'HyperlegibleSans';
+        src: url('/fonts/HyperlegibleSans.ttf') format('truetype');
         font-display: swap;
     }
 
@@ -46,7 +46,7 @@
     }
 
     * {
-        font-family: 'Inter' !important;
+        font-family: 'HyperlegibleSans' !important;
     }
 
     .SofiaSans,
@@ -137,6 +137,7 @@
 
 ::-webkit-scrollbar {
     width: 10px;
+    height: 10px;
 }
 
 ::-webkit-scrollbar-corner {
@@ -171,4 +172,8 @@ input[type="color"]::-webkit-color-swatch-wrapper {
 
 input[type="color"]::-webkit-color-swatch {
     border: none;
+}
+
+#launcher {
+    z-index: 40 !important;
 }
