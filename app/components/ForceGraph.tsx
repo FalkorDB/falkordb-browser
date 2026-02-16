@@ -150,7 +150,7 @@ export default function ForceGraph({
                 // Get only new elements from graph
                 const dataElements: Data = {
                     nodes: graph.Elements.nodes
-                        .map(({ id, labels, color, visible, data: nodeData }) => ({ id, labels, color, visible, data: nodeData })),
+                        .map(({ id, labels, color, visible, caption, size, data: nodeData }) => ({ id, labels, color, visible, caption, size, data: nodeData })),
                     links: graph.Elements.links
                         .map(({ id, relationship, color, visible, source, target, data: linkData }) => ({
                             id, relationship, color, visible, source, target, data: linkData
