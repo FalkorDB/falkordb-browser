@@ -17,56 +17,65 @@ on:
       - main
 
 jobs:
-  build-and-release:
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      cypher_version: ${{ steps.vars.outputs.cypher_version }}
+      tags: ${{ steps.vars.outputs.tags }}
     steps:
       - name: Set up variables
+        id: vars
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "CYPHER_VERSION=${{ github.event.inputs.cypher_version }}" >> $GITHUB_ENV
+            echo "cypher_version=${{ github.event.inputs.cypher_version }}" >> $GITHUB_OUTPUT
           else
             # Get the latest released version from GitHub releases
             LATEST_VERSION=$(curl -s https://api.github.com/repos/falkordb/text-to-cypher/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-            echo "CYPHER_VERSION=$LATEST_VERSION" >> $GITHUB_ENV
+            echo "cypher_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
           fi
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Set tags
         run: |
           if ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags') }}; then
-            echo "TAGS=falkordb/falkordb-browser:latest,falkordb/falkordb-browser:${{ github.ref_name }}" >> $GITHUB_ENV
+            echo "tags=falkordb/falkordb-browser:latest,falkordb/falkordb-browser:${{ github.ref_name }}" >> $GITHUB_OUTPUT
           else
-            echo "TAGS=falkordb/falkordb-browser:edge" >> $GITHUB_ENV
+            echo "tags=falkordb/falkordb-browser:edge" >> $GITHUB_OUTPUT
           fi
+
+  build-amd64:
+    needs: prepare
+    runs-on: ubuntu-latest
+    env:
+      CYPHER_VERSION: ${{ needs.prepare.outputs.cypher_version }}
+      BASE_TAGS: ${{ needs.prepare.outputs.tags }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute tags
+        run: |
+          ARCH_TAGS=$(echo "$BASE_TAGS" | awk -v arch="amd64" -F',' '{for(i=1;i<=NF;i++){printf "%s-%s", $i, arch; if(i<NF) printf ","}}')
+          echo "ARCH_TAGS=$ARCH_TAGS" >> $GITHUB_ENV
+          echo "TRIVY_TAG=$(echo "$BASE_TAGS" | cut -d',' -f1)-amd64" >> $GITHUB_ENV
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-  
-      - name: Build image
+
+      - name: Build and push amd64 image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
-          push: false
+          push: true
           platforms: linux/amd64
-          tags: ${{ env.TAGS }}
+          tags: ${{ env.ARCH_TAGS }}
           build-args: |
             CYPHER_VERSION=${{ env.CYPHER_VERSION }}
-          load: true
-
-      - name: Extract Trivy tag
-        run: |
-          echo "TRIVY_TAG=$(echo '${{ env.TAGS }}' | cut -d',' -f1)" >> $GITHUB_ENV
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@22438a435773de8c97dc0958cc0b823c45b064ac
@@ -78,13 +87,59 @@ jobs:
           vuln-type: 'os,library'
           severity: 'HIGH,CRITICAL'
 
-      - name: Push image
+  build-arm64:
+    needs: prepare
+    runs-on: ubuntu-24.04-arm
+    env:
+      CYPHER_VERSION: ${{ needs.prepare.outputs.cypher_version }}
+      BASE_TAGS: ${{ needs.prepare.outputs.tags }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute tags
+        run: |
+          ARCH_TAGS=$(echo "$BASE_TAGS" | awk -v arch="arm64" -F',' '{for(i=1;i<=NF;i++){printf "%s-%s", $i, arch; if(i<NF) printf ","}}')
+          echo "ARCH_TAGS=$ARCH_TAGS" >> $GITHUB_ENV
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push arm64 image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
           push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ env.TAGS }}
+          platforms: linux/arm64
+          tags: ${{ env.ARCH_TAGS }}
           build-args: |
             CYPHER_VERSION=${{ env.CYPHER_VERSION }}
+
+  publish-manifest:
+    needs: [build-amd64, build-arm64, prepare]
+    runs-on: ubuntu-latest
+    env:
+      BASE_TAGS: ${{ needs.prepare.outputs.tags }}
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Create and push manifest list
+        run: |
+          IFS=',' read -ra TAGS <<< "$BASE_TAGS"
+          for TAG in "${TAGS[@]}"; do
+            docker buildx imagetools create -t "$TAG" "${TAG}-amd64" "${TAG}-arm64"
+          done
