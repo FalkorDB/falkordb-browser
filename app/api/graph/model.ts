@@ -834,8 +834,10 @@ export class Graph {
             (l) => this.labelsMap.get(l) || this.createLabel([l])[0]
           )
         );
-        // Use custom color if available, otherwise use default label color
+        // Use custom style if available, otherwise use default label style
         node.color = label.style.color;
+        node.caption = label.style.caption;
+        node.size = label.style.size;
       });
 
     // remove empty category if there are no more empty nodes category
