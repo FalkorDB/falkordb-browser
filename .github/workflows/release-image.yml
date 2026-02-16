@@ -41,9 +41,16 @@ jobs:
             echo "tags=falkordb/falkordb-browser:edge" >> $GITHUB_OUTPUT
           fi
 
-  build-amd64:
+  build-and-push:
     needs: prepare
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     env:
       CYPHER_VERSION: ${{ needs.prepare.outputs.cypher_version }}
       BASE_TAGS: ${{ needs.prepare.outputs.tags }}
@@ -53,9 +60,11 @@ jobs:
 
       - name: Compute tags
         run: |
-          ARCH_TAGS=$(echo "$BASE_TAGS" | awk -v arch="amd64" -F',' '{for(i=1;i<=NF;i++){printf "%s-%s", $i, arch; if(i<NF) printf ","}}')
+          ARCH_TAGS=$(echo "$BASE_TAGS" | awk -v arch="${{ matrix.arch }}" -F',' '{for(i=1;i<=NF;i++){printf "%s-%s", $i, arch; if(i<NF) printf ","}}')
           echo "ARCH_TAGS=$ARCH_TAGS" >> $GITHUB_ENV
-          echo "TRIVY_TAG=$(echo "$BASE_TAGS" | cut -d',' -f1)-amd64" >> $GITHUB_ENV
+          if [ "${{ matrix.arch }}" = "amd64" ]; then
+            echo "TRIVY_TAG=$(echo "$BASE_TAGS" | cut -d',' -f1)-amd64" >> $GITHUB_ENV
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
@@ -66,18 +75,19 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push amd64 image
+      - name: Build and push image
         uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6.9.0
         with:
           context: .
           file: ./Dockerfile
           push: true
-          platforms: linux/amd64
+          platforms: linux/${{ matrix.arch }}
           tags: ${{ env.ARCH_TAGS }}
           build-args: |
             CYPHER_VERSION=${{ env.CYPHER_VERSION }}
 
       - name: Run Trivy vulnerability scanner
+        if: matrix.arch == 'amd64'
         uses: aquasecurity/trivy-action@22438a435773de8c97dc0958cc0b823c45b064ac
         with:
           image-ref: ${{ env.TRIVY_TAG }}
@@ -86,44 +96,8 @@ jobs:
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'HIGH,CRITICAL'
-
-  build-arm64:
-    needs: prepare
-    runs-on: ubuntu-24.04-arm
-    env:
-      CYPHER_VERSION: ${{ needs.prepare.outputs.cypher_version }}
-      BASE_TAGS: ${{ needs.prepare.outputs.tags }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - name: Compute tags
-        run: |
-          ARCH_TAGS=$(echo "$BASE_TAGS" | awk -v arch="arm64" -F',' '{for(i=1;i<=NF;i++){printf "%s-%s", $i, arch; if(i<NF) printf ","}}')
-          echo "ARCH_TAGS=$ARCH_TAGS" >> $GITHUB_ENV
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
-
-      - name: Login to DockerHub
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Build and push arm64 image
-        uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6.9.0
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          platforms: linux/arm64
-          tags: ${{ env.ARCH_TAGS }}
-          build-args: |
-            CYPHER_VERSION=${{ env.CYPHER_VERSION }}
-
   publish-manifest:
-    needs: [build-amd64, build-arm64, prepare]
+    needs: [build-and-push, prepare]
     runs-on: ubuntu-latest
     env:
       BASE_TAGS: ${{ needs.prepare.outputs.tags }}
