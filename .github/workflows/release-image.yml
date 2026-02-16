@@ -34,7 +34,7 @@ jobs:
             echo "cypher_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
           fi
           
-          if ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags') }}; then
+          if [ "${{ github.event_name }}" = "push" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
             echo "tags=falkordb/falkordb-browser:latest,falkordb/falkordb-browser:${{ github.ref_name }}" >> $GITHUB_OUTPUT
           else
             echo "tags=falkordb/falkordb-browser:edge" >> $GITHUB_OUTPUT
