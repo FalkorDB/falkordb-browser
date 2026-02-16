@@ -635,8 +635,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
           (alice)-[:WORKS_WITH]->(diana)
       `;
 
-      await getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, toast, setIndicator);
-
       // Create social-test demo graph
       const socialTestQuery = `
       CREATE 
@@ -644,15 +642,18 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       (frank:Person {name: 'Frank', age: 29}),
       (eve)-[:FOLLOWS]->(frank)
       `;
-
-      await getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, toast, setIndicator);
+      
+      await Promise.all([
+        getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, toast, setIndicator),
+        getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, toast, setIndicator)
+      ]);
 
       // Update graph list to only show demo graphs
       setGraphNames(["social-demo", "social-demo-test"]);
       setGraphName("");
       setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }));
       setGraph(Graph.empty());
-
+      setData({ nodes: [], links: [] });
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("Failed to load demo graphs", error);
@@ -682,6 +683,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     // Clear current graph to avoid showing deleted demo graph
     setGraph(Graph.empty());
     setGraphInfo(GraphInfo.empty());
+    setData({ nodes: [], links: [] });
+    localStorage.removeItem("savedContent");
 
     if (userGraphBeforeTutorial && userGraphsBeforeTutorial.includes(userGraphBeforeTutorial)) {
       setGraphName(userGraphBeforeTutorial);

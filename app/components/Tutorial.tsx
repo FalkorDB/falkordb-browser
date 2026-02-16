@@ -137,13 +137,19 @@ const tutorialSteps: TutorialStep[] = [
         hidePrev: true
     },
     {
+        title: "Export Table Results",
+        description: "Click this button to export the table results. This allows you to save the query results for further analysis or sharing.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="exportTableViewButton"]',
+        hidePrev: true
+    },
+    {
         title: "Query Metadata",
         description: "View query execution details, explain plans, and profile information in the metadata tabs below your results.",
         placementAxis: "y",
         targetSelector: '[data-testid="metadataTab"]',
         advanceOn: "mousedown",
         forward: ["mousedown", "mouseenter", "mouseleave"],
-        hidePrev: true
     },
     {
         title: "Query History",
