@@ -3,7 +3,7 @@ import { TextToCypher } from "@falkordb/text-to-cypher";
 import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { getClient } from "../auth/[...nextauth]/options";
 import { chatRequest, validateBody } from "../validate-body";
-import { buildFalkorDBConnection, getCorsHeaders, runQuery } from "../utils";
+import { buildFalkorDBConnection, getCorsHeaders } from "../utils";
 
 export async function OPTIONS(request: NextRequest) {
     return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
@@ -60,7 +60,7 @@ function createUserFriendlyErrorMessage(error: unknown, model: string, apiKey: s
     }
 
     // Check for empty graph
-    if (errorMessage === "EMPTY_GRAPH" || errorMessage.includes("empty key") || errorMessage.includes("Invalid graph operation")) {
+    if (errorMessage === "EMPTY_GRAPH") {
         return "Your graph is empty. Add some data to your graph before using the chat.";
     }
 
@@ -137,11 +137,14 @@ export async function POST(request: NextRequest) {
             }
             const question = lastUserMessage.content;
 
-            // Check if graph has data before calling text-to-cypher
+            // Check if graph exists and has data before calling text-to-cypher
+            const graphs = await session.client.list();
+            if (!graphs.includes(graphName)) {
+                throw new Error("EMPTY_GRAPH");
+            }
             const graph = session.client.selectGraph(graphName);
-            const countResult = await runQuery(graph, "MATCH (n) RETURN count(n) as count", session.user.role);
-            const nodeCount = (countResult?.data?.[0] as { count: number })?.count ?? 0;
-            if (nodeCount === 0) {
+            const existsResult = await graph.roQuery("MATCH (n) RETURN 1 LIMIT 1");
+            if (!existsResult?.data?.length) {
                 throw new Error("EMPTY_GRAPH");
             }
 
