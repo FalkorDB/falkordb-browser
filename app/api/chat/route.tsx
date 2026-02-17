@@ -3,7 +3,7 @@ import { TextToCypher } from "@falkordb/text-to-cypher";
 import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { getClient } from "../auth/[...nextauth]/options";
 import { chatRequest, validateBody } from "../validate-body";
-import { buildFalkorDBConnection, getCorsHeaders } from "../utils";
+import { buildFalkorDBConnection, getCorsHeaders, runQuery } from "../utils";
 
 export async function OPTIONS(request: NextRequest) {
     return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
@@ -41,7 +41,7 @@ function createUserFriendlyErrorMessage(error: unknown, model: string, apiKey: s
     }
 
     // Check for authentication errors
-    if (errorMessage.includes("401") || errorMessage.includes("invalid_api_key") || errorMessage.includes("Incorrect API key")) {
+    if (errorMessage.includes("401") || errorMessage.includes("invalid_api_key") || errorMessage.includes("Incorrect API key") || errorMessage.includes("Authentication failed") || errorMessage.includes("Unauthorized")) {
         const provider = keyProvider !== "unknown" ? keyProviderName : "";
         return `Invalid ${provider} API key. Please check your API key in Settings and ensure it is correct.`;
     }
@@ -52,16 +52,26 @@ function createUserFriendlyErrorMessage(error: unknown, model: string, apiKey: s
     }
 
     // Check for network/connection errors
-    if (errorMessage.includes("fetch failed") || errorMessage.includes("ECONNREFUSED")) {
+    if (errorMessage.includes("fetch failed") || errorMessage.includes("ECONNREFUSED") || errorMessage.includes("ECONNRESET")) {
         if (modelProvider === "ollama") {
             return "Cannot connect to Ollama. Please ensure Ollama is running locally on your machine.";
         }
         return "Network error. Please check your internet connection and try again.";
     }
 
+    // Check for empty graph
+    if (errorMessage === "EMPTY_GRAPH" || errorMessage.includes("empty key") || errorMessage.includes("Invalid graph operation")) {
+        return "Your graph is empty. Add some data to your graph before using the chat.";
+    }
+
+    // Check for timeout errors
+    if (errorMessage.includes("timeout") || errorMessage.includes("Timeout") || errorMessage.includes("ETIMEDOUT")) {
+        return "Request timed out. Try a simpler question or check your connection.";
+    }
+
     // Check for text-to-cypher query generation failures
     if (errorMessage.includes("Query validation failed") || errorMessage.includes("Query does not contain valid Cypher keywords")) {
-        return "Failed to convert your question to a valid database query.";
+        return "Could not generate a query from your question. Try asking a more specific question about your data.";
     }
 
     // Check for general text-to-cypher failures
@@ -126,6 +136,14 @@ export async function POST(request: NextRequest) {
                 throw new Error('No user messages found');
             }
             const question = lastUserMessage.content;
+
+            // Check if graph has data before calling text-to-cypher
+            const graph = session.client.selectGraph(graphName);
+            const countResult = await runQuery(graph, "MATCH (n) RETURN count(n) as count", session.user.role);
+            const nodeCount = (countResult?.data?.[0] as { count: number })?.count ?? 0;
+            if (nodeCount === 0) {
+                throw new Error("EMPTY_GRAPH");
+            }
 
             // Call textToCypher and get the result
             const result = await textToCypher.textToCypher(graphName, question);
