@@ -59,9 +59,12 @@ function createUserFriendlyErrorMessage(error: unknown, model: string, apiKey: s
         return "Network error. Please check your internet connection and try again.";
     }
 
-    // Check for empty graph
+    // Check for empty or non-existent graph
     if (errorMessage === "EMPTY_GRAPH") {
         return "Your graph is empty. Add some data to your graph before using the chat.";
+    }
+    if (errorMessage === "GRAPH_NOT_FOUND") {
+        return "Graph not found. Please select an existing graph.";
     }
 
     // Check for timeout errors
@@ -140,7 +143,7 @@ export async function POST(request: NextRequest) {
             // Check if graph exists and has data before calling text-to-cypher
             const graphs = await session.client.list();
             if (!graphs.includes(graphName)) {
-                throw new Error("EMPTY_GRAPH");
+                throw new Error("GRAPH_NOT_FOUND");
             }
             const graph = session.client.selectGraph(graphName);
             const existsResult = await graph.roQuery("MATCH (n) RETURN 1 LIMIT 1");
