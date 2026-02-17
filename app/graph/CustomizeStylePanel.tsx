@@ -5,7 +5,7 @@
 import { useContext, useState, useEffect, useCallback, useRef } from "react";
 import { X, Palette } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { GraphContext, ForceGraphContext } from "@/app/components/provider";
+import { GraphContext, ForceGraphContext, BrowserSettingsContext } from "@/app/components/provider";
 import { Label, STYLE_COLORS, NODE_SIZE_OPTIONS, LabelStyle, getLabelWithFewestElements, EMPTY_DISPLAY_NAME } from "@/app/api/graph/model";
 import Button from "@/app/components/ui/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -17,6 +17,7 @@ interface Props {
 
 export default function CustomizeStylePanel({ label, onClose }: Props) {
     const { graph, setLabels } = useContext(GraphContext);
+    const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { canvasRef } = useContext(ForceGraphContext);
 
     // Get available properties from nodes with this label
@@ -137,12 +138,16 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
     };
 
     const handleSave = () => {
-        // Save to localStorage
-        saveStyleToStorage(label.name, {
-            color: selectedColor,
-            size: selectedSize,
-            caption: selectedCaption,
-        });
+        // Prevent saving during tutorial
+        if (!tutorialOpen) {
+            // Save to localStorage
+            saveStyleToStorage(label.name, {
+                color: selectedColor,
+                size: selectedSize,
+                caption: selectedCaption,
+            });
+        }
+
         onClose();
     };
 
@@ -353,6 +358,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
                                 selectedCaption === option && "bg-muted font-semibold"
                             )}
                             onClick={() => handleCaptionSelect(option)}
+                            aria-label={`Select Caption ${option}`}
                         >
                             {option}
                         </button>

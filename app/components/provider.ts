@@ -102,7 +102,7 @@ type GraphContextType = {
   setEdgesCount: Dispatch<SetStateAction<number | undefined>>;
   currentTab: Tab;
   setCurrentTab: Dispatch<SetStateAction<Tab>>;
-  runQuery: (query: string, name?: string) => Promise<void>;
+  runQuery: (query: string, name?: string, saveContext?: boolean) => Promise<void>;
   fetchCount: () => Promise<void>;
   handleCooldown: (ticks?: number, isSetLoading?: boolean) => void;
   cooldownTicks: number | undefined;

@@ -14,6 +14,7 @@ interface TutorialStep {
     spotlightSelector?: string;
     placementAxis?: "x" | "y";
     advanceOn?: string;
+    advanceCondition?: () => boolean;
     forward?: (keyof HTMLElementEventMap)[];
     hidePrev?: boolean;
 }
@@ -93,12 +94,54 @@ const tutorialSteps: TutorialStep[] = [
         hidePrev: true
     },
     {
+        title: "Customize Label Styles",
+        description: "You can customize how nodes with specific labels appear in the graph. Click the palette icon next to the 'person1' label to open the style customization panel.",
+        targetSelector: '[data-testid="customizeStylePerson"]',
+        placementAxis: "x",
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave"],
+        hidePrev: true
+    },
+    {
+        title: "Choose Node Color",
+        description: "Select a color for nodes with this label. Choose from the preset colors or use the RGB color picker for custom colors. Your changes are previewed immediately.",
+        targetSelector: 'button[aria-label^="Select color"]',
+        placementAxis: "x",
+        advanceOn: "click",
+        hidePrev: true
+    },
+    {
+        title: "Adjust Node Size",
+        description: "Change the size of nodes with this label. Select from the available size options to make nodes larger or smaller in the visualization.",
+        targetSelector: 'button[aria-label^="Select size"]',
+        placementAxis: "x",
+        advanceOn: "click",
+        hidePrev: true
+    },
+    {
+        title: "Set Node Caption",
+        description: "Choose which property to display as the caption on nodes. You can select any property from the dropdown or choose 'ID' to display the graph ID. Once you're done customizing, click 'Save Changes' or continue the tour.",
+        targetSelector: 'button[aria-label^="Select Caption"]',
+        placementAxis: "x",
+        advanceOn: "click",
+        hidePrev: true
+    },
+    {
+        title: "Save Style Changes",
+        description: "",
+        targetSelector: '[data-testid="saveStyleChanges"]',
+        placementAxis: "x",
+        advanceOn: "click",
+        hidePrev: true
+    },
+    {
         title: "Get all nodes",
         description: "Click this button to retrieve all nodes in the graph. This will show you the total count and basic information about all nodes.",
         targetSelector: '[data-testid="graphInfoAllNodes"]',
         placementAxis: "x",
         advanceOn: "click",
-        forward: ["mouseenter", "mouseleave"]
+        forward: ["mouseenter", "mouseleave"],
+        hidePrev: true
     },
     {
         title: "Get KNOWS edge",
@@ -125,6 +168,24 @@ const tutorialSteps: TutorialStep[] = [
         targetSelector: 'falkordb-canvas',
         spotlightSelector: '[data-testid="graphView"]',
         forward: ["mousedown", "mouseup", "mousemove", "mouseenter", "mouseleave", "mouseover", "mouseout", "contextmenu", "pointerdown", "pointerup", "pointermove", "pointerenter", "pointerleave", "wheel"],
+        hidePrev: true
+    },
+    {
+        title: "View Node Details",
+        description: "Now let's explore node data. Right-click on any node in the graph to open the data panel and view its properties, labels, and relationships.",
+        targetSelector: 'falkordb-canvas',
+        spotlightSelector: '[data-testid="graphView"]',
+        placementAxis: "x",
+        advanceOn: "contextmenu",
+        advanceCondition: () => !!document.querySelector('[data-testid="DataPanel"]'),
+        forward: ["mousedown", "mouseup", "mousemove", "mouseenter", "mouseleave", "mouseover", "mouseout", "contextmenu", "pointerdown", "pointerup", "pointermove", "pointerenter", "pointerleave", "wheel"],
+        hidePrev: true
+    },
+    {
+        title: "Data Panel",
+        description: "The data panel displays detailed information about the selected node or edge, including all properties, labels, and IDs. You can edit properties, add or remove labels, and manage attributes from here.",
+        targetSelector: '[data-testid="DataPanel"]',
+        placementAxis: "x",
         hidePrev: true
     },
     {
@@ -340,6 +401,15 @@ function TutorialPortal({
             const element = document.querySelector(targetSelector);
 
             if (element) {
+                // For falkordb-canvas web component, we need to get the internal canvas from shadow DOM
+                let eventTarget: Element = element;
+                if (element.tagName.toLowerCase() === 'falkordb-canvas' && element.shadowRoot) {
+                    const canvas = element.shadowRoot.querySelector('canvas');
+                    if (canvas) {
+                        eventTarget = canvas;
+                    }
+                }
+
                 // Check if the element is disabled
                 const isDisabled = element instanceof HTMLButtonElement || element instanceof HTMLInputElement
                     ? element.disabled
@@ -375,6 +445,10 @@ function TutorialPortal({
                             cancelable: true,
                         });
                         element.dispatchEvent(newEvent);
+                        // Also dispatch to internal canvas if it exists
+                        if (eventTarget !== element) {
+                            eventTarget.dispatchEvent(newEvent);
+                        }
                     };
                     overlay.addEventListener('wheel', wheelHandler, { passive: true } as EventListenerOptions);
                 }
@@ -440,8 +514,7 @@ function TutorialPortal({
                 const forwardKeyboardEvents = ['keydown', 'keyup', 'keypress'] as const;
 
                 const forwardEvent = (ev: Event) => {
-
-                    if (advanceOn === ev.type) {
+                    if (advanceOn === ev.type && (!currentStep.advanceCondition || currentStep.advanceCondition())) {
                         // Advance the tutorial on the specified event type. Use a short delay
                         // so the forwarded event can reach the underlying element's handlers first.
                         setTimeout(() => {
@@ -479,6 +552,10 @@ function TutorialPortal({
                             metaKey: ev.metaKey,
                         });
                         element.dispatchEvent(clone);
+                        // Also dispatch to internal canvas if it exists
+                        if (eventTarget !== element) {
+                            eventTarget.dispatchEvent(clone);
+                        }
 
                         return;
                     }
@@ -507,6 +584,10 @@ function TutorialPortal({
                         });
 
                         element.dispatchEvent(clone);
+                        // Also dispatch to internal canvas if it exists
+                        if (eventTarget !== element) {
+                            eventTarget.dispatchEvent(clone);
+                        }
                         return;
                     }
 
