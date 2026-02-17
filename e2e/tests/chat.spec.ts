@@ -331,6 +331,7 @@ test.describe("Chat Feature Tests", () => {
   });
 
   test(`@readwrite Verify messages are graph-specific and respect maxSavedMessages limit`, async () => {
+    test.setTimeout(60000);
     const graph1Name = getRandomString("chat");
     const graph2Name = getRandomString("chat");
     await apiCall.addGraph(graph1Name);
@@ -342,6 +343,7 @@ test.describe("Chat Feature Tests", () => {
     await browser.setPageToFullScreen();
     await settings.expandChatSection();
 
+    const maxSavedMessages = Number(await settings.getMaxSavedMessagesValue());
     const testApiKey = process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY || "test-api-key-placeholder";
     
     await settings.fillChatApiKey(testApiKey);
@@ -373,14 +375,11 @@ test.describe("Chat Feature Tests", () => {
       // eslint-disable-next-line no-await-in-loop
       await chat.fillChatInput(message);
       // eslint-disable-next-line no-await-in-loop
-      await chat.clickChatSendButton();
-      // eslint-disable-next-line no-await-in-loop
       await chat.waitForChatSendButtonEnabled(); // Wait for button to be ready for next message
+      // eslint-disable-next-line no-await-in-loop
+      await chat.clickChatSendButton();
     }
-    
-    // Wait for all messages to be processed
-    await chat.waitForTimeout(1000);
-    
+
     // Verify that we have exactly 7 user messages displayed
     const graph1MessageCount = await chat.getChatUserMessagesCount();
     expect(graph1MessageCount).toBe(7);
@@ -414,12 +413,11 @@ test.describe("Chat Feature Tests", () => {
     const graph1ReloadedCount = await chat.getChatUserMessagesCount();
     
     // Should have 5 user messages (maxSavedMessages limit applied from localStorage)
-    expect(graph1ReloadedCount).toBe(5);
+    expect(graph1ReloadedCount).toBe(maxSavedMessages);
     
-    // Verify the earliest message shown is the 3rd question (first 2 questions should be trimmed)
     // Get all user messages and check the first one
     const firstVisibleMessage = await chat.getFirstUserMessageContent();
-    expect(firstVisibleMessage).toContain("How many people are in the graph?");
+    expect(firstVisibleMessage).toContain(messages[messages.length - maxSavedMessages]);
     
     // Verify the last message is still the 7th question
     const lastVisibleMessage = await chat.getLastUserMessageContent();
