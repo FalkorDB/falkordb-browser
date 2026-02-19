@@ -327,7 +327,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
   const handelGetNewQueries = useCallback((newQuery: Query) => [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), newQuery], [historyQuery.queries]);
 
-  const runQuery = useCallback(async (q: string, name?: string, saveContext?: boolean): Promise<void> => {
+  const runQuery = useCallback(async (q: string, name?: string, saveContext = true): Promise<void> => {
     const n = name || graphName;
     let newQuery: Query = {
       elementsCount: 0,
