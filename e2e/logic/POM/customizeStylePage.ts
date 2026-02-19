@@ -41,7 +41,7 @@ export default class CustomizeStylePage extends GraphInfoPage {
   }
 
   private captionOption(caption: string): Locator {
-    return this.page.getByRole('button', { name: caption, exact: true });
+    return this.page.locator(`button[aria-label="Select caption ${caption}"]`);
   }
 
   private get closeButton(): Locator {
