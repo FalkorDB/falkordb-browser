@@ -6,6 +6,7 @@ import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Copy, CornerDownLeft, CornerDownRight, CornerLeftDown, CornerRightDown } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { cn } from "@/lib/utils";
 import Button from "./ui/Button";
 
 interface TutorialStep {
@@ -21,21 +22,21 @@ interface TutorialStep {
     hidePrev?: boolean;
 }
 
-const parseDescription = (description: string, toast: ({ title }: { title: string }) => void) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const parseDescription = (description: string, toast: any) => {
     const parts = description.split(/(```[\s\S]*?```)/);
     return parts.map((part, index) => {
         if (part.startsWith('```') && part.endsWith('```')) {
             const code = part.slice(3, -3).trim();
             return (
-                <div key={index} className="flex gap-2">
-                    <code className="block mt-2 bg-muted px-3 py-2 rounded text-sm font-mono text-foreground whitespace-pre-wrap">
+                <div key={index} className="flex gap-2 items-center">
+                    <code className="block bg-foreground px-3 py-2 rounded text-sm font-mono text-background whitespace-pre-wrap">
                         {code}
                     </code>
                     <Button
                         title="Copy"
                         onClick={() => {
-                            navigator.clipboard.writeText(code);
-                            toast({ title: "Copied to clipboard" });
+                            navigator.clipboard.writeText(code).then(() => toast({ title: "Code copied to clipboard!" })).catch(() => toast({ title: "Failed to copy code", variant: "destructive" }));
                         }}
                     >
                         <Copy className="w-4 h-4" />
@@ -55,7 +56,7 @@ const tutorialSteps: TutorialStep[] = [
     },
     {
         title: "Welcome to FalkorDB Browser",
-        description: "Let's take a quick tour to help you get started with the graph database interface. This tour will guide you through the key features.",
+        description: "Let's take a quick tour to help you get started with the graph database interface. This tour will guide you through the main features.",
         position: { top: "50%", left: "50%" }
     },
     {
@@ -68,7 +69,7 @@ const tutorialSteps: TutorialStep[] = [
     },
     {
         title: "Manage Graphs",
-        description: "The Manage button opens a comprehensive interface where you can create new graphs, delete existing ones, duplicate graphs with all their data, and export graphs to .dump files for backup or sharing.",
+        description: "The Manage button opens a comprehensive interface where you can delete existing graphs, duplicate graphs with all their data, and export graphs to .dump files for backup or sharing.",
         placementAxis: "x",
         targetSelector: '[data-testid="manageGraphs"]',
         advanceOn: "click",
@@ -77,14 +78,14 @@ const tutorialSteps: TutorialStep[] = [
     },
     {
         title: "Manage Graphs Window",
-        description: "Here you can see all your graphs and manage them. Each graph has actions to delete, duplicate (with all data), or export to a .dump file. You can also create new graphs from this interface. When you're done, click the close button to return to the main view.",
+        description: "Here you can see all your graphs and their main data points and manage them. Each graph has actions to delete, duplicate (with all data), or export to a .dump file.",
         placementAxis: "x",
         targetSelector: '[data-testid="manageContent"]',
         hidePrev: true
     },
     {
         title: "Close Manage Graphs Window",
-        description: "Here you can see all your graphs and manage them. Each graph has actions to delete, duplicate (with all data), or export to a .dump file. You can also create new graphs from this interface. When you're done, click the close button to return to the main view.",
+        description: "When you're done, click the close button to return to the main view.",
         placementAxis: "x",
         targetSelector: '[data-testid="closeManage"]',
         advanceOn: "click",
@@ -92,7 +93,7 @@ const tutorialSteps: TutorialStep[] = [
     },
     {
         title: "Select a Demo Graph",
-        description: "Click on the 'social-demo' option to select and load this demo graph. It contains sample social network data with users, posts, and relationships that you can explore. Click the highlighted option to continue.",
+        description: "Click on the 'social-demo' option to select and load this demo graph. It contains sample social network data with users, posts, and relationships that you can explore.",
         placementAxis: "x",
         targetSelector: '[data-testid="selectGraphsocial-demoButton"]',
         advanceOn: "click",
@@ -101,14 +102,14 @@ const tutorialSteps: TutorialStep[] = [
     },
     {
         title: "Graph Info Panel",
-        description: "The Graph Info panel displays node labels, edge types, and graph statistics.",
+        description: "The Graph Info panel displays node labels, edge types, and graph statistics. You can click on the elements to trigger a custom query that filters the graph by that label or edge type. This is a great way to explore the structure of your graph and understand what data it contains.",
         placementAxis: "x",
         targetSelector: '[data-testid="graphInfoPanel"]',
         hidePrev: true
     },
     {
         title: "Customize Label Styles",
-        description: "You can customize how nodes with specific labels appear in the graph. Click the palette icon next to the 'person1' label to open the style customization panel.",
+        description: "You can customize how nodes with specific labels appear in the graph. Click the palette icon next to the 'Person' label to open the style customization panel.",
         placementAxis: "x",
         targetSelector: '[data-testid="customizeStylePerson"]',
         advanceOn: "click",
@@ -131,14 +132,14 @@ const tutorialSteps: TutorialStep[] = [
     },
     {
         title: "Set Node Caption",
-        description: "Choose which property to display as the caption on nodes. You can select any property from the dropdown or choose 'ID' to display the graph ID. Once you're done customizing, click 'Save Changes' or continue the tour.",
+        description: "Choose which property to display as the caption on nodes. You can select any property from the dropdown or choose 'ID' to display the internal ID.",
         placementAxis: "x",
         targetSelector: 'button[aria-label^="Select Caption"]',
         advanceOn: "click",
     },
     {
         title: "Save Style Changes",
-        description: "",
+        description: "Click 'Save Changes' to apply your node style customizations to the graph.",
         placementAxis: "x",
         targetSelector: '[data-testid="saveStyleChanges"]',
         advanceOn: "click",
@@ -179,8 +180,8 @@ const tutorialSteps: TutorialStep[] = [
         forward: ["mousedown", "mouseup", "mousemove", "mouseenter", "mouseleave", "mouseover", "mouseout", "contextmenu", "pointerdown", "pointerup", "pointermove", "pointerenter", "pointerleave", "wheel"],
     },
     {
-        title: "View Node Details",
-        description: "Now let's explore node data. Right-click on any node in the graph to open the data panel and view its properties, labels, and relationships.",
+        title: "View Node / Edge Details",
+        description: "Now let's explore node or edge data. Right-click on any node or edge in the graph to open the data panel and view its properties, labels, and relationships.",
         placementAxis: "x",
         targetSelector: 'falkordb-canvas',
         spotlightSelector: '[data-testid="graphView"]',
@@ -234,31 +235,30 @@ const tutorialSteps: TutorialStep[] = [
     },
     {
         title: "Query History Window",
-        description: "Access your previous queries here. You can filter by graph, search queries, and view metadata for each executed query.",
+        description: "Access your previous queries here. You can also remove queries from your history or clear the entire history.",
         placementAxis: "y",
         targetSelector: '[data-testid="queryHistoryContent"]',
         hidePrev: true
     },
     {
         title: "Close Query History Window",
-        description: "Access your previous queries here. You can filter by graph, search queries, and view metadata for each executed query.",
+        description: "",
         placementAxis: "y",
         targetSelector: '[data-testid="closeQueryHistory"]',
         advanceOn: "click",
         forward: ["mouseenter", "mouseleave"],
-        hidePrev: true
     },
     {
         title: "Theme Toggle",
-        description: "Switch between light and dark themes for a comfortable viewing experience.",
+        description: "Switch between light, dark, and system themes for a comfortable viewing experience.",
         placementAxis: "x",
         targetSelector: '[data-testid="themeToggle"]',
         hidePrev: true
     },
     {
-        title: "Settings",
-        description: "Access browser settings to configure query limits, timeouts, default queries, AI chat features, and more. You can also retake this tour from settings.",
-        targetSelector: '[data-testid="settings"]',
+        title: "Left Menu Navigation",
+        description: "Here you can navigate between different sections of the application, such as the main graph view, and settings. You can activate side panels such as the graph info panel, and chat panel",
+        targetSelector: '[data-testid="NavigationButtons"]',
     },
     {
         title: "You're All Set!",
@@ -436,6 +436,7 @@ function TutorialPortal({
                             top: `${arrowTop}px`,
                             zIndex: 45,
                             pointerEvents: 'none',
+                            transition: 'left 300ms ease-in-out, top 300ms ease-in-out',
                             display: 'block'
                         });
                         setArrowDirection(direction);
@@ -626,9 +627,17 @@ function TutorialPortal({
     // Fixed position style for bottom right
     let fixedPositionStyle: React.CSSProperties;
     if (position) {
-        fixedPositionStyle = { ...position, transform: "translate(-50%, -50%)" };
+        fixedPositionStyle = {
+            ...position,
+            transform: "translate(-50%, -50%)",
+            transition: "top 300ms ease-in-out, left 300ms ease-in-out, right 300ms ease-in-out, bottom 300ms ease-in-out, transform 300ms ease-in-out"
+        };
     } else {
-        fixedPositionStyle = { bottom: '20px', right: '20px' };
+        fixedPositionStyle = {
+            bottom: '20px',
+            right: '20px',
+            transition: "top 300ms ease-in-out, left 300ms ease-in-out, right 300ms ease-in-out, bottom 300ms ease-in-out, transform 300ms ease-in-out"
+        };
     }
 
     const content = (
@@ -651,6 +660,23 @@ function TutorialPortal({
                 <div className="text-muted-foreground">
                     {parseDescription(description, toast)}
                 </div>
+                {
+                    step === 1 &&
+                    <>
+                        <div className="flex gap-2 items-center">
+                            <p>shows where you need to look and click</p>
+                            <div className="w-10 h-10 text-primary">
+                                <ArrowIcon direction="right" />
+                            </div>
+                        </div>
+                        <div className="flex gap-2 items-center">
+                            <p>shows where you need to look</p>
+                            <div className="w-10 h-10 text-yellow-200">
+                                <ArrowIcon direction="right" />
+                            </div>
+                        </div>
+                    </>
+                }
                 {
                     advanceOn && targetSelector &&
                     <div className="flex items-center gap-2 p-3 bg-primary/10 rounded-lg">
@@ -704,7 +730,7 @@ function TutorialPortal({
         <>
             {content}
             {arrowStyle.display !== 'none' && (
-                <div style={{ ...arrowStyle, width: '30px', height: '30px' }} className="animate-bounce text-primary drop-shadow-lg">
+                <div style={{ ...arrowStyle, width: '40px', height: '40px' }} className={cn("animate-bounce drop-shadow-lg", advanceOn ? "text-primary" : "text-yellow-200")}>
                     <ArrowIcon direction={arrowDirection} />
                 </div>
             )}
