@@ -134,7 +134,7 @@ const tutorialSteps: TutorialStep[] = [
         title: "Set Node Caption",
         description: "Choose which property to display as the caption on nodes. You can select any property from the dropdown or choose 'ID' to display the internal ID.",
         placementAxis: "x",
-        targetSelector: 'button[aria-label^="Select Caption"]',
+        targetSelector: 'button[aria-label^="Select caption"]',
         advanceOn: "click",
     },
     {

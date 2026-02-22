@@ -86,6 +86,10 @@ function GraphView({
     }, [graph.Id, setSelectedElements]);
 
     const onLabelClick = (label: Label) => {
+        const canvas = canvasRef.current;
+
+        if (!canvas) return;
+
         label.show = !label.show;
 
         label.elements.forEach((node) => {
@@ -94,38 +98,37 @@ function GraphView({
         });
 
         graph.visibleLinks(label.show);
-
         graph.LabelsMap.set(label.name, label);
 
-        const canvas = canvasRef.current;
+        const currentData = canvas.getGraphData();
 
-        if (canvas) {
-            const currentData = canvas.getGraphData();
-            currentData.nodes.forEach(canvasNode => {
-                const appNode = graph.NodesMap.get(canvasNode.id);
+        currentData.nodes.forEach(canvasNode => {
+            const appNode = graph.NodesMap.get(canvasNode.id);
 
-                if (appNode) {
-                    canvasNode.visible = appNode.visible;
-                }
-            });
-            currentData.links.forEach(canvasLink => {
-                const appLink = graph.LinksMap.get(canvasLink.id);
+            if (appNode) {
+                canvasNode.visible = appNode.visible;
+            }
+        });
+        currentData.links.forEach(canvasLink => {
+            const appLink = graph.LinksMap.get(canvasLink.id);
 
-                if (appLink) {
-                    canvasLink.visible = appLink.visible;
-                }
-            });
-            canvas.setGraphData({ ...currentData });
-        }
+            if (appLink) {
+                canvasLink.visible = appLink.visible;
+            }
+        });
+
+        canvas.setGraphData({ ...currentData });
 
         const cooldown = cooldownTicks === undefined ? undefined : -1;
-
         handleCooldown(cooldown);
-
         setLabels([...graph.Labels]);
     };
 
     const onRelationshipClick = (relationship: Relationship) => {
+        const canvas = canvasRef.current;
+
+        if (!canvas) return;
+
         relationship.show = !relationship.show;
 
         relationship.elements.filter((link) => graph.NodesMap.get(link.source)?.visible && graph.NodesMap.get(link.target)?.visible).forEach((link) => {
@@ -134,29 +137,25 @@ function GraphView({
 
         graph.RelationshipsMap.set(relationship.name, relationship);
 
-        const canvas = canvasRef.current;
+        const currentData = canvas.getGraphData();
 
-        if (canvas) {
-            const currentData = canvas.getGraphData();
-            currentData.nodes.forEach(canvasNode => {
-                const appNode = graph.NodesMap.get(canvasNode.id);
-                if (appNode) {
-                    canvasNode.visible = appNode.visible;
-                }
-            });
-            currentData.links.forEach(canvasLink => {
-                const appLink = graph.LinksMap.get(canvasLink.id);
-                if (appLink) {
-                    canvasLink.visible = appLink.visible;
-                }
-            });
-            canvas.setGraphData({ ...currentData });
-        }
+        currentData.nodes.forEach(canvasNode => {
+            const appNode = graph.NodesMap.get(canvasNode.id);
+            if (appNode) {
+                canvasNode.visible = appNode.visible;
+            }
+        });
+        currentData.links.forEach(canvasLink => {
+            const appLink = graph.LinksMap.get(canvasLink.id);
+            if (appLink) {
+                canvasLink.visible = appLink.visible;
+            }
+        });
+
+        canvas.setGraphData({ ...currentData });
 
         const cooldown = cooldownTicks === undefined ? undefined : -1;
-
         handleCooldown(cooldown);
-
         setRelationships([...graph.Relationships]);
     };
 

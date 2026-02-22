@@ -358,7 +358,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
                                 selectedCaption === option && "bg-muted font-semibold"
                             )}
                             onClick={() => handleCaptionSelect(option)}
-                            aria-label={`Select Caption ${option}`}
+                            aria-label={`Select caption ${option}`}
                         >
                             {option}
                         </button>
@@ -373,6 +373,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
                                     selectedCaption === undefined && "bg-muted font-semibold"
                                 )}
                                 onClick={() => handleCaptionSelect()}
+                                aria-label="Select caption ID"
                             >
                                 ID
                             </button>
