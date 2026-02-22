@@ -1,6 +1,6 @@
 import { ArrowRight, Circle, Info } from "lucide-react";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
-import { cn, GraphRef } from "@/lib/utils";
+import { areCaptionKeysEqual, cn, GraphRef } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSession } from "next-auth/react";
 import { Graph, Link, Node } from "../api/graph/model";
@@ -44,6 +44,7 @@ export default function Toolbar({
 }: Props) {
 
     const { isLoading: isLoadingGraph } = useContext(GraphContext);
+    const { settings: { showPropertyKeyPrefixSettings: { showPropertyKeyPrefix }, captionsKeysSettings: { captionsKeys } } } = useContext(BrowserSettingsContext);
     const {
         settings: {
             limitSettings: { limit, lastLimit },
@@ -302,13 +303,15 @@ export default function Toolbar({
                         {
                             (hasLimitWarning || hasLimitChangeWarning) ?
                                 <Button
-                                    data-testid={`elementCanvasWarning${label}`}
+                                    data-testid={`elementCanvasLimitWarning${label}`}
                                     className="p-1 bg-background cursor-default border-orange-300"
                                     variant="Secondary"
                                     tooltipVariant="Primary"
                                     tooltipSide="bottom"
                                     title={`${hasLimitWarning ? `Data currently limited to ${graph.Data.length} rows` : ""}
-                        ${hasLimitChangeWarning ? "Rerun the query to apply the new limit." : ""}`}
+                        ${hasLimitChangeWarning ? "Rerun the query to apply the new limit." : ""}
+                        ${!areCaptionKeysEqual(graph.CaptionsKeys, captionsKeys) ? "Rerun the query to apply the new captions keys settings." : ""}
+                        ${graph.ShowPropertyKeyPrefix !== showPropertyKeyPrefix ? "Rerun the query to apply the new property key prefix settings." : ""}`}
                                 >
                                     <Info className="text-orange-300" size={20} />
                                 </Button>

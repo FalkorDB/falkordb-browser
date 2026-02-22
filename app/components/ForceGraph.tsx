@@ -10,7 +10,7 @@ import { dataToGraphData } from "@falkordb/canvas";
 import { securedFetch, getTheme, GraphRef } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Link, Node, Relationship, Graph, GraphData } from "../api/graph/model";
-import { IndicatorContext } from "./provider";
+import { BrowserSettingsContext, IndicatorContext } from "./provider";
 
 interface Props {
     graph: Graph
@@ -32,12 +32,11 @@ interface Props {
 }
 
 const convertToCanvasData = (graphData: GraphData): Data => ({
-    nodes: graphData.nodes.map(({ id, labels, color, visible, caption, size, data }) => ({
+    nodes: graphData.nodes.map(({ id, labels, color, visible, size, data }) => ({
         id,
         labels,
         color,
         visible,
-        caption,
         size,
         data
     })),
@@ -71,6 +70,7 @@ export default function ForceGraph({
 }: Props) {
 
     const { setIndicator } = useContext(IndicatorContext);
+    const { settings: { captionsKeysSettings: { captionsKeys }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
 
     const { theme } = useTheme();
     const { toast } = useToast();
@@ -330,9 +330,11 @@ export default function ForceGraph({
 
     // Update event handlers and selection functions
     useEffect(() => {
-        if (!canvasRef.current || !canvasLoaded) return;
+    if (!canvasRef.current || !canvasLoaded) return;
         canvasRef.current.setConfig({
             autoStopOnSettle: false,
+            captionsKeys,
+            showPropertyKeyPrefix,
             onNodeClick: handleNodeClick,
             onNodeRightClick: handleRightClick,
             onLinkRightClick: handleRightClick,
@@ -344,7 +346,7 @@ export default function ForceGraph({
             onEngineStop: handleEngineStop,
             onLoadingChange: handleLoadingChange
         });
-    }, [handleNodeClick, handleRightClick, handleHover, handleUnselected, checkIsNodeSelected, checkIsLinkSelected, handleEngineStop, handleLoadingChange, canvasRef, canvasLoaded]);
+    }, [handleNodeClick, handleRightClick, handleHover, handleUnselected, checkIsNodeSelected, checkIsLinkSelected, handleEngineStop, handleLoadingChange, canvasRef, canvasLoaded, captionsKeys, showPropertyKeyPrefix]);
 
     // Update canvas data
     useEffect(() => {
