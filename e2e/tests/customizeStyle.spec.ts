@@ -160,7 +160,7 @@ test.describe("Customize Style Tests", () => {
     // Click customize style button
     await graph.clickCustomizeStyleButton("person2");
 
-    // Select caption "name"
+    // Select caption "occupation"
     await graph.selectCaption("occupation");
 
     // Verify Save button is visible

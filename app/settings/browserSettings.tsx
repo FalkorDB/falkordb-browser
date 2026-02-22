@@ -86,9 +86,10 @@ export default function BrowserSettings() {
 
     useEffect(() => {
         (async () => {
-            if (!model && secretKey) {
+            const detectedProvider = detectProviderFromApiKey(secretKey);
+            if (!model && detectedProvider !== "unknown") {
                 const res = await securedFetch(
-                    `/api/chat/models?provider=${detectProviderFromApiKey(secretKey)}`,
+                    `/api/chat/models?provider=${detectedProvider}`,
                     { method: "GET" },
                     toast,
                     setIndicator

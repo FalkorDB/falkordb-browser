@@ -329,4 +329,102 @@ test.describe("Chat Feature Tests", () => {
     
     await apiCall.removeGraph(graphName);
   });
+
+  test(`@readwrite Verify messages are graph-specific and respect maxSavedMessages limit`, async () => {
+    test.setTimeout(60000);
+    const graph1Name = getRandomString("chat");
+    const graph2Name = getRandomString("chat");
+    await apiCall.addGraph(graph1Name);
+    await apiCall.addGraph(graph2Name);
+    await apiCall.runQuery(graph1Name, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
+    await apiCall.runQuery(graph2Name, 'CREATE (x:Person {name: "Xavier"})-[:KNOWS]->(y:Person {name: "Yara"})');
+    
+    const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+    await browser.setPageToFullScreen();
+    await settings.expandChatSection();
+
+    const maxSavedMessages = Number(await settings.getMaxSavedMessagesValue());
+    const testApiKey = process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY || "test-api-key-placeholder";
+    
+    await settings.fillChatApiKey(testApiKey);
+    await settings.clickSaveSettingsButton();
+    
+    // Navigate to graphs page
+    const header = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
+    await header.clickOnGraphsButton();
+    
+    const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
+    await chat.selectGraphByName(graph1Name);
+    
+    // Open chat and send 7 messages to graph1 (more than maxSavedMessages)
+    await chat.openChat();
+    await chat.waitForChatPanel();
+    
+    const messages = [
+      "Who does Alice know?",
+      "What is Bob's name?",
+      "How many people are in the graph?",
+      "Show me all relationships",
+      "What relationship exists between Alice and Bob?",
+      "List all Person nodes",
+      "Who are Alice's friends?"
+    ];
+    
+    // eslint-disable-next-line no-restricted-syntax
+    for (const message of messages) {
+      // eslint-disable-next-line no-await-in-loop
+      await chat.fillChatInput(message);
+      // eslint-disable-next-line no-await-in-loop
+      await chat.waitForChatSendButtonEnabled(); // Wait for button to be ready for next message
+      // eslint-disable-next-line no-await-in-loop
+      await chat.clickChatSendButton();
+    }
+
+    // Verify that we have exactly 7 user messages displayed
+    const graph1MessageCount = await chat.getChatUserMessagesCount();
+    expect(graph1MessageCount).toBe(7);
+    
+    // Get the last user message to verify it's the 7th question
+    const lastMessage = await chat.getLastUserMessageContent();
+    expect(lastMessage).toContain("Who are Alice's friends?");
+  
+    // Switch to graph2
+    await chat.selectGraphByName(graph2Name);
+    await chat.waitForTimeout(500);
+    
+    // Verify chat is empty for graph2 (no messages from graph1)
+    const graph2MessageCount = await chat.getChatUserMessagesCount();
+    expect(graph2MessageCount).toBe(0);
+    
+    // Send a message to graph2 (about Xavier and Yara)
+    await chat.fillChatInput("Who does Xavier know?");
+    await chat.clickChatSendButton();
+    await chat.waitForTimeout(500);
+    
+    // Verify graph2 has 1 message
+    const graph2MessageCountAfter = await chat.getChatUserMessagesCount();
+    expect(graph2MessageCountAfter).toBe(1);
+    
+    // Switch back to graph1
+    await chat.selectGraphByName(graph1Name);
+    
+    // After reload/re-selecting graph, verify only maxSavedMessages (5) are loaded from localStorage
+    // The getLastUserMessagesWithContext function should have limited it to 5 user messages
+    const graph1ReloadedCount = await chat.getChatUserMessagesCount();
+    
+    // Should have 5 user messages (maxSavedMessages limit applied from localStorage)
+    expect(graph1ReloadedCount).toBe(maxSavedMessages);
+    
+    // Get all user messages and check the first one
+    const firstVisibleMessage = await chat.getFirstUserMessageContent();
+    expect(firstVisibleMessage).toContain(messages[messages.length - maxSavedMessages]);
+    
+    // Verify the last message is still the 7th question
+    const lastVisibleMessage = await chat.getLastUserMessageContent();
+    expect(lastVisibleMessage).toContain("Who are Alice's friends?");
+    
+    // Clean up
+    await apiCall.removeGraph(graph1Name);
+    await apiCall.removeGraph(graph2Name);
+  });
 });

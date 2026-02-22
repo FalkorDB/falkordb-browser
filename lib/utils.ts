@@ -411,8 +411,9 @@ export async function fetchOptions(
 
   if (!result.ok) return;
 
+  
   const { opts } = (await result.json()) as { opts: string[] };
-
+  
   setOptions(opts);
 
   if (
