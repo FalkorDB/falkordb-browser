@@ -237,7 +237,7 @@ export default function BrowserSettings() {
     const handleAddCaptionKey = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
-        if (!newCaption.trim()) return;
+        if (!newCaption.trim() || newCaptionsKeys.includes(newCaption)) return;
 
         setNewCaptionsKeys(prev => [...prev, newCaption]);
         setNewCaption("");

@@ -435,7 +435,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       handleCooldown(-1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graphName, limit, timeout, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries, showMemoryUsage]);
+  }, [graphName, limit, timeout, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries, showMemoryUsage, captionsKeys, showPropertyKeyPrefix]);
 
   const graphContext = useMemo(() => ({
     graph,
