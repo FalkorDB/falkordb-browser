@@ -8,7 +8,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { ImperativePanelHandle } from "react-resizable-panels";
 import type { GraphData as CanvasData } from "@falkordb/canvas";
 import { Label, Graph, GraphData, Link, Node, Relationship } from "../api/graph/model";
-import { IndicatorContext, SchemaContext } from "../components/provider";
+import { BrowserSettingsContext, IndicatorContext, SchemaContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import DataPanel from "./DataPanel";
 import SchemaCreateElement from "./CreateElementPanel";
@@ -38,7 +38,7 @@ export default function Page() {
         schemaNames,
         setSchemaNames
     } = useContext(SchemaContext);
-
+    const { settings: { captionsKeysSettings: { captionsKeys }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
     const { toast } = useToast();
 
     const panelRef = useRef<ImperativePanelHandle>(null);
@@ -117,9 +117,9 @@ export default function Page() {
         }, toast, setIndicator);
         if (!result.ok) return;
         const json = await result.json();
-        const schemaGraph = Graph.create(schemaName, json.result, 0, undefined, true);
+        const schemaGraph = Graph.create(schemaName, json.result,captionsKeys, showPropertyKeyPrefix, 0, undefined, true);
         setSchema(schemaGraph);
-    }, [setIndicator, setSchema, toast, schemaName]);
+    }, [setIndicator, setSchema, toast, schemaName, captionsKeys, showPropertyKeyPrefix]);
 
     useEffect(() => {
         if (!schemaName) return;

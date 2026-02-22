@@ -25,6 +25,14 @@ type BrowserSettingsContextType = {
       newContentPersistence: boolean;
       setNewContentPersistence: Dispatch<SetStateAction<boolean>>;
     };
+    captionsKeysSettings: {
+      newCaptionsKeys: string[];
+      setNewCaptionsKeys: Dispatch<SetStateAction<string[]>>;
+    };
+    showPropertyKeyPrefixSettings: {
+      newShowPropertyKeyPrefix: boolean;
+      setNewShowPropertyKeyPrefix: Dispatch<SetStateAction<boolean>>;
+    };
     chatSettings: {
       newSecretKey: string;
       setNewSecretKey: Dispatch<SetStateAction<string>>;
@@ -60,6 +68,14 @@ type BrowserSettingsContextType = {
     contentPersistenceSettings: {
       contentPersistence: boolean;
       setContentPersistence: Dispatch<SetStateAction<boolean>>;
+    };
+    showPropertyKeyPrefixSettings: {
+      showPropertyKeyPrefix: boolean;
+      setShowPropertyKeyPrefix: Dispatch<SetStateAction<boolean>>;
+    };
+    captionsKeysSettings: {
+      captionsKeys: string[];
+      setCaptionsKeys: Dispatch<SetStateAction<string[]>>;
     };
     chatSettings: {
       secretKey: string;
@@ -183,6 +199,14 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         newContentPersistence: false,
         setNewContentPersistence: () => {},
       },
+      captionsKeysSettings: {
+        newCaptionsKeys: [],
+        setNewCaptionsKeys: () => {},
+      },
+      showPropertyKeyPrefixSettings: {
+        newShowPropertyKeyPrefix: false,
+        setNewShowPropertyKeyPrefix: () => {},
+      },
       chatSettings: {
         newSecretKey: "",
         setNewSecretKey: () => {},
@@ -212,6 +236,14 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
       contentPersistenceSettings: {
         contentPersistence: false,
         setContentPersistence: () => {},
+      },
+      captionsKeysSettings: {
+        captionsKeys: [],
+        setCaptionsKeys: () => {},
+      },
+      showPropertyKeyPrefixSettings: {
+        showPropertyKeyPrefix: false,
+        setShowPropertyKeyPrefix: () => {},
       },
       chatSettings: {
         secretKey: "",

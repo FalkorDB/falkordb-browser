@@ -281,18 +281,18 @@ function findMatchingBrace(str: string, startIndex: number): number {
   let depth = 0;
   let inSingleQuote = false;
   let inDoubleQuote = false;
-  
+
   for (let i = startIndex; i < str.length; i += 1) {
     const char = str[i];
     const prevChar = i > 0 ? str[i - 1] : '';
-    
+
     // Toggle quote state (ignore escaped quotes)
     if (char === "'" && prevChar !== '\\') {
       inSingleQuote = !inSingleQuote;
     } else if (char === '"' && prevChar !== '\\') {
       inDoubleQuote = !inDoubleQuote;
     }
-    
+
     // Only count braces when not inside a string literal
     if (!inSingleQuote && !inDoubleQuote) {
       if (char === '{') {
@@ -319,7 +319,7 @@ function findMatchingBrace(str: string, startIndex: number): number {
  */
 function hasCallBlockWithReturnNoLimit(query: string): boolean {
   let searchStart = 0;
-  
+
   // Iterate through all CALL blocks in the query
   while (searchStart < query.length) {
     const callMatch = /\bCALL\s*\{/i.exec(query.substring(searchStart));
@@ -334,7 +334,7 @@ function hasCallBlockWithReturnNoLimit(query: string): boolean {
       // Stop at the next major clause (UNION, WITH, MATCH, CALL, etc.) or end of query
       const afterCallBlock = query.substring(closeBraceIndex + 1);
       const nextClauseMatch = afterCallBlock.match(/\b(UNION|WITH|MATCH|CALL|CREATE|MERGE|DELETE|SET|REMOVE)\b/i);
-      const relevantPart = nextClauseMatch 
+      const relevantPart = nextClauseMatch
         ? afterCallBlock.substring(0, nextClauseMatch.index)
         : afterCallBlock;
 
@@ -350,7 +350,7 @@ function hasCallBlockWithReturnNoLimit(query: string): boolean {
       searchStart = openBraceIndex + 1;
     }
   }
-  
+
   return false;
 }
 
@@ -423,6 +423,9 @@ export async function fetchOptions(
   )
     setSelectedValue(formatName(opts[0]));
 }
+
+export const areCaptionKeysEqual = (left: string[], right: string[]) =>
+  left.length === right.length && left.every((key, index) => key === right[index]);
 
 export function getTheme(theme: string | undefined) {
   let currentTheme = theme;

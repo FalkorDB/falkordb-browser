@@ -28,20 +28,12 @@ export default class CustomizeStylePage extends GraphInfoPage {
     return this.page.getByText("Size:");
   }
 
-  private get captionSection(): Locator {
-    return this.page.getByText("Caption:");
-  }
-
   private get colorButtons(): Locator {
     return this.page.locator('button[aria-label^="Select color"]');
   }
 
   private get sizeButtons(): Locator {
     return this.page.locator('button[aria-label^="Select size"]');
-  }
-
-  private captionOption(caption: string): Locator {
-    return this.page.locator(`button[aria-label="Select caption ${caption}"]`);
   }
 
   private get closeButton(): Locator {
@@ -96,10 +88,6 @@ export default class CustomizeStylePage extends GraphInfoPage {
     return waitForElementToBeVisible(this.sizeSection);
   }
 
-  async isCaptionSectionVisible(): Promise<boolean> {
-    return waitForElementToBeVisible(this.captionSection);
-  }
-
   async selectFirstColor(): Promise<void> {
     await interactWhenVisible(
       this.colorButtons.first(),
@@ -132,14 +120,6 @@ export default class CustomizeStylePage extends GraphInfoPage {
     );
   }
 
-  async selectCaption(caption: string): Promise<void> {
-    await interactWhenVisible(
-      this.captionOption(caption),
-      (el) => el.click(),
-      `Caption Option ${caption}`
-    );
-  }
-
   async closePanel(): Promise<void> {
     await interactWhenVisible(
       this.closeButton,
@@ -166,7 +146,6 @@ export default class CustomizeStylePage extends GraphInfoPage {
   async getLabelStyleFromLocalStorage(label: string): Promise<{
     color?: string;
     size?: number;
-    caption?: string;
   } | null> {
     const style = await this.page.evaluate((labelName) => {
       const stored = localStorage.getItem(`labelStyle_${labelName}`);

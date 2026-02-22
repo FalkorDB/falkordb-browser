@@ -12,7 +12,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { ImperativePanelHandle } from "react-resizable-panels";
 import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
-import { Graph, GraphData, GraphInfo, HistoryQuery, MemoryValue, Query, Data, Label, Relationship } from "./api/graph/model";
+import { Graph, GraphData, GraphInfo, HistoryQuery, MemoryValue, Query, Data, Label, Relationship, InfoLabel } from "./api/graph/model";
 import Header from "./components/Header";
 import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ForceGraphContext, TableViewContext, ConnectionContext } from "./components/provider";
 import Tutorial from "./components/Tutorial";
@@ -102,9 +102,13 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [showMemoryUsage, setShowMemoryUsage] = useState(false);
   const [labels, setLabels] = useState<Label[]>([]);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
-  const [customizingLabel, setCustomizingLabel] = useState<Label | null>(null);
+  const [customizingLabel, setCustomizingLabel] = useState<InfoLabel | null>(null);
   const [dbVersion, setDbVersion] = useState<string>("");
   const [connectionType, setConnectionType] = useState<ConnectionType>("Standalone");
+  const [captionsKeys, setCaptionsKeys] = useState<string[]>([]);
+  const [newCaptionsKeys, setNewCaptionsKeys] = useState<string[]>([]);
+  const [newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix] = useState<boolean>(false);
+  const [showPropertyKeyPrefix, setShowPropertyKeyPrefix] = useState<boolean>(false);
 
   const replayTutorial = useCallback(() => {
     router.push("/graph");
@@ -125,6 +129,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       runDefaultQuerySettings: { newRunDefaultQuery, setNewRunDefaultQuery },
       defaultQuerySettings: { newDefaultQuery, setNewDefaultQuery },
       contentPersistenceSettings: { newContentPersistence, setNewContentPersistence },
+      captionsKeysSettings: { newCaptionsKeys, setNewCaptionsKeys },
+      showPropertyKeyPrefixSettings: { newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
       chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages },
       graphInfo: { newRefreshInterval, setNewRefreshInterval }
     },
@@ -134,6 +140,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       runDefaultQuerySettings: { runDefaultQuery, setRunDefaultQuery },
       defaultQuerySettings: { defaultQuery, setDefaultQuery },
       contentPersistenceSettings: { contentPersistence, setContentPersistence },
+      captionsKeysSettings: { captionsKeys, setCaptionsKeys },
+      showPropertyKeyPrefixSettings: { showPropertyKeyPrefix, setShowPropertyKeyPrefix },
       chatSettings: { secretKey, setSecretKey, model, setModel, maxSavedMessages, setMaxSavedMessages },
       graphInfo: { showMemoryUsage, refreshInterval, setRefreshInterval }
     },
@@ -151,6 +159,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       localStorage.setItem("refreshInterval", newRefreshInterval.toString());
       localStorage.setItem("model", newModel);
       localStorage.setItem("maxSavedMessages", newMaxSavedMessages.toString());
+      localStorage.setItem("captionsKeys", JSON.stringify(newCaptionsKeys));
+      localStorage.setItem("showPropertyKeyPrefix", newShowPropertyKeyPrefix.toString());
 
       // Only encrypt and save secret key if it has changed
       if (newSecretKey !== secretKey) {
@@ -202,6 +212,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setModel(newModel);
       setRefreshInterval(newRefreshInterval);
       setMaxSavedMessages(newMaxSavedMessages);
+      setCaptionsKeys(newCaptionsKeys);
+      setShowPropertyKeyPrefix(newShowPropertyKeyPrefix);
       // Reset has changes
       setHasChanges(false);
 
@@ -221,10 +233,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setNewModel(model);
       setNewRefreshInterval(refreshInterval);
       setNewMaxSavedMessages(maxSavedMessages);
+      setNewCaptionsKeys(captionsKeys);
+      setNewShowPropertyKeyPrefix(showPropertyKeyPrefix);
       setHasChanges(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, toast]);
+  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, toast]);
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -381,7 +395,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       if (!explain.ok) throw new Error("Failed to fetch explain plan");
 
       const explainJson = await explain.json();
-      const g = Graph.create(n, result, existingLimit, graphI);
+      const g = Graph.create(n, result, captionsKeys, showPropertyKeyPrefix, existingLimit, graphI);
 
       newQuery = {
         ...newQuery,
@@ -421,7 +435,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       handleCooldown(-1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graphName, limit, timeout, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries, showMemoryUsage]);
+  }, [graphName, limit, timeout, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries, showMemoryUsage, captionsKeys, showPropertyKeyPrefix]);
 
   const graphContext = useMemo(() => ({
     graph,
@@ -509,6 +523,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setTutorialOpen(localStorage.getItem("tutorial") !== "false");
       setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30));
       setMaxSavedMessages(parseInt(localStorage.getItem("maxSavedMessages") || "5", 10));
+      setCaptionsKeys(JSON.parse(localStorage.getItem("captionsKeys") || '["name", "title"]'));
+      setShowPropertyKeyPrefix(localStorage.getItem("showPropertyKeyPrefix") === "true");
 
       // Decrypt secret key if encrypted, or migrate plain text keys to encrypted format
       const storedSecretKey = localStorage.getItem("secretKey") || "";
