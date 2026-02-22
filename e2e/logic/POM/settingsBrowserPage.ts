@@ -15,6 +15,10 @@ export default class SettingsBrowserPage extends BasePage {
     return this.page.getByTestId("chatApiKeyInput");
   }
 
+  private get maxSaveMessagesInput(): Locator {
+    return this.page.getByTestId("maxSaveMessagesInput");
+  }
+
   // Save/Cancel Buttons
   private get saveSettingsButton(): Locator {
     return this.page.getByTestId("saveSettingsButton");
@@ -98,6 +102,25 @@ export default class SettingsBrowserPage extends BasePage {
       this.chatApiKeyInput,
       (el) => el.clear(),
       "Chat API Key Input Clear"
+    );
+  }
+
+  async fillMaxSavedMessages(value: number): Promise<void> {
+    await interactWhenVisible(
+      this.maxSaveMessagesInput,
+      async (el) => {
+        await el.clear();
+        await el.fill(value.toString());
+      },
+      "Max Saved Messages Input"
+    );
+  }
+
+  async getMaxSavedMessagesValue(): Promise<string> {
+    return interactWhenVisible(
+      this.maxSaveMessagesInput,
+      (el) => el.inputValue(),
+      "Max Saved Messages Value"
     );
   }
 

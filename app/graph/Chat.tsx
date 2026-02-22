@@ -81,7 +81,7 @@ export default function Chat({ onClose }: Props) {
         }).filter(m => !!m);
 
         setMessagesList(newMessagesList);
-    }, [messages]);
+    }, [maxSavedMessages, messages]);
 
     const scrollToBottom = () => {
         const chatContainer = document.querySelector(".chat-container");
