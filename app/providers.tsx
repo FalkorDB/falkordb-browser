@@ -102,6 +102,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [showMemoryUsage, setShowMemoryUsage] = useState(false);
   const [labels, setLabels] = useState<Label[]>([]);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
+  const [customizingLabel, setCustomizingLabel] = useState<Label | null>(null);
   const [dbVersion, setDbVersion] = useState<string>("");
   const [connectionType, setConnectionType] = useState<ConnectionType>("Standalone");
 
@@ -326,7 +327,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
   const handelGetNewQueries = useCallback((newQuery: Query) => [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), newQuery], [historyQuery.queries]);
 
-  const runQuery = useCallback(async (q: string, name?: string): Promise<void> => {
+  const runQuery = useCallback(async (q: string, name?: string, saveContext = true): Promise<void> => {
     const n = name || graphName;
     let newQuery: Query = {
       elementsCount: 0,
@@ -396,7 +397,9 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       fetchCount(n);
       setLastLimit(limit);
 
-      localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }));
+      if (saveContext) {
+        localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }));
+      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -635,8 +638,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
           (alice)-[:WORKS_WITH]->(diana)
       `;
 
-      await getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, toast, setIndicator);
-
       // Create social-test demo graph
       const socialTestQuery = `
       CREATE 
@@ -645,14 +646,18 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       (eve)-[:FOLLOWS]->(frank)
       `;
 
-      await getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, toast, setIndicator);
+      await Promise.all([
+        getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, toast, setIndicator),
+        getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, toast, setIndicator)
+      ]);
 
       // Update graph list to only show demo graphs
       setGraphNames(["social-demo", "social-demo-test"]);
       setGraphName("");
       setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }));
       setGraph(Graph.empty());
-
+      setData({ nodes: [], links: [] });
+      setCustomizingLabel(null);
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("Failed to load demo graphs", error);
@@ -682,6 +687,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     // Clear current graph to avoid showing deleted demo graph
     setGraph(Graph.empty());
     setGraphInfo(GraphInfo.empty());
+    setData({ nodes: [], links: [] });
 
     if (userGraphBeforeTutorial && userGraphsBeforeTutorial.includes(userGraphBeforeTutorial)) {
       setGraphName(userGraphBeforeTutorial);
@@ -752,6 +758,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                               >
                                 <GraphInfoPanel
                                   onClose={onExpand}
+                                  customizingLabel={customizingLabel}
+                                  setCustomizingLabel={setCustomizingLabel}
                                 />
                               </ResizablePanel>
                               <ResizableHandle withHandle onMouseUp={() => isCollapsed && onExpand()} className={cn("w-0", isCollapsed && "hidden")} />

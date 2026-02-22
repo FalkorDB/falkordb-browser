@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { Dispatch, SetStateAction, useContext } from "react";
 import { Loader2, X, Palette } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -14,9 +14,7 @@ import CustomizeStylePanel from "./CustomizeStylePanel";
  * @param onClose - Callback invoked when the panel's close button is clicked
  * @returns The Graph Info panel React element containing graph name, memory usage, node/edge counts, property keys, and query buttons
  */
-export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
-    const [customizingLabel, setCustomizingLabel] = useState<Label | null>(null);
-
+export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizingLabel }: { onClose: () => void, customizingLabel: Label | null, setCustomizingLabel: Dispatch<SetStateAction<Label | null>> }) {
     const { graph, graphInfo: { Labels, Relationships, PropertyKeys, MemoryUsage }, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
     const { settings: { graphInfo: { showMemoryUsage } } } = useContext(BrowserSettingsContext);

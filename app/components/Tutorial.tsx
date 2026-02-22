@@ -4,6 +4,9 @@
 
 import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
+import { Copy, CornerDownLeft, CornerDownRight, CornerLeftDown, CornerRightDown } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
+import { cn } from "@/lib/utils";
 import Button from "./ui/Button";
 
 interface TutorialStep {
@@ -14,19 +17,31 @@ interface TutorialStep {
     spotlightSelector?: string;
     placementAxis?: "x" | "y";
     advanceOn?: string;
+    advanceCondition?: () => boolean;
     forward?: (keyof HTMLElementEventMap)[];
     hidePrev?: boolean;
 }
 
-const parseDescription = (description: string) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const parseDescription = (description: string, toast: any) => {
     const parts = description.split(/(```[\s\S]*?```)/);
     return parts.map((part, index) => {
         if (part.startsWith('```') && part.endsWith('```')) {
             const code = part.slice(3, -3).trim();
             return (
-                <code key={index} className="block mt-2 bg-muted px-3 py-2 rounded text-sm font-mono text-foreground whitespace-pre-wrap">
-                    {code}
-                </code>
+                <div key={index} className="flex gap-2 items-center">
+                    <code className="block bg-foreground px-3 py-2 rounded text-sm font-mono text-background whitespace-pre-wrap">
+                        {code}
+                    </code>
+                    <Button
+                        title="Copy"
+                        onClick={() => {
+                            navigator.clipboard.writeText(code).then(() => toast({ title: "Code copied to clipboard!" })).catch(() => toast({ title: "Failed to copy code", variant: "destructive" }));
+                        }}
+                    >
+                        <Copy className="w-4 h-4" />
+                    </Button>
+                </div>
             );
         }
         return <span key={index}>{part}</span>;
@@ -41,79 +56,117 @@ const tutorialSteps: TutorialStep[] = [
     },
     {
         title: "Welcome to FalkorDB Browser",
-        description: "Let's take a quick tour to help you get started with the graph database interface. This tour will guide you through the key features.",
+        description: "Let's take a quick tour to help you get started with the graph database interface. This tour will guide you through the main features.",
         position: { top: "50%", left: "50%" }
     },
     {
         title: "Select a Graph",
         description: "This dropdown lets you select which graph to work with. We've loaded demo graphs for this tour. Click the highlighted dropdown to see them.",
-        targetSelector: '[data-testid="selectGraph"]',
         placementAxis: "x",
+        targetSelector: '[data-testid="selectGraph"]',
         advanceOn: "pointerdown",
         forward: ["mouseenter", "mouseleave"],
     },
     {
         title: "Manage Graphs",
-        description: "The Manage button opens a comprehensive interface where you can create new graphs, delete existing ones, duplicate graphs with all their data, and export graphs to .dump files for backup or sharing.",
-        targetSelector: '[data-testid="manageGraphs"]',
+        description: "The Manage button opens a comprehensive interface where you can delete existing graphs, duplicate graphs with all their data, and export graphs to .dump files for backup or sharing.",
         placementAxis: "x",
+        targetSelector: '[data-testid="manageGraphs"]',
         advanceOn: "click",
         forward: ["mouseenter", "mouseleave"],
         hidePrev: true
     },
     {
         title: "Manage Graphs Window",
-        description: "Here you can see all your graphs and manage them. Each graph has actions to delete, duplicate (with all data), or export to a .dump file. You can also create new graphs from this interface. When you're done, click the close button to return to the main view.",
-        targetSelector: '[data-testid="manageContent"]',
+        description: "Here you can see all your graphs and their main data points and manage them. Each graph has actions to delete, duplicate (with all data), or export to a .dump file.",
         placementAxis: "x",
+        targetSelector: '[data-testid="manageContent"]',
         hidePrev: true
     },
     {
         title: "Close Manage Graphs Window",
-        description: "Here you can see all your graphs and manage them. Each graph has actions to delete, duplicate (with all data), or export to a .dump file. You can also create new graphs from this interface. When you're done, click the close button to return to the main view.",
-        targetSelector: '[data-testid="closeManage"]',
+        description: "When you're done, click the close button to return to the main view.",
         placementAxis: "x",
+        targetSelector: '[data-testid="closeManage"]',
         advanceOn: "click",
         forward: ["mouseenter", "mouseleave"],
     },
     {
         title: "Select a Demo Graph",
-        description: "Click on the 'social-demo' option to select and load this demo graph. It contains sample social network data with users, posts, and relationships that you can explore. Click the highlighted option to continue.",
-        targetSelector: '[data-testid="selectGraphsocial-demoButton"]',
+        description: "Click on the 'social-demo' option to select and load this demo graph. It contains sample social network data with users, posts, and relationships that you can explore.",
         placementAxis: "x",
+        targetSelector: '[data-testid="selectGraphsocial-demoButton"]',
         advanceOn: "click",
         forward: ["mouseenter", "mouseleave"],
         hidePrev: true
     },
     {
         title: "Graph Info Panel",
-        description: "The Graph Info panel displays node labels, edge types, and graph statistics.",
-        targetSelector: '[data-testid="graphInfoPanel"]',
+        description: "The Graph Info panel displays node labels, edge types, and graph statistics. You can click on the elements to trigger a custom query that filters the graph by that label or edge type. This is a great way to explore the structure of your graph and understand what data it contains.",
         placementAxis: "x",
+        targetSelector: '[data-testid="graphInfoPanel"]',
         hidePrev: true
     },
     {
-        title: "Get all nodes",
-        description: "Click this button to retrieve all nodes in the graph. This will show you the total count and basic information about all nodes.",
-        targetSelector: '[data-testid="graphInfoAllNodes"]',
+        title: "Customize Label Styles",
+        description: "You can customize how nodes with specific labels appear in the graph. Click the palette icon next to the 'Person' label to open the style customization panel.",
         placementAxis: "x",
+        targetSelector: '[data-testid="customizeStylePerson"]',
         advanceOn: "click",
-        forward: ["mouseenter", "mouseleave"]
+        forward: ["mouseenter", "mouseleave"],
+    },
+    {
+        title: "Choose Node Color",
+        description: "Select a color for nodes with this label. Choose from the preset colors or use the RGB color picker for custom colors. Your changes are previewed immediately.",
+        placementAxis: "x",
+        targetSelector: 'button[aria-label^="Select color"]',
+        advanceOn: "click",
+        hidePrev: true
+    },
+    {
+        title: "Adjust Node Size",
+        description: "Change the size of nodes with this label. Select from the available size options to make nodes larger or smaller in the visualization.",
+        placementAxis: "x",
+        targetSelector: 'button[aria-label^="Select size"]',
+        advanceOn: "click",
+    },
+    {
+        title: "Set Node Caption",
+        description: "Choose which property to display as the caption on nodes. You can select any property from the dropdown or choose 'ID' to display the internal ID.",
+        placementAxis: "x",
+        targetSelector: 'button[aria-label^="Select caption"]',
+        advanceOn: "click",
+    },
+    {
+        title: "Save Style Changes",
+        description: "Click 'Save Changes' to apply your node style customizations to the graph.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="saveStyleChanges"]',
+        advanceOn: "click",
+    },
+    {
+        title: "Get all nodes (*)",
+        description: "Click this button to retrieve all nodes in the graph. This will show you the total count and basic information about all nodes.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="graphInfoAllNodes"]',
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave"],
+        hidePrev: true
     },
     {
         title: "Get KNOWS edge",
         description: "Click this button to retrieve all edges of type 'KNOWS' in the graph. This will show you the count and details of all KNOWS relationships.",
-        targetSelector: '[data-testid="graphInfoKNOWSEdge"]',
         placementAxis: "x",
+        targetSelector: '[data-testid="graphInfoKNOWSEdge"]',
         advanceOn: "click",
         forward: ["mouseenter", "mouseleave"]
     },
     {
         title: "Query Editor",
         description: "Write and execute your Cypher queries here. Try modifying the query by adding a filter, for example: ```MATCH p=()-[r:KNOWS]-() WHERE r.since > 2018 RETURN p```. Then click Run to execute your modified query.",
+        placementAxis: "y",
         targetSelector: '[data-testid="editorRun"]',
         spotlightSelector: '[data-testid="editor"]',
-        placementAxis: "y",
         advanceOn: "click",
         forward: ["mouseenter", "mouseleave"],
         hidePrev: true
@@ -125,7 +178,28 @@ const tutorialSteps: TutorialStep[] = [
         targetSelector: 'falkordb-canvas',
         spotlightSelector: '[data-testid="graphView"]',
         forward: ["mousedown", "mouseup", "mousemove", "mouseenter", "mouseleave", "mouseover", "mouseout", "contextmenu", "pointerdown", "pointerup", "pointermove", "pointerenter", "pointerleave", "wheel"],
-        hidePrev: true
+    },
+    {
+        title: "View Node / Edge Details",
+        description: "Now let's explore node or edge data. Right-click on any node or edge in the graph to open the data panel and view its properties, labels, and relationships.",
+        placementAxis: "x",
+        targetSelector: 'falkordb-canvas',
+        spotlightSelector: '[data-testid="graphView"]',
+        advanceOn: "contextmenu",
+        advanceCondition: () => !!document.querySelector('[data-testid="DataPanel"]'),
+        forward: ["mousedown", "mouseup", "mousemove", "mouseenter", "mouseleave", "mouseover", "mouseout", "contextmenu", "pointerdown", "pointerup", "pointermove", "pointerenter", "pointerleave", "wheel"],
+    },
+    {
+        title: "Data Panel",
+        description: "The data panel displays detailed information about the selected node or edge, including all properties, labels, and IDs. You can edit properties, add or remove labels, and manage attributes from here.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="DataPanel"]',
+    },
+    {
+        title: "Graph Action Toolbar",
+        description: "Use these action buttons to edit your graph. Add new nodes (circle icon), create edges between nodes (arrow icon) (you can see the add edge button only when there are two nodes selected, see the info), or delete selected elements. The info button provides helpful tips for selecting and managing multiple graph elements.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="elementCanvasToolbarActionGraph"]',
     },
     {
         title: "Table Results",
@@ -134,6 +208,12 @@ const tutorialSteps: TutorialStep[] = [
         targetSelector: '[data-testid="tableTab"]',
         advanceOn: "mousedown",
         forward: ["mousedown", "mouseenter", "mouseleave"],
+    },
+    {
+        title: "Export Table Results",
+        description: "Click this button to export the table results. This allows you to save the query results for further analysis or sharing.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="exportTableViewButton"]',
         hidePrev: true
     },
     {
@@ -143,7 +223,6 @@ const tutorialSteps: TutorialStep[] = [
         targetSelector: '[data-testid="metadataTab"]',
         advanceOn: "mousedown",
         forward: ["mousedown", "mouseenter", "mouseleave"],
-        hidePrev: true
     },
     {
         title: "Query History",
@@ -156,31 +235,30 @@ const tutorialSteps: TutorialStep[] = [
     },
     {
         title: "Query History Window",
-        description: "Access your previous queries here. You can filter by graph, search queries, and view metadata for each executed query.",
+        description: "Access your previous queries here. You can also remove queries from your history or clear the entire history.",
         placementAxis: "y",
         targetSelector: '[data-testid="queryHistoryContent"]',
         hidePrev: true
     },
     {
         title: "Close Query History Window",
-        description: "Access your previous queries here. You can filter by graph, search queries, and view metadata for each executed query.",
+        description: "",
         placementAxis: "y",
         targetSelector: '[data-testid="closeQueryHistory"]',
         advanceOn: "click",
         forward: ["mouseenter", "mouseleave"],
-        hidePrev: true
     },
     {
         title: "Theme Toggle",
-        description: "Switch between light and dark themes for a comfortable viewing experience.",
+        description: "Switch between light, dark, and system themes for a comfortable viewing experience.",
         placementAxis: "x",
         targetSelector: '[data-testid="themeToggle"]',
         hidePrev: true
     },
     {
-        title: "Settings",
-        description: "Access browser settings to configure query limits, timeouts, default queries, AI chat features, and more. You can also retake this tour from settings.",
-        targetSelector: '[data-testid="settings"]',
+        title: "Left Menu Navigation",
+        description: "Here you can navigate between different sections of the application, such as the main graph view, and settings. You can activate side panels such as the graph info panel, and chat panel",
+        targetSelector: '[data-testid="NavigationButtons"]',
     },
     {
         title: "You're All Set!",
@@ -188,6 +266,22 @@ const tutorialSteps: TutorialStep[] = [
         position: { top: "50%", left: "50%" }
     }
 ];
+
+// Arrow icon component based on direction
+function ArrowIcon({ direction }: { direction: "left" | "right" | "top" | "bottom" }) {
+    switch (direction) {
+        case "left":
+            return <CornerDownLeft className="w-full h-full" strokeWidth={2.5} />;
+        case "right":
+            return <CornerDownRight className="w-full h-full" strokeWidth={2.5} />;
+        case "top":
+            // Flip vertically to point upward
+            return <CornerRightDown className="w-full h-full" strokeWidth={2.5} style={{ transform: 'scaleY(-1)' }} />;
+        case "bottom":
+        default:
+            return <CornerLeftDown className="w-full h-full" strokeWidth={2.5} />;
+    }
+}
 
 function TutorialPortal({
     step,
@@ -200,131 +294,19 @@ function TutorialPortal({
     onPrev: () => void;
     onClose: () => void;
 }) {
+    const { toast } = useToast();
+
     const [mounted, setMounted] = useState(false);
-    const [currentPosition, setCurrentPosition] = useState<{ top?: string; bottom?: string; left?: string; right?: string; transform?: string }>({ transform: "" });
-    const [direction, setDirection] = useState<"left" | "right" | "top" | "bottom">();
     const [targetDisabled, setTargetDisabled] = useState(false);
+    const [arrowStyle, setArrowStyle] = useState<React.CSSProperties>({ display: 'none' });
+    const [arrowDirection, setArrowDirection] = useState<"left" | "right" | "top" | "bottom">("top");
     const tooltipRef = useRef<HTMLDivElement>(null);
     const currentStep = tutorialSteps[step];
-    const { targetSelector, advanceOn, forward, description, position, title, hidePrev, placementAxis } = currentStep;
+    const { targetSelector, advanceOn, forward, description, position, title, hidePrev, spotlightSelector, placementAxis } = currentStep;
 
     useEffect(() => {
         setMounted(true);
     }, []);
-
-    // Calculate position based on target element
-    useEffect(() => {
-        if (!targetSelector) {
-            setCurrentPosition({ ...position, transform: "translate(-50%, -50%)" });
-            return () => { };
-        }
-
-        const element = document.querySelector(targetSelector);
-        const currentTooltip = tooltipRef.current;
-
-        if (!element || !currentTooltip) {
-            setCurrentPosition({ ...position, transform: "translate(-50%, -50%)" });
-            return () => { };
-        }
-
-        // Get actual tooltip dimensions from ref
-        const tooltipRect = tooltipRef.current.getBoundingClientRect();
-        const tooltipWidth = tooltipRect.width;
-        const tooltipHeight = tooltipRect.height;
-
-        const updatePosition = () => {
-            const rect = element.getBoundingClientRect();
-            const offset = 60; // Distance from the element
-            const padding = 4; // Distance from viewport edges
-
-
-            let calculatedPosition: { top?: string; bottom?: string; left?: string; right?: string; transform: string };
-            let computedDirection: "left" | "right" | "top" | "bottom" | undefined;
-
-            // Axis-driven auto placement overrides default when provided
-            if (placementAxis === "x") {
-                const elementCenterX = rect.left + rect.width / 2;
-                const viewportCenterX = window.innerWidth / 2;
-                // If element on the left side, place tooltip to the right of it (arrow pointing left)
-                // If element on the right side, place tooltip to the left of it (arrow pointing right)
-                computedDirection = elementCenterX < viewportCenterX ? "left" : "right";
-            }
-            if (placementAxis === "y") {
-                const elementCenterY = rect.top + rect.height / 2;
-                const viewportCenterY = window.innerHeight / 2;
-                // If element above center, place tooltip below (arrow pointing up)
-                // If element below center, place tooltip above (arrow pointing down)
-                computedDirection = elementCenterY < viewportCenterY ? "top" : "bottom";
-            }
-
-            switch (computedDirection) {
-                case "left": {
-                    // Right of the element, centered vertically
-                    let y = rect.top + rect.height / 2;
-                    let x = rect.right + offset;
-                    y = Math.min(window.innerHeight - tooltipHeight / 2 - padding, Math.max(tooltipHeight / 2 + padding, y));
-                    x = Math.min(window.innerWidth - tooltipWidth - padding, Math.max(padding, x));
-                    calculatedPosition = { top: `${y}px`, left: `${x}px`, transform: 'translateY(-50%)' };
-                    break;
-                }
-                case "right": {
-                    // Left of the element, centered vertically
-                    let y = rect.top + rect.height / 2;
-                    let x = rect.left - offset - tooltipWidth;
-                    y = Math.min(window.innerHeight - tooltipHeight / 2 - padding, Math.max(tooltipHeight / 2 + padding, y));
-                    x = Math.min(window.innerWidth - tooltipWidth - padding, Math.max(padding, x));
-                    calculatedPosition = { top: `${y}px`, left: `${x}px`, transform: 'translateY(-50%)' };
-                    break;
-                }
-                case "top": {
-                    // Below the element, centered horizontally
-                    let y = rect.bottom + offset;
-                    let x = rect.left + rect.width / 2;
-                    y = Math.min(window.innerHeight - tooltipHeight - padding, Math.max(padding, y));
-                    x = Math.min(window.innerWidth - tooltipWidth / 2 - padding, Math.max(tooltipWidth / 2 + padding, x));
-                    calculatedPosition = { top: `${y}px`, left: `${x}px`, transform: 'translateX(-50%)' };
-                    break;
-                }
-                case "bottom": {
-                    // Above the element, centered horizontally
-                    let y = rect.top - offset - tooltipHeight;
-                    let x = rect.left + rect.width / 2;
-                    y = Math.min(window.innerHeight - tooltipHeight - padding, Math.max(padding, y));
-                    x = Math.min(window.innerWidth - tooltipWidth / 2 - padding, Math.max(tooltipWidth / 2 + padding, x));
-                    calculatedPosition = { top: `${y}px`, left: `${x}px`, transform: 'translateX(-50%)' };
-                    break;
-                }
-                default: {
-                    // Default to right of element
-                    let y = rect.top + rect.height / 2;
-                    let x = rect.right + offset;
-                    y = Math.min(window.innerHeight - tooltipHeight / 2 - padding, Math.max(tooltipHeight / 2 + padding, y));
-                    x = Math.min(window.innerWidth - tooltipWidth - padding, Math.max(padding, x));
-                    calculatedPosition = { top: `${y}px`, left: `${x}px`, transform: 'translateY(-50%)' };
-                }
-            }
-
-            setCurrentPosition(calculatedPosition);
-            setDirection(computedDirection);
-        };
-
-        updatePosition();
-
-        // Set up observers for both element and tooltip changes
-        const elementResizeObserver = new ResizeObserver(updatePosition);
-        const tooltipResizeObserver = new ResizeObserver(updatePosition);
-
-        elementResizeObserver.observe(element);
-        tooltipResizeObserver.observe(tooltipRef.current);
-
-        window.addEventListener('resize', updatePosition);
-
-        return () => {
-            elementResizeObserver.disconnect();
-            tooltipResizeObserver.disconnect();
-            window.removeEventListener('resize', updatePosition);
-        };
-    }, [placementAxis, position, step, targetSelector]);
 
     useEffect(() => {
         const forwardArr = [...(forward || []), advanceOn].filter(ev => !!ev);
@@ -334,13 +316,21 @@ function TutorialPortal({
             const element = document.querySelector(targetSelector);
 
             if (element) {
+                // For falkordb-canvas web component, we need to get the internal canvas from shadow DOM
+                let eventTarget: Element = element;
+                if (element.tagName.toLowerCase() === 'falkordb-canvas' && element.shadowRoot) {
+                    const canvas = element.shadowRoot.querySelector('canvas');
+                    if (canvas) {
+                        eventTarget = canvas;
+                    }
+                }
+
                 // Check if the element is disabled
                 const isDisabled = element instanceof HTMLButtonElement || element instanceof HTMLInputElement
                     ? element.disabled
                     : element.getAttribute('disabled') === 'true' ||
                     element.getAttribute('aria-disabled') === 'true' ||
-                    element.classList.contains('disabled') ||
-                    window.getComputedStyle(element).pointerEvents === 'none';
+                    element.classList.contains('disabled');
 
                 setTargetDisabled(isDisabled);
 
@@ -349,7 +339,7 @@ function TutorialPortal({
                 overlay.style.position = 'fixed';
                 overlay.style.zIndex = '40';
                 overlay.style.cursor = window.getComputedStyle(element).cursor || 'default';
-                overlay.style.pointerEvents = isDisabled ? 'none' : 'auto';
+                overlay.style.pointerEvents = window.getComputedStyle(element).pointerEvents === 'none' ? 'none' : 'auto';
 
                 // Simple wheel event passthrough - only if wheel is in forward array
                 let wheelHandler: ((ev: Event) => void) | null = null;
@@ -369,6 +359,10 @@ function TutorialPortal({
                             cancelable: true,
                         });
                         element.dispatchEvent(newEvent);
+                        // Also dispatch to internal canvas if it exists
+                        if (eventTarget !== element) {
+                            eventTarget.dispatchEvent(newEvent);
+                        }
                     };
                     overlay.addEventListener('wheel', wheelHandler, { passive: true } as EventListenerOptions);
                 }
@@ -385,6 +379,70 @@ function TutorialPortal({
                     overlay.style.left = `${left}px`;
                     overlay.style.width = `${right - left}px`;
                     overlay.style.height = `${bottom - top}px`;
+
+                    // Update arrow position using the same rect
+                    const arrowSelector = targetSelector || spotlightSelector;
+                    if (arrowSelector) {
+                        const offset = 40;
+                        const arrowSize = 30;
+                        const centerX = rect.left + rect.width / 2;
+                        const centerY = rect.top + rect.height / 2;
+
+                        let arrowLeft: number;
+                        let arrowTop: number;
+                        let direction: "left" | "right" | "top" | "bottom";
+
+                        if (placementAxis === "x") {
+                            const viewportCenterX = window.innerWidth / 2;
+
+                            const isElementOnRight = centerX >= viewportCenterX;
+
+                            if (isElementOnRight) {
+                                // Element is on right side, put arrow on left pointing right
+                                direction = "right";
+                                arrowLeft = rect.left - offset;
+                                arrowTop = centerY - arrowSize / 2;
+                            } else {
+                                // Element is on left side, put arrow on right pointing left
+                                direction = "left";
+                                arrowLeft = rect.right + offset;
+                                arrowTop = centerY - arrowSize / 2;
+                            }
+                        } else if (placementAxis === "y") {
+                            const viewportCenterY = window.innerHeight / 2;
+                            const isElementOnTop = centerY < viewportCenterY;
+
+                            if (isElementOnTop) {
+                                // Element is on top, put arrow below it pointing up toward it
+                                direction = "top";
+                                arrowLeft = centerX - arrowSize / 2;
+                                arrowTop = rect.bottom + offset;
+                            } else {
+                                // Element is on bottom, put arrow above it pointing down toward it
+                                direction = "bottom";
+                                arrowLeft = centerX - arrowSize / 2;
+                                arrowTop = rect.top - offset;
+                            }
+                        } else {
+                            // Default: arrow below element pointing up
+                            direction = "top";
+                            arrowLeft = centerX - arrowSize / 2;
+                            arrowTop = rect.bottom + offset;
+                        }
+
+                        setArrowStyle({
+                            position: 'fixed',
+                            left: `${arrowLeft}px`,
+                            top: `${arrowTop}px`,
+                            zIndex: 45,
+                            pointerEvents: 'none',
+                            transition: 'left 300ms ease-in-out, top 300ms ease-in-out',
+                            display: 'block'
+                        });
+                        setArrowDirection(direction);
+                    } else {
+                        setArrowStyle({ display: 'none' });
+                    }
                 };
 
                 const resizeObserver = new ResizeObserver(updateOverlayPosition);
@@ -434,12 +492,13 @@ function TutorialPortal({
                 const forwardKeyboardEvents = ['keydown', 'keyup', 'keypress'] as const;
 
                 const forwardEvent = (ev: Event) => {
-
                     if (advanceOn === ev.type) {
                         // Advance the tutorial on the specified event type. Use a short delay
                         // so the forwarded event can reach the underlying element's handlers first.
                         setTimeout(() => {
-                            onNext();
+                            if ((!currentStep.advanceCondition || currentStep.advanceCondition())) {
+                                onNext();
+                            }
                         }, 200);
                     }
 
@@ -473,6 +532,10 @@ function TutorialPortal({
                             metaKey: ev.metaKey,
                         });
                         element.dispatchEvent(clone);
+                        // Also dispatch to internal canvas if it exists
+                        if (eventTarget !== element) {
+                            eventTarget.dispatchEvent(clone);
+                        }
 
                         return;
                     }
@@ -501,6 +564,10 @@ function TutorialPortal({
                         });
 
                         element.dispatchEvent(clone);
+                        // Also dispatch to internal canvas if it exists
+                        if (eventTarget !== element) {
+                            eventTarget.dispatchEvent(clone);
+                        }
                         return;
                     }
 
@@ -545,66 +612,40 @@ function TutorialPortal({
                     cleanup();
                 };
             }
+        } else {
+            // No target selector, hide the arrow
+            setArrowStyle({ display: 'none' });
         }
 
         return () => { };
-    }, [step, onNext, targetDisabled, forward, advanceOn, targetSelector]);
+    }, [step, onNext, targetDisabled, forward, advanceOn, targetSelector, spotlightSelector, placementAxis, currentStep]);
 
     if (!mounted) return null;
 
     const isLastStep = step === tutorialSteps.length - 1;
 
-    const getArrowStyles = () => {
-        if (!direction) return {};
-
-        const arrowBase = "absolute w-0 h-0 border-solid";
-        const arrowSize = "border-[12px]";
-
-        switch (direction) {
-            case "left":
-                return {
-                    className: `${arrowBase} ${arrowSize} border-transparent border-r-border -left-6 top-8`,
-                    innerClassName: `${arrowBase} ${arrowSize} border-transparent border-r-background -left-[23px] top-8`
-                };
-            case "right":
-                return {
-                    className: `${arrowBase} ${arrowSize} border-transparent border-l-border -right-6 top-8`,
-                    innerClassName: `${arrowBase} ${arrowSize} border-transparent border-l-background -right-[23px] top-8`
-                };
-            case "top":
-                return {
-                    className: `${arrowBase} ${arrowSize} border-transparent border-b-border -top-6 left-8`,
-                    innerClassName: `${arrowBase} ${arrowSize} border-transparent border-b-background -top-[23px] left-8`
-                };
-            case "bottom":
-                return {
-                    className: `${arrowBase} ${arrowSize} border-transparent border-t-border -bottom-6 left-8`,
-                    innerClassName: `${arrowBase} ${arrowSize} border-transparent border-t-background -bottom-[23px] left-8`
-                };
-            default:
-                return {};
-        }
-    };
-
-    const arrowStyles = getArrowStyles();
-
+    // Fixed position style for bottom right
+    let fixedPositionStyle: React.CSSProperties;
+    if (position) {
+        fixedPositionStyle = {
+            ...position,
+            transform: "translate(-50%, -50%)",
+            transition: "top 300ms ease-in-out, left 300ms ease-in-out, right 300ms ease-in-out, bottom 300ms ease-in-out, transform 300ms ease-in-out"
+        };
+    } else {
+        fixedPositionStyle = {
+            bottom: '20px',
+            right: '20px',
+            transition: "top 300ms ease-in-out, left 300ms ease-in-out, right 300ms ease-in-out, bottom 300ms ease-in-out, transform 300ms ease-in-out"
+        };
+    }
 
     const content = (
         <div
             ref={tooltipRef}
             className="fixed bg-background border border-border rounded-lg p-6 shadow-2xl max-w-[500px] z-50 pointer-events-auto"
-            style={{
-                ...currentPosition
-            }}
+            style={fixedPositionStyle}
         >
-            {
-                arrowStyles.className && (
-                    <>
-                        <div className={arrowStyles.className} />
-                        <div className={arrowStyles.innerClassName} />
-                    </>
-                )
-            }
             <div className="space-y-4">
                 <div>
                     {
@@ -617,8 +658,25 @@ function TutorialPortal({
                     <h3 className="text-xl font-semibold">{title}</h3>
                 </div>
                 <div className="text-muted-foreground">
-                    {parseDescription(description)}
+                    {parseDescription(description, toast)}
                 </div>
+                {
+                    step === 1 &&
+                    <>
+                        <div className="flex gap-2 items-center">
+                            <p>shows where you need to look and click</p>
+                            <div className="w-10 h-10 text-primary">
+                                <ArrowIcon direction="right" />
+                            </div>
+                        </div>
+                        <div className="flex gap-2 items-center">
+                            <p>shows where you need to look</p>
+                            <div className="w-10 h-10 text-yellow-200">
+                                <ArrowIcon direction="right" />
+                            </div>
+                        </div>
+                    </>
+                }
                 {
                     advanceOn && targetSelector &&
                     <div className="flex items-center gap-2 p-3 bg-primary/10 rounded-lg">
@@ -668,8 +726,20 @@ function TutorialPortal({
         </div>
     );
 
-    return createPortal(content, document.body);
+    return createPortal(
+        <>
+            {content}
+            {arrowStyle.display !== 'none' && (
+                <div style={{ ...arrowStyle, width: '40px', height: '40px' }} className={cn("animate-bounce drop-shadow-lg", advanceOn ? "text-primary" : "text-yellow-200")}>
+                    <ArrowIcon direction={arrowDirection} />
+                </div>
+            )}
+        </>,
+        document.body
+    );
 }
+
+
 
 interface TutorialProps {
     open: boolean;

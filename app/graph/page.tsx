@@ -46,6 +46,7 @@ export default function Page() {
     const { historyQuery, setHistoryQuery } = useContext(HistoryQueryContext);
     const { setIndicator } = useContext(IndicatorContext);
     const { panel, setPanel } = useContext(PanelContext);
+    const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext);
     const { setData, canvasRef } = useContext(ForceGraphContext);
     const {
@@ -178,7 +179,7 @@ export default function Page() {
 
         if (graphName && graphName !== graph.Id) {
             if (runDefaultQuery) {
-                runQuery(defaultQuery);
+                runQuery(defaultQuery, undefined, !tutorialOpen);
                 return;
             }
 
@@ -187,7 +188,7 @@ export default function Page() {
         }
 
         setIsQueryLoading(false);
-    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames, setIsQueryLoading]);
+    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames, setIsQueryLoading, tutorialOpen]);
 
     const handleSetSelectedElements = useCallback((el: (Node | Link)[] = []) => {
         setSelectedElements(el);

@@ -283,13 +283,13 @@ export default function Toolbar({
                     </div>
                 }
             </div>
-            <div className={cn("flex flex-row-reverse gap-2", label === "Schema" && "h-full")}>
+            <div data-testid={`elementCanvasToolbarAction${label}`} className={cn("flex flex-row-reverse gap-2 pointer-events-auto", label === "Schema" && "h-full")}>
                 {
                     graphName && session?.user.role !== "Read-Only" &&
                     <>
                         <Button
                             data-testid={`elementCanvasInfo${label}`}
-                            className="p-1 pointer-events-auto bg-background cursor-default border-primary"
+                            className="p-1 bg-background cursor-default border-primary"
                             variant="Secondary"
                             tooltipVariant="Primary"
                             tooltipSide="bottom"
@@ -303,7 +303,7 @@ export default function Toolbar({
                             (hasLimitWarning || hasLimitChangeWarning) ?
                                 <Button
                                     data-testid={`elementCanvasWarning${label}`}
-                                    className="p-1 pointer-events-auto bg-background cursor-default border-orange-300"
+                                    className="p-1 bg-background cursor-default border-orange-300"
                                     variant="Secondary"
                                     tooltipVariant="Primary"
                                     tooltipSide="bottom"
@@ -316,7 +316,7 @@ export default function Toolbar({
                         }
                         <Button
                             data-testid={`elementCanvasAddNode${label}`}
-                            className="p-1 pointer-events-auto bg-background border-green-900"
+                            className="p-1 bg-background border-green-900"
                             variant="Secondary"
                             tooltipVariant="Primary"
                             tooltipSide="bottom"
@@ -329,7 +329,7 @@ export default function Toolbar({
                             setIsAddEdge &&
                             <Button
                                 data-testid={`elementCanvasAddEdge${label}`}
-                                className="p-1 pointer-events-auto bg-background border-green-900"
+                                className="p-1 bg-background border-green-900"
                                 variant="Secondary"
                                 tooltipVariant="Primary"
                                 tooltipSide="bottom"
