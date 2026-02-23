@@ -2,9 +2,9 @@
 
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { RotateCcw, MonitorPlay, ChevronRight } from "lucide-react";
+import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2 } from "lucide-react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
-import { cn, getDefaultQuery, securedFetch } from "@/lib/utils";
+import { areCaptionKeysEqual, cn, getDefaultQuery, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
@@ -24,6 +24,8 @@ export default function BrowserSettings() {
             defaultQuerySettings: { newDefaultQuery, setNewDefaultQuery },
             timeoutSettings: { newTimeout, setNewTimeout },
             limitSettings: { newLimit, setNewLimit },
+            captionsKeysSettings: { newCaptionsKeys, setNewCaptionsKeys },
+            showPropertyKeyPrefixSettings: { newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
             chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages },
             graphInfo: { newRefreshInterval, setNewRefreshInterval }
         },
@@ -33,6 +35,8 @@ export default function BrowserSettings() {
             defaultQuerySettings: { defaultQuery, setDefaultQuery },
             timeoutSettings: { timeout: timeoutValue },
             limitSettings: { limit },
+            captionsKeysSettings: { captionsKeys },
+            showPropertyKeyPrefixSettings: { showPropertyKeyPrefix },
             chatSettings: { secretKey, model, setModel, maxSavedMessages },
             graphInfo: { refreshInterval }
         },
@@ -44,7 +48,7 @@ export default function BrowserSettings() {
     } = useContext(BrowserSettingsContext);
 
     const { setIndicator } = useContext(IndicatorContext);
-    const scrollableContainerRef = useRef<HTMLFormElement>(null);
+    const scrollableContainerRef = useRef<HTMLDivElement>(null);
 
     const { toast } = useToast();
     const router = useRouter();
@@ -58,6 +62,7 @@ export default function BrowserSettings() {
         graphInfo: false,
         userExperience: false
     });
+    const [newCaption, setNewCaption] = useState("");
 
     const toggleSection = (section: keyof typeof expandedSections) => {
         setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -67,7 +72,7 @@ export default function BrowserSettings() {
     useEffect(() => {
         (async () => {
             setIsLoadingModels(true);
-            
+
             const result = await securedFetch(
                 "/api/chat/models",
                 { method: "GET" },
@@ -98,9 +103,9 @@ export default function BrowserSettings() {
                 if (!res.ok) return;
 
                 const defaultModel = (await res.json()).models[0];
-                
+
                 if (!defaultModel) return;
-                
+
                 setNewModel(defaultModel);
                 setModel(defaultModel);
                 localStorage.setItem("model", defaultModel);
@@ -118,7 +123,9 @@ export default function BrowserSettings() {
         setNewModel(model);
         setNewRefreshInterval(refreshInterval);
         setNewMaxSavedMessages(maxSavedMessages);
-    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, model, setNewModel, setNewRefreshInterval, refreshInterval, setNewMaxSavedMessages, maxSavedMessages]);
+        setNewCaptionsKeys(captionsKeys);
+        setNewShowPropertyKeyPrefix(showPropertyKeyPrefix);
+    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, model, setNewModel, setNewRefreshInterval, refreshInterval, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix]);
 
     useEffect(() => {
         setHasChanges(
@@ -130,9 +137,11 @@ export default function BrowserSettings() {
             newSecretKey !== secretKey ||
             newModel !== model ||
             refreshInterval !== newRefreshInterval ||
-            newMaxSavedMessages !== maxSavedMessages
+            newMaxSavedMessages !== maxSavedMessages ||
+            !areCaptionKeysEqual(newCaptionsKeys, captionsKeys) ||
+            newShowPropertyKeyPrefix !== showPropertyKeyPrefix
         );
-    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey, newModel, model, refreshInterval, newRefreshInterval, newMaxSavedMessages, maxSavedMessages]);
+    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey, newModel, model, refreshInterval, newRefreshInterval, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix]);
 
     const handleSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
         e?.preventDefault();
@@ -225,6 +234,15 @@ export default function BrowserSettings() {
         createChangeHandler(setNewModel)(modelValue, 'secretKeyInput');
     };
 
+    const handleAddCaptionKey = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+
+        if (!newCaption.trim() || newCaptionsKeys.includes(newCaption)) return;
+
+        setNewCaptionsKeys(prev => [...prev, newCaption]);
+        setNewCaption("");
+    };
+
     return (
         <div className="grow basis-0 w-full flex flex-col gap-6 overflow-hidden">
             <div className="flex items-start justify-between gap-4 px-2">
@@ -249,7 +267,7 @@ export default function BrowserSettings() {
                     </TooltipContent>
                 </Tooltip>
             </div>
-            <form ref={scrollableContainerRef} className="h-1 grow px-2 overflow-y-auto flex flex-col gap-6 pb-8" onSubmit={handleSubmit}>
+            <div ref={scrollableContainerRef} className="h-1 grow px-2 overflow-y-auto flex flex-col gap-6 pb-8">
                 {/* Chat Section */}
                 <Card className="border-border shadow-sm">
                     <CardHeader
@@ -267,7 +285,7 @@ export default function BrowserSettings() {
                     </CardHeader>
                     {expandedSections.chat && (
                         <CardContent className="pt-2">
-                            <div className="flex flex-col gap-4 p-4 bg-muted/10 rounded-lg">
+                            <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-4 bg-muted/10 rounded-lg">
                                 <div className="flex flex-col gap-2">
                                     {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                                     <label htmlFor="maxSaveMessagesInput" className="text-sm font-medium whitespace-nowrap">Store latest interactions (per graph) [5..10]</label>
@@ -310,7 +328,8 @@ export default function BrowserSettings() {
                                         onChange={(e) => createChangeHandler(setNewSecretKey)(e.target.value, 'secretKeyInput')}
                                     />
                                 </div>
-                            </div>
+                                <button type="submit" className="hidden" aria-hidden="true" tabIndex={-1} />
+                            </form>
                         </CardContent>
                     )}
                 </Card>
@@ -375,108 +394,110 @@ export default function BrowserSettings() {
                         </div>
                     </CardHeader>
                     {expandedSections.queryExecution && (
-                        <CardContent className="space-y-6 pt-2">
-                            {/* Timeout Setting */}
-                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 p-4 bg-muted/10 rounded-lg">
-                                <div className="flex flex-col gap-2 flex-1">
-                                    <h3 className="text-lg font-semibold">Timeout</h3>
-                                    <p className="text-sm text-muted-foreground">
-                                        Shows a &apos;Timed Out&apos; error if the query takes longer than the timeout in seconds.
-                                        <a
-                                            className="underline underline-offset-2 ml-2 text-primary hover:text-primary/80"
-                                            href="https://docs.falkordb.com/configuration.html#query-configurations"
-                                            target="_blank"
-                                            rel="noreferrer"
-                                        >
-                                            Learn more
-                                        </a>
-                                    </p>
-                                </div>
-                                <Input
-                                    id="timeoutInput"
-                                    className="text-center w-full sm:w-48"
-                                    value={newTimeout === 0 ? "∞" : `${newTimeout} seconds`}
-                                    onChange={(e) => handleInfinityNumberChange(setNewTimeout, e.target.value, 'timeoutInput', [' seconds'])}
-                                />
-                            </div>
-
-                            {/* Limit Setting */}
-                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 p-4 bg-muted/10 rounded-lg">
-                                <div className="flex flex-col gap-2 flex-1">
-                                    <h3 className="text-lg font-semibold">Limit</h3>
-                                    <p className="text-sm text-muted-foreground">
-                                        Limits the number of rows returned by the query.
-                                        <a
-                                            className="underline underline-offset-2 ml-2 text-primary hover:text-primary/80"
-                                            href="https://docs.falkordb.com/cypher/limit.html"
-                                            target="_blank"
-                                            rel="noreferrer"
-                                        >
-                                            Learn more
-                                        </a>
-                                    </p>
-                                </div>
-                                <Input
-                                    id="limitInput"
-                                    className="text-center w-full sm:w-48"
-                                    value={newLimit === 0 ? "∞" : newLimit}
-                                    onChange={(e) => handleInfinityNumberChange(setNewLimit, e.target.value, 'limitInput')}
-                                />
-                            </div>
-
-                            {/* Default Query On-load */}
-                            <div className="flex flex-col gap-4 p-4 bg-muted/10 rounded-lg">
-                                <div className="flex items-center gap-3">
-                                    <Switch
-                                        id="runDefaultQuerySwitch"
-                                        className="data-[state=unchecked]:bg-border"
-                                        checked={newRunDefaultQuery}
-                                        onCheckedChange={() => createChangeHandler(setNewRunDefaultQuery)(!newRunDefaultQuery, 'runDefaultQuerySwitch')}
+                        <CardContent>
+                            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                                {/* Timeout Setting */}
+                                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 p-4 bg-muted/10 rounded-lg">
+                                    <div className="flex flex-col gap-2 flex-1">
+                                        <h3 className="text-lg font-semibold">Timeout</h3>
+                                        <p className="text-sm text-muted-foreground">
+                                            Shows a &apos;Timed Out&apos; error if the query takes longer than the timeout in seconds.
+                                            <a
+                                                className="underline underline-offset-2 ml-2 text-primary hover:text-primary/80"
+                                                href="https://docs.falkordb.com/configuration.html#query-configurations"
+                                                target="_blank"
+                                                rel="noreferrer"
+                                            >
+                                                Learn more
+                                            </a>
+                                        </p>
+                                    </div>
+                                    <Input
+                                        id="timeoutInput"
+                                        className="text-center w-full sm:w-48"
+                                        value={newTimeout === 0 ? "∞" : `${newTimeout} seconds`}
+                                        onChange={(e) => handleInfinityNumberChange(setNewTimeout, e.target.value, 'timeoutInput', [' seconds'])}
                                     />
-                                    <div className="flex flex-col gap-1 flex-1">
-                                        <h3 className="text-lg font-semibold">Default Query On-load</h3>
-                                        <p className="text-sm text-muted-foreground">Define a query to run when the graph is loaded.</p>
+                                </div>
+
+                                {/* Limit Setting */}
+                                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 p-4 bg-muted/10 rounded-lg">
+                                    <div className="flex flex-col gap-2 flex-1">
+                                        <h3 className="text-lg font-semibold">Limit</h3>
+                                        <p className="text-sm text-muted-foreground">
+                                            Limits the number of rows returned by the query.
+                                            <a
+                                                className="underline underline-offset-2 ml-2 text-primary hover:text-primary/80"
+                                                href="https://docs.falkordb.com/cypher/limit.html"
+                                                target="_blank"
+                                                rel="noreferrer"
+                                            >
+                                                Learn more
+                                            </a>
+                                        </p>
+                                    </div>
+                                    <Input
+                                        id="limitInput"
+                                        className="text-center w-full sm:w-48"
+                                        value={newLimit === 0 ? "∞" : newLimit}
+                                        onChange={(e) => handleInfinityNumberChange(setNewLimit, e.target.value, 'limitInput')}
+                                    />
+                                </div>
+
+                                {/* Default Query On-load */}
+                                <div className="flex flex-col gap-4 p-4 bg-muted/10 rounded-lg">
+                                    <div className="flex items-center gap-3">
+                                        <Switch
+                                            id="runDefaultQuerySwitch"
+                                            className="data-[state=unchecked]:bg-border"
+                                            checked={newRunDefaultQuery}
+                                            onCheckedChange={() => createChangeHandler(setNewRunDefaultQuery)(!newRunDefaultQuery, 'runDefaultQuerySwitch')}
+                                        />
+                                        <div className="flex flex-col gap-1 flex-1">
+                                            <h3 className="text-lg font-semibold">Default Query On-load</h3>
+                                            <p className="text-sm text-muted-foreground">Define a query to run when the graph is loaded.</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2 items-center">
+                                        <Input
+                                            id="runDefaultQueryInput"
+                                            className="flex-1 SofiaSans"
+                                            placeholder="Enter default query..."
+                                            value={newDefaultQuery}
+                                            onChange={(e) => createChangeHandler(setNewDefaultQuery)(e.target.value, 'runDefaultQueryInput')}
+                                            disabled={!newRunDefaultQuery}
+                                        />
+                                        {
+                                            ((defaultQuery !== getDefaultQuery() && newRunDefaultQuery) || isResetting) &&
+                                            <Button
+                                                id="runDefaultQueryResetBtn"
+                                                variant="Secondary"
+                                                onClick={async () => {
+                                                    setIsResetting(true);
+                                                    try {
+                                                        // add a delay to the reset to show the animation
+                                                        await new Promise(resolve => { setTimeout(resolve, 1000); });
+                                                        const q = getDefaultQuery();
+                                                        setDefaultQuery(q);
+                                                        setNewDefaultQuery(q);
+                                                        localStorage.setItem("defaultQuery", q);
+                                                        toast({
+                                                            title: "Default query reset",
+                                                            description: "Your default query has been reset.",
+                                                        });
+                                                    } finally {
+                                                        setIsResetting(false);
+                                                    }
+                                                }}
+                                                title="Reset"
+                                            >
+                                                <RotateCcw className={cn(isResetting && "animate-spin")} />
+                                            </Button>
+                                        }
                                     </div>
                                 </div>
-                                <div className="flex gap-2 items-center">
-                                    <Input
-                                        id="runDefaultQueryInput"
-                                        className="flex-1 SofiaSans"
-                                        placeholder="Enter default query..."
-                                        value={newDefaultQuery}
-                                        onChange={(e) => createChangeHandler(setNewDefaultQuery)(e.target.value, 'runDefaultQueryInput')}
-                                        disabled={!newRunDefaultQuery}
-                                    />
-                                    {
-                                        ((defaultQuery !== getDefaultQuery() && newRunDefaultQuery) || isResetting) &&
-                                        <Button
-                                            id="runDefaultQueryResetBtn"
-                                            variant="Secondary"
-                                            onClick={async () => {
-                                                setIsResetting(true);
-                                                try {
-                                                    // add a delay to the reset to show the animation
-                                                    await new Promise(resolve => { setTimeout(resolve, 1000); });
-                                                    const q = getDefaultQuery();
-                                                    setDefaultQuery(q);
-                                                    setNewDefaultQuery(q);
-                                                    localStorage.setItem("defaultQuery", q);
-                                                    toast({
-                                                        title: "Default query reset",
-                                                        description: "Your default query has been reset.",
-                                                    });
-                                                } finally {
-                                                    setIsResetting(false);
-                                                }
-                                            }}
-                                            title="Reset"
-                                        >
-                                            <RotateCcw className={cn(isResetting && "animate-spin")} />
-                                        </Button>
-                                    }
-                                </div>
-                            </div>
-
+                                <button type="submit" className="hidden" aria-hidden="true" tabIndex={-1} />
+                            </form>
                         </CardContent>
                     )}
                 </Card>
@@ -495,7 +516,8 @@ export default function BrowserSettings() {
                             <ChevronRight className={cn("h-5 w-5 transition-transform duration-200", expandedSections.userExperience && "rotate-90")} />
                         </div>
                     </CardHeader>
-                    {expandedSections.userExperience && (
+                    {
+                        expandedSections.userExperience &&
                         <CardContent className="space-y-6 pt-2">
                             {/* Content Persistence */}
                             <div className="flex items-center gap-4 p-4 bg-muted/10 rounded-lg">
@@ -510,8 +532,67 @@ export default function BrowserSettings() {
                                     <p className="text-sm text-muted-foreground">Enable this function to &apos;Auto-Save&apos; your data in your next Browser session.</p>
                                 </div>
                             </div>
+
+                            {/* Captions Keys */}
+                            <div className="flex flex-col gap-4 p-4 bg-muted/10 rounded-lg">
+                                <div className="flex flex-col gap-2">
+                                    <h3 className="text-lg font-semibold">Captions Keys</h3>
+                                    <p className="text-sm text-muted-foreground">Manage the caption: propertyKeys used for displaying captions on nodes.</p>
+                                </div>
+                                <div className="flex items-center gap-4 p-4 bg-muted/10 rounded-lg">
+                                    <Switch
+                                        className="data-[state=unchecked]:bg-border"
+                                        checked={newShowPropertyKeyPrefix}
+                                        onCheckedChange={() => createChangeHandler(setNewShowPropertyKeyPrefix)(!newShowPropertyKeyPrefix, 'showPropertyKeyPrefixSwitch')}
+                                    />
+                                    <div className="flex flex-col gap-2">
+                                        <h3 className="text-lg font-semibold">Add Property Key To Caption</h3>
+                                        <p className="text-sm text-muted-foreground">When enabled, show key before value in the caption. (company: FalkorDB)</p>
+                                    </div>
+                                </div>
+                                {
+                                    newCaptionsKeys.length > 0 ?
+                                        <ul className="flex flex-col gap-2">
+                                            {newCaptionsKeys.map((key, index) => (
+                                                // eslint-disable-next-line react/no-array-index-key
+                                                <li key={index} className="flex justify-between items-center p-2 bg-background rounded-lg">
+                                                    <p>{key}</p>
+                                                    <Button
+                                                        className="p-1"
+                                                        variant="Delete"
+                                                        title="Remove Caption"
+                                                        onClick={() => {
+                                                            setNewCaptionsKeys(prev => prev.filter(caption => caption !== key));
+                                                        }}
+                                                    >
+                                                        <Trash2 />
+                                                    </Button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                        : <p className="text-sm text-muted-foreground">No caption keys added. Add keys to display them on the nodes.</p>
+                                }
+                                <form className="flex gap-2" onSubmit={handleAddCaptionKey}>
+                                    <Input
+                                        id="captionKeyInput"
+                                        className="flex-1"
+                                        placeholder="Enter a caption key to display on nodes..."
+                                        value={newCaption}
+                                        onChange={(e) => setNewCaption(e.target.value)}
+                                    />
+                                    <Button
+                                        id="addCaptionKeyBtn"
+                                        disabled={!newCaption.trim()}
+                                        variant="Primary"
+                                        type="submit"
+                                        label="Add Caption"
+                                    >
+                                        <PlusCircle />
+                                    </Button>
+                                </form>
+                            </div>
                         </CardContent>
-                    )}
+                    }
                 </Card>
 
                 {/* Sticky Save/Cancel Buttons */}
@@ -530,13 +611,14 @@ export default function BrowserSettings() {
                             data-testid="saveSettingsButton"
                             id="saveQuerySettingsBtn"
                             variant="Primary"
-                            type="submit"
+                            type="button"
+                            onClick={() => handleSubmit()}
                         >
                             <p>Save Settings</p>
                         </Button>
                     </div>
                 }
-            </form >
+            </div>
         </div >
     );
 }

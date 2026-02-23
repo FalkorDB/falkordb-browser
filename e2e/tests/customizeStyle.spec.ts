@@ -2,7 +2,6 @@ import { expect, test } from "@playwright/test";
 import {
   getRandomString,
   CREATE_QUERY,
-  CREATE_PERSON_RELATIONSHIP
 } from "../infra/utils";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
@@ -58,9 +57,6 @@ test.describe("Customize Style Tests", () => {
 
     // Verify size section is visible
     expect(await graph.isSizeSectionVisible()).toBeTruthy();
-
-    // Verify caption section is visible
-    expect(await graph.isCaptionSectionVisible()).toBeTruthy();
 
     await apiCall.removeGraph(graphName);
   });
@@ -143,38 +139,6 @@ test.describe("Customize Style Tests", () => {
     // Verify the selected size persists in UI
     const sizeAfterReopen = await graph.getSelectedSizeButtonIndex();
     expect(sizeAfterReopen).toBe(newSizeIndexToSelect);
-
-    await apiCall.removeGraph(graphName);
-  });
-
-  test(`@readwrite Validate caption selection in customization panel`, async () => {
-    const graphName = getRandomString("graph");
-    await apiCall.addGraph(graphName);
-    const graph = await browser.createNewPage(CustomizeStylePage, urls.graphUrl);
-    await browser.setPageToFullScreen();
-    await graph.selectGraphByName(graphName);
-    await graph.insertQuery(CREATE_PERSON_RELATIONSHIP);
-    await graph.clickRunQuery();
-    await graph.openGraphInfoButton();
-
-    // Click customize style button
-    await graph.clickCustomizeStyleButton("person2");
-
-    // Select caption "occupation"
-    await graph.selectCaption("occupation");
-
-    // Verify Save button is visible
-    expect(await graph.isSaveButtonVisible()).toBeTruthy();
-
-    // Click Save to persist changes
-    await graph.clickSaveStyleButton();
-
-    // Wait for canvas to re-render with new caption
-    await graph.waitForCanvasAnimationToEnd();
-
-    // Verify the caption change persisted in localStorage
-    const savedStyle = await graph.getLabelStyleFromLocalStorage("person2");
-    expect(savedStyle?.caption).toBe("occupation");
 
     await apiCall.removeGraph(graphName);
   });
@@ -352,7 +316,6 @@ test.describe("Customize Style Tests", () => {
     // Select different color and size
     await graph.selectColorByIndex(newColorIndex);
     await graph.selectSizeByIndex(newSizeIndex);
-    await graph.selectCaption("ID");
 
     // Verify Save button is visible (changes were made)
     expect(await graph.isSaveButtonVisible()).toBeTruthy();
@@ -377,7 +340,6 @@ test.describe("Customize Style Tests", () => {
     // Verify style in localStorage did NOT change
     const styleAfterRefresh = await graph.getLabelStyleFromLocalStorage("person1");
     expect(styleAfterRefresh?.size).toBe(originalStyle?.size);
-    expect(styleAfterRefresh?.caption).toBe(originalStyle?.caption);
 
     await apiCall.removeGraph(graphName);
   });
@@ -552,7 +514,7 @@ test.describe("Customize Style Tests", () => {
     const person1NodesAfterRefresh = nodes.filter((n: any) => n.labels?.includes("person1"));
     expect(person1NodesAfterRefresh.length).toBeGreaterThan(0);
 
-    // Verify that the node caption matches the saved style
+    // Verify that the node color matches the saved style
     const colorAfterRefresh = person1NodesAfterRefresh[0].color;
     expect(colorAfterRefresh).toBe(newColor);
     expect(colorAfterRefresh).not.toBe(initialColor);
@@ -618,72 +580,6 @@ test.describe("Customize Style Tests", () => {
     const sizeAfterRefresh = person1NodesAfterRefresh[0].size;
     expect(sizeAfterRefresh).toBe(newSize);
     expect(sizeAfterRefresh).not.toBe(initialSize);
-
-    await apiCall.removeGraph(graphName);
-  });
-
-  test(`@readwrite Validate nodes update correctly after caption change and refresh`, async () => {
-    const graphName = getRandomString("graph");
-    await apiCall.addGraph(graphName);
-    const graph = await browser.createNewPage(CustomizeStylePage, urls.graphUrl);
-    await browser.setPageToFullScreen();
-    await graph.selectGraphByName(graphName);
-    await graph.insertQuery(CREATE_PERSON_RELATIONSHIP);
-    await graph.clickRunQuery(false);
-    
-    // Get initial nodes - find person1 nodes
-    let nodes = await graph.getNodesScreenPositions("graph");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const person1Nodes = nodes.filter((n: any) => n.labels?.includes("person1"));
-    expect(person1Nodes.length).toBeGreaterThan(0);
-    
-    // Store initial caption and displayName of person1 nodes
-    const initialCaption = person1Nodes[0].caption;
-    const initialDisplayName = person1Nodes[0].displayName;
-
-    // Open graph info and customize person1 style
-    await graph.openGraphInfoButton();
-    await graph.clickCustomizeStyleButton("person1");
-
-    // Change caption to "name"
-    await graph.selectCaption("name");
-
-    // Save the style changes
-    await graph.clickSaveStyleButton();
-
-    // Get the new caption from localStorage
-    const savedStyle = await graph.getLabelStyleFromLocalStorage("person1");
-    const newCaption = savedStyle?.caption;
-    expect(newCaption).toBe("name");
-    expect(newCaption).not.toBe(initialCaption);
-
-    // Close the panel
-    await graph.closePanelWithEscape();
-
-    // Refresh the page
-    await graph.refreshPage();
-    await graph.waitForPageIdle();
-
-    // Select graph and re-query to render nodes
-    await graph.selectGraphByName(graphName);
-    await graph.insertQuery("MATCH (n) RETURN n");
-    await graph.clickRunQuery(false);
-
-    // Get nodes after refresh
-    nodes = await graph.getNodesScreenPositions("graph");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const person1NodesAfterRefresh = nodes.filter((n: any) => n.labels?.includes("person1"));
-    expect(person1NodesAfterRefresh.length).toBeGreaterThan(0);
-
-    // Verify that the node caption matches the saved style
-    const captionAfterRefresh = person1NodesAfterRefresh[0].caption;
-    expect(captionAfterRefresh).toBe(newCaption);
-    expect(captionAfterRefresh).toBe("name");
-
-    // Verify that displayName also changed (displayName should reflect the caption change)
-    const displayNameAfterRefresh = person1NodesAfterRefresh[0].displayName;
-    expect(displayNameAfterRefresh).toBeDefined();
-    expect(displayNameAfterRefresh).not.toEqual(initialDisplayName);
 
     await apiCall.removeGraph(graphName);
   });

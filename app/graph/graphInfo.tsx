@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { getContrastTextColor } from "@falkordb/canvas";
 import Button from "../components/ui/Button";
 import { BrowserSettingsContext, GraphContext, QueryLoadingContext } from "../components/provider";
-import { Label } from "../api/graph/model";
+import { InfoLabel } from "../api/graph/model";
 import CustomizeStylePanel from "./CustomizeStylePanel";
 
 /**
@@ -14,7 +14,7 @@ import CustomizeStylePanel from "./CustomizeStylePanel";
  * @param onClose - Callback invoked when the panel's close button is clicked
  * @returns The Graph Info panel React element containing graph name, memory usage, node/edge counts, property keys, and query buttons
  */
-export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizingLabel }: { onClose: () => void, customizingLabel: Label | null, setCustomizingLabel: Dispatch<SetStateAction<Label | null>> }) {
+export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizingLabel }: { onClose: () => void, customizingLabel: InfoLabel | null, setCustomizingLabel: Dispatch<SetStateAction<InfoLabel | null>> }) {
     const { graph, graphInfo: { Labels, Relationships, PropertyKeys, MemoryUsage }, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
     const { settings: { graphInfo: { showMemoryUsage } } } = useContext(BrowserSettingsContext);
@@ -98,7 +98,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                 {Array.from(Labels.values()).map((label) => {
                                     const name = label.name || "Empty";
                                     const labelColor = label.style.color;
-                                    const graphLabel = graph.LabelsMap.get(label.name);
+                                    const graphLabel = graph.GraphInfo.Labels.get(label.name);
 
                                     return (
                                         <li key={`${name}-${labelColor}`} className="max-w-full flex gap-1">

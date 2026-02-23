@@ -34,7 +34,7 @@ test.describe('Canvas Tests', () => {
             const searchQuery = `Person${node}`;
             await graph.searchElementInCanvas(searchQuery);
             await graph.hoverAtCanvasCenter();
-            expect(await graph.getNodeCanvasToolTip()).toBe(`${node - 1}`);
+            expect(await graph.getNodeCanvasToolTip()).toBe(searchQuery);
             await apicalls.removeGraph(graphName);
         });
     });
@@ -131,7 +131,7 @@ test.describe('Canvas Tests', () => {
         await graph.getNodesScreenPositions('graph');
         await graph.searchElementInCanvas("Alice");
         await graph.hoverAtCanvasCenter();
-        expect(await graph.getNodeCanvasToolTip()).toBe("0");
+        expect(await graph.getNodeCanvasToolTip()).toBe("Alice");
         await apicalls.removeGraph(graphName);
     });
 
@@ -160,7 +160,7 @@ test.describe('Canvas Tests', () => {
         await graph.waitForCanvasAnimationToEnd();
         await graph.hoverAtCanvasCenter();
         expect(await graph.isNodeCanvasToolTipVisible());
-        expect(await graph.getNodeCanvasToolTip()).toBe("0");
+        expect(await graph.getNodeCanvasToolTip()).toBe("Bob");
         await apicalls.removeGraph(graphName);
     });
 

@@ -6,12 +6,12 @@ import { useContext, useState, useEffect, useCallback, useRef } from "react";
 import { X, Palette } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GraphContext, ForceGraphContext, BrowserSettingsContext } from "@/app/components/provider";
-import { Label, STYLE_COLORS, NODE_SIZE_OPTIONS, LabelStyle, getLabelWithFewestElements, EMPTY_DISPLAY_NAME } from "@/app/api/graph/model";
+import { Label, STYLE_COLORS, NODE_SIZE_OPTIONS, LabelStyle, getLabelWithFewestElements, InfoLabel } from "@/app/api/graph/model";
 import Button from "@/app/components/ui/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Props {
-    label: Label;
+    label: InfoLabel;
     onClose: () => void;
 }
 
@@ -20,26 +20,15 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { canvasRef } = useContext(ForceGraphContext);
 
-    // Get available properties from nodes with this label
-    const captionOptions = Array.from(
-        new Set(
-            label.elements.flatMap(node => Object.keys(node.data || {}))
-        )
-    ).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-
     // Store original values for comparison and cancel functionality
     const [originalColor] = useState<string>(label.style.color);
     const [originalSize] = useState(label.style.size || 6);
-    const [originalCaption] = useState(label.style.caption);
 
     const [selectedColor, setSelectedColor] = useState<string>(
         label.style.color
     );
     const [selectedSize, setSelectedSize] = useState(
         label.style.size || 6
-    );
-    const [selectedCaption, setSelectedCaption] = useState(
-        label.style.caption
     );
 
     // RGB Color Picker state
@@ -50,15 +39,14 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
     // Track if there are unsaved changes
     const hasChanges =
         selectedColor !== originalColor ||
-        selectedSize !== originalSize ||
-        selectedCaption !== originalCaption;
+        selectedSize !== originalSize;
 
     const saveStyleToStorage = useCallback((labelName: string, style: LabelStyle) => {
         const storageKey = `labelStyle_${labelName}`;
         localStorage.setItem(storageKey, JSON.stringify(style));
     }, []);
 
-    const applyStylesToGraph = useCallback((color: string, size: number, caption?: string) => {
+    const applyStylesToGraph = useCallback((color: string, size: number) => {
         const updatedLabel = graph.LabelsMap.get(label.name);
         const graphInfoLabel = graph.GraphInfo.Labels.get(label.name);
 
@@ -68,13 +56,11 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
             ...updatedLabel.style,
             color,
             size,
-            caption,
         };
         graphInfoLabel.style = {
             ...graphInfoLabel.style,
             color,
             size,
-            caption,
         };
 
         // Update all nodes with this label
@@ -82,7 +68,6 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
             if (getLabelWithFewestElements(n.labels.map(l => graph.LabelsMap.get(l)).filter(Boolean) as Label[])?.name === label.name) {
                 n.color = color;
                 n.size = size;
-                n.caption = caption;
             }
         });
 
@@ -97,8 +82,6 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
                 if (getLabelWithFewestElements(node.labels.map(l => graph.LabelsMap.get(l)).filter(Boolean) as Label[])?.name === label.name) {
                     node.color = color;
                     node.size = size;
-                    node.caption = caption;
-                    node.displayName = EMPTY_DISPLAY_NAME;
                 }
             });
 
@@ -110,7 +93,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
         setSelectedColor(color);
         setShowRgbPicker(false); // Close RGB picker when preset color is selected
         // Apply to graph immediately for preview (without saving to localStorage)
-        applyStylesToGraph(color, selectedSize, selectedCaption);
+        applyStylesToGraph(color, selectedSize);
     };
 
     const handleRgbColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -118,7 +101,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
         setCustomRgbColor(color);
         setSelectedColor(color);
         // Apply to graph immediately for preview
-        applyStylesToGraph(color, selectedSize, selectedCaption);
+        applyStylesToGraph(color, selectedSize);
     };
 
     const handleRgbPickerClick = () => {
@@ -128,14 +111,9 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
     const handleSizeSelect = (size: number) => {
         setSelectedSize(size);
         // Apply to graph immediately for preview (without saving to localStorage)
-        applyStylesToGraph(selectedColor, size, selectedCaption);
+        applyStylesToGraph(selectedColor, size);
     };
 
-    const handleCaptionSelect = (caption?: string) => {
-        setSelectedCaption(caption);
-        // Apply to graph immediately for preview (without saving to localStorage)
-        applyStylesToGraph(selectedColor, selectedSize, caption);
-    };
 
     const handleSave = () => {
         // Prevent saving during tutorial
@@ -144,7 +122,6 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
             saveStyleToStorage(label.name, {
                 color: selectedColor,
                 size: selectedSize,
-                caption: selectedCaption,
             });
         }
 
@@ -155,11 +132,10 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
         // Revert to original values in state
         setSelectedColor(originalColor);
         setSelectedSize(originalSize);
-        setSelectedCaption(originalCaption);
 
         // Revert graph to original values
-        applyStylesToGraph(originalColor, originalSize, originalCaption);
-    }, [originalColor, originalSize, originalCaption, applyStylesToGraph]);
+        applyStylesToGraph(originalColor, originalSize);
+    }, [originalColor, originalSize, applyStylesToGraph]);
 
     const handleClose = useCallback(() => {
         handleCancel();
@@ -294,7 +270,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
                                                         setCustomRgbColor(color);
                                                         if (color.length === 7) {
                                                             setSelectedColor(color);
-                                                            applyStylesToGraph(color, selectedSize, selectedCaption);
+                                                            applyStylesToGraph(color, selectedSize);
                                                         }
                                                     }
                                                 }}
@@ -342,46 +318,6 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
                             </TooltipContent>
                         </Tooltip>
                     ))}
-                </div>
-            </div>
-
-            {/* Caption Selection */}
-            <div className="flex flex-col gap-2 overflow-hidden">
-                <h2 className="text-base font-semibold">Caption:</h2>
-                <div className="flex flex-col gap-1 p-2 bg-muted/10 rounded-lg overflow-y-auto">
-                    {captionOptions.map((option) => (
-                        <button
-                            key={option}
-                            type="button"
-                            className={cn(
-                                "px-3 py-2 text-left rounded-md transition-all hover:bg-muted SofiaSans",
-                                selectedCaption === option && "bg-muted font-semibold"
-                            )}
-                            onClick={() => handleCaptionSelect(option)}
-                            aria-label={`Select caption ${option}`}
-                        >
-                            {option}
-                        </button>
-                    ))}
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <button
-                                key="__id__"
-                                type="button"
-                                className={cn(
-                                    "px-3 py-2 text-left rounded-md transition-all hover:bg-muted SofiaSans",
-                                    selectedCaption === undefined && "bg-muted font-semibold"
-                                )}
-                                onClick={() => handleCaptionSelect()}
-                                aria-label="Select caption ID"
-                            >
-                                ID
-                            </button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            Graph ID
-                        </TooltipContent>
-                    </Tooltip>
                 </div>
             </div>
 
