@@ -237,9 +237,11 @@ export default function BrowserSettings() {
     const handleAddCaptionKey = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
-        if (!newCaption.trim() || newCaptionsKeys.includes(newCaption)) return;
+        const caption = newCaption.trim();
 
-        setNewCaptionsKeys(prev => [...prev, newCaption]);
+        if (!caption || newCaptionsKeys.includes(caption)) return;
+
+        setNewCaptionsKeys(prev => [...prev, caption]);
         setNewCaption("");
     };
 
@@ -541,6 +543,7 @@ export default function BrowserSettings() {
                                 </div>
                                 <div className="flex items-center gap-4 p-4 bg-muted/10 rounded-lg">
                                     <Switch
+                                        id="showPropertyKeyPrefixSwitch"
                                         className="data-[state=unchecked]:bg-border"
                                         checked={newShowPropertyKeyPrefix}
                                         onCheckedChange={() => createChangeHandler(setNewShowPropertyKeyPrefix)(!newShowPropertyKeyPrefix, 'showPropertyKeyPrefixSwitch')}

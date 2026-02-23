@@ -512,7 +512,18 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     if (status !== "authenticated") return;
 
     (async () => {
-      setHistoryQuery({ ...defaultQueryHistory, queries: JSON.parse(localStorage.getItem("query history") || "[]") });
+      try {
+        setHistoryQuery({ ...defaultQueryHistory, queries: JSON.parse(localStorage.getItem("query history") || "[]") });
+      } catch (error) {
+        setHistoryQuery({ ...defaultQueryHistory, queries: [] });
+        console.error("Failed to parse query history from localStorage", error);
+      }
+      try {
+        setCaptionsKeys(JSON.parse(localStorage.getItem("captionsKeys") || '["name", "title"]'));
+      } catch (error) {
+        console.error("Failed to parse captions keys from localStorage", error);
+        setCaptionsKeys(['name', 'title']);
+      }
       setTimeout(parseInt(localStorage.getItem("timeout") || "0", 10));
       const l = parseInt(localStorage.getItem("limit") || "300", 10);
       setLimit(l);
@@ -523,7 +534,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setTutorialOpen(localStorage.getItem("tutorial") !== "false");
       setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30));
       setMaxSavedMessages(parseInt(localStorage.getItem("maxSavedMessages") || "5", 10));
-      setCaptionsKeys(JSON.parse(localStorage.getItem("captionsKeys") || '["name", "title"]'));
       setShowPropertyKeyPrefix(localStorage.getItem("showPropertyKeyPrefix") === "true");
 
       // Decrypt secret key if encrypted, or migrate plain text keys to encrypted format
@@ -665,7 +675,16 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       await Promise.all([
         getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, toast, setIndicator),
         getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, toast, setIndicator)
-      ]);
+      ]).catch(async () => {
+        await Promise.all([
+          securedFetch("/api/graph/social-demo", {
+            method: "DELETE",
+          }, toast, setIndicator),
+          securedFetch("/api/graph/social-demo-test", {
+            method: "DELETE",
+          }, toast, setIndicator)
+        ]);
+      });
 
       // Update graph list to only show demo graphs
       setGraphNames(["social-demo", "social-demo-test"]);
@@ -687,14 +706,14 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
   const handleCleanupDemoGraphs = useCallback(async () => {
     try {
-      // Delete demo graphs
-      await securedFetch("/api/graph/social-demo", {
-        method: "DELETE",
-      }, toast, setIndicator);
-
-      await securedFetch("/api/graph/social-demo-test", {
-        method: "DELETE",
-      }, toast, setIndicator);
+      await Promise.all([
+        securedFetch("/api/graph/social-demo", {
+          method: "DELETE",
+        }, toast, setIndicator),
+        securedFetch("/api/graph/social-demo-test", {
+          method: "DELETE",
+        }, toast, setIndicator)
+      ]);
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("Failed to cleanup demo graphs", error);
