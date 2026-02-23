@@ -131,13 +131,6 @@ const tutorialSteps: TutorialStep[] = [
         advanceOn: "click",
     },
     {
-        title: "Set Node Caption",
-        description: "Choose which property to display as the caption on nodes. You can select any property from the dropdown or choose 'ID' to display the internal ID.",
-        placementAxis: "x",
-        targetSelector: 'button[aria-label^="Select caption"]',
-        advanceOn: "click",
-    },
-    {
         title: "Save Style Changes",
         description: "Click 'Save Changes' to apply your node style customizations to the graph.",
         placementAxis: "x",
