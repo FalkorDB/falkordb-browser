@@ -485,15 +485,31 @@ function TutorialPortal({
                 const forwardKeyboardEvents = ['keydown', 'keyup', 'keypress'] as const;
 
                 const forwardEvent = (ev: Event) => {
-                    if (advanceOn === ev.type) {
-                        // Advance the tutorial on the specified event type. Use a short delay
-                        // so the forwarded event can reach the underlying element's handlers first.
-                        setTimeout(() => {
-                            if ((!currentStep.advanceCondition || currentStep.advanceCondition())) {
+                    const maybeAdvanceStep = () => {
+                        if (advanceOn !== ev.type) {
+                            return;
+                        }
+
+                        const maxAttempts = 12;
+                        const attemptIntervalMs = 50;
+                        let attempt = 0;
+
+                        const tryAdvance = () => {
+                            if (!currentStep.advanceCondition || currentStep.advanceCondition()) {
                                 onNext();
+                                return;
                             }
-                        }, 200);
-                    }
+
+                            attempt += 1;
+                            if (attempt < maxAttempts) {
+                                window.setTimeout(tryAdvance, attemptIntervalMs);
+                            }
+                        };
+
+                        window.setTimeout(() => {
+                            requestAnimationFrame(tryAdvance);
+                        }, 0);
+                    };
 
                     // Get the overlay and target element positions to adjust coordinates
                     const overlayRect = overlay.getBoundingClientRect();
@@ -530,6 +546,8 @@ function TutorialPortal({
                             eventTarget.dispatchEvent(clone);
                         }
 
+                        maybeAdvanceStep();
+
                         return;
                     }
 
@@ -561,6 +579,8 @@ function TutorialPortal({
                         if (eventTarget !== element) {
                             eventTarget.dispatchEvent(clone);
                         }
+
+                        maybeAdvanceStep();
                         return;
                     }
 
@@ -569,6 +589,7 @@ function TutorialPortal({
                         const tev = ev as TouchEvent;
                         const clone = new Event(tev.type, { bubbles: true, cancelable: true });
                         element.dispatchEvent(clone);
+                        maybeAdvanceStep();
                         return;
                     }
 
@@ -580,6 +601,7 @@ function TutorialPortal({
                             cancelable: true,
                         });
                         element.dispatchEvent(clone);
+                        maybeAdvanceStep();
                     }
                 };
 
