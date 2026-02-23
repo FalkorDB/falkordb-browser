@@ -483,12 +483,33 @@ function TutorialPortal({
                     'touchcancel',
                 ] as const;
                 const forwardKeyboardEvents = ['keydown', 'keyup', 'keypress'] as const;
+                let advancePending = false;
+                let advanceRetryTimeoutId: number | undefined;
+                let advanceStartTimeoutId: number | undefined;
+                let advanceAnimationFrameId: number | undefined;
+
+                const clearAdvanceTimers = () => {
+                    if (advanceRetryTimeoutId !== undefined) {
+                        window.clearTimeout(advanceRetryTimeoutId);
+                        advanceRetryTimeoutId = undefined;
+                    }
+                    if (advanceStartTimeoutId !== undefined) {
+                        window.clearTimeout(advanceStartTimeoutId);
+                        advanceStartTimeoutId = undefined;
+                    }
+                    if (advanceAnimationFrameId !== undefined) {
+                        window.cancelAnimationFrame(advanceAnimationFrameId);
+                        advanceAnimationFrameId = undefined;
+                    }
+                };
 
                 const forwardEvent = (ev: Event) => {
                     const maybeAdvanceStep = () => {
-                        if (advanceOn !== ev.type) {
+                        if (advanceOn !== ev.type || advancePending) {
                             return;
                         }
+
+                        advancePending = true;
 
                         const maxAttempts = 12;
                         const attemptIntervalMs = 50;
@@ -496,18 +517,30 @@ function TutorialPortal({
 
                         const tryAdvance = () => {
                             if (!currentStep.advanceCondition || currentStep.advanceCondition()) {
+                                clearAdvanceTimers();
+                                advancePending = false;
                                 onNext();
                                 return;
                             }
 
                             attempt += 1;
                             if (attempt < maxAttempts) {
-                                window.setTimeout(tryAdvance, attemptIntervalMs);
+                                advanceRetryTimeoutId = window.setTimeout(() => {
+                                    advanceRetryTimeoutId = undefined;
+                                    tryAdvance();
+                                }, attemptIntervalMs);
+                            } else {
+                                clearAdvanceTimers();
+                                advancePending = false;
                             }
                         };
 
-                        window.setTimeout(() => {
-                            requestAnimationFrame(tryAdvance);
+                        advanceStartTimeoutId = window.setTimeout(() => {
+                            advanceStartTimeoutId = undefined;
+                            advanceAnimationFrameId = window.requestAnimationFrame(() => {
+                                advanceAnimationFrameId = undefined;
+                                tryAdvance();
+                            });
                         }, 0);
                     };
 
@@ -624,6 +657,8 @@ function TutorialPortal({
 
                 return () => {
                     removeForwarders();
+                    clearAdvanceTimers();
+                    advancePending = false;
                     cleanup();
                 };
             }
