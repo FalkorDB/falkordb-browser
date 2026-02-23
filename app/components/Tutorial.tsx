@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Copy, CornerDownLeft, CornerDownRight, CornerLeftDown, CornerRightDown } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
@@ -318,14 +318,24 @@ function TutorialPortal({
                     }
                 }
 
-                // Check if the element is disabled
-                const isDisabled = element instanceof HTMLButtonElement || element instanceof HTMLInputElement
-                    ? element.disabled
-                    : element.getAttribute('disabled') === 'true' ||
-                    element.getAttribute('aria-disabled') === 'true' ||
-                    element.classList.contains('disabled');
+                const applyDisabledStyle = () => {
+                    // Check if the element is disabled
+                    const isDisabled = element instanceof HTMLButtonElement || element instanceof HTMLInputElement
+                        ? element.disabled
+                        : element.getAttribute('disabled') === 'true' ||
+                        element.getAttribute('aria-disabled') === 'true' ||
+                        element.classList.contains('disabled');
 
-                setTargetDisabled(isDisabled);
+                    setTargetDisabled(isDisabled);
+                };
+
+                applyDisabledStyle();
+
+                const disabledObserver = new MutationObserver(applyDisabledStyle);
+                disabledObserver.observe(element, {
+                    attributes: true,
+                    attributeFilter: ['disabled', 'aria-disabled', 'class'],
+                });
 
                 // Create an invisible overlay over the element to catch clicks
                 const overlay = document.createElement('div');
@@ -483,67 +493,8 @@ function TutorialPortal({
                     'touchcancel',
                 ] as const;
                 const forwardKeyboardEvents = ['keydown', 'keyup', 'keypress'] as const;
-                let advancePending = false;
-                let advanceRetryTimeoutId: number | undefined;
-                let advanceStartTimeoutId: number | undefined;
-                let advanceAnimationFrameId: number | undefined;
-
-                const clearAdvanceTimers = () => {
-                    if (advanceRetryTimeoutId !== undefined) {
-                        window.clearTimeout(advanceRetryTimeoutId);
-                        advanceRetryTimeoutId = undefined;
-                    }
-                    if (advanceStartTimeoutId !== undefined) {
-                        window.clearTimeout(advanceStartTimeoutId);
-                        advanceStartTimeoutId = undefined;
-                    }
-                    if (advanceAnimationFrameId !== undefined) {
-                        window.cancelAnimationFrame(advanceAnimationFrameId);
-                        advanceAnimationFrameId = undefined;
-                    }
-                };
 
                 const forwardEvent = (ev: Event) => {
-                    const maybeAdvanceStep = () => {
-                        if (advanceOn !== ev.type || advancePending) {
-                            return;
-                        }
-
-                        advancePending = true;
-
-                        const maxAttempts = 12;
-                        const attemptIntervalMs = 50;
-                        let attempt = 0;
-
-                        const tryAdvance = () => {
-                            if (!currentStep.advanceCondition || currentStep.advanceCondition()) {
-                                clearAdvanceTimers();
-                                advancePending = false;
-                                onNext();
-                                return;
-                            }
-
-                            attempt += 1;
-                            if (attempt < maxAttempts) {
-                                advanceRetryTimeoutId = window.setTimeout(() => {
-                                    advanceRetryTimeoutId = undefined;
-                                    tryAdvance();
-                                }, attemptIntervalMs);
-                            } else {
-                                clearAdvanceTimers();
-                                advancePending = false;
-                            }
-                        };
-
-                        advanceStartTimeoutId = window.setTimeout(() => {
-                            advanceStartTimeoutId = undefined;
-                            advanceAnimationFrameId = window.requestAnimationFrame(() => {
-                                advanceAnimationFrameId = undefined;
-                                tryAdvance();
-                            });
-                        }, 0);
-                    };
-
                     // Get the overlay and target element positions to adjust coordinates
                     const overlayRect = overlay.getBoundingClientRect();
                     const elementRect = element.getBoundingClientRect();
@@ -578,13 +529,7 @@ function TutorialPortal({
                         if (eventTarget !== element) {
                             eventTarget.dispatchEvent(clone);
                         }
-
-                        maybeAdvanceStep();
-
-                        return;
-                    }
-
-                    if (ev instanceof PointerEvent) {
+                    } else if (ev instanceof PointerEvent) {
                         const pev = ev as PointerEvent;
                         const clone = new PointerEvent(pev.type, {
                             clientX: pev.clientX - offsetX,
@@ -612,21 +557,12 @@ function TutorialPortal({
                         if (eventTarget !== element) {
                             eventTarget.dispatchEvent(clone);
                         }
-
-                        maybeAdvanceStep();
-                        return;
-                    }
-
-                    if (ev instanceof TouchEvent) {
+                    } else if (ev instanceof TouchEvent) {
                         // TouchEvent constructors are not fully supported across browsers; fallback to dispatching a simple Event
                         const tev = ev as TouchEvent;
                         const clone = new Event(tev.type, { bubbles: true, cancelable: true });
                         element.dispatchEvent(clone);
-                        maybeAdvanceStep();
-                        return;
-                    }
-
-                    if (ev instanceof KeyboardEvent) {
+                    } else if (ev instanceof KeyboardEvent) {
                         const kev = ev as KeyboardEvent;
                         const clone = new KeyboardEvent(kev.type, {
                             ...kev,
@@ -634,8 +570,28 @@ function TutorialPortal({
                             cancelable: true,
                         });
                         element.dispatchEvent(clone);
-                        maybeAdvanceStep();
                     }
+
+                    if (advanceOn !== ev.type) return;
+
+                    window.requestAnimationFrame(() => {
+                        if (currentStep.advanceCondition) {
+                            const pollInterval = 100;   // ms between checks
+                            const pollTimeout = 3000;   // ms total wait
+                            const deadline = Date.now() + pollTimeout;
+                            const intervalId = setInterval(() => {
+                                if (currentStep.advanceCondition!()) {
+                                    clearInterval(intervalId);
+                                    onNext();
+                                } else if (Date.now() >= deadline) {
+                                    clearInterval(intervalId);
+                                    toast({ description: "Action not detected — please try again." });
+                                }
+                            }, pollInterval);
+                        } else {
+                            onNext();
+                        }
+                    }); // Delay to allow any state updates from the event to propagate before checking advance condition
                 };
 
                 const addForwarders = () => {
@@ -656,9 +612,8 @@ function TutorialPortal({
                 addForwarders();
 
                 return () => {
+                    disabledObserver.disconnect();
                     removeForwarders();
-                    clearAdvanceTimers();
-                    advancePending = false;
                     cleanup();
                 };
             }
@@ -668,7 +623,7 @@ function TutorialPortal({
         }
 
         return () => { };
-    }, [step, onNext, targetDisabled, forward, advanceOn, targetSelector, spotlightSelector, placementAxis, currentStep]);
+    }, [step, forward, advanceOn, targetSelector, spotlightSelector, placementAxis, currentStep, targetDisabled, toast, onNext]);
 
     if (!mounted) return null;
 
@@ -894,13 +849,13 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
         }
     }, [open, step, demoLoaded, onLoadDemoGraphs, onClose]);
 
-    const handleNextStep = () => {
+    const handleNextStep = useCallback(() => {
         setStep(prev => Math.min(prev + 1, tutorialSteps.length - 1));
-    };
+    }, []);
 
-    const handlePrevStep = () => {
+    const handlePrevStep = useCallback(() => {
         setStep(prev => Math.max(prev - 1, 1)); // Don't go back to step 0 (loading)
-    };
+    }, []);
 
     const handleClose = async () => {
         // Cleanup demo graphs before closing

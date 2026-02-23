@@ -341,7 +341,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
   const handelGetNewQueries = useCallback((newQuery: Query) => [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), newQuery], [historyQuery.queries]);
 
-  const runQuery = useCallback(async (q: string, name?: string, saveContext = true): Promise<void> => {
+  const runQuery = useCallback(async (q: string, name?: string): Promise<void> => {
     const n = name || graphName;
     let newQuery: Query = {
       elementsCount: 0,
@@ -411,7 +411,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       fetchCount(n);
       setLastLimit(limit);
 
-      if (saveContext) {
+      if (!tutorialOpen) {
         localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }));
       }
     } catch (error) {
@@ -435,7 +435,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       handleCooldown(-1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graphName, limit, timeout, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries, showMemoryUsage, captionsKeys, showPropertyKeyPrefix]);
+  }, [graphName, limit, timeout, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries, showMemoryUsage, captionsKeys, showPropertyKeyPrefix, tutorialOpen]);
 
   const graphContext = useMemo(() => ({
     graph,
