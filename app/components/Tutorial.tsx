@@ -303,6 +303,19 @@ function TutorialPortal({
     useEffect(() => { toastRef.current = toast; }, [toast]);
     // Prevent double-firing during the rAF window — survives effect cleanup via ref
     const advancePendingRef = useRef(false);
+    // Interval/rAF IDs stored in refs so effect cleanup can always cancel them,
+    // even if they were scheduled in a rAF that fires after cleanup ran.
+    const advanceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const advanceRaf1Ref = useRef<number | null>(null);
+    const advanceRaf2Ref = useRef<number | null>(null);
+    const advanceCancelledRef = useRef(false);
+
+    const clearAdvance = () => {
+        advanceCancelledRef.current = true;
+        if (advanceRaf1Ref.current !== null) { window.cancelAnimationFrame(advanceRaf1Ref.current); advanceRaf1Ref.current = null; }
+        if (advanceRaf2Ref.current !== null) { window.cancelAnimationFrame(advanceRaf2Ref.current); advanceRaf2Ref.current = null; }
+        if (advanceIntervalRef.current !== null) { clearInterval(advanceIntervalRef.current); advanceIntervalRef.current = null; }
+    };
     const currentStep = tutorialSteps[step];
     const { targetSelector, advanceOn, forward, description, position, title, hidePrev, spotlightSelector, placementAxis } = currentStep;
 
@@ -310,10 +323,11 @@ function TutorialPortal({
         setMounted(true);
     }, []);
 
-    // Reset retryCount and advancePendingRef whenever the step changes
+    // Reset retryCount and advance state whenever the step changes
     useEffect(() => {
         setRetryCount(0);
         advancePendingRef.current = false;
+        advanceCancelledRef.current = false;
     }, [step]);
 
     useEffect(() => {
@@ -345,6 +359,11 @@ function TutorialPortal({
                     }
                 }
 
+                // Create an invisible overlay over the element to catch clicks
+                const overlay = document.createElement('div');
+                overlay.style.position = 'fixed';
+                overlay.style.zIndex = '40';
+
                 const applyDisabledStyle = () => {
                     // Check if the element is disabled
                     const isDisabled = element instanceof HTMLButtonElement || element instanceof HTMLInputElement
@@ -354,6 +373,10 @@ function TutorialPortal({
                         element.classList.contains('disabled');
 
                     setTargetDisabled(isDisabled);
+                    // Also update the overlay directly so it reflects the current disabled state
+                    // without needing a React re-render / effect re-run
+                    overlay.style.cursor = isDisabled ? 'not-allowed' : (window.getComputedStyle(element).cursor || 'default');
+                    overlay.style.pointerEvents = isDisabled || window.getComputedStyle(element).pointerEvents === 'none' ? 'none' : 'auto';
                 };
 
                 applyDisabledStyle();
@@ -363,13 +386,6 @@ function TutorialPortal({
                     attributes: true,
                     attributeFilter: ['disabled', 'aria-disabled', 'class'],
                 });
-
-                // Create an invisible overlay over the element to catch clicks
-                const overlay = document.createElement('div');
-                overlay.style.position = 'fixed';
-                overlay.style.zIndex = '40';
-                overlay.style.cursor = window.getComputedStyle(element).cursor || 'default';
-                overlay.style.pointerEvents = window.getComputedStyle(element).pointerEvents === 'none' ? 'none' : 'auto';
 
                 // Simple wheel event passthrough - only if wheel is in forward array
                 let wheelHandler: ((ev: Event) => void) | null = null;
@@ -521,15 +537,6 @@ function TutorialPortal({
                 ] as const;
                 const forwardKeyboardEvents = ['keydown', 'keyup', 'keypress'] as const;
 
-                let advanceIntervalId: ReturnType<typeof setInterval> | null = null;
-
-                const clearAdvanceInterval = () => {
-                    if (advanceIntervalId !== null) {
-                        clearInterval(advanceIntervalId);
-                        advanceIntervalId = null;
-                    }
-                };
-
                 const forwardEvent = (ev: Event) => {
                     // Get the overlay and target element positions to adjust coordinates
                     const overlayRect = overlay.getBoundingClientRect();
@@ -611,11 +618,16 @@ function TutorialPortal({
                     if (advanceOn !== ev.type) return;
                     if (advancePendingRef.current) return;
                     advancePendingRef.current = true;
+                    advanceCancelledRef.current = false;
 
                     // Double-rAF: first frame lets the forwarded event’s DOM changes commit,
                     // second frame ensures React has painted before we check/advance.
-                    window.requestAnimationFrame(() => {
-                        window.requestAnimationFrame(() => {
+                    advanceRaf1Ref.current = window.requestAnimationFrame(() => {
+                        advanceRaf1Ref.current = null;
+                        if (advanceCancelledRef.current) return;
+                        advanceRaf2Ref.current = window.requestAnimationFrame(() => {
+                            advanceRaf2Ref.current = null;
+                            if (advanceCancelledRef.current) return;
                             const condition = tutorialSteps[step].advanceCondition;
                             if (!condition) {
                                 // No condition — advance immediately
@@ -626,13 +638,20 @@ function TutorialPortal({
                                 const pollInterval = 100;
                                 const pollTimeout = 3000;
                                 const deadline = Date.now() + pollTimeout;
-                                advanceIntervalId = setInterval(() => {
+                                advanceIntervalRef.current = setInterval(() => {
+                                    if (advanceCancelledRef.current) {
+                                        clearInterval(advanceIntervalRef.current!);
+                                        advanceIntervalRef.current = null;
+                                        return;
+                                    }
                                     if (condition()) {
-                                        clearAdvanceInterval();
+                                        clearInterval(advanceIntervalRef.current!);
+                                        advanceIntervalRef.current = null;
                                         advancePendingRef.current = false;
                                         onNextRef.current();
                                     } else if (Date.now() >= deadline) {
-                                        clearAdvanceInterval();
+                                        clearInterval(advanceIntervalRef.current!);
+                                        advanceIntervalRef.current = null;
                                         advancePendingRef.current = false;
                                         toastRef.current({ description: "Action not detected — please try again." });
                                     }
@@ -660,7 +679,7 @@ function TutorialPortal({
                 addForwarders();
 
                 return () => {
-                    clearAdvanceInterval();
+                    clearAdvance();
                     disabledObserver.disconnect();
                     removeForwarders();
                     cleanup();
@@ -672,7 +691,7 @@ function TutorialPortal({
         }
 
         return () => { };
-    }, [step, retryCount, forward, advanceOn, targetSelector, spotlightSelector, placementAxis, targetDisabled]);
+    }, [step, retryCount, forward, advanceOn, targetSelector, spotlightSelector, placementAxis]);
 
     if (!mounted) return null;
 
