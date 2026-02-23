@@ -310,7 +310,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
 
             if (success) {
                 const value = object.data[key];
-                const isDisplayKey = getNodeDisplayKey(object as Node, captionsKeys) === key
+                const isDisplayKey = getNodeDisplayKey(object as Node, captionsKeys) === key;
 
                 graph.removeProperty(key, id, type);
 
