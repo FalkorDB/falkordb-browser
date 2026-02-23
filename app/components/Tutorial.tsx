@@ -293,7 +293,16 @@ function TutorialPortal({
     const [targetDisabled, setTargetDisabled] = useState(false);
     const [arrowStyle, setArrowStyle] = useState<React.CSSProperties>({ display: 'none' });
     const [arrowDirection, setArrowDirection] = useState<"left" | "right" | "top" | "bottom">("top");
+    // retryCount forces the setup effect to re-run when a target element isn’t in the DOM yet
+    const [retryCount, setRetryCount] = useState(0);
     const tooltipRef = useRef<HTMLDivElement>(null);
+    // Keep latest callbacks in refs so the setup effect never needs them as deps
+    const onNextRef = useRef(onNext);
+    const toastRef = useRef(toast);
+    useEffect(() => { onNextRef.current = onNext; }, [onNext]);
+    useEffect(() => { toastRef.current = toast; }, [toast]);
+    // Prevent double-firing during the rAF window — survives effect cleanup via ref
+    const advancePendingRef = useRef(false);
     const currentStep = tutorialSteps[step];
     const { targetSelector, advanceOn, forward, description, position, title, hidePrev, spotlightSelector, placementAxis } = currentStep;
 
@@ -301,12 +310,30 @@ function TutorialPortal({
         setMounted(true);
     }, []);
 
+    // Reset retryCount and advancePendingRef whenever the step changes
+    useEffect(() => {
+        setRetryCount(0);
+        advancePendingRef.current = false;
+    }, [step]);
+
     useEffect(() => {
         const forwardArr = [...(forward || []), advanceOn].filter(ev => !!ev);
 
         // Highlight target element and add click listener
         if (targetSelector) {
             const element = document.querySelector(targetSelector);
+
+            if (!element) {
+                // Element not yet in DOM (e.g. inside a dropdown that hasn’t opened).
+                // Schedule a retry by bumping retryCount, which re-runs this effect.
+                if (retryCount < 10) {
+                    const id = window.setTimeout(() => setRetryCount(c => c + 1), 50);
+                    return () => window.clearTimeout(id);
+                }
+                // Gave up after 10 retries — hide arrow
+                setArrowStyle({ display: 'none' });
+                return () => { };
+            }
 
             if (element) {
                 // For falkordb-canvas web component, we need to get the internal canvas from shadow DOM
@@ -494,6 +521,15 @@ function TutorialPortal({
                 ] as const;
                 const forwardKeyboardEvents = ['keydown', 'keyup', 'keypress'] as const;
 
+                let advanceIntervalId: ReturnType<typeof setInterval> | null = null;
+
+                const clearAdvanceInterval = () => {
+                    if (advanceIntervalId !== null) {
+                        clearInterval(advanceIntervalId);
+                        advanceIntervalId = null;
+                    }
+                };
+
                 const forwardEvent = (ev: Event) => {
                     // Get the overlay and target element positions to adjust coordinates
                     const overlayRect = overlay.getBoundingClientRect();
@@ -573,25 +609,37 @@ function TutorialPortal({
                     }
 
                     if (advanceOn !== ev.type) return;
+                    if (advancePendingRef.current) return;
+                    advancePendingRef.current = true;
 
+                    // Double-rAF: first frame lets the forwarded event’s DOM changes commit,
+                    // second frame ensures React has painted before we check/advance.
                     window.requestAnimationFrame(() => {
-                        if (currentStep.advanceCondition) {
-                            const pollInterval = 100;   // ms between checks
-                            const pollTimeout = 3000;   // ms total wait
-                            const deadline = Date.now() + pollTimeout;
-                            const intervalId = setInterval(() => {
-                                if (currentStep.advanceCondition!()) {
-                                    clearInterval(intervalId);
-                                    onNext();
-                                } else if (Date.now() >= deadline) {
-                                    clearInterval(intervalId);
-                                    toast({ description: "Action not detected — please try again." });
-                                }
-                            }, pollInterval);
-                        } else {
-                            onNext();
-                        }
-                    }); // Delay to allow any state updates from the event to propagate before checking advance condition
+                        window.requestAnimationFrame(() => {
+                            const condition = tutorialSteps[step].advanceCondition;
+                            if (!condition) {
+                                // No condition — advance immediately
+                                advancePendingRef.current = false;
+                                onNextRef.current();
+                            } else {
+                                // Has condition — poll every 100ms for up to 3s
+                                const pollInterval = 100;
+                                const pollTimeout = 3000;
+                                const deadline = Date.now() + pollTimeout;
+                                advanceIntervalId = setInterval(() => {
+                                    if (condition()) {
+                                        clearAdvanceInterval();
+                                        advancePendingRef.current = false;
+                                        onNextRef.current();
+                                    } else if (Date.now() >= deadline) {
+                                        clearAdvanceInterval();
+                                        advancePendingRef.current = false;
+                                        toastRef.current({ description: "Action not detected — please try again." });
+                                    }
+                                }, pollInterval);
+                            }
+                        });
+                    });
                 };
 
                 const addForwarders = () => {
@@ -612,6 +660,7 @@ function TutorialPortal({
                 addForwarders();
 
                 return () => {
+                    clearAdvanceInterval();
                     disabledObserver.disconnect();
                     removeForwarders();
                     cleanup();
@@ -623,7 +672,7 @@ function TutorialPortal({
         }
 
         return () => { };
-    }, [step, forward, advanceOn, targetSelector, spotlightSelector, placementAxis, currentStep, targetDisabled, toast, onNext]);
+    }, [step, retryCount, forward, advanceOn, targetSelector, spotlightSelector, placementAxis, targetDisabled]);
 
     if (!mounted) return null;
 
