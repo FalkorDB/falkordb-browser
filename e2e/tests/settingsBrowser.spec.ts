@@ -291,4 +291,45 @@ test.describe('@browser Browser Settings tests', () => {
         // Clean up
         await apiCall.removeGraph(graphName);
     });
+
+    test('@readwrite Verify Cypher Only toggle defaults to off and persists after save and reload', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+
+        // Expand chat section
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+
+        // Verify toggle is OFF by default
+        const defaultState = await settingsBrowserPage.getCypherOnlySwitch();
+        expect(defaultState).toBe(false);
+
+        // Toggle ON
+        await settingsBrowserPage.clickCypherOnlySwitchOn();
+        const onState = await settingsBrowserPage.getCypherOnlySwitch();
+        expect(onState).toBe(true);
+
+        // Save settings
+        await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForTimeout(1000);
+
+        // Reload the page
+        await settingsBrowserPage.reloadPage();
+
+        // Expand chat section again
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+
+        // Verify toggle persists as ON
+        const persistedState = await settingsBrowserPage.getCypherOnlySwitch();
+        expect(persistedState).toBe(true);
+
+        // Toggle OFF and save to clean up
+        await settingsBrowserPage.clickCypherOnlySwitchOff();
+        await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForTimeout(1000);
+
+        // Verify toggle is OFF after save
+        const offState = await settingsBrowserPage.getCypherOnlySwitch();
+        expect(offState).toBe(false);
+    });
 });
