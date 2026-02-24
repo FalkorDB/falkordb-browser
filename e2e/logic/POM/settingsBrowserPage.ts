@@ -50,10 +50,6 @@ export default class SettingsBrowserPage extends BasePage {
     return this.page.locator('p:has-text("No models found")');
   }
 
-  private get cypherOnlySwitch(): Locator {
-    return this.page.locator("#cypherOnlySwitch");
-  }
-
   // Wait for Interactive Methods
   async waitForChatSection(): Promise<boolean> {
     return waitForElementToBeVisible(this.chatSectionHeader);
@@ -359,36 +355,5 @@ export default class SettingsBrowserPage extends BasePage {
       !model.toLowerCase().includes(searchTerm.toLowerCase())
     );
     return nonMatchingModel || null;
-  }
-
-  // Cypher Only Switch Methods
-  async clickCypherOnlySwitchOn(): Promise<void> {
-    await interactWhenVisible(
-      this.cypherOnlySwitch,
-      async (el) => {
-        if ((await el.getAttribute("data-state")) === "checked") return;
-        el.click();
-      },
-      "check cypher only ON switch"
-    );
-  }
-
-  async clickCypherOnlySwitchOff(): Promise<void> {
-    await interactWhenVisible(
-      this.cypherOnlySwitch,
-      async (el) => {
-        if ((await el.getAttribute("data-state")) === "unchecked") return;
-        el.click();
-      },
-      "check cypher only OFF switch"
-    );
-  }
-
-  async getCypherOnlySwitch(): Promise<boolean> {
-    return interactWhenVisible(
-      this.cypherOnlySwitch,
-      async (el) => (await el.getAttribute("data-state")) === "checked",
-      "get cypher only switch"
-    );
   }
 }
