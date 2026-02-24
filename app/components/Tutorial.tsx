@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Copy, CornerDownLeft, CornerDownRight, CornerLeftDown, CornerRightDown } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
@@ -293,7 +293,29 @@ function TutorialPortal({
     const [targetDisabled, setTargetDisabled] = useState(false);
     const [arrowStyle, setArrowStyle] = useState<React.CSSProperties>({ display: 'none' });
     const [arrowDirection, setArrowDirection] = useState<"left" | "right" | "top" | "bottom">("top");
+    // retryCount forces the setup effect to re-run when a target element isn’t in the DOM yet
+    const [retryCount, setRetryCount] = useState(0);
     const tooltipRef = useRef<HTMLDivElement>(null);
+    // Keep latest callbacks in refs so the setup effect never needs them as deps
+    const onNextRef = useRef(onNext);
+    const toastRef = useRef(toast);
+    useEffect(() => { onNextRef.current = onNext; }, [onNext]);
+    useEffect(() => { toastRef.current = toast; }, [toast]);
+    // Prevent double-firing during the rAF window — survives effect cleanup via ref
+    const advancePendingRef = useRef(false);
+    // Interval/rAF IDs stored in refs so effect cleanup can always cancel them,
+    // even if they were scheduled in a rAF that fires after cleanup ran.
+    const advanceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const advanceRaf1Ref = useRef<number | null>(null);
+    const advanceRaf2Ref = useRef<number | null>(null);
+    const advanceCancelledRef = useRef(false);
+
+    const clearAdvance = () => {
+        advanceCancelledRef.current = true;
+        if (advanceRaf1Ref.current !== null) { window.cancelAnimationFrame(advanceRaf1Ref.current); advanceRaf1Ref.current = null; }
+        if (advanceRaf2Ref.current !== null) { window.cancelAnimationFrame(advanceRaf2Ref.current); advanceRaf2Ref.current = null; }
+        if (advanceIntervalRef.current !== null) { clearInterval(advanceIntervalRef.current); advanceIntervalRef.current = null; }
+    };
     const currentStep = tutorialSteps[step];
     const { targetSelector, advanceOn, forward, description, position, title, hidePrev, spotlightSelector, placementAxis } = currentStep;
 
@@ -301,12 +323,31 @@ function TutorialPortal({
         setMounted(true);
     }, []);
 
+    // Reset retryCount and advance state whenever the step changes
+    useEffect(() => {
+        setRetryCount(0);
+        advancePendingRef.current = false;
+        advanceCancelledRef.current = false;
+    }, [step]);
+
     useEffect(() => {
         const forwardArr = [...(forward || []), advanceOn].filter(ev => !!ev);
 
         // Highlight target element and add click listener
         if (targetSelector) {
             const element = document.querySelector(targetSelector);
+
+            if (!element) {
+                // Element not yet in DOM (e.g. inside a dropdown that hasn’t opened).
+                // Schedule a retry by bumping retryCount, which re-runs this effect.
+                if (retryCount < 10) {
+                    const id = window.setTimeout(() => setRetryCount(c => c + 1), 50);
+                    return () => window.clearTimeout(id);
+                }
+                // Gave up after 10 retries — hide arrow
+                setArrowStyle({ display: 'none' });
+                return () => { };
+            }
 
             if (element) {
                 // For falkordb-canvas web component, we need to get the internal canvas from shadow DOM
@@ -318,21 +359,33 @@ function TutorialPortal({
                     }
                 }
 
-                // Check if the element is disabled
-                const isDisabled = element instanceof HTMLButtonElement || element instanceof HTMLInputElement
-                    ? element.disabled
-                    : element.getAttribute('disabled') === 'true' ||
-                    element.getAttribute('aria-disabled') === 'true' ||
-                    element.classList.contains('disabled');
-
-                setTargetDisabled(isDisabled);
-
                 // Create an invisible overlay over the element to catch clicks
                 const overlay = document.createElement('div');
                 overlay.style.position = 'fixed';
                 overlay.style.zIndex = '40';
-                overlay.style.cursor = window.getComputedStyle(element).cursor || 'default';
-                overlay.style.pointerEvents = window.getComputedStyle(element).pointerEvents === 'none' ? 'none' : 'auto';
+
+                const applyDisabledStyle = () => {
+                    // Check if the element is disabled
+                    const isDisabled = element instanceof HTMLButtonElement || element instanceof HTMLInputElement
+                        ? element.disabled
+                        : element.getAttribute('disabled') === 'true' ||
+                        element.getAttribute('aria-disabled') === 'true' ||
+                        element.classList.contains('disabled');
+
+                    setTargetDisabled(isDisabled);
+                    // Also update the overlay directly so it reflects the current disabled state
+                    // without needing a React re-render / effect re-run
+                    overlay.style.cursor = isDisabled ? 'not-allowed' : (window.getComputedStyle(element).cursor || 'default');
+                    overlay.style.pointerEvents = isDisabled || window.getComputedStyle(element).pointerEvents === 'none' ? 'none' : 'auto';
+                };
+
+                applyDisabledStyle();
+
+                const disabledObserver = new MutationObserver(applyDisabledStyle);
+                disabledObserver.observe(element, {
+                    attributes: true,
+                    attributeFilter: ['disabled', 'aria-disabled', 'class'],
+                });
 
                 // Simple wheel event passthrough - only if wheel is in forward array
                 let wheelHandler: ((ev: Event) => void) | null = null;
@@ -483,67 +536,8 @@ function TutorialPortal({
                     'touchcancel',
                 ] as const;
                 const forwardKeyboardEvents = ['keydown', 'keyup', 'keypress'] as const;
-                let advancePending = false;
-                let advanceRetryTimeoutId: number | undefined;
-                let advanceStartTimeoutId: number | undefined;
-                let advanceAnimationFrameId: number | undefined;
-
-                const clearAdvanceTimers = () => {
-                    if (advanceRetryTimeoutId !== undefined) {
-                        window.clearTimeout(advanceRetryTimeoutId);
-                        advanceRetryTimeoutId = undefined;
-                    }
-                    if (advanceStartTimeoutId !== undefined) {
-                        window.clearTimeout(advanceStartTimeoutId);
-                        advanceStartTimeoutId = undefined;
-                    }
-                    if (advanceAnimationFrameId !== undefined) {
-                        window.cancelAnimationFrame(advanceAnimationFrameId);
-                        advanceAnimationFrameId = undefined;
-                    }
-                };
 
                 const forwardEvent = (ev: Event) => {
-                    const maybeAdvanceStep = () => {
-                        if (advanceOn !== ev.type || advancePending) {
-                            return;
-                        }
-
-                        advancePending = true;
-
-                        const maxAttempts = 12;
-                        const attemptIntervalMs = 50;
-                        let attempt = 0;
-
-                        const tryAdvance = () => {
-                            if (!currentStep.advanceCondition || currentStep.advanceCondition()) {
-                                clearAdvanceTimers();
-                                advancePending = false;
-                                onNext();
-                                return;
-                            }
-
-                            attempt += 1;
-                            if (attempt < maxAttempts) {
-                                advanceRetryTimeoutId = window.setTimeout(() => {
-                                    advanceRetryTimeoutId = undefined;
-                                    tryAdvance();
-                                }, attemptIntervalMs);
-                            } else {
-                                clearAdvanceTimers();
-                                advancePending = false;
-                            }
-                        };
-
-                        advanceStartTimeoutId = window.setTimeout(() => {
-                            advanceStartTimeoutId = undefined;
-                            advanceAnimationFrameId = window.requestAnimationFrame(() => {
-                                advanceAnimationFrameId = undefined;
-                                tryAdvance();
-                            });
-                        }, 0);
-                    };
-
                     // Get the overlay and target element positions to adjust coordinates
                     const overlayRect = overlay.getBoundingClientRect();
                     const elementRect = element.getBoundingClientRect();
@@ -578,13 +572,7 @@ function TutorialPortal({
                         if (eventTarget !== element) {
                             eventTarget.dispatchEvent(clone);
                         }
-
-                        maybeAdvanceStep();
-
-                        return;
-                    }
-
-                    if (ev instanceof PointerEvent) {
+                    } else if (ev instanceof PointerEvent) {
                         const pev = ev as PointerEvent;
                         const clone = new PointerEvent(pev.type, {
                             clientX: pev.clientX - offsetX,
@@ -612,21 +600,12 @@ function TutorialPortal({
                         if (eventTarget !== element) {
                             eventTarget.dispatchEvent(clone);
                         }
-
-                        maybeAdvanceStep();
-                        return;
-                    }
-
-                    if (ev instanceof TouchEvent) {
+                    } else if (ev instanceof TouchEvent) {
                         // TouchEvent constructors are not fully supported across browsers; fallback to dispatching a simple Event
                         const tev = ev as TouchEvent;
                         const clone = new Event(tev.type, { bubbles: true, cancelable: true });
                         element.dispatchEvent(clone);
-                        maybeAdvanceStep();
-                        return;
-                    }
-
-                    if (ev instanceof KeyboardEvent) {
+                    } else if (ev instanceof KeyboardEvent) {
                         const kev = ev as KeyboardEvent;
                         const clone = new KeyboardEvent(kev.type, {
                             ...kev,
@@ -634,8 +613,52 @@ function TutorialPortal({
                             cancelable: true,
                         });
                         element.dispatchEvent(clone);
-                        maybeAdvanceStep();
                     }
+
+                    if (advanceOn !== ev.type) return;
+                    if (advancePendingRef.current) return;
+                    advancePendingRef.current = true;
+                    advanceCancelledRef.current = false;
+
+                    // Double-rAF: first frame lets the forwarded event’s DOM changes commit,
+                    // second frame ensures React has painted before we check/advance.
+                    advanceRaf1Ref.current = window.requestAnimationFrame(() => {
+                        advanceRaf1Ref.current = null;
+                        if (advanceCancelledRef.current) return;
+                        advanceRaf2Ref.current = window.requestAnimationFrame(() => {
+                            advanceRaf2Ref.current = null;
+                            if (advanceCancelledRef.current) return;
+                            const condition = tutorialSteps[step].advanceCondition;
+                            if (!condition) {
+                                // No condition — advance immediately
+                                advancePendingRef.current = false;
+                                onNextRef.current();
+                            } else {
+                                // Has condition — poll every 100ms for up to 3s
+                                const pollInterval = 100;
+                                const pollTimeout = 3000;
+                                const deadline = Date.now() + pollTimeout;
+                                advanceIntervalRef.current = setInterval(() => {
+                                    if (advanceCancelledRef.current) {
+                                        clearInterval(advanceIntervalRef.current!);
+                                        advanceIntervalRef.current = null;
+                                        return;
+                                    }
+                                    if (condition()) {
+                                        clearInterval(advanceIntervalRef.current!);
+                                        advanceIntervalRef.current = null;
+                                        advancePendingRef.current = false;
+                                        onNextRef.current();
+                                    } else if (Date.now() >= deadline) {
+                                        clearInterval(advanceIntervalRef.current!);
+                                        advanceIntervalRef.current = null;
+                                        advancePendingRef.current = false;
+                                        toastRef.current({ description: "Action not detected — please try again." });
+                                    }
+                                }, pollInterval);
+                            }
+                        });
+                    });
                 };
 
                 const addForwarders = () => {
@@ -656,9 +679,9 @@ function TutorialPortal({
                 addForwarders();
 
                 return () => {
+                    clearAdvance();
+                    disabledObserver.disconnect();
                     removeForwarders();
-                    clearAdvanceTimers();
-                    advancePending = false;
                     cleanup();
                 };
             }
@@ -668,7 +691,7 @@ function TutorialPortal({
         }
 
         return () => { };
-    }, [step, onNext, targetDisabled, forward, advanceOn, targetSelector, spotlightSelector, placementAxis, currentStep]);
+    }, [step, retryCount, forward, advanceOn, targetSelector, spotlightSelector, placementAxis]);
 
     if (!mounted) return null;
 
@@ -894,13 +917,13 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
         }
     }, [open, step, demoLoaded, onLoadDemoGraphs, onClose]);
 
-    const handleNextStep = () => {
+    const handleNextStep = useCallback(() => {
         setStep(prev => Math.min(prev + 1, tutorialSteps.length - 1));
-    };
+    }, []);
 
-    const handlePrevStep = () => {
+    const handlePrevStep = useCallback(() => {
         setStep(prev => Math.max(prev - 1, 1)); // Don't go back to step 0 (loading)
-    };
+    }, []);
 
     const handleClose = async () => {
         // Cleanup demo graphs before closing
