@@ -2,7 +2,7 @@
  * Utility functions for AI provider detection and model management
  */
 
-export type AIProvider = "openai" | "anthropic" | "gemini" | "ollama" | "unknown";
+export type AIProvider = "openai" | "anthropic" | "gemini" | "ollama" | "groq" | "cohere" | "unknown";
 
 /**
  * Detects the AI provider based on the API key format
@@ -39,6 +39,14 @@ export function detectProviderFromApiKey(apiKey: string | undefined): AIProvider
         return "gemini";
     }
 
+    // Groq: starts with "gsk_"
+    if (trimmedKey.startsWith("gsk_")) {
+        return "groq";
+    }
+
+    // Cohere: typically a long alphanumeric string starting with specific patterns
+    // No reliable prefix detection for Cohere, handled by model selection
+
     // Ollama doesn't require an API key
     // This is handled separately in the UI
 
@@ -58,6 +66,10 @@ export function getProviderDisplayName(provider: AIProvider): string {
             return "Google Gemini";
         case "ollama":
             return "Ollama";
+        case "groq":
+            return "Groq";
+        case "cohere":
+            return "Cohere";
         default:
             return "Unknown";
     }
@@ -98,6 +110,16 @@ export function getProviderApiKeyInfo(provider: AIProvider): {
                 url: "https://ollama.ai/",
                 description: "Ollama runs locally and doesn't require an API key",
             };
+        case "groq":
+            return {
+                url: "https://console.groq.com/keys",
+                description: "Get your Groq API key from the Groq Console",
+            };
+        case "cohere":
+            return {
+                url: "https://dashboard.cohere.com/api-keys",
+                description: "Get your Cohere API key from the Cohere Dashboard",
+            };
         default:
             return null;
     }
@@ -114,10 +136,18 @@ export function getProviderApiKeyInfo(provider: AIProvider): {
  * detectProviderFromModel("anthropic:claude-3-5-sonnet-20241022") // returns "anthropic"
  */
 export function detectProviderFromModel(model: string): AIProvider {
+    // Use prefix-based detection (e.g., "anthropic::claude-sonnet-4-5")
+    const separatorIndex = model.indexOf("::");
+    if (separatorIndex !== -1) {
+        const prefix = model.substring(0, separatorIndex);
+        const knownProviders: AIProvider[] = ["anthropic", "gemini", "ollama", "groq", "cohere"];
+        const matched = knownProviders.find(p => p === prefix);
+        if (matched) return matched;
+    }
+
+    // Fallback for OpenAI models (no prefix)
     if (model.startsWith("gpt")) return "openai";
-    if (model.includes("claude") || model.startsWith("anthropic:")) return "anthropic";
-    if (model.includes("gemini") || model.startsWith("gemini:")) return "gemini";
-    if (model.includes("llama") || model.includes("mixtral") || model.includes("phi") || model.startsWith("ollama:")) return "ollama";
+
     return "unknown";
 }
 
@@ -133,12 +163,11 @@ export function detectProviderFromModel(model: string): AIProvider {
  * formatModelDisplayName("gpt-4o-mini") // "gpt-4o-mini"
  */
 export function formatModelDisplayName(modelValue: string): string {
-    // Remove provider prefix (e.g., "anthropic:", "gemini:", "ollama:")
+    // Remove provider prefix (e.g., "anthropic::", "gemini::", "groq::")
     let withoutPrefix = modelValue;
-    if (modelValue.includes(':')) {
-        const parts = modelValue.split(':');
-        // Handle edge case where model ends with colon or has multiple colons
-        withoutPrefix = parts.slice(1).join(':') || modelValue;
+    const separatorIndex = modelValue.indexOf("::");
+    if (separatorIndex !== -1) {
+        withoutPrefix = modelValue.substring(separatorIndex + 2);
     }
 
     // Remove date suffixes (e.g., "-20241022", "-20240229")
