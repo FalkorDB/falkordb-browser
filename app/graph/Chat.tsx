@@ -39,7 +39,7 @@ export default function Chat({ onClose }: Props) {
     const { setIndicator } = useContext(IndicatorContext);
     const { graphName, runQuery } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
-    const { settings: { chatSettings: { secretKey, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
+    const { settings: { chatSettings: { secretKey, model, maxSavedMessages, cypherOnly } } } = useContext(BrowserSettingsContext);
 
     const { toast } = useToast();
     const route = useRouter();
@@ -163,7 +163,8 @@ export default function Chat({ onClose }: Props) {
                     })),
                     graphName,
                     model,
-                    key: secretKey
+                    key: secretKey,
+                    cypherOnly
                 })
             });
 
