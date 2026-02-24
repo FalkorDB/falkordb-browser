@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { formatModelDisplayName } from "@/lib/ai-provider-utils";
-import { Search, Check, Sparkles, Zap, Brain, Globe, Server } from "lucide-react";
+import { Search, Check, Sparkles, Zap, Brain, Globe, Server, Cpu, MessageSquare, ChevronDown, ChevronUp } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Input from "../components/ui/Input";
+
+const MAX_MODELS_PER_CATEGORY = 8;
 
 interface ModelSelectorProps {
     models: string[];
@@ -13,9 +15,19 @@ interface ModelSelectorProps {
     isLoading?: boolean;
 }
 
+// Map provider prefix to display category name
+const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
+    openai: "OpenAI",
+    anthropic: "Anthropic",
+    gemini: "Google",
+    ollama: "Ollama",
+    groq: "Groq",
+    cohere: "Cohere",
+};
+
 // Get icon for provider category
 const getCategoryIcon = (category: string) => {
-    const className = "h-3.5 w-3.5 text-primary";
+    const className = "h-4 w-4";
     switch (category) {
         case "OpenAI":
             return <Zap className={className} />;
@@ -25,37 +37,37 @@ const getCategoryIcon = (category: string) => {
             return <Globe className={className} />;
         case "Ollama":
             return <Server className={className} />;
+        case "Groq":
+            return <Cpu className={className} />;
+        case "Cohere":
+            return <MessageSquare className={className} />;
         default:
-            return null;
+            return <Sparkles className={className} />;
     }
 };
 
-// Categorize models by provider
+// Categorize models by provider prefix (e.g., "anthropic::model" -> Anthropic)
 const categorizeModels = (models: string[]) => {
-    const categories: Record<string, string[]> = {
-        OpenAI: [],
-        Anthropic: [],
-        Google: [],
-        Ollama: [],
-        Other: [],
-    };
+    const uniqueModels = [...new Set(models)];
+    const categories: Record<string, string[]> = {};
 
-    models.forEach((model) => {
-        if (model.startsWith("gpt")) {
-            categories.OpenAI.push(model);
-        } else if (model.includes("claude")) {
-            categories.Anthropic.push(model);
-        } else if (model.includes("gemini")) {
-            categories.Google.push(model);
-        } else if (model.includes("llama") || model.includes("mixtral") || model.includes("phi")) {
-            categories.Ollama.push(model);
+    uniqueModels.forEach((model) => {
+        const separatorIndex = model.indexOf("::");
+        let categoryName: string;
+
+        if (separatorIndex !== -1) {
+            const prefix = model.substring(0, separatorIndex);
+            categoryName = PROVIDER_DISPLAY_NAMES[prefix] || prefix.charAt(0).toUpperCase() + prefix.slice(1);
         } else {
-            // Add unknown models to "Other" category
-            categories.Other.push(model);
+            categoryName = "OpenAI";
         }
+
+        if (!categories[categoryName]) {
+            categories[categoryName] = [];
+        }
+        categories[categoryName].push(model);
     });
 
-    // Remove empty categories
     return Object.entries(categories).filter(([, categoryModels]) => categoryModels.length > 0);
 };
 
@@ -69,8 +81,8 @@ export default function ModelSelector({
     const [search, setSearch] = useState("");
     const [filteredModels, setFilteredModels] = useState<string[]>(models);
     const [categorizedModels, setCategorizedModels] = useState<[string, string[]][]>([]);
+    const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
-    // Filter and categorize models based on search
     useEffect(() => {
         const timeout = setTimeout(() => {
             const filtered = !search
@@ -91,17 +103,20 @@ export default function ModelSelector({
         }
     };
 
-    const maxColumns = categorizedModels.length > 0
-        ? categorizedModels.reduce((acc, [, ms]) => Math.max(acc, ms.length), 0) + 1
-        : 1; // +1 for category label
-
-    // Account for gap between columns with minimum 10% width adjusted for gaps
-    const gapSize = 8; // gap in pixels
-    const gapPerColumn = ((maxColumns - 1) * gapSize) / maxColumns;
-    const colWidth = `max(calc(10% - ${gapPerColumn}px), calc((100% - ${(maxColumns - 1) * gapSize}px) / ${maxColumns}))`;
+    const toggleExpand = (category: string) => {
+        setExpandedCategories(prev => {
+            const next = new Set(prev);
+            if (next.has(category)) {
+                next.delete(category);
+            } else {
+                next.add(category);
+            }
+            return next;
+        });
+    };
 
     return (
-        <div className="relative flex flex-col rounded-lg border border-border bg-background shadow-sm overflow-hidden">
+        <div className="relative flex flex-col rounded-lg border border-border bg-background overflow-hidden">
             {/* Search Header */}
             <div className="sticky top-0 z-10 bg-background border-b border-border">
                 <div className="relative p-3">
@@ -119,7 +134,7 @@ export default function ModelSelector({
             </div>
 
             {/* Model List */}
-            <div className="max-h-[280px] overflow-y-auto custom-scrollbar">
+            <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
                 {
                     isLoading &&
                     <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
@@ -141,71 +156,98 @@ export default function ModelSelector({
 
                 {
                     !isLoading && filteredModels.length > 0 &&
-                    <div className="flex flex-col gap-2 p-2">
+                    <div className="flex flex-col gap-3 p-3">
                         {
-                            categorizedModels.map(([category, categoryModels]) => (
-                                // Models Grid with Horizontal Scroll
-                                <div key={category} style={{ gridAutoColumns: colWidth, gap: `${gapSize}px` }} className="bg-muted/40 rounded-md overflow-x-auto flex-1 grid grid-flow-col items-center">
-                                    {/* Category Label */}
-                                    <div className="flex items-center gap-2">
-                                        {getCategoryIcon(category)}
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <h3 className="text-sm font-bold text-foreground tracking-wide truncate">
-                                                    {category}
-                                                </h3>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p>{category}</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </div>
-                                    {
-                                        categoryModels.map((model) => {
-                                            const isSelected = model === selectedModel;
-                                            return (
-                                                <Tooltip key={model}>
-                                                    <TooltipTrigger asChild>
-                                                        <button
-                                                            type="button"
-                                                            data-testid={`selectModel${model}`}
-                                                            data-selected={isSelected}
-                                                            onClick={() => handleModelClick(model)}
-                                                            disabled={disabled}
-                                                            className={cn(
-                                                                "flex items-center justify-between p-2 rounded-md text-sm transition-all duration-150",
-                                                                "hover:bg-muted/80 active:scale-[0.98]",
-                                                                isSelected && "bg-primary hover:bg-primary",
-                                                                disabled && "opacity-50 cursor-not-allowed"
-                                                            )}
-                                                        >
-                                                            <span className={cn(
-                                                                "font-medium truncate",
-                                                                isSelected ? "text-background" : "text-foreground"
-                                                            )}>
-                                                                {formatModelDisplayName(model)}
-                                                            </span>
+                            categorizedModels.map(([category, categoryModels]) => {
+                                const isExpanded = expandedCategories.has(category);
+                                const hasMore = categoryModels.length > MAX_MODELS_PER_CATEGORY;
+                                const visibleModels = isExpanded ? categoryModels : categoryModels.slice(0, MAX_MODELS_PER_CATEGORY);
+                                const hiddenCount = categoryModels.length - MAX_MODELS_PER_CATEGORY;
 
-                                                            {isSelected && (
-                                                                <Check className="h-4 w-4 text-background flex-shrink-0 ml-2" />
-                                                            )}
-                                                        </button>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>
-                                                        <p>{model}</p>
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            );
-                                        })
-                                    }
-                                </div>
-                            ))
+                                return (
+                                    <div key={category} className="rounded-lg border border-border/50 overflow-hidden">
+                                        {/* Category Header */}
+                                        <div className="flex items-center gap-2 px-3 py-2 bg-secondary/50">
+                                            {getCategoryIcon(category)}
+                                            <h3 className="text-sm font-bold text-foreground tracking-wide">
+                                                {category}
+                                            </h3>
+                                            <span className="text-xs text-muted-foreground ml-auto">
+                                                {categoryModels.length} {categoryModels.length === 1 ? "model" : "models"}
+                                            </span>
+                                        </div>
+
+                                        {/* Models Grid */}
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5 p-2">
+                                            {
+                                                visibleModels.map((model) => {
+                                                    const isSelected = model === selectedModel;
+                                                    return (
+                                                        <Tooltip key={model}>
+                                                            <TooltipTrigger asChild>
+                                                                <button
+                                                                    type="button"
+                                                                    data-testid={`selectModel${model}`}
+                                                                    data-selected={isSelected}
+                                                                    onClick={() => handleModelClick(model)}
+                                                                    disabled={disabled}
+                                                                    className={cn(
+                                                                        "flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs transition-all duration-150",
+                                                                        "border border-transparent",
+                                                                        "hover:bg-muted/60 hover:border-border/50 active:scale-[0.98]",
+                                                                        isSelected && "bg-primary border-primary hover:bg-primary hover:border-primary",
+                                                                        disabled && "opacity-50 cursor-not-allowed"
+                                                                    )}
+                                                                >
+                                                                    <span className={cn(
+                                                                        "font-medium truncate text-center",
+                                                                        isSelected ? "text-background" : "text-foreground"
+                                                                    )}>
+                                                                        {formatModelDisplayName(model)}
+                                                                    </span>
+                                                                    {isSelected && (
+                                                                        <Check className="h-3 w-3 text-background flex-shrink-0" />
+                                                                    )}
+                                                                </button>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                <p>{model}</p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    );
+                                                })
+                                            }
+                                        </div>
+
+                                        {/* Show more / less */}
+                                        {
+                                            hasMore &&
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleExpand(category)}
+                                                className="flex items-center justify-center gap-1 w-full py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors border-t border-border/30"
+                                            >
+                                                {isExpanded ? (
+                                                    <>
+                                                        <ChevronUp className="h-3 w-3" />
+                                                        Show less
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <ChevronDown className="h-3 w-3" />
+                                                        {hiddenCount} more
+                                                    </>
+                                                )}
+                                            </button>
+                                        }
+                                    </div>
+                                );
+                            })
                         }
                     </div>
                 }
             </div>
-
-        </div >
+        </div>
     );
 }
 
