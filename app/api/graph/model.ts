@@ -31,7 +31,6 @@ export type Node = {
   expand: boolean;
   collapsed: boolean;
   size?: number;
-  caption?: string;
   data: {
     [key: string]: any;
   };
@@ -90,7 +89,6 @@ export interface LinkStyle {
 
 export interface LabelStyle extends LinkStyle {
   size?: number;
-  caption?: string;
 }
 
 export interface InfoLabel {
@@ -203,8 +201,8 @@ export function loadLabelStyle(label: Label | InfoLabel): void {
 
   if (savedStyle) {
     try {
-      const style = JSON.parse(savedStyle);
-      label.style = style;
+      const { color, size } = JSON.parse(savedStyle);
+      label.style = { color, size };
     } catch (e) {
       // Ignore invalid JSON
     }
@@ -383,6 +381,10 @@ export class Graph {
 
   private graphInfo: GraphInfo;
 
+  private captionsKeys: string[] = [];
+
+  private showPropertyKeyPrefix: boolean = false;
+
   private constructor(
     id: string,
     labels: Label[],
@@ -392,6 +394,8 @@ export class Graph {
     relationshipsMap: Map<string, Relationship>,
     nodesMap: Map<number, Node>,
     linksMap: Map<number, Link>,
+    captionsKeys?: string[],
+    showPropertyKeyPrefix?: boolean,
     currentLimit?: number,
     graphInfo?: GraphInfo
   ) {
@@ -405,6 +409,8 @@ export class Graph {
     this.relationshipsMap = relationshipsMap;
     this.nodesMap = nodesMap;
     this.linksMap = linksMap;
+    this.captionsKeys = captionsKeys || [];
+    this.showPropertyKeyPrefix = showPropertyKeyPrefix || false;
     this.currentLimit = currentLimit || 0;
     this.graphInfo = graphInfo || GraphInfo.empty();
   }
@@ -477,12 +483,22 @@ export class Graph {
     this.graphInfo = graphInfo;
   }
 
+  get CaptionsKeys(): string[] {
+    return this.captionsKeys;
+  }
+
+  get ShowPropertyKeyPrefix(): boolean {
+    return this.showPropertyKeyPrefix;
+  }
+
   public getElements(): (Node | Link)[] {
     return [...this.elements.nodes, ...this.elements.links];
   }
 
   public static empty(
     graphName?: string,
+    captionsKeys?: string[],
+    showPropertyKeyPrefix?: boolean,
     currentLimit?: number,
     graphInfo?: GraphInfo
   ): Graph {
@@ -495,6 +511,8 @@ export class Graph {
       new Map<string, Relationship>(),
       new Map<number, Node>(),
       new Map<number, Link>(),
+      captionsKeys,
+      showPropertyKeyPrefix,
       currentLimit,
       graphInfo
     );
@@ -503,12 +521,16 @@ export class Graph {
   public static create(
     id: string,
     results: { data: Data; metadata: any[] },
+    captionsKeys: string[],
+    showPropertyKeyPrefix: boolean,
     currentLimit: number,
     graphInfo?: GraphInfo,
     isSchema = false
   ): Graph {
     const graph = Graph.empty(
       undefined,
+      captionsKeys,
+      showPropertyKeyPrefix,
       currentLimit,
       graphInfo
     );
@@ -570,7 +592,6 @@ export class Graph {
         visible: true,
         expand: false,
         collapsed,
-        caption: mainLabel.style.caption,
         size: mainLabel.style.size,
         data: {},
       };
@@ -594,7 +615,6 @@ export class Graph {
         : "";
       currentNode.expand = false;
       currentNode.collapsed = collapsed;
-      currentNode.caption = mainLabel.style.caption;
       currentNode.size = mainLabel.style.size;
       Object.entries(cell.properties).forEach(([key, value]) => {
         currentNode.data[key] = isSchema ? getSchemaValue(value) : value;
@@ -650,7 +670,6 @@ export class Graph {
             expand: false,
             collapsed,
             visible: true,
-            caption: label.style.caption,
             size: label.style.size,
             data: {
               fake: true
@@ -689,7 +708,6 @@ export class Graph {
             expand: false,
             collapsed,
             visible: true,
-            caption: label!.style.caption,
             size: label!.style.size,
             data: {
               fake: true
@@ -709,7 +727,6 @@ export class Graph {
             expand: false,
             collapsed,
             visible: true,
-            caption: label!.style.caption,
             size: label!.style.size,
             data: {
               fake: true
@@ -859,9 +876,6 @@ export class Graph {
           ...infoLabel,
           elements: [],
         };
-
-        // Load saved style from localStorage
-        loadLabelStyle(c);
 
         this.labelsMap.set(c.name, c);
         this.labels.push(c);
@@ -1049,7 +1063,7 @@ export class Graph {
               typeof cell === "object" &&
               typeof cellToCheck === "object" &&
               (Array.isArray(cell) ? cell.some(c => c.id === selectedElement.id) : cell.id === selectedElement.id) &&
-              "labels" in cellToCheck 
+              "labels" in cellToCheck
             ) {
               const newCell = Array.isArray(cell) ? cell.map(c => ({ ...c }) as NodeCell) : { ...cell } as NodeCell;
 
@@ -1095,20 +1109,18 @@ export class Graph {
     if (selectedElement.labels.length === 0) {
       const [emptyCategory] = this.createLabel([""], selectedElement);
       selectedElement.labels.push(emptyCategory.name);
-      const { color, size, caption } = emptyCategory.style;
+      const { color, size } = emptyCategory.style;
       selectedElement.color = color;
       selectedElement.size = size;
-      selectedElement.caption = caption;
     } else {
       // Update node color to reflect the remaining label
       const remainingLabel = this.LabelsMap.get(getLabelWithFewestElements(selectedElement.labels.map(l => this.LabelsMap.get(l)).filter(l => !!l)).name);
 
       if (remainingLabel) {
-        const { color, size, caption } = remainingLabel.style;
+        const { color, size } = remainingLabel.style;
 
         selectedElement.color = color;
         selectedElement.size = size;
-        selectedElement.caption = caption;
       }
     }
   }
@@ -1184,12 +1196,10 @@ export class Graph {
 
     selectedElement.labels.push(label);
 
-    const { color, size, caption } = category.style;
+    const { color, size } = category.style;
 
     selectedElement.color = color;
     selectedElement.size = size;
-    selectedElement.caption = caption;
-
 
     return this.labels;
   }

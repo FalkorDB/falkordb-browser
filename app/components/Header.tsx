@@ -142,7 +142,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                         </TooltipContent>
                     </Tooltip>
                 </div>
-                <div className="p-1 flex flex-col items-center gap-2 bg-secondary rounded-lg">
+                <div data-testid="NavigationButtons" className="p-1 flex flex-col items-center gap-2 bg-secondary rounded-lg">
                     <Button
                         data-testid="settings"
                         className={cn("text-foreground p-1 rounded-lg", type === "Settings" && "text-background bg-primary")}
