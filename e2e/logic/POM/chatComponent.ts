@@ -203,6 +203,14 @@ export default class ChatComponent extends GraphPage {
     );
   }
 
+  async getFirstUserMessageContent(): Promise<string | null> {
+    return interactWhenVisible(
+      this.chatUserMessages.first(),
+      (el) => el.textContent(),
+      "First User Message"
+    );
+  }
+
   async getLastAssistantMessageContent(type: string): Promise<string | null> {
     return interactWhenVisible(
       this.chatAssistantMessage(type).last(),

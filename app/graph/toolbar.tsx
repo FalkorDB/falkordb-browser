@@ -1,6 +1,6 @@
 import { ArrowRight, Circle, Info } from "lucide-react";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
-import { cn, GraphRef } from "@/lib/utils";
+import { areCaptionKeysEqual, cn, GraphRef } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSession } from "next-auth/react";
 import { Graph, Link, Node } from "../api/graph/model";
@@ -44,6 +44,7 @@ export default function Toolbar({
 }: Props) {
 
     const { isLoading: isLoadingGraph } = useContext(GraphContext);
+    const { settings: { showPropertyKeyPrefixSettings: { showPropertyKeyPrefix }, captionsKeysSettings: { captionsKeys } } } = useContext(BrowserSettingsContext);
     const {
         settings: {
             limitSettings: { limit, lastLimit },
@@ -283,13 +284,13 @@ export default function Toolbar({
                     </div>
                 }
             </div>
-            <div className={cn("flex flex-row-reverse gap-2", label === "Schema" && "h-full")}>
+            <div data-testid={`elementCanvasToolbarAction${label}`} className={cn("flex flex-row-reverse gap-2 pointer-events-auto", label === "Schema" && "h-full")}>
                 {
                     graphName && session?.user.role !== "Read-Only" &&
                     <>
                         <Button
                             data-testid={`elementCanvasInfo${label}`}
-                            className="p-1 pointer-events-auto bg-background cursor-default border-primary"
+                            className="p-1 bg-background cursor-default border-primary"
                             variant="Secondary"
                             tooltipVariant="Primary"
                             tooltipSide="bottom"
@@ -302,13 +303,15 @@ export default function Toolbar({
                         {
                             (hasLimitWarning || hasLimitChangeWarning) ?
                                 <Button
-                                    data-testid={`elementCanvasWarning${label}`}
-                                    className="p-1 pointer-events-auto bg-background cursor-default border-orange-300"
+                                    data-testid={`elementCanvasLimitWarning${label}`}
+                                    className="p-1 bg-background cursor-default border-orange-300"
                                     variant="Secondary"
                                     tooltipVariant="Primary"
                                     tooltipSide="bottom"
                                     title={`${hasLimitWarning ? `Data currently limited to ${graph.Data.length} rows` : ""}
-                        ${hasLimitChangeWarning ? "Rerun the query to apply the new limit." : ""}`}
+                        ${hasLimitChangeWarning ? "Rerun the query to apply the new limit." : ""}
+                        ${!areCaptionKeysEqual(graph.CaptionsKeys, captionsKeys) ? "Rerun the query to apply the new captions keys settings." : ""}
+                        ${graph.ShowPropertyKeyPrefix !== showPropertyKeyPrefix ? "Rerun the query to apply the new property key prefix settings." : ""}`}
                                 >
                                     <Info className="text-orange-300" size={20} />
                                 </Button>
@@ -316,7 +319,7 @@ export default function Toolbar({
                         }
                         <Button
                             data-testid={`elementCanvasAddNode${label}`}
-                            className="p-1 pointer-events-auto bg-background border-green-900"
+                            className="p-1 bg-background border-green-900"
                             variant="Secondary"
                             tooltipVariant="Primary"
                             tooltipSide="bottom"
@@ -329,7 +332,7 @@ export default function Toolbar({
                             setIsAddEdge &&
                             <Button
                                 data-testid={`elementCanvasAddEdge${label}`}
-                                className="p-1 pointer-events-auto bg-background border-green-900"
+                                className="p-1 bg-background border-green-900"
                                 variant="Secondary"
                                 tooltipVariant="Primary"
                                 tooltipSide="bottom"
