@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        const { messages, graphName, key, model } = validation.data;
+        const { messages, graphName, key, model, cypherOnly } = validation.data;
 
         try {
             // Build FalkorDB connection URL from user session
@@ -152,7 +152,9 @@ export async function POST(request: NextRequest) {
             }
 
             // Call textToCypher and get the result
-            const result = await textToCypher.textToCypher(graphName, question);
+            const result = cypherOnly
+                ? await textToCypher.cypherOnly(graphName, question)
+                : await textToCypher.textToCypher(graphName, question);
 
             // Check if the result has an error status
             if (result.status === 'error') {
