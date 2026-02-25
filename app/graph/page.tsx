@@ -179,7 +179,7 @@ export default function Page() {
 
         if (graphName && graphName !== graph.Id) {
             if (runDefaultQuery) {
-                runQuery(defaultQuery, undefined, !tutorialOpen);
+                runQuery(defaultQuery, undefined);
                 return;
             }
 
