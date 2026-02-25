@@ -40,6 +40,8 @@ type BrowserSettingsContextType = {
       setNewModel: Dispatch<SetStateAction<string>>;
       newMaxSavedMessages: number;
       setNewMaxSavedMessages: Dispatch<SetStateAction<number>>;
+      newCypherOnly: boolean;
+      setNewCypherOnly: Dispatch<SetStateAction<boolean>>;
     };
     graphInfo: {
       newRefreshInterval: number;
@@ -84,6 +86,8 @@ type BrowserSettingsContextType = {
       setModel: Dispatch<SetStateAction<string>>;
       maxSavedMessages: number;
       setMaxSavedMessages: Dispatch<SetStateAction<number>>;
+      cypherOnly: boolean;
+      setCypherOnly: Dispatch<SetStateAction<boolean>>;
     };
     graphInfo: {
       showMemoryUsage: boolean;
@@ -214,6 +218,8 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         setNewModel: () => {},
         newMaxSavedMessages: 0,
         setNewMaxSavedMessages: () => {},
+        newCypherOnly: false,
+        setNewCypherOnly: () => {},
       },
       graphInfo: {
         newRefreshInterval: 0,
@@ -252,6 +258,8 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         setModel: () => {},
         maxSavedMessages: 0,
         setMaxSavedMessages: () => {},
+        cypherOnly: false,
+        setCypherOnly: () => {},
       },
       graphInfo: {
         showMemoryUsage: false,
