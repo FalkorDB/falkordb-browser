@@ -2,8 +2,7 @@
 /* eslint-disable react/no-array-index-key */
 import { cn, Message } from "@/lib/utils";
 import { useContext, useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, CircleArrowUp, Copy, Loader2, Play, Search, X, Info } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
+import { ChevronDown, ChevronRight, CircleArrowUp, Share2, Copy, Loader2, Play, Search, X } from "lucide-react";
 import { Tooltip as ShadTooltip, TooltipContent as ShadTooltipContent, TooltipTrigger as ShadTooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
@@ -41,7 +40,7 @@ export default function Chat({ onClose }: Props) {
     const { graphName, runQuery } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
     const { settings: { chatSettings: { secretKey, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
-    // Local Cypher Only toggle state for this chat session
+    // Cypher Only toggle state, persisted per graph
     const [cypherOnly, setCypherOnly] = useState(false);
 
     const { toast } = useToast();
@@ -53,7 +52,7 @@ export default function Chat({ onClose }: Props) {
     const [isLoading, setIsLoading] = useState(false);
     const [queryCollapse, setQueryCollapse] = useState<{ [key: string]: boolean }>({});
 
-    // Load messages for current graph on mount
+    // Load messages and cypher only preference for current graph on mount
     useEffect(() => {
         const savedMessages = localStorage.getItem(`chat-${graphName}`);
         const currentMessages = JSON.parse(savedMessages || "[]");
@@ -379,26 +378,6 @@ export default function Chat({ onClose }: Props) {
     return (
         <div data-testid="chatPanel" className="border-Gradient-rounded h-full w-full">
             <div className="bg-background relative h-full w-full flex flex-col gap-4 items-center rounded-lg p-4">
-                {/* Cypher Only Toolbar */}
-                <div className="w-full flex items-center justify-between mb-4 px-3 py-2" style={{ background: "rgba(240, 240, 255, 0.7)", borderRadius: 8, border: "1px solid #e0e0f0", boxShadow: "0 1px 4px 0 rgba(80,80,120,0.04)", marginTop: 8, zIndex: 1, position: 'relative' }}>
-                    <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm text-foreground">Cypher Only</span>
-                        <ShadTooltip>
-                            <ShadTooltipTrigger asChild>
-                                <Info size={16} className="text-muted-foreground cursor-pointer" />
-                            </ShadTooltipTrigger>
-                            <ShadTooltipContent side="bottom">
-                                <span>When enabled, only Cypher queries will be shown in responses.</span>
-                            </ShadTooltipContent>
-                        </ShadTooltip>
-                    </div>
-                    <Switch
-                        id="cypher-only-toggle"
-                        checked={cypherOnly}
-                        onCheckedChange={setCypherOnly}
-                        data-testid="cypherOnlySwitch"
-                    />
-                </div>
                 <Button
                     data-testid="chatCloseButton"
                     className="absolute top-2 right-2"
@@ -478,6 +457,32 @@ export default function Chat({ onClose }: Props) {
                     }
                 </ul>
                 <form data-testid="chatForm" className="flex gap-2 items-center border border-border rounded-lg w-full p-2" onSubmit={handleSubmit}>
+                    <ShadTooltip>
+                        <ShadTooltipTrigger asChild>
+                            <button
+                                type="button"
+                                data-testid="cypherOnlySwitch"
+                                data-state={cypherOnly ? "checked" : "unchecked"}
+                                onClick={() => {
+                                    const next = !cypherOnly;
+                                    setCypherOnly(next);
+                                    localStorage.setItem(`cypherOnly-${graphName}`, String(next));
+                                }}
+                                className={cn(
+                                    "shrink-0 flex items-center justify-center rounded-md transition-all duration-150 active:scale-[0.96]",
+                                    "h-8 w-8",
+                                    cypherOnly
+                                        ? "bg-primary text-background hover:opacity-90"
+                                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                                )}
+                            >
+                                <Share2 size={18} />
+                            </button>
+                        </ShadTooltipTrigger>
+                        <ShadTooltipContent side="top">
+                            <span>{cypherOnly ? "Cypher only mode is ON — click to disable" : "Cypher only mode"}</span>
+                        </ShadTooltipContent>
+                    </ShadTooltip>
                     <Button
                         data-testid="chatSendButton"
                         disabled={newMessage.trim() === ""}
