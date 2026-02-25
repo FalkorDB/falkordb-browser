@@ -291,4 +291,5 @@ test.describe('@browser Browser Settings tests', () => {
         // Clean up
         await apiCall.removeGraph(graphName);
     });
+
 });
