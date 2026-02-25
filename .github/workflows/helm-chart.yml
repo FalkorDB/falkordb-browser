@@ -235,7 +235,7 @@ jobs:
           cat installation-instructions.txt
 
       - name: Upload package as artifact
-        uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4.4.3
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4.4.3
         with:
           name: helm-chart
           path: .helm-charts/*.tgz
