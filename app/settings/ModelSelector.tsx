@@ -46,20 +46,49 @@ const getCategoryIcon = (category: string) => {
     }
 };
 
-// Categorize models by provider prefix (e.g., "anthropic::model" -> Anthropic)
+// Categorize models by provider prefix or name heuristics
 const categorizeModels = (models: string[]) => {
     const uniqueModels = [...new Set(models)];
     const categories: Record<string, string[]> = {};
 
     uniqueModels.forEach((model) => {
-        const separatorIndex = model.indexOf("::");
-        let categoryName: string;
+        let categoryName: string | undefined;
 
-        if (separatorIndex !== -1) {
-            const prefix = model.substring(0, separatorIndex);
+        // New format: double-colon prefix (e.g., "anthropic::claude-sonnet-4-5")
+        const doubleSepIndex = model.indexOf("::");
+        if (doubleSepIndex !== -1) {
+            const prefix = model.substring(0, doubleSepIndex);
             categoryName = PROVIDER_DISPLAY_NAMES[prefix] || prefix.charAt(0).toUpperCase() + prefix.slice(1);
-        } else {
-            categoryName = "OpenAI";
+        }
+
+        // Legacy format: single-colon prefix (e.g., "anthropic:claude-3-5-sonnet")
+        if (!categoryName) {
+            const singleSepIndex = model.indexOf(":");
+            if (singleSepIndex !== -1) {
+                const prefix = model.substring(0, singleSepIndex);
+                if (PROVIDER_DISPLAY_NAMES[prefix]) {
+                    categoryName = PROVIDER_DISPLAY_NAMES[prefix];
+                }
+            }
+        }
+
+        // Fallback: substring heuristics for unprefixed model names
+        if (!categoryName) {
+            if (model.startsWith("gpt") || model.startsWith("o1") || model.startsWith("o3")) {
+                categoryName = "OpenAI";
+            } else if (model.includes("claude")) {
+                categoryName = "Anthropic";
+            } else if (model.includes("gemini")) {
+                categoryName = "Google";
+            } else if (model.includes("llama") || model.includes("mixtral") || model.includes("phi") || model.includes("deepseek")) {
+                categoryName = "Ollama";
+            } else if (model.includes("groq")) {
+                categoryName = "Groq";
+            } else if (model.includes("command") || model.includes("cohere")) {
+                categoryName = "Cohere";
+            } else {
+                categoryName = "Other";
+            }
         }
 
         if (!categories[categoryName]) {
@@ -225,6 +254,7 @@ export default function ModelSelector({
                                             <button
                                                 type="button"
                                                 onClick={() => toggleExpand(category)}
+                                                aria-expanded={isExpanded}
                                                 className="flex items-center justify-center gap-1 w-full py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors border-t border-border/30"
                                             >
                                                 {isExpanded ? (
