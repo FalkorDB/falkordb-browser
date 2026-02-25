@@ -330,6 +330,62 @@ test.describe("Chat Feature Tests", () => {
     await apiCall.removeGraph(graphName);
   });
 
+  test(`@readwrite Verify Cypher Only toggle returns only Cypher query without AI response`, async () => {
+    const graphName = getRandomString("chat");
+    await apiCall.addGraph(graphName);
+    await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
+
+    // Set up API key in settings
+    const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+    await browser.setPageToFullScreen();
+
+    const testApiKey = process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY || "test-api-key-placeholder";
+    await settings.setChatApiKeyAndSave(testApiKey);
+    await settings.waitForTimeout(1000);
+
+    // Navigate to graph page
+    const header = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
+    await header.clickOnGraphsButton();
+
+    const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
+    await chat.selectGraphByName(graphName);
+
+    // Open chat
+    await chat.openChat();
+    await chat.waitForChatPanel();
+
+    // Verify toggle is OFF by default
+    const defaultState = await chat.getCypherOnlySwitch();
+    expect(defaultState).toBe(false);
+
+    // Toggle Cypher Only ON
+    await chat.clickCypherOnlySwitchOn();
+    const onState = await chat.getCypherOnlySwitch();
+    expect(onState).toBe(true);
+
+    // Send a question with Cypher Only enabled
+    await chat.fillChatInput("Who is Alice?");
+    await chat.clickChatSendButton();
+
+    // Verify user message appears
+    await chat.waitForChatUserMessage();
+
+    if (process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY) {
+      // Wait for the CypherQuery response
+      await chat.waitForAssistantResponse("CypherQuery");
+
+      // Verify we got exactly 1 CypherQuery and 0 Result messages
+      const cypherQueryCount = await chat.getChatAssistantMessagesCount("CypherQuery");
+      const resultCount = await chat.getChatAssistantMessagesCount("Result");
+
+      expect(cypherQueryCount).toBe(1);
+      expect(resultCount).toBe(0);
+    }
+
+    // Clean up
+    await apiCall.removeGraph(graphName);
+  });
+
   test(`@readwrite Verify messages are graph-specific and respect maxSavedMessages limit`, async () => {
     test.setTimeout(60000);
     const graph1Name = getRandomString("chat");

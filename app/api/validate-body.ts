@@ -223,6 +223,12 @@ export const chatRequest = z.object({
       invalid_type_error: "Invalid Model",
     })
     .min(1, "Model cannot be empty"),
+  cypherOnly: z
+    .boolean({
+      invalid_type_error: "Invalid Cypher Only value",
+    })
+    .optional()
+    .default(false),
 });
 
 // Auth schemas
