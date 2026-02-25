@@ -57,6 +57,9 @@ export default function Chat({ onClose }: Props) {
         const savedMessages = localStorage.getItem(`chat-${graphName}`);
         const currentMessages = JSON.parse(savedMessages || "[]");
         setMessages(currentMessages);
+
+        const savedCypherOnly = localStorage.getItem(`cypherOnly-${graphName}`);
+        setCypherOnly(savedCypherOnly === "true");
     }, [graphName, maxSavedMessages]);
 
     useEffect(() => {
