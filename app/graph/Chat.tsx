@@ -2,9 +2,10 @@
 /* eslint-disable react/no-array-index-key */
 import { cn, Message } from "@/lib/utils";
 import { useContext, useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, CircleArrowUp, Copy, Loader2, Play, Search, X } from "lucide-react";
+import { ChevronDown, ChevronRight, CircleArrowUp, Copy, Loader2, Play, Search, X, Info } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Tooltip as ShadTooltip, TooltipContent as ShadTooltipContent, TooltipTrigger as ShadTooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRouter } from "next/navigation";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -40,6 +41,8 @@ export default function Chat({ onClose }: Props) {
     const { graphName, runQuery } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
     const { settings: { chatSettings: { secretKey, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
+    // Local Cypher Only toggle state for this chat session
+    const [cypherOnly, setCypherOnly] = useState(false);
 
     const { toast } = useToast();
     const route = useRouter();
@@ -151,7 +154,7 @@ export default function Chat({ onClose }: Props) {
         setNewMessage("");
 
         try {
-            const response = await fetch("/api/chat", {
+        const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -163,7 +166,8 @@ export default function Chat({ onClose }: Props) {
                     })),
                     graphName,
                     model,
-                    key: secretKey
+                    key: secretKey,
+                    cypherOnly
                 })
             });
 
@@ -325,14 +329,14 @@ export default function Chat({ onClose }: Props) {
                         <div className="overflow-hidden SofiaSans">
                             {
                                 queryCollapse[i] ? (
-                                    <Tooltip>
-                                        <TooltipTrigger className="w-full">
+                                    <ShadTooltip>
+                                        <ShadTooltipTrigger asChild>
                                             <p className="truncate">{message.content}</p>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
+                                        </ShadTooltipTrigger>
+                                        <ShadTooltipContent>
                                             {message.content}
-                                        </TooltipContent>
-                                    </Tooltip>
+                                        </ShadTooltipContent>
+                                    </ShadTooltip>
                                 ) : (
                                     <pre className="text-wrap whitespace-pre-wrap">
                                         {message.content}
@@ -375,6 +379,26 @@ export default function Chat({ onClose }: Props) {
     return (
         <div data-testid="chatPanel" className="border-Gradient-rounded h-full w-full">
             <div className="bg-background relative h-full w-full flex flex-col gap-4 items-center rounded-lg p-4">
+                {/* Cypher Only Toolbar */}
+                <div className="w-full flex items-center justify-between mb-4 px-3 py-2" style={{ background: "rgba(240, 240, 255, 0.7)", borderRadius: 8, border: "1px solid #e0e0f0", boxShadow: "0 1px 4px 0 rgba(80,80,120,0.04)", marginTop: 8, zIndex: 1, position: 'relative' }}>
+                    <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm text-foreground">Cypher Only</span>
+                        <ShadTooltip>
+                            <ShadTooltipTrigger asChild>
+                                <Info size={16} className="text-muted-foreground cursor-pointer" />
+                            </ShadTooltipTrigger>
+                            <ShadTooltipContent side="bottom">
+                                <span>When enabled, only Cypher queries will be shown in responses.</span>
+                            </ShadTooltipContent>
+                        </ShadTooltip>
+                    </div>
+                    <Switch
+                        id="cypher-only-toggle"
+                        checked={cypherOnly}
+                        onCheckedChange={setCypherOnly}
+                        data-testid="cypherOnlySwitch"
+                    />
+                </div>
                 <Button
                     data-testid="chatCloseButton"
                     className="absolute top-2 right-2"
