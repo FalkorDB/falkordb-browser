@@ -386,6 +386,52 @@ test.describe("Chat Feature Tests", () => {
     await apiCall.removeGraph(graphName);
   });
 
+  test(`@readwrite Verify Cypher Only toggle persists after page refresh`, async () => {
+    const graphName = getRandomString("chat");
+    await apiCall.addGraph(graphName);
+    await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})');
+
+    const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await chat.selectGraphByName(graphName);
+
+    // Open chat and verify toggle is OFF by default
+    await chat.openChat();
+    await chat.waitForChatPanel();
+    const defaultState = await chat.getCypherOnlySwitch();
+    expect(defaultState).toBe(false);
+
+    // Toggle Cypher Only ON
+    await chat.clickCypherOnlySwitchOn();
+    const onState = await chat.getCypherOnlySwitch();
+    expect(onState).toBe(true);
+
+    // Refresh the page
+    await chat.refreshPage();
+
+    // Re-select graph and open chat
+    await chat.selectGraphByName(graphName);
+    await chat.openChat();
+    await chat.waitForChatPanel();
+
+    // Verify toggle is still ON after refresh
+    const persistedState = await chat.getCypherOnlySwitch();
+    expect(persistedState).toBe(true);
+
+    // Toggle OFF and verify persistence
+    await chat.clickCypherOnlySwitchOff();
+    await chat.refreshPage();
+    await chat.selectGraphByName(graphName);
+    await chat.openChat();
+    await chat.waitForChatPanel();
+
+    const offState = await chat.getCypherOnlySwitch();
+    expect(offState).toBe(false);
+
+    // Clean up
+    await apiCall.removeGraph(graphName);
+  });
+
   test(`@readwrite Verify messages are graph-specific and respect maxSavedMessages limit`, async () => {
     test.setTimeout(60000);
     const graph1Name = getRandomString("chat");
