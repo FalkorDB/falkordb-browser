@@ -466,6 +466,8 @@ export default function Chat({ onClose }: Props) {
                                 type="button"
                                 data-testid="cypherOnlySwitch"
                                 data-state={cypherOnly ? "checked" : "unchecked"}
+                                aria-pressed={cypherOnly}
+                                aria-label="Cypher only mode"
                                 onClick={() => {
                                     const next = !cypherOnly;
                                     setCypherOnly(next);
@@ -473,7 +475,7 @@ export default function Chat({ onClose }: Props) {
                                 }}
                                 className={cn(
                                     "shrink-0 flex items-center justify-center rounded-md transition-all duration-150 active:scale-[0.96]",
-                                    "h-8 w-8",
+                                    "h-8 w-8 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
                                     cypherOnly
                                         ? "bg-primary text-background hover:opacity-90"
                                         : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
