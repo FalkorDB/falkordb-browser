@@ -1,11 +1,11 @@
 'use client';
 
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { cn, getMemoryUsage, isTwoNodes, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamicImport from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { PanelImperativeHandle } from "react-resizable-panels";
+import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import { Graph, Link, Node, GraphInfo, Value, MemoryValue } from "../api/graph/model";
 import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ForceGraphContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
@@ -84,17 +84,9 @@ export default function Page() {
     const [isAddNode, setIsAddNode] = useState(false);
     const [isAddEdge, setIsAddEdge] = useState(false);
 
-    const panelSize = useMemo(() => {
-        switch (panel) {
-            case "data":
-            case "add":
-                return 30;
-            case "chat":
-                return 40;
-            default:
-                return 0;
-        }
-    }, [panel]);
+    const onPanelResize = useCallback((size: PanelSize) => {
+        setIsCollapsed(size.asPercentage === 0);
+    }, []);
 
     useEffect(() => {
         const currentPanel = panelRef.current;
@@ -397,9 +389,9 @@ export default function Page() {
             />
             <ResizablePanelGroup orientation="horizontal" className="h-1 grow">
                 <ResizablePanel
-                    defaultSize={100 - panelSize}
+                    defaultSize="100%"
                     collapsible
-                    minSize={30}
+                    minSize="30%"
                 >
                     <GraphView
                         selectedElements={selectedElements}
@@ -424,16 +416,14 @@ export default function Page() {
                 <ResizableHandle
                     withHandle
                     onMouseUp={() => isCollapsed && handleSetSelectedElements()}
-                    className={cn("ml-6 w-0", isCollapsed && "hidden")}
+                    className={cn("ml-6", isCollapsed && "hidden")}
                 />
                 <ResizablePanel
                     panelRef={panelRef}
                     collapsible
-                    defaultSize={panelSize}
-                    minSize={30}
-                    onResize={(size) => {
-                        setIsCollapsed(size.asPercentage === 0);
-                    }}
+                    defaultSize="0%"
+                    minSize="30%"
+                    onResize={onPanelResize}
                 >
                     {getCurrentPanel()}
                 </ResizablePanel>

@@ -9,7 +9,7 @@ import { encryptValue, decryptValue, isCryptoAvailable, isEncrypted } from "@/li
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { PanelImperativeHandle } from "react-resizable-panels";
+import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphData, GraphInfo, HistoryQuery, MemoryValue, Query, Data, Label, Relationship, InfoLabel } from "./api/graph/model";
@@ -580,7 +580,9 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     })();
   }, [status]);
 
-  const panelSize = useMemo(() => isCollapsed ? 0 : 20, [isCollapsed]);
+  const onPanelResize = useCallback((size: PanelSize) => {
+    setIsCollapsed(size.asPercentage === 0);
+  }, []);
 
   useEffect(() => {
     const currentPanel = panelRef.current;
@@ -789,11 +791,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                             <ResizablePanelGroup orientation="horizontal" className="w-1 grow">
                               <ResizablePanel
                                 panelRef={panelRef}
-                                defaultSize={panelSize}
+                                defaultSize="0%"
                                 collapsible
-                                minSize={15}
-                                maxSize={30}
-                                onResize={(size) => setIsCollapsed(size.asPercentage === 0)}
+                                minSize="15%"
+                                maxSize="30%"
+                                onResize={onPanelResize}
                                 data-testid="graphInfoPanel"
                               >
                                 <GraphInfoPanel
@@ -802,11 +804,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                                   setCustomizingLabel={setCustomizingLabel}
                                 />
                               </ResizablePanel>
-                              <ResizableHandle withHandle onMouseUp={() => isCollapsed && onExpand()} className={cn("w-0", isCollapsed && "hidden")} />
+                              <ResizableHandle withHandle onMouseUp={() => isCollapsed && onExpand()} className={cn("bg-border", isCollapsed && "hidden")} />
                               <ResizablePanel
-                                defaultSize={100 - panelSize}
-                                minSize={70}
-                                maxSize={100}
+                                defaultSize="100%"
+                                minSize="70%"
+                                maxSize="100%"
                               >
                                 {
                                   (pathname === "/graph" || pathname === "/schema") ?
