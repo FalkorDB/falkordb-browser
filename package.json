@@ -15,8 +15,8 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@falkordb/canvas": "^0.0.36",
-    "@falkordb/text-to-cypher": "^0.1.12",
+    "@falkordb/canvas": "^0.0.40",
+    "@falkordb/text-to-cypher": "^0.1.13",
     "@hookform/resolvers": "^3.10.0",
     "@monaco-editor/react": "^4.6.0",
     "@radix-ui/react-alert-dialog": "^1.1.6",
@@ -94,7 +94,7 @@
     "@playwright/test": "^1.56.1",
     "@types/cytoscape-fcose": "^2.2.4",
     "@types/lodash": "^4.17.15",
-    "@types/node": "^20.19.4",
+    "@types/node": "^25.3.0",
     "@types/react": "^18.3.18",
     "@types/react-cytoscapejs": "^1.2.5",
     "@types/react-dom": "^18.3.5",
