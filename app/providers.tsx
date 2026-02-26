@@ -9,7 +9,7 @@ import { encryptValue, decryptValue, isCryptoAvailable, isEncrypted } from "@/li
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { ImperativePanelHandle } from "react-resizable-panels";
+import { PanelImperativeHandle } from "react-resizable-panels";
 import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphData, GraphInfo, HistoryQuery, MemoryValue, Query, Data, Label, Relationship, InfoLabel } from "./api/graph/model";
@@ -54,7 +54,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const { status } = useSession();
   const router = useRouter();
 
-  const panelRef = useRef<ImperativePanelHandle>(null);
+  const panelRef = useRef<PanelImperativeHandle>(null);
   const canvasRef = useRef<GraphRef["current"]>(null);
 
   const [historyQuery, setHistoryQuery] = useState<HistoryQuery>(defaultQueryHistory);
@@ -589,7 +589,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
     if (pathname === "/graph" && graphName) {
       if (currentPanel.isCollapsed()) currentPanel.expand();
-    } else if (currentPanel.isExpanded()) currentPanel.collapse();
+    } else if (!currentPanel.isCollapsed()) currentPanel.collapse();
   }, [graphName, pathname]);
 
   const checkStatus = useCallback(() => {
@@ -786,15 +786,14 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                                 graphInfoOpen={!isCollapsed}
                               />
                             }
-                            <ResizablePanelGroup direction="horizontal" className="w-1 grow">
+                            <ResizablePanelGroup orientation="horizontal" className="w-1 grow">
                               <ResizablePanel
-                                ref={panelRef}
+                                panelRef={panelRef}
                                 defaultSize={panelSize}
                                 collapsible
                                 minSize={15}
                                 maxSize={30}
-                                onCollapse={() => setIsCollapsed(true)}
-                                onExpand={() => setIsCollapsed(false)}
+                                onResize={(size) => setIsCollapsed(size.asPercentage === 0)}
                                 data-testid="graphInfoPanel"
                               >
                                 <GraphInfoPanel

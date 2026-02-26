@@ -5,7 +5,7 @@ import { cn, GraphRef, isTwoNodes, prepareArg, securedFetch } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { ImperativePanelHandle } from "react-resizable-panels";
+import { PanelImperativeHandle } from "react-resizable-panels";
 import type { GraphData as CanvasData } from "@falkordb/canvas";
 import { Label, Graph, GraphData, Link, Node, Relationship } from "../api/graph/model";
 import { BrowserSettingsContext, IndicatorContext, SchemaContext } from "../components/provider";
@@ -41,7 +41,7 @@ export default function Page() {
     const { settings: { captionsKeysSettings: { captionsKeys }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
     const { toast } = useToast();
 
-    const panelRef = useRef<ImperativePanelHandle>(null);
+    const panelRef = useRef<PanelImperativeHandle>(null);
     const canvasRef = useRef<GraphRef["current"]>(null);
 
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
@@ -270,7 +270,7 @@ export default function Page() {
                 isAddEdge={isAddEdge}
                 isAddNode={isAddNode}
             />
-            <ResizablePanelGroup direction="horizontal" className="h-1 grow">
+            <ResizablePanelGroup orientation="horizontal" className="h-1 grow">
                 <ResizablePanel
                     defaultSize={100 - panelSize}
                     collapsible
@@ -300,15 +300,12 @@ export default function Page() {
                     className={cn("ml-6 w-0", isCollapsed && "hidden")}
                 />
                 <ResizablePanel
-                    ref={panelRef}
+                    panelRef={panelRef}
                     collapsible
                     defaultSize={panelSize}
                     minSize={30}
-                    onCollapse={() => {
-                        setIsCollapsed(true);
-                    }}
-                    onExpand={() => {
-                        setIsCollapsed(false);
+                    onResize={(size) => {
+                        setIsCollapsed(size.asPercentage === 0);
                     }}
                 >
                     {getCurrentPanel()}
