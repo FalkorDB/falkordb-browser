@@ -30,7 +30,7 @@ jobs:
           cache: 'npm'
       - name: Cache node modules
         id: cache-npm
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.npm
@@ -92,7 +92,7 @@ jobs:
           node-version: 24
           cache: 'npm'
       - name: Restore dependencies cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.npm
@@ -158,7 +158,7 @@ jobs:
           node-version: 24
           cache: 'npm'
       - name: Restore dependencies cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.npm
@@ -224,7 +224,7 @@ jobs:
           node-version: 24
           cache: 'npm'
       - name: Restore dependencies cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.npm
@@ -294,7 +294,7 @@ jobs:
           node-version: 24
           cache: 'npm'
       - name: Restore dependencies cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.npm
@@ -363,7 +363,7 @@ jobs:
           node-version: 24
           cache: 'npm'
       - name: Restore dependencies cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.npm
@@ -425,7 +425,7 @@ jobs:
           node-version: 24
           cache: 'npm'
       - name: Restore dependencies cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.npm
@@ -558,7 +558,7 @@ jobs:
           node-version: 24
           cache: 'npm'
       - name: Restore dependencies cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.npm
