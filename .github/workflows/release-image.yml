@@ -87,7 +87,7 @@ jobs:
 
       - name: Run Trivy vulnerability scanner
         if: matrix.arch == 'amd64'
-        uses: aquasecurity/trivy-action@22438a435773de8c97dc0958cc0b823c45b064ac
+        uses: aquasecurity/trivy-action@1bd062560b422f5944df1de50abd05162bea079e
         with:
           image-ref: ${{ env.TRIVY_TAG }}
           format: 'table'
