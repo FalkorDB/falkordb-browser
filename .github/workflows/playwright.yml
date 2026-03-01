@@ -116,7 +116,7 @@ jobs:
           npx playwright test --grep-invert "@config|@tls|@cluster|@token" --shard=1/3 --workers=4 --reporter=dot,list
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-results-part-1-${{ github.run_id }}
           path: test-results/
@@ -124,7 +124,7 @@ jobs:
           if-no-files-found: ignore
       - name: Upload HTML report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-part-1-${{ github.run_id }}
           path: playwright-report/
@@ -132,7 +132,7 @@ jobs:
           if-no-files-found: ignore
       - name: Upload server logs
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: nextjs-logs-part-1-${{ github.run_id }}
           path: nextjs.log
@@ -182,7 +182,7 @@ jobs:
           npx playwright test --grep-invert "@config|@tls|@cluster|@token" --shard=2/3 --workers=4 --reporter=dot,list
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-results-part-2-${{ github.run_id }}
           path: test-results/
@@ -190,7 +190,7 @@ jobs:
           if-no-files-found: ignore
       - name: Upload HTML report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-part-2-${{ github.run_id }}
           path: playwright-report/
@@ -198,7 +198,7 @@ jobs:
           if-no-files-found: ignore
       - name: Upload server logs
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: nextjs-logs-part-2-${{ github.run_id }}
           path: nextjs.log
@@ -248,7 +248,7 @@ jobs:
           npx playwright test --grep-invert "@config|@tls|@cluster|@token" --shard=3/3 --workers=4 --reporter=dot,list
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-results-part-3-${{ github.run_id }}
           path: test-results/
@@ -256,7 +256,7 @@ jobs:
           if-no-files-found: ignore
       - name: Upload HTML report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-part-3-${{ github.run_id }}
           path: playwright-report/
@@ -264,7 +264,7 @@ jobs:
           if-no-files-found: ignore
       - name: Upload server logs
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: nextjs-logs-part-3-${{ github.run_id }}
           path: nextjs.log
@@ -330,7 +330,7 @@ jobs:
           kill $APP_PID || true
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-results-tokens-${{ github.run_id }}
           path: test-results/
@@ -338,7 +338,7 @@ jobs:
           if-no-files-found: ignore
       - name: Upload HTML report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-tokens-${{ github.run_id }}
           path: playwright-report/
@@ -389,7 +389,7 @@ jobs:
           mkdir -p playwright-report/artifacts
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-results-settings-${{ github.run_id }}
           path: test-results/
@@ -397,7 +397,7 @@ jobs:
           if-no-files-found: ignore
       - name: Upload HTML report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-settings-${{ github.run_id }}
           path: playwright-report/
@@ -405,7 +405,7 @@ jobs:
           if-no-files-found: ignore
       - name: Upload server logs
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: nextjs-logs-settings-${{ github.run_id }}
           path: nextjs.log
@@ -522,7 +522,7 @@ jobs:
         run: docker stop falkordb-tls || true
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-results-tls-${{ github.run_id }}
           path: test-results/
@@ -530,7 +530,7 @@ jobs:
           if-no-files-found: ignore
       - name: Upload HTML report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-tls-${{ github.run_id }}
           path: playwright-report/
@@ -538,7 +538,7 @@ jobs:
           if-no-files-found: ignore
       - name: Upload server logs
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: nextjs-logs-tls-${{ github.run_id }}
           path: nextjs.log
@@ -655,7 +655,7 @@ jobs:
           done
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-results-cluster-${{ github.run_id }}
           path: test-results/
@@ -663,7 +663,7 @@ jobs:
           if-no-files-found: ignore
       - name: Upload HTML report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-cluster-${{ github.run_id }}
           path: playwright-report/
@@ -671,7 +671,7 @@ jobs:
           if-no-files-found: ignore
       - name: Upload server logs
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: nextjs-logs-cluster-${{ github.run_id }}
           path: nextjs.log
