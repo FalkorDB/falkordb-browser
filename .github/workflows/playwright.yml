@@ -90,6 +90,7 @@ jobs:
         with:
           name: nextjs-build-${{ github.run_id }}
           path: .next/
+          include-hidden-files: true
           retention-days: 1
           if-no-files-found: error
 
