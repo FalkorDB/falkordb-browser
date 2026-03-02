@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Locator } from "@playwright/test";
+import { Locator, expect } from "@playwright/test";
 import {
   interactWhenVisible,
   waitForElementToBeVisible,
@@ -89,6 +89,10 @@ export default class ChatComponent extends GraphPage {
 
   async waitForChatAssistantMessage(type: string): Promise<boolean> {
     return waitForElementToBeVisible(this.chatAssistantMessage(type));
+  }
+
+  async waitForUserMessageCount(expectedCount: number): Promise<void> {
+    await expect(this.chatUserMessages).toHaveCount(expectedCount, { timeout: 10000 });
   }
 
   async waitForChatSendButtonEnabled(): Promise<void> {
