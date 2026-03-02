@@ -5,8 +5,20 @@ permissions:
 on:
   push:
     branches: [ main, staging ]
+    paths-ignore:
+      - '**/*.md'
+      - 'LICENSE.txt'
+      - 'helm/**'
+      - '.github/workflows/helm-chart.yml'
+      - '.github/dependabot.yml'
   pull_request:
     branches: [ main, staging ]
+    paths-ignore:
+      - '**/*.md'
+      - 'LICENSE.txt'
+      - 'helm/**'
+      - '.github/workflows/helm-chart.yml'
+      - '.github/dependabot.yml'
   workflow_call:
     secrets:
       RUN_BROWSER_TESTS:
@@ -17,11 +29,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  setup-dependencies:
-    name: Setup and cache dependencies
+  setup-and-build:
+    name: Setup, cache dependencies, and build
     runs-on: ubuntu-latest
-    outputs:
-      cache-hit: ${{ steps.cache-npm.outputs.cache-hit }}
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
@@ -72,12 +83,26 @@ jobs:
           done
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium firefox
+      - name: Build application
+        run: npm run build
+      - name: Upload build output
+        uses: actions/upload-artifact@v7
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: .next/
+          include-hidden-files: true
+          retention-days: 1
+          if-no-files-found: error
 
-  test-part-1:
-    name: Run tests part 1 (except settings)
-    needs: setup-dependencies
+  test-shards:
+    name: Run tests (shard ${{ matrix.shard }}/3)
+    needs: setup-and-build
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
 
     services:
       falkordb:
@@ -102,9 +127,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
             ${{ runner.os }}-node-
-      - name: Build application
-        run: npm run build
-      - name: Run Playwright tests (shard 1 of 3)
+      - name: Download build output
+        uses: actions/download-artifact@v4
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: .next/
+      - name: Run Playwright tests (shard ${{ matrix.shard }} of 3)
         env:
           OPENAI_TOKEN: ${{ secrets.OPENAI_TOKEN }}
         run: |
@@ -113,167 +141,35 @@ jobs:
           export NEXTAUTH_SECRET=SECRET
           npm start > nextjs.log 2>&1 &
           timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
-          npx playwright test --grep-invert "@config|@tls|@cluster|@token" --shard=1/3 --workers=4 --reporter=dot,list
+          npx playwright test --grep-invert "@config|@tls|@cluster|@token" --shard=${{ matrix.shard }}/3 --workers=4 --reporter=dot,list
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
-          name: playwright-results-part-1-${{ github.run_id }}
+          name: playwright-results-shard-${{ matrix.shard }}-${{ github.run_id }}
           path: test-results/
-          retention-days: 7
+          retention-days: 3
           if-no-files-found: ignore
       - name: Upload HTML report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
-          name: playwright-report-part-1-${{ github.run_id }}
+          name: playwright-report-shard-${{ matrix.shard }}-${{ github.run_id }}
           path: playwright-report/
           retention-days: 30
           if-no-files-found: ignore
       - name: Upload server logs
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
-          name: nextjs-logs-part-1-${{ github.run_id }}
+          name: nextjs-logs-shard-${{ matrix.shard }}-${{ github.run_id }}
           path: nextjs.log
-          retention-days: 7
-          if-no-files-found: ignore
-
-  test-part-2:
-    name: Run tests part 2 (except settings)
-    needs: setup-dependencies
-    timeout-minutes: 60
-    runs-on: ubuntu-latest
-
-    services:
-      falkordb:
-        image: falkordb/falkordb:latest
-        ports:
-          - 6379:6379
-
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: 'npm'
-      - name: Restore dependencies cache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/.npm
-            node_modules
-            ~/.cache/ms-playwright
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
-          restore-keys: |
-            ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
-            ${{ runner.os }}-node-
-      - name: Build application
-        run: npm run build
-      - name: Run Playwright tests (shard 2 of 3)
-        env:
-          OPENAI_TOKEN: ${{ secrets.OPENAI_TOKEN }}
-        run: |
-          export CHAT_URL="http://localhost:8080/"
-          export NEXTAUTH_URL="http://localhost:3000/"
-          export NEXTAUTH_SECRET=SECRET
-          npm start > nextjs.log 2>&1 &
-          timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
-          npx playwright test --grep-invert "@config|@tls|@cluster|@token" --shard=2/3 --workers=4 --reporter=dot,list
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: playwright-results-part-2-${{ github.run_id }}
-          path: test-results/
-          retention-days: 7
-          if-no-files-found: ignore
-      - name: Upload HTML report
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: playwright-report-part-2-${{ github.run_id }}
-          path: playwright-report/
-          retention-days: 30
-          if-no-files-found: ignore
-      - name: Upload server logs
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: nextjs-logs-part-2-${{ github.run_id }}
-          path: nextjs.log
-          retention-days: 7
-          if-no-files-found: ignore
-
-  test-part-3:
-    name: Run tests part 3 (except settings)
-    needs: setup-dependencies
-    timeout-minutes: 60
-    runs-on: ubuntu-latest
-
-    services:
-      falkordb:
-        image: falkordb/falkordb:latest
-        ports:
-          - 6379:6379
-
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: 'npm'
-      - name: Restore dependencies cache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/.npm
-            node_modules
-            ~/.cache/ms-playwright
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
-          restore-keys: |
-            ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
-            ${{ runner.os }}-node-
-      - name: Build application
-        run: npm run build
-      - name: Run Playwright tests (shard 3 of 3)
-        env:
-          OPENAI_TOKEN: ${{ secrets.OPENAI_TOKEN }}
-        run: |
-          export CHAT_URL="http://localhost:8080/"
-          export NEXTAUTH_URL="http://localhost:3000/"
-          export NEXTAUTH_SECRET=SECRET
-          npm start > nextjs.log 2>&1 &
-          timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
-          npx playwright test --grep-invert "@config|@tls|@cluster|@token" --shard=3/3 --workers=4 --reporter=dot,list
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: playwright-results-part-3-${{ github.run_id }}
-          path: test-results/
-          retention-days: 7
-          if-no-files-found: ignore
-      - name: Upload HTML report
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: playwright-report-part-3-${{ github.run_id }}
-          path: playwright-report/
-          retention-days: 30
-          if-no-files-found: ignore
-      - name: Upload server logs
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: nextjs-logs-part-3-${{ github.run_id }}
-          path: nextjs.log
-          retention-days: 7
+          retention-days: 3
           if-no-files-found: ignore
 
   run-token-tests:
     name: Run token tests
-    needs: setup-dependencies
+    needs: setup-and-build
     timeout-minutes: 60
     runs-on: ubuntu-latest
 
@@ -304,8 +200,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
             ${{ runner.os }}-node-
-      - name: Build application
-        run: npm run build
+      - name: Download build output
+        uses: actions/download-artifact@v4
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: .next/
       - name: Run token tests
         env:
           NEXTAUTH_SECRET: SECRET
@@ -330,15 +229,15 @@ jobs:
           kill $APP_PID || true
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-results-tokens-${{ github.run_id }}
           path: test-results/
-          retention-days: 7
+          retention-days: 3
           if-no-files-found: ignore
       - name: Upload HTML report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-tokens-${{ github.run_id }}
           path: playwright-report/
@@ -347,7 +246,8 @@ jobs:
 
   run-settings-tests:
     name: Run settings tests
-    needs: setup-dependencies
+    needs: setup-and-build
+    timeout-minutes: 60
     runs-on: ubuntu-latest
 
     services:
@@ -373,8 +273,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
             ${{ runner.os }}-node-
-      - name: Build application
-        run: npm run build
+      - name: Download build output
+        uses: actions/download-artifact@v4
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: .next/
       - name: Run only config test
         run: |
           export CHAT_URL="http://localhost:8080/"
@@ -389,15 +292,15 @@ jobs:
           mkdir -p playwright-report/artifacts
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-results-settings-${{ github.run_id }}
           path: test-results/
-          retention-days: 7
+          retention-days: 3
           if-no-files-found: ignore
       - name: Upload HTML report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-settings-${{ github.run_id }}
           path: playwright-report/
@@ -405,16 +308,16 @@ jobs:
           if-no-files-found: ignore
       - name: Upload server logs
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: nextjs-logs-settings-${{ github.run_id }}
           path: nextjs.log
-          retention-days: 7
+          retention-days: 3
           if-no-files-found: ignore
 
   run-tls-tests:
     name: Run TLS tests
-    needs: setup-dependencies
+    needs: setup-and-build
     timeout-minutes: 60
     runs-on: ubuntu-latest
 
@@ -435,8 +338,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
             ${{ runner.os }}-node-
-      - name: Build application
-        run: npm run build
+      - name: Download build output
+        uses: actions/download-artifact@v4
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: .next/
       - name: Setup TLS certificates
         run: |
           mkdir -p tls
@@ -522,15 +428,15 @@ jobs:
         run: docker stop falkordb-tls || true
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-results-tls-${{ github.run_id }}
           path: test-results/
-          retention-days: 7
+          retention-days: 3
           if-no-files-found: ignore
       - name: Upload HTML report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-tls-${{ github.run_id }}
           path: playwright-report/
@@ -538,16 +444,16 @@ jobs:
           if-no-files-found: ignore
       - name: Upload server logs
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: nextjs-logs-tls-${{ github.run_id }}
           path: nextjs.log
-          retention-days: 7
+          retention-days: 3
           if-no-files-found: ignore
 
   run-cluster-tests:
     name: Run cluster tests
-    needs: setup-dependencies
+    needs: setup-and-build
     timeout-minutes: 60
     runs-on: ubuntu-latest
 
@@ -568,8 +474,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
             ${{ runner.os }}-node-
-      - name: Build application
-        run: npm run build
+      - name: Download build output
+        uses: actions/download-artifact@v4
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: .next/
       - name: Start FalkorDB cluster nodes
         run: |
           echo "Starting 3 FalkorDB cluster nodes..."
@@ -655,15 +564,15 @@ jobs:
           done
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-results-cluster-${{ github.run_id }}
           path: test-results/
-          retention-days: 7
+          retention-days: 3
           if-no-files-found: ignore
       - name: Upload HTML report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-cluster-${{ github.run_id }}
           path: playwright-report/
@@ -671,10 +580,10 @@ jobs:
           if-no-files-found: ignore
       - name: Upload server logs
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: nextjs-logs-cluster-${{ github.run_id }}
           path: nextjs.log
-          retention-days: 7
+          retention-days: 3
           if-no-files-found: ignore
 
