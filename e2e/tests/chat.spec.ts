@@ -472,14 +472,16 @@ test.describe("Chat Feature Tests", () => {
       "Who are Alice's friends?"
     ];
     
-    // eslint-disable-next-line no-restricted-syntax
-    for (const message of messages) {
+    for (let i = 0; i < messages.length; i++) {
+      const message = messages[i];
       // eslint-disable-next-line no-await-in-loop
       await chat.fillChatInput(message);
       // eslint-disable-next-line no-await-in-loop
-      await chat.waitForChatSendButtonEnabled(); // Wait for button to be ready for next message
+      await chat.waitForChatSendButtonEnabled();
       // eslint-disable-next-line no-await-in-loop
       await chat.clickChatSendButton();
+      // eslint-disable-next-line no-await-in-loop
+      await chat.waitForUserMessageCount(i + 1);
     }
 
     // Verify that we have exactly 7 user messages displayed
