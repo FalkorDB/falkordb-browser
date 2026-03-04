@@ -153,9 +153,6 @@ export const STYLE_COLORS = [
   "#E5E5E5", // Light Gray
 ];
 
-// Size options for node customization (relative to base NODE_SIZE)
-export const NODE_SIZE_OPTIONS = [3, 4.2, 5.1, 6, 6.9, 7.8, 9, 10.2, 12, 13.8, 15.6];
-
 // Constant for empty display name
 export const EMPTY_DISPLAY_NAME: [string, string] = ['', ''];
 
