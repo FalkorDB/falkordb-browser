@@ -38,7 +38,7 @@ export default function Page() {
         schemaNames,
         setSchemaNames
     } = useContext(SchemaContext);
-    const { settings: { captionsKeysSettings: { captionsKeys }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
+    const { settings: { showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
     const { toast } = useToast();
 
     const panelRef = useRef<ImperativePanelHandle>(null);
@@ -117,9 +117,9 @@ export default function Page() {
         }, toast, setIndicator);
         if (!result.ok) return;
         const json = await result.json();
-        const schemaGraph = Graph.create(schemaName, json.result,captionsKeys, showPropertyKeyPrefix, 0, undefined, true);
+        const schemaGraph = Graph.create(schemaName, json.result, showPropertyKeyPrefix, 0, undefined, true);
         setSchema(schemaGraph);
-    }, [setIndicator, setSchema, toast, schemaName, captionsKeys, showPropertyKeyPrefix]);
+    }, [setIndicator, setSchema, toast, schemaName, showPropertyKeyPrefix]);
 
     useEffect(() => {
         if (!schemaName) return;

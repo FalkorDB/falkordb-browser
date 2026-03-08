@@ -153,9 +153,6 @@ export const STYLE_COLORS = [
   "#E5E5E5", // Light Gray
 ];
 
-// Size options for node customization (relative to base NODE_SIZE)
-export const NODE_SIZE_OPTIONS = [3, 4.2, 5.1, 6, 6.9, 7.8, 9, 10.2, 12, 13.8, 15.6];
-
 // Constant for empty display name
 export const EMPTY_DISPLAY_NAME: [string, string] = ['', ''];
 
@@ -381,8 +378,6 @@ export class Graph {
 
   private graphInfo: GraphInfo;
 
-  private captionsKeys: string[] = [];
-
   private showPropertyKeyPrefix: boolean = false;
 
   private constructor(
@@ -394,7 +389,6 @@ export class Graph {
     relationshipsMap: Map<string, Relationship>,
     nodesMap: Map<number, Node>,
     linksMap: Map<number, Link>,
-    captionsKeys?: string[],
     showPropertyKeyPrefix?: boolean,
     currentLimit?: number,
     graphInfo?: GraphInfo
@@ -409,7 +403,6 @@ export class Graph {
     this.relationshipsMap = relationshipsMap;
     this.nodesMap = nodesMap;
     this.linksMap = linksMap;
-    this.captionsKeys = captionsKeys || [];
     this.showPropertyKeyPrefix = showPropertyKeyPrefix || false;
     this.currentLimit = currentLimit || 0;
     this.graphInfo = graphInfo || GraphInfo.empty();
@@ -483,10 +476,6 @@ export class Graph {
     this.graphInfo = graphInfo;
   }
 
-  get CaptionsKeys(): string[] {
-    return this.captionsKeys;
-  }
-
   get ShowPropertyKeyPrefix(): boolean {
     return this.showPropertyKeyPrefix;
   }
@@ -497,7 +486,6 @@ export class Graph {
 
   public static empty(
     graphName?: string,
-    captionsKeys?: string[],
     showPropertyKeyPrefix?: boolean,
     currentLimit?: number,
     graphInfo?: GraphInfo
@@ -511,7 +499,6 @@ export class Graph {
       new Map<string, Relationship>(),
       new Map<number, Node>(),
       new Map<number, Link>(),
-      captionsKeys,
       showPropertyKeyPrefix,
       currentLimit,
       graphInfo
@@ -521,7 +508,6 @@ export class Graph {
   public static create(
     id: string,
     results: { data: Data; metadata: any[] },
-    captionsKeys: string[],
     showPropertyKeyPrefix: boolean,
     currentLimit: number,
     graphInfo?: GraphInfo,
@@ -529,7 +515,6 @@ export class Graph {
   ): Graph {
     const graph = Graph.empty(
       undefined,
-      captionsKeys,
       showPropertyKeyPrefix,
       currentLimit,
       graphInfo
