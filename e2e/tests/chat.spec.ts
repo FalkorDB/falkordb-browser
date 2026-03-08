@@ -335,55 +335,59 @@ test.describe("Chat Feature Tests", () => {
     await apiCall.addGraph(graphName);
     await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
 
-    // Set up API key in settings
-    const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
-    await browser.setPageToFullScreen();
+    try {
+      // Set up API key in settings
+      const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+      await browser.setPageToFullScreen();
 
-    const testApiKey = process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY || "test-api-key-placeholder";
-    await settings.setChatApiKeyAndSave(testApiKey);
-    await settings.waitForTimeout(1000);
+      const testApiKey = process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY || "test-api-key-placeholder";
+      await settings.setChatApiKeyAndSave(testApiKey);
+      await settings.waitForTimeout(1000);
 
-    // Navigate to graph page
-    const header = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
-    await header.clickOnGraphsButton();
+      // Navigate to graph page
+      const header = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
+      await header.clickOnGraphsButton();
 
-    const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
-    await chat.selectGraphByName(graphName);
+      const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
+      await chat.selectGraphByName(graphName);
 
-    // Open chat
-    await chat.openChat();
-    await chat.waitForChatPanel();
+      // Open chat
+      await chat.openChat();
+      await chat.waitForChatPanel();
 
-    // Verify toggle is OFF by default
-    const defaultState = await chat.getCypherOnlySwitch();
-    expect(defaultState).toBe(false);
+      // Verify toggle is OFF by default
+      const defaultState = await chat.getCypherOnlySwitch();
+      expect(defaultState).toBe(false);
 
-    // Toggle Cypher Only ON
-    await chat.clickCypherOnlySwitchOn();
-    const onState = await chat.getCypherOnlySwitch();
-    expect(onState).toBe(true);
+      // Toggle Cypher Only ON
+      await chat.clickCypherOnlySwitchOn();
+      const onState = await chat.getCypherOnlySwitch();
+      expect(onState).toBe(true);
 
-    // Send a question with Cypher Only enabled
-    await chat.fillChatInput("Who is Alice?");
-    await chat.clickChatSendButton();
+      // Send a question with Cypher Only enabled
+      await chat.fillChatInput("Who is Alice?");
+      await chat.clickChatSendButton();
 
-    // Verify user message appears
-    await chat.waitForChatUserMessage();
+      // Verify user message appears
+      await chat.waitForChatUserMessage();
 
-    if (process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY) {
-      // Wait for the CypherQuery response
-      await chat.waitForAssistantResponse("CypherQuery");
+      if (process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY) {
+        // Wait for the CypherQuery response
+        await chat.waitForAssistantResponse("CypherQuery");
 
-      // Verify we got exactly 1 CypherQuery and 0 Result messages
-      const cypherQueryCount = await chat.getChatAssistantMessagesCount("CypherQuery");
-      const resultCount = await chat.getChatAssistantMessagesCount("Result");
+        // Brief wait for stream to fully close and any remaining events to render
+        await chat.waitForTimeout(2000);
 
-      expect(cypherQueryCount).toBe(1);
-      expect(resultCount).toBe(0);
+        // Verify we got exactly 1 CypherQuery and 0 Result messages
+        const cypherQueryCount = await chat.getChatAssistantMessagesCount("CypherQuery");
+        const resultCount = await chat.getChatAssistantMessagesCount("Result");
+
+        expect(cypherQueryCount).toBe(1);
+        expect(resultCount).toBe(0);
+      }
+    } finally {
+      await apiCall.removeGraph(graphName);
     }
-
-    // Clean up
-    await apiCall.removeGraph(graphName);
   });
 
   test(`@readwrite Verify Cypher Only toggle persists after page refresh`, async () => {
@@ -472,7 +476,7 @@ test.describe("Chat Feature Tests", () => {
       "Who are Alice's friends?"
     ];
     
-    for (let i = 0; i < messages.length; i++) {
+    for (let i = 0; i < messages.length; i += 1) {
       const message = messages[i];
       // eslint-disable-next-line no-await-in-loop
       await chat.fillChatInput(message);
