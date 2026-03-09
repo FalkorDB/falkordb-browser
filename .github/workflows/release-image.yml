@@ -95,6 +95,7 @@ jobs:
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'HIGH,CRITICAL'
+          version: 'v0.69.2'
   publish-manifest:
     needs: [build-and-push, prepare]
     runs-on: ubuntu-latest
