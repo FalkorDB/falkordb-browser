@@ -142,10 +142,13 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                         </TooltipContent>
                     </Tooltip>
                 </div>
-                <div data-testid="NavigationButtons" className="p-1 flex flex-col items-center gap-2 bg-secondary rounded-lg">
+                <div data-testid="NavigationButtons" className="p-1 flex flex-col items-center gap-2 bg-foreground/5 rounded-lg">
                     <Button
                         data-testid="settings"
-                        className={cn("text-foreground p-1 rounded-lg", type === "Settings" && "text-background bg-primary")}
+                        className={cn(
+                            "text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/15",
+                            type === "Settings" && "!text-primary !bg-primary/15 !border-primary/30"
+                        )}
                         title="Adjust application settings"
                         label="SETTINGS"
                         onClick={() => router.push("/settings")}
@@ -153,7 +156,10 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                     <Button
                         label="GRAPHS"
                         title="View and manage your graphs"
-                        className={cn("text-foreground p-1 rounded-lg", type === "Graph" && "text-background bg-primary")}
+                        className={cn(
+                            "text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
+                            type === "Graph" && "!text-primary !bg-primary/15 !border-primary/30"
+                        )}
                         onClick={() => router.push("/graph")}
                         data-testid="GraphsButton"
                     />
@@ -183,7 +189,10 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                         {separator}
                         <Button
                             indicator={indicator}
-                            className={cn("text-foreground p-1 rounded-lg", graphInfoOpen && "text-background bg-primary")}
+                            className={cn(
+                                "text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
+                                graphInfoOpen && "!text-primary !bg-primary/15 !border-primary/30"
+                            )}
                             title="Graph info"
                             onClick={() => onOpenGraphInfo()}
                             data-testid="graphInfoToggle"
@@ -198,7 +207,10 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                         {separator}
                         <Button
                             data-testid="chatToggleButton"
-                            className={cn("text-foreground font-semibold text-xl p-1 rounded-lg", panel === "chat" && "text-background bg-primary")}
+                            className={cn(
+                                "text-foreground font-semibold text-xl p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
+                                panel === "chat" && "!text-primary !bg-primary/15 !border-primary/30"
+                            )}
                             indicator={indicator}
                             title={`Use English to query the graph.
                                 The feature requires LLM model and API key.
@@ -215,7 +227,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                 <Drawer direction="right">
                     <DropdownMenu>
                         <DropdownMenuTrigger onClick={(e) => e.preventDefault()} asChild>
-                            <Button title="Help">
+                            <Button className="text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10" title="Help">
                                 <FileCode size={iconSize} />
                             </Button>
                         </DropdownMenuTrigger>
@@ -288,6 +300,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                         {separator}
                         <Button
                             data-testid="themeToggle"
+                            className="text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10"
                             title={`Toggle theme current theme: ${theme}`}
                             onClick={() => {
                                 let newTheme = "";
@@ -322,6 +335,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                 {separator}
                 <Button
                     title="Log Out"
+                    className="text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10"
                     data-testid="logoutButton"
                     onClick={() => signOut({ redirect: false }).then(() => router.push("/login"))}
                 >
