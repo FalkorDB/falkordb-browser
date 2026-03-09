@@ -126,7 +126,7 @@ jobs:
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'HIGH,CRITICAL'
-          version: 'v0.69.2'
+          skip-setup-trivy: true
 
       - name: Comment PR with Trivy results
         if: github.event_name == 'pull_request'
