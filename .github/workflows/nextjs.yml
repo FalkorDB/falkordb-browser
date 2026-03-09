@@ -95,6 +95,7 @@ jobs:
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'HIGH,CRITICAL'
+          version: 'v0.69.2'
 
       - name: Check scan outcome
         if: always()
