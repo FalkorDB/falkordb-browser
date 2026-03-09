@@ -332,19 +332,6 @@ export default function BrowserSettings() {
                                         onChange={(e) => createChangeHandler(setNewSecretKey)(e.target.value, 'secretKeyInput')}
                                     />
                                 </div>
-                                <div className="flex items-center gap-3">
-                                    <Switch
-                                        id="cypherOnlySwitch"
-                                        data-testid="cypherOnlySwitch"
-                                        className="data-[state=unchecked]:bg-border"
-                                        checked={newCypherOnly}
-                                        onCheckedChange={() => createChangeHandler(setNewCypherOnly)(!newCypherOnly, 'cypherOnlySwitch')}
-                                    />
-                                    <div className="flex flex-col gap-1 flex-1">
-                                        <h3 className="text-lg font-semibold">Cypher Only</h3>
-                                        <p className="text-sm text-muted-foreground">Return only the generated Cypher query without executing it</p>
-                                    </div>
-                                </div>
                                 <button type="submit" className="hidden" aria-hidden="true" tabIndex={-1} />
                             </form>
                         </CardContent>
