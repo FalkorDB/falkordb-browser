@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Locator } from "@playwright/test";
+import { Locator, expect } from "@playwright/test";
 import {
   interactWhenVisible,
   waitForElementToBeVisible,
@@ -57,6 +57,11 @@ export default class ChatComponent extends GraphPage {
     return this.page.getByTestId("chatCopyQueryButton");
   }
 
+  // Cypher Only Toggle
+  private get cypherOnlySwitch(): Locator {
+    return this.page.getByTestId("cypherOnlySwitch");
+  }
+
   // Wait for Interactive Methods
   async waitForChatToggleButton(): Promise<boolean> {
     return waitForElementToBeVisible(this.chatToggleButton);
@@ -84,6 +89,10 @@ export default class ChatComponent extends GraphPage {
 
   async waitForChatAssistantMessage(type: string): Promise<boolean> {
     return waitForElementToBeVisible(this.chatAssistantMessage(type));
+  }
+
+  async waitForUserMessageCount(expectedCount: number): Promise<void> {
+    await expect(this.chatUserMessages).toHaveCount(expectedCount, { timeout: 10000 });
   }
 
   async waitForChatSendButtonEnabled(): Promise<void> {
@@ -258,6 +267,53 @@ export default class ChatComponent extends GraphPage {
 
   async getClipboardContent(): Promise<string> {
     return this.page.evaluate(() => navigator.clipboard.readText());
+  }
+
+  // Cypher Only Switch Methods
+  async clickCypherOnlySwitchOn(): Promise<void> {
+    await interactWhenVisible(
+      this.cypherOnlySwitch,
+      async (el) => {
+        if ((await el.getAttribute("data-state")) === "checked") return;
+        await el.click();
+      },
+      "check cypher only ON switch"
+    );
+    await this.cypherOnlySwitch.waitFor({ state: "attached" });
+    await this.page.waitForFunction(
+      () => {
+        const sw = document.querySelector('[data-testid="cypherOnlySwitch"]');
+        return sw && sw.getAttribute("data-state") === "checked";
+      },
+      { timeout: 5000 }
+    );
+  }
+
+  async clickCypherOnlySwitchOff(): Promise<void> {
+    await interactWhenVisible(
+      this.cypherOnlySwitch,
+      async (el) => {
+        if ((await el.getAttribute("data-state")) === "unchecked") return;
+        await el.click();
+      },
+      "check cypher only OFF switch"
+    );
+    await this.cypherOnlySwitch.waitFor({ state: "attached" });
+    await this.page.waitForFunction(
+      () => {
+        const sw = document.querySelector('[data-testid="cypherOnlySwitch"]');
+        return sw && sw.getAttribute("data-state") === "unchecked";
+      },
+      { timeout: 5000 }
+    );
+  }
+
+  async getCypherOnlySwitch(): Promise<boolean> {
+    return interactWhenVisible(
+      this.cypherOnlySwitch,
+      async (el) => (await el.getAttribute("data-state")) === "checked",
+      "get cypher only switch"
+    );
   }
 
   async isNodeVisibleInCanvas(nodeName: string): Promise<boolean> {

@@ -330,6 +330,112 @@ test.describe("Chat Feature Tests", () => {
     await apiCall.removeGraph(graphName);
   });
 
+  test(`@readwrite Verify Cypher Only toggle returns only Cypher query without AI response`, async () => {
+    const graphName = getRandomString("chat");
+    await apiCall.addGraph(graphName);
+    await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
+
+    try {
+      // Set up API key in settings
+      const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+      await browser.setPageToFullScreen();
+
+      const testApiKey = process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY || "test-api-key-placeholder";
+      await settings.setChatApiKeyAndSave(testApiKey);
+      await settings.waitForTimeout(1000);
+
+      // Navigate to graph page
+      const header = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
+      await header.clickOnGraphsButton();
+
+      const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
+      await chat.selectGraphByName(graphName);
+
+      // Open chat
+      await chat.openChat();
+      await chat.waitForChatPanel();
+
+      // Verify toggle is OFF by default
+      const defaultState = await chat.getCypherOnlySwitch();
+      expect(defaultState).toBe(false);
+
+      // Toggle Cypher Only ON
+      await chat.clickCypherOnlySwitchOn();
+      const onState = await chat.getCypherOnlySwitch();
+      expect(onState).toBe(true);
+
+      // Send a question with Cypher Only enabled
+      await chat.fillChatInput("Who is Alice?");
+      await chat.clickChatSendButton();
+
+      // Verify user message appears
+      await chat.waitForChatUserMessage();
+
+      if (process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY) {
+        // Wait for the CypherQuery response
+        await chat.waitForAssistantResponse("CypherQuery");
+
+        // Brief wait for stream to fully close and any remaining events to render
+        await chat.waitForTimeout(2000);
+
+        // Verify we got exactly 1 CypherQuery and 0 Result messages
+        const cypherQueryCount = await chat.getChatAssistantMessagesCount("CypherQuery");
+        const resultCount = await chat.getChatAssistantMessagesCount("Result");
+
+        expect(cypherQueryCount).toBe(1);
+        expect(resultCount).toBe(0);
+      }
+    } finally {
+      await apiCall.removeGraph(graphName);
+    }
+  });
+
+  test(`@readwrite Verify Cypher Only toggle persists after page refresh`, async () => {
+    const graphName = getRandomString("chat");
+    await apiCall.addGraph(graphName);
+    await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})');
+
+    const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await chat.selectGraphByName(graphName);
+
+    // Open chat and verify toggle is OFF by default
+    await chat.openChat();
+    await chat.waitForChatPanel();
+    const defaultState = await chat.getCypherOnlySwitch();
+    expect(defaultState).toBe(false);
+
+    // Toggle Cypher Only ON
+    await chat.clickCypherOnlySwitchOn();
+    const onState = await chat.getCypherOnlySwitch();
+    expect(onState).toBe(true);
+
+    // Refresh the page
+    await chat.refreshPage();
+
+    // Re-select graph and open chat
+    await chat.selectGraphByName(graphName);
+    await chat.openChat();
+    await chat.waitForChatPanel();
+
+    // Verify toggle is still ON after refresh
+    const persistedState = await chat.getCypherOnlySwitch();
+    expect(persistedState).toBe(true);
+
+    // Toggle OFF and verify persistence
+    await chat.clickCypherOnlySwitchOff();
+    await chat.refreshPage();
+    await chat.selectGraphByName(graphName);
+    await chat.openChat();
+    await chat.waitForChatPanel();
+
+    const offState = await chat.getCypherOnlySwitch();
+    expect(offState).toBe(false);
+
+    // Clean up
+    await apiCall.removeGraph(graphName);
+  });
+
   test(`@readwrite Verify messages are graph-specific and respect maxSavedMessages limit`, async () => {
     test.setTimeout(60000);
     const graph1Name = getRandomString("chat");
@@ -370,14 +476,16 @@ test.describe("Chat Feature Tests", () => {
       "Who are Alice's friends?"
     ];
     
-    // eslint-disable-next-line no-restricted-syntax
-    for (const message of messages) {
+    for (let i = 0; i < messages.length; i += 1) {
+      const message = messages[i];
       // eslint-disable-next-line no-await-in-loop
       await chat.fillChatInput(message);
       // eslint-disable-next-line no-await-in-loop
-      await chat.waitForChatSendButtonEnabled(); // Wait for button to be ready for next message
+      await chat.waitForChatSendButtonEnabled();
       // eslint-disable-next-line no-await-in-loop
       await chat.clickChatSendButton();
+      // eslint-disable-next-line no-await-in-loop
+      await chat.waitForUserMessageCount(i + 1);
     }
 
     // Verify that we have exactly 7 user messages displayed

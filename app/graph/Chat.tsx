@@ -2,9 +2,9 @@
 /* eslint-disable react/no-array-index-key */
 import { cn, Message } from "@/lib/utils";
 import { useContext, useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, CircleArrowUp, Copy, Loader2, Play, Search, X } from "lucide-react";
+import { ChevronDown, ChevronRight, CircleArrowUp, Share2, Copy, Loader2, Play, Search, X } from "lucide-react";
+import { Tooltip as ShadTooltip, TooltipContent as ShadTooltipContent, TooltipTrigger as ShadTooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRouter } from "next/navigation";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -40,6 +40,8 @@ export default function Chat({ onClose }: Props) {
     const { graphName, runQuery } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
     const { settings: { chatSettings: { secretKey, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
+    // Cypher Only toggle state, persisted per graph
+    const [cypherOnly, setCypherOnly] = useState(false);
 
     const { toast } = useToast();
     const route = useRouter();
@@ -50,11 +52,14 @@ export default function Chat({ onClose }: Props) {
     const [isLoading, setIsLoading] = useState(false);
     const [queryCollapse, setQueryCollapse] = useState<{ [key: string]: boolean }>({});
 
-    // Load messages for current graph on mount
+    // Load messages and cypher only preference for current graph on mount
     useEffect(() => {
         const savedMessages = localStorage.getItem(`chat-${graphName}`);
         const currentMessages = JSON.parse(savedMessages || "[]");
         setMessages(currentMessages);
+
+        const savedCypherOnly = localStorage.getItem(`cypherOnly-${graphName}`);
+        setCypherOnly(savedCypherOnly === "true");
     }, [graphName, maxSavedMessages]);
 
     useEffect(() => {
@@ -151,7 +156,7 @@ export default function Chat({ onClose }: Props) {
         setNewMessage("");
 
         try {
-            const response = await fetch("/api/chat", {
+        const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -163,7 +168,8 @@ export default function Chat({ onClose }: Props) {
                     })),
                     graphName,
                     model,
-                    key: secretKey
+                    key: secretKey,
+                    cypherOnly
                 })
             });
 
@@ -325,14 +331,14 @@ export default function Chat({ onClose }: Props) {
                         <div className="overflow-hidden SofiaSans">
                             {
                                 queryCollapse[i] ? (
-                                    <Tooltip>
-                                        <TooltipTrigger className="w-full">
+                                    <ShadTooltip>
+                                        <ShadTooltipTrigger asChild>
                                             <p className="truncate">{message.content}</p>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
+                                        </ShadTooltipTrigger>
+                                        <ShadTooltipContent>
                                             {message.content}
-                                        </TooltipContent>
-                                    </Tooltip>
+                                        </ShadTooltipContent>
+                                    </ShadTooltip>
                                 ) : (
                                     <pre className="text-wrap whitespace-pre-wrap">
                                         {message.content}
@@ -454,6 +460,34 @@ export default function Chat({ onClose }: Props) {
                     }
                 </ul>
                 <form data-testid="chatForm" className="flex gap-2 items-center border border-border rounded-lg w-full p-2" onSubmit={handleSubmit}>
+                    <ShadTooltip>
+                        <ShadTooltipTrigger asChild>
+                            <button
+                                type="button"
+                                data-testid="cypherOnlySwitch"
+                                data-state={cypherOnly ? "checked" : "unchecked"}
+                                aria-pressed={cypherOnly}
+                                aria-label="Cypher only mode"
+                                onClick={() => {
+                                    const next = !cypherOnly;
+                                    setCypherOnly(next);
+                                    localStorage.setItem(`cypherOnly-${graphName}`, String(next));
+                                }}
+                                className={cn(
+                                    "shrink-0 flex items-center justify-center rounded-md transition-all duration-150 active:scale-[0.96]",
+                                    "h-8 w-8 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                                    cypherOnly
+                                        ? "bg-primary text-background hover:opacity-90"
+                                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                                )}
+                            >
+                                <Share2 size={18} />
+                            </button>
+                        </ShadTooltipTrigger>
+                        <ShadTooltipContent side="top">
+                            <span>{cypherOnly ? "Cypher only mode is ON — click to disable" : "Cypher only mode"}</span>
+                        </ShadTooltipContent>
+                    </ShadTooltip>
                     <Button
                         data-testid="chatSendButton"
                         disabled={newMessage.trim() === ""}

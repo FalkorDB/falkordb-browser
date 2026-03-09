@@ -109,6 +109,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [newCaptionsKeys, setNewCaptionsKeys] = useState<string[]>([]);
   const [newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix] = useState<boolean>(false);
   const [showPropertyKeyPrefix, setShowPropertyKeyPrefix] = useState<boolean>(false);
+  const [newCypherOnly, setNewCypherOnly] = useState<boolean>(false);
+  const [cypherOnly, setCypherOnly] = useState<boolean>(false);
 
   const replayTutorial = useCallback(() => {
     router.push("/graph");
@@ -131,7 +133,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       contentPersistenceSettings: { newContentPersistence, setNewContentPersistence },
       captionsKeysSettings: { newCaptionsKeys, setNewCaptionsKeys },
       showPropertyKeyPrefixSettings: { newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
-      chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages },
+      chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly },
       graphInfo: { newRefreshInterval, setNewRefreshInterval }
     },
     settings: {
@@ -142,7 +144,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       contentPersistenceSettings: { contentPersistence, setContentPersistence },
       captionsKeysSettings: { captionsKeys, setCaptionsKeys },
       showPropertyKeyPrefixSettings: { showPropertyKeyPrefix, setShowPropertyKeyPrefix },
-      chatSettings: { secretKey, setSecretKey, model, setModel, maxSavedMessages, setMaxSavedMessages },
+      chatSettings: { secretKey, setSecretKey, model, setModel, maxSavedMessages, setMaxSavedMessages, cypherOnly, setCypherOnly },
       graphInfo: { showMemoryUsage, refreshInterval, setRefreshInterval }
     },
     hasChanges,
@@ -161,6 +163,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       localStorage.setItem("maxSavedMessages", newMaxSavedMessages.toString());
       localStorage.setItem("captionsKeys", JSON.stringify(newCaptionsKeys));
       localStorage.setItem("showPropertyKeyPrefix", newShowPropertyKeyPrefix.toString());
+      localStorage.setItem("cypherOnly", newCypherOnly.toString());
 
       // Only encrypt and save secret key if it has changed
       if (newSecretKey !== secretKey) {
@@ -214,6 +217,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setMaxSavedMessages(newMaxSavedMessages);
       setCaptionsKeys(newCaptionsKeys);
       setShowPropertyKeyPrefix(newShowPropertyKeyPrefix);
+      setCypherOnly(newCypherOnly);
       // Reset has changes
       setHasChanges(false);
 
@@ -235,10 +239,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setNewMaxSavedMessages(maxSavedMessages);
       setNewCaptionsKeys(captionsKeys);
       setNewShowPropertyKeyPrefix(showPropertyKeyPrefix);
+      setNewCypherOnly(cypherOnly);
       setHasChanges(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, toast]);
+  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, toast]);
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -395,7 +400,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       if (!explain.ok) throw new Error("Failed to fetch explain plan");
 
       const explainJson = await explain.json();
-      const g = Graph.create(n, result, captionsKeys, showPropertyKeyPrefix, existingLimit, graphI);
+      const g = Graph.create(n, result, showPropertyKeyPrefix, existingLimit, graphI);
 
       newQuery = {
         ...newQuery,
@@ -535,6 +540,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30));
       setMaxSavedMessages(parseInt(localStorage.getItem("maxSavedMessages") || "5", 10));
       setShowPropertyKeyPrefix(localStorage.getItem("showPropertyKeyPrefix") === "true");
+      setCypherOnly(localStorage.getItem("cypherOnly") === "true");
 
       // Decrypt secret key if encrypted, or migrate plain text keys to encrypted format
       const storedSecretKey = localStorage.getItem("secretKey") || "";

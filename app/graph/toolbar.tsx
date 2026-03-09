@@ -1,6 +1,6 @@
 import { ArrowRight, Circle, Info } from "lucide-react";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
-import { areCaptionKeysEqual, cn, GraphRef } from "@/lib/utils";
+import { cn, GraphRef } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSession } from "next-auth/react";
 import { Graph, Link, Node } from "../api/graph/model";
@@ -44,7 +44,7 @@ export default function Toolbar({
 }: Props) {
 
     const { isLoading: isLoadingGraph } = useContext(GraphContext);
-    const { settings: { showPropertyKeyPrefixSettings: { showPropertyKeyPrefix }, captionsKeysSettings: { captionsKeys } } } = useContext(BrowserSettingsContext);
+    const { settings: { showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
     const {
         settings: {
             limitSettings: { limit, lastLimit },
@@ -310,7 +310,6 @@ export default function Toolbar({
                                     tooltipSide="bottom"
                                     title={`${hasLimitWarning ? `Data currently limited to ${graph.Data.length} rows` : ""}
                         ${hasLimitChangeWarning ? "Rerun the query to apply the new limit." : ""}
-                        ${!areCaptionKeysEqual(graph.CaptionsKeys, captionsKeys) ? "Rerun the query to apply the new captions keys settings." : ""}
                         ${graph.ShowPropertyKeyPrefix !== showPropertyKeyPrefix ? "Rerun the query to apply the new property key prefix settings." : ""}`}
                                 >
                                     <Info className="text-orange-300" size={20} />
