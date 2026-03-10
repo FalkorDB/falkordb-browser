@@ -483,10 +483,10 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                         </PaginationList>
                                         <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="w-1/2 flex flex-col gap-8 items-center">
                                             <TabsList className="bg-secondary h-fit w-fit p-2">
-                                                <TabsTrigger className={cn("!text-foreground data-[state=active]:!text-background data-[state=active]:!bg-primary")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
-                                                <TabsTrigger className={cn("!text-foreground data-[state=active]:!text-background data-[state=active]:!bg-primary")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>
-                                                <TabsTrigger className={cn("!text-foreground data-[state=active]:!text-background data-[state=active]:!bg-primary")} disabled={!isTabEnabled("metadata")} value="metadata">Metadata</TabsTrigger>
-                                                <TabsTrigger className={cn("!text-foreground data-[state=active]:!text-background data-[state=active]:!bg-primary")} disabled={!isTabEnabled("explain")} value="explain">Explain</TabsTrigger>
+                                                <TabsTrigger className={cn("border border-transparent hover:bg-secondary/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
+                                                <TabsTrigger className={cn("border border-transparent hover:bg-secondary/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>
+                                                <TabsTrigger className={cn("border border-transparent hover:bg-secondary/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("metadata")} value="metadata">Metadata</TabsTrigger>
+                                                <TabsTrigger className={cn("border border-transparent hover:bg-secondary/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("explain")} value="explain">Explain</TabsTrigger>
                                             </TabsList>
                                             <TabsContent value="text" className="w-full h-1 grow bg-secondary rounded-lg p-2 py-4 relative">
                                                 {

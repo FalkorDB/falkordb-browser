@@ -371,7 +371,7 @@ export default function TableComponent({
         <span className={cn(valueClassName)}>{l[0]}:</span>
     );
 
-    const getClassName = (index: number, level?: number) => cn("text-foreground rounded-lg", expandArr.get(index) === level && "bg-primary text-background");
+    const getClassName = (index: number, level?: number) => cn("text-foreground rounded-lg border border-transparent hover:border-border/10 hover:bg-secondary", expandArr.get(index) === level && "text-primary");
 
     return (
         <div className={cn("h-full w-full flex flex-col gap-4", className)}>

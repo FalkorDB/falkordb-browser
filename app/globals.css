@@ -57,7 +57,7 @@
     }
 
     .tabs-trigger {
-        @apply !p-0 rounded-lg data-[state=active]:!text-primary text-foreground !bg-transparent;
+        @apply !p-0 rounded-lg border border-transparent text-foreground hover:!bg-secondary hover:!border-border/10 data-[state=active]:!text-primary;
     }
 
     .hide-scrollbar {
