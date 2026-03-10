@@ -147,7 +147,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                         data-testid="settings"
                         className={cn(
                             "text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/15",
-                            type === "Settings" && "!text-primary !bg-primary/15 !border-primary/30"
+                            type === "Settings" && "!text-primary"
                         )}
                         title="Adjust application settings"
                         label="SETTINGS"
@@ -158,7 +158,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                         title="View and manage your graphs"
                         className={cn(
                             "text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
-                            type === "Graph" && "!text-primary !bg-primary/15 !border-primary/30"
+                            type === "Graph" && "!text-primary"
                         )}
                         onClick={() => router.push("/graph")}
                         data-testid="GraphsButton"
@@ -191,7 +191,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                             indicator={indicator}
                             className={cn(
                                 "text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
-                                graphInfoOpen && "!text-primary !bg-primary/15 !border-primary/30"
+                                graphInfoOpen && "!text-primary"
                             )}
                             title="Graph info"
                             onClick={() => onOpenGraphInfo()}
@@ -209,7 +209,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                             data-testid="chatToggleButton"
                             className={cn(
                                 "text-foreground font-semibold text-xl p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
-                                panel === "chat" && "!text-primary !bg-primary/15 !border-primary/30"
+                                panel === "chat" && "!text-primary"
                             )}
                             indicator={indicator}
                             title={`Use English to query the graph.

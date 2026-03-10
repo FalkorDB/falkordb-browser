@@ -248,8 +248,8 @@ export default function BrowserSettings() {
     };
 
     return (
-        <div className="grow basis-0 w-full flex flex-col gap-6 overflow-hidden">
-            <div className="flex items-start justify-between gap-4 px-2">
+        <div className="grow basis-0 w-full flex flex-col gap-2 overflow-hidden">
+            <div className="flex items-start justify-between gap-2 px-2">
                 <div className="flex flex-col gap-2">
                     <h1 className="text-3xl font-semibold">Browser Settings</h1>
                     <p className="text-base text-muted-foreground">Customize your browser experience and manage configurations</p>
@@ -271,12 +271,12 @@ export default function BrowserSettings() {
                     </TooltipContent>
                 </Tooltip>
             </div>
-            <div ref={scrollableContainerRef} className="h-1 grow px-2 overflow-y-auto flex flex-col gap-6 pb-8">
+            <div ref={scrollableContainerRef} className="h-1 grow px-2 overflow-y-auto flex flex-col gap-2 pb-8">
                 {/* Chat Section */}
                 <Card className="border-border shadow-sm">
                     <CardHeader
                         data-testid="chatSectionHeader"
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        className="cursor-pointer hover:bg-muted/50 transition-colors p-2"
                         onClick={() => toggleSection('chat')}
                     >
                         <div className="flex items-center justify-between">
@@ -288,8 +288,8 @@ export default function BrowserSettings() {
                         </div>
                     </CardHeader>
                     {expandedSections.chat && (
-                        <CardContent className="pt-2">
-                            <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-4 bg-muted/10 rounded-lg">
+                        <CardContent>
+                            <form onSubmit={handleSubmit} className="flex flex-col gap-2 p-2 bg-muted/10 rounded-lg">
                                 <div className="flex flex-col gap-2">
                                     {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                                     <label htmlFor="maxSaveMessagesInput" className="text-sm font-medium whitespace-nowrap">Store latest interactions (per graph) [5..10]</label>
@@ -341,7 +341,7 @@ export default function BrowserSettings() {
                 {/* Graph Info Section */}
                 <Card className="border-border shadow-sm">
                     <CardHeader
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        className="cursor-pointer hover:bg-muted/50 transition-colors p-2"
                         onClick={() => toggleSection('graphInfo')}
                     >
                         <div className="flex items-center justify-between">
@@ -353,9 +353,9 @@ export default function BrowserSettings() {
                         </div>
                     </CardHeader>
                     {expandedSections.graphInfo && (
-                        <CardContent className="space-y-6 pt-2">
+                        <CardContent>
                             {/* Refresh Interval */}
-                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 p-4 bg-muted/10 rounded-lg">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 p-2 bg-muted/10 rounded-lg">
                                 <div className="flex flex-col gap-2 flex-1">
                                     {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                                     <label htmlFor="refreshInterval" className="text-lg font-semibold">Refresh Interval</label>
@@ -386,7 +386,7 @@ export default function BrowserSettings() {
                 {/* Query Execution Section */}
                 <Card className="border-border shadow-sm">
                     <CardHeader
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        className="cursor-pointer hover:bg-muted/50 transition-colors p-2"
                         onClick={() => toggleSection('queryExecution')}
                     >
                         <div className="flex items-center justify-between">
@@ -399,9 +399,9 @@ export default function BrowserSettings() {
                     </CardHeader>
                     {expandedSections.queryExecution && (
                         <CardContent>
-                            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                            <form onSubmit={handleSubmit} className="flex flex-col gap-2">
                                 {/* Timeout Setting */}
-                                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 p-4 bg-muted/10 rounded-lg">
+                                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 p-2 bg-muted/10 rounded-lg">
                                     <div className="flex flex-col gap-2 flex-1">
                                         <h3 className="text-lg font-semibold">Timeout</h3>
                                         <p className="text-sm text-muted-foreground">
@@ -425,7 +425,7 @@ export default function BrowserSettings() {
                                 </div>
 
                                 {/* Limit Setting */}
-                                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 p-4 bg-muted/10 rounded-lg">
+                                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 p-2 bg-muted/10 rounded-lg">
                                     <div className="flex flex-col gap-2 flex-1">
                                         <h3 className="text-lg font-semibold">Limit</h3>
                                         <p className="text-sm text-muted-foreground">
@@ -449,7 +449,7 @@ export default function BrowserSettings() {
                                 </div>
 
                                 {/* Default Query On-load */}
-                                <div className="flex flex-col gap-4 p-4 bg-muted/10 rounded-lg">
+                                <div className="flex flex-col gap-2 p-2 bg-muted/10 rounded-lg">
                                     <div className="flex items-center gap-3">
                                         <Switch
                                             id="runDefaultQuerySwitch"
@@ -509,7 +509,7 @@ export default function BrowserSettings() {
                 {/* User Experience Section */}
                 <Card className="border-border shadow-sm">
                     <CardHeader
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        className="cursor-pointer hover:bg-muted/50 transition-colors p-2"
                         onClick={() => toggleSection('userExperience')}
                     >
                         <div className="flex items-center justify-between">
@@ -522,9 +522,9 @@ export default function BrowserSettings() {
                     </CardHeader>
                     {
                         expandedSections.userExperience &&
-                        <CardContent className="space-y-6 pt-2">
+                        <CardContent>
                             {/* Content Persistence */}
-                            <div className="flex items-center gap-4 p-4 bg-muted/10 rounded-lg">
+                            <div className="flex items-center gap-2 p-2 bg-muted/10 rounded-lg">
                                 <Switch
                                     id="contentPersistenceSwitch"
                                     className="data-[state=unchecked]:bg-border"
@@ -538,12 +538,12 @@ export default function BrowserSettings() {
                             </div>
 
                             {/* Captions Keys */}
-                            <div className="flex flex-col gap-4 p-4 bg-muted/10 rounded-lg">
+                            <div className="flex flex-col gap-2 p-2 bg-muted/10 rounded-lg">
                                 <div className="flex flex-col gap-2">
                                     <h3 className="text-lg font-semibold">Captions Keys</h3>
                                     <p className="text-sm text-muted-foreground">Manage the caption: propertyKeys used for displaying captions on nodes.</p>
                                 </div>
-                                <div className="flex items-center gap-4 p-4 bg-muted/10 rounded-lg">
+                                <div className="flex items-center gap-2 p-2 bg-muted/10 rounded-lg">
                                     <Switch
                                         id="showPropertyKeyPrefixSwitch"
                                         className="data-[state=unchecked]:bg-border"
@@ -557,10 +557,10 @@ export default function BrowserSettings() {
                                 </div>
                                 {
                                     newCaptionsKeys.length > 0 ?
-                                        <ul className="flex flex-col gap-2">
+                                        <ul className="flex flex-col gap-1">
                                             {newCaptionsKeys.map((key, index) => (
                                                 // eslint-disable-next-line react/no-array-index-key
-                                                <li key={index} className="flex justify-between items-center p-2 bg-background rounded-lg">
+                                                <li key={index} className="flex justify-between items-center p-1 bg-background rounded-lg">
                                                     <p>{key}</p>
                                                     <Button
                                                         className="p-1"

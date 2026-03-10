@@ -71,40 +71,38 @@ export default function Settings() {
     };
 
     return (
-        <div className="Page p-2">
+        <div className="Page p-2 gap-2">
             <p className="text-sm text-foreground"><span className="opacity-50">Settings</span> {`> ${current}`}</p>
-            <div className="flex flex-col gap-8 items-center p-2">
-                <div className="w-fit bg-background flex gap-2 p-2 rounded-lg">
-                    <Button
-                        className={cn("p-2 rounded-lg", current === "Browser" ? "bg-background" : "text-gray-500")}
-                        label="Browser Settings"
-                        title="Manage browser settings"
-                        onClick={() => handleSetCurrent("Browser")}
-                    />
-                    {
-                        session?.user.role === "Admin" && indicator === "online" &&
-                        <>
-                            <Button
-                                className={cn("p-2 rounded-lg", current === "Configurations" ? "bg-background" : "text-gray-500")}
-                                label="DB Configurations"
-                                title="Configure database settings"
-                                onClick={() => handleSetCurrent("Configurations")}
-                            />
-                            <Button
-                                className={cn("p-2 rounded-lg", current === "Users" ? "bg-background" : "text-gray-500")}
-                                label="Users"
-                                title="Manage users accounts"
-                                onClick={() => handleSetCurrent("Users")}
-                            />
-                        </>
-                    }
-                    <Button
-                        className={cn("p-2 rounded-lg", current === "Tokens" ? "bg-background" : "text-gray-500")}
-                        label="Personal Access Tokens"
-                        title="Manage personal access tokens"
-                        onClick={() => handleSetCurrent("Tokens")}
-                    />
-                </div>
+            <div className="w-full bg-background flex gap-2 p-2 rounded-lg justify-center">
+                <Button
+                    className={cn("p-2 rounded-lg", current === "Browser" ? "bg-background" : "text-gray-500")}
+                    label="Browser Settings"
+                    title="Manage browser settings"
+                    onClick={() => handleSetCurrent("Browser")}
+                />
+                {
+                    session?.user.role === "Admin" && indicator === "online" &&
+                    <>
+                        <Button
+                            className={cn("p-2 rounded-lg", current === "Configurations" ? "bg-background" : "text-gray-500")}
+                            label="DB Configurations"
+                            title="Configure database settings"
+                            onClick={() => handleSetCurrent("Configurations")}
+                        />
+                        <Button
+                            className={cn("p-2 rounded-lg", current === "Users" ? "bg-background" : "text-gray-500")}
+                            label="Users"
+                            title="Manage users accounts"
+                            onClick={() => handleSetCurrent("Users")}
+                        />
+                    </>
+                }
+                <Button
+                    className={cn("p-2 rounded-lg", current === "Tokens" ? "bg-background" : "text-gray-500")}
+                    label="Personal Access Tokens"
+                    title="Manage personal access tokens"
+                    onClick={() => handleSetCurrent("Tokens")}
+                />
             </div>
             {
                 getCurrentTab()
