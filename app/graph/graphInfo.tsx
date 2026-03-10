@@ -1,5 +1,5 @@
 import { Dispatch, SetStateAction, useContext } from "react";
-import { Loader2, X, Palette } from "lucide-react";
+import { Loader2, X, Palette, Database } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { getContrastTextColor } from "@falkordb/canvas";
@@ -20,7 +20,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     const { settings: { graphInfo: { showMemoryUsage } } } = useContext(BrowserSettingsContext);
 
     return (
-        <div aria-disabled={!nodesCount || !edgesCount} data-testid="graphInfoPanel" className={cn(`relative h-full w-full p-2 grid grid-rows-[max-content_max-content_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)] gap-8 border-r border-border`)}>
+        <div aria-disabled={!nodesCount || !edgesCount} data-testid="graphInfoPanel" className={cn(`relative h-full w-full p-2 grid grid-rows-[max-content_max-content_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)] gap-2 border-r border-border`)}>
             {
                 !customizingLabel ? (
                     <>
@@ -31,7 +31,10 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                         >
                             <X className="h-4 w-4" />
                         </Button>
-                        <h1 className="text-2xl">Graph Info</h1>
+                        <div className=" pr-5 w-full flex justify-between items-center gap-1">
+                            <h1 className="text-2xl">Graph Info</h1>
+                            <Database size={25}/>
+                        </div>
                         <div className="flex gap-2 items-center overflow-hidden">
                             <h2>Graph Name:</h2>
                             <Tooltip>

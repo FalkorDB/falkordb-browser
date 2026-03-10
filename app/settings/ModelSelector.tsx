@@ -95,7 +95,10 @@ const categorizeModels = (models: string[]) => {
         categories[categoryName].push(model);
     });
 
-    return Object.entries(categories).filter(([, categoryModels]) => categoryModels.length > 0);
+    return Object.entries(categories)
+        .filter(([, categoryModels]) => categoryModels.length > 0)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([name, categoryModels]) => [name, categoryModels.sort((a, b) => a.localeCompare(b))] as [string, string[]]);
 };
 
 export default function ModelSelector({

@@ -33,17 +33,17 @@ const getItemClassName = (selected: boolean, deleteSelected: boolean, hover: boo
     if (selected) return `${prefix}-primary border-primary`;
     if (deleteSelected) return `${prefix}-destructive border-destructive`;
     if (hover) return `${prefix}-foreground border-foreground`;
-    return `${prefix}-foreground/50 border-foreground/70`;
+    return `${prefix}-foreground/50 border-foreground/50`;
 };
 
-const getSeparator = (selected: boolean, deleteSelected: boolean, hover: boolean) => (
+const getSeparator = () => (
     <div
-        className={cn("h-2/3 w-px rounded-full", getItemClassName(selected, deleteSelected, hover, "bg"))}
+        className={cn("h-2/3 w-px rounded-full bg-foreground/60")}
     />
 );
 
 const getStatusIcon = (status: Query["status"]) => {
-    const size = 20;
+    const size = 15;
     switch (status) {
         case "Empty":
             return <Circle color="orange" size={size} />;
@@ -54,7 +54,7 @@ const getStatusIcon = (status: Query["status"]) => {
     }
 };
 
-const getQueryElement = (item: Query, selected: boolean, deleteSelected: boolean, hover: boolean) => {
+const getQueryElement = (item: Query) => {
     const executionTime = getExecutionTime(item.metadata);
 
     // Build array of items to display
@@ -70,14 +70,14 @@ const getQueryElement = (item: Query, selected: boolean, deleteSelected: boolean
 
     if (item.elementsCount) {
         elements.push({
-            content: item.elementsCount,
+            content: `ELM: ${item.elementsCount}`,
             tooltip: `Elements: ${item.elementsCount}`,
         });
     }
 
     if (item.timestamp) {
         elements.push({
-            content: getLastRun(item.timestamp),
+            content: `LR: ${getLastRun(item.timestamp)}`,
             tooltip: `Last Run: ${getLastRun(item.timestamp)}`,
             className: "truncate"
         });
@@ -85,7 +85,7 @@ const getQueryElement = (item: Query, selected: boolean, deleteSelected: boolean
 
     if (item.graphName) {
         elements.push({
-            content: item.graphName,
+            content: `GN: ${item.graphName}`,
             tooltip: `Graph Name: ${item.graphName}`,
             className: "truncate"
         });
@@ -93,14 +93,14 @@ const getQueryElement = (item: Query, selected: boolean, deleteSelected: boolean
 
     if (executionTime) {
         elements.push({
-            content: executionTime,
+            content: `IET: ${executionTime}`,
             tooltip: `Internal Execution Time: ${executionTime}`,
             className: "truncate"
         });
     }
 
     return (
-        <div className="h-1 grow flex gap-2 items-center w-full">
+        <div className="h-1 grow flex gap-2 items-center w-full text-foreground/60 text-sm">
             {elements.map((element, index) => (
                 <Fragment key={element.tooltip}>
                     <Tooltip>
@@ -111,7 +111,7 @@ const getQueryElement = (item: Query, selected: boolean, deleteSelected: boolean
                             {element.tooltip}
                         </TooltipContent>
                     </Tooltip>
-                    {index < elements.length - 1 && getSeparator(selected, deleteSelected, hover)}
+                    {index < elements.length - 1 && getSeparator()}
                 </Fragment>
             ))}
         </div>
@@ -204,7 +204,7 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
     };
 
     return (
-        <div className={cn("w-full flex flex-col gap-2 p-3", className)}>
+        <div className={cn("w-full flex flex-col gap-2 p-2", className)}>
             {children}
             <div className="flex gap-2 items-center">
                 <Input
@@ -245,7 +245,7 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
             <ul
                 ref={containerRef}
                 data-testid="queryList"
-                className={cn("h-1 grow flex flex-col p-2", items.length > 0 && typeof items[0] === "object" && "SofiaSans")}
+                className={cn("h-1 grow flex flex-col", items.length > 0 && typeof items[0] === "object" && "SofiaSans")}
             >
                 {
                     items.map((item, index) => {
@@ -259,9 +259,9 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                             <>
                                 {
                                     !isString && (item.status || item.elementsCount || item.timestamp || item.graphName || getExecutionTime(item.metadata)) &&
-                                    getQueryElement(item, selected, deleteSelected, hover)
+                                    getQueryElement(item)
                                 }
-                                <p data-testid={`${dataTestId}${text}Text`} className={cn("truncate w-full text-left", !isString && "h-1 grow")}>{text}</p>
+                                <p data-testid={`${dataTestId}${text}Text`} className={cn("truncate w-full text-left", !isString && "h-1 grow", getItemClassName(selected, deleteSelected, hover))}>{text}</p>
                             </>
                         );
 
