@@ -12,7 +12,8 @@ import { Editor } from "@monaco-editor/react";
 import { useTheme } from "next-themes";
 import Button from "../components/ui/Button";
 import { BrowserSettingsContext, GraphContext, IndicatorContext } from "../components/provider";
-import EditorComponent, { setTheme } from "../components/EditorComponent";
+import CypherEditor from "../components/CypherEditor";
+import { setTheme } from "../components/EditorComponent";
 import DialogComponent from "../components/DialogComponent";
 import Toolbar from "./toolbar";
 import { Node, Link, Graph, Query, HistoryQuery } from "../api/graph/model";
@@ -353,7 +354,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                 historyQuery ?
                     <>
                         <div className="h-full w-1 grow relative overflow-visible">
-                            <EditorComponent
+                            <CypherEditor
                                 graph={graph}
                                 graphName={graphName}
                                 maximize={maximize}

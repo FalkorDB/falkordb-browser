@@ -14,6 +14,7 @@ type TableFile = {
 
 /* eslint-disable react/require-default-props */
 interface Props {
+    title?: string
     filesCount?: boolean
     className?: string
     withTable?: boolean
@@ -27,7 +28,7 @@ const FileProps = [
     "Type",
 ];
 
-function Dropzone({ filesCount = false, className = "", withTable = false, disabled = false, onFileDrop }: Props) {
+function Dropzone({ title, filesCount = false, className = "", withTable = false, disabled = false, onFileDrop }: Props) {
 
     const [files, setFiles] = useState<TableFile[]>([]);
 
@@ -56,7 +57,7 @@ function Dropzone({ filesCount = false, className = "", withTable = false, disab
                             <ArrowDownToLine color='#57577B' />
                             <span>Or <span className='text-[#7167F6]'>Browse</span></span>
                         </div>
-                        : <p className={cn('underline underline-offset-2 text-[#99E4E5]', disabled ? "opacity-30 cursor-text" : "cursor-pointer")}>Upload Certificate</p>
+                        : <p className={cn('underline underline-offset-2 text-[#99E4E5]', disabled ? "opacity-30 cursor-text" : "cursor-pointer")}>{title}</p>
                 }
             </div>
             {

@@ -2,7 +2,7 @@
 
 'use client';
 
-import { ArrowUpRight, Database, FileCode, LogOut, Monitor, Moon, Sun } from "lucide-react";
+import { ArrowUpRight, Braces, Database, FileCode, LogOut, Monitor, Moon, Sun } from "lucide-react";
 import { useCallback, useContext, useState, useEffect } from "react";
 import Image from "next/image";
 import { cn, getTheme, Panel } from "@/lib/utils";
@@ -23,14 +23,15 @@ interface Props {
     onSetGraphName: (newGraphName: string) => void
     graphNames: string[]
     graphName: string
-    onOpenGraphInfo: () => void
-    graphInfoOpen: boolean
+    onOpenPanel: () => void
+    panelOpen: boolean
 }
 
-function getPathType(pathname: string): "Schema" | "Graph" | "Settings" | undefined {
+function getPathType(pathname: string): "Schema" | "Graph" | "Settings" | "UDF" | undefined {
     if (pathname.includes("/schema")) return "Schema";
     if (pathname.includes("/graph")) return "Graph";
     if (pathname.includes("/settings")) return "Settings";
+    if (pathname.includes("/udf")) return "UDF";
     return undefined;
 }
 
@@ -56,7 +57,7 @@ function formatVersion(version: string | undefined): string {
     return version;
 }
 
-export default function Header({ onSetGraphName, graphNames, graphName, onOpenGraphInfo, graphInfoOpen }: Props) {
+export default function Header({ onSetGraphName, graphNames, graphName, onOpenPanel, panelOpen }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
     const { connectionType, dbVersion } = useContext(ConnectionContext);
@@ -71,7 +72,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
     const [mounted, setMounted] = useState(false);
 
     const type = getPathType(pathname);
-    const showCreate = type && type !== "Settings" && session?.user.role && session.user.role !== "Read-Only";
+    const showCreate = type && type !== "Settings" && type !== "UDF" && session?.user.role && session.user.role !== "Read-Only";
 
     useEffect(() => {
         setMounted(true);
@@ -157,6 +158,13 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                         onClick={() => router.push("/graph")}
                         data-testid="GraphsButton"
                     />
+                    <Button
+                        label="UDF"
+                        title="User Defined Functions"
+                        className={cn("text-foreground p-1 rounded-lg", type === "UDF" && "text-background bg-primary")}
+                        onClick={() => router.push("/udf")}
+                        data-testid="UdfButton"
+                    />
                 </div>
                 {/*
                 <Button
@@ -183,9 +191,9 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                         {separator}
                         <Button
                             indicator={indicator}
-                            className={cn("text-foreground p-1 rounded-lg", graphInfoOpen && "text-background bg-primary")}
+                            className={cn("text-foreground p-1 rounded-lg", panelOpen && "text-background bg-primary")}
                             title="Graph info"
-                            onClick={() => onOpenGraphInfo()}
+                            onClick={() => onOpenPanel()}
                             data-testid="graphInfoToggle"
                         >
                             <Database size={iconSize} />
@@ -208,6 +216,20 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                                 handleSetCurrentPanel("chat");
                             }}
                         />
+                    </>
+                }
+                {
+                    type === "UDF" &&
+                    <>
+                        {separator}
+                        <Button
+                            className={cn("text-foreground p-1 rounded-lg", panelOpen && "text-background bg-primary")}
+                            title="UDF Panel"
+                            onClick={() => onOpenPanel()}
+                            data-testid="udfPanelToggle"
+                        >
+                            <Braces size={iconSize} />
+                        </Button>
                     </>
                 }
             </div>

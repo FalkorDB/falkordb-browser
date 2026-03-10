@@ -1,0 +1,720 @@
+/* eslint-disable consistent-return */
+/* eslint-disable react-hooks/exhaustive-deps */
+
+"use client";
+
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Monaco } from "@monaco-editor/react";
+import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext, useMemo, useCallback } from "react";
+import * as monaco from "monaco-editor";
+import { Minimize2, X } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
+import { cn, prepareArg, securedFetch } from "@/lib/utils";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import Button from "./ui/Button";
+import CloseDialog from "./CloseDialog";
+import EditorComponent, { LINE_HEIGHT, LanguageConfig } from "./EditorComponent";
+import { BrowserSettingsContext, IndicatorContext } from "./provider";
+import { Graph, HistoryQuery } from "../api/graph/model";
+
+interface Props {
+    graph: Graph
+    graphName: string
+    historyQuery: HistoryQuery
+    maximize: boolean
+    setMaximize: Dispatch<SetStateAction<boolean>>
+    runQuery: (query: string) => Promise<void>
+    setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
+    editorKey: string
+    isQueryLoading: boolean
+}
+
+const MAX_HEIGHT = 20;
+const PLACEHOLDER = "Type your query here to start";
+const LANGUAGE_NAME = "cypher-custom-language";
+
+const KEYWORDS = [
+    "CREATE",
+    "MATCH",
+    "OPTIONAL",
+    "AS",
+    "WHERE",
+    "RETURN",
+    "ORDER BY",
+    "SKIP",
+    "LIMIT",
+    "MERGE",
+    "DELETE",
+    "SET",
+    "WITH",
+    "UNION",
+    "UNWIND",
+    "FOREACH",
+    "CALL",
+    "YIELD",
+];
+
+const FUNCTIONS = [
+    "all",
+    "any",
+    "exists",
+    "isEmpty",
+    "none",
+    "single",
+    "coalesce",
+    "endNode",
+    "hasLabels",
+    "id",
+    "labels",
+    "properties",
+    "randomUUID",
+    "startNode",
+    "timestamp",
+    "type",
+    "typeOf",
+    "avg",
+    "collect",
+    "count",
+    "max",
+    "min",
+    "percentileCont",
+    "percentileDisc",
+    "stDevP",
+    "sum",
+    "head",
+    "keys",
+    "last",
+    "range",
+    "size",
+    "tail",
+    "reduce",
+    "abs",
+    "ceil",
+    "e",
+    "exp",
+    "floor",
+    "log",
+    "log10",
+    "pow",
+    "rand",
+    "round",
+    "sign",
+    "sqrt",
+    "acos",
+    "atan",
+    "atan2",
+    "cos",
+    "cot",
+    "degrees",
+    "haversin",
+    "pi",
+    "radians",
+    "sin",
+    "tan",
+    "left",
+    "lTrim",
+    "replace",
+    "reverse",
+    "right",
+    "rTrim",
+    "split",
+    "substring",
+    "toLower",
+    "toJSON",
+    "toUpper",
+    "trim",
+    "point",
+    "distance",
+    "toBoolean",
+    "toBooleanList",
+    "toBooleanOrNull",
+    "toFloat",
+    "toFloatList",
+    "toFloatOrNull",
+    "toInteger",
+    "toIntegerList",
+    "toIntegerOrNull",
+    "toString",
+    "toStringList",
+    "toStringOrNull",
+    "indegree",
+    "outdegree",
+    "nodes",
+    "relationships",
+    "length",
+    "shortestPath",
+    "vecf32",
+    "vec.euclideanDistance",
+    "vec.cosineDistance",
+];
+
+const STATIC_SUGGESTIONS: monaco.languages.CompletionItem[] = [
+    ...KEYWORDS.map(key => ({
+        insertText: key,
+        label: key,
+        kind: monaco.languages.CompletionItemKind.Keyword,
+        range: new monaco.Range(1, 1, 1, 1),
+        detail: "(keyword)"
+    })),
+    ...FUNCTIONS.map(f => ({
+        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+        insertText: `${f}(\${0})`,
+        label: `${f}()`,
+        kind: monaco.languages.CompletionItemKind.Function,
+        range: new monaco.Range(1, 1, 1, 1),
+        detail: "(function)"
+    }))
+];
+
+const DEFAULT_MONARCH_TOKENIZER: monaco.languages.IMonarchLanguage = {
+    tokenizer: {
+        root: [
+            [new RegExp(`\\b(${KEYWORDS.join('|')})\\b`), "keyword"],
+            [/"([^"\\]|\\.)*"/, 'string'],
+            [/'([^'\\]|\\.)*'/, 'string'],
+            [/\d+/, 'number'],
+            [/:(\w+)/, 'type'],
+            [/\{/, { token: 'delimiter.curly', next: '@bracketCounting' }],
+            [/\[/, { token: 'delimiter.square', next: '@bracketCounting' }],
+            [/\(/, { token: 'delimiter.parenthesis', next: '@bracketCounting' }],
+        ],
+        bracketCounting: [
+            [/\{/, 'delimiter.curly', '@bracketCounting'],
+            [/\}/, 'delimiter.curly', '@pop'],
+            [/\[/, 'delimiter.square', '@bracketCounting'],
+            [/\]/, 'delimiter.square', '@pop'],
+            [/\(/, 'delimiter.parenthesis', '@bracketCounting'],
+            [/\)/, 'delimiter.parenthesis', '@pop'],
+            { include: 'root' }
+        ],
+    },
+    ignoreCase: true,
+};
+
+const CYPHER_LANGUAGE_CONFIGURATION: monaco.languages.LanguageConfiguration = {
+    brackets: [
+        ['{', '}'],
+        ['[', ']'],
+        ['(', ')']
+    ],
+    autoClosingPairs: [
+        { open: '{', close: '}' },
+        { open: '[', close: ']' },
+        { open: '(', close: ')' },
+        { open: '"', close: '"', notIn: ['string'] },
+        { open: "'", close: "'", notIn: ['string', 'comment'] }
+    ],
+    surroundingPairs: [
+        { open: '{', close: '}' },
+        { open: '[', close: ']' },
+        { open: '(', close: ')' },
+        { open: '"', close: '"' },
+        { open: "'", close: "'" }
+    ]
+};
+
+export default function CypherEditor({ graph, graphName, historyQuery, maximize, setMaximize, runQuery, setHistoryQuery, editorKey, isQueryLoading }: Props) {
+    const { indicator, setIndicator } = useContext(IndicatorContext);
+    const { tutorialOpen } = useContext(BrowserSettingsContext);
+
+    const { toast } = useToast();
+    const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+    const dialogEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+    const placeholderRef = useRef<HTMLDivElement>(null);
+    const submitQuery = useRef<HTMLButtonElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const indicatorRef = useRef(indicator);
+    const graphIdRef = useRef(graph.Id);
+    const graphNameRef = useRef(graphName);
+    const queryRef = useRef(historyQuery.query);
+    const tutorialOpenRef = useRef(tutorialOpen);
+    const monacoRef = useRef<Monaco | null>(null);
+
+    const [lineNumber, setLineNumber] = useState(1);
+    const [blur, setBlur] = useState(false);
+
+    const editorHeight = useMemo(() => blur
+        ? LINE_HEIGHT
+        : Math.min(lineNumber * LINE_HEIGHT, document.body.clientHeight / 100 * MAX_HEIGHT),
+        [blur, lineNumber]);
+
+    useEffect(() => {
+        tutorialOpenRef.current = tutorialOpen;
+    }, [tutorialOpen]);
+
+    useEffect(() => {
+        graphNameRef.current = graphName;
+    }, [graphName]);
+
+    useEffect(() => {
+        queryRef.current = historyQuery.query;
+    }, [historyQuery.query]);
+
+    useEffect(() => {
+        indicatorRef.current = indicator;
+    }, [indicator]);
+
+    useEffect(() => {
+        if (historyQuery.query && placeholderRef.current) {
+            placeholderRef.current.style.display = "none";
+        } else if (!historyQuery.query && placeholderRef.current && blur) {
+            placeholderRef.current.style.display = "block";
+        }
+    }, [historyQuery.query]);
+
+    useEffect(() => {
+        graphIdRef.current = graph.Id;
+    }, [graph.Id]);
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+
+        const handleResize = () => {
+            editorRef.current?.layout();
+        };
+
+        window.addEventListener("resize", handleResize);
+
+        const observer = new ResizeObserver(handleResize);
+
+        observer.observe(containerRef.current);
+
+        return () => {
+            window.removeEventListener("resize", handleResize);
+            observer.disconnect();
+        };
+    }, [containerRef.current]);
+
+    useEffect(() => {
+        setLineNumber(historyQuery.query.split("\n").length);
+    }, [historyQuery.query]);
+
+    const fetchSuggestions = async (detail: string): Promise<monaco.languages.CompletionItem[]> => {
+        if (indicator === "offline") return [];
+
+        const result = await securedFetch(`api/graph/${graphIdRef.current}/info?type=${prepareArg(detail)}`, {
+            method: 'GET',
+        }, toast, setIndicator);
+
+        if (!result) return [];
+
+        const json = await result.json();
+
+        if (json.result.data.length === 0) return [];
+
+        return json.result.data.map(({ info }: { info: string }) => ({
+            insertTextRules: detail === '(function)' ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet : undefined,
+            insertText: detail === '(function)' ? `${info}(\${0})` : info,
+            label: detail === '(function)' ? `${info}()` : info,
+            kind: (() => {
+                switch (detail) {
+                    case '(function)':
+                        return monaco.languages.CompletionItemKind.Function;
+                    case '(property key)':
+                        return monaco.languages.CompletionItemKind.Property;
+                    default:
+                        return monaco.languages.CompletionItemKind.Variable;
+                }
+            })(),
+            range: new monaco.Range(1, 1, 1, 1),
+            detail
+        }));
+    };
+
+    const getRemoteSuggestions = async () => (await Promise.all([
+        fetchSuggestions('(function)'),
+        fetchSuggestions('(property key)'),
+        fetchSuggestions('(label)'),
+        fetchSuggestions('(relationship type)')
+    ])).flat();
+
+    const getAllSuggestions = useCallback(async (): Promise<monaco.languages.CompletionItem[]> => {
+        const remoteSuggestions = graphIdRef.current ? await getRemoteSuggestions() : [];
+        const all = [...STATIC_SUGGESTIONS, ...remoteSuggestions];
+
+        // Deduplicate by label + detail
+        const seen = new Set<string>();
+        return all.filter(s => {
+            const key = `${s.label}::${s.detail}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    }, []);
+
+    const updateTokenizer = async (monacoI: Monaco) => {
+        const sug = await getAllSuggestions();
+
+        const functions = sug.filter(({ detail }) => detail === "(function)");
+
+        const namespaces = new Set(
+            functions
+                .filter(({ label }) => (label as string).includes("."))
+                .map(({ label }) => {
+                    const newNamespaces = (label as string).split(".");
+                    newNamespaces.pop();
+                    return newNamespaces;
+                }).flat()
+        );
+
+        monacoI.languages.setMonarchTokensProvider(LANGUAGE_NAME, {
+            tokenizer: {
+                root: graphIdRef.current ? [
+                    [new RegExp(`\\b(${Array.from(namespaces.keys()).join('|')})\\b`), "keyword"],
+                    [new RegExp(`\\b(${KEYWORDS.join('|')})\\b`), "keyword"],
+                    [
+                        new RegExp(`\\b(${functions.map(({ label }) => {
+                            if ((label as string).includes(".")) {
+                                const labels = (label as string).split(".");
+                                return labels[labels.length - 1];
+                            }
+                            return label;
+                        }).join('|')})\\b`),
+                        "function"
+                    ],
+                    [/"([^"\\]|\\.)*"/, 'string'],
+                    [/'([^'\\]|\\.)*'/, 'string'],
+                    [/\d+/, 'number'],
+                    [/:(\w+)/, 'type'],
+                    [/\{/, { token: 'delimiter.curly', next: '@bracketCounting' }],
+                    [/\[/, { token: 'delimiter.square', next: '@bracketCounting' }],
+                    [/\(/, { token: 'delimiter.parenthesis', next: '@bracketCounting' }],
+                ] : [
+                    [new RegExp(`\\b(${KEYWORDS.join('|')})\\b`), "keyword"],
+                    [/"([^"\\]|\\.)*"/, 'string'],
+                    [/'([^'\\]|\\.)*'/, 'string'],
+                    [/\d+/, 'number'],
+                    [/:(\w+)/, 'type'],
+                    [/\{/, { token: 'delimiter.curly', next: '@bracketCounting' }],
+                    [/\[/, { token: 'delimiter.square', next: '@bracketCounting' }],
+                    [/\(/, { token: 'delimiter.parenthesis', next: '@bracketCounting' }],
+                ],
+                bracketCounting: [
+                    [/\{/, 'delimiter.curly', '@bracketCounting'],
+                    [/\}/, 'delimiter.curly', '@pop'],
+                    [/\[/, 'delimiter.square', '@bracketCounting'],
+                    [/\]/, 'delimiter.square', '@pop'],
+                    [/\(/, 'delimiter.parenthesis', '@bracketCounting'],
+                    [/\)/, 'delimiter.parenthesis', '@pop'],
+                    { include: 'root' }
+                ],
+            },
+            ignoreCase: true,
+        });
+    };
+
+    // Update monarch tokenizer when graph changes (to include dynamic functions/namespaces)
+    useEffect(() => {
+        if (monacoRef.current && graphIdRef.current) {
+            updateTokenizer(monacoRef.current);
+        }
+    }, [graph.Id]);
+
+    const cypherLanguageConfig: LanguageConfig = useMemo(() => ({
+        monarchTokensProvider: DEFAULT_MONARCH_TOKENIZER,
+        languageConfiguration: CYPHER_LANGUAGE_CONFIGURATION,
+        getSuggestions: async (monacoI: Monaco) => {
+            const sug = await getAllSuggestions();
+            // Also update the tokenizer with dynamic suggestions
+            await updateTokenizer(monacoI);
+            return sug;
+        },
+    }), []);
+
+    const handleSubmit = async () => {
+        runQuery(historyQuery.query.trim());
+    };
+
+    const handleMonacoReady = (monacoI: Monaco) => {
+        monacoRef.current = monacoI;
+        // Trigger initial tokenizer update with dynamic suggestions
+        updateTokenizer(monacoI);
+    };
+
+    const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
+        const updatePlaceholderVisibility = () => {
+            const hasContent = !!e.getValue();
+            if (placeholderRef.current) {
+                placeholderRef.current.style.display = hasContent ? 'none' : 'block';
+            }
+        };
+
+        e.onDidFocusEditorText(() => {
+            if (placeholderRef.current) {
+                placeholderRef.current.style.display = 'none';
+            }
+
+            setBlur(false);
+        });
+
+        e.onDidBlurEditorText(() => {
+            updatePlaceholderVisibility();
+
+            setBlur(true);
+        });
+
+        updatePlaceholderVisibility();
+
+        const isFirstLine = e.createContextKey<boolean>('isFirstLine', true);
+        const isLastLine = e.createContextKey<boolean>('isLastLine', true);
+
+        // Update the context key value based on the cursor position
+        e.onDidChangeCursorPosition(() => {
+            const position = e.getPosition();
+            if (position) {
+                isFirstLine.set(position.lineNumber === 1);
+                isLastLine.set(position.lineNumber === e.getModel()?.getLineCount());
+            }
+        });
+
+        e.addCommand(monaco.KeyCode.Escape, () => {
+            const domNode = e.getDomNode();
+            if (domNode) {
+                const textarea = domNode.querySelector('textarea');
+
+                if (textarea) (textarea as HTMLTextAreaElement).blur();
+            }
+        });
+
+        // eslint-disable-next-line no-bitwise
+        e.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
+            e.trigger('keyboard', 'type', { text: '\n' });
+        });
+
+        // eslint-disable-next-line no-bitwise
+        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+            if (indicatorRef.current === "offline" || !queryRef.current || !graphNameRef.current || tutorialOpenRef.current) return;
+            submitQuery.current?.click();
+        });
+
+        e.addAction({
+            id: 'submit',
+            label: 'Submit Query',
+            // eslint-disable-next-line no-bitwise
+            keybindings: [monaco.KeyCode.Enter],
+            contextMenuOrder: 1.5,
+            run: async () => {
+                if (indicatorRef.current === "offline" || !queryRef.current || !graphNameRef.current || tutorialOpenRef.current) return;
+                submitQuery.current?.click();
+            },
+            precondition: '!suggestWidgetVisible',
+        });
+
+        e.addAction({
+            id: 'history up',
+            label: 'history up',
+            keybindings: [monaco.KeyCode.UpArrow],
+            contextMenuOrder: 1.5,
+            run: async () => {
+                setHistoryQuery(prev => {
+                    if (prev.queries.length === 0) return prev;
+
+                    let counter;
+                    if (prev.counter !== 1) {
+                        counter = prev.counter ? prev.counter - 1 : prev.queries.length;
+                    } else {
+                        counter = 1;
+                    }
+
+                    return {
+                        ...prev,
+                        counter
+                    };
+                });
+            },
+            precondition: 'isFirstLine && !suggestWidgetVisible',
+        });
+
+        e.addAction({
+            id: 'history down',
+            label: 'history down',
+            keybindings: [monaco.KeyCode.DownArrow],
+            contextMenuOrder: 1.5,
+            run: async () => {
+                setHistoryQuery(prev => {
+                    if (prev.queries.length === 0) return prev;
+
+                    let counter;
+
+                    if (prev.counter) {
+                        counter = prev.counter + 1 > prev.queries.length ? 0 : prev.counter + 1;
+                    } else {
+                        counter = 0;
+                    }
+
+                    return {
+                        ...prev,
+                        counter
+                    };
+                });
+            },
+            precondition: 'isLastLine && !suggestWidgetVisible',
+        });
+
+        // Override the default Ctrl + F keybinding
+        // eslint-disable-next-line no-bitwise
+        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => { });
+    };
+
+    const getLabel = () => {
+        if (!graphName) return "Select a graph first";
+        if (!historyQuery.query) return "You need to type a query first";
+        return "Press Enter to run the query";
+    };
+
+    return (
+        <div data-testid="editor" style={{ height: editorHeight + 18 }} className="absolute w-full flex items-start gap-8 border border-border rounded-lg overflow-hidden bg-background p-2">
+            <div className="h-full w-1 grow flex rounded-lg overflow-hidden">
+                <div ref={containerRef} className="h-full relative grow w-1" data-value={historyQuery.query} data-testid="editorContainer">
+                    <EditorComponent
+                        className="SofiaSans"
+                        editorKey={editorKey}
+                        height={editorHeight}
+                        language={LANGUAGE_NAME}
+                        languageConfig={cypherLanguageConfig}
+                        options={{
+                            lineNumbers: lineNumber > 1 ? "on" : "off",
+                        }}
+                        value={blur ? historyQuery.query.replace(/\n/g, ' ') : historyQuery.query}
+                        onChange={(val) => {
+                            if (!historyQuery.counter) {
+                                setHistoryQuery(prev => ({
+                                    ...prev,
+                                    currentQuery: {
+                                        ...prev.currentQuery,
+                                        text: val || "",
+                                    },
+                                    query: val || "",
+                                }));
+                            } else {
+                                setHistoryQuery(prev => ({
+                                    ...prev,
+                                    query: val || "",
+                                }));
+                            }
+                        }}
+                        onMonacoReady={handleMonacoReady}
+                        onMount={(e) => {
+                            handleEditorDidMount(e);
+                            editorRef.current = e;
+                        }}
+                    />
+                    <span ref={placeholderRef} className="w-full top-0 left-0 absolute pointer-events-none truncate SofiaSans">
+                        {PLACEHOLDER}
+                    </span>
+                </div>
+                <div style={{ height: LINE_HEIGHT }} className={cn("flex gap-2")}>
+                    {
+                        historyQuery.query &&
+                        <Button
+                            data-testid="clearEditor"
+                            title="Clear"
+                            onClick={() => {
+                                setHistoryQuery(prev => ({
+                                    ...prev,
+                                    query: "",
+                                }));
+                                editorRef.current?.focus();
+                            }}
+                        >
+                            <X />
+                        </Button>
+                    }
+                    <Button
+                        data-testid="editorRun"
+                        ref={submitQuery}
+                        indicator={indicator}
+                        disabled={!historyQuery.query || !graphName}
+                        variant="Primary"
+                        label="RUN"
+                        title={getLabel()}
+                        onClick={handleSubmit}
+                        isLoading={isQueryLoading}
+                    />
+                </div>
+            </div>
+            <Dialog open={maximize} onOpenChange={setMaximize}>
+                <DialogContent hideClose className="w-full h-full">
+                    <div className="relative w-full h-full">
+                        <VisuallyHidden>
+                            <DialogTitle />
+                            <DialogDescription />
+                        </VisuallyHidden>
+                        <div className="z-10 absolute right-0 top-0 bottom-0 py-4 px-8 flex flex-col items-end justify-between pointer-events-none">
+                            <CloseDialog
+                                className="pointer-events-auto"
+                            >
+                                <Minimize2 size={20} />
+                            </CloseDialog>
+                            <div className="flex gap-2 items-center pointer-events-auto">
+                                {
+                                    historyQuery.query &&
+                                    <Button
+                                        data-testid="clearEditor"
+                                        title="Clear"
+                                        onClick={() => {
+                                            setHistoryQuery(prev => ({
+                                                ...prev,
+                                                query: "",
+                                            }));
+                                            dialogEditorRef.current?.focus();
+                                        }}
+                                    >
+                                        <X />
+                                    </Button>
+                                }
+                                <CloseDialog
+                                    data-testid="editorRun"
+                                    className="pointer-events-auto py-2 px-8"
+                                    indicator={indicator}
+                                    disabled={!historyQuery.query || !graphName}
+                                    variant="Primary"
+                                    label="RUN"
+                                    title={getLabel()}
+                                    onClick={handleSubmit}
+                                    isLoading={isQueryLoading}
+                                />
+                            </div>
+                        </div>
+                        <EditorComponent
+                            editorKey={editorKey}
+                            className="w-full h-full"
+                            language={LANGUAGE_NAME}
+                            languageConfig={cypherLanguageConfig}
+                            options={{
+                                padding: {
+                                    bottom: 10,
+                                    top: 10,
+                                },
+                                lineNumbersMinChars: 3,
+                                fontSize: 25,
+                            }}
+                            value={historyQuery.query}
+                            onChange={(val) => {
+                                if (historyQuery.counter) {
+                                    setHistoryQuery(prev => ({
+                                        ...prev,
+                                        query: val || ""
+                                    }));
+                                } else {
+                                    setHistoryQuery(prev => ({
+                                        ...prev,
+                                        query: val || "",
+                                        currentQuery: {
+                                            ...prev.currentQuery,
+                                            text: val || "",
+                                        },
+                                    }));
+                                }
+                            }}
+                            onMount={(e) => {
+                                handleEditorDidMount(e);
+                                dialogEditorRef.current = e;
+                            }}
+                        />
+                    </div>
+                </DialogContent>
+            </Dialog>
+        </div>
+    );
+}
