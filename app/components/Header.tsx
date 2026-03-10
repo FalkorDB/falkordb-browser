@@ -167,7 +167,10 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                     <Button
                         label="UDF"
                         title="User Defined Functions"
-                        className={cn("text-foreground p-1 rounded-lg", type === "UDF" && "text-background bg-primary")}
+                        className={cn(
+                            "text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
+                            type === "UDF" && "!text-primary"
+                        )}
                         onClick={() => router.push("/udf")}
                         data-testid="UdfButton"
                     />
