@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useContext, Dispatch, SetStateAction, useRef, useCallback, useMemo } from "react";
 import { cn, GraphRef, formatName, getTheme } from "@/lib/utils";
-import { History, Info, Maximize2 } from "lucide-react";
+import { History, Info, Maximize2, Trash2 } from "lucide-react";
 import * as monaco from "monaco-editor";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -138,8 +138,8 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
         if (!historyQuery || !setHistoryQuery) return;
 
         // Get the currently selected query based on counter
-        const selectedQuery = historyQuery.counter === 0 
-            ? historyQuery.currentQuery 
+        const selectedQuery = historyQuery.counter === 0
+            ? historyQuery.currentQuery
             : historyQuery.queries[historyQuery.counter - 1];
 
         // If the selected query is not in the filtered list, reset counter to 0
@@ -309,7 +309,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
 
         // Check if counter points to a deleted query (counter is 1-indexed, so counter - 1 is the index)
         const isCounterDeleted = historyQuery.counter > 0 && deleteElements.includes(historyQuery.counter - 1);
-        
+
         let nextCounter: number;
         if (isCounterDeleted) {
             // Unselect if counter points to deleted query
@@ -454,18 +454,18 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                     className="p-1"
                                                     variant="Delete"
                                                     data-testid="queryHistoryDelete"
-                                                    label="Delete"
                                                     title={`Remove selected query from history
                                                         press (Right Click) to select
                                                         press (Ctrl + Right Click) for multi select`}
                                                     onClick={handleDeleteQuery}
                                                     disabled={deleteElements.length === 0}
-                                                />
+                                                >
+                                                    <Trash2 />
+                                                </Button>
                                                 <Button
                                                     className="p-1"
                                                     variant="Delete"
                                                     data-testid="queryHistoryDelete"
-                                                    label="Delete All"
                                                     title="Remove all queries from history"
                                                     onClick={() => {
                                                         localStorage.removeItem("query history");
@@ -479,7 +479,9 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                         setDeleteElements([]);
                                                     }}
                                                     disabled={historyQuery.queries.length === 0}
-                                                />
+                                                >
+                                                    <Trash2 /> All
+                                                </Button>
                                             </div>
                                         </PaginationList>
                                         <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="w-1/2 flex flex-col gap-2 items-center">
