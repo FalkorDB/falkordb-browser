@@ -217,7 +217,12 @@ export default class SettingsBrowserPage extends BasePage {
     }
     const count = await toggleLocator.count();
     for (let i = 0; i < count; i++) {
-      await toggleLocator.nth(i).click();
+      const toggle = toggleLocator.nth(i);
+      // Only click if not already expanded — avoids accidentally collapsing an open category
+      const isExpanded = await toggle.getAttribute('aria-expanded');
+      if (isExpanded !== 'true') {
+        await toggle.click();
+      }
     }
     // Allow time for expansion animations / DOM updates
     await this.page.waitForTimeout(200);
@@ -269,12 +274,16 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   async isModelSelected(providerName: string): Promise<boolean> {
-    // First check if element exists by testid (raw model name)
+    // Model buttons only exist in DOM when their category is expanded
     const modelButton = this.getModelButton(providerName);
-    const existsByTestId = await modelButton.count() > 0;
+    let existsByTestId = await modelButton.count() > 0;
+
+    if (!existsByTestId) {
+      await this.expandAllCategories();
+      existsByTestId = await modelButton.count() > 0;
+    }
 
     if (existsByTestId) {
-      // Use testid approach
       try {
         const selected = await modelButton.getAttribute("data-selected");
         return selected === "true";
@@ -282,7 +291,6 @@ export default class SettingsBrowserPage extends BasePage {
         return false;
       }
     } else {
-      // Try by displayed text (formatted name)
       try {
         const buttonByText = this.getModelButtonByDisplayText(providerName);
         const selected = await buttonByText.first().getAttribute("data-selected");
@@ -294,25 +302,25 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   async isModelVisible(providerName: string): Promise<boolean> {
-    // First check if element exists by testid (raw model name)
-    const modelButton = this.getModelButton(providerName);
-    const existsByTestId = await modelButton.count() > 0;
+    // Model buttons only exist in DOM when their category is expanded.
+    // Expand whatever categories are currently shown (respects active search filter)
+    // so we can check whether the model is present in the filtered results.
+    await this.expandAllCategories();
 
-    if (existsByTestId) {
-      // Use testid approach
+    const modelButton = this.getModelButton(providerName);
+    if (await modelButton.count() > 0) {
       try {
         return await modelButton.isVisible();
       } catch {
         return false;
       }
-    } else {
-      // Try by displayed text (formatted name)
-      try {
-        const buttonByText = this.getModelButtonByDisplayText(providerName);
-        return await buttonByText.first().isVisible();
-      } catch {
-        return false;
-      }
+    }
+
+    try {
+      const buttonByText = this.getModelButtonByDisplayText(providerName);
+      return await buttonByText.first().isVisible();
+    } catch {
+      return false;
     }
   }
 
