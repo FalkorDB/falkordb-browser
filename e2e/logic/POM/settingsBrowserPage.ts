@@ -203,19 +203,24 @@ export default class SettingsBrowserPage extends BasePage {
 
   /**
    * Expands all collapsible category sections in the ModelSelector.
-   * The new ModelSelector (PR) hides model buttons inside collapsed categories by default.
-   * Clicking the category header (h3) bubbles up to the parent <button> toggle.
+   * Categories are collapsed by default and model buttons are only rendered when expanded.
+   * Uses data-testid="categoryToggle*" added to each category <button> in ModelSelector.tsx.
+   * Waits for categories to appear first (ModelSelector has a 200ms debounce before rendering).
    */
   private async expandAllCategories(): Promise<void> {
-    const categoryHeaders = this.page.locator('h3.text-sm.font-bold.text-foreground');
-    const count = await categoryHeaders.count();
+    const toggleLocator = this.page.locator('[data-testid^="categoryToggle"]');
+    try {
+      // Wait for at least one category toggle to be visible (handles the 200ms render debounce)
+      await toggleLocator.first().waitFor({ state: 'visible', timeout: 5000 });
+    } catch {
+      return; // No categories rendered within timeout, nothing to expand
+    }
+    const count = await toggleLocator.count();
     for (let i = 0; i < count; i++) {
-      await categoryHeaders.nth(i).click();
+      await toggleLocator.nth(i).click();
     }
     // Allow time for expansion animations / DOM updates
-    if (count > 0) {
-      await this.page.waitForTimeout(200);
-    }
+    await this.page.waitForTimeout(200);
   }
 
   async searchModels(searchText: string): Promise<void> {

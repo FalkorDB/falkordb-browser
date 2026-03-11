@@ -213,6 +213,7 @@ export default function ModelSelector({
                                         {/* Category Header */}
                                         <button
                                             type="button"
+                                            data-testid={`categoryToggle${category}`}
                                             onClick={() => toggleExpand(category)}
                                             className="flex items-center gap-2 p-2 w-full bg-secondary/50 cursor-pointer hover:bg-muted/50 transition-colors"
                                         >
