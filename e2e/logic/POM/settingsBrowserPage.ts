@@ -200,6 +200,24 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   // Model Selector Methods
+
+  /**
+   * Expands all collapsible category sections in the ModelSelector.
+   * The new ModelSelector (PR) hides model buttons inside collapsed categories by default.
+   * Clicking the category header (h3) bubbles up to the parent <button> toggle.
+   */
+  private async expandAllCategories(): Promise<void> {
+    const categoryHeaders = this.page.locator('h3.text-sm.font-bold.text-foreground');
+    const count = await categoryHeaders.count();
+    for (let i = 0; i < count; i++) {
+      await categoryHeaders.nth(i).click();
+    }
+    // Allow time for expansion animations / DOM updates
+    if (count > 0) {
+      await this.page.waitForTimeout(200);
+    }
+  }
+
   async searchModels(searchText: string): Promise<void> {
     await interactWhenVisible(
       this.modelSearchInput,
@@ -219,7 +237,13 @@ export default class SettingsBrowserPage extends BasePage {
   async selectModel(providerName: string): Promise<void> {
     // First check if element exists by testid (raw model name)
     const modelButton = this.getModelButton(providerName);
-    const existsByTestId = await modelButton.count() > 0;
+    let existsByTestId = await modelButton.count() > 0;
+
+    if (!existsByTestId) {
+      // Categories may be collapsed (new collapsible ModelSelector design) — expand all first
+      await this.expandAllCategories();
+      existsByTestId = await modelButton.count() > 0;
+    }
 
     if (existsByTestId) {
       // Use testid approach
@@ -317,6 +341,9 @@ export default class SettingsBrowserPage extends BasePage {
   async getAvailableModels(): Promise<string[]> {
     // Wait for models to load
     await this.page.waitForTimeout(500);
+
+    // Expand all collapsible categories so model buttons are rendered in the DOM
+    await this.expandAllCategories();
 
     // Get all model buttons by looking for elements with data-testid starting with "selectModel"
     const modelButtons = await this.page.locator('[data-testid^="selectModel"]').all();
