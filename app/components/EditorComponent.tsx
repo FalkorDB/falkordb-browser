@@ -699,7 +699,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                 </div>
             </div>
             <Dialog open={maximize} onOpenChange={setMaximize}>
-                <DialogContent hideClose className="w-full h-full">
+                <DialogContent hideClose className="w-full h-full p-2">
                     <div className="relative w-full h-full">
                         <VisuallyHidden>
                             <DialogTitle />

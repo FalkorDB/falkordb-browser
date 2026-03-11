@@ -2,7 +2,7 @@
 /* eslint-disable react/no-array-index-key */
 import { cn, Message } from "@/lib/utils";
 import { useContext, useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, CircleArrowUp, Share2, Copy, Loader2, Play, Search, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Share2, Copy, Loader2, Play, Search, X, Send } from "lucide-react";
 import { Tooltip as ShadTooltip, TooltipContent as ShadTooltipContent, TooltipTrigger as ShadTooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
@@ -495,7 +495,7 @@ export default function Chat({ onClose }: Props) {
                         onClick={handleSubmit}
                         isLoading={isLoading}
                     >
-                        <CircleArrowUp size={25} />
+                        <Send size={25} />
                     </Button>
                     <Input
                         data-testid="chatInput"

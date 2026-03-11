@@ -1,11 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { formatModelDisplayName } from "@/lib/ai-provider-utils";
-import { Search, Check, Sparkles, Zap, Brain, Globe, Server, Cpu, MessageSquare, ChevronDown, ChevronUp } from "lucide-react";
+import { Search, Check, Sparkles, Zap, Brain, Globe, Server, Cpu, MessageSquare, ChevronRight } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Input from "../components/ui/Input";
-
-const MAX_MODELS_PER_CATEGORY = 8;
 
 interface ModelSelectorProps {
     models: string[];
@@ -97,7 +95,10 @@ const categorizeModels = (models: string[]) => {
         categories[categoryName].push(model);
     });
 
-    return Object.entries(categories).filter(([, categoryModels]) => categoryModels.length > 0);
+    return Object.entries(categories)
+        .filter(([, categoryModels]) => categoryModels.length > 0)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([name, categoryModels]) => [name, categoryModels.sort((a, b) => a.localeCompare(b))] as [string, string[]]);
 };
 
 export default function ModelSelector({
@@ -111,6 +112,15 @@ export default function ModelSelector({
     const [filteredModels, setFilteredModels] = useState<string[]>(models);
     const [categorizedModels, setCategorizedModels] = useState<[string, string[]][]>([]);
     const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+    const categoryRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+    const setCategoryRef = useCallback((category: string) => (el: HTMLDivElement | null) => {
+        if (el) {
+            categoryRefs.current.set(category, el);
+        } else {
+            categoryRefs.current.delete(category);
+        }
+    }, []);
 
     useEffect(() => {
         const timeout = setTimeout(() => {
@@ -133,6 +143,7 @@ export default function ModelSelector({
     };
 
     const toggleExpand = (category: string) => {
+        const wasExpanded = expandedCategories.has(category);
         setExpandedCategories(prev => {
             const next = new Set(prev);
             if (next.has(category)) {
@@ -142,13 +153,19 @@ export default function ModelSelector({
             }
             return next;
         });
+
+        if (!wasExpanded) {
+            setTimeout(() => {
+                categoryRefs.current.get(category)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 0);
+        }
     };
 
     return (
         <div className="relative flex flex-col rounded-lg border border-border bg-background overflow-hidden">
             {/* Search Header */}
             <div className="sticky top-0 z-10 bg-background border-b border-border">
-                <div className="relative p-3">
+                <div className="relative p-2">
                     <Search className="absolute left-5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                         data-testid="modelSearch"
@@ -163,7 +180,7 @@ export default function ModelSelector({
             </div>
 
             {/* Model List */}
-            <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+            <div className="max-h-[250px] overflow-y-auto custom-scrollbar">
                 {
                     isLoading &&
                     <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
@@ -185,91 +202,82 @@ export default function ModelSelector({
 
                 {
                     !isLoading && filteredModels.length > 0 &&
-                    <div className="flex flex-col gap-3 p-3">
+                    <div className="flex flex-col gap-2 p-2">
                         {
                             categorizedModels.map(([category, categoryModels]) => {
-                                const isExpanded = expandedCategories.has(category);
-                                const hasMore = categoryModels.length > MAX_MODELS_PER_CATEGORY;
-                                const visibleModels = isExpanded ? categoryModels : categoryModels.slice(0, MAX_MODELS_PER_CATEGORY);
-                                const hiddenCount = categoryModels.length - MAX_MODELS_PER_CATEGORY;
+                                const isCategoryExpanded = expandedCategories.has(category);
+                                const selectedInCategory = categoryModels.find(m => m === selectedModel);
 
                                 return (
-                                    <div key={category} className="rounded-lg border border-border/50 overflow-hidden">
+                                    <div key={category} ref={setCategoryRef(category)} className="rounded-lg border border-border/50 overflow-hidden">
                                         {/* Category Header */}
-                                        <div className="flex items-center gap-2 px-3 py-2 bg-secondary/50">
+                                        <button
+                                            type="button"
+                                            data-testid={`categoryToggle${category}`}
+                                            aria-expanded={isCategoryExpanded}
+                                            onClick={() => toggleExpand(category)}
+                                            className="flex items-center gap-2 p-2 w-full bg-secondary/50 cursor-pointer hover:bg-muted/50 transition-colors"
+                                        >
+                                            <ChevronRight className={cn("h-4 w-4 transition-transform duration-200", isCategoryExpanded && "rotate-90")} />
                                             {getCategoryIcon(category)}
                                             <h3 className="text-sm font-bold text-foreground tracking-wide">
                                                 {category}
                                             </h3>
+                                            {!isCategoryExpanded && selectedInCategory && (
+                                                <span className="text-xs text-primary font-medium truncate">
+                                                    {formatModelDisplayName(selectedInCategory)}
+                                                </span>
+                                            )}
                                             <span className="text-xs text-muted-foreground ml-auto">
                                                 {categoryModels.length} {categoryModels.length === 1 ? "model" : "models"}
                                             </span>
-                                        </div>
+                                        </button>
 
-                                        {/* Models Grid */}
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5 p-2">
-                                            {
-                                                visibleModels.map((model) => {
-                                                    const isSelected = model === selectedModel;
-                                                    return (
-                                                        <Tooltip key={model}>
-                                                            <TooltipTrigger asChild>
-                                                                <button
-                                                                    type="button"
-                                                                    data-testid={`selectModel${model}`}
-                                                                    data-selected={isSelected}
-                                                                    onClick={() => handleModelClick(model)}
-                                                                    disabled={disabled}
-                                                                    className={cn(
-                                                                        "flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs transition-all duration-150",
-                                                                        "border border-transparent",
-                                                                        "hover:bg-muted/60 hover:border-border/50 active:scale-[0.98]",
-                                                                        isSelected && "bg-primary border-primary hover:bg-primary hover:border-primary",
-                                                                        disabled && "opacity-50 cursor-not-allowed"
-                                                                    )}
-                                                                >
-                                                                    <span className={cn(
-                                                                        "font-medium truncate text-center",
-                                                                        isSelected ? "text-background" : "text-foreground"
-                                                                    )}>
-                                                                        {formatModelDisplayName(model)}
-                                                                    </span>
-                                                                    {isSelected && (
-                                                                        <Check className="h-3 w-3 text-background flex-shrink-0" />
-                                                                    )}
-                                                                </button>
-                                                            </TooltipTrigger>
-                                                            <TooltipContent>
-                                                                <p>{model}</p>
-                                                            </TooltipContent>
-                                                        </Tooltip>
-                                                    );
-                                                })
-                                            }
-                                        </div>
-
-                                        {/* Show more / less */}
-                                        {
-                                            hasMore &&
-                                            <button
-                                                type="button"
-                                                onClick={() => toggleExpand(category)}
-                                                aria-expanded={isExpanded}
-                                                className="flex items-center justify-center gap-1 w-full py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors border-t border-border/30"
-                                            >
-                                                {isExpanded ? (
-                                                    <>
-                                                        <ChevronUp className="h-3 w-3" />
-                                                        Show less
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <ChevronDown className="h-3 w-3" />
-                                                        {hiddenCount} more
-                                                    </>
-                                                )}
-                                            </button>
-                                        }
+                                        {isCategoryExpanded && (
+                                            <>
+                                                {/* Models Grid */}
+                                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5 p-1">
+                                                    {
+                                                        categoryModels.map((model) => {
+                                                            const isSelected = model === selectedModel;
+                                                            return (
+                                                                <Tooltip key={model}>
+                                                                    <TooltipTrigger asChild>
+                                                                        <button
+                                                                            type="button"
+                                                                            data-testid={`selectModel${model}`}
+                                                                            data-selected={isSelected}
+                                                                            onClick={() => handleModelClick(model)}
+                                                                            disabled={disabled}
+                                                                            className={cn(
+                                                                                "flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs transition-all duration-150",
+                                                                                "border border-transparent",
+                                                                                "hover:bg-muted/60 hover:border-border/50 active:scale-[0.98]",
+                                                                                isSelected && "bg-primary border-primary hover:bg-primary hover:border-primary",
+                                                                                disabled && "opacity-50 cursor-not-allowed"
+                                                                            )}
+                                                                        >
+                                                                            <span className={cn(
+                                                                                "font-medium truncate text-center",
+                                                                                isSelected ? "text-background" : "text-foreground"
+                                                                            )}>
+                                                                                {formatModelDisplayName(model)}
+                                                                            </span>
+                                                                            {isSelected && (
+                                                                                <Check className="h-3 w-3 text-background flex-shrink-0" />
+                                                                            )}
+                                                                        </button>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent>
+                                                                        <p>{model}</p>
+                                                                    </TooltipContent>
+                                                                </Tooltip>
+                                                            );
+                                                        })
+                                                    }
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 );
                             })
