@@ -95,8 +95,12 @@ test.describe("Chat Feature Tests", () => {
     const testApiKey = process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY || "test-api-key-placeholder";
     // Expand chat section first so the model selector is visible before querying models
     await settings.expandChatSection();
-    const availableModels = await settings.getAvailableModels();
-    await settings.setChatApiKeyAndSave(testApiKey, availableModels[0]);
+    // Find an OpenAI-compatible model (OPENAI_TOKEN is an OpenAI key; picking
+    // the first alphabetical model risks getting an Anthropic/other model which
+    // would cause an auth error with an OpenAI key)
+    const openAiModel = await settings.getFirstModelBySearch("openai") ||
+                        await settings.getFirstModelBySearch("gpt");
+    await settings.setChatApiKeyAndSave(testApiKey, openAiModel || undefined);
     
     // Wait for settings to be saved
     await settings.waitForTimeout(1000);
