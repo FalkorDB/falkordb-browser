@@ -15,7 +15,7 @@ import CustomizeStylePanel from "./CustomizeStylePanel";
  * @returns The Graph Info panel React element containing graph name, memory usage, node/edge counts, property keys, and query buttons
  */
 export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizingLabel }: { onClose: () => void, customizingLabel: InfoLabel | null, setCustomizingLabel: Dispatch<SetStateAction<InfoLabel | null>> }) {
-    const { graph, graphInfo: { Labels, Relationships, PropertyKeys, MemoryUsage }, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
+    const { graphInfo: { Labels, Relationships, PropertyKeys, MemoryUsage }, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
     const { settings: { graphInfo: { showMemoryUsage } } } = useContext(BrowserSettingsContext);
 
@@ -98,10 +98,9 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                         disabled={isQueryLoading}
                                     />
                                 </li>
-                                {Array.from(Labels.values()).map((label) => {
+                {Array.from(Labels.values()).map((label) => {
                                     const name = label.name || "Empty";
                                     const labelColor = label.style.color;
-                                    const graphLabel = graph.GraphInfo.Labels.get(label.name);
 
                                     return (
                                         <li key={`${name}-${labelColor}`} className="max-w-full flex gap-1">
@@ -117,24 +116,21 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                 onClick={() => runQuery(`MATCH (n:${name}) RETURN n`)}
                                                 disabled={isQueryLoading}
                                             />
-                                            {
-                                                graphLabel &&
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <Button
-                                                            className="h-6 w-6 p-1 rounded-full flex justify-center items-center bg-muted hover:bg-muted/80"
-                                                            data-testid={`customizeStyle${name}`}
-                                                            title="Customize Style"
-                                                            onClick={() => setCustomizingLabel(graphLabel)}
-                                                        >
-                                                            <Palette className="h-3 w-3" />
-                                                        </Button>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>
-                                                        Customize Style
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            }
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button
+                                                        className="h-6 w-6 p-1 rounded-full flex justify-center items-center bg-muted hover:bg-muted/80"
+                                                        data-testid={`customizeStyle${name}`}
+                                                        title="Customize Style"
+                                                        onClick={() => setCustomizingLabel(label)}
+                                                    >
+                                                        <Palette className="h-3 w-3" />
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    Customize Style
+                                                </TooltipContent>
+                                            </Tooltip>
                                         </li>
                                     );
                                 })}

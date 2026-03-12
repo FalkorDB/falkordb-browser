@@ -49,17 +49,17 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
 
     const applyStylesToGraph = useCallback((color: string, size: number) => {
         const updatedLabel = graph.LabelsMap.get(label.name);
-        const graphInfoLabel = graph.GraphInfo.Labels.get(label.name);
 
-        if (!updatedLabel || !graphInfoLabel) return;
+        if (!updatedLabel) return;
 
         updatedLabel.style = {
             ...updatedLabel.style,
             color,
             size,
         };
-        graphInfoLabel.style = {
-            ...graphInfoLabel.style,
+        // Mutate the InfoLabel prop directly so graphInfo context stays in sync
+        label.style = {
+            ...label.style,
             color,
             size,
         };
@@ -92,7 +92,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
 
             canvas.setGraphData(currentData);
         }
-    }, [canvasRef, graph.GraphInfo.Labels, graph.Labels, graph.LabelsMap, label.name, setLabels]);
+    }, [canvasRef, graph.Labels, graph.LabelsMap, label, setLabels]);
 
     const handleColorSelect = (color: string) => {
         setSelectedColor(color);
