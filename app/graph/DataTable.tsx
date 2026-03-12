@@ -467,14 +467,16 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
         }
     };
 
+    const iconSize = 15;
+
     return (
         <div className={cn("flex flex-col gap-4 bg-background rounded-lg overflow-hidden", className)}>
             <div ref={scrollableContainerRef} className="h-1 grow overflow-y-auto overflow-x-hidden">
-                <div className="w-full grid grid-cols-[minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)_minmax(60px,1fr)]">
-                    <div className="flex items-center font-medium text-muted-foreground px-1 border-b border-border h-10">Key</div>
-                    <div className="flex items-center font-medium text-muted-foreground px-1 border-b border-border h-10">Value</div>
-                    <div className="flex items-center font-medium text-muted-foreground px-1 border-b border-border h-10">Type</div>
-                    <div className="flex items-center px-1 border-b border-border h-10"><div className="w-6" /></div>
+                <div className="w-full grid grid-cols-[minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)_38px]">
+                    <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Key</div>
+                    <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Value</div>
+                    <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Type</div>
+                    <div className="flex items-center px-1 border-y border-border h-10"><div className="w-6" /></div>
                     {
                         attributes.map((key) => {
                             const value = object.data[key];
@@ -482,13 +484,13 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                             const stringValue = getStringValue(value);
                             const isExpanded = expandedAttributes[key];
                             const shouldShowToggle = valueNeedsExpansion(key);
-                            const rowClass = cn("flex items-center px-1 py-1 border-b border-border", editable === key ? "min-h-14" : "min-h-10");
+                            const cellClass = cn("flex items-center px-1 border-b border-border min-h-6");
                             const buttonTitle = session?.user.role === "Read-Only" ? undefined : (isComplex && "Complex values cannot be edited") || "Click to edit the attribute value";
 
                             return (
                                 <Fragment key={key}>
                                     <div
-                                        className={rowClass}
+                                        className={cellClass}
                                         data-testid={`DataPanelAttribute${key}`}
                                         onMouseEnter={() => setHover(key)}
                                         onMouseLeave={() => setHover("")}
@@ -497,7 +499,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                                         <p className="w-full truncate">{key}:</p>
                                     </div>
                                     <div
-                                        className={rowClass}
+                                        className={cellClass}
                                         data-testid={`DataPanelAttribute${value}`}
                                         onMouseEnter={() => setHover(key)}
                                         onMouseLeave={() => setHover("")}
@@ -548,7 +550,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                                         }
                                     </div>
                                     <div
-                                        className={rowClass}
+                                        className={cellClass}
                                         onMouseEnter={() => setHover(key)}
                                         onMouseLeave={() => setHover("")}
                                         key={`${key}-type`}
@@ -556,7 +558,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                                         {editable === key ? getNewTypeInput() : <p className="w-full truncate">{typeof value}</p>}
                                     </div>
                                     <div
-                                        className={rowClass}
+                                        className={cellClass}
                                         onMouseEnter={() => setHover(key)}
                                         onMouseLeave={() => setHover("")}
                                         key={`${key}-actions`}
@@ -575,7 +577,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                                                             }}
                                                             isLoading={isSetLoading}
                                                         >
-                                                            <Check size={20} />
+                                                            <Check size={iconSize} />
                                                         </Button>
                                                         {
                                                             !isSetLoading &&
@@ -587,7 +589,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                                                                     handleSetEditable("", "");
                                                                 }}
                                                             >
-                                                                <X size={20} />
+                                                                <X size={iconSize} />
                                                             </Button>
                                                         }
                                                     </>
@@ -600,7 +602,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                                                                         variant="button"
                                                                         title="Complex values can only be added from Cypher"
                                                                     >
-                                                                        <Info size={20} />
+                                                                        <Info size={iconSize} />
                                                                     </Button>
                                                                 </TooltipTrigger>
                                                                 <TooltipContent>
@@ -615,7 +617,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                                                                 onClick={() => handleSetEditable(key, value)}
                                                                 disabled={isAddValue}
                                                             >
-                                                                <Pencil size={20} />
+                                                                <Pencil size={iconSize} />
                                                             </Button>
                                                         )}
                                                         <DialogComponent
@@ -625,7 +627,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                                                                     variant="button"
                                                                     title="Delete Attribute"
                                                                 >
-                                                                    <Trash2 size={20} />
+                                                                    <Trash2 size={iconSize} />
                                                                 </Button>
                                                             }
                                                             title="Delete Attribute"
@@ -683,7 +685,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                                         isLoading={isAddLoading}
                                         indicator={indicator}
                                     >
-                                        <Check size={20} />
+                                        <Check size={iconSize} />
                                     </Button>
                                     {
                                         !isAddLoading &&
@@ -693,7 +695,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                                             onClick={() => setIsAddValue(false)}
                                             title="Cancel"
                                         >
-                                            <X size={20} />
+                                            <X size={iconSize} />
                                         </Button>
                                     }
                                 </div>
@@ -711,7 +713,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                         title="Add a new attribute"
                         onClick={() => setIsAddValue(true)}
                     >
-                        <CirclePlus size={20} />
+                        <CirclePlus size={iconSize} />
                     </Button>
                 }
             </div>

@@ -1,16 +1,11 @@
 import { useContext, useEffect, useState } from "react";
-import { Braces, ChevronDown, ChevronRight, X } from "lucide-react";
+import { Braces, ChevronDown, ChevronRight } from "lucide-react";
 import { cn, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
-import Button from "../components/ui/Button";
 import { IndicatorContext, UDFContext } from "../components/provider";
 import LoadUDF from "./LoadUdf";
 import FlushUDFs from "./FlushUdfs";
 import DeleteUDF from "./DeleteUdf";
-
-interface UdfPanelProps {
-    onClose: () => void
-}
 
 function LibrarySection({ libraryName, libraryType, functions, isSelected, onSelect, onDelete }: {
     libraryName: string
@@ -67,7 +62,7 @@ function LibrarySection({ libraryName, libraryType, functions, isSelected, onSel
     );
 }
 
-export default function UdfPanel({ onClose }: UdfPanelProps) {
+export default function UdfPanel() {
     const { udfList, setUdfList, selectedUdf, setSelectedUdf } = useContext(UDFContext);
     const { setIndicator } = useContext(IndicatorContext);
     const { toast } = useToast();
@@ -117,14 +112,7 @@ export default function UdfPanel({ onClose }: UdfPanelProps) {
 
     return (
         <div className="relative h-full w-full p-2 flex flex-col gap-4 border-r border-border overflow-auto">
-            <Button
-                className="absolute top-2 right-2"
-                title="Close"
-                onClick={onClose}
-            >
-                <X className="h-4 w-4" />
-            </Button>
-            <div className="flex justify-between pr-6">
+            <div className="flex justify-between items-center">
                 <h1 className="text-2xl">UDF Libraries</h1>
                 <Braces size={25} />
             </div>

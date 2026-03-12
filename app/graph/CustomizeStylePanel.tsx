@@ -168,7 +168,10 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
             >
                 <X className="h-4 w-4" />
             </Button>
-            <h1 className="text-2xl">Style Settings</h1>
+            <div className="flex justify-between items-center pr-8">
+                <h1 className="text-2xl">Customize Style</h1>
+                <Palette size={25} />
+            </div>
             <div className="flex gap-2 items-center overflow-hidden">
                 <div
                     style={{ backgroundColor: selectedColor }}

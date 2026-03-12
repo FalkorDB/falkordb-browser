@@ -96,7 +96,7 @@ export default function LoadUDF({ onLoad }: LoadUDFProps) {
                 <Button
                     label="Load Lib"
                     title="Upload a User Defined Function"
-                    className="bg-primary text-background p-1 rounded-lg w-full flex items-center justify-center gap-2"
+                    className="bg-primary text-background p-1 rounded-lg flex items-center justify-center gap-2"
                     data-testid="loadUdfTrigger"
                 >
                     <Upload className="h-4 w-4" />

@@ -33,7 +33,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                         </Button>
                         <div className=" pr-5 w-full flex justify-between items-center gap-1">
                             <h1 className="text-2xl">Graph Info</h1>
-                            <Database size={25}/>
+                            <Database size={25} />
                         </div>
                         <div className="flex gap-2 items-center overflow-hidden">
                             <h2>Graph Name:</h2>
@@ -112,6 +112,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                 }}
                                                 className="h-6 w-full p-2 rounded-full flex justify-center items-center SofiaSans"
                                                 data-testid={`graphInfo${name}Node`}
+                                                title={`MATCH (n:${name}) RETURN n`}
                                                 label={name}
                                                 onClick={() => runQuery(`MATCH (n:${name}) RETURN n`)}
                                                 disabled={isQueryLoading}
@@ -179,6 +180,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                     return (
                                         <li key={relationship.name} className="max-w-full">
                                             <Button
+                                                title={`MATCH p=()-[:${relationship.name}]-() RETURN p`}
                                                 style={{
                                                     backgroundColor: relationshipColor,
                                                     color: textColor
@@ -221,6 +223,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                     PropertyKeys && PropertyKeys.map((key) => (
                                         <li key={key} className="max-w-full">
                                             <Button
+                                                title={`MATCH (e) WHERE e.${key} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`}
                                                 className="h-6 w-full p-2 bg-border flex justify-center items-center rounded-full text-white SofiaSans"
                                                 label={key}
                                                 onClick={() => runQuery(

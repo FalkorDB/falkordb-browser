@@ -86,7 +86,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
 
     return (
         <div className="py-5 px-2 flex flex-col justify-between items-center border-r border-border">
-            <div className="w-full flex flex-col gap-4 items-center">
+            <div className="w-full flex flex-col gap-2 items-center">
                 {
                     mounted && currentTheme &&
                     <Link
@@ -147,28 +147,28 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                     <Button
                         data-testid="settings"
                         className={cn(
-                            "text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/15",
+                            "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/15",
                             type === "Settings" && "!text-primary"
                         )}
                         title="Adjust application settings"
                         label="SETTINGS"
                         onClick={() => router.push("/settings")}
                     />
-                        <Button
-                            label="UDFs"
-                            title="User Defined Functions: View and manage your UDFs"
-                            className={cn(
-                                "text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
-                                type === "UDF" && "!text-primary"
-                            )}
-                            onClick={() => router.push("/udf")}
-                            data-testid="UdfButton"
-                        />
+                    <Button
+                        label="UDFs"
+                        title="User Defined Functions: View and manage your UDFs"
+                        className={cn(
+                            "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
+                            type === "UDF" && "!text-primary"
+                        )}
+                        onClick={() => router.push("/udf")}
+                        data-testid="UdfButton"
+                    />
                     <Button
                         label="GRAPHS"
                         title="View and manage your graphs"
                         className={cn(
-                            "text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
+                            "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
                             type === "Graph" && "!text-primary"
                         )}
                         onClick={() => router.push("/graph")}
@@ -185,69 +185,61 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                 /> 
                 {separator}
                 */}
-                <div className="flex flex-col items-center gap-2">
+                <div className="flex flex-col items-center gap-1">
                     {
                         type === "Graph" && graphName &&
                         <Button
                             indicator={indicator}
                             className={cn(
-                                "text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
+                                "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
                                 panelOpen && "!text-primary"
                             )}
                             title="Graph info"
                             onClick={() => onOpenPanel()}
                             data-testid="graphInfoToggle"
                         >
-                            <Database size={iconSize} />
+                            <Database size={iconSize - 5} />
                         </Button>
                     }
                     {
                         type === "Graph" && graphName &&
-                        <>
-                            {separator}
-                            <Button
-                                data-testid="chatToggleButton"
-                                className={cn(
-                                    "text-foreground font-semibold text-xl p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
-                                    panel === "chat" && "!text-primary"
-                                )}
-                                indicator={indicator}
-                                title={`Use English to query the graph.
-                                The feature requires LLM model and API key.
-                                Update local user parameters in Settings.`}
-                                onClick={() => {
-                                    handleSetCurrentPanel("chat");
-                                }}
-                            >
-                                <MessagesSquare size={iconSize} />
-                            </Button>
-                        </>
+                        <Button
+                            data-testid="chatToggleButton"
+                            className={cn(
+                                "text-foreground font-semibold text-xl p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
+                                panel === "chat" && "!text-primary"
+                            )}
+                            indicator={indicator}
+                            title="Chat"
+                            onClick={() => {
+                                handleSetCurrentPanel("chat");
+                            }}
+                        >
+                            <MessagesSquare size={iconSize - 5} />
+                        </Button>
                     }
                     {
                         showCreate &&
-                        <>
-                            {separator}
-                            <CreateGraph
-                                label="Header"
-                                onSetGraphName={onSetGraphName}
-                                type={type}
-                                graphNames={graphNames}
-                                trigger={
-                                    <Button
-                                        data-testid={`create${type}`}
-                                        variant="Primary"
-                                        className="hover:!bg-primary/70 p-2"
-                                        title={`Create New ${type}`}
-                                    >
-                                        <Plus size={iconSize} />
-                                    </Button>
-                                }
-                            />
-                        </>
+                        <CreateGraph
+                            label="Header"
+                            onSetGraphName={onSetGraphName}
+                            type={type}
+                            graphNames={graphNames}
+                            trigger={
+                                <Button
+                                    data-testid={`create${type}`}
+                                    variant="Primary"
+                                    className="hover:!bg-primary/70 p-1"
+                                    title={`Create New ${type}`}
+                                >
+                                    <Plus size={iconSize - 5} />
+                                </Button>
+                            }
+                        />
                     }
                 </div>
             </div>
-            <div className="w-full flex flex-col gap-4 items-center">
+            <div className="w-full flex flex-col gap-2 items-center">
                 <Drawer direction="right">
                     <DropdownMenu>
                         <DropdownMenuTrigger onClick={(e) => e.preventDefault()} asChild>

@@ -73,13 +73,11 @@ function GraphView({
     }, [graph, historyQuery.currentQuery]);
 
     useEffect(() => {
-        if ((currentTab !== "Metadata" && isTabEnabled(currentTab)) || currentTab === "Metadata") return;
-
         let defaultChecked: Tab = "Graph";
         if (elementsLength === 0 && graph.Data.length !== 0) defaultChecked = "Table";
 
         setCurrentTab(defaultChecked);
-    }, [graph, graph.Id, elementsLength, graph.Data.length, currentTab, setCurrentTab, isTabEnabled]);
+    }, [graph, elementsLength, graph.Data.length, setCurrentTab]);
 
     useEffect(() => {
         setSelectedElements([]);
@@ -160,7 +158,7 @@ function GraphView({
     };
 
     return (
-        <Tabs data-testid="graphView" value={currentTab} onValueChange={(value) => setCurrentTab(value as Tab)} className={cn("h-full w-full relative border border-border rounded-lg overflow-hidden", currentTab === "Table" && "flex flex-col-reverse")}>
+        <Tabs data-testid="graphView" value={currentTab} onValueChange={(value) => setCurrentTab(value as Tab)} className={cn("h-full w-full relative overflow-hidden", currentTab === "Table" && "flex flex-col-reverse")}>
             <div className="h-full w-full flex flex-col gap-4 absolute p-2 pointer-events-none z-10 justify-between">
                 <div className="grow basis-0 flex flex-col gap-2 overflow-hidden">
                     {
