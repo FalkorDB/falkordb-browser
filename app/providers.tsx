@@ -826,7 +826,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                                 <ResizablePanel
                                   ref={panelRef}
                                   defaultSize={panelSize}
-                                  collapsible
+                                  collapsible={pathname !== "/udf"}
                                   minSize={15}
                                   maxSize={30}
                                   onCollapse={() => setIsCollapsed(true)}
@@ -835,7 +835,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                                 >
                                   {
                                     pathname === "/udf" ?
-                                      <UdfPanel onClose={onExpand} />
+                                      <UdfPanel />
                                       : pathname === "/graph" &&
                                       <GraphInfoPanel
                                         onClose={onExpand}

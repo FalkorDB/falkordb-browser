@@ -175,6 +175,28 @@ export default class SettingsBrowserPage extends BasePage {
     await this.fillChatApiKey(apiKey);
   }
 
+  /**
+   * Wait for model auto-detection to complete after saving an API key.
+   * The settings page auto-detects the provider from the key and saves the first
+   * available model to localStorage asynchronously. This can take longer on
+   * cold starts (first test run), so we poll localStorage instead of using a
+   * fixed timeout.
+   */
+  async waitForModelAutoDetection(timeout = 10000): Promise<void> {
+    try {
+      await this.page.waitForFunction(
+        () => {
+          const model = localStorage.getItem("model");
+          return model !== null && model.trim() !== "";
+        },
+        { timeout }
+      );
+    } catch {
+      // Model was not auto-detected within the timeout — proceed anyway
+      // (the test assertion will catch the resulting error)
+    }
+  }
+
   async setChatApiKeyAndSave(apiKey: string, modelName?: string): Promise<void> {
     await this.expandChatSection();
     await this.waitForChatApiKeyInputEnabled();

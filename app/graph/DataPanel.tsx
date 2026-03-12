@@ -164,10 +164,10 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
     };
 
     return (
-        <div data-testid="DataPanel" className="DataPanel p-4">
-            <div className="relative flex flex-col gap-6 pb-4 border-b border-border">
+        <div data-testid="DataPanel" className="DataPanel gap-1 p-2">
+            <div className="relative flex flex-col gap-2">
                 <div className="flex flex-row justify-between">
-                    <div className="flex flex-col gap-2 font-medium text-xl text-nowrap">
+                    <div className="flex flex-col gap-1 font-medium text-xl text-nowrap">
                         <p>ID: <span className="Gradient text-transparent bg-clip-text">{object.id}</span></p>
                         <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text">{Object.keys(object.data).length}</span></p>
                     </div>
@@ -183,7 +183,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
                 <ul
                     ref={labelsListRef}
                     data-testid="DataPanelLabel"
-                    className="flex flex-wrap gap-4"
+                    className="flex flex-wrap gap-2"
                     onMouseEnter={() => setLabelsHover(true)}
                     onMouseLeave={() => setLabelsHover(false)}
                 >
@@ -191,7 +191,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
                         <li
                             data-testid={`DataPanelLabel${l}`}
                             key={l}
-                            className="flex gap-2 px-2 py-1 bg-secondary rounded-full items-center"
+                            className="flex gap-1 p-1 bg-secondary rounded-full items-center"
                         >
                             <p>{l || "No Label"}</p>
                             {

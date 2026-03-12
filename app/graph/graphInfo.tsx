@@ -15,7 +15,7 @@ import CustomizeStylePanel from "./CustomizeStylePanel";
  * @returns The Graph Info panel React element containing graph name, memory usage, node/edge counts, property keys, and query buttons
  */
 export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizingLabel }: { onClose: () => void, customizingLabel: InfoLabel | null, setCustomizingLabel: Dispatch<SetStateAction<InfoLabel | null>> }) {
-    const { graph, graphInfo: { Labels, Relationships, PropertyKeys, MemoryUsage }, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
+    const { graphInfo: { Labels, Relationships, PropertyKeys, MemoryUsage }, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
     const { settings: { graphInfo: { showMemoryUsage } } } = useContext(BrowserSettingsContext);
 
@@ -33,7 +33,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                         </Button>
                         <div className=" pr-5 w-full flex justify-between items-center gap-1">
                             <h1 className="text-2xl">Graph Info</h1>
-                            <Database size={25}/>
+                            <Database size={25} />
                         </div>
                         <div className="flex gap-2 items-center overflow-hidden">
                             <h2>Graph Name:</h2>
@@ -98,10 +98,9 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                         disabled={isQueryLoading}
                                     />
                                 </li>
-                                {Array.from(Labels.values()).map((label) => {
+                {Array.from(Labels.values()).map((label) => {
                                     const name = label.name || "Empty";
                                     const labelColor = label.style.color;
-                                    const graphLabel = graph.GraphInfo.Labels.get(label.name);
 
                                     return (
                                         <li key={`${name}-${labelColor}`} className="max-w-full flex gap-1">
@@ -112,28 +111,26 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                 }}
                                                 className="h-6 w-full p-2 rounded-full flex justify-center items-center SofiaSans"
                                                 data-testid={`graphInfo${name}Node`}
+                                                title={`MATCH (n:${name}) RETURN n`}
                                                 label={name}
                                                 onClick={() => runQuery(`MATCH (n:${name}) RETURN n`)}
                                                 disabled={isQueryLoading}
                                             />
-                                            {
-                                                graphLabel &&
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <Button
-                                                            className="h-6 w-6 p-1 rounded-full flex justify-center items-center bg-muted hover:bg-muted/80"
-                                                            data-testid={`customizeStyle${name}`}
-                                                            title="Customize Style"
-                                                            onClick={() => setCustomizingLabel(graphLabel)}
-                                                        >
-                                                            <Palette className="h-3 w-3" />
-                                                        </Button>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>
-                                                        Customize Style
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            }
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button
+                                                        className="h-6 w-6 p-1 rounded-full flex justify-center items-center bg-muted hover:bg-muted/80"
+                                                        data-testid={`customizeStyle${name}`}
+                                                        title="Customize Style"
+                                                        onClick={() => setCustomizingLabel(label)}
+                                                    >
+                                                        <Palette className="h-3 w-3" />
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    Customize Style
+                                                </TooltipContent>
+                                            </Tooltip>
                                         </li>
                                     );
                                 })}
@@ -179,6 +176,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                     return (
                                         <li key={relationship.name} className="max-w-full">
                                             <Button
+                                                title={`MATCH p=()-[:${relationship.name}]-() RETURN p`}
                                                 style={{
                                                     backgroundColor: relationshipColor,
                                                     color: textColor
@@ -221,6 +219,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                     PropertyKeys && PropertyKeys.map((key) => (
                                         <li key={key} className="max-w-full">
                                             <Button
+                                                title={`MATCH (e) WHERE e.${key} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`}
                                                 className="h-6 w-full p-2 bg-border flex justify-center items-center rounded-full text-white SofiaSans"
                                                 label={key}
                                                 onClick={() => runQuery(

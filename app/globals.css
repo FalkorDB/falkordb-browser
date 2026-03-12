@@ -116,6 +116,14 @@
         @apply !hidden;
     }
 
+    .json-tree-container li {
+        @apply !pt-0;
+    }
+    
+    .json-tree-container > ul {
+        @apply !pt-0;
+    }
+
     /* Custom scrollbar for model selector */
     .custom-scrollbar::-webkit-scrollbar {
         width: 8px;
