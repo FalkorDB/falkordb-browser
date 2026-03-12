@@ -3,9 +3,9 @@
 
 "use client";
 
-import { Editor, Monaco } from "@monaco-editor/react";
+import { loader, Monaco } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { useTheme } from "next-themes";
 import { getTheme } from "@/lib/utils";
 
@@ -49,11 +49,15 @@ export const setEditorTheme = (monacoI: Monaco, themeName: string, backgroundCol
         base: isDark ? 'vs-dark' : 'vs',
         inherit: true,
         rules: [
-            { token: 'keyword', foreground: isDark ? '#99E4E5' : '#7568F2' },
-            { token: 'function', foreground: isDark ? '#DCDCAA' : '#5A5A42' },
+            { token: 'keyword', foreground: isDark ? '#569CD6' : '#0000FF' },
+            { token: 'keyword.flow', foreground: isDark ? '#C586C0' : '#AF00DB' },
+            { token: 'function', foreground: isDark ? '#DCDCAA' : '#795E26' },
             { token: 'type', foreground: isDark ? '#89D86D' : '#2E5A27' },
-            { token: 'string', foreground: isDark ? '#CE9178' : '#53392C' },
-            { token: 'number', foreground: isDark ? '#b5cea8' : '#3C5335' },
+            { token: 'string', foreground: isDark ? '#CE9178' : '#A31515' },
+            { token: 'number', foreground: isDark ? '#b5cea8' : '#098658' },
+            { token: 'variable', foreground: isDark ? '#9CDCFE' : '#001080' },
+            { token: 'constant', foreground: isDark ? '#4FC1FF' : '#0070C1' },
+            { token: 'comment', foreground: isDark ? '#6A9955' : '#008000' },
         ],
         colors: {
             'editor.background': backgroundColor,
@@ -102,6 +106,10 @@ export interface EditorComponentProps {
     /** Callback fired with the Monaco instance after beforeMount completes */
     onMonacoReady?: (monacoInstance: Monaco) => void;
     readOnly?: boolean;
+    /** Custom Monaco theme name (defaults to "editor-theme") */
+    themeName?: string;
+    /** Custom background color for the editor theme (defaults to the app background color) */
+    themeBackground?: string;
 }
 
 export default function EditorComponent({
@@ -112,67 +120,31 @@ export default function EditorComponent({
     options,
     height,
     className,
+    // editorKey is accepted for API compat but not used (no key-based remount needed)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     editorKey,
     onMount,
     onMonacoReady,
     readOnly = false,
+    themeName = "editor-theme",
+    themeBackground,
 }: EditorComponentProps) {
     const { theme } = useTheme();
     const { background, currentTheme } = getTheme(theme);
-    const [sugDisposable, setSugDisposable] = useState<monaco.IDisposable>();
+    const containerRef = useRef<HTMLDivElement>(null);
+    const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+    const monacoRef = useRef<Monaco | null>(null);
+    const sugDisposableRef = useRef<monaco.IDisposable | null>(null);
     const languageConfigRef = useRef(languageConfig);
+    const onChangeRef = useRef(onChange);
+    const onMountRef = useRef(onMount);
+    const onMonacoReadyRef = useRef(onMonacoReady);
 
-    // Keep ref in sync so the completion provider always calls the latest getSuggestions
-    useEffect(() => {
-        languageConfigRef.current = languageConfig;
-    }, [languageConfig]);
-
-    // Dispose completion provider on unmount
-    useEffect(() => () => {
-        sugDisposable?.dispose();
-    }, [sugDisposable]);
-
-    const handleBeforeMount = (monacoI: Monaco) => {
-        setEditorTheme(monacoI, "editor-theme", background, currentTheme === "dark");
-
-        if (languageConfig) {
-            // Register the custom language if not already registered
-            const languages = monacoI.languages.getLanguages();
-            if (!languages.some(l => l.id === language)) {
-                monacoI.languages.register({ id: language });
-            }
-
-            // Set monarch tokenizer if provided
-            if (languageConfig.monarchTokensProvider) {
-                monacoI.languages.setMonarchTokensProvider(language, languageConfig.monarchTokensProvider);
-            }
-
-            // Set language configuration if provided
-            if (languageConfig.languageConfiguration) {
-                monacoI.languages.setLanguageConfiguration(language, languageConfig.languageConfiguration);
-            }
-
-            // Register completion provider if getSuggestions is provided
-            if (languageConfig.getSuggestions) {
-                const provider = monacoI.languages.registerCompletionItemProvider(language, {
-                    provideCompletionItems: async (model, position) => {
-                        const currentConfig = languageConfigRef.current;
-                        if (!currentConfig?.getSuggestions) return { suggestions: [] };
-
-                        const word = model.getWordUntilPosition(position);
-                        const range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
-                        const suggestions = await currentConfig.getSuggestions(monacoI);
-                        return {
-                            suggestions: suggestions.map(s => ({ ...s, range }))
-                        };
-                    },
-                });
-                setSugDisposable(provider);
-            }
-        }
-
-        onMonacoReady?.(monacoI);
-    };
+    // Keep refs in sync
+    useEffect(() => { languageConfigRef.current = languageConfig; }, [languageConfig]);
+    useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+    useEffect(() => { onMountRef.current = onMount; }, [onMount]);
+    useEffect(() => { onMonacoReadyRef.current = onMonacoReady; }, [onMonacoReady]);
 
     const mergedOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
         ...DEFAULT_MONACO_OPTIONS,
@@ -180,18 +152,135 @@ export default function EditorComponent({
         ...options,
     };
 
+    // Initialize the editor once the container is mounted
+    useEffect(() => {
+        let disposed = false;
+
+        loader.init().then((monacoInstance: Monaco) => {
+            if (disposed || !containerRef.current) return;
+
+            monacoRef.current = monacoInstance;
+
+            // Set up theme
+            setEditorTheme(monacoInstance, themeName, themeBackground || background, currentTheme === "dark");
+
+            // Register custom language if needed
+            if (languageConfigRef.current) {
+                const lc = languageConfigRef.current;
+                const languages = monacoInstance.languages.getLanguages();
+                if (!languages.some(l => l.id === language)) {
+                    monacoInstance.languages.register({ id: language });
+                }
+                if (lc.monarchTokensProvider) {
+                    monacoInstance.languages.setMonarchTokensProvider(language, lc.monarchTokensProvider);
+                }
+                if (lc.languageConfiguration) {
+                    monacoInstance.languages.setLanguageConfiguration(language, lc.languageConfiguration);
+                }
+                if (lc.getSuggestions) {
+                    const provider = monacoInstance.languages.registerCompletionItemProvider(language, {
+                        provideCompletionItems: async (model, position) => {
+                            const currentConfig = languageConfigRef.current;
+                            if (!currentConfig?.getSuggestions) return { suggestions: [] };
+                            const word = model.getWordUntilPosition(position);
+                            const range = new monacoInstance.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
+                            const suggestions = await currentConfig.getSuggestions(monacoInstance);
+                            return {
+                                suggestions: suggestions.map(s => ({ ...s, range }))
+                            };
+                        },
+                    });
+                    sugDisposableRef.current = provider;
+                }
+            }
+
+            onMonacoReadyRef.current?.(monacoInstance);
+
+            // Create the editor
+            const editor = monacoInstance.editor.create(containerRef.current, {
+                ...mergedOptions,
+                value,
+                language,
+                theme: themeName,
+            });
+
+            editorRef.current = editor;
+
+            // Listen for content changes
+            editor.onDidChangeModelContent(() => {
+                onChangeRef.current?.(editor.getValue());
+            });
+
+            onMountRef.current?.(editor);
+        });
+
+        return () => {
+            disposed = true;
+        };
+    }, []);
+
+    // Synchronous cleanup before DOM removal — prevents rAF callbacks
+    // from accessing destroyed DOM nodes during HMR
+    useLayoutEffect(() => () => {
+        sugDisposableRef.current?.dispose();
+        sugDisposableRef.current = null;
+
+        if (editorRef.current) {
+            // Get the model before disposing the editor
+            const model = editorRef.current.getModel();
+            editorRef.current.dispose();
+            editorRef.current = null;
+            // Dispose the model separately to avoid leaks
+            model?.dispose();
+        }
+    }, []);
+
+    // Re-register monarch tokenizer when languageConfig changes
+    useEffect(() => {
+        const monacoInstance = monacoRef.current;
+        const lc = languageConfigRef.current;
+        if (monacoInstance && lc?.monarchTokensProvider) {
+            monacoInstance.languages.setMonarchTokensProvider(language, lc.monarchTokensProvider);
+        }
+    }, [languageConfig, language]);
+
+    // Update value when prop changes (but not if the editor content already matches)
+    useEffect(() => {
+        const editor = editorRef.current;
+        if (editor && value !== undefined && editor.getValue() !== value) {
+            editor.setValue(value);
+        }
+    }, [value]);
+
+    // Update options when they change
+    useEffect(() => {
+        editorRef.current?.updateOptions(mergedOptions);
+    }, [readOnly, options]);
+
+    // Update theme when it changes
+    useEffect(() => {
+        if (monacoRef.current) {
+            setEditorTheme(monacoRef.current, themeName, themeBackground || background, currentTheme === "dark");
+        }
+    }, [currentTheme, themeName, themeBackground, background]);
+
+    // Update language when it changes
+    useEffect(() => {
+        const editor = editorRef.current;
+        const monacoInstance = monacoRef.current;
+        if (editor && monacoInstance) {
+            const model = editor.getModel();
+            if (model) {
+                monacoInstance.editor.setModelLanguage(model, language);
+            }
+        }
+    }, [language]);
+
     return (
-        <Editor
+        <div
+            ref={containerRef}
             className={className}
-            key={editorKey ? `${editorKey}-${currentTheme}` : currentTheme}
-            height={height}
-            language={language}
-            options={mergedOptions}
-            value={value}
-            onChange={onChange}
-            theme="editor-theme"
-            beforeMount={handleBeforeMount}
-            onMount={onMount}
+            style={{ height: typeof height === "number" ? `${height}px` : (height || "100%"), width: "100%" }}
         />
     );
 }

@@ -8,12 +8,11 @@ import { History, Info, Maximize2 } from "lucide-react";
 import * as monaco from "monaco-editor";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Editor } from "@monaco-editor/react";
 import { useTheme } from "next-themes";
 import Button from "../components/ui/Button";
 import { BrowserSettingsContext, GraphContext, IndicatorContext } from "../components/provider";
-import CypherEditor from "../components/CypherEditor";
-import { setTheme } from "../components/EditorComponent";
+import CypherEditor, { CYPHER_LANGUAGE_NAME } from "../components/CypherEditor";
+import EditorComponent from "../components/EditorComponent";
 import DialogComponent from "../components/DialogComponent";
 import Toolbar from "./toolbar";
 import { Node, Link, Graph, Query, HistoryQuery } from "../api/graph/model";
@@ -103,7 +102,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     const { graphNames } = useContext(GraphContext);
 
     const { theme } = useTheme();
-    const { secondary, currentTheme } = getTheme(theme);
+    const { secondary } = getTheme(theme);
 
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
     const submitQuery = useRef<HTMLButtonElement>(null);
@@ -503,14 +502,12 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                             onClick={handleSubmit}
                                                             isLoading={isLoading}
                                                         />
-                                                        <Editor
-                                                            key={currentTheme}
+                                                        <EditorComponent
                                                             className="SofiaSans"
-                                                            data-testid="queryHistoryEditor"
-                                                            width="100%"
                                                             height="100%"
-                                                            language="cypher"
-                                                            theme="selector-theme"
+                                                            language={CYPHER_LANGUAGE_NAME}
+                                                            themeName="selector-theme"
+                                                            themeBackground={secondary}
                                                             options={{
                                                                 lineHeight: 30,
                                                                 fontSize: 25,
@@ -538,9 +535,6 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                                 });
                                                             }}
                                                             onMount={handleEditorDidMount}
-                                                            beforeMount={(m) => {
-                                                                setTheme(m, "selector-theme", secondary, currentTheme === "dark");
-                                                            }}
                                                         />
                                                     </>
                                                 }

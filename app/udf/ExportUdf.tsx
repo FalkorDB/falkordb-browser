@@ -13,11 +13,11 @@ import Button from "../components/ui/Button";
 import Dropzone from "../components/ui/Dropzone";
 import { IndicatorContext } from "../components/provider";
 
-interface LoadUDFProps {
-    onLoad: (name: string) => void
+interface ExportUDFProps {
+    onExport: (name: string) => void
 }
 
-export default function LoadUDF({ onLoad }: LoadUDFProps) {
+export default function ExportUDF({ onExport }: ExportUDFProps) {
     const [open, setOpen] = useState(false);
     const [name, setName] = useState("");
     const [code, setCode] = useState("");
@@ -74,7 +74,7 @@ export default function LoadUDF({ onLoad }: LoadUDFProps) {
             }, toast, setIndicator);
 
             if (res.ok) {
-                onLoad(name.trim());
+                onExport(name.trim());
                 setName("");
                 setCode("");
                 setFileName("");
@@ -121,7 +121,7 @@ export default function LoadUDF({ onLoad }: LoadUDFProps) {
                         />
                     </div>
                     <div className={cn("rounded-lg", fileName && "border border-primary/50")}>
-                        <Dropzone accept={{ 'application/javascript': ['.js'] }} title="Drop a .js file" onFileDrop={onFileDrop} className="w-full" withTable={false} />
+                        <Dropzone title="Drop a .js file" onFileDrop={onFileDrop} className="w-full" withTable={false} />
                         {fileName && (
                             <p className="text-sm text-foreground px-2 pb-2 text-center">{fileName}</p>
                         )}

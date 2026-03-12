@@ -2,7 +2,7 @@
 
 'use client';
 
-import { ArrowUpRight, Braces, Database, FileCode, LogOut, Monitor, Moon, Sun } from "lucide-react";
+import { ArrowUpRight, Database, FileCode, LogOut, Monitor, Moon, Sun } from "lucide-react";
 import { useCallback, useContext, useState, useEffect } from "react";
 import Image from "next/image";
 import { cn, getTheme, Panel } from "@/lib/utils";
@@ -154,6 +154,16 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                         label="SETTINGS"
                         onClick={() => router.push("/settings")}
                     />
+                        <Button
+                            label="UDFs"
+                            title="User Defined Functions: View and manage your UDFs"
+                            className={cn(
+                                "text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
+                                type === "UDF" && "!text-primary"
+                            )}
+                            onClick={() => router.push("/udf")}
+                            data-testid="UdfButton"
+                        />
                     <Button
                         label="GRAPHS"
                         title="View and manage your graphs"
@@ -163,16 +173,6 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                         )}
                         onClick={() => router.push("/graph")}
                         data-testid="GraphsButton"
-                    />
-                    <Button
-                        label="UDF"
-                        title="User Defined Functions"
-                        className={cn(
-                            "text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
-                            type === "UDF" && "!text-primary"
-                        )}
-                        onClick={() => router.push("/udf")}
-                        data-testid="UdfButton"
                     />
                 </div>
                 {/*
@@ -231,23 +231,6 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                                 handleSetCurrentPanel("chat");
                             }}
                         />
-                    </>
-                }
-                {
-                    type === "UDF" &&
-                    <>
-                        {separator}
-                        <Button
-                            className={cn(
-                                "text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
-                                panelOpen && "!text-primary"
-                            )}
-                            title="UDF Panel"
-                            onClick={() => onOpenPanel()}
-                            data-testid="udfPanelToggle"
-                        >
-                            <Braces size={iconSize} />
-                        </Button>
                     </>
                 }
             </div>

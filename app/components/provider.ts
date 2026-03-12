@@ -1,5 +1,5 @@
 import { createContext, Dispatch, SetStateAction } from "react";
-import { ConnectionType, GraphRef, Panel, Tab } from "@/lib/utils";
+import { ConnectionType, GraphRef, Panel, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
 import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
 import { Graph, GraphData, GraphInfo, HistoryQuery, Label, Relationship } from "../api/graph/model";
 
@@ -187,10 +187,10 @@ type ConnectionContextType = {
 };
 
 type UDFContextType = {
-  udfList: string[];
-  setUdfList: Dispatch<SetStateAction<string[]>>;
-  selectedUdf: string | undefined;
-  setSelectedUdf: Dispatch<SetStateAction<string | undefined>>;
+  udfList: UDFEntry[];
+  setUdfList: Dispatch<SetStateAction<UDFEntry[]>>;
+  selectedUdf: UDFEntryWithCode | undefined;
+  setSelectedUdf: Dispatch<SetStateAction<UDFEntryWithCode | undefined>>;
 };
 
 export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(

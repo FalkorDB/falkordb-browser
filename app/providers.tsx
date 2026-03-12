@@ -4,7 +4,7 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef, ConnectionType } from "@/lib/utils";
+import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef, ConnectionType, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
 import { encryptValue, decryptValue, isCryptoAvailable, isEncrypted } from "@/lib/encryption";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
@@ -115,8 +115,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [showPropertyKeyPrefix, setShowPropertyKeyPrefix] = useState<boolean>(false);
   const [newCypherOnly, setNewCypherOnly] = useState<boolean>(false);
   const [cypherOnly, setCypherOnly] = useState<boolean>(false);
-  const [udfList, setUdfList] = useState<string[]>([]);
-  const [selectedUdf, setSelectedUdf] = useState<string>();
+  const [udfList, setUdfList] = useState<UDFEntry[]>([]);
+  const [selectedUdf, setSelectedUdf] = useState<UDFEntryWithCode>();
 
   const replayTutorial = useCallback(() => {
     router.push("/graph");
@@ -590,8 +590,30 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       }
 
       setModel(localStorage.getItem("model") || "");
+      (async () => {
+            const res = await securedFetch("/api/udf", {
+                method: "GET",
+            }, toast, setIndicator);
+
+            if (!res.ok) return;
+
+            const json = await res.json();
+            setUdfList(json.result);
+
+            if (json.result.length > 0) {
+                const result = await securedFetch(`/api/udf/${encodeURIComponent(json.result[0][1])}`, {
+                    method: "GET",
+                }, toast, setIndicator);
+
+                if (!result.ok) return;
+
+                const udfData = await result.json();
+                
+                setSelectedUdf(udfData.result[0]);
+            }
+        })();
     })();
-  }, [status]);
+  }, [status, toast]);
 
   const panelSize = useMemo(() => isCollapsed ? 0 : 20, [isCollapsed]);
 

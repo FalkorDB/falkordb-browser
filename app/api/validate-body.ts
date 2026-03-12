@@ -189,12 +189,6 @@ export const deleteGraphElementAttribute = z.object({
 
 // UDF schemas
 export const loadUdf = z.object({
-  name: z
-    .string({
-      required_error: "Name is required",
-      invalid_type_error: "Invalid Name",
-    })
-    .min(1, "Name cannot be empty"),
   code: z
     .string({
       required_error: "Code is required",

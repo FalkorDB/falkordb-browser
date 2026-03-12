@@ -2,11 +2,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useContext, useMemo, useEffect, useRef } from "react";
-import { Download } from "lucide-react";
 import { Row } from "@/lib/utils";
 import TableComponent from "../components/TableComponent";
 import { GraphContext, TableViewContext } from "../components/provider";
-import Button from "../components/ui/Button";
+import Export from "../components/Export";
 
 export default function TableView() {
     const { graph } = useContext(GraphContext);
@@ -46,46 +45,30 @@ export default function TableView() {
         }
     }, [dataHash, setScrollPosition]);
 
-    const handleExportCSV = () => {
-        if (!tableData) return;
+    const csvContent = useMemo(() => {
+        if (!tableData) return "";
 
-        // Convert data to CSV format
         const csvRows: string[] = [];
-        
-        // Add headers
+
         csvRows.push(tableData.headers.map(header => `"${header}"`).join(','));
-        
-        // Add data rows
+
         graph.Data.forEach((row) => {
             const csvRow = tableData.headers.map((header) => {
                 const value = row[header];
                 if (value === null || value === undefined) return '""';
-                
-                // Handle different types of values
+
                 if (typeof value === 'object') {
                     return `"${JSON.stringify(value).replace(/"/g, '""')}"`;
                 }
-                
-                // Escape quotes and wrap in quotes
+
                 const stringValue = String(value).replace(/"/g, '""');
                 return `"${stringValue}"`;
             });
             csvRows.push(csvRow.join(','));
         });
 
-        const csvContent = csvRows.join('\n');
-        
-        // Create blob and download
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `${graph.Id}_table_export.csv`);
-        document.body.appendChild(link);
-        link.click();
-        link.parentNode?.removeChild(link);
-        window.URL.revokeObjectURL(url);
-    };
+        return csvRows.join('\n');
+    }, [tableData, graph.Data]);
 
     if (tableData === undefined) return undefined;
 
@@ -104,15 +87,14 @@ export default function TableView() {
             initialExpand={expand}
             onExpandChange={setExpand}
         >
-            <Button
+            <Export
                 data-testid="exportTableViewButton"
-                variant="Primary"
-                label="Export"
+                content={csvContent}
+                filename={`${graph.Id}_table_export.csv`}
                 title="Export table data to CSV"
-                onClick={handleExportCSV}
-            >
-                <Download size={20} />
-            </Button>
+                label="Export"
+
+            />
         </TableComponent>
     );
 }

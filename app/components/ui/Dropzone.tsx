@@ -2,7 +2,7 @@
 
 import { ArrowDownToLine } from 'lucide-react';
 import React, { useCallback, useState } from 'react';
-import { useDropzone } from 'react-dropzone';
+import { Accept, useDropzone } from 'react-dropzone';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
 
@@ -18,6 +18,7 @@ interface Props {
     filesCount?: boolean
     className?: string
     withTable?: boolean
+    accept?: Accept
     disabled?: boolean
     onFileDrop: (acceptedFiles: File[]) => void
 }
@@ -28,7 +29,7 @@ const FileProps = [
     "Type",
 ];
 
-function Dropzone({ title, filesCount = false, className = "", withTable = false, disabled = false, onFileDrop }: Props) {
+function Dropzone({ title, filesCount = false, className = "", withTable = false, disabled = false, accept, onFileDrop }: Props) {
 
     const [files, setFiles] = useState<TableFile[]>([]);
 
@@ -42,7 +43,7 @@ function Dropzone({ title, filesCount = false, className = "", withTable = false
         onFileDrop(acceptedFiles);
     }, [onFileDrop]);
 
-    const { getRootProps, getInputProps } = useDropzone({ onDrop, disabled });
+    const { getRootProps, getInputProps } = useDropzone({ onDrop, disabled, accept });
 
     return (
         <div className={cn('flex gap-4 grow', className)}>

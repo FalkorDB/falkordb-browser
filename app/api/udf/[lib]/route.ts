@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { UDF_VERSION_THRESHOLD } from "@/app/utils";
 import { getCorsHeaders } from "../../utils";
+import { GET as getDBVersion } from "../../DBVersion/route";
 import { getClient } from "../../auth/[...nextauth]/options";
+import { loadUdf, validateBody } from "../../validate-body";
 
 export async function OPTIONS(request: Request) {
     return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
 
-export async function GET(request: Request) {
+export async function GET(request: Request, { params }: { params: Promise<{ lib: string }> }) {
     try {
         const session = await getClient(request);
 
@@ -45,12 +47,98 @@ export async function GET(request: Request) {
             );
         }
 
+        const { lib } = await params;
 
         try {
-            const result = await client.udfList();
-
+            const result = await client.udfList(lib, true);
+            
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
             return NextResponse.json({ result }, { status: 200, headers: getCorsHeaders(request) });
         } catch (error) {
+            console.error(error);
+            return NextResponse.json(
+                { message: (error as Error).message },
+                { status: 400, headers: getCorsHeaders(request) }
+            );
+        }
+    } catch (err) {
+        console.error(err);
+        return NextResponse.json(
+            { message: (err as Error).message },
+            { status: 500, headers: getCorsHeaders(request) }
+        );
+    }
+}
+
+export async function POST(request: Request, { params }: { params: Promise<{ lib: string }> }) {
+    try {
+        const session = await getClient(request);
+
+        if (session instanceof NextResponse) {
+            return session;
+        }
+
+        const { client } = session;
+        const body = await request.json();
+
+        const validation = validateBody(loadUdf, body);
+
+        if (!validation.success) {
+            return NextResponse.json(
+                { message: validation.error },
+                { status: 400, headers: getCorsHeaders(request) }
+            );
+        }
+
+        const { code, replace } = validation.data;
+        const { lib } = (await params);
+        try {
+            const result = await client.udfLoad(lib, code, replace);
+
+            if (!result) {
+                throw new Error("Failed to create UDF");
+            }
+
+            return NextResponse.json({ message: "UDF created successfully" }, { status: 200, headers: getCorsHeaders(request) });
+        }
+        catch (error) {
+            console.error(error);
+            return NextResponse.json(
+                { message: (error as Error).message },
+                { status: 400, headers: getCorsHeaders(request) }
+            );
+        }
+    } catch (err) {
+        console.error(err);
+        return NextResponse.json(
+            { message: (err as Error).message },
+            { status: 500, headers: getCorsHeaders(request) }
+        );
+    }
+}
+
+export async function DELETE(request: Request, { params }: { params: Promise<{ lib: string }> }) {
+    try {
+        const session = await getClient(request);
+
+        if (session instanceof NextResponse) {
+            return session;
+        }
+
+        const { client } = session;
+        const { lib } = (await params);
+        
+        try {
+            const result = await client.udfDelete(lib);
+            
+            if (!result) {
+                throw new Error("Failed to delete UDF");
+            }
+            
+            return NextResponse.json({ message: "UDF deleted successfully" }, { status: 200, headers: getCorsHeaders(request) });
+        }
+        catch (error) {
             console.error(error);
             return NextResponse.json(
                 { message: (error as Error).message },

@@ -14,7 +14,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
 import EditorComponent, { LINE_HEIGHT, LanguageConfig } from "./EditorComponent";
-import { BrowserSettingsContext, IndicatorContext } from "./provider";
+import { BrowserSettingsContext, IndicatorContext, UDFContext } from "./provider";
 import { Graph, HistoryQuery } from "../api/graph/model";
 
 interface Props {
@@ -31,7 +31,8 @@ interface Props {
 
 const MAX_HEIGHT = 20;
 const PLACEHOLDER = "Type your query here to start";
-const LANGUAGE_NAME = "cypher-custom-language";
+export const CYPHER_LANGUAGE_NAME = "cypher-custom-language";
+const LANGUAGE_NAME = CYPHER_LANGUAGE_NAME;
 
 const KEYWORDS = [
     "CREATE",
@@ -216,6 +217,7 @@ const CYPHER_LANGUAGE_CONFIGURATION: monaco.languages.LanguageConfiguration = {
 export default function CypherEditor({ graph, graphName, historyQuery, maximize, setMaximize, runQuery, setHistoryQuery, editorKey, isQueryLoading }: Props) {
     const { indicator, setIndicator } = useContext(IndicatorContext);
     const { tutorialOpen } = useContext(BrowserSettingsContext);
+    const { udfList } = useContext(UDFContext);
 
     const { toast } = useToast();
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -328,9 +330,22 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         fetchSuggestions('(relationship type)')
     ])).flat();
 
+    const udfSuggestions = useMemo((): monaco.languages.CompletionItem[] =>
+        udfList.flatMap(([, libName, , functions]) =>
+            functions.map((fn: string) => ({
+                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                insertText: `${libName}.${fn}(\${0})`,
+                label: `${libName}.${fn}()`,
+                kind: monaco.languages.CompletionItemKind.Function,
+                range: new monaco.Range(1, 1, 1, 1),
+                detail: "(udf function)"
+            }))
+        )
+    , [udfList]);
+
     const getAllSuggestions = useCallback(async (): Promise<monaco.languages.CompletionItem[]> => {
         const remoteSuggestions = graphIdRef.current ? await getRemoteSuggestions() : [];
-        const all = [...STATIC_SUGGESTIONS, ...remoteSuggestions];
+        const all = [...STATIC_SUGGESTIONS, ...udfSuggestions, ...remoteSuggestions];
 
         // Deduplicate by label + detail
         const seen = new Set<string>();
@@ -340,22 +355,26 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             seen.add(key);
             return true;
         });
-    }, []);
+    }, [udfSuggestions]);
 
     const updateTokenizer = async (monacoI: Monaco) => {
         const sug = await getAllSuggestions();
 
-        const functions = sug.filter(({ detail }) => detail === "(function)");
+        const functions = sug.filter(({ detail }) => detail === "(function)" || detail === "(udf function)");
 
-        const namespaces = new Set(
-            functions
+        // Collect UDF library names for keyword coloring
+        const udfLibNames = udfList.map(([, libName]) => libName).filter(Boolean);
+
+        const namespaces = new Set([
+            ...udfLibNames,
+            ...functions
                 .filter(({ label }) => (label as string).includes("."))
                 .map(({ label }) => {
                     const newNamespaces = (label as string).split(".");
                     newNamespaces.pop();
                     return newNamespaces;
                 }).flat()
-        );
+        ]);
 
         monacoI.languages.setMonarchTokensProvider(LANGUAGE_NAME, {
             tokenizer: {
@@ -403,12 +422,12 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         });
     };
 
-    // Update monarch tokenizer when graph changes (to include dynamic functions/namespaces)
+    // Update monarch tokenizer when graph or UDF list changes (to include dynamic functions/namespaces)
     useEffect(() => {
         if (monacoRef.current && graphIdRef.current) {
             updateTokenizer(monacoRef.current);
         }
-    }, [graph.Id]);
+    }, [graph.Id, udfList]);
 
     const cypherLanguageConfig: LanguageConfig = useMemo(() => ({
         monarchTokensProvider: DEFAULT_MONARCH_TOKENIZER,
@@ -551,7 +570,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             precondition: 'isLastLine && !suggestWidgetVisible',
         });
 
-        // Override the default Ctrl + F keybinding
+        // Disable Ctrl+F search in the compact cypher editor
         // eslint-disable-next-line no-bitwise
         e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => { });
     };
@@ -640,7 +659,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                             <DialogTitle />
                             <DialogDescription />
                         </VisuallyHidden>
-                        <div className="z-10 absolute right-0 top-0 bottom-0 py-4 px-8 flex flex-col items-end justify-between pointer-events-none">
+                        <div className="z-10 absolute right-0 top-0 bottom-0 p-2 flex flex-col items-end justify-between pointer-events-none">
                             <CloseDialog
                                 className="pointer-events-auto"
                             >
@@ -682,12 +701,12 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                             language={LANGUAGE_NAME}
                             languageConfig={cypherLanguageConfig}
                             options={{
-                                padding: {
-                                    bottom: 10,
-                                    top: 10,
-                                },
                                 lineNumbersMinChars: 3,
                                 fontSize: 25,
+                                minimap: { enabled: true },
+                                scrollbar: { vertical: 'auto', horizontal: 'auto' },
+                                overviewRulerLanes: 3,
+                                overviewRulerBorder: true,
                             }}
                             value={historyQuery.query}
                             onChange={(val) => {
