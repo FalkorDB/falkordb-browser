@@ -93,14 +93,8 @@ test.describe("Chat Feature Tests", () => {
     // Configure chat settings with a test API key
     // Note: Using a placeholder key for testing - in real tests you'd use a valid key
     const testApiKey = process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY || "test-api-key-placeholder";
-    // Expand chat section first so the model selector is visible before querying models
-    await settings.expandChatSection();
-    // Find an OpenAI-compatible model (OPENAI_TOKEN is an OpenAI key; picking
-    // the first alphabetical model risks getting an Anthropic/other model which
-    // would cause an auth error with an OpenAI key)
-    const openAiModel = await settings.getFirstModelBySearch("openai") ||
-                        await settings.getFirstModelBySearch("gpt");
-    await settings.setChatApiKeyAndSave(testApiKey, openAiModel || undefined);
+    // Use gpt-5.2 specifically — the CI OpenAI token requires this model
+    await settings.setChatApiKeyAndSave(testApiKey, "gpt-5.2");
     
     // Wait for settings to be saved
     await settings.waitForTimeout(1000);
