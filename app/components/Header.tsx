@@ -2,7 +2,7 @@
 
 'use client';
 
-import { ArrowUpRight, Database, FileCode, LogOut, Monitor, Moon, Sun } from "lucide-react";
+import { ArrowUpRight, Database, FileCode, LogOut, MessagesSquare, Monitor, Moon, Plus, Sun } from "lucide-react";
 import { useCallback, useContext, useState, useEffect } from "react";
 import Image from "next/image";
 import { cn, getTheme, Panel } from "@/lib/utils";
@@ -185,19 +185,9 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                 /> 
                 {separator}
                 */}
-                {
-                    showCreate &&
-                    <CreateGraph
-                        label="Header"
-                        onSetGraphName={onSetGraphName}
-                        type={type}
-                        graphNames={graphNames}
-                    />
-                }
-                {
-                    type === "Graph" && graphName &&
-                    <>
-                        {separator}
+                <div className="flex flex-col items-center gap-2">
+                    {
+                        type === "Graph" && graphName &&
                         <Button
                             indicator={indicator}
                             className={cn(
@@ -210,29 +200,52 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                         >
                             <Database size={iconSize} />
                         </Button>
-                    </>
-                }
-                {
-                    type === "Graph" && graphName &&
-                    <>
-                        {separator}
-                        <Button
-                            data-testid="chatToggleButton"
-                            className={cn(
-                                "text-foreground font-semibold text-xl p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
-                                panel === "chat" && "!text-primary"
-                            )}
-                            indicator={indicator}
-                            title={`Use English to query the graph.
+                    }
+                    {
+                        type === "Graph" && graphName &&
+                        <>
+                            {separator}
+                            <Button
+                                data-testid="chatToggleButton"
+                                className={cn(
+                                    "text-foreground font-semibold text-xl p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
+                                    panel === "chat" && "!text-primary"
+                                )}
+                                indicator={indicator}
+                                title={`Use English to query the graph.
                                 The feature requires LLM model and API key.
                                 Update local user parameters in Settings.`}
-                            label="CHAT"
-                            onClick={() => {
-                                handleSetCurrentPanel("chat");
-                            }}
-                        />
-                    </>
-                }
+                                onClick={() => {
+                                    handleSetCurrentPanel("chat");
+                                }}
+                            >
+                                <MessagesSquare size={iconSize} />
+                            </Button>
+                        </>
+                    }
+                    {
+                        showCreate &&
+                        <>
+                            {separator}
+                            <CreateGraph
+                                label="Header"
+                                onSetGraphName={onSetGraphName}
+                                type={type}
+                                graphNames={graphNames}
+                                trigger={
+                                    <Button
+                                        data-testid={`create${type}`}
+                                        variant="Primary"
+                                        className="hover:!bg-primary/70 p-2"
+                                        title={`Create New ${type}`}
+                                    >
+                                        <Plus size={iconSize} />
+                                    </Button>
+                                }
+                            />
+                        </>
+                    }
+                </div>
             </div>
             <div className="w-full flex flex-col gap-4 items-center">
                 <Drawer direction="right">

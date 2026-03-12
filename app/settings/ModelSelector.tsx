@@ -95,7 +95,10 @@ const categorizeModels = (models: string[]) => {
         categories[categoryName].push(model);
     });
 
-    return Object.entries(categories).filter(([, categoryModels]) => categoryModels.length > 0);
+    return Object.entries(categories)
+        .filter(([, categoryModels]) => categoryModels.length > 0)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([name, categoryModels]) => [name, categoryModels.sort((a, b) => a.localeCompare(b))] as [string, string[]]);
 };
 
 export default function ModelSelector({
@@ -210,6 +213,8 @@ export default function ModelSelector({
                                         {/* Category Header */}
                                         <button
                                             type="button"
+                                            data-testid={`categoryToggle${category}`}
+                                            aria-expanded={isCategoryExpanded}
                                             onClick={() => toggleExpand(category)}
                                             className="flex items-center gap-2 p-2 w-full bg-secondary/50 cursor-pointer hover:bg-muted/50 transition-colors"
                                         >

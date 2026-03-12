@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useContext, Dispatch, SetStateAction, useRef, useCallback, useMemo } from "react";
 import { cn, GraphRef, formatName, getTheme } from "@/lib/utils";
-import { History, Info, Maximize2 } from "lucide-react";
+import { History, Info, Maximize2, Trash2 } from "lucide-react";
 import * as monaco from "monaco-editor";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -138,8 +138,8 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
         if (!historyQuery || !setHistoryQuery) return;
 
         // Get the currently selected query based on counter
-        const selectedQuery = historyQuery.counter === 0 
-            ? historyQuery.currentQuery 
+        const selectedQuery = historyQuery.counter === 0
+            ? historyQuery.currentQuery
             : historyQuery.queries[historyQuery.counter - 1];
 
         // If the selected query is not in the filtered list, reset counter to 0
@@ -309,7 +309,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
 
         // Check if counter points to a deleted query (counter is 1-indexed, so counter - 1 is the index)
         const isCounterDeleted = historyQuery.counter > 0 && deleteElements.includes(historyQuery.counter - 1);
-        
+
         let nextCounter: number;
         if (isCounterDeleted) {
             // Unselect if counter points to deleted query
@@ -340,7 +340,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     const separator = <div className="h-[80%] w-0.5 bg-border rounded-full" />;
 
     return (
-        <div className="z-20 w-full h-[40px] flex flex-row gap-4 items-center">
+        <div className="z-20 w-full h-[40px] flex flex-row gap-2 items-center">
             <SelectGraph
                 options={options}
                 setOptions={setOptions}
@@ -426,7 +426,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                             }}
                                             searchRef={searchQueryRef}
                                         >
-                                            <ul className="w-full flex flex-wrap gap-2 overflow-y-auto max-h-[72px] p-1 graphsFilter">
+                                            <ul className="w-full flex flex-wrap gap-2 overflow-y-auto max-h-[80px] p-1 graphsFilter">
                                                 <li key="info">
                                                     <Tooltip>
                                                         <TooltipTrigger className="h-[32px] flex items-center">
@@ -439,7 +439,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                 </li>
                                                 {
                                                     filters.map(name => (
-                                                        <li key={name} className="max-w-full">
+                                                        <li key={name} className="max-w-full h-[32px]">
                                                             <Button
                                                                 className={cn("bg-background py-1 px-2 rounded-full w-full", activeFilters.some(f => f === name) && "text-background bg-foreground")}
                                                                 label={name}
@@ -449,21 +449,23 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                     ))
                                                 }
                                             </ul>
-                                            <div className="flex gap-2 p-2">
+                                            <div className="flex gap-2">
                                                 <Button
+                                                    className="p-1"
                                                     variant="Delete"
                                                     data-testid="queryHistoryDelete"
-                                                    label="Delete"
                                                     title={`Remove selected query from history
                                                         press (Right Click) to select
                                                         press (Ctrl + Right Click) for multi select`}
                                                     onClick={handleDeleteQuery}
                                                     disabled={deleteElements.length === 0}
-                                                />
+                                                >
+                                                    <Trash2 />
+                                                </Button>
                                                 <Button
+                                                    className="p-1"
                                                     variant="Delete"
                                                     data-testid="queryHistoryDelete"
-                                                    label="Delete All"
                                                     title="Remove all queries from history"
                                                     onClick={() => {
                                                         localStorage.removeItem("query history");
@@ -477,17 +479,19 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                         setDeleteElements([]);
                                                     }}
                                                     disabled={historyQuery.queries.length === 0}
-                                                />
+                                                >
+                                                    <Trash2 /> All
+                                                </Button>
                                             </div>
                                         </PaginationList>
-                                        <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="w-1/2 flex flex-col gap-8 items-center">
-                                            <TabsList className="bg-secondary h-fit w-fit p-2">
-                                                <TabsTrigger className={cn("border border-transparent hover:bg-secondary/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
-                                                <TabsTrigger className={cn("border border-transparent hover:bg-secondary/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>
-                                                <TabsTrigger className={cn("border border-transparent hover:bg-secondary/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("metadata")} value="metadata">Metadata</TabsTrigger>
-                                                <TabsTrigger className={cn("border border-transparent hover:bg-secondary/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("explain")} value="explain">Explain</TabsTrigger>
+                                        <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="w-1/2 flex flex-col gap-2 items-center">
+                                            <TabsList className="h-fit bg-background">
+                                                <TabsTrigger className={cn("border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-background data-[state=active]:!text-primary")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
+                                                <TabsTrigger className={cn("border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-background data-[state=active]:!text-primary")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>
+                                                <TabsTrigger className={cn("border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-background data-[state=active]:!text-primary")} disabled={!isTabEnabled("metadata")} value="metadata">Metadata</TabsTrigger>
+                                                <TabsTrigger className={cn("border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-background data-[state=active]:!text-primary")} disabled={!isTabEnabled("explain")} value="explain">Explain</TabsTrigger>
                                             </TabsList>
-                                            <TabsContent value="text" className="w-full h-1 grow bg-secondary rounded-lg p-2 py-4 relative">
+                                            <TabsContent value="text" className="mt-0 w-full h-1 grow bg-secondary rounded-lg relative p-2">
                                                 {
                                                     currentQuery &&
                                                     <>

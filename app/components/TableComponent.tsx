@@ -440,7 +440,7 @@ export default function TableComponent({
                                         <p>{header}</p>
                                         {
                                             visibleRows.some(r => r.cells[i].type === "object") &&
-                                            <div className="flex gap-2 bg-secondary p-1 rounded-lg">
+                                            <div className="flex gap-2">
                                                 <Button
                                                     className={getClassName(i, 1)}
                                                     title="Expand Root"
