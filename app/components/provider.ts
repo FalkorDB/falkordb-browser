@@ -1,5 +1,5 @@
 import { createContext, Dispatch, SetStateAction } from "react";
-import { ConnectionType, GraphRef, Panel, Tab } from "@/lib/utils";
+import { ConnectionType, GraphRef, Panel, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
 import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
 import { Graph, GraphData, GraphInfo, HistoryQuery, Label, Relationship } from "../api/graph/model";
 
@@ -186,130 +186,137 @@ type ConnectionContextType = {
   setDbVersion: Dispatch<SetStateAction<string>>;
 };
 
+type UDFContextType = {
+  udfList: UDFEntry[];
+  setUdfList: Dispatch<SetStateAction<UDFEntry[]>>;
+  selectedUdf: UDFEntryWithCode | undefined;
+  setSelectedUdf: Dispatch<SetStateAction<UDFEntryWithCode | undefined>>;
+};
+
 export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
   {
     newSettings: {
-      limitSettings: { newLimit: 0, setNewLimit: () => {} },
-      timeoutSettings: { newTimeout: 0, setNewTimeout: () => {} },
+      limitSettings: { newLimit: 0, setNewLimit: () => { } },
+      timeoutSettings: { newTimeout: 0, setNewTimeout: () => { } },
       runDefaultQuerySettings: {
         newRunDefaultQuery: false,
-        setNewRunDefaultQuery: () => {},
+        setNewRunDefaultQuery: () => { },
       },
       defaultQuerySettings: {
         newDefaultQuery: "",
-        setNewDefaultQuery: () => {},
+        setNewDefaultQuery: () => { },
       },
       contentPersistenceSettings: {
         newContentPersistence: false,
-        setNewContentPersistence: () => {},
+        setNewContentPersistence: () => { },
       },
       captionsKeysSettings: {
         newCaptionsKeys: [],
-        setNewCaptionsKeys: () => {},
+        setNewCaptionsKeys: () => { },
       },
       showPropertyKeyPrefixSettings: {
         newShowPropertyKeyPrefix: false,
-        setNewShowPropertyKeyPrefix: () => {},
+        setNewShowPropertyKeyPrefix: () => { },
       },
       chatSettings: {
         newSecretKey: "",
-        setNewSecretKey: () => {},
+        setNewSecretKey: () => { },
         newModel: "",
-        setNewModel: () => {},
+        setNewModel: () => { },
         newMaxSavedMessages: 0,
-        setNewMaxSavedMessages: () => {},
+        setNewMaxSavedMessages: () => { },
         newCypherOnly: false,
-        setNewCypherOnly: () => {},
+        setNewCypherOnly: () => { },
       },
       graphInfo: {
         newRefreshInterval: 0,
-        setNewRefreshInterval: () => {},
+        setNewRefreshInterval: () => { },
       },
     },
     settings: {
       limitSettings: {
         limit: 0,
-        setLimit: () => {},
+        setLimit: () => { },
         lastLimit: 0,
-        setLastLimit: () => {},
+        setLastLimit: () => { },
       },
-      timeoutSettings: { timeout: 0, setTimeout: () => {} },
+      timeoutSettings: { timeout: 0, setTimeout: () => { } },
       runDefaultQuerySettings: {
         runDefaultQuery: false,
-        setRunDefaultQuery: () => {},
+        setRunDefaultQuery: () => { },
       },
-      defaultQuerySettings: { defaultQuery: "", setDefaultQuery: () => {} },
+      defaultQuerySettings: { defaultQuery: "", setDefaultQuery: () => { } },
       contentPersistenceSettings: {
         contentPersistence: false,
-        setContentPersistence: () => {},
+        setContentPersistence: () => { },
       },
       captionsKeysSettings: {
         captionsKeys: [],
-        setCaptionsKeys: () => {},
+        setCaptionsKeys: () => { },
       },
       showPropertyKeyPrefixSettings: {
         showPropertyKeyPrefix: false,
-        setShowPropertyKeyPrefix: () => {},
+        setShowPropertyKeyPrefix: () => { },
       },
       chatSettings: {
         secretKey: "",
-        setSecretKey: () => {},
+        setSecretKey: () => { },
         model: "",
-        setModel: () => {},
+        setModel: () => { },
         maxSavedMessages: 0,
-        setMaxSavedMessages: () => {},
+        setMaxSavedMessages: () => { },
         cypherOnly: false,
-        setCypherOnly: () => {},
+        setCypherOnly: () => { },
       },
       graphInfo: {
         showMemoryUsage: false,
         refreshInterval: 0,
-        setRefreshInterval: () => {},
+        setRefreshInterval: () => { },
       },
     },
     hasChanges: false,
-    setHasChanges: () => {},
-    saveSettings: () => {},
-    resetSettings: () => {},
-    replayTutorial: () => {},
+    setHasChanges: () => { },
+    saveSettings: () => { },
+    resetSettings: () => { },
+    replayTutorial: () => { },
     tutorialOpen: false,
   }
 );
 
 export const GraphContext = createContext<GraphContextType>({
   graph: Graph.empty(),
-  setGraph: () => {},
+  setGraph: () => { },
   graphInfo: GraphInfo.empty(),
-  setGraphInfo: () => {},
+  setGraphInfo: () => { },
   graphName: "",
-  setGraphName: () => {},
+  setGraphName: () => { },
   graphNames: [],
-  setGraphNames: () => {},
+  setGraphNames: () => { },
   labels: [],
-  setLabels: () => {},
+  setLabels: () => { },
   relationships: [],
-  setRelationships: () => {},
+  setRelationships: () => { },
   nodesCount: undefined,
-  setNodesCount: () => {},
+  setNodesCount: () => { },
   edgesCount: undefined,
-  setEdgesCount: () => {},
+  setEdgesCount: () => { },
   currentTab: "Graph",
-  setCurrentTab: () => {},
-  runQuery: async () => {},
-  fetchCount: async () => {},
-  handleCooldown: () => {},
+  setCurrentTab: () => { },
+  runQuery: async () => { },
+  fetchCount: async () => { },
+  handleCooldown: () => { },
   cooldownTicks: undefined,
   isLoading: false,
-  setIsLoading: () => {},
+  setIsLoading: () => { },
 });
 
 export const SchemaContext = createContext<SchemaContextType>({
   schema: Graph.empty(),
-  setSchema: () => {},
+  setSchema: () => { },
   schemaName: "",
-  setSchemaName: () => {},
+  setSchemaName: () => { },
   schemaNames: [],
-  setSchemaNames: () => {},
+  setSchemaNames: () => { },
 });
 
 export const HistoryQueryContext = createContext<HistoryQueryContextType>({
@@ -328,47 +335,54 @@ export const HistoryQueryContext = createContext<HistoryQueryContextType>({
     },
     counter: 0,
   },
-  setHistoryQuery: () => {},
+  setHistoryQuery: () => { },
 });
 
 export const IndicatorContext = createContext<IndicatorContextType>({
   indicator: "online",
-  setIndicator: () => {},
+  setIndicator: () => { },
 });
 
 export const PanelContext = createContext<PanelContextType>({
   panel: undefined,
-  setPanel: () => {},
+  setPanel: () => { },
 });
 
 export const QueryLoadingContext = createContext<QueryLoadingContextType>({
   isQueryLoading: false,
-  setIsQueryLoading: () => {},
+  setIsQueryLoading: () => { },
 });
 
 export const ForceGraphContext = createContext<ForceGraphContextType>({
   canvasRef: { current: null },
   viewport: { centerX: 0, centerY: 0, zoom: 0 },
-  setViewport: () => {},
+  setViewport: () => { },
   data: { nodes: [], links: [] },
-  setData: () => {},
+  setData: () => { },
   graphData: { nodes: [], links: [] },
-  setGraphData: () => {},
+  setGraphData: () => { },
 });
 
 export const TableViewContext = createContext<TableViewContextType>({
   scrollPosition: 0,
-  setScrollPosition: () => {},
+  setScrollPosition: () => { },
   search: "",
-  setSearch: () => {},
+  setSearch: () => { },
   expand: new Map(),
-  setExpand: () => {},
+  setExpand: () => { },
   dataHash: "",
 });
 
 export const ConnectionContext = createContext<ConnectionContextType>({
   connectionType: "Standalone",
-  setConnectionType: () => {},
+  setConnectionType: () => { },
   dbVersion: "",
-  setDbVersion: () => {},
+  setDbVersion: () => { },
+});
+
+export const UDFContext = createContext<UDFContextType>({
+  udfList: [],
+  setUdfList: () => { },
+  selectedUdf: undefined,
+  setSelectedUdf: () => { },
 }); 

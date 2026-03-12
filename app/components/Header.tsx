@@ -23,14 +23,15 @@ interface Props {
     onSetGraphName: (newGraphName: string) => void
     graphNames: string[]
     graphName: string
-    onOpenGraphInfo: () => void
-    graphInfoOpen: boolean
+    onOpenPanel: () => void
+    panelOpen: boolean
 }
 
-function getPathType(pathname: string): "Schema" | "Graph" | "Settings" | undefined {
+function getPathType(pathname: string): "Schema" | "Graph" | "Settings" | "UDF" | undefined {
     if (pathname.includes("/schema")) return "Schema";
     if (pathname.includes("/graph")) return "Graph";
     if (pathname.includes("/settings")) return "Settings";
+    if (pathname.includes("/udf")) return "UDF";
     return undefined;
 }
 
@@ -56,7 +57,7 @@ function formatVersion(version: string | undefined): string {
     return version;
 }
 
-export default function Header({ onSetGraphName, graphNames, graphName, onOpenGraphInfo, graphInfoOpen }: Props) {
+export default function Header({ onSetGraphName, graphNames, graphName, onOpenPanel, panelOpen }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
     const { connectionType, dbVersion } = useContext(ConnectionContext);
@@ -71,7 +72,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
     const [mounted, setMounted] = useState(false);
 
     const type = getPathType(pathname);
-    const showCreate = type && type !== "Settings" && session?.user.role && session.user.role !== "Read-Only";
+    const showCreate = type && type !== "Settings" && type !== "UDF" && session?.user.role && session.user.role !== "Read-Only";
 
     useEffect(() => {
         setMounted(true);
@@ -153,6 +154,16 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                         label="SETTINGS"
                         onClick={() => router.push("/settings")}
                     />
+                        <Button
+                            label="UDFs"
+                            title="User Defined Functions: View and manage your UDFs"
+                            className={cn(
+                                "text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
+                                type === "UDF" && "!text-primary"
+                            )}
+                            onClick={() => router.push("/udf")}
+                            data-testid="UdfButton"
+                        />
                     <Button
                         label="GRAPHS"
                         title="View and manage your graphs"
@@ -181,10 +192,10 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                             indicator={indicator}
                             className={cn(
                                 "text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
-                                graphInfoOpen && "!text-primary"
+                                panelOpen && "!text-primary"
                             )}
                             title="Graph info"
-                            onClick={() => onOpenGraphInfo()}
+                            onClick={() => onOpenPanel()}
                             data-testid="graphInfoToggle"
                         >
                             <Database size={iconSize} />

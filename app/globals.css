@@ -45,7 +45,7 @@
         font-display: swap;
     }
 
-    * {
+    *:not(.codicon) {
         font-family: 'HyperlegibleSans' !important;
     }
 
