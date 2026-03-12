@@ -23,7 +23,7 @@ export default function Export({
             try {
                 const extension = filename.includes('.') ? filename.split('.').pop()! : '';
                 const baseMimeType = mimeType.split(';')[0].trim();
-                const handle = await window.showSaveFilePicker({
+                const handle = await (window as Window & { showSaveFilePicker: (opts?: object) => Promise<FileSystemFileHandle> }).showSaveFilePicker({
                     suggestedName: filename,
                     types: extension ? [{
                         description: `${extension.toUpperCase()} file`,
