@@ -41,7 +41,7 @@ export async function GET(request: Request) {
 
         if (name !== "graph" || version < UDF_VERSION_THRESHOLD) {
             return NextResponse.json(
-                { message: `Memory usage feature requires graph module version ${UDF_VERSION_THRESHOLD.toString()} or higher. Current version: ${version}` },
+                { message: `UDF feature requires graph module version ${UDF_VERSION_THRESHOLD.toString()} or higher. Current version: ${version}` },
                 { status: 400, headers: getCorsHeaders(request) }
             );
         }

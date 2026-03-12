@@ -591,27 +591,27 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
       setModel(localStorage.getItem("model") || "");
       (async () => {
-            const res = await securedFetch("/api/udf", {
-                method: "GET",
-            }, toast, setIndicator);
+        const res = await securedFetch("/api/udf", {
+          method: "GET",
+        }, toast, setIndicator);
 
-            if (!res.ok) return;
+        if (!res.ok) return;
 
-            const json = await res.json();
-            setUdfList(json.result);
+        const json = await res.json();
+        setUdfList(json.result);
 
-            if (json.result.length > 0) {
-                const result = await securedFetch(`/api/udf/${encodeURIComponent(json.result[0][1])}`, {
-                    method: "GET",
-                }, toast, setIndicator);
+        if (json.result.length > 0) {
+          const result = await securedFetch(`/api/udf/${encodeURIComponent(json.result[0][1])}`, {
+            method: "GET",
+          }, toast, setIndicator);
 
-                if (!result.ok) return;
+          if (!result.ok) return;
 
-                const udfData = await result.json();
-                
-                setSelectedUdf(udfData.result[0]);
-            }
-        })();
+          const udfData = await result.json();
+
+          setSelectedUdf(udfData.result[0]);
+        }
+      })();
     })();
   }, [status, toast]);
 

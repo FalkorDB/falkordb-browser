@@ -29,7 +29,7 @@ const FileProps = [
     "Type",
 ];
 
-function Dropzone({ title, filesCount = false, className = "", withTable = false, disabled = false, accept, onFileDrop }: Props) {
+function Dropzone({ title = "Upload File", filesCount = false, className = "", withTable = false, disabled = false, accept, onFileDrop }: Props) {
 
     const [files, setFiles] = useState<TableFile[]>([]);
 
@@ -65,7 +65,7 @@ function Dropzone({ title, filesCount = false, className = "", withTable = false
                 withTable &&
                 <div className='grow bg-background flex flex-col gap-4 justify-center'>
                     <div className='text-lg'>
-                        {`Uploaded Files ${filesCount ? `(${files.length})`: ''}`}
+                        {`Uploaded Files ${filesCount ? `(${files.length})` : ''}`}
                     </div>
                     <Table parentClassName='h-1 grow overflow-auto'>
                         <TableHeader className='border-b border-border'>

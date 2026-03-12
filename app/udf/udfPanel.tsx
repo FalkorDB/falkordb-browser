@@ -105,9 +105,14 @@ export default function UdfPanel({ onClose }: UdfPanelProps) {
         if (!res.ok) return;
 
         const data = await res.json();
-        setUdfList((prev) => [...prev, data.result[0]]);
-        setSelectedLib(data.result[0][1]);
-        setSelectedUdf(data.result[0]);
+        const loaded = data.result[0];
+        const loadedName = loaded[1];
+        setUdfList((prev) => {
+            const filtered = prev.filter(([, libName]) => libName !== loadedName);
+            return [...filtered, loaded];
+        });
+        setSelectedLib(loadedName);
+        setSelectedUdf(loaded);
     };
 
     return (
@@ -121,11 +126,11 @@ export default function UdfPanel({ onClose }: UdfPanelProps) {
             </Button>
             <div className="flex justify-between pr-6">
                 <h1 className="text-2xl">UDF Libraries</h1>
-                <Braces size={25}/>
+                <Braces size={25} />
             </div>
             <div className="flex gap-2">
                 <LoadUDF onLoad={handleLoad} />
-                <FlushUDFs onFlush={() => setUdfList([])} />
+                <FlushUDFs onFlush={() => { setUdfList([]); setSelectedLib(undefined); setSelectedUdf(undefined); }} />
             </div>
             {udfList.length > 0 && (
                 <div className="flex flex-col gap-2">

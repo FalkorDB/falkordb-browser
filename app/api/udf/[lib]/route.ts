@@ -42,7 +42,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ lib:
 
         if (name !== "graph" || version < UDF_VERSION_THRESHOLD) {
             return NextResponse.json(
-                { message: `Memory usage feature requires graph module version ${UDF_VERSION_THRESHOLD.toString()} or higher. Current version: ${version}` },
+                { message: `UDF feature requires graph module version ${UDF_VERSION_THRESHOLD.toString()} or higher. Current version: ${version}` },
                 { status: 400, headers: getCorsHeaders(request) }
             );
         }
@@ -51,7 +51,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ lib:
 
         try {
             const result = await client.udfList(lib, true);
-            
+
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
             return NextResponse.json({ result }, { status: 200, headers: getCorsHeaders(request) });
@@ -128,14 +128,14 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ l
 
         const { client } = session;
         const { lib } = (await params);
-        
+
         try {
             const result = await client.udfDelete(lib);
-            
+
             if (!result) {
                 throw new Error("Failed to delete UDF");
             }
-            
+
             return NextResponse.json({ message: "UDF deleted successfully" }, { status: 200, headers: getCorsHeaders(request) });
         }
         catch (error) {

@@ -121,7 +121,7 @@ export default function LoadUDF({ onLoad }: LoadUDFProps) {
                         />
                     </div>
                     <div className={cn("rounded-lg", fileName && "border border-primary/50")}>
-                        <Dropzone accept={{ 'application/javascript': ['.js'] }} title="Drop a .js file" onFileDrop={onFileDrop} className="w-full" withTable={false} />
+                        <Dropzone accept={{ 'application/javascript': ['.js'], 'text/javascript': ['.js'], 'application/x-javascript': ['.js'] }} title="Drop a .js file" onFileDrop={onFileDrop} className="w-full" withTable={false} />
                         {fileName && (
                             <p className="text-sm text-foreground px-2 pb-2 text-center">{fileName}</p>
                         )}
