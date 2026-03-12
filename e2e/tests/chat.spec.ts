@@ -97,8 +97,10 @@ test.describe("Chat Feature Tests", () => {
     // the provider from the key and selects the first working model automatically
     await settings.setChatApiKeyAndSave(testApiKey);
     
-    // Wait for settings to be saved
-    await settings.waitForTimeout(1000);
+    // Wait for the async model auto-detection to complete and persist to localStorage.
+    // This is especially important for the first test in a shard where the Next.js
+    // server may need extra time to handle the initial /api/chat/models request.
+    await settings.waitForModelAutoDetection();
     
     // Navigate to graph page
     const header = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
