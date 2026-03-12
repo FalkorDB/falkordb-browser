@@ -130,7 +130,13 @@ export default function UdfPanel({ onClose }: UdfPanelProps) {
             </div>
             <div className="flex gap-2">
                 <LoadUDF onLoad={handleLoad} />
-                <FlushUDFs onFlush={() => { setUdfList([]); setSelectedLib(undefined); setSelectedUdf(undefined); }} />
+                <FlushUDFs
+                    onFlush={() => {
+                        setUdfList([]);
+                        setSelectedLib(undefined);
+                        setSelectedUdf(undefined);
+                    }}
+                />
             </div>
             {udfList.length > 0 && (
                 <div className="flex flex-col gap-2">
