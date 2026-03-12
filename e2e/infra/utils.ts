@@ -38,6 +38,7 @@ export const initializeLocalStorage = () => `
         if (!localStorage.getItem("contentPersistence")) localStorage.setItem("contentPersistence", "false");
         if (!localStorage.getItem("query history")) localStorage.setItem("query history", "[]");
         if (!localStorage.getItem("refreshInterval")) localStorage.setItem("refreshInterval", "60");
+        if (!localStorage.getItem("tutorial")) localStorage.setItem("tutorial", "false");
     `;
 
 export function delay(ms: number) {

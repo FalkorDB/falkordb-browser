@@ -93,7 +93,8 @@ test.describe("Chat Feature Tests", () => {
     // Configure chat settings with a test API key
     // Note: Using a placeholder key for testing - in real tests you'd use a valid key
     const testApiKey = process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY || "test-api-key-placeholder";
-    await settings.setChatApiKeyAndSave(testApiKey);
+    const availableModels = await settings.getAvailableModels();
+    await settings.setChatApiKeyAndSave(testApiKey, availableModels[0]);
     
     // Wait for settings to be saved
     await settings.waitForTimeout(1000);
