@@ -82,7 +82,7 @@ jobs:
             fi
           done
       - name: Install Playwright Browsers
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox
       - name: Build application
         run: npm run build
       - name: Upload build output
@@ -95,14 +95,83 @@ jobs:
           if-no-files-found: error
 
   test-shards:
-    name: Run tests (shard ${{ matrix.shard }}/6)
+    name: Run tests (shard ${{ matrix.shard }}/3)
     needs: setup-and-build
     timeout-minutes: 60
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6]
+        shard: [1, 2, 3]
+
+    services:
+      falkordb:
+        image: falkordb/falkordb:latest
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+      - name: Restore dependencies cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
+            ${{ runner.os }}-node-
+      - name: Download build output
+        uses: actions/download-artifact@v4
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: .next/
+      - name: Run Playwright tests (shard ${{ matrix.shard }} of 3)
+        env:
+          OPENAI_TOKEN: ${{ secrets.OPENAI_TOKEN }}
+        run: |
+          export CHAT_URL="http://localhost:8080/"
+          export NEXTAUTH_URL="http://localhost:3000/"
+          export NEXTAUTH_SECRET=SECRET
+          npm start > nextjs.log 2>&1 &
+          timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
+          npx playwright test --grep-invert "@config|@tls|@cluster|@token" --shard=${{ matrix.shard }}/3 --workers=4 --reporter=dot,list
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-results-shard-${{ matrix.shard }}-${{ github.run_id }}
+          path: test-results/
+          retention-days: 3
+          if-no-files-found: ignore
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-shard-${{ matrix.shard }}-${{ github.run_id }}
+          path: playwright-report/
+          retention-days: 30
+          if-no-files-found: ignore
+      - name: Upload server logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nextjs-logs-shard-${{ matrix.shard }}-${{ github.run_id }}
+          path: nextjs.log
+          retention-days: 3
+          if-no-files-found: ignore
+
+  run-token-tests:
+    name: Run token tests
+    needs: setup-and-build
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
 
     services:
       falkordb:
@@ -136,35 +205,33 @@ jobs:
         with:
           name: nextjs-build-${{ github.run_id }}
           path: .next/
-      - name: Run Playwright tests (shard ${{ matrix.shard }} of 6)
+      - name: Run token tests
         env:
-          OPENAI_TOKEN: ${{ secrets.OPENAI_TOKEN }}
+          NEXTAUTH_SECRET: SECRET
+          PAT_FALKORDB_HOST: localhost
+          PAT_FALKORDB_PORT: 6380
+          PAT_FALKORDB_USERNAME: default
+          PAT_FALKORDB_PASSWORD: ""
+          PAT_FALKORDB_GRAPH_NAME: token_management
+          ENCRYPTION_KEY: "a3f5d8c2b7e4f1a0c9d6e8b2f5a7c3d1e9f2a4b8c6d3e7f1a5b9c2d8e4f0a6b3"
         run: |
-          export CHAT_URL="http://localhost:8080/"
-          export NEXTAUTH_URL="http://localhost:3000/"
-          export NEXTAUTH_SECRET=SECRET
-          export ENCRYPTION_KEY="a3f5d8c2b7e4f1a0c9d6e8b2f5a7c3d1e9f2a4b8c6d3e7f1a5b9c2d8e4f0a6b3"
-          export PAT_FALKORDB_HOST=localhost
-          export PAT_FALKORDB_PORT=6380
-          export PAT_FALKORDB_USERNAME=default
-          export PAT_FALKORDB_PASSWORD=""
-          export PAT_FALKORDB_GRAPH_NAME=token_management
-          npm start > nextjs.log 2>&1 &
-          timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
-          npx playwright test \
-            --grep-invert "@tls|@cluster" \
-            --project="[Admin] Chromium" \
-            --project="[Read-Write] - Chromium" \
-            --project="[Read-Only] - Chromium" \
-            --project="[Admin: Settings - Chromium]" \
-            --shard=${{ matrix.shard }}/6 \
-            --workers=4 \
-            --reporter=dot,list
+          npm start &
+          APP_PID=$!
+          echo "Waiting for app to start..."
+          for i in {1..30}; do
+            if curl -f http://localhost:3000 > /dev/null 2>&1; then
+              echo "App is ready"
+              break
+            fi
+            sleep 1
+          done
+          npx playwright test settingsTokens --workers=4 --reporter=dot,list
+          kill $APP_PID || true
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-results-shard-${{ matrix.shard }}-${{ github.run_id }}
+          name: playwright-results-tokens-${{ github.run_id }}
           path: test-results/
           retention-days: 3
           if-no-files-found: ignore
@@ -172,7 +239,70 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report-shard-${{ matrix.shard }}-${{ github.run_id }}
+          name: playwright-report-tokens-${{ github.run_id }}
+          path: playwright-report/
+          retention-days: 30
+          if-no-files-found: ignore
+
+  run-settings-tests:
+    name: Run settings tests
+    needs: setup-and-build
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+
+    services:
+      falkordb:
+        image: falkordb/falkordb:latest
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+      - name: Restore dependencies cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
+            ${{ runner.os }}-node-
+      - name: Download build output
+        uses: actions/download-artifact@v4
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: .next/
+      - name: Run only config test
+        run: |
+          export CHAT_URL="http://localhost:8080/"
+          export NEXTAUTH_URL="http://localhost:3000/"
+          export NEXTAUTH_SECRET=SECRET 
+          npm start > nextjs.log 2>&1 & 
+          timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
+          npx playwright test --grep @config --workers=4 --reporter=dot,list
+      - name: Ensure required directories exist
+        run: |
+          mkdir -p playwright-report
+          mkdir -p playwright-report/artifacts
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-results-settings-${{ github.run_id }}
+          path: test-results/
+          retention-days: 3
+          if-no-files-found: ignore
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-settings-${{ github.run_id }}
           path: playwright-report/
           retention-days: 30
           if-no-files-found: ignore
@@ -180,7 +310,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: nextjs-logs-shard-${{ matrix.shard }}-${{ github.run_id }}
+          name: nextjs-logs-settings-${{ github.run_id }}
           path: nextjs.log
           retention-days: 3
           if-no-files-found: ignore

@@ -64,7 +64,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@admin/,
-      testIgnore: /.*settingsConfig\.spec\.ts$|.*settingsUsers\.spec\.ts$|.*tls\.spec\.ts$|.*cluster\.spec\.ts$/,
+      testIgnore: /.*settingsConfig\.spec\.ts$|.*tls\.spec\.ts$|.*cluster\.spec\.ts$/,
     },
     {
       name: '[Admin] Firefox',
@@ -75,7 +75,7 @@ export default defineConfig({
       timeout: 40000,
       dependencies: ['setup'],
       grep: /@admin/,
-      testIgnore: /.*settingsConfig\.spec\.ts$|.*settingsUsers\.spec\.ts$|.*tls\.spec\.ts$|.*cluster\.spec\.ts$/,
+      testIgnore: /.*settingsConfig\.spec\.ts$|.*tls\.spec\.ts$|.*cluster\.spec\.ts$/,
     },
     {
       name: '[Read-Write] - Chromium',
