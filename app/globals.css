@@ -43,7 +43,7 @@
         font-display: swap;
     }
 
-    *:not(.codicon) {
+    *:not(.codicon):not(code):not(pre):not(code *):not(pre *):not(.monospace):not(.monospace *) {
         font-family: 'HyperlegibleSans' !important;
     }
 

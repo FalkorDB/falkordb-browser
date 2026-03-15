@@ -28,6 +28,8 @@ function LibrarySection({ libraryName, libraryType, functions, isSelected, onSel
             >
                 <button
                     type="button"
+                    aria-expanded={open}
+                    aria-label={`Toggle ${libraryName} functions`}
                     onClick={() => setOpen(!open)}
                     className="flex items-center gap-1"
                 >
@@ -89,7 +91,13 @@ export default function UdfPanel() {
 
         const data = await res.json();
 
-        setSelectedUdf(data.result[0]);
+        // Only update if this library is still the selected one (avoid stale responses)
+        setSelectedLib(current => {
+            if (current === libraryName) {
+                setSelectedUdf(data.result[0]);
+            }
+            return current;
+        });
     };
 
     const handleLoad = async (name: string) => {

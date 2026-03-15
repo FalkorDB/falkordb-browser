@@ -73,11 +73,13 @@ function GraphView({
     }, [graph, historyQuery.currentQuery]);
 
     useEffect(() => {
+        if (currentTab === "Metadata" || isTabEnabled(currentTab)) return;
+
         let defaultChecked: Tab = "Graph";
         if (elementsLength === 0 && graph.Data.length !== 0) defaultChecked = "Table";
 
         setCurrentTab(defaultChecked);
-    }, [graph, elementsLength, graph.Data.length, setCurrentTab]);
+    }, [graph, elementsLength, graph.Data.length, currentTab, setCurrentTab, isTabEnabled]);
 
     useEffect(() => {
         setSelectedElements([]);

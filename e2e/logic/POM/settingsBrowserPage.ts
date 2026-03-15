@@ -1,3 +1,4 @@
+/* eslint-disable no-await-in-loop */
 import { Locator } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
 import {
@@ -182,7 +183,7 @@ export default class SettingsBrowserPage extends BasePage {
    * cold starts (first test run), so we poll localStorage instead of using a
    * fixed timeout.
    */
-  async waitForModelAutoDetection(timeout = 10000): Promise<void> {
+  async waitForModelAutoDetection(timeout = 10000): Promise<boolean> {
     try {
       await this.page.waitForFunction(
         () => {
@@ -191,9 +192,10 @@ export default class SettingsBrowserPage extends BasePage {
         },
         { timeout }
       );
+      return true;
     } catch {
-      // Model was not auto-detected within the timeout — proceed anyway
-      // (the test assertion will catch the resulting error)
+      // Model was not auto-detected within the timeout
+      return false;
     }
   }
 
@@ -238,7 +240,7 @@ export default class SettingsBrowserPage extends BasePage {
       return; // No categories rendered within timeout, nothing to expand
     }
     const count = await toggleLocator.count();
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < count; i += 1) {
       const toggle = toggleLocator.nth(i);
       // Only click if not already expanded — avoids accidentally collapsing an open category
       const isExpanded = await toggle.getAttribute('aria-expanded');

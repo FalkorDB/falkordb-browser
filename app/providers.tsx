@@ -633,7 +633,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
           const udfData = await result.json();
 
-          setSelectedUdf(udfData.result[0]);
+          setSelectedUdf(prev => prev ?? udfData.result[0]);
         }
       })();
     })();
