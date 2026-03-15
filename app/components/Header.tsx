@@ -149,7 +149,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                         data-testid="settings"
                         className={cn(
                             "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/15",
-                            type === "Settings" && "!text-primary bg-primary/10 border-border"
+                            type === "Settings" && "!text-primary"
                         )}
                         title="Adjust application settings"
                         label="SETTINGS"
@@ -162,7 +162,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                                 title="User Defined Functions: View and manage your UDFs"
                                 className={cn(
                                     "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
-                                    type === "UDF" && "!text-primary bg-primary/10 border-border"
+                                    type === "UDF" && "!text-primary"
                                 )}
                                 onClick={() => router.push("/udf")}
                                 data-testid="UdfButton"
@@ -173,7 +173,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                         title="View and manage your graphs"
                         className={cn(
                             "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
-                            type === "Graph" && "!text-primary bg-primary/10 border-border"
+                            type === "Graph" && "!text-primary"
                         )}
                         onClick={() => router.push("/graph")}
                         data-testid="GraphsButton"
@@ -196,7 +196,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                             indicator={indicator}
                             className={cn(
                                 "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
-                                panelOpen && "!text-primary bg-primary/10 border-border"
+                                panelOpen && "!text-primary"
                             )}
                             title="Graph info"
                             onClick={() => onOpenPanel()}
@@ -211,7 +211,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                             data-testid="chatToggleButton"
                             className={cn(
                                 "text-foreground font-semibold text-xl p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
-                                panel === "chat" && "!text-primary bg-primary/10 border-border"
+                                panel === "chat" && "!text-primary"
                             )}
                             indicator={indicator}
                             title="Chat"
