@@ -6,10 +6,14 @@ import * as SliderPrimitive from "@radix-ui/react-slider"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip"
 
+interface SliderProps extends React.ComponentProps<typeof SliderPrimitive.Root> {
+  type?: "seconds" | "%" | "px"
+}
+
 const Slider = React.forwardRef<
   React.ElementRef<typeof SliderPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root>
->(({ value, className, ...props }, ref) => (
+  SliderProps
+>(({ value, type = "seconds", className, ...props }, ref) => (
   <SliderPrimitive.Root
     ref={ref}
     className={cn(
@@ -29,7 +33,7 @@ const Slider = React.forwardRef<
         <SliderPrimitive.Thumb className="block h-5 w-5 rounded-full border-2 border-primary bg-background ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50" />
       </TooltipTrigger>
       <TooltipContent>
-        {value} seconds
+        {value} {type}
       </TooltipContent>
     </Tooltip>
   </SliderPrimitive.Root>

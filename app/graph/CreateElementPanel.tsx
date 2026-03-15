@@ -4,7 +4,7 @@
 
 import { Fragment, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
-import { ArrowRight, ArrowRightLeft, Check, Info, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ArrowRight, ArrowRightLeft, Check, Circle, Info, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -320,7 +320,7 @@ export default function CreateElementPanel(props: Props) {
 
         return (
             <Combobox
-                className="w-fit"
+                className="w-full"
                 inTable
                 options={["string", "number", "boolean"]}
                 selectedValue={valueType}
@@ -410,29 +410,35 @@ export default function CreateElementPanel(props: Props) {
     };
 
     return (
-        <div className="DataPanel p-4">
-            <div className="relative flex flex-col gap-6 pb-4 border-b border-border">
-                <div className="flex flex-row justify-between">
-                    <div className="flex flex-col gap-2 font-medium text-xl text-nowrap">
-                        <p>Attributes: <span className="Gradient text-transparent bg-clip-text">{attributes.length}</span></p>
-                    </div>
-                    <Button
-                        className="h-fit"
-                        title="Close"
-                        onClick={onClose}
-                    >
-                        <X />
-                    </Button>
+        <div className="DataPanel p-4 gap-1 relative">
+            <Button
+                className="absolute top-2 right-2"
+                title="Close"
+                onClick={onClose}
+            >
+                <X size={16} />
+            </Button>
+            <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between pr-5">
+                    <h1 className="text-2xl">Create {type ? "Node" : "Edge"}</h1>
+                    {
+                        type
+                            ? <Circle className="text-green" size={25} />
+                            : <ArrowRight className="text-green" size={25} />
+                    }
+                </div>
+                <div className="flex flex-col gap-2 font-medium text-xl text-nowrap">
+                    <p>Attributes: <span className="Gradient text-transparent bg-clip-text">{attributes.length}</span></p>
                 </div>
                 <ul
-                    className="flex flex-wrap gap-4"
+                    className="flex flex-wrap gap-2"
                     onMouseEnter={() => setLabelsHover(true)}
                     onMouseLeave={() => setLabelsHover(false)}
                 >
                     {labels.map((l) => (
                         <li
                             key={l}
-                            className="flex gap-2 px-2 py-1 bg-secondary rounded-full items-center"
+                            className="flex gap-2 p-1 bg-secondary rounded-full items-center"
                         >
                             <p>{l}</p>
                             <RemoveLabel
@@ -471,10 +477,10 @@ export default function CreateElementPanel(props: Props) {
             <div className="w-full h-1 grow flex flex-col justify-between items-start font-medium">
                 <div ref={scrollableContainerRef} className="h-1 grow overflow-y-auto overflow-x-hidden w-full">
                     <div className="grid grid-cols-[minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)_minmax(60px,1fr)]">
-                        <div className="flex items-center font-medium text-muted-foreground px-2 border-b border-border h-10">Key</div>
-                        <div className="flex items-center font-medium text-muted-foreground px-2 border-b border-border h-10">Value</div>
-                        <div className="flex items-center font-medium text-muted-foreground px-2 border-b border-border h-10">Type</div>
-                        <div className="flex items-center px-2 border-b border-border h-10"><div className="w-6" /></div>
+                        <div className="flex items-center font-medium text-muted-foreground px-2 border-y border-border h-10">Key</div>
+                        <div className="flex items-center font-medium text-muted-foreground px-2 border-y border-border h-10">Value</div>
+                        <div className="flex items-center font-medium text-muted-foreground px-2 border-y border-border h-10">Type</div>
+                        <div className="flex items-center px-2 border-y border-border h-10"><div className="w-6" /></div>
                         {attributes.map(([key, value]) => {
                             const isComplex = isComplexType(value);
                             const stringValue = getStringValue(value);
@@ -674,7 +680,7 @@ export default function CreateElementPanel(props: Props) {
                         </div>
                         <div className="flex items-center px-2 border-b border-border h-14 opacity-50">
                             <Combobox
-                                className="w-fit"
+                                className="w-full"
                                 inTable
                                 disabled
                                 options={["string", "number", "boolean"]}

@@ -29,6 +29,14 @@ type BrowserSettingsContextType = {
       newCaptionsKeys: string[];
       setNewCaptionsKeys: Dispatch<SetStateAction<string[]>>;
     };
+    tableViewSettings: {
+      newColumnWidth: number;
+      setNewColumnWidth: Dispatch<SetStateAction<number>>;
+      newRowHeight: number;
+      setNewRowHeight: Dispatch<SetStateAction<number>>;
+      newRowHeightExpandMultiple: number;
+      setNewRowHeightExpandMultiple: Dispatch<SetStateAction<number>>;
+    };
     showPropertyKeyPrefixSettings: {
       newShowPropertyKeyPrefix: boolean;
       setNewShowPropertyKeyPrefix: Dispatch<SetStateAction<boolean>>;
@@ -78,6 +86,14 @@ type BrowserSettingsContextType = {
     captionsKeysSettings: {
       captionsKeys: string[];
       setCaptionsKeys: Dispatch<SetStateAction<string[]>>;
+    };
+    tableViewSettings: {
+      columnWidth: number;
+      setColumnWidth: Dispatch<SetStateAction<number>>;
+      rowHeight: number;
+      setRowHeight: Dispatch<SetStateAction<number>>;
+      rowHeightExpandMultiple: number;
+      setRowHeightExpandMultiple: Dispatch<SetStateAction<number>>;
     };
     chatSettings: {
       secretKey: string;
@@ -214,6 +230,14 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         newCaptionsKeys: [],
         setNewCaptionsKeys: () => { },
       },
+      tableViewSettings: {
+        newColumnWidth: 0,
+        setNewColumnWidth: () => { },
+        newRowHeight: 0,
+        setNewRowHeight: () => { },
+        newRowHeightExpandMultiple: 0,
+        setNewRowHeightExpandMultiple: () => { },
+      },
       showPropertyKeyPrefixSettings: {
         newShowPropertyKeyPrefix: false,
         setNewShowPropertyKeyPrefix: () => { },
@@ -253,6 +277,14 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
       captionsKeysSettings: {
         captionsKeys: [],
         setCaptionsKeys: () => { },
+      },
+      tableViewSettings: {
+        columnWidth: 0,
+        setColumnWidth: () => { },
+        rowHeight: 0,
+        setRowHeight: () => { },
+        rowHeightExpandMultiple: 0,
+        setRowHeightExpandMultiple: () => { },
       },
       showPropertyKeyPrefixSettings: {
         showPropertyKeyPrefix: false,

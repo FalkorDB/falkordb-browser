@@ -4,12 +4,13 @@
 import { useContext, useMemo, useEffect, useRef } from "react";
 import { Row } from "@/lib/utils";
 import TableComponent from "../components/TableComponent";
-import { GraphContext, TableViewContext } from "../components/provider";
+import { BrowserSettingsContext, GraphContext, TableViewContext } from "../components/provider";
 import Export from "../components/Export";
 
 export default function TableView() {
     const { graph } = useContext(GraphContext);
     const { scrollPosition, setScrollPosition, search, setSearch, expand, setExpand, dataHash } = useContext(TableViewContext);
+    const { settings: { tableViewSettings: { rowHeight, rowHeightExpandMultiple, columnWidth } } } = useContext(BrowserSettingsContext);
     const previousDataHash = useRef<string>("");
 
     const tableData = useMemo(() => {
@@ -75,11 +76,14 @@ export default function TableView() {
     return (
         <TableComponent
             label="TableView"
-            className="p-2 pb-10"
-            valueClassName="SofiaSans text-xl"
+            className="p-2 pb-12"
+            valueClassName="SofiaSans"
             headers={tableData.headers}
             rows={tableData.rows}
             entityName="Element"
+            itemHeight={rowHeight}
+            itemHeightExpandMultiple={rowHeightExpandMultiple}
+            itemWidth={columnWidth}
             initialScrollPosition={scrollPosition}
             onScrollChange={setScrollPosition}
             initialSearch={search}

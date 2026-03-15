@@ -1,11 +1,11 @@
 'use client';
 
-import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { cn, getMemoryUsage, isTwoNodes, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamicImport from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { ImperativePanelHandle } from "react-resizable-panels";
+import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import { Graph, Link, Node, GraphInfo, Value, MemoryValue } from "../api/graph/model";
 import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ForceGraphContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
@@ -77,23 +77,40 @@ export default function Page() {
     } = useContext(BrowserSettingsContext);
     const { toast } = useToast();
 
-    const panelRef = useRef<ImperativePanelHandle>(null);
+    const panelRef = useRef<PanelImperativeHandle>(null);
 
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
     const [isCollapsed, setIsCollapsed] = useState(true);
     const [isAddNode, setIsAddNode] = useState(false);
     const [isAddEdge, setIsAddEdge] = useState(false);
 
+    const onPanelResize = useCallback((size: PanelSize) => {
+        setIsCollapsed(size.asPercentage === 0);
+    }, []);
+
     const getPanelSize = useCallback(() => {
         switch (panel) {
             case "data":
-                return 15;
+                return "200px";
             case "add":
-                return 30;
+                return "30%";
             case "chat":
-                return 40;
+                return "40%";
             default:
-                return 0;
+                return "0%";
+        }
+    }, [panel]);
+
+    const panelMinSize = useMemo(() => {
+        switch (panel) {
+            case "data":
+                return "200px";
+            case "add":
+                return "25%";
+            case "chat":
+                return "45%";
+            default:
+                return "0%";
         }
     }, [panel]);
 
@@ -104,9 +121,14 @@ export default function Page() {
 
         if (panel) {
             currentPanel.expand();
-            currentPanel.resize(getPanelSize());
-        } else currentPanel.collapse();
-
+            // Defer resize to next frame so the panel processes the updated minSize prop first
+            const frameId = requestAnimationFrame(() => {
+                currentPanel.resize(getPanelSize());
+            });
+            // eslint-disable-next-line consistent-return
+            return () => cancelAnimationFrame(frameId);
+        }
+        currentPanel.collapse();
 
         if (panel !== "chat") return;
 
@@ -400,11 +422,11 @@ export default function Page() {
                 fetchCount={fetchCount}
                 isQueryLoading={isQueryLoading}
             />
-            <ResizablePanelGroup direction="horizontal" className="h-1 grow">
+            <ResizablePanelGroup orientation="horizontal" className="h-1 grow">
                 <ResizablePanel
-                    defaultSize={100 - getPanelSize()}
+                    defaultSize="100%"
                     collapsible
-                    minSize={30}
+                    minSize="30%"
                 >
                     <GraphView
                         selectedElements={selectedElements}
@@ -429,19 +451,14 @@ export default function Page() {
                 <ResizableHandle
                     withHandle
                     onMouseUp={() => isCollapsed && handleSetSelectedElements()}
-                    className={cn("ml-2 w-0", isCollapsed && "hidden")}
+                    className={cn("ml-2", isCollapsed && "hidden")}
                 />
                 <ResizablePanel
-                    ref={panelRef}
+                    panelRef={panelRef}
                     collapsible
-                    defaultSize={getPanelSize()}
-                    minSize={panel === "data" ? 15 : 30}
-                    onCollapse={() => {
-                        setIsCollapsed(true);
-                    }}
-                    onExpand={() => {
-                        setIsCollapsed(false);
-                    }}
+                    defaultSize="0%"
+                    minSize={panelMinSize}
+                    onResize={onPanelResize}
                 >
                     {getCurrentPanel()}
                 </ResizablePanel>

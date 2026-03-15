@@ -25,12 +25,14 @@ interface Props {
     rows: Row[],
     label: "Graphs" | "Schemas" | "Configs" | "Users" | "TableView",
     entityName: "Graph" | "Schema" | "Config" | "User" | "Element",
+    itemHeight: number
+    itemHeightExpandMultiple?: number
+    itemWidth?: number
     valueClassName?: string
     inputRef?: React.RefObject<HTMLInputElement>,
     children?: React.ReactNode,
     setRows?: Dispatch<SetStateAction<Row[]>>,
     className?: string
-    itemHeight?: number
     itemsPerPage?: number
     initialScrollPosition?: number
     onScrollChange?: Dispatch<SetStateAction<number>>
@@ -74,7 +76,9 @@ export default function TableComponent({
     children,
     setRows,
     className,
-    itemHeight = 70.5,
+    itemHeight,
+    itemHeightExpandMultiple,
+    itemWidth = 25,
     itemsPerPage = 30,
     initialScrollPosition,
     onScrollChange,
@@ -134,10 +138,10 @@ export default function TableComponent({
             fixedColsWidth = fixedCols.reduce((sum, cell) => sum + cell.getBoundingClientRect().width, 0);
         }
         const availableWidth = containerWidth - fixedColsWidth;
-        return Math.floor(availableWidth / Math.min(headers.length, 4));
-    }, [containerWidth, headers.length]);
+        return Math.floor(availableWidth / Math.min(headers.length, 100 / itemWidth));
+    }, [containerWidth, headers.length, itemWidth]);
 
-    const height = useMemo(() => expandArr.size === 0 ? itemHeight : itemHeight * 2, [expandArr.size, itemHeight]);
+    const height = useMemo(() => itemHeightExpandMultiple !== undefined ? expandArr.size === 0 ? itemHeight : itemHeight * itemHeightExpandMultiple : itemHeight, [expandArr.size, itemHeight, itemHeightExpandMultiple]);
 
     const handleLoadLazyCell = useCallback((rowName: string, cellIndex: number, loadFn: () => Promise<any>) => {
         // Use row name for stable cell key
@@ -464,44 +468,49 @@ export default function TableComponent({
                         <TableHead key="index" className="w-fit min-w-fit max-w-fit border-r border-border p-2">
                             <div className="flex">
                                 <p>Index</p>
-                                <Button
-                                    className={getClassName(undefined, 1)}
-                                    title="Expand Root"
-                                    onClick={() => {
-                                        const newExpandArr = new Map<number, number>();
-                                        headers.forEach((_, idx) => newExpandArr.set(idx, 1));
-                                        setExpandArr(newExpandArr);
+                                {
+                                    visibleRows.some(r => r.cells.some(cell => cell?.type === "object")) &&
+                                    <>
+                                        <Button
+                                            className={getClassName(undefined, 1)}
+                                            title="Expand Root"
+                                            onClick={() => {
+                                                const newExpandArr = new Map<number, number>();
+                                                headers.forEach((_, idx) => newExpandArr.set(idx, 1));
+                                                setExpandArr(newExpandArr);
 
-                                        if (onExpandChange) onExpandChange(newExpandArr);
-                                    }}
-                                >
-                                    <ChevronDown />
-                                </Button>
-                                <Button
-                                    title="Expand All"
-                                    className={getClassName(undefined, -1)}
-                                    onClick={() => {
-                                        const newExpandArr = new Map<number, number>();
-                                        headers.forEach((_, idx) => newExpandArr.set(idx, -1));
-                                        setExpandArr(newExpandArr);
+                                                if (onExpandChange) onExpandChange(newExpandArr);
+                                            }}
+                                        >
+                                            <ChevronDown />
+                                        </Button>
+                                        <Button
+                                            title="Expand All"
+                                            className={getClassName(undefined, -1)}
+                                            onClick={() => {
+                                                const newExpandArr = new Map<number, number>();
+                                                headers.forEach((_, idx) => newExpandArr.set(idx, -1));
+                                                setExpandArr(newExpandArr);
 
-                                        if (onExpandChange) onExpandChange(newExpandArr);
-                                    }}
-                                >
-                                    <ChevronsDown />
-                                </Button>
-                                <Button
-                                    title="Collapse All"
-                                    className={getClassName(undefined)}
-                                    onClick={() => {
-                                        const newExpandArr = new Map<number, number>();
-                                        setExpandArr(newExpandArr);
+                                                if (onExpandChange) onExpandChange(newExpandArr);
+                                            }}
+                                        >
+                                            <ChevronsDown />
+                                        </Button>
+                                        <Button
+                                            title="Collapse All"
+                                            className={getClassName(undefined)}
+                                            onClick={() => {
+                                                const newExpandArr = new Map<number, number>();
+                                                setExpandArr(newExpandArr);
 
-                                        if (onExpandChange) onExpandChange(newExpandArr);
-                                    }}
-                                >
-                                    <ChevronsUp />
-                                </Button>
+                                                if (onExpandChange) onExpandChange(newExpandArr);
+                                            }}
+                                        >
+                                            <ChevronsUp />
+                                        </Button>
+                                    </>
+                                }
                             </div>
                         </TableHead>
                         {
@@ -587,7 +596,6 @@ export default function TableComponent({
                         visibleRows.map((row, index) => {
                             const actualIndex = topFakeRowHeight / height + index;
                             const rowTestID = `${label}${row.name}`;
-
                             return (
                                 <TableRow
                                     className="border-border"
@@ -616,7 +624,7 @@ export default function TableComponent({
                                             : null
                                     }
                                     <TableCell className="border-r border-border p-1">
-                                        <p>{actualIndex + 1}.</p>
+                                        <p className="w-full h-full text-start">{actualIndex + 1}.</p>
                                     </TableCell>
                                     {
                                         row.cells.map((cell, j) => {
@@ -653,14 +661,14 @@ export default function TableComponent({
                                             return (
                                                 <TableCell
                                                     className={cn(
-                                                        "border-border p-0",
+                                                        "border-border p-0 items-center",
                                                         j + 1 !== row.cells.length && "border-r"
                                                     )}
                                                     key={cellKey}
                                                 >
                                                     <div
                                                         style={{ height }}
-                                                        className="overflow-auto p-1"
+                                                        className="overflow-auto"
                                                     >
                                                         {
                                                             cell.type === "object" ?
