@@ -25,6 +25,7 @@ interface Props {
     graphName: string
     onOpenPanel: () => void
     panelOpen: boolean
+    showUDF: boolean
 }
 
 function getPathType(pathname: string): "Schema" | "Graph" | "Settings" | "UDF" | undefined {
@@ -57,7 +58,7 @@ function formatVersion(version: string | undefined): string {
     return version;
 }
 
-export default function Header({ onSetGraphName, graphNames, graphName, onOpenPanel, panelOpen }: Props) {
+export default function Header({ onSetGraphName, graphNames, graphName, onOpenPanel, panelOpen, showUDF }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
     const { connectionType, dbVersion } = useContext(ConnectionContext);
@@ -154,16 +155,19 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                         label="SETTINGS"
                         onClick={() => router.push("/settings")}
                     />
-                    <Button
-                        label="UDFs"
-                        title="User Defined Functions: View and manage your UDFs"
-                        className={cn(
-                            "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
-                            type === "UDF" && "!text-primary"
-                        )}
-                        onClick={() => router.push("/udf")}
-                        data-testid="UdfButton"
-                    />
+                    {
+                        showUDF ?
+                            <Button
+                                label="UDFs"
+                                title="User Defined Functions: View and manage your UDFs"
+                                className={cn(
+                                    "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
+                                    type === "UDF" && "!text-primary"
+                                )}
+                                onClick={() => router.push("/udf")}
+                                data-testid="UdfButton"
+                            /> : null
+                    }
                     <Button
                         label="GRAPHS"
                         title="View and manage your graphs"

@@ -6,7 +6,7 @@
 
 import { prepareArg, securedFetch, GraphRef } from "@/lib/utils";
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { Pencil, X } from "lucide-react";
+import { Pencil, TableProperties, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
 import Button from "../components/ui/Button";
@@ -92,7 +92,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
             graph.GraphInfo = newGraphInfo;
 
             const canvas = canvasRef.current;
-            
+
             if (canvas) {
                 const currentData = canvas.getGraphData();
 
@@ -164,21 +164,23 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
     };
 
     return (
-        <div data-testid="DataPanel" className="DataPanel gap-1 p-2">
-            <div className="relative flex flex-col gap-2">
-                <div className="flex flex-row justify-between">
-                    <div className="flex flex-col gap-1 font-medium text-xl text-nowrap">
-                        <p>ID: <span className="Gradient text-transparent bg-clip-text">{object.id}</span></p>
-                        <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text">{Object.keys(object.data).length}</span></p>
-                    </div>
-                    <Button
-                        className="h-fit"
-                        data-testid="DataPanelClose"
-                        title="Close"
-                        onClick={() => onClose()}
-                    >
-                        <X />
-                    </Button>
+        <div data-testid="DataPanel" className="DataPanel gap-1 p-2 relative">
+            <Button
+                className="absolute top-2 right-2"
+                data-testid="DataPanelClose"
+                title="Close"
+                onClick={() => onClose()}
+            >
+                <X size={16} />
+            </Button>
+            <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between pr-5">
+                    <h1 className="text-2xl">{type ? "Node" : "Edge"} Data</h1>
+                    <TableProperties size={25} />
+                </div>
+                <div className="flex flex-col gap-1 font-medium text-xl text-nowrap">
+                    <p>ID: <span className="Gradient text-transparent bg-clip-text">{object.id}</span></p>
+                    <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text">{Object.keys(object.data).length}</span></p>
                 </div>
                 <ul
                     ref={labelsListRef}
