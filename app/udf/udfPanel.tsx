@@ -75,11 +75,7 @@ export default function UdfPanel() {
     }, [selectedUdf]);
 
     const handleSelectLib = async (libraryName: string) => {
-        if (libraryName === selectedLib) {
-            setSelectedLib(undefined);
-            setSelectedUdf(undefined);
-            return;
-        }
+        if (selectedLib === libraryName) return;
 
         setSelectedLib(libraryName);
 
@@ -91,13 +87,7 @@ export default function UdfPanel() {
 
         const data = await res.json();
 
-        // Only update if this library is still the selected one (avoid stale responses)
-        setSelectedLib(current => {
-            if (current === libraryName) {
-                setSelectedUdf(data.result[0]);
-            }
-            return current;
-        });
+        setSelectedUdf(data.result[0]);
     };
 
     const handleLoad = async (name: string) => {

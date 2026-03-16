@@ -526,7 +526,7 @@ export default function TableComponent({
                                     <div className="flex gap-2 justify-between items-center">
                                         <p>{header}</p>
                                         {
-                                            filteredRows.some(r => r.cells[i]?.type === "object") &&
+                                            visibleRows.some(r => r.cells[i]?.type === "object") &&
                                             <div className="flex">
                                                 <Button
                                                     className={getClassName(i, 1)}
