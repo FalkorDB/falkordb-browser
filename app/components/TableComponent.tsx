@@ -413,6 +413,8 @@ export default function TableComponent({
         return cn("text-foreground rounded-lg border border-transparent hover:border-border/10 hover:bg-secondary", isActive && "text-primary");
     };
 
+    const isObjectType =visibleRows.some(r => r.cells.some(cell => cell?.type === "object"));
+
     return (
         <div className={cn("h-full w-full flex flex-col gap-4", className)}>
             <div className="flex gap-4">
@@ -467,9 +469,9 @@ export default function TableComponent({
                         }
                         <TableHead key="index" className="w-fit min-w-fit max-w-fit border-r border-border p-2">
                             <div className="flex">
-                                <p>Index</p>
+                                <p className={!isObjectType ? "w-full text-center" : ""}>Index</p>
                                 {
-                                    visibleRows.some(r => r.cells.some(cell => cell?.type === "object")) &&
+                                    isObjectType &&
                                     <>
                                         <Button
                                             className={getClassName(undefined, 1)}
@@ -524,9 +526,9 @@ export default function TableComponent({
                                     key={header}
                                 >
                                     <div className="flex gap-2 justify-between items-center">
-                                        <p>{header}</p>
+                                        <p className={!isObjectType ? "w-full text-center" : ""}>{header}</p>
                                         {
-                                            visibleRows.some(r => r.cells[i]?.type === "object") &&
+                                            isObjectType &&
                                             <div className="flex">
                                                 <Button
                                                     className={getClassName(i, 1)}
@@ -701,7 +703,7 @@ export default function TableComponent({
                                                                     />
                                                                 </div>
                                                                 : editable === cellKey ?
-                                                                    <div className="h-full w-full flex gap-2 items-center">
+                                                                    <div className="h-full w-full flex gap-2 items-center justify-center">
                                                                         {
                                                                             cell.type === "select" ?
                                                                                 <Combobox
@@ -778,7 +780,7 @@ export default function TableComponent({
                                                                             }
                                                                         </div>
                                                                     </div>
-                                                                    : <div className="flex items-center gap-2">
+                                                                    : <div className="flex items-center gap-2 justify-center">
                                                                         <Tooltip>
                                                                             <TooltipTrigger asChild>
                                                                                 <p data-testid={`content${cellTestId}${headers[j]}`} >{cell.value}</p>

@@ -614,11 +614,6 @@ export class Graph {
           emptyCategory.elements.findIndex((e) => e.id === currentNode.id),
           1
         );
-
-        if (emptyCategory.elements.length === 0) {
-          this.labels = this.labels.filter((c) => c.name !== "");
-          this.labelsMap.delete("");
-        }
       }
 
       delete currentNode.data.fake;

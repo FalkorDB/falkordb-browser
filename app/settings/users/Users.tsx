@@ -143,7 +143,7 @@ export default function Users() {
                 headers={["Name", "Role"]}
                 rows={rows}
                 setRows={setRows}
-                itemHeight={24}
+                itemHeight={40}
             >
                 <div className="flex flex-row-reverse gap-4">
                     <AddUser onAddUser={handleAddUser} />
