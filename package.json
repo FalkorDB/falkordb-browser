@@ -2,7 +2,7 @@
   "name": "falkordb-browser",
   "author": "FalkorDB",
   "description": "FalkorDB Browser",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "private": true,
   "engines": {
     "node": ">=20.9.0"
