@@ -110,11 +110,11 @@
         /* 32px */
     }
 
-    .json-tree-container ul>li>div {
+    .json-tree-container>ul>li>div {
         @apply !hidden;
     }
 
-    .json-tree-container li {
+    .json-tree-container>ul>li {
         @apply !pl-0 !pt-0;
         text-indent: 0 !important;
     }

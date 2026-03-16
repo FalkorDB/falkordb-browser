@@ -423,8 +423,8 @@ export default function CreateElementPanel(props: Props) {
                     <h1 className="text-2xl">Create {type ? "Node" : "Edge"}</h1>
                     {
                         type
-                            ? <Circle className="text-green" size={25} />
-                            : <ArrowRight className="text-green" size={25} />
+                            ? <Circle className="text-brandGreen" size={25} />
+                            : <ArrowRight className="text-brandGreen" size={25} />
                     }
                 </div>
                 <div className="flex flex-col gap-2 font-medium text-xl text-nowrap">

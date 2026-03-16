@@ -117,12 +117,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [cypherOnly, setCypherOnly] = useState<boolean>(false);
   const [udfList, setUdfList] = useState<UDFEntry[]>([]);
   const [selectedUdf, setSelectedUdf] = useState<UDFEntryWithCode>();
-  const [columnWidth, setColumnWidth] = useState<number>(0);
-  const [rowHeight, setRowHeight] = useState<number>(0);
-  const [newColumnWidth, setNewColumnWidth] = useState<number>(0);
-  const [newRowHeight, setNewRowHeight] = useState<number>(0);
-  const [newRowHeightExpandMultiple, setNewRowHeightExpandMultiple] = useState<number>(0);
-  const [rowHeightExpandMultiple, setRowHeightExpandMultiple] = useState<number>(0);
+  const [columnWidth, setColumnWidth] = useState<number>(25);
+  const [rowHeight, setRowHeight] = useState<number>(40);
+  const [newColumnWidth, setNewColumnWidth] = useState<number>(25);
+  const [newRowHeight, setNewRowHeight] = useState<number>(40);
+  const [newRowHeightExpandMultiple, setNewRowHeightExpandMultiple] = useState<number>(3);
+  const [rowHeightExpandMultiple, setRowHeightExpandMultiple] = useState<number>(3);
   const [showUDF, setShowUDF] = useState<boolean>(true);
 
   const replayTutorial = useCallback(() => {

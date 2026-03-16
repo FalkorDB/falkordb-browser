@@ -339,8 +339,6 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
 
     const separator = <div className="h-[80%] w-0.5 bg-border rounded-full" />;
 
-    console.log(historyQuery?.query);
-
     return (
         <div className="z-20 w-full h-[40px] flex flex-row gap-2 items-center">
             <SelectGraph

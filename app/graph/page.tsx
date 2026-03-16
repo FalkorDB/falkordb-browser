@@ -44,6 +44,7 @@ const GraphView = dynamicImport(() => import("./GraphView"), {
  */
 export default function Page() {
     const { historyQuery, setHistoryQuery } = useContext(HistoryQueryContext);
+    const { currentTab } = useContext(GraphContext);
     const { setIndicator } = useContext(IndicatorContext);
     const { panel, setPanel } = useContext(PanelContext);
     const { tutorialOpen } = useContext(BrowserSettingsContext);
@@ -137,6 +138,21 @@ export default function Page() {
         setIsAddEdge(false);
 
     }, [getPanelSize, panel]);
+
+    useEffect(() => {
+        const currentPanel = panelRef.current;
+
+        if (!currentPanel) return;
+
+        if (currentTab === "Graph") {
+            if (selectedElements.length !== 0) {
+                currentPanel.expand();
+                if (panel === undefined) setPanel("data");
+            }
+        } else if (panel === "data") {
+            currentPanel.collapse();
+        }
+    }, [currentTab, panel, selectedElements.length, setPanel]);
 
     const fetchInfo = useCallback(async (type: string) => {
         if (!graphName) return [];
