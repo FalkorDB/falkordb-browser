@@ -23,8 +23,8 @@ export interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttribute
 const getClassName = (variant: Variant, disable: boolean | undefined, open: boolean | undefined, isLoading: boolean, classN: string | undefined) => {
 
     let className = cn(
-        "disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2",
-        variant !== "button" && "rounded-lg hover:opacity-90",
+        "disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all duration-150",
+        variant !== "button" && "rounded-lg",
         open !== undefined && "gap-4",
         isLoading && "flex items-center justify-center",
         classN,
@@ -34,7 +34,7 @@ const getClassName = (variant: Variant, disable: boolean | undefined, open: bool
         case "Primary":
             className = cn(
                 "px-4 py-[10px] bg-primary",
-                !disable && "hover:bg-primary",
+                !disable && "hover:bg-primary/80",
                 className
             );
             break;

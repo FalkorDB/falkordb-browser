@@ -27,7 +27,8 @@ export default function BrowserSettings() {
             captionsKeysSettings: { newCaptionsKeys, setNewCaptionsKeys },
             showPropertyKeyPrefixSettings: { newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
             chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly },
-            graphInfo: { newRefreshInterval, setNewRefreshInterval }
+            graphInfo: { newRefreshInterval, setNewRefreshInterval },
+            tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple}
         },
         settings: {
             contentPersistenceSettings: { contentPersistence },
@@ -38,7 +39,8 @@ export default function BrowserSettings() {
             captionsKeysSettings: { captionsKeys },
             showPropertyKeyPrefixSettings: { showPropertyKeyPrefix },
             chatSettings: { secretKey, model, setModel, maxSavedMessages, cypherOnly },
-            graphInfo: { refreshInterval }
+            graphInfo: { refreshInterval },
+            tableViewSettings: { columnWidth, rowHeight, rowHeightExpandMultiple }
         },
         hasChanges,
         setHasChanges,
@@ -126,7 +128,10 @@ export default function BrowserSettings() {
         setNewCaptionsKeys(captionsKeys);
         setNewShowPropertyKeyPrefix(showPropertyKeyPrefix);
         setNewCypherOnly(cypherOnly);
-    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, model, setNewModel, setNewRefreshInterval, refreshInterval, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly]);
+        setNewColumnWidth(columnWidth);
+        setNewRowHeight(rowHeight);
+        setNewRowHeightExpandMultiple(rowHeightExpandMultiple);
+    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, model, setNewModel, setNewRefreshInterval, refreshInterval, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, rowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple]);
 
     useEffect(() => {
         setHasChanges(
@@ -141,9 +146,12 @@ export default function BrowserSettings() {
             newMaxSavedMessages !== maxSavedMessages ||
             !areCaptionKeysEqual(newCaptionsKeys, captionsKeys) ||
             newShowPropertyKeyPrefix !== showPropertyKeyPrefix ||
-            newCypherOnly !== cypherOnly
+            newCypherOnly !== cypherOnly ||
+            newColumnWidth !== columnWidth ||
+            newRowHeight !== rowHeight ||
+            newRowHeightExpandMultiple !== rowHeightExpandMultiple
         );
-    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey, newModel, model, refreshInterval, newRefreshInterval, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly]);
+    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey, newModel, model, refreshInterval, newRefreshInterval, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple]);
 
     const handleSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
         e?.preventDefault();
@@ -248,8 +256,8 @@ export default function BrowserSettings() {
     };
 
     return (
-        <div className="grow basis-0 w-full flex flex-col gap-6 overflow-hidden">
-            <div className="flex items-start justify-between gap-4 px-2">
+        <div className="grow basis-0 w-full flex flex-col gap-2 overflow-hidden">
+            <div className="flex items-start justify-between gap-2 px-2">
                 <div className="flex flex-col gap-2">
                     <h1 className="text-3xl font-semibold">Browser Settings</h1>
                     <p className="text-base text-muted-foreground">Customize your browser experience and manage configurations</p>
@@ -271,13 +279,17 @@ export default function BrowserSettings() {
                     </TooltipContent>
                 </Tooltip>
             </div>
-            <div ref={scrollableContainerRef} className="h-1 grow px-2 overflow-y-auto flex flex-col gap-6 pb-8">
+            <div ref={scrollableContainerRef} className="h-1 grow px-2 overflow-y-auto flex flex-col gap-2 pb-8">
                 {/* Chat Section */}
                 <Card className="border-border shadow-sm">
                     <CardHeader
                         data-testid="chatSectionHeader"
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        className="cursor-pointer hover:bg-muted/50 transition-colors p-2"
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={expandedSections.chat}
                         onClick={() => toggleSection('chat')}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSection('chat'); } }}
                     >
                         <div className="flex items-center justify-between">
                             <div className="space-y-1.5">
@@ -288,9 +300,9 @@ export default function BrowserSettings() {
                         </div>
                     </CardHeader>
                     {expandedSections.chat && (
-                        <CardContent className="pt-2">
-                            <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-4 bg-muted/10 rounded-lg">
-                                <div className="flex flex-col gap-2">
+                        <CardContent>
+                            <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+                                <div className="flex flex-col gap-2 p-2 bg-muted/10 rounded-lg">
                                     {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                                     <label htmlFor="maxSaveMessagesInput" className="text-sm font-medium whitespace-nowrap">Store latest interactions (per graph) [5..10]</label>
                                     <Input
@@ -307,8 +319,8 @@ export default function BrowserSettings() {
                                         }}
                                     />
                                 </div>
-                                <h2 className="font-medium">Configure LLM access for chat functionality</h2>
-                                <div className="flex flex-col gap-2">
+                                <div className="flex flex-col gap-2 p-2 bg-muted/10 rounded-lg">
+                                    <h2 className="font-medium">Configure LLM access for chat functionality</h2>
                                     {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                                     <label className="text-sm font-medium">
                                         {isLoadingModels ? "Model (Loading...)" : "Model"}
@@ -319,8 +331,6 @@ export default function BrowserSettings() {
                                         onModelSelect={handleModelChange}
                                         isLoading={isLoadingModels}
                                     />
-                                </div>
-                                <div className="flex flex-col gap-2">
                                     {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                                     <label htmlFor="secretKeyInput" className="text-sm font-medium whitespace-nowrap">Secret Key</label>
                                     <Input
@@ -341,8 +351,12 @@ export default function BrowserSettings() {
                 {/* Graph Info Section */}
                 <Card className="border-border shadow-sm">
                     <CardHeader
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        className="cursor-pointer hover:bg-muted/50 transition-colors p-2"
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={expandedSections.graphInfo}
                         onClick={() => toggleSection('graphInfo')}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSection('graphInfo'); } }}
                     >
                         <div className="flex items-center justify-between">
                             <div className="space-y-1.5">
@@ -353,9 +367,9 @@ export default function BrowserSettings() {
                         </div>
                     </CardHeader>
                     {expandedSections.graphInfo && (
-                        <CardContent className="space-y-6 pt-2">
+                        <CardContent>
                             {/* Refresh Interval */}
-                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 p-4 bg-muted/10 rounded-lg">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 p-2 bg-muted/10 rounded-lg">
                                 <div className="flex flex-col gap-2 flex-1">
                                     {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                                     <label htmlFor="refreshInterval" className="text-lg font-semibold">Refresh Interval</label>
@@ -386,8 +400,12 @@ export default function BrowserSettings() {
                 {/* Query Execution Section */}
                 <Card className="border-border shadow-sm">
                     <CardHeader
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        className="cursor-pointer hover:bg-muted/50 transition-colors p-2"
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={expandedSections.queryExecution}
                         onClick={() => toggleSection('queryExecution')}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSection('queryExecution'); } }}
                     >
                         <div className="flex items-center justify-between">
                             <div className="space-y-1.5">
@@ -399,9 +417,9 @@ export default function BrowserSettings() {
                     </CardHeader>
                     {expandedSections.queryExecution && (
                         <CardContent>
-                            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                            <form onSubmit={handleSubmit} className="flex flex-col gap-2">
                                 {/* Timeout Setting */}
-                                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 p-4 bg-muted/10 rounded-lg">
+                                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 p-2 bg-muted/10 rounded-lg">
                                     <div className="flex flex-col gap-2 flex-1">
                                         <h3 className="text-lg font-semibold">Timeout</h3>
                                         <p className="text-sm text-muted-foreground">
@@ -425,7 +443,7 @@ export default function BrowserSettings() {
                                 </div>
 
                                 {/* Limit Setting */}
-                                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 p-4 bg-muted/10 rounded-lg">
+                                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 p-2 bg-muted/10 rounded-lg">
                                     <div className="flex flex-col gap-2 flex-1">
                                         <h3 className="text-lg font-semibold">Limit</h3>
                                         <p className="text-sm text-muted-foreground">
@@ -449,7 +467,7 @@ export default function BrowserSettings() {
                                 </div>
 
                                 {/* Default Query On-load */}
-                                <div className="flex flex-col gap-4 p-4 bg-muted/10 rounded-lg">
+                                <div className="flex flex-col gap-2 p-2 bg-muted/10 rounded-lg">
                                     <div className="flex items-center gap-3">
                                         <Switch
                                             id="runDefaultQuerySwitch"
@@ -509,8 +527,12 @@ export default function BrowserSettings() {
                 {/* User Experience Section */}
                 <Card className="border-border shadow-sm">
                     <CardHeader
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        className="cursor-pointer hover:bg-muted/50 transition-colors p-2"
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={expandedSections.userExperience}
                         onClick={() => toggleSection('userExperience')}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSection('userExperience'); } }}
                     >
                         <div className="flex items-center justify-between">
                             <div className="space-y-1.5">
@@ -522,79 +544,163 @@ export default function BrowserSettings() {
                     </CardHeader>
                     {
                         expandedSections.userExperience &&
-                        <CardContent className="space-y-6 pt-2">
-                            {/* Content Persistence */}
-                            <div className="flex items-center gap-4 p-4 bg-muted/10 rounded-lg">
-                                <Switch
-                                    id="contentPersistenceSwitch"
-                                    className="data-[state=unchecked]:bg-border"
-                                    checked={newContentPersistence}
-                                    onCheckedChange={() => createChangeHandler(setNewContentPersistence)(!newContentPersistence, 'contentPersistenceSwitch')}
-                                />
-                                <div className="flex flex-col gap-2">
-                                    <h3 className="text-lg font-semibold">Content Persistence</h3>
-                                    <p className="text-sm text-muted-foreground">Enable this function to &apos;Auto-Save&apos; your data in your next Browser session.</p>
-                                </div>
-                            </div>
-
-                            {/* Captions Keys */}
-                            <div className="flex flex-col gap-4 p-4 bg-muted/10 rounded-lg">
-                                <div className="flex flex-col gap-2">
-                                    <h3 className="text-lg font-semibold">Captions Keys</h3>
-                                    <p className="text-sm text-muted-foreground">Manage the caption: propertyKeys used for displaying captions on nodes.</p>
-                                </div>
-                                <div className="flex items-center gap-4 p-4 bg-muted/10 rounded-lg">
+                        <CardContent>
+                            <div className="flex flex-col gap-2">
+                                {/* Content Persistence */}
+                                <div className="flex items-center gap-2 p-2 bg-muted/10 rounded-lg">
                                     <Switch
-                                        id="showPropertyKeyPrefixSwitch"
+                                        id="contentPersistenceSwitch"
                                         className="data-[state=unchecked]:bg-border"
-                                        checked={newShowPropertyKeyPrefix}
-                                        onCheckedChange={() => createChangeHandler(setNewShowPropertyKeyPrefix)(!newShowPropertyKeyPrefix, 'showPropertyKeyPrefixSwitch')}
+                                        checked={newContentPersistence}
+                                        onCheckedChange={() => createChangeHandler(setNewContentPersistence)(!newContentPersistence, 'contentPersistenceSwitch')}
                                     />
                                     <div className="flex flex-col gap-2">
-                                        <h3 className="text-lg font-semibold">Add Property Key To Caption</h3>
-                                        <p className="text-sm text-muted-foreground">When enabled, show key before value in the caption. (company: FalkorDB)</p>
+                                        <h3 className="text-lg font-semibold">Content Persistence</h3>
+                                        <p className="text-sm text-muted-foreground">Enable this function to &apos;Auto-Save&apos; your data in your next Browser session.</p>
                                     </div>
                                 </div>
-                                {
-                                    newCaptionsKeys.length > 0 ?
-                                        <ul className="flex flex-col gap-2">
-                                            {newCaptionsKeys.map((key, index) => (
-                                                // eslint-disable-next-line react/no-array-index-key
-                                                <li key={index} className="flex justify-between items-center p-2 bg-background rounded-lg">
-                                                    <p>{key}</p>
-                                                    <Button
-                                                        className="p-1"
-                                                        variant="Delete"
-                                                        title="Remove Caption"
-                                                        onClick={() => {
-                                                            setNewCaptionsKeys(prev => prev.filter(caption => caption !== key));
-                                                        }}
-                                                    >
-                                                        <Trash2 />
-                                                    </Button>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                        : <p className="text-sm text-muted-foreground">No caption keys added. Add keys to display them on the nodes.</p>
-                                }
-                                <form className="flex gap-2" onSubmit={handleAddCaptionKey}>
-                                    <Input
-                                        id="captionKeyInput"
-                                        className="flex-1"
-                                        placeholder="Enter a caption key to display on nodes..."
-                                        value={newCaption}
-                                        onChange={(e) => setNewCaption(e.target.value)}
-                                    />
-                                    <Button
-                                        id="addCaptionKeyBtn"
-                                        disabled={!newCaption.trim()}
-                                        variant="Primary"
-                                        type="submit"
-                                        label="Add Caption"
-                                    >
-                                        <PlusCircle />
-                                    </Button>
-                                </form>
+
+                                {/* Captions Keys */}
+                                <div className="flex flex-col gap-2 p-2 bg-muted/10 rounded-lg">
+                                    <div className="flex flex-col gap-2">
+                                        <h3 className="text-lg font-semibold">Captions Keys</h3>
+                                        <p className="text-sm text-muted-foreground">Manage the caption: propertyKeys used for displaying captions on nodes.</p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Switch
+                                            id="showPropertyKeyPrefixSwitch"
+                                            className="data-[state=unchecked]:bg-border"
+                                            checked={newShowPropertyKeyPrefix}
+                                            onCheckedChange={() => createChangeHandler(setNewShowPropertyKeyPrefix)(!newShowPropertyKeyPrefix, 'showPropertyKeyPrefixSwitch')}
+                                        />
+                                        <div className="flex flex-col gap-2">
+                                            <h3 className="text-lg font-semibold">Add Property Key To Caption</h3>
+                                            <p className="text-sm text-muted-foreground">When enabled, show key before value in the caption. (company: FalkorDB)</p>
+                                        </div>
+                                    </div>
+                                    {
+                                        newCaptionsKeys.length > 0 ?
+                                            <ul className="flex flex-col gap-1">
+                                                {newCaptionsKeys.map((key, index) => (
+                                                    // eslint-disable-next-line react/no-array-index-key
+                                                    <li key={index} className="flex justify-between items-center p-1 bg-background rounded-lg">
+                                                        <p>{key}</p>
+                                                        <Button
+                                                            className="p-1"
+                                                            variant="Delete"
+                                                            title="Remove Caption"
+                                                            onClick={() => {
+                                                                setNewCaptionsKeys(prev => prev.filter(caption => caption !== key));
+                                                            }}
+                                                        >
+                                                            <Trash2 />
+                                                        </Button>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                            : <p className="text-sm text-muted-foreground">No caption keys added. Add keys to display them on the nodes.</p>
+                                    }
+                                    <form className="flex gap-2" onSubmit={handleAddCaptionKey}>
+                                        <Input
+                                            id="captionKeyInput"
+                                            className="flex-1"
+                                            placeholder="Enter a caption key to display on nodes..."
+                                            value={newCaption}
+                                            onChange={(e) => setNewCaption(e.target.value)}
+                                        />
+                                        <Button
+                                            id="addCaptionKeyBtn"
+                                            disabled={!newCaption.trim()}
+                                            variant="Primary"
+                                            type="submit"
+                                            label="Add Caption"
+                                        >
+                                            <PlusCircle />
+                                        </Button>
+                                    </form>
+                                </div>
+
+                                {/* Query Result Table View Preferences */}
+                                <div className="flex flex-col gap-2 p-2 bg-muted/10 rounded-lg">
+                                    <h3 className="font-semibold">Query Result Table View Preferences</h3>
+                                    <p>Customize the appearance of the table view.</p>
+                                    <form className="flex flex-col gap-2 p-2" onSubmit={saveSettings}>
+                                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                                            <div className="flex flex-col gap-2 flex-1">
+                                                {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+                                                <label htmlFor="columnWidth" className="font-semibold">Column Width</label>
+                                                <p className="text-sm text-muted-foreground">
+                                                    Set the width of the table columns.
+                                                </p>
+                                            </div>
+                                            <div className="w-full sm:w-64">
+                                                <Slider
+                                                    id="columnWidth"
+                                                    className="w-full"
+                                                    type="%"
+                                                    min={20}
+                                                    max={80}
+                                                    step={5}
+                                                    value={[newColumnWidth]}
+                                                    onValueChange={(value) => createChangeHandler(setNewColumnWidth)(value[value.length - 1], "columnWidth")}
+                                                />
+                                                <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                                                    <span>20%</span>
+                                                    <span>80%</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                                            <div className="flex flex-col gap-2 flex-1">
+                                                {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+                                                <label htmlFor="rowHeight" className="font-semibold">Row Height</label>
+                                                <p className="text-sm text-muted-foreground">
+                                                    Set the height of the table rows.
+                                                </p>
+                                            </div>
+                                            <div className="w-full sm:w-64">
+                                                <Slider
+                                                    id="rowHeight"
+                                                    className="w-full"
+                                                    type="px"
+                                                    min={40}
+                                                    max={80}
+                                                    value={[newRowHeight]}
+                                                    onValueChange={(value) => createChangeHandler(setNewRowHeight)(value[value.length - 1], "rowHeight")}
+                                                />
+                                                <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                                                    <span>40px</span>
+                                                    <span>80px</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                                            <div className="flex flex-col gap-2 flex-1">
+                                                {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+                                                <label htmlFor="rowHeightExpandMultiple" className="font-semibold">Row Height Expand Multiplier</label>
+                                                <p className="text-sm text-muted-foreground">
+                                                    Height multiplier for expanded rows.
+                                                </p>
+                                            </div>
+                                            <div className="w-full sm:w-64">
+                                                <Slider
+                                                    id="rowHeightExpandMultiple"
+                                                    className="w-full"
+                                                    type="px"
+                                                    min={2}
+                                                    max={8}
+                                                    step={1}
+                                                    value={[newRowHeightExpandMultiple]}
+                                                    onValueChange={(value) => createChangeHandler(setNewRowHeightExpandMultiple)(value[value.length - 1], "rowHeightExpandMultiple")}
+                                                />
+                                                <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                                                    <span>2X</span>
+                                                    <span>8X</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
                             </div>
                         </CardContent>
                     }
@@ -603,7 +709,7 @@ export default function BrowserSettings() {
                 {/* Sticky Save/Cancel Buttons */}
                 {
                     hasChanges &&
-                    <div className="bg-background flex gap-4 px-4 py-4 sticky -bottom-8 justify-center border-t border-border shadow-lg rounded-t-lg">
+                    <div className="bg-background flex gap-4 px-4 py-4 sticky -bottom-8 justify-center shadow-t-2xl rounded-t-lg">
                         <Button
                             data-testid="cancelSettingsButton"
                             id="cancelQuerySettingsBtn"

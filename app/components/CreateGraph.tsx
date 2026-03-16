@@ -3,7 +3,7 @@
 "use client";
 
 import React, { useState, useContext, useEffect } from "react";
-import { InfoIcon, PlusCircle } from "lucide-react";
+import { InfoIcon, Plus } from "lucide-react";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -30,9 +30,10 @@ export default function CreateGraph({
         <Button
             data-testid={`create${type}`}
             variant="Primary"
+            className="hover:!bg-primary/70"
             title={`Create New ${type}`}
         >
-            <PlusCircle size={20} />
+            <Plus size={20} />
         </Button>
     ),
 }: Props) {

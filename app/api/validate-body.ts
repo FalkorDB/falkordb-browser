@@ -187,6 +187,31 @@ export const deleteGraphElementAttribute = z.object({
   }),
 });
 
+// UDF schemas
+export const loadUdf = z.object({
+  code: z
+    .string({
+      required_error: "Code is required",
+      invalid_type_error: "Invalid Code",
+    })
+    .min(1, "Code cannot be empty"),
+  replace: z
+    .boolean({
+      invalid_type_error: "Invalid Replace value",
+    })
+    .optional()
+    .default(false),
+});
+
+export const deleteUdf = z.object({
+  name: z
+    .string({
+      required_error: "Name is required",
+      invalid_type_error: "Invalid Name",
+    })
+    .min(1, "Name cannot be empty"),
+});
+
 // Graph config schemas
 export const updateGraphConfig = z.object({
   value: z

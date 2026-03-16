@@ -318,27 +318,27 @@ export default function Toolbar({
                         }
                         <Button
                             data-testid={`elementCanvasAddNode${label}`}
-                            className="p-1 bg-background border-green-900"
+                            className="p-1 bg-background border-brandGreen text-brandGreen"
                             variant="Secondary"
                             tooltipVariant="Primary"
                             tooltipSide="bottom"
                             title="Add Node"
                             onClick={() => setIsAddNode(!isAddNode)}
                         >
-                            <Circle className="text-green-900" size={20} />
+                            <Circle size={20} />
                         </Button>
                         {
                             setIsAddEdge &&
                             <Button
                                 data-testid={`elementCanvasAddEdge${label}`}
-                                className="p-1 bg-background border-green-900"
+                                className="p-1 bg-background border-brandGreen text-brandGreen"
                                 variant="Secondary"
                                 tooltipVariant="Primary"
                                 tooltipSide="bottom"
                                 title="Add Edge"
                                 onClick={() => setIsAddEdge(!isAddEdge)}
                             >
-                                <ArrowRight className="text-green-900" size={20} />
+                                <ArrowRight size={20} />
                             </Button>
                         }
                         {

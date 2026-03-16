@@ -1,6 +1,7 @@
 import { Locator } from "@playwright/test";
 import {
   interactWhenVisible,
+  waitForElementToBeVisible,
   waitForElementToNotBeVisible,
   waitForURL,
 } from "@/e2e/infra/utils";
@@ -185,6 +186,8 @@ export default class LoginPage extends HeaderComponent {
   }
 
   async handleSkipTutorial(): Promise<void> {
+    const isVisible = await waitForElementToBeVisible(this.skipTutorial);
+    if (!isVisible) return;
     await this.clickSkipTutorial();
     await waitForElementToNotBeVisible(this.tutorialSpotlight);
   }
