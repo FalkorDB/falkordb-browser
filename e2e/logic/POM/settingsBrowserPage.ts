@@ -287,7 +287,9 @@ export default class SettingsBrowserPage extends BasePage {
         `Select Model: ${providerName}`
       );
     } else {
-      // Try by displayed text (formatted name)
+      // Try by displayed text (formatted name).
+      // Re-expand categories in case the component's debounced effect collapsed them.
+      await this.expandAllCategories();
       const buttonByText = this.getModelButtonByDisplayText(providerName);
       await interactWhenVisible(
         buttonByText.first(),

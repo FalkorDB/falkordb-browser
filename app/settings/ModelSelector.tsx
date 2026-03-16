@@ -140,6 +140,9 @@ export default function ModelSelector({
                 // When search is cleared, collapse all except the one containing the selected model
                 const selectedCategory = categorized.find(([, categoryModels]) => categoryModels.includes(selectedModel));
                 setExpandedCategories(selectedCategory ? new Set([selectedCategory[0]]) : new Set());
+                setTimeout(() => {
+                    if (selectedCategory) categoryRefs.current.get(selectedCategory[0])?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }, 0);
             }
         }, 200);
 
