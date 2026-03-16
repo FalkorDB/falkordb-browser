@@ -1,3 +1,4 @@
+/* eslint-disable no-await-in-loop */
 import { Locator } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
 import {
@@ -238,7 +239,7 @@ export default class SettingsBrowserPage extends BasePage {
       return; // No categories rendered within timeout, nothing to expand
     }
     const count = await toggleLocator.count();
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < count; i += 1) {
       const toggle = toggleLocator.nth(i);
       // Only click if not already expanded — avoids accidentally collapsing an open category
       const isExpanded = await toggle.getAttribute('aria-expanded');
