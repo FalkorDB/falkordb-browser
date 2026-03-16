@@ -638,15 +638,15 @@ export default function BrowserSettings() {
                                                     id="columnWidth"
                                                     className="w-full"
                                                     type="%"
-                                                    min={25}
-                                                    max={75}
+                                                    min={20}
+                                                    max={80}
                                                     step={5}
                                                     value={[newColumnWidth]}
                                                     onValueChange={(value) => createChangeHandler(setNewColumnWidth)(value[value.length - 1], "columnWidth")}
                                                 />
                                                 <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                                                    <span>25%</span>
-                                                    <span>75%</span>
+                                                    <span>20%</span>
+                                                    <span>80%</span>
                                                 </div>
                                             </div>
                                         </div>
