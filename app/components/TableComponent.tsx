@@ -413,7 +413,7 @@ export default function TableComponent({
         return cn("text-foreground rounded-lg border border-transparent hover:border-border/10 hover:bg-secondary", isActive && "text-primary");
     };
 
-    const isObjectType =visibleRows.some(r => r.cells.some(cell => cell?.type === "object"));
+    const isObjectType = useMemo(() => visibleRows.some(r => r.cells.some(cell => cell?.type === "object")), [visibleRows]);
 
     return (
         <div className={cn("h-full w-full flex flex-col gap-4", className)}>
