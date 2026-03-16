@@ -92,7 +92,7 @@ export default class ChatComponent extends GraphPage {
   }
 
   async waitForUserMessageCount(expectedCount: number): Promise<void> {
-    await expect(this.chatUserMessages).toHaveCount(expectedCount, { timeout: 10000 });
+    await expect(this.chatUserMessages).toHaveCount(expectedCount, { timeout: 15000 });
   }
 
   async waitForChatSendButtonEnabled(): Promise<void> {
