@@ -69,17 +69,16 @@ function GraphView({
     const isTabEnabled = useCallback((tab: Tab) => {
         if (tab === "Table") return graph.Data.length !== 0;
         if (tab === "Metadata") return historyQuery.currentQuery && historyQuery.currentQuery.metadata.length > 0 && historyQuery.currentQuery.explain.length > 0;
+        if (tab === "Graph") return graph.getElements().length !== 0;
         return true;
     }, [graph, historyQuery.currentQuery]);
 
     useEffect(() => {
-        if (currentTab === "Metadata" || isTabEnabled(currentTab)) return;
-
         let defaultChecked: Tab = "Graph";
         if (elementsLength === 0 && graph.Data.length !== 0) defaultChecked = "Table";
 
         setCurrentTab(defaultChecked);
-    }, [graph, elementsLength, graph.Data.length, currentTab, setCurrentTab, isTabEnabled]);
+    }, [graph, elementsLength, graph.Data.length, setCurrentTab, isTabEnabled]);
 
     useEffect(() => {
         setSelectedElements([]);
