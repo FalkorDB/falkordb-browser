@@ -20,7 +20,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     const { settings: { graphInfo: { showMemoryUsage } } } = useContext(BrowserSettingsContext);
 
     return (
-        <div aria-disabled={!nodesCount || !edgesCount} data-testid="graphInfoPanel" className={cn(`relative h-full w-full p-2 grid grid-rows-[max-content_max-content_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)] gap-2`)}>
+        <div aria-disabled={nodesCount === undefined || edgesCount === undefined} data-testid="graphInfoPanel" className={cn(`relative h-full w-full p-2 grid grid-rows-[max-content_max-content_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)] gap-2`)}>
             {
                 !customizingLabel ? (
                     <>

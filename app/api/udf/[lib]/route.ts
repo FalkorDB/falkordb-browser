@@ -34,7 +34,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ lib:
 
             return NextResponse.json(
                 { message: `Failed to retrieve database version: ${message}` },
-                { status: 400, headers: getCorsHeaders(request) }
+                { status: res.status, headers: getCorsHeaders(request) }
             );
         }
 
@@ -71,6 +71,38 @@ export async function GET(request: Request, { params }: { params: Promise<{ lib:
     }
 }
 
+async function checkUdfCompatibility(request: Request, corsHeaders: HeadersInit) {
+    const res = await getDBVersion(request);
+
+    if (!res.ok) {
+        const err = await res.text();
+
+        let message;
+
+        try {
+            message = JSON.parse(err).message;
+        } catch {
+            message = err;
+        }
+
+        return NextResponse.json(
+            { message: `Failed to retrieve database version: ${message}` },
+            { status: res.status, headers: corsHeaders }
+        );
+    }
+
+    const [name, version] = (await res.json()).result;
+
+    if (name !== "graph" || version < UDF_VERSION_THRESHOLD) {
+        return NextResponse.json(
+            { message: `UDF feature requires graph module version ${UDF_VERSION_THRESHOLD.toString()} or higher. Current version: ${version}` },
+            { status: 400, headers: corsHeaders }
+        );
+    }
+
+    return null;
+}
+
 export async function POST(request: Request, { params }: { params: Promise<{ lib: string }> }) {
     try {
         const session = await getClient(request);
@@ -80,7 +112,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ lib
         }
 
         const { client } = session;
-        const body = await request.json();
+
+        const compatError = await checkUdfCompatibility(request, getCorsHeaders(request));
+        if (compatError) return compatError;
+
+        let body;
+        try {
+            body = await request.json();
+        } catch {
+            return NextResponse.json(
+                { message: "Invalid JSON in request body" },
+                { status: 400, headers: getCorsHeaders(request) }
+            );
+        }
 
         const validation = validateBody(loadUdf, body);
 
@@ -127,6 +171,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ l
         }
 
         const { client } = session;
+
+        const compatError = await checkUdfCompatibility(request, getCorsHeaders(request));
+        if (compatError) return compatError;
+
         const { lib } = (await params);
 
         try {

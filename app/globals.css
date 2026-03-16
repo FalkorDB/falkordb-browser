@@ -43,7 +43,7 @@
         font-display: swap;
     }
 
-    *:not(.codicon) {
+    *:not(.codicon):not(code):not(pre):not(code *):not(pre *):not(.monospace):not(.monospace *) {
         font-family: 'HyperlegibleSans' !important;
     }
 
@@ -110,11 +110,11 @@
         /* 32px */
     }
 
-    .json-tree-container ul>li>div {
+    .json-tree-container>ul>li>div {
         @apply !hidden;
     }
 
-    .json-tree-container li {
+    .json-tree-container>ul>li {
         @apply !pl-0 !pt-0;
         text-indent: 0 !important;
     }
