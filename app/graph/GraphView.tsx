@@ -69,6 +69,7 @@ function GraphView({
     const isTabEnabled = useCallback((tab: Tab) => {
         if (tab === "Table") return graph.Data.length !== 0;
         if (tab === "Metadata") return historyQuery.currentQuery && historyQuery.currentQuery.metadata.length > 0 && historyQuery.currentQuery.explain.length > 0;
+        if (tab === "Graph") return graph.getElements().length !== 0;
         return true;
     }, [graph, historyQuery.currentQuery]);
 
@@ -77,7 +78,7 @@ function GraphView({
         if (elementsLength === 0 && graph.Data.length !== 0) defaultChecked = "Table";
 
         setCurrentTab(defaultChecked);
-    }, [graph, elementsLength, graph.Data.length, setCurrentTab]);
+    }, [graph, elementsLength, graph.Data.length, setCurrentTab, isTabEnabled]);
 
     useEffect(() => {
         setSelectedElements([]);
@@ -157,8 +158,12 @@ function GraphView({
         setRelationships([...graph.Relationships]);
     };
 
+    const handleTabChange = (value: string) => {
+        setCurrentTab(value as Tab);
+    };
+
     return (
-        <Tabs data-testid="graphView" value={currentTab} onValueChange={(value) => setCurrentTab(value as Tab)} className={cn("h-full w-full relative overflow-hidden", currentTab === "Table" && "flex flex-col-reverse")}>
+        <Tabs data-testid="graphView" value={currentTab} onValueChange={handleTabChange} className={cn("h-full w-full relative overflow-hidden", currentTab === "Table" && "flex flex-col-reverse")}>
             <div className="h-full w-full flex flex-col gap-4 absolute p-2 pointer-events-none z-10 justify-between">
                 <div className="grow basis-0 flex flex-col gap-2 overflow-hidden">
                     {

@@ -130,11 +130,24 @@ export default function ModelSelector({
                     model.toLowerCase().includes(search.toLowerCase())
                 );
             setFilteredModels(filtered);
-            setCategorizedModels(categorizeModels(filtered));
+            const categorized = categorizeModels(filtered);
+            setCategorizedModels(categorized);
+
+            // Auto-expand all matching categories when searching
+            if (search.trim()) {
+                setExpandedCategories(new Set(categorized.map(([name]) => name)));
+            } else {
+                // When search is cleared, collapse all except the one containing the selected model
+                const selectedCategory = categorized.find(([, categoryModels]) => categoryModels.includes(selectedModel));
+                setExpandedCategories(selectedCategory ? new Set([selectedCategory[0]]) : new Set());
+                setTimeout(() => {
+                    if (selectedCategory) categoryRefs.current.get(selectedCategory[0])?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }, 0);
+            }
         }, 200);
 
         return () => clearTimeout(timeout);
-    }, [search, models]);
+    }, [search, models, selectedModel]);
 
     const handleModelClick = (model: string) => {
         if (!disabled) {

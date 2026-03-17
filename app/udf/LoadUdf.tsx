@@ -14,7 +14,7 @@ import Dropzone from "../components/ui/Dropzone";
 import { IndicatorContext } from "../components/provider";
 
 interface LoadUDFProps {
-    onLoad: (name: string) => void
+    onLoad: (name: string) => Promise<void> | void
 }
 
 export default function LoadUDF({ onLoad }: LoadUDFProps) {
@@ -74,7 +74,7 @@ export default function LoadUDF({ onLoad }: LoadUDFProps) {
             }, toast, setIndicator);
 
             if (res.ok) {
-                onLoad(name.trim());
+                await onLoad(name.trim());
                 setName("");
                 setCode("");
                 setFileName("");
