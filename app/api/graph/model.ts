@@ -340,12 +340,36 @@ export class GraphInfo {
     return c;
   }
 
+  /**
+   * Deterministic hash (djb2) for generating consistent colors.
+   * Based on the algorithm used by neo4j-browser (@neo4j-devtools/word-color).
+   */
+  private static hashCode(value: number): number {
+    const str = value.toString();
+    let hash = 0;
+    for (let i = 0; i < str.length; i += 1) {
+      // eslint-disable-next-line no-bitwise
+      hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
+    }
+    return Math.abs(hash);
+  }
+
   public getLabelColorValue(index: number) {
     if (index < this.colors.length) {
       return this.colors[index];
     }
 
-    const newColor = `hsl(${(index - DEFAULT_COLORS.length) * 20}, 100%, 70%)`;
+    // Hash the index three times to get independent values for H, S, L.
+    // Multiply index by 137 (golden angle) to space consecutive colors apart.
+    const h1 = GraphInfo.hashCode(index * 137);
+    const h2 = GraphInfo.hashCode(h1);
+    const h3 = GraphInfo.hashCode(h2);
+
+    const hue = h3 % 360;               // full hue range
+    const saturation = (h2 % 36) + 55;   // 55-90%
+    const lightness = (h1 % 26) + 45;    // 45-70%
+
+    const newColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 
     this.colors.push(newColor);
 
