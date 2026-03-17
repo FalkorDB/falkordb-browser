@@ -393,7 +393,7 @@ export default function Chat({ onClose }: Props) {
                     <h1 className="text-2xl">Chat</h1>
                     <MessagesSquare size={25} />
                 </div>
-                <span className="text-center">Use English to query the graph. The feature requires LLM model and API key. Update local user parameters in Settings.</span>
+                <span id="chat-prerequisites" className="text-center">Use English to query the graph. The feature requires LLM model and API key. Update local user parameters in Settings.</span>
                 <ul data-testid="chatMessagesList" className="w-full h-1 grow flex flex-col gap-[12px] overflow-x-hidden overflow-y-auto chat-container">
                     {
                         messagesList.map((message, index) => {
@@ -505,6 +505,7 @@ export default function Chat({ onClose }: Props) {
                         data-testid="chatInput"
                         className="w-1 grow bg-transparent border-none text-foreground text-lg SofiaSans"
                         placeholder="Type your message here..."
+                        aria-describedby="chat-prerequisites"
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
                     />

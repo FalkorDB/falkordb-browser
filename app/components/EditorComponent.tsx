@@ -72,8 +72,6 @@ export const setEditorTheme = (monacoI: Monaco, themeName: string, backgroundCol
             'focusBorder': '#00000000',
         },
     });
-
-    monacoI.editor.setTheme(themeName);
 };
 
 // Keep backward-compatible alias
@@ -120,8 +118,6 @@ export default function EditorComponent({
     options,
     height,
     className,
-    // editorKey is accepted for API compat but not used (no key-based remount needed)
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     editorKey,
     onMount,
     onMonacoReady,
@@ -139,12 +135,14 @@ export default function EditorComponent({
     const onChangeRef = useRef(onChange);
     const onMountRef = useRef(onMount);
     const onMonacoReadyRef = useRef(onMonacoReady);
+    const valueRef = useRef(value);
 
     // Keep refs in sync
     useEffect(() => { languageConfigRef.current = languageConfig; }, [languageConfig]);
     useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
     useEffect(() => { onMountRef.current = onMount; }, [onMount]);
     useEffect(() => { onMonacoReadyRef.current = onMonacoReady; }, [onMonacoReady]);
+    useEffect(() => { valueRef.current = value; }, [value]);
 
     const mergedOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
         ...DEFAULT_MONACO_OPTIONS,
@@ -199,7 +197,7 @@ export default function EditorComponent({
             // Create the editor
             const editor = monacoInstance.editor.create(containerRef.current, {
                 ...mergedOptions,
-                value,
+                value: valueRef.current,
                 language,
                 theme: themeName,
             });
@@ -247,22 +245,25 @@ export default function EditorComponent({
     // Update value when prop changes (but not if the editor content already matches)
     useEffect(() => {
         const editor = editorRef.current;
+        
         if (editor && value !== undefined && editor.getValue() !== value) {
             editor.setValue(value);
         }
-    }, [value]);
+    }, [value, editorRef.current]);
 
     // Update options when they change
     useEffect(() => {
         editorRef.current?.updateOptions(mergedOptions);
     }, [readOnly, options]);
 
-    // Update theme when it changes
+    // Update theme when it changes (editorKey is included so that external state
+    // changes – such as closing the query-history dialog – trigger a re-apply)
     useEffect(() => {
         if (monacoRef.current) {
             setEditorTheme(monacoRef.current, themeName, themeBackground || background, currentTheme === "dark");
+            editorRef.current?.updateOptions({ theme: themeName });
         }
-    }, [currentTheme, themeName, themeBackground, background]);
+    }, [currentTheme, themeName, themeBackground, background, editorKey]);
 
     // Update language when it changes
     useEffect(() => {

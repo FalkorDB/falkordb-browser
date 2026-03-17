@@ -48,18 +48,19 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
     }, []);
 
     const applyStylesToGraph = useCallback((color: string, size: number) => {
+        // Mutate the InfoLabel prop directly so graphInfo context stays in sync
+        label.style = {
+            ...label.style,
+            color,
+            size,
+        };
+
         const updatedLabel = graph.LabelsMap.get(label.name);
 
         if (!updatedLabel) return;
 
         updatedLabel.style = {
             ...updatedLabel.style,
-            color,
-            size,
-        };
-        // Mutate the InfoLabel prop directly so graphInfo context stays in sync
-        label.style = {
-            ...label.style,
             color,
             size,
         };

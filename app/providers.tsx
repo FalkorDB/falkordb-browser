@@ -9,7 +9,7 @@ import { encryptValue, decryptValue, isCryptoAvailable, isEncrypted } from "@/li
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { ImperativePanelHandle } from "react-resizable-panels";
+import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphData, GraphInfo, HistoryQuery, MemoryValue, Query, Data, Label, Relationship, InfoLabel } from "./api/graph/model";
@@ -58,7 +58,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const { status } = useSession();
   const router = useRouter();
 
-  const panelRef = useRef<ImperativePanelHandle>(null);
+  const panelRef = useRef<PanelImperativeHandle>(null);
   const canvasRef = useRef<GraphRef["current"]>(null);
 
   const [historyQuery, setHistoryQuery] = useState<HistoryQuery>(defaultQueryHistory);
@@ -117,6 +117,13 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [cypherOnly, setCypherOnly] = useState<boolean>(false);
   const [udfList, setUdfList] = useState<UDFEntry[]>([]);
   const [selectedUdf, setSelectedUdf] = useState<UDFEntryWithCode>();
+  const [columnWidth, setColumnWidth] = useState<number>(25);
+  const [rowHeight, setRowHeight] = useState<number>(40);
+  const [newColumnWidth, setNewColumnWidth] = useState<number>(25);
+  const [newRowHeight, setNewRowHeight] = useState<number>(40);
+  const [newRowHeightExpandMultiple, setNewRowHeightExpandMultiple] = useState<number>(3);
+  const [rowHeightExpandMultiple, setRowHeightExpandMultiple] = useState<number>(3);
+  const [showUDF, setShowUDF] = useState<boolean>(true);
 
   const replayTutorial = useCallback(() => {
     router.push("/graph");
@@ -140,7 +147,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       captionsKeysSettings: { newCaptionsKeys, setNewCaptionsKeys },
       showPropertyKeyPrefixSettings: { newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
       chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly },
-      graphInfo: { newRefreshInterval, setNewRefreshInterval }
+      graphInfo: { newRefreshInterval, setNewRefreshInterval },
+      tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple }
     },
     settings: {
       limitSettings: { limit, setLimit, lastLimit, setLastLimit },
@@ -151,7 +159,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       captionsKeysSettings: { captionsKeys, setCaptionsKeys },
       showPropertyKeyPrefixSettings: { showPropertyKeyPrefix, setShowPropertyKeyPrefix },
       chatSettings: { secretKey, setSecretKey, model, setModel, maxSavedMessages, setMaxSavedMessages, cypherOnly, setCypherOnly },
-      graphInfo: { showMemoryUsage, refreshInterval, setRefreshInterval }
+      graphInfo: { showMemoryUsage, refreshInterval, setRefreshInterval },
+      tableViewSettings: { columnWidth, setColumnWidth, rowHeight, setRowHeight, rowHeightExpandMultiple, setRowHeightExpandMultiple }
     },
     hasChanges,
     setHasChanges,
@@ -170,6 +179,9 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       localStorage.setItem("captionsKeys", JSON.stringify(newCaptionsKeys));
       localStorage.setItem("showPropertyKeyPrefix", newShowPropertyKeyPrefix.toString());
       localStorage.setItem("cypherOnly", newCypherOnly.toString());
+      localStorage.setItem("columnWidth", newColumnWidth.toString());
+      localStorage.setItem("rowHeight", newRowHeight.toString());
+      localStorage.setItem("rowHeightExpandMultiple", newRowHeightExpandMultiple.toString());
 
       // Only encrypt and save secret key if it has changed
       if (newSecretKey !== secretKey) {
@@ -224,6 +236,9 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setCaptionsKeys(newCaptionsKeys);
       setShowPropertyKeyPrefix(newShowPropertyKeyPrefix);
       setCypherOnly(newCypherOnly);
+      setColumnWidth(newColumnWidth);
+      setRowHeight(newRowHeight);
+      setRowHeightExpandMultiple(newRowHeightExpandMultiple);
       // Reset has changes
       setHasChanges(false);
 
@@ -246,10 +261,13 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setNewCaptionsKeys(captionsKeys);
       setNewShowPropertyKeyPrefix(showPropertyKeyPrefix);
       setNewCypherOnly(cypherOnly);
+      setNewColumnWidth(columnWidth);
+      setNewRowHeight(rowHeight);
+      setNewRowHeightExpandMultiple(rowHeightExpandMultiple);
       setHasChanges(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, toast]);
+  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, toast]);
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -554,6 +572,9 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setMaxSavedMessages(parseInt(localStorage.getItem("maxSavedMessages") || "5", 10));
       setShowPropertyKeyPrefix(localStorage.getItem("showPropertyKeyPrefix") === "true");
       setCypherOnly(localStorage.getItem("cypherOnly") === "true");
+      setColumnWidth(parseInt(localStorage.getItem("columnWidth") || "25", 10));
+      setRowHeight(parseInt(localStorage.getItem("rowHeight") || "40", 10));
+      setRowHeightExpandMultiple(parseInt(localStorage.getItem("rowHeightExpandMultiple") || "3", 10));
 
       // Decrypt secret key if encrypted, or migrate plain text keys to encrypted format
       const storedSecretKey = localStorage.getItem("secretKey") || "";
@@ -591,11 +612,14 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
       setModel(localStorage.getItem("model") || "");
       (async () => {
-        const res = await securedFetch("/api/udf", {
+        const res = await fetch("/api/udf", {
           method: "GET",
-        }, toast, setIndicator);
+        });
 
-        if (!res.ok) return;
+        if (!res.ok) {
+          setShowUDF(false);
+          return;
+        };
 
         const json = await res.json();
         setUdfList(json.result);
@@ -609,13 +633,15 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
           const udfData = await result.json();
 
-          setSelectedUdf(udfData.result[0]);
+          setSelectedUdf(prev => prev ?? udfData.result[0]);
         }
       })();
     })();
   }, [status, toast]);
 
-  const panelSize = useMemo(() => isCollapsed ? 0 : 20, [isCollapsed]);
+  const onPanelResize = useCallback((size: PanelSize) => {
+    setIsCollapsed(size.asPercentage === 0);
+  }, []);
 
   useEffect(() => {
     const currentPanel = panelRef.current;
@@ -624,7 +650,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
     if ((pathname === "/graph" && graphName) || pathname === "/udf") {
       if (currentPanel.isCollapsed()) currentPanel.expand();
-    } else if (currentPanel.isExpanded()) currentPanel.collapse();
+    } else if (!currentPanel.isCollapsed()) currentPanel.collapse();
   }, [graphName, pathname]);
 
   const checkStatus = useCallback(() => {
@@ -818,19 +844,19 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                                   graphName={graphName}
                                   graphNames={pathname.includes("/schema") ? schemaNames : graphNames}
                                   onSetGraphName={handleOnSetGraphName}
+                                  showUDF={showUDF}
                                   onOpenPanel={onExpand}
                                   panelOpen={!isCollapsed}
                                 />
                               }
-                              <ResizablePanelGroup direction="horizontal" className="w-1 grow">
+                              <ResizablePanelGroup orientation="horizontal" className="w-1 grow">
                                 <ResizablePanel
-                                  ref={panelRef}
-                                  defaultSize={panelSize}
+                                  panelRef={panelRef}
+                                  defaultSize="0%"
                                   collapsible={pathname !== "/udf"}
-                                  minSize={15}
-                                  maxSize={30}
-                                  onCollapse={() => setIsCollapsed(true)}
-                                  onExpand={() => setIsCollapsed(false)}
+                                  minSize="15%"
+                                  maxSize="30%"
+                                  onResize={onPanelResize}
                                   data-testid="graphInfoPanel"
                                 >
                                   {
@@ -844,11 +870,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                                       />
                                   }
                                 </ResizablePanel>
-                                <ResizableHandle withHandle onMouseUp={() => isCollapsed && onExpand()} className={cn("w-0", isCollapsed && "hidden")} />
+                                <ResizableHandle withHandle onMouseUp={() => isCollapsed && onExpand()} className={cn("bg-border", isCollapsed && "hidden")} />
                                 <ResizablePanel
-                                  defaultSize={100 - panelSize}
-                                  minSize={70}
-                                  maxSize={100}
+                                  defaultSize="100%"
+                                  minSize="70%"
+                                  maxSize="100%"
                                 >
                                   {
                                     (pathname === "/graph" || pathname === "/schema") ?

@@ -20,7 +20,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     const { settings: { graphInfo: { showMemoryUsage } } } = useContext(BrowserSettingsContext);
 
     return (
-        <div aria-disabled={!nodesCount || !edgesCount} data-testid="graphInfoPanel" className={cn(`relative h-full w-full p-2 grid grid-rows-[max-content_max-content_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)] gap-2 border-r border-border`)}>
+        <div aria-disabled={nodesCount === undefined || edgesCount === undefined} data-testid="graphInfoPanel" className={cn(`relative h-full w-full p-2 grid grid-rows-[max-content_max-content_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)] gap-2`)}>
             {
                 !customizingLabel ? (
                     <>
@@ -29,7 +29,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             title="Close"
                             onClick={onClose}
                         >
-                            <X className="h-4 w-4" />
+                            <X size={16} />
                         </Button>
                         <div className=" pr-5 w-full flex justify-between items-center gap-1">
                             <h1 className="text-2xl">Graph Info</h1>

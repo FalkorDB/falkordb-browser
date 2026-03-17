@@ -17,6 +17,7 @@
         --text-muted-foreground: var(--foreground);
         --muted: 0 0% 80%;
         --border: 0 0% 40%;
+        --green: 142 71% 45%;
     }
 
     .dark {
@@ -24,10 +25,7 @@
         --foreground: 0 0% 100%;
         --secondary: 0 0% 14.1%;
         --border: 0 0% 26%;
-    }
-
-    :focus-visible {
-        @apply outline-none;
+        --green: 144 61% 20%;
     }
 }
 
@@ -45,7 +43,7 @@
         font-display: swap;
     }
 
-    *:not(.codicon) {
+    *:not(.codicon):not(code):not(pre):not(code *):not(pre *):not(.monospace):not(.monospace *) {
         font-family: 'HyperlegibleSans' !important;
     }
 
@@ -112,16 +110,21 @@
         /* 32px */
     }
 
-    .json-tree-container ul > li > div {
+    .json-tree-container>ul>li>div {
         @apply !hidden;
     }
 
-    .json-tree-container li {
-        @apply !pt-0;
+    .json-tree-container>ul>li {
+        @apply !pl-0 !pt-0;
+        text-indent: 0 !important;
     }
-    
-    .json-tree-container > ul {
-        @apply !pt-0;
+
+    .json-tree-container>ul {
+        @apply !pt-0 !m-0;
+    }
+
+    .json-tree-container>ul>li {
+        @apply !ml-0;
     }
 
     /* Custom scrollbar for model selector */
@@ -159,19 +162,11 @@
 }
 
 .light ::-webkit-scrollbar-thumb {
-    background: hsl(0 0% 90%);
+    background: #666666;
 }
 
 .dark ::-webkit-scrollbar-thumb {
-    background: hsl(0 0% 14.1%);
-}
-
-.light .graphsFilter::-webkit-scrollbar-thumb {
-    background: hsl(0 0% 80%);
-}
-
-.dark .graphsFilter::-webkit-scrollbar-thumb {
-    background: hsl(0 0% 24.1%);
+    background: #666666;
 }
 
 input[type="color"]::-webkit-color-swatch-wrapper {

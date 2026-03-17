@@ -426,7 +426,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                             }}
                                             searchRef={searchQueryRef}
                                         >
-                                            <ul className="w-full flex flex-wrap gap-2 overflow-y-auto max-h-[80px] p-1 graphsFilter">
+                                            <ul className="w-full flex flex-wrap gap-2 overflow-y-auto max-h-[80px] p-1">
                                                 <li key="info">
                                                     <Tooltip>
                                                         <TooltipTrigger className="h-[32px] flex items-center">

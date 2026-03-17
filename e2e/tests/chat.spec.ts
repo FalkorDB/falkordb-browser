@@ -136,10 +136,11 @@ test.describe("Chat Feature Tests", () => {
       // library contains future models that the CI token cannot yet use).
       const isErrorToastVisible = await chat.getNotificationErrorToast();
 
-      // Skip the response-flow assertions when the model is unavailable in this
-      // environment, rather than hard-failing the whole PR.  The test still
-      // exercises every step up to (and including) the send action.
-      test.skip(isErrorToastVisible, 'Chat model unavailable in CI — the auto-detected model is not accessible with the provided API key');
+      // Clean up before potentially skipping to avoid resource leaks
+      if (isErrorToastVisible) {
+        await apiCall.removeGraph(graphName);
+        test.skip(true, 'Chat model unavailable in CI — the auto-detected model is not accessible with the provided API key');
+      }
 
       // Verify no error toast appears (API key is valid and model is working)
       expect(isErrorToastVisible).toBe(false);

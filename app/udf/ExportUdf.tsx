@@ -14,7 +14,7 @@ import Dropzone from "../components/ui/Dropzone";
 import { IndicatorContext } from "../components/provider";
 
 interface ExportUDFProps {
-    onExport: (name: string) => void
+    onExport: (name: string) => Promise<void> | void
 }
 
 export default function ExportUDF({ onExport }: ExportUDFProps) {
@@ -74,7 +74,7 @@ export default function ExportUDF({ onExport }: ExportUDFProps) {
             }, toast, setIndicator);
 
             if (res.ok) {
-                onExport(name.trim());
+                await onExport(name.trim());
                 setName("");
                 setCode("");
                 setFileName("");
