@@ -360,8 +360,8 @@ export class GraphInfo {
     }
 
     // Hash the index three times to get independent values for H, S, L.
-    // Multiply index by 137 (golden angle) to space consecutive colors apart.
-    const h1 = GraphInfo.hashCode(index * 137);
+    // Multiply index by 7 to space consecutive colors apart.
+    const h1 = GraphInfo.hashCode(index * 7);
     const h2 = GraphInfo.hashCode(h1);
     const h3 = GraphInfo.hashCode(h2);
 
