@@ -1,12 +1,12 @@
 'use client';
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { cn, getMemoryUsage, isTwoNodes, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, getMemoryUsage, getMetaStats, isTwoNodes, Link, MemoryValue, Node, prepareArg, securedFetch, Value } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamicImport from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
-import { Graph, Link, Node, GraphInfo, Value, MemoryValue } from "../api/graph/model";
+import { Graph, GraphInfo } from "../api/graph/model";
 import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ForceGraphContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
@@ -168,15 +168,19 @@ export default function Page() {
         return json.result.data.map(({ info }: { info: string }) => info);
     }, [graphName, setIndicator, toast]);
 
+    const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator), [graphName, setIndicator, toast]);
+
     useEffect(() => {
         if (!graphName) return undefined;
 
         const handleSetInfo = () => Promise.all([
-            fetchInfo("(label)"),
-            fetchInfo("(relationship type)"),
+            fetchMetaStats(graphName),
             fetchInfo("(property key)"),
-        ]).then(async ([newLabels, newRelationships, newPropertyKeys]) => {
+        ]).then(async ([newDataStats, newPropertyKeys]) => {
             const memoryUsage = showMemoryUsage ? await getMemoryUsage(graphName, toast, setIndicator) : new Map<string, MemoryValue>();
+            const newLabels = newDataStats?.[0] || [];
+            const newRelationships = newDataStats?.[1] || [];
+
             const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage);
             setGraphInfo(gi);
             fetchCount();
@@ -226,12 +230,12 @@ export default function Page() {
                 return;
             }
 
-            setGraph(Graph.empty(graphName));
+            setGraph(Graph.empty(toast, setIndicator, graphName));
             fetchCount();
         }
 
         setIsQueryLoading(false);
-    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames, setIsQueryLoading, tutorialOpen]);
+    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames, setIsQueryLoading, tutorialOpen, toast, setIndicator]);
 
     const handleSetSelectedElements = useCallback((el: (Node | Link)[] = []) => {
         setSelectedElements(el);
@@ -285,14 +289,14 @@ export default function Page() {
             const json = await result.json();
 
             if (isAddNode) {
-                const node = graph.extendNode(json.result.data[0].n, false, false, true);
+                const node = await graph.extendNode(json.result.data[0].n, false, false, true);
 
                 if (node) {
                     setLabels(prev => [...prev, ...node.labels.filter(c => !prev.some(p => p.name === c)).map(c => graph.LabelsMap.get(c)!)]);
                     handleSetIsAdd(setIsAddNode, setIsAddEdge)(false);
                 }
             } else {
-                const link = graph.extendEdge(json.result.data[0].e, false, false, true);
+                const link = await graph.extendEdge(json.result.data[0].e, false, false, true);
 
                 if (link) {
                     setRelationships(prev => [...prev.filter(p => p.name !== link.relationship), graph.RelationshipsMap.get(link.relationship)!]);

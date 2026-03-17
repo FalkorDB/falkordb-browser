@@ -1,9 +1,8 @@
-import { cn } from "@/lib/utils";
+import { cn, Query } from "@/lib/utils";
 import { Fragment, KeyboardEvent, MouseEvent, useEffect, useRef, useState } from "react";
 import { Check, Circle, Loader2, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Button from "./ui/Button";
-import { Query } from "../api/graph/model";
 import Input from "./ui/Input";
 
 type Item = string | Query;

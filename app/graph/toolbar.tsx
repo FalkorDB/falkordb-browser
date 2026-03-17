@@ -1,9 +1,9 @@
 import { ArrowRight, Circle, Info } from "lucide-react";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
-import { cn, GraphRef } from "@/lib/utils";
+import { cn, GraphRef, Link, Node } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSession } from "next-auth/react";
-import { Graph, Link, Node } from "../api/graph/model";
+import { Graph } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import DeleteElement from "./DeleteElement";

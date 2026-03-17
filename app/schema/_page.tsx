@@ -1,13 +1,13 @@
 'use client';
 
 import { useContext, useState, useRef, useCallback, useEffect } from "react";
-import { cn, GraphRef, isTwoNodes, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, GraphRef, isTwoNodes, prepareArg, securedFetch, Label, GraphData, Link, Node, Relationship } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import type { GraphData as CanvasData } from "@falkordb/canvas";
-import { Label, Graph, GraphData, Link, Node, Relationship } from "../api/graph/model";
+import { Graph } from "../api/graph/model";
 import { BrowserSettingsContext, IndicatorContext, SchemaContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import DataPanel from "./DataPanel";
@@ -115,7 +115,7 @@ export default function Page() {
         }, toast, setIndicator);
         if (!result.ok) return;
         const json = await result.json();
-        const schemaGraph = Graph.create(schemaName, json.result, showPropertyKeyPrefix, 0, undefined, true);
+        const schemaGraph = Graph.create(schemaName, json.result, showPropertyKeyPrefix, 0, toast, setIndicator, undefined, true);
         setSchema(schemaGraph);
     }, [setIndicator, setSchema, toast, schemaName, showPropertyKeyPrefix]);
 
@@ -189,13 +189,13 @@ export default function Page() {
             const json = await result.json();
 
             if (isAddNode) {
-                const node = schema.extendNode(json.result.data[0].n, false, true, true);
+                const node = await schema.extendNode(json.result.data[0].n, false, true, true);
                 if (node) {
                     setLabels(prev => [...prev, ...node.labels.filter(c => !prev.some(p => p.name === c)).map(c => schema.LabelsMap.get(c)!)]);
                     handleSetIsAddNode(false);
                 }
             } else {
-                const link = schema.extendEdge(json.result.data[0].e, false, true);
+                const link = await schema.extendEdge(json.result.data[0].e, false, true);
                 if (link) {
                     setRelationships(prev => [...prev.filter(p => p.name !== link.relationship), schema.RelationshipsMap.get(link.relationship)!]);
                     handleSetIsAddEdge(false);

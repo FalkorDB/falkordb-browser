@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable no-param-reassign */
 // eslint-disable-next-line import/prefer-default-export
 
@@ -6,7 +7,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { MutableRefObject } from "react";
-import { Node, Link, DataCell, MemoryValue } from "@/app/api/graph/model";
 import type { FalkorDBCanvas } from "@falkordb/canvas";
 
 export type ToastArguments = {
@@ -24,6 +24,124 @@ export const screenSize = {
   xl: 1280,
   "2xl": 1536,
 };
+
+
+export type Value = string | number | boolean;
+
+export type HistoryQuery = {
+  queries: Query[];
+  currentQuery: Query;
+  query: string;
+  counter: number;
+};
+
+export type Query = {
+  text: string;
+  metadata: string[];
+  explain: string[];
+  profile: string[];
+  graphName: string;
+  timestamp: number;
+  status: "Success" | "Failed" | "Empty";
+  elementsCount: number;
+};
+
+export type Node = {
+  id: number;
+  labels: string[];
+  color: string;
+  visible: boolean;
+  expand: boolean;
+  collapsed: boolean;
+  size?: number;
+  data: {
+    [key: string]: any;
+  };
+};
+
+export type Link = {
+  id: number;
+  relationship: string;
+  color: string;
+  source: number;
+  target: number;
+  visible: boolean;
+  expand: boolean;
+  collapsed: boolean;
+  data: {
+    [key: string]: any;
+  };
+};
+
+export type GraphData = {
+  nodes: Node[];
+  links: Link[];
+};
+
+export type NodeCell = {
+  id: number;
+  labels: string[];
+  properties: {
+    [key: string]: any;
+  };
+};
+
+export type LinkCell = {
+  id: number;
+  relationshipType: string;
+  sourceId: number;
+  destinationId: number;
+  properties: {
+    [key: string]: any;
+  };
+};
+
+export type DataCell = NodeCell | LinkCell | NodeCell[] | LinkCell[] | number | string | null;
+
+export type DataRow = {
+  [key: string]: DataCell;
+};
+
+export type Data = DataRow[];
+
+export type MemoryValue = number | Map<string, MemoryValue>;
+
+export interface LinkStyle {
+  color: string;
+}
+
+export interface LabelStyle extends LinkStyle {
+  size?: number;
+}
+
+export interface InfoLabel {
+  name: string;
+  style: LabelStyle;
+  show: boolean;
+  count: number;
+}
+
+export interface Label extends Omit<InfoLabel, "count"> {
+  elements: Node[];
+  textWidth?: number;
+  textHeight?: number;
+  style: LabelStyle;
+}
+
+export interface InfoRelationship {
+  name: string;
+  style: LinkStyle;
+  show: boolean;
+  count: number;
+}
+
+export interface Relationship extends Omit<InfoRelationship, "count"> {
+  elements: Link[];
+  textWidth?: number;
+  textHeight?: number;
+  textAscent?: number;
+  textDescent?: number;
+}
 
 export type GraphRef = MutableRefObject<FalkorDBCanvas | null>;
 
@@ -175,6 +293,19 @@ export function prepareArg(arg: string) {
 
 export const getDefaultQuery = (q?: string) =>
   q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN * LIMIT 100";
+
+export const getMetaStats = async (name: string, toast: ToastFn, setIndicator: (indicator: "online" | "offline") => void) => {
+  const q = "CALL db.meta.stats() YIELD labels, relTypes RETURN labels, relTypes as relationships";
+
+  const result = await getSSEGraphResult(`/api/graph/${name}?query=${q}`, toast, setIndicator) as { data: { labels: { [key: string]: number }, relationships: { [key: string]: number } }[] };
+
+  if (!result) return undefined;
+
+  const l = Object.entries(result.data[0].labels);
+  const r = Object.entries(result.data[0].relationships);
+
+  return [l, r];
+};
 
 export function rgbToHSL(hex: string): string {
   // Remove the # if present

@@ -4,9 +4,9 @@
 
 import { useContext, useState, useEffect, useCallback, useRef } from "react";
 import { X, Palette } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { LabelStyle, InfoLabel, Label, cn } from "@/lib/utils";
 import { GraphContext, ForceGraphContext, BrowserSettingsContext } from "@/app/components/provider";
-import { Label, STYLE_COLORS, LabelStyle, getLabelWithFewestElements, InfoLabel } from "@/app/api/graph/model";
+import { STYLE_COLORS, getLabelWithFewestElements } from "@/app/api/graph/model";
 import Button from "@/app/components/ui/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { NODE_SIZE } from "@falkordb/canvas";

@@ -4,7 +4,7 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef, ConnectionType, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
+import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef, ConnectionType, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue } from "@/lib/utils";
 import { encryptValue, decryptValue, isCryptoAvailable, isEncrypted } from "@/lib/encryption";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
@@ -12,7 +12,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
-import { Graph, GraphData, GraphInfo, HistoryQuery, MemoryValue, Query, Data, Label, Relationship, InfoLabel } from "./api/graph/model";
+import { Graph, GraphInfo } from "./api/graph/model";
 import Header from "./components/Header";
 import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext } from "./components/provider";
 import Tutorial from "./components/Tutorial";
@@ -61,13 +61,13 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const panelRef = useRef<PanelImperativeHandle>(null);
   const canvasRef = useRef<GraphRef["current"]>(null);
 
-  const [historyQuery, setHistoryQuery] = useState<HistoryQuery>(defaultQueryHistory);
   const [indicator, setIndicator] = useState<"online" | "offline">("online");
+  const [historyQuery, setHistoryQuery] = useState<HistoryQuery>(defaultQueryHistory);
   const [runDefaultQuery, setRunDefaultQuery] = useState(false);
   const [schemaNames, setSchemaNames] = useState<string[]>([]);
   const [graphNames, setGraphNames] = useState<string[]>([]);
-  const [schema, setSchema] = useState<Graph>(Graph.empty());
-  const [graph, setGraph] = useState<Graph>(Graph.empty());
+  const [schema, setSchema] = useState<Graph>(Graph.empty(toast, setIndicator));
+  const [graph, setGraph] = useState<Graph>(Graph.empty(toast, setIndicator));
   const [data, setData] = useState<GraphData>({ ...graph.Elements });
   const [graphData, setGraphData] = useState<CanvasData>();
   const [graphInfo, setGraphInfo] = useState<GraphInfo>(GraphInfo.empty());
@@ -375,6 +375,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graphName]);
 
+  const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator), [toast, setIndicator]);
+
   const handelGetNewQueries = useCallback((newQuery: Query) => [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), newQuery], [historyQuery.queries]);
 
   const runQuery = useCallback(async (q: string, name?: string): Promise<void> => {
@@ -406,12 +408,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       if (!result) throw new Error();
 
       const graphI = await Promise.all([
-        fetchInfo("(label)", n),
-        fetchInfo("(relationship type)", n),
+        fetchMetaStats(n),
         fetchInfo("(property key)", n),
-      ]).then(async ([newLabels, newRelationships, newPropertyKeys]) => {
+      ]).then(async ([metaStats, newPropertyKeys]) => {
         const memoryUsage = showMemoryUsage ? await getMemoryUsage(n, toast, setIndicator) : new Map<string, MemoryValue>();
-
+        const newLabels = metaStats?.[0] || [];
+        const newRelationships = metaStats?.[1] || [];
         const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage);
         setGraphInfo(gi);
         return gi;
@@ -431,7 +433,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       if (!explain.ok) throw new Error("Failed to fetch explain plan");
 
       const explainJson = await explain.json();
-      const g = Graph.create(n, result, showPropertyKeyPrefix, existingLimit, graphI);
+      const g = Graph.create(n, result, showPropertyKeyPrefix, existingLimit, toast, setIndicator, graphI);
 
       newQuery = {
         ...newQuery,
@@ -757,7 +759,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setGraphNames(["social-demo", "social-demo-test"]);
       setGraphName("");
       setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }));
-      setGraph(Graph.empty());
+      setGraph(Graph.empty(toast, setIndicator));
       setData({ nodes: [], links: [] });
       setCustomizingLabel(null);
     } catch (error) {
@@ -787,7 +789,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     }
 
     // Clear current graph to avoid showing deleted demo graph
-    setGraph(Graph.empty());
+    setGraph(Graph.empty(toast, setIndicator));
     setGraphInfo(GraphInfo.empty());
     setData({ nodes: [], links: [] });
 
