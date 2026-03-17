@@ -26,7 +26,7 @@ export default function Labels<T extends Label | Relationship>({ labels, onClick
                     labels.map((l) => (
                         <li key={l.name}>
                             <Button
-                                aria-expanded
+                                aria-pressed={l.show}
                                 data-testid={`${type}${label}Button${l.name}`}
                                 className={cn("w-full SofiaSans", l.show ? "opacity-100" : "opacity-50")}
                                 label={l.name}
