@@ -6,9 +6,10 @@ import { useContext, useState, useEffect, useCallback, useRef } from "react";
 import { X, Palette } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GraphContext, ForceGraphContext, BrowserSettingsContext } from "@/app/components/provider";
-import { Label, STYLE_COLORS, NODE_SIZE_OPTIONS, LabelStyle, getLabelWithFewestElements, InfoLabel } from "@/app/api/graph/model";
+import { Label, STYLE_COLORS, LabelStyle, getLabelWithFewestElements, InfoLabel } from "@/app/api/graph/model";
 import Button from "@/app/components/ui/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { NODE_SIZE } from "@falkordb/canvas";
 
 interface Props {
     label: InfoLabel;
@@ -22,13 +23,13 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
 
     // Store original values for comparison and cancel functionality
     const [originalColor] = useState<string>(label.style.color);
-    const [originalSize] = useState(label.style.size || 6);
+    const [originalSize] = useState(label.style.size || NODE_SIZE);
 
     const [selectedColor, setSelectedColor] = useState<string>(
         label.style.color
     );
     const [selectedSize, setSelectedSize] = useState(
-        label.style.size || 6
+        label.style.size || NODE_SIZE
     );
 
     // RGB Color Picker state
@@ -47,18 +48,19 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
     }, []);
 
     const applyStylesToGraph = useCallback((color: string, size: number) => {
-        const updatedLabel = graph.LabelsMap.get(label.name);
-        const graphInfoLabel = graph.GraphInfo.Labels.get(label.name);
-
-        if (!updatedLabel || !graphInfoLabel) return;
-
-        updatedLabel.style = {
-            ...updatedLabel.style,
+        // Mutate the InfoLabel prop directly so graphInfo context stays in sync
+        label.style = {
+            ...label.style,
             color,
             size,
         };
-        graphInfoLabel.style = {
-            ...graphInfoLabel.style,
+
+        const updatedLabel = graph.LabelsMap.get(label.name);
+
+        if (!updatedLabel) return;
+
+        updatedLabel.style = {
+            ...updatedLabel.style,
             color,
             size,
         };
@@ -81,13 +83,17 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
             currentData.nodes.forEach(node => {
                 if (getLabelWithFewestElements(node.labels.map(l => graph.LabelsMap.get(l)).filter(Boolean) as Label[])?.name === label.name) {
                     node.color = color;
-                    node.size = size;
+
+                    if (node.size !== size) {
+                        node.size = size;
+                        node.displayName = ["", ""]; // Force re-render by clearing displayName (it will be recalculated in canvas)
+                    }
                 }
             });
 
             canvas.setGraphData(currentData);
         }
-    }, [canvasRef, graph.GraphInfo.Labels, graph.Labels, graph.LabelsMap, label.name, setLabels]);
+    }, [canvasRef, graph.Labels, graph.LabelsMap, label, setLabels]);
 
     const handleColorSelect = (color: string) => {
         setSelectedColor(color);
@@ -163,7 +169,10 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
             >
                 <X className="h-4 w-4" />
             </Button>
-            <h1 className="text-2xl">Style Settings</h1>
+            <div className="flex justify-between items-center pr-8">
+                <h1 className="text-2xl">Customize Style</h1>
+                <Palette size={25} />
+            </div>
             <div className="flex gap-2 items-center overflow-hidden">
                 <div
                     style={{ backgroundColor: selectedColor }}
@@ -291,7 +300,8 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
             <div className="flex flex-col gap-2 overflow-hidden">
                 <h2 className="text-base font-semibold">Size:</h2>
                 <div className="flex gap-2 p-2 bg-muted/10 rounded-lg overflow-x-auto">
-                    {NODE_SIZE_OPTIONS.map((size) => (
+                    {/* Size options from 0.25x to 2.5x of NODE_SIZE */}
+                    {Array.from({ length: 10 }, (_, i) => (i + 1) / 4 * NODE_SIZE).map((size) => (
                         <Tooltip key={size}>
                             <TooltipTrigger asChild>
                                 <button
@@ -314,7 +324,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
                                 </button>
                             </TooltipTrigger>
                             <TooltipContent>
-                                {(size / 6).toFixed(2)}x
+                                {(size / NODE_SIZE).toFixed(2)}x
                             </TooltipContent>
                         </Tooltip>
                     ))}

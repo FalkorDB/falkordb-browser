@@ -1,11 +1,11 @@
 'use client';
 
-import { useContext, useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { useContext, useState, useRef, useCallback, useEffect } from "react";
 import { cn, GraphRef, isTwoNodes, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { ImperativePanelHandle } from "react-resizable-panels";
+import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import type { GraphData as CanvasData } from "@falkordb/canvas";
 import { Label, Graph, GraphData, Link, Node, Relationship } from "../api/graph/model";
 import { BrowserSettingsContext, IndicatorContext, SchemaContext } from "../components/provider";
@@ -38,10 +38,10 @@ export default function Page() {
         schemaNames,
         setSchemaNames
     } = useContext(SchemaContext);
-    const { settings: { captionsKeysSettings: { captionsKeys }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
+    const { settings: { showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
     const { toast } = useToast();
 
-    const panelRef = useRef<ImperativePanelHandle>(null);
+    const panelRef = useRef<PanelImperativeHandle>(null);
     const canvasRef = useRef<GraphRef["current"]>(null);
 
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
@@ -55,11 +55,9 @@ export default function Page() {
     const [isCanvasLoading, setIsCanvasLoading] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(true);
 
-    const panelSize = useMemo(() => {
-        if (selectedElements.length !== 0) return 30;
-        if (isAddNode || isAddEdge) return 40;
-        return 0;
-    }, [selectedElements, isAddNode, isAddEdge]);
+    const onPanelResize = useCallback((size: PanelSize) => {
+        setIsCollapsed(size.asPercentage === 0);
+    }, []);
 
     const handleSetSelectedElements = useCallback((el: (Node | Link)[] = []) => {
         setSelectedElements(el);
@@ -117,9 +115,9 @@ export default function Page() {
         }, toast, setIndicator);
         if (!result.ok) return;
         const json = await result.json();
-        const schemaGraph = Graph.create(schemaName, json.result,captionsKeys, showPropertyKeyPrefix, 0, undefined, true);
+        const schemaGraph = Graph.create(schemaName, json.result, showPropertyKeyPrefix, 0, undefined, true);
         setSchema(schemaGraph);
-    }, [setIndicator, setSchema, toast, schemaName, captionsKeys, showPropertyKeyPrefix]);
+    }, [setIndicator, setSchema, toast, schemaName, showPropertyKeyPrefix]);
 
     useEffect(() => {
         if (!schemaName) return;
@@ -270,11 +268,11 @@ export default function Page() {
                 isAddEdge={isAddEdge}
                 isAddNode={isAddNode}
             />
-            <ResizablePanelGroup direction="horizontal" className="h-1 grow">
+            <ResizablePanelGroup orientation="horizontal" className="h-1 grow">
                 <ResizablePanel
-                    defaultSize={100 - panelSize}
+                    defaultSize="100%"
                     collapsible
-                    minSize={30}
+                    minSize="30%"
                 >
                     <SchemaView
                         selectedElements={selectedElements}
@@ -297,19 +295,14 @@ export default function Page() {
                 <ResizableHandle
                     withHandle
                     onMouseUp={() => isCollapsed && handleSetSelectedElements()}
-                    className={cn("ml-6 w-0", isCollapsed && "hidden")}
+                    className={cn("ml-6", isCollapsed && "hidden")}
                 />
                 <ResizablePanel
-                    ref={panelRef}
+                    panelRef={panelRef}
                     collapsible
-                    defaultSize={panelSize}
-                    minSize={30}
-                    onCollapse={() => {
-                        setIsCollapsed(true);
-                    }}
-                    onExpand={() => {
-                        setIsCollapsed(false);
-                    }}
+                    defaultSize="0%"
+                    minSize="30%"
+                    onResize={onPanelResize}
                 >
                     {getCurrentPanel()}
                 </ResizablePanel>

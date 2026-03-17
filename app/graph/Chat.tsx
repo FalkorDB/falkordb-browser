@@ -2,7 +2,7 @@
 /* eslint-disable react/no-array-index-key */
 import { cn, Message } from "@/lib/utils";
 import { useContext, useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, CircleArrowUp, Share2, Copy, Loader2, Play, Search, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Share2, Copy, Loader2, Play, Search, X, Send, MessagesSquare } from "lucide-react";
 import { Tooltip as ShadTooltip, TooltipContent as ShadTooltipContent, TooltipTrigger as ShadTooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
@@ -156,7 +156,7 @@ export default function Chat({ onClose }: Props) {
         setNewMessage("");
 
         try {
-        const response = await fetch("/api/chat", {
+            const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -380,7 +380,7 @@ export default function Chat({ onClose }: Props) {
 
     return (
         <div data-testid="chatPanel" className="border-Gradient-rounded h-full w-full">
-            <div className="bg-background relative h-full w-full flex flex-col gap-4 items-center rounded-lg p-4">
+            <div className="bg-background relative h-full w-full flex flex-col gap-2 items-center rounded-lg p-2">
                 <Button
                     data-testid="chatCloseButton"
                     className="absolute top-2 right-2"
@@ -389,8 +389,12 @@ export default function Chat({ onClose }: Props) {
                 >
                     <X className="h-4 w-4" />
                 </Button>
-                <h1 className="mt-6 text-center">Chat with your database in natural language</h1>
-                <ul data-testid="chatMessagesList" className="w-full h-1 grow flex flex-col gap-6 overflow-x-hidden overflow-y-auto chat-container">
+                <div className="w-full flex justify-between items-center pr-8">
+                    <h1 className="text-2xl">Chat</h1>
+                    <MessagesSquare size={25} />
+                </div>
+                <span id="chat-prerequisites" className="text-center">Use English to query the graph. The feature requires LLM model and API key. Update local user parameters in Settings.</span>
+                <ul data-testid="chatMessagesList" className="w-full h-1 grow flex flex-col gap-[12px] overflow-x-hidden overflow-y-auto chat-container">
                     {
                         messagesList.map((message, index) => {
                             if (Array.isArray(message)) {
@@ -495,12 +499,13 @@ export default function Chat({ onClose }: Props) {
                         onClick={handleSubmit}
                         isLoading={isLoading}
                     >
-                        <CircleArrowUp size={25} />
+                        <Send size={25} />
                     </Button>
                     <Input
                         data-testid="chatInput"
                         className="w-1 grow bg-transparent border-none text-foreground text-lg SofiaSans"
                         placeholder="Type your message here..."
+                        aria-describedby="chat-prerequisites"
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
                     />

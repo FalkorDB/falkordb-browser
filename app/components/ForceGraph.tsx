@@ -111,8 +111,12 @@ export default function ForceGraph({
         return () => {
             if (canvas && setViewport && canvasLoaded) {
                 const savedData = canvas.getGraphData();
+
                 if (savedData.nodes.length !== 0) {
                     setViewport(canvas.getViewport());
+                    savedData.nodes.forEach(node => {
+                        node.displayName = ["", ""];
+                    });
                     setGraphData(savedData);
                 }
             }
@@ -330,7 +334,7 @@ export default function ForceGraph({
 
     // Update event handlers and selection functions
     useEffect(() => {
-    if (!canvasRef.current || !canvasLoaded) return;
+        if (!canvasRef.current || !canvasLoaded) return;
         canvasRef.current.setConfig({
             autoStopOnSettle: false,
             captionsKeys,

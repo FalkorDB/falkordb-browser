@@ -74,6 +74,12 @@ export type Message = {
   | "Schema";
 };
 
+// [library_name, type, 'functions', function_names[]]
+export type UDFEntry = [string, string, string, string[]];
+
+// [...UDFEntry, library_code, code]
+export type UDFEntryWithCode = [...UDFEntry, string, string];
+
 export type ConnectionType = "Standalone" | "Cluster" | "Sentinel";
 
 export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell | LazyCell;
@@ -411,9 +417,9 @@ export async function fetchOptions(
 
   if (!result.ok) return;
 
-  
+
   const { opts } = (await result.json()) as { opts: string[] };
-  
+
   setOptions(opts);
 
   if (

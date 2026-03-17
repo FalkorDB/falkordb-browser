@@ -2,7 +2,7 @@
 
 'use client';
 
-import { ArrowUpRight, Database, FileCode, LogOut, Monitor, Moon, Sun } from "lucide-react";
+import { ArrowUpRight, Database, FileCode, LogOut, MessagesSquare, Monitor, Moon, Plus, Sun } from "lucide-react";
 import { useCallback, useContext, useState, useEffect } from "react";
 import Image from "next/image";
 import { cn, getTheme, Panel } from "@/lib/utils";
@@ -23,14 +23,16 @@ interface Props {
     onSetGraphName: (newGraphName: string) => void
     graphNames: string[]
     graphName: string
-    onOpenGraphInfo: () => void
-    graphInfoOpen: boolean
+    onOpenPanel: () => void
+    panelOpen: boolean
+    showUDF: boolean
 }
 
-function getPathType(pathname: string): "Schema" | "Graph" | "Settings" | undefined {
+function getPathType(pathname: string): "Schema" | "Graph" | "Settings" | "UDF" | undefined {
     if (pathname.includes("/schema")) return "Schema";
     if (pathname.includes("/graph")) return "Graph";
     if (pathname.includes("/settings")) return "Settings";
+    if (pathname.includes("/udf")) return "UDF";
     return undefined;
 }
 
@@ -56,7 +58,7 @@ function formatVersion(version: string | undefined): string {
     return version;
 }
 
-export default function Header({ onSetGraphName, graphNames, graphName, onOpenGraphInfo, graphInfoOpen }: Props) {
+export default function Header({ onSetGraphName, graphNames, graphName, onOpenPanel, panelOpen, showUDF }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
     const { connectionType, dbVersion } = useContext(ConnectionContext);
@@ -71,7 +73,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
     const [mounted, setMounted] = useState(false);
 
     const type = getPathType(pathname);
-    const showCreate = type && type !== "Settings" && session?.user.role && session.user.role !== "Read-Only";
+    const showCreate = type && type !== "Settings" && type !== "UDF" && session?.user.role && session.user.role !== "Read-Only";
 
     useEffect(() => {
         setMounted(true);
@@ -85,7 +87,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
 
     return (
         <div className="py-5 px-2 flex flex-col justify-between items-center border-r border-border">
-            <div className="w-full flex flex-col gap-4 items-center">
+            <div className="w-full flex flex-col gap-2 items-center">
                 {
                     mounted && currentTheme &&
                     <Link
@@ -142,18 +144,37 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                         </TooltipContent>
                     </Tooltip>
                 </div>
-                <div data-testid="NavigationButtons" className="p-1 flex flex-col items-center gap-2 bg-secondary rounded-lg">
+                <div data-testid="NavigationButtons" className="p-1 flex flex-col items-center gap-2 bg-foreground/5 rounded-lg">
                     <Button
                         data-testid="settings"
-                        className={cn("text-foreground p-1 rounded-lg", type === "Settings" && "text-background bg-primary")}
+                        className={cn(
+                            "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/15",
+                            type === "Settings" && "!text-primary"
+                        )}
                         title="Adjust application settings"
                         label="SETTINGS"
                         onClick={() => router.push("/settings")}
                     />
+                    {
+                        showUDF ?
+                            <Button
+                                label="UDFs"
+                                title="User Defined Functions: View and manage your UDFs"
+                                className={cn(
+                                    "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
+                                    type === "UDF" && "!text-primary"
+                                )}
+                                onClick={() => router.push("/udf")}
+                                data-testid="UdfButton"
+                            /> : null
+                    }
                     <Button
                         label="GRAPHS"
                         title="View and manage your graphs"
-                        className={cn("text-foreground p-1 rounded-lg", type === "Graph" && "text-background bg-primary")}
+                        className={cn(
+                            "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
+                            type === "Graph" && "!text-primary"
+                        )}
                         onClick={() => router.push("/graph")}
                         data-testid="GraphsButton"
                     />
@@ -168,54 +189,65 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                 /> 
                 {separator}
                 */}
-                {
-                    showCreate &&
-                    <CreateGraph
-                        label="Header"
-                        onSetGraphName={onSetGraphName}
-                        type={type}
-                        graphNames={graphNames}
-                    />
-                }
-                {
-                    type === "Graph" && graphName &&
-                    <>
-                        {separator}
+                <div className="flex flex-col items-center gap-1">
+                    {
+                        type === "Graph" && graphName &&
                         <Button
                             indicator={indicator}
-                            className={cn("text-foreground p-1 rounded-lg", graphInfoOpen && "text-background bg-primary")}
+                            className={cn(
+                                "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
+                                panelOpen && "!text-primary"
+                            )}
                             title="Graph info"
-                            onClick={() => onOpenGraphInfo()}
+                            onClick={() => onOpenPanel()}
                             data-testid="graphInfoToggle"
                         >
-                            <Database size={iconSize} />
+                            <Database size={iconSize - 5} />
                         </Button>
-                    </>
-                }
-                {
-                    type === "Graph" && graphName &&
-                    <>
-                        {separator}
+                    }
+                    {
+                        type === "Graph" && graphName &&
                         <Button
                             data-testid="chatToggleButton"
-                            className={cn("text-foreground font-semibold text-xl p-1 rounded-lg", panel === "chat" && "text-background bg-primary")}
+                            className={cn(
+                                "text-foreground font-semibold text-xl p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
+                                panel === "chat" && "!text-primary"
+                            )}
                             indicator={indicator}
-                            title={`Use English to query the graph.
-                                The feature requires LLM model and API key.
-                                Update local user parameters in Settings.`}
-                            label="CHAT"
+                            title="Chat"
                             onClick={() => {
                                 handleSetCurrentPanel("chat");
                             }}
+                        >
+                            <MessagesSquare size={iconSize - 5} />
+                        </Button>
+                    }
+                    {
+                        showCreate &&
+                        <CreateGraph
+                            label="Header"
+                            onSetGraphName={onSetGraphName}
+                            type={type}
+                            graphNames={graphNames}
+                            trigger={
+                                <Button
+                                    data-testid={`create${type}`}
+                                    variant="Primary"
+                                    className="hover:!bg-primary/70 p-1"
+                                    title={`Create New ${type}`}
+                                >
+                                    <Plus size={iconSize - 5} />
+                                </Button>
+                            }
                         />
-                    </>
-                }
+                    }
+                </div>
             </div>
-            <div className="w-full flex flex-col gap-4 items-center">
+            <div className="w-full flex flex-col gap-2 items-center">
                 <Drawer direction="right">
                     <DropdownMenu>
                         <DropdownMenuTrigger onClick={(e) => e.preventDefault()} asChild>
-                            <Button title="Help">
+                            <Button className="text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10" title="Help">
                                 <FileCode size={iconSize} />
                             </Button>
                         </DropdownMenuTrigger>
@@ -288,6 +320,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                         {separator}
                         <Button
                             data-testid="themeToggle"
+                            className="text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10"
                             title={`Toggle theme current theme: ${theme}`}
                             onClick={() => {
                                 let newTheme = "";
@@ -322,6 +355,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                 {separator}
                 <Button
                     title="Log Out"
+                    className="text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10"
                     data-testid="logoutButton"
                     onClick={() => signOut({ redirect: false }).then(() => router.push("/login"))}
                 >

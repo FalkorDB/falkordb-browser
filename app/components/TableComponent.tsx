@@ -25,12 +25,14 @@ interface Props {
     rows: Row[],
     label: "Graphs" | "Schemas" | "Configs" | "Users" | "TableView",
     entityName: "Graph" | "Schema" | "Config" | "User" | "Element",
+    itemHeight: number
+    itemHeightExpandMultiple?: number
+    itemWidth?: number
     valueClassName?: string
     inputRef?: React.RefObject<HTMLInputElement>,
     children?: React.ReactNode,
     setRows?: Dispatch<SetStateAction<Row[]>>,
     className?: string
-    itemHeight?: number
     itemsPerPage?: number
     initialScrollPosition?: number
     onScrollChange?: Dispatch<SetStateAction<number>>
@@ -74,7 +76,9 @@ export default function TableComponent({
     children,
     setRows,
     className,
-    itemHeight = 70.5,
+    itemHeight,
+    itemHeightExpandMultiple,
+    itemWidth = 25,
     itemsPerPage = 30,
     initialScrollPosition,
     onScrollChange,
@@ -110,8 +114,34 @@ export default function TableComponent({
     const [loadingCells, setLoadingCells] = useState<Set<string>>(new Set());
     const [loadedCells, setLoadedCells] = useState<Set<string>>(new Set());
     const [expandArr, setExpandArr] = useState(new Map(initialExpand));
+    const [containerWidth, setContainerWidth] = useState(0);
 
-    const height = useMemo(() => expandArr.size === 0 ? itemHeight : itemHeight * 2, [expandArr.size, itemHeight]);
+    useEffect(() => {
+        const el = scrollContainerRef.current;
+        if (!el) return undefined;
+
+        const observer = new ResizeObserver(([entry]) => {
+            setContainerWidth(entry.contentRect.width);
+        });
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, []);
+
+    const colMinWidth = useMemo(() => {
+        if (!containerWidth || headers.length === 0) return 0;
+        const headerRow = headerRef.current;
+        let fixedColsWidth = 0;
+        if (headerRow) {
+            const cells = Array.from(headerRow.cells);
+            // All columns before the data columns (checkbox + index) are fixed
+            const fixedCols = cells.slice(0, cells.length - headers.length);
+            fixedColsWidth = fixedCols.reduce((sum, cell) => sum + cell.getBoundingClientRect().width, 0);
+        }
+        const availableWidth = containerWidth - fixedColsWidth;
+        return Math.floor(availableWidth / Math.min(headers.length, 100 / itemWidth));
+    }, [containerWidth, headers.length, itemWidth]);
+
+    const height = useMemo(() => itemHeightExpandMultiple !== undefined ? expandArr.size === 0 ? itemHeight : itemHeight * itemHeightExpandMultiple : itemHeight, [expandArr.size, itemHeight, itemHeightExpandMultiple]);
 
     const handleLoadLazyCell = useCallback((rowName: string, cellIndex: number, loadFn: () => Promise<any>) => {
         // Use row name for stable cell key
@@ -250,7 +280,7 @@ export default function TableComponent({
         const timeout = setTimeout(() => {
             setFilteredRows(prev => [...rows].filter((row) => {
                 const is = row.cells.some(cell => handleSearchFilter(cell));
-                
+
                 // If using row selection, uncheck rows that no longer match the search
                 if (!is) {
                     row.checked = prev.every(r => r.checked);
@@ -371,7 +401,19 @@ export default function TableComponent({
         <span className={cn(valueClassName)}>{l[0]}:</span>
     );
 
-    const getClassName = (index: number, level?: number) => cn("text-foreground rounded-lg", expandArr.get(index) === level && "bg-primary text-background");
+    const getClassName = (index?: number, level?: number) => {
+        let isActive: boolean;
+        if (index !== undefined) {
+            isActive = expandArr.get(index) === level;
+        } else if (level === undefined) {
+            isActive = headers.every((_, i) => !expandArr.has(i));
+        } else {
+            isActive = headers.length > 0 && headers.every((_, i) => expandArr.get(i) === level);
+        }
+        return cn("text-foreground rounded-lg border border-transparent hover:border-border/10 hover:bg-secondary", isActive && "text-primary");
+    };
+
+    const isObjectType = useMemo(() => visibleRows.some(r => r.cells.some(cell => cell?.type === "object")), [visibleRows]);
 
     return (
         <div className={cn("h-full w-full flex flex-col gap-4", className)}>
@@ -400,7 +442,7 @@ export default function TableComponent({
                     }}
                 />
             </div>
-            <Table ref={tableRef} parentRef={scrollContainerRef} parentOnScroll={handleScroll} className="h-full" parentClassName="p-1 relative">
+            <Table ref={tableRef} parentRef={scrollContainerRef} parentOnScroll={handleScroll} className="h-full" parentClassName="p-1 relative overflow-auto">
                 <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow ref={headerRef} className="text-nowrap border-border">
                         {
@@ -425,22 +467,69 @@ export default function TableComponent({
                                 </TableHead>
                                 : null
                         }
-                        <TableHead key="index" className="w-0 border-r border-border p-2">Index</TableHead>
+                        <TableHead key="index" className="w-fit min-w-fit max-w-fit border-r border-border p-2">
+                            <div className="flex">
+                                <p className={!isObjectType ? "w-full text-center" : ""}>Index</p>
+                                {
+                                    isObjectType &&
+                                    <>
+                                        <Button
+                                            className={getClassName(undefined, 1)}
+                                            title="Expand Root"
+                                            onClick={() => {
+                                                const newExpandArr = new Map<number, number>();
+                                                headers.forEach((_, idx) => newExpandArr.set(idx, 1));
+                                                setExpandArr(newExpandArr);
+
+                                                if (onExpandChange) onExpandChange(newExpandArr);
+                                            }}
+                                        >
+                                            <ChevronDown />
+                                        </Button>
+                                        <Button
+                                            title="Expand All"
+                                            className={getClassName(undefined, -1)}
+                                            onClick={() => {
+                                                const newExpandArr = new Map<number, number>();
+                                                headers.forEach((_, idx) => newExpandArr.set(idx, -1));
+                                                setExpandArr(newExpandArr);
+
+                                                if (onExpandChange) onExpandChange(newExpandArr);
+                                            }}
+                                        >
+                                            <ChevronsDown />
+                                        </Button>
+                                        <Button
+                                            title="Collapse All"
+                                            className={getClassName(undefined)}
+                                            onClick={() => {
+                                                const newExpandArr = new Map<number, number>();
+                                                setExpandArr(newExpandArr);
+
+                                                if (onExpandChange) onExpandChange(newExpandArr);
+                                            }}
+                                        >
+                                            <ChevronsUp />
+                                        </Button>
+                                    </>
+                                }
+                            </div>
+                        </TableHead>
                         {
                             headers.map((header, i) => (
                                 <TableHead
+                                    style={{ minWidth: colMinWidth > 0 ? colMinWidth : undefined }}
                                     className={cn(
                                         i + 1 !== headers.length && "border-r",
                                         "border-border",
-                                        i === 0 && (label === "Graphs" || label === "Schemas" || label === "Users") && "w-full"
                                     )}
                                     key={header}
                                 >
                                     <div className="flex gap-2 justify-between items-center">
-                                        <p>{header}</p>
+                                        <p className={!isObjectType ? "w-full text-center" : ""}>{header}</p>
                                         {
-                                            visibleRows.some(r => r.cells[i].type === "object") &&
-                                            <div className="flex gap-2 bg-secondary p-1 rounded-lg">
+                                            isObjectType &&
+                                            <div className="flex">
                                                 <Button
                                                     className={getClassName(i, 1)}
                                                     title="Expand Root"
@@ -509,7 +598,6 @@ export default function TableComponent({
                         visibleRows.map((row, index) => {
                             const actualIndex = topFakeRowHeight / height + index;
                             const rowTestID = `${label}${row.name}`;
-
                             return (
                                 <TableRow
                                     className="border-border"
@@ -537,8 +625,8 @@ export default function TableComponent({
                                             </TableCell>
                                             : null
                                     }
-                                    <TableCell className="border-r border-border p-2">
-                                        <p>{actualIndex + 1}.</p>
+                                    <TableCell className="border-r border-border p-1">
+                                        <p className="w-full h-full text-start">{actualIndex + 1}.</p>
                                     </TableCell>
                                     {
                                         row.cells.map((cell, j) => {
@@ -575,14 +663,14 @@ export default function TableComponent({
                                             return (
                                                 <TableCell
                                                     className={cn(
-                                                        "border-border p-0",
+                                                        "border-border p-0 items-center",
                                                         j + 1 !== row.cells.length && "border-r"
                                                     )}
                                                     key={cellKey}
                                                 >
                                                     <div
                                                         style={{ height }}
-                                                        className={cn("overflow-auto p-2", cell.type === "object" && "p-1", j === 0 && "w-full")}
+                                                        className="overflow-auto"
                                                     >
                                                         {
                                                             cell.type === "object" ?
@@ -615,7 +703,7 @@ export default function TableComponent({
                                                                     />
                                                                 </div>
                                                                 : editable === cellKey ?
-                                                                    <div className="h-full w-full flex gap-2 items-center">
+                                                                    <div className="h-full w-full flex gap-2 items-center justify-center">
                                                                         {
                                                                             cell.type === "select" ?
                                                                                 <Combobox
@@ -692,7 +780,7 @@ export default function TableComponent({
                                                                             }
                                                                         </div>
                                                                     </div>
-                                                                    : <div className="flex items-center gap-2">
+                                                                    : <div className="flex items-center gap-2 justify-center">
                                                                         <Tooltip>
                                                                             <TooltipTrigger asChild>
                                                                                 <p data-testid={`content${cellTestId}${headers[j]}`} >{cell.value}</p>
