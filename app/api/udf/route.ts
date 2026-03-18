@@ -33,7 +33,7 @@ export async function GET(request: Request) {
 
             return NextResponse.json(
                 { message: `Failed to retrieve database version: ${message}` },
-                { status: 400, headers: getCorsHeaders(request) }
+                { status: res.status, headers: getCorsHeaders(request) }
             );
         }
 
@@ -67,6 +67,38 @@ export async function GET(request: Request) {
     }
 }
 
+async function checkUdfCompatibility(request: Request, corsHeaders: HeadersInit) {
+    const res = await getDBVersion(request);
+
+    if (!res.ok) {
+        const err = await res.text();
+
+        let message;
+
+        try {
+            message = JSON.parse(err).message;
+        } catch {
+            message = err;
+        }
+
+        return NextResponse.json(
+            { message: `Failed to retrieve database version: ${message}` },
+            { status: res.status, headers: corsHeaders }
+        );
+    }
+
+    const [name, version] = (await res.json()).result;
+
+    if (name !== "graph" || version < UDF_VERSION_THRESHOLD) {
+        return NextResponse.json(
+            { message: `UDF feature requires graph module version ${UDF_VERSION_THRESHOLD.toString()} or higher. Current version: ${version}` },
+            { status: 400, headers: corsHeaders }
+        );
+    }
+
+    return null;
+}
+
 export async function DELETE(request: Request) {
     try {
         const session = await getClient(request);
@@ -76,6 +108,9 @@ export async function DELETE(request: Request) {
         }
 
         const { client } = session;
+
+        const compatError = await checkUdfCompatibility(request, getCorsHeaders(request));
+        if (compatError) return compatError;
 
         try {
             const result = await client.udfFlush();

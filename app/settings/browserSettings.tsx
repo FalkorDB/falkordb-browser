@@ -285,7 +285,11 @@ export default function BrowserSettings() {
                     <CardHeader
                         data-testid="chatSectionHeader"
                         className="cursor-pointer hover:bg-muted/50 transition-colors p-2"
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={expandedSections.chat}
                         onClick={() => toggleSection('chat')}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSection('chat'); } }}
                     >
                         <div className="flex items-center justify-between">
                             <div className="space-y-1.5">
@@ -348,7 +352,11 @@ export default function BrowserSettings() {
                 <Card className="border-border shadow-sm">
                     <CardHeader
                         className="cursor-pointer hover:bg-muted/50 transition-colors p-2"
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={expandedSections.graphInfo}
                         onClick={() => toggleSection('graphInfo')}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSection('graphInfo'); } }}
                     >
                         <div className="flex items-center justify-between">
                             <div className="space-y-1.5">
@@ -393,7 +401,11 @@ export default function BrowserSettings() {
                 <Card className="border-border shadow-sm">
                     <CardHeader
                         className="cursor-pointer hover:bg-muted/50 transition-colors p-2"
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={expandedSections.queryExecution}
                         onClick={() => toggleSection('queryExecution')}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSection('queryExecution'); } }}
                     >
                         <div className="flex items-center justify-between">
                             <div className="space-y-1.5">
@@ -516,7 +528,11 @@ export default function BrowserSettings() {
                 <Card className="border-border shadow-sm">
                     <CardHeader
                         className="cursor-pointer hover:bg-muted/50 transition-colors p-2"
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={expandedSections.userExperience}
                         onClick={() => toggleSection('userExperience')}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSection('userExperience'); } }}
                     >
                         <div className="flex items-center justify-between">
                             <div className="space-y-1.5">
@@ -622,15 +638,15 @@ export default function BrowserSettings() {
                                                     id="columnWidth"
                                                     className="w-full"
                                                     type="%"
-                                                    min={25}
-                                                    max={75}
+                                                    min={20}
+                                                    max={80}
                                                     step={5}
                                                     value={[newColumnWidth]}
                                                     onValueChange={(value) => createChangeHandler(setNewColumnWidth)(value[value.length - 1], "columnWidth")}
                                                 />
                                                 <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                                                    <span>25%</span>
-                                                    <span>75%</span>
+                                                    <span>20%</span>
+                                                    <span>80%</span>
                                                 </div>
                                             </div>
                                         </div>

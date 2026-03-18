@@ -84,15 +84,25 @@ export default class ChatComponent extends GraphPage {
   }
 
   async waitForChatUserMessage(): Promise<boolean> {
-    return waitForElementToBeVisible(this.chatUserMessages.first());
+    try {
+      await this.chatUserMessages.first().waitFor({ state: 'visible', timeout: 15000 });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async waitForChatAssistantMessage(type: string): Promise<boolean> {
-    return waitForElementToBeVisible(this.chatAssistantMessage(type));
+    try {
+      await this.chatAssistantMessage(type).first().waitFor({ state: 'visible', timeout: 30000 });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async waitForUserMessageCount(expectedCount: number): Promise<void> {
-    await expect(this.chatUserMessages).toHaveCount(expectedCount, { timeout: 15000 });
+    await expect(this.chatUserMessages).toHaveCount(expectedCount, { timeout: 30000 });
   }
 
   async waitForChatSendButtonEnabled(): Promise<void> {

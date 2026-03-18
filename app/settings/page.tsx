@@ -73,7 +73,7 @@ export default function Settings() {
     return (
         <div className="Page p-2 gap-2">
             <p className="text-sm text-foreground"><span className="opacity-50">Settings</span> {`> ${current}`}</p>
-            <div className="w-full bg-background flex gap-2 p-2 rounded-lg justify-center">
+            <div className="w-full bg-background flex flex-wrap gap-2 p-2 rounded-lg justify-center overflow-x-auto">
                 <Button
                     className={cn("p-2 rounded-lg", current === "Browser" ? "bg-background" : "text-gray-500")}
                     label="Browser Settings"

@@ -135,12 +135,14 @@ export default function EditorComponent({
     const onChangeRef = useRef(onChange);
     const onMountRef = useRef(onMount);
     const onMonacoReadyRef = useRef(onMonacoReady);
+    const valueRef = useRef(value);
 
     // Keep refs in sync
     useEffect(() => { languageConfigRef.current = languageConfig; }, [languageConfig]);
     useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
     useEffect(() => { onMountRef.current = onMount; }, [onMount]);
     useEffect(() => { onMonacoReadyRef.current = onMonacoReady; }, [onMonacoReady]);
+    useEffect(() => { valueRef.current = value; }, [value]);
 
     const mergedOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
         ...DEFAULT_MONACO_OPTIONS,
@@ -195,7 +197,7 @@ export default function EditorComponent({
             // Create the editor
             const editor = monacoInstance.editor.create(containerRef.current, {
                 ...mergedOptions,
-                value,
+                value: valueRef.current,
                 language,
                 theme: themeName,
             });

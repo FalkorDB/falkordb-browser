@@ -318,7 +318,7 @@ export default function Toolbar({
                         }
                         <Button
                             data-testid={`elementCanvasAddNode${label}`}
-                            className="p-1 bg-background border-green text-green"
+                            className="p-1 bg-background border-brandGreen text-brandGreen"
                             variant="Secondary"
                             tooltipVariant="Primary"
                             tooltipSide="bottom"
@@ -331,7 +331,7 @@ export default function Toolbar({
                             setIsAddEdge &&
                             <Button
                                 data-testid={`elementCanvasAddEdge${label}`}
-                                className="p-1 bg-background border-green text-green"
+                                className="p-1 bg-background border-brandGreen text-brandGreen"
                                 variant="Secondary"
                                 tooltipVariant="Primary"
                                 tooltipSide="bottom"
