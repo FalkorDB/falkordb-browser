@@ -237,7 +237,7 @@ export async function getSSEGraphResult(
 
       if (status === 401 || status >= 500) setIndicator("offline");
 
-      reject();
+      reject(new Error(message));
     });
 
     evtSource.onerror = () => {
@@ -250,7 +250,7 @@ export async function getSSEGraphResult(
         variant: "destructive",
       });
       setIndicator("offline");
-      reject();
+      reject(new Error("Network or server error"));
     };
   });
 }
