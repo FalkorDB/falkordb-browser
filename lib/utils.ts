@@ -297,12 +297,16 @@ export const getDefaultQuery = (q?: string) =>
 export const getMetaStats = async (name: string, toast: ToastFn, setIndicator: (indicator: "online" | "offline") => void) => {
   const q = "CALL db.meta.stats() YIELD labels, relTypes RETURN labels, relTypes as relationships";
 
-  const result = await getSSEGraphResult(`/api/graph/${name}?query=${q}`, toast, setIndicator) as { data: { labels: { [key: string]: number }, relationships: { [key: string]: number } }[] };
+  const result = await getSSEGraphResult(`/api/graph/${prepareArg(name)}?query=${q}`, toast, setIndicator) as { data: { labels: { [key: string]: number }, relationships: { [key: string]: number } }[] };
 
   if (!result) return undefined;
 
-  const l = Object.entries(result.data[0].labels);
-  const r = Object.entries(result.data[0].relationships);
+  const row = result.data?.[0];
+  
+  if (!row) return undefined;
+
+  const l = Object.entries(row.labels);
+  const r = Object.entries(row.relationships);
 
   return [l, r];
 };

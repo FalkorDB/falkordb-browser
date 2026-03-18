@@ -329,7 +329,10 @@ export class Graph {
     this.linksMap = linksMap;
     this.showPropertyKeyPrefix = showPropertyKeyPrefix || false;
     this.currentLimit = currentLimit || 0;
-    this.graphInfo = graphInfo || GraphInfo.empty(() => {}, () => {});
+    this.graphInfo = graphInfo || GraphInfo.empty(
+      (props) => { console.error("Graph toast fallback:", props); },
+      () => { console.error("Graph setIndicator fallback called on empty graph"); }
+    );
   }
 
   get Id(): string {
