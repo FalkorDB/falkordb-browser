@@ -109,7 +109,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                     backgroundColor: labelColor,
                                                     color: getContrastTextColor(labelColor)
                                                 }}
-                                                className="h-6 w-full p-2 rounded-full flex justify-center items-center SofiaSans"
+                                                className="h-6 w-full p-2 rounded-full flex justify-center items-center SofiaSans hover:opacity-80 transition-opacity"
                                                 data-testid={`graphInfo${name}Node`}
                                                 title={`MATCH (n:${name}) RETURN n`}
                                                 label={name}
@@ -179,9 +179,10 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                 title={`MATCH p=()-[:${relationship.name}]-() RETURN p`}
                                                 style={{
                                                     backgroundColor: relationshipColor,
-                                                    color: textColor
+                                                    color: textColor,
+                                                    clipPath: 'polygon(8px 0%, calc(100% - 8px) 0%, 100% 50%, calc(100% - 8px) 100%, 8px 100%, 0% 50%)',
                                                 }}
-                                                className="h-6 w-full p-2 rounded-full flex justify-center items-center SofiaSans"
+                                                className="h-6 w-fit px-2 py-1 flex justify-center items-center SofiaSans hover:opacity-80 transition-opacity"
                                                 data-testid={`graphInfo${relationship.name}Edge`}
                                                 label={relationship.name}
                                                 onClick={() => runQuery(`MATCH p=()-[:${relationship.name}]-() RETURN p`)}
@@ -220,7 +221,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                         <li key={key} className="max-w-full">
                                             <Button
                                                 title={`MATCH (e) WHERE e.${key} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`}
-                                                className="h-6 w-full p-2 bg-border flex justify-center items-center rounded-full text-white SofiaSans"
+                                                className="h-6 w-full p-2 bg-secondary flex justify-center items-center rounded text-foreground SofiaSans hover:bg-opacity-40 transition-opacity"
                                                 label={key}
                                                 onClick={() => runQuery(
                                                     `MATCH (e) WHERE e.${key} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`
