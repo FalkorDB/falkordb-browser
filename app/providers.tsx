@@ -560,7 +560,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         console.error("Failed to parse captions keys from localStorage", error);
         setCaptionsKeys(['name', 'title']);
       }
-      setTimeout(parseInt(localStorage.getItem("timeout") || "60000", 10));
+      setTimeout(parseInt(localStorage.getItem("timeout") || "60", 10));
       const l = parseInt(localStorage.getItem("limit") || "300", 10);
       setLimit(l);
       setLastLimit(l);
