@@ -218,7 +218,6 @@ export async function GET(
       streamResult();
       writer.close();
     } catch (error) {
-      console.log(error);
       console.error(error);
       writer.write(
         encoder.encode(
@@ -231,7 +230,6 @@ export async function GET(
       writer.close();
     }
   } catch (error) {
-    console.log(error);
     console.error(error);
     writer.write(
       encoder.encode(
