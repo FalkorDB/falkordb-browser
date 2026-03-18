@@ -168,7 +168,7 @@ export default function Page() {
         return json.result.data.map(({ info }: { info: string }) => info);
     }, [graphName, setIndicator, toast]);
 
-    const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator), [graphName, setIndicator, toast]);
+    const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator), [setIndicator, toast]);
 
     useEffect(() => {
         if (!graphName) return undefined;
@@ -181,7 +181,7 @@ export default function Page() {
             const newLabels = newDataStats?.[0] || [];
             const newRelationships = newDataStats?.[1] || [];
 
-            const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage);
+            const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
             setGraphInfo(gi);
             fetchCount();
         }).catch((error) => {
@@ -199,7 +199,7 @@ export default function Page() {
         return () => {
             clearInterval(interval);
         };
-    }, [fetchCount, fetchInfo, graphName, refreshInterval, setGraphInfo, setIndicator, showMemoryUsage, toast]);
+    }, [fetchCount, fetchInfo, fetchMetaStats, graphName, refreshInterval, setGraphInfo, setIndicator, showMemoryUsage, toast]);
 
     useEffect(() => {
         if (graphName) return;
@@ -230,12 +230,12 @@ export default function Page() {
                 return;
             }
 
-            setGraph(Graph.empty(toast, setIndicator, graphName));
+            setGraph(Graph.empty(graphName));
             fetchCount();
         }
 
         setIsQueryLoading(false);
-    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames, setIsQueryLoading, tutorialOpen, toast, setIndicator]);
+    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames, setIsQueryLoading, tutorialOpen]);
 
     const handleSetSelectedElements = useCallback((el: (Node | Link)[] = []) => {
         setSelectedElements(el);

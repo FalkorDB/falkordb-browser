@@ -66,11 +66,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [runDefaultQuery, setRunDefaultQuery] = useState(false);
   const [schemaNames, setSchemaNames] = useState<string[]>([]);
   const [graphNames, setGraphNames] = useState<string[]>([]);
-  const [schema, setSchema] = useState<Graph>(Graph.empty(toast, setIndicator));
-  const [graph, setGraph] = useState<Graph>(Graph.empty(toast, setIndicator));
+  const [schema, setSchema] = useState<Graph>(Graph.empty());
+  const [graph, setGraph] = useState<Graph>(Graph.empty());
   const [data, setData] = useState<GraphData>({ ...graph.Elements });
   const [graphData, setGraphData] = useState<CanvasData>();
-  const [graphInfo, setGraphInfo] = useState<GraphInfo>(GraphInfo.empty());
+  const [graphInfo, setGraphInfo] = useState<GraphInfo>(GraphInfo.empty(toast, setIndicator));
   const [schemaName, setSchemaName] = useState<string>("");
   const [graphName, setGraphName] = useState<string>("");
   const [contentPersistence, setContentPersistence] = useState(false);
@@ -414,7 +414,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         const memoryUsage = showMemoryUsage ? await getMemoryUsage(n, toast, setIndicator) : new Map<string, MemoryValue>();
         const newLabels = metaStats?.[0] || [];
         const newRelationships = metaStats?.[1] || [];
-        const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage);
+        const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
         setGraphInfo(gi);
         return gi;
       }).catch((error) => {
@@ -433,7 +433,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       if (!explain.ok) throw new Error("Failed to fetch explain plan");
 
       const explainJson = await explain.json();
-      const g = Graph.create(n, result, showPropertyKeyPrefix, existingLimit, toast, setIndicator, graphI);
+      const g = await Graph.create(n, result, showPropertyKeyPrefix, existingLimit, graphI);
 
       newQuery = {
         ...newQuery,
@@ -759,7 +759,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setGraphNames(["social-demo", "social-demo-test"]);
       setGraphName("");
       setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }));
-      setGraph(Graph.empty(toast, setIndicator));
+      setGraph(Graph.empty());
       setData({ nodes: [], links: [] });
       setCustomizingLabel(null);
     } catch (error) {
@@ -789,8 +789,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     }
 
     // Clear current graph to avoid showing deleted demo graph
-    setGraph(Graph.empty(toast, setIndicator));
-    setGraphInfo(GraphInfo.empty());
+    setGraph(Graph.empty());
+    setGraphInfo(GraphInfo.empty(toast, setIndicator));
     setData({ nodes: [], links: [] });
 
     if (userGraphBeforeTutorial && userGraphsBeforeTutorial.includes(userGraphBeforeTutorial)) {

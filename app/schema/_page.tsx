@@ -115,7 +115,7 @@ export default function Page() {
         }, toast, setIndicator);
         if (!result.ok) return;
         const json = await result.json();
-        const schemaGraph = Graph.create(schemaName, json.result, showPropertyKeyPrefix, 0, toast, setIndicator, undefined, true);
+        const schemaGraph = await Graph.create(schemaName, json.result, showPropertyKeyPrefix, 0, undefined, true);
         setSchema(schemaGraph);
     }, [setIndicator, setSchema, toast, schemaName, showPropertyKeyPrefix]);
 

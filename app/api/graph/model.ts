@@ -3,7 +3,7 @@
 /* eslint-disable no-param-reassign */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { Data, DataRow, getMetaStats, GraphData, InfoLabel, InfoRelationship, Label, Link, LinkCell, MemoryValue, Node, NodeCell, Relationship, ToastFn, Value } from "@/lib/utils";
+import { Data, getMetaStats, GraphData, InfoLabel, InfoRelationship, Label, Link, LinkCell, MemoryValue, Node, NodeCell, Relationship, ToastFn, Value } from "@/lib/utils";
 
 export const DEFAULT_COLORS = [
   "hsl(246, 100%, 70%)",
@@ -106,19 +106,28 @@ export class GraphInfo {
 
   private colorsCounter: number = 0;
 
+  private toast: ToastFn;
+
+  private setIndicator: (indicator: "online" | "offline") => void;
+
   constructor(
     propertyKeys: string[] | undefined,
     labels: Map<string, InfoLabel>,
     relationships: Map<string, InfoRelationship>,
     memoryUsage: Map<string, MemoryValue>,
+    toast: ToastFn,
+    setIndicator: (indicator: "online" | "offline") => void,
     colors?: string[]
   ) {
     this.propertyKeys = propertyKeys;
     this.labels = labels;
     this.relationships = relationships;
     this.memoryUsage = memoryUsage;
+    this.toast = toast;
+    this.setIndicator = setIndicator;
     this.colors = [...(colors || DEFAULT_COLORS)];
   }
+
 
   get PropertyKeys(): string[] | undefined {
     return this.propertyKeys;
@@ -154,11 +163,15 @@ export class GraphInfo {
       new Map(this.labels),
       new Map(this.relationships),
       new Map(this.memoryUsage),
+      this.toast,
+      this.setIndicator,
       this.colors
     );
   }
 
   public static empty(
+    toast: ToastFn,
+    setIndicator: (indicator: "online" | "offline") => void,
     propertyKeys?: string[],
     memoryUsage?: Map<string, MemoryValue>,
   ): GraphInfo {
@@ -167,59 +180,81 @@ export class GraphInfo {
       new Map(),
       new Map(),
       new Map(memoryUsage),
+      toast,
+      setIndicator
     );
   }
 
-  public static create(
+  public static async create(
     propertyKeys: string[],
     labels: [string, number][],
     relationships: [string, number][],
     memoryUsage: Map<string, MemoryValue>,
-  ): GraphInfo {
-    const graphInfo = GraphInfo.empty(propertyKeys, memoryUsage);
-    graphInfo.createLabel(labels);
-    relationships.forEach((relationship) =>
-      graphInfo.createRelationship(relationship)
+    toast: ToastFn,
+    setIndicator: (indicator: "online" | "offline") => void
+  ): Promise<GraphInfo> {
+    const graphInfo = GraphInfo.empty(toast, setIndicator, propertyKeys, memoryUsage);
+    await graphInfo.createLabel(labels, "");
+    await relationships.reduce(
+      (prev, relationship) => prev.then(() => graphInfo.createRelationship(relationship, "")),
+      Promise.resolve() as Promise<unknown>
     );
 
     return graphInfo;
   }
 
-  public createLabel(labels: [string, number][]): InfoLabel[] {
-    return labels.map(([label, count]) => {
-      let l = this.labels.get(label);
+  private async getMetaStatsCount(graphName: string, type: "relationships" | "labels", name: string): Promise<number> {
+    const result = await getMetaStats(graphName, this.toast, this.setIndicator);
 
-      if (!l) {
-        l = {
-          name: label,
-          style: {
-            color: this.getLabelColorValue(this.colorsCounter),
-          },
-          show: true,
-          count,
-        };
+    if (!result) return 0;
 
-        loadLabelStyle(l);
-
-        this.labels.set(label, l);
-        this.colorsCounter += 1;
-      }
-
-      return l;
-    });
+    return result[type === "labels" ? 0 : 1].find(([itemName]) => itemName === name)?.[1] || 0;
   }
 
-  public createRelationship([relationship, count]: [string, number]): InfoRelationship {
+  public async createLabel(labels: [string, number | undefined][], graphName: string): Promise<InfoLabel[]> {
+    return labels.reduce(
+      (prev, [label, count]) => prev.then(async (result) => {
+        let l = this.labels.get(label);
+
+        if (!l) {
+          // eslint-disable-next-line no-await-in-loop
+          const resolvedCount = label === "" ? 0 : count ?? await this.getMetaStatsCount(graphName, "labels", label);
+
+          l = {
+            name: label,
+            style: {
+              color: this.getLabelColorValue(this.colorsCounter),
+            },
+            show: true,
+            count: resolvedCount,
+          };
+
+          loadLabelStyle(l);
+
+          this.labels.set(label, l);
+          this.colorsCounter += 1;
+        }
+
+        result.push(l);
+        return result;
+      }),
+      Promise.resolve([] as InfoLabel[])
+    );
+  }
+
+  public async createRelationship([relationship, count]: [string, number | undefined], graphName: string): Promise<InfoRelationship> {
     let r = this.relationships.get(relationship);
 
     if (!r) {
+      const resolvedCount = count ?? await this.getMetaStatsCount(graphName, "relationships", relationship);
+
       r = {
         name: relationship,
         show: true,
         style: {
           color: this.getLabelColorValue(this.colorsCounter),
         },
-        count,
+        count: resolvedCount,
       };
 
       this.relationships.set(relationship, r);
@@ -269,10 +304,6 @@ export class Graph {
 
   private showPropertyKeyPrefix: boolean = false;
 
-  private toast: ToastFn;
-
-  private setIndicator: (indicator: "online" | "offline") => void; 
-
   private constructor(
     id: string,
     labels: Label[],
@@ -282,8 +313,6 @@ export class Graph {
     relationshipsMap: Map<string, Relationship>,
     nodesMap: Map<number, Node>,
     linksMap: Map<number, Link>,
-    toast: ToastFn,
-    setIndicator: (indicator: "online" | "offline") => void,
     showPropertyKeyPrefix?: boolean,
     currentLimit?: number,
     graphInfo?: GraphInfo
@@ -298,11 +327,9 @@ export class Graph {
     this.relationshipsMap = relationshipsMap;
     this.nodesMap = nodesMap;
     this.linksMap = linksMap;
-    this.toast = toast;
-    this.setIndicator = setIndicator;
     this.showPropertyKeyPrefix = showPropertyKeyPrefix || false;
     this.currentLimit = currentLimit || 0;
-    this.graphInfo = graphInfo || GraphInfo.empty();
+    this.graphInfo = graphInfo || GraphInfo.empty(() => {}, () => {});
   }
 
   get Id(): string {
@@ -382,8 +409,6 @@ export class Graph {
   }
 
   public static empty(
-    toast: ToastFn,
-    setIndicator: (indicator: "online" | "offline") => void,
     graphName?: string,
     showPropertyKeyPrefix?: boolean,
     currentLimit?: number,
@@ -398,33 +423,27 @@ export class Graph {
       new Map<string, Relationship>(),
       new Map<number, Node>(),
       new Map<number, Link>(),
-      toast,
-      setIndicator,
       showPropertyKeyPrefix,
       currentLimit,
       graphInfo
     );
   }
 
-  public static create(
+  public static async create(
     id: string,
     results: { data: Data; metadata: any[] },
     showPropertyKeyPrefix: boolean,
     currentLimit: number,
-    toast: ToastFn,
-    setIndicator: (indicator: "online" | "offline") => void,
     graphInfo?: GraphInfo,
     isSchema = false
-  ): Graph {
+  ): Promise<Graph> {
     const graph = Graph.empty(
-      toast,
-      setIndicator,
       undefined,
       showPropertyKeyPrefix,
       currentLimit,
       graphInfo
     );
-    graph.extend(results, isSchema);
+    await graph.extend(results, isSchema);
     graph.id = id;
     return graph;
   }
@@ -673,12 +692,12 @@ export class Graph {
     return undefined;
   }
 
-  public extend(
+  public async extend(
     results: { data: Data; metadata: any[] },
     isSchema = false,
     collapsed = false,
     isMerge = false
-  ): (Node | Link)[] {
+  ): Promise<(Node | Link)[]> {
     const newElements: (Node | Link)[] = [];
     const { data } = results;
 
@@ -699,46 +718,61 @@ export class Graph {
 
     if (!data || data.length === 0) return [];
 
-    data.forEach((row: DataRow) => {
-      Object.values(row).forEach(async (cell) => {
-        if (Array.isArray(cell) && cell.length > 0 && cell[0] instanceof Object) {
-          cell.forEach(async (c: any) => {
-            const elements = await this.extendCell(c, collapsed, isSchema);
-            if (elements) {
-              if (Array.isArray(elements)) {
-                newElements.push(...elements);
-              } else {
-                newElements.push(elements);
+    await data.reduce(
+      (rowPrev, row) => rowPrev.then(() =>
+        Object.values(row).reduce(
+          (cellPrev, cell) => cellPrev.then(async () => {
+            if (Array.isArray(cell) && cell.length > 0 && cell[0] instanceof Object) {
+              await cell.reduce(
+                (cPrev: Promise<void>, c: any) => cPrev.then(async () => {
+                  const elements = await this.extendCell(c, collapsed, isSchema);
+                  if (elements) {
+                    if (Array.isArray(elements)) {
+                      newElements.push(...elements);
+                    } else {
+                      newElements.push(elements);
+                    }
+                  }
+                }),
+                Promise.resolve()
+              );
+            } else if (cell instanceof Object) {
+              const elements = await this.extendCell(cell, collapsed, isSchema);
+              if (elements) {
+                if (Array.isArray(elements)) {
+                  newElements.push(...elements);
+                } else {
+                  newElements.push(elements);
+                }
               }
             }
-          });
-        } else if (cell instanceof Object) {
-          const elements = await this.extendCell(cell, collapsed, isSchema);
-          if (elements) {
-            if (Array.isArray(elements)) {
-              newElements.push(...elements);
-            } else {
-              newElements.push(elements);
-            }
-          }
-        }
-      });
-    });
+          }),
+          Promise.resolve()
+        )
+      ),
+      Promise.resolve()
+    );
 
     this.nodesMap = new Map<number, Node>(this.elements.nodes.map((n) => [n.id, n]));
     this.linksMap = new Map<number, Link>(this.elements.links.map((l) => [l.id, l]));
 
-    newElements
+    await newElements
       .filter((element): element is Node => !!element && "labels" in element)
-      .forEach(async (node) => {
-        const label = getLabelWithFewestElements(
-          await Promise.all(node.labels.map(
-            async (l) => this.labelsMap.get(l) || (await this.createLabel([l]))[0]
-          ))
-        );
-        // Use custom color if available, otherwise use default label color
-        node.color = label.style.color;
-      });
+      .reduce(
+        (prev, node) => prev.then(async () => {
+          const resolvedLabels = await node.labels.reduce(
+            (lPrev, l) => lPrev.then(async (acc) => {
+              acc.push(this.labelsMap.get(l) || (await this.createLabel([l]))[0]);
+              return acc;
+            }),
+            Promise.resolve([] as Label[])
+          );
+          const label = getLabelWithFewestElements(resolvedLabels);
+          // Use custom color if available, otherwise use default label color
+          node.color = label.style.color;
+        }),
+        Promise.resolve()
+      );
 
     // remove empty category if there are no more empty nodes category
     const emptyCategory = this.labelsMap.get("");
@@ -751,45 +785,39 @@ export class Graph {
     return newElements;
   }
 
-  private async getMetaStatsCount(type: "relationships" | "labels", name: string): Promise<number> {
-    const result = await getMetaStats(this.Id, this.toast, this.setIndicator);
-    
-    if (!result) return 0;
+  public async createLabel(labels: string[], node?: Node): Promise<Label[]> {
+    return labels.reduce(
+      (prev, label) => prev.then(async (result) => {
+        let l = this.labelsMap.get(label);
 
-    return result[type === "labels" ? 0 : 1].find(([itemName]) => itemName === name)?.[1] || 0;
-  }
+        if (!l) {
+          const [infoLabel] = await this.graphInfo.createLabel([[label, undefined]], this.id);
 
-  public createLabel(labels: string[], node?: Node): Promise<Label[]> {
-    return Promise.all(labels.map(async (label) => {
-      let l = this.labelsMap.get(label);
+          l = {
+            ...infoLabel,
+            elements: [],
+          };
 
-      if (!l) {
-        const count = await this.getMetaStatsCount("labels", label);
-        const [infoLabel] = this.graphInfo.createLabel([[label, count]]);
+          this.labelsMap.set(l.name, l);
+          this.labels.push(l);
+        }
 
-        l = {
-          ...infoLabel,
-          elements: [],
-        };
+        if (node) {
+          l.elements.push(node);
+        }
 
-        this.labelsMap.set(l.name, l);
-        this.labels.push(l);
-      }
-
-      if (node) {
-        l.elements.push(node);
-      }
-
-      return l;
-    }));
+        result.push(l);
+        return result;
+      }),
+      Promise.resolve([] as Label[])
+    );
   }
 
   public async createRelationship(relationship: string): Promise<Relationship> {
     let r = this.relationshipsMap.get(relationship);
 
     if (!r) {
-      const count = await this.getMetaStatsCount("relationships", relationship);
-      const infoRelationship = this.graphInfo.createRelationship([relationship, count]);
+      const infoRelationship = await this.graphInfo.createRelationship([relationship, undefined], this.id);
       r = {
         ...infoRelationship,
         elements: [],
