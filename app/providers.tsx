@@ -402,72 +402,77 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
     const [query, existingLimit] = getQueryWithLimit(q, limit);
     const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}`;
-    const result = await getSSEGraphResult(url, toast, setIndicator) as { data: Data; metadata: string[] };
+    try {
+      const result = await getSSEGraphResult(url, toast, setIndicator) as { data: Data; metadata: string[] };
 
-    if (!result) throw new Error("Failed to execute query");
+      if (!result) throw new Error("Failed to execute query");
 
-    const graphI = await Promise.all([
-      fetchMetaStats(n),
-      fetchInfo("(property key)", n),
-    ]).then(async ([metaStats, newPropertyKeys]) => {
-      const memoryUsage = showMemoryUsage ? await getMemoryUsage(n, toast, setIndicator) : new Map<string, MemoryValue>();
-      const newLabels = metaStats?.[0] || [];
-      const newRelationships = metaStats?.[1] || [];
-      const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
-      setGraphInfo(gi);
-      return gi;
-    }).catch((error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to fetch graph info",
-        variant: "destructive",
+      const graphI = await Promise.all([
+        fetchMetaStats(n),
+        fetchInfo("(property key)", n),
+      ]).then(async ([metaStats, newPropertyKeys]) => {
+        const memoryUsage = showMemoryUsage ? await getMemoryUsage(n, toast, setIndicator) : new Map<string, MemoryValue>();
+        const newLabels = metaStats?.[0] || [];
+        const newRelationships = metaStats?.[1] || [];
+        const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
+        setGraphInfo(gi);
+        return gi;
+      }).catch((error) => {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to fetch graph info",
+          variant: "destructive",
+        });
+        return undefined;
       });
-      return undefined;
-    });
 
-    const explain = await securedFetch(`api/graph/${prepareArg(n)}/explain?query=${prepareArg(query)}`, {
-      method: "GET"
-    }, toast, setIndicator);
+      const explain = await securedFetch(`api/graph/${prepareArg(n)}/explain?query=${prepareArg(query)}`, {
+        method: "GET"
+      }, toast, setIndicator);
 
-    if (!explain.ok) throw new Error("Failed to fetch explain plan");
+      if (!explain.ok) throw new Error("Failed to fetch explain plan");
 
-    const explainJson = await explain.json();
-    const g = await Graph.create(n, result, showPropertyKeyPrefix, existingLimit, graphI);
+      const explainJson = await explain.json();
+      const g = await Graph.create(n, result, showPropertyKeyPrefix, existingLimit, graphI);
 
-    newQuery = {
-      ...newQuery,
-      elementsCount: g.getElements().length,
-      explain: explainJson.result,
-      graphName: n,
-      metadata: result.metadata,
-      status: "Success",
-    };
+      newQuery = {
+        ...newQuery,
+        elementsCount: g.getElements().length,
+        explain: explainJson.result,
+        graphName: n,
+        metadata: result.metadata,
+        status: "Success",
+      };
 
-    setGraph(g);
-    setData({ ...g.Elements });
-    fetchCount(n);
-    setLastLimit(limit);
+      setGraph(g);
+      setData({ ...g.Elements });
+      fetchCount(n);
+      setLastLimit(limit);
 
-    if (!tutorialOpen) {
-      localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }));
+      if (!tutorialOpen) {
+        localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }));
+      }
+
+      const newQueries = handelGetNewQueries(newQuery);
+
+      localStorage.setItem("query history", JSON.stringify(newQueries));
+
+      setHistoryQuery(prev => ({
+        ...prev,
+        queries: newQueries,
+        currentQuery: newQuery,
+        counter: 0
+      }));
+      setViewport(undefined);
+      setGraphData(undefined);
+      setSearch("");
+      setScrollPosition(0);
+      handleCooldown(-1);
+    } catch (error) {
+      // Error already handled in getSSEGraphResult
+    } finally {
+      setIsQueryLoading(false);
     }
-
-    const newQueries = handelGetNewQueries(newQuery);
-
-    localStorage.setItem("query history", JSON.stringify(newQueries));
-
-    setHistoryQuery(prev => ({
-      ...prev,
-      queries: newQueries,
-      currentQuery: newQuery,
-      counter: 0
-    }));
-    setIsQueryLoading(false);
-    setViewport(undefined);
-    setGraphData(undefined);
-    setSearch("");
-    setScrollPosition(0);
-    handleCooldown(-1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graphName, limit, timeout, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries, showMemoryUsage, captionsKeys, showPropertyKeyPrefix, tutorialOpen]);
 
