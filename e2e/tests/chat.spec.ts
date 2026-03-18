@@ -533,11 +533,11 @@ test.describe("Chat Feature Tests", () => {
     await chat.selectGraphByName(graph1Name);
     // Wait for maxSavedMessages user messages to load from localStorage
     await chat.waitForUserMessageCount(maxSavedMessages);
-    // After reload/re-selecting graph, verify only maxSavedMessages (5) are loaded from localStorage
-    // The getLastUserMessagesWithContext function should have limited it to 5 user messages
+    // After reload/re-selecting graph, verify only maxSavedMessages user messages are loaded from localStorage
+    // The getLastUserMessagesWithContext function should have limited it to maxSavedMessages user messages
     const graph1ReloadedCount = await chat.getChatUserMessagesCount();
     
-    // Should have 5 user messages (maxSavedMessages limit applied from localStorage)
+    // Should have maxSavedMessages user messages (limit applied from localStorage)
     expect(graph1ReloadedCount).toBe(maxSavedMessages);
     
     // Get all user messages and check the first one
