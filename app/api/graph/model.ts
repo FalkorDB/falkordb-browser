@@ -118,13 +118,6 @@ export interface Relationship extends InfoRelationship {
   textDescent?: number;
 }
 
-export const DEFAULT_COLORS = [
-  "hsl(246, 100%, 70%)",
-  "hsl(330, 100%, 70%)",
-  "hsl(20, 100%, 65%)",
-  "hsl(180, 66%, 70%)",
-];
-
 // Color palette for node customization
 export const STYLE_COLORS = [
   // Reds & Pinks
@@ -230,7 +223,7 @@ export class GraphInfo {
     this.labels = labels;
     this.relationships = relationships;
     this.memoryUsage = memoryUsage;
-    this.colors = [...(colors || DEFAULT_COLORS)];
+    this.colors = [...colors || []];
   }
 
   get PropertyKeys(): string[] | undefined {
@@ -360,8 +353,7 @@ export class GraphInfo {
     }
 
     // Hash the index three times to get independent values for H, S, L.
-    // Multiply index by 7 to space consecutive colors apart.
-    const h1 = GraphInfo.hashCode(index * 7);
+    const h1 = GraphInfo.hashCode(index * 6);
     const h2 = GraphInfo.hashCode(h1);
     const h3 = GraphInfo.hashCode(h2);
 
