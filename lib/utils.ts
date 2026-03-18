@@ -297,18 +297,23 @@ export const getDefaultQuery = (q?: string) =>
 export const getMetaStats = async (name: string, toast: ToastFn, setIndicator: (indicator: "online" | "offline") => void) => {
   const q = "CALL db.meta.stats() YIELD labels, relTypes RETURN labels, relTypes as relationships";
 
-  const result = await getSSEGraphResult(`/api/graph/${prepareArg(name)}?query=${q}`, toast, setIndicator) as { data: { labels: { [key: string]: number }, relationships: { [key: string]: number } }[] };
+  try {
+    const result = await getSSEGraphResult(`/api/graph/${prepareArg(name)}?query=${q}`, toast, setIndicator) as { data: { labels: { [key: string]: number }, relationships: { [key: string]: number } }[] };
 
-  if (!result) return undefined;
+    if (!result) return undefined;
 
-  const row = result.data?.[0];
-  
-  if (!row) return undefined;
+    const row = result.data?.[0];
 
-  const l = Object.entries(row.labels);
-  const r = Object.entries(row.relationships);
+    if (!row) return undefined;
 
-  return [l, r];
+    const l = Object.entries(row.labels);
+    const r = Object.entries(row.relationships);
+
+    return [l, r];
+  } catch (error) {
+    console.error("Failed to fetch meta stats:", error);
+    return undefined;
+  }
 };
 
 export function rgbToHSL(hex: string): string {
