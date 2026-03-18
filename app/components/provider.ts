@@ -316,9 +316,9 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
 );
 
 export const GraphContext = createContext<GraphContextType>({
-  graph: Graph.empty(() => { }, () => { }),
+  graph: Graph.empty(),
   setGraph: () => { },
-  graphInfo: GraphInfo.empty(),
+  graphInfo: GraphInfo.empty(() => { }, () => { }),
   setGraphInfo: () => { },
   graphName: "",
   setGraphName: () => { },
@@ -343,7 +343,7 @@ export const GraphContext = createContext<GraphContextType>({
 });
 
 export const SchemaContext = createContext<SchemaContextType>({
-  schema: Graph.empty(() => { }, () => { }),
+  schema: Graph.empty(),
   setSchema: () => { },
   schemaName: "",
   setSchemaName: () => { },
