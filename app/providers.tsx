@@ -109,8 +109,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [customizingLabel, setCustomizingLabel] = useState<InfoLabel | null>(null);
   const [dbVersion, setDbVersion] = useState<string>("");
   const [connectionType, setConnectionType] = useState<ConnectionType>("Standalone");
-  const [captionsKeys, setCaptionsKeys] = useState<string[]>([]);
-  const [newCaptionsKeys, setNewCaptionsKeys] = useState<string[]>([]);
+  const [captionsKeys, setCaptionsKeys] = useState<[string, boolean][]>([]);
+  const [newCaptionsKeys, setNewCaptionsKeys] = useState<[string, boolean][]>([]);
   const [newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix] = useState<boolean>(false);
   const [showPropertyKeyPrefix, setShowPropertyKeyPrefix] = useState<boolean>(false);
   const [newCypherOnly, setNewCypherOnly] = useState<boolean>(false);
@@ -555,10 +555,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         console.error("Failed to parse query history from localStorage", error);
       }
       try {
-        setCaptionsKeys(JSON.parse(localStorage.getItem("captionsKeys") || '["name", "title"]'));
+        setCaptionsKeys(JSON.parse(localStorage.getItem("captionsKeys") || '[["name", false], ["title", false]]'));
       } catch (error) {
         console.error("Failed to parse captions keys from localStorage", error);
-        setCaptionsKeys(['name', 'title']);
+        setCaptionsKeys([['name', false], ['title', false]]);
       }
       setTimeout(parseInt(localStorage.getItem("timeout") || "0", 10));
       const l = parseInt(localStorage.getItem("limit") || "300", 10);

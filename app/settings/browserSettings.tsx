@@ -2,7 +2,7 @@
 
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2 } from "lucide-react";
+import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2, Info } from "lucide-react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
 import { areCaptionKeysEqual, cn, getDefaultQuery, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
@@ -28,7 +28,7 @@ export default function BrowserSettings() {
             showPropertyKeyPrefixSettings: { newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
             chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly },
             graphInfo: { newRefreshInterval, setNewRefreshInterval },
-            tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple}
+            tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple }
         },
         settings: {
             contentPersistenceSettings: { contentPersistence },
@@ -144,7 +144,7 @@ export default function BrowserSettings() {
             newModel !== model ||
             refreshInterval !== newRefreshInterval ||
             newMaxSavedMessages !== maxSavedMessages ||
-            !areCaptionKeysEqual(newCaptionsKeys, captionsKeys) ||
+            !areCaptionKeysEqual(newCaptionsKeys.map(([key]) => key), captionsKeys.map(([key]) => key)) ||
             newShowPropertyKeyPrefix !== showPropertyKeyPrefix ||
             newCypherOnly !== cypherOnly ||
             newColumnWidth !== columnWidth ||
@@ -249,9 +249,9 @@ export default function BrowserSettings() {
 
         const caption = newCaption.trim();
 
-        if (!caption || newCaptionsKeys.includes(caption)) return;
+        if (!caption || newCaptionsKeys.some(([key]) => key === caption[0])) return;
 
-        setNewCaptionsKeys(prev => [...prev, caption]);
+        setNewCaptionsKeys(prev => [...prev, [caption, false]]);
         setNewCaption("");
     };
 
@@ -581,29 +581,46 @@ export default function BrowserSettings() {
                                     {
                                         newCaptionsKeys.length > 0 ?
                                             <ul className="flex flex-col gap-1">
-                                                {newCaptionsKeys.map((key, index) => (
+                                                {newCaptionsKeys.map(([key, exactMatch], index) => (
                                                     // eslint-disable-next-line react/no-array-index-key
                                                     <li key={index} className="flex justify-between items-center p-1 bg-background rounded-lg">
                                                         <p>{key}</p>
-                                                        <Button
-                                                            className="p-1"
-                                                            variant="Delete"
-                                                            title="Remove Caption"
-                                                            onClick={() => {
-                                                                setNewCaptionsKeys(prev => prev.filter(caption => caption !== key));
-                                                            }}
-                                                        >
-                                                            <Trash2 />
-                                                        </Button>
+                                                        <div className="flex gap-4 items-center">
+                                                            <Tooltip>
+                                                                <TooltipTrigger>
+                                                                    <Info size={20} />
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    <p>Toggle exact match for this caption key. (when enabled, the caption will only match the exact key)</p>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                            <Switch
+                                                                className="data-[state=unchecked]:bg-border"
+                                                                checked={exactMatch}
+                                                                onCheckedChange={() => {
+                                                                    setNewCaptionsKeys(prev => prev.map(([k, v]) => k === key ? [k, !v] : [k, v]));
+                                                                }}
+                                                            />
+                                                            <Button
+                                                                className="p-1"
+                                                                variant="Delete"
+                                                                title="Remove Caption"
+                                                                onClick={() => {
+                                                                    setNewCaptionsKeys(prev => prev.filter(([k]) => k !== key));
+                                                                }}
+                                                            >
+                                                                <Trash2 />
+                                                            </Button>
+                                                        </div>
                                                     </li>
                                                 ))}
                                             </ul>
                                             : <p className="text-sm text-muted-foreground">No caption keys added. Add keys to display them on the nodes.</p>
                                     }
-                                    <form className="flex gap-2" onSubmit={handleAddCaptionKey}>
+                                    <form className="flex gap-2 items-center" onSubmit={handleAddCaptionKey}>
                                         <Input
                                             id="captionKeyInput"
-                                            className="flex-1"
+                                            className="flex-1 h-fit"
                                             placeholder="Enter a caption key to display on nodes..."
                                             value={newCaption}
                                             onChange={(e) => setNewCaption(e.target.value)}
