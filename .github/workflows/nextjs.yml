@@ -93,6 +93,7 @@ jobs:
           output: 'trivy-results.sarif'
           exit-code: '1'
           ignore-unfixed: true
+          scanners: 'vuln'
           vuln-type: 'os,library'
           severity: 'HIGH,CRITICAL'
           version: 'v0.69.2'
@@ -124,6 +125,7 @@ jobs:
           format: 'table'
           output: 'trivy-results.txt'
           ignore-unfixed: true
+          scanners: 'vuln'
           vuln-type: 'os,library'
           severity: 'HIGH,CRITICAL'
           skip-setup-trivy: true
@@ -174,9 +176,19 @@ jobs:
             }
 
       - name: Fail if vulnerabilities found
-        if: steps.trivy-scan.outcome == 'failure'
+        if: always()
         run: |
-          echo "❌ HIGH or CRITICAL vulnerabilities detected in the Docker image!"
-          echo "Please review the security scan results above."
-          exit 1
+          if [ ! -f trivy-results.sarif ]; then
+            echo "⚠️ Trivy SARIF report not found. Failing to avoid a silent security-scan skip."
+            exit 1
+          fi
+
+          RESULTS_COUNT=$(grep -o '"ruleId"' trivy-results.sarif | wc -l | tr -d ' ')
+          if [ "${RESULTS_COUNT}" -gt 0 ]; then
+            echo "❌ HIGH or CRITICAL vulnerabilities detected in the Docker image (${RESULTS_COUNT} findings)."
+            echo "Please review the security scan results above."
+            exit 1
+          fi
+
+          echo "✅ No HIGH or CRITICAL vulnerabilities detected in the Docker image."
 
