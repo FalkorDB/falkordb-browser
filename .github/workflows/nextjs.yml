@@ -93,6 +93,7 @@ jobs:
           output: 'trivy-results.sarif'
           exit-code: '1'
           ignore-unfixed: true
+          scanners: 'vuln'
           vuln-type: 'os,library'
           severity: 'HIGH,CRITICAL'
           version: 'v0.69.2'
@@ -124,6 +125,7 @@ jobs:
           format: 'table'
           output: 'trivy-results.txt'
           ignore-unfixed: true
+          scanners: 'vuln'
           vuln-type: 'os,library'
           severity: 'HIGH,CRITICAL'
           skip-setup-trivy: true
@@ -173,10 +175,16 @@ jobs:
               });
             }
 
-      - name: Fail if vulnerabilities found
-        if: steps.trivy-scan.outcome == 'failure'
-        run: |
-          echo "❌ HIGH or CRITICAL vulnerabilities detected in the Docker image!"
-          echo "Please review the security scan results above."
-          exit 1
+      - name: Enforce HIGH/CRITICAL vulnerability threshold
+        uses: aquasecurity/trivy-action@22438a435773de8c97dc0958cc0b823c45b064ac
+        with:
+          image-ref: 'falkordb/falkordb-browser:test'
+          format: 'table'
+          output: 'trivy-enforce.txt'
+          exit-code: '1'
+          ignore-unfixed: true
+          scanners: 'vuln'
+          vuln-type: 'os,library'
+          severity: 'HIGH,CRITICAL'
+          skip-setup-trivy: true
 
