@@ -175,20 +175,16 @@ jobs:
               });
             }
 
-      - name: Fail if vulnerabilities found
-        if: always()
-        run: |
-          if [ ! -f trivy-results.sarif ]; then
-            echo "⚠️ Trivy SARIF report not found. Failing to avoid a silent security-scan skip."
-            exit 1
-          fi
-
-          RESULTS_COUNT=$(grep -o '"ruleId"' trivy-results.sarif | wc -l | tr -d ' ')
-          if [ "${RESULTS_COUNT}" -gt 0 ]; then
-            echo "❌ HIGH or CRITICAL vulnerabilities detected in the Docker image (${RESULTS_COUNT} findings)."
-            echo "Please review the security scan results above."
-            exit 1
-          fi
-
-          echo "✅ No HIGH or CRITICAL vulnerabilities detected in the Docker image."
+      - name: Enforce HIGH/CRITICAL vulnerability threshold
+        uses: aquasecurity/trivy-action@22438a435773de8c97dc0958cc0b823c45b064ac
+        with:
+          image-ref: 'falkordb/falkordb-browser:test'
+          format: 'table'
+          output: 'trivy-enforce.txt'
+          exit-code: '1'
+          ignore-unfixed: true
+          scanners: 'vuln'
+          vuln-type: 'os,library'
+          severity: 'HIGH,CRITICAL'
+          skip-setup-trivy: true
 
