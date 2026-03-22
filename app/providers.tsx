@@ -558,7 +558,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         console.error("Failed to parse query history from localStorage", error);
       }
       try {
-        setCaptionsKeys(JSON.parse(localStorage.getItem("captionsKeys") || '[["name", false], ["title", false]]'));
+        const raw = JSON.parse(localStorage.getItem("captionsKeys") || '[["name", false], ["title", false]]');
+        // Migrate from old string[] format to [string, boolean][] tuple format
+        const normalized: [string, boolean][] = Array.isArray(raw)
+          ? raw.map((item: unknown) => typeof item === 'string' ? [item, false] as [string, boolean] : item as [string, boolean])
+          : [['name', false], ['title', false]];
+        setCaptionsKeys(normalized);
       } catch (error) {
         console.error("Failed to parse captions keys from localStorage", error);
         setCaptionsKeys([['name', false], ['title', false]]);
