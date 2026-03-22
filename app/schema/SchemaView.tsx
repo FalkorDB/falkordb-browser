@@ -3,11 +3,10 @@
 'use client';
 
 import { useEffect, useContext, Dispatch, SetStateAction } from "react";
-import { GraphRef } from "@/lib/utils";
+import { GraphRef, Label, Link, Node, GraphData, Relationship } from "@/lib/utils";
 import type { GraphData as CanvasData } from "@falkordb/canvas";
 import dynamic from "next/dynamic";
 import Labels from "../graph/labels";
-import { Label, Link, Node, GraphData, Relationship } from "../api/graph/model";
 import { SchemaContext } from "../components/provider";
 import Controls from "../graph/controls";
 import Spinning from "../components/ui/spinning";

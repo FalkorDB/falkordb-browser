@@ -9,11 +9,11 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
 import { Switch } from "@/components/ui/switch";
-import { prepareArg, securedFetch } from "@/lib/utils";
+import { GraphData, Label, Link, Node, prepareArg, securedFetch } from "@/lib/utils";
 import Button from "../components/ui/Button";
 import { ATTRIBUTES, getDefaultAttribute, OPTIONS } from "./CreateElementPanel";
 import Combobox from "../components/ui/combobox";
-import { Label, Graph, Link, Node, GraphData } from "../api/graph/model";
+import { Graph } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import ToastButton from "../components/ToastButton";
 import DialogComponent from "../components/DialogComponent";
@@ -282,7 +282,7 @@ export default function DataPanel({ object, setObject, schema, setLabels, setDat
             }, toast, setIndicator);
 
             if (result.ok) {
-                setLabels([...schema.addLabel(newLabel, node, false)]);
+                setLabels([...await schema.addLabel(newLabel, node, false)]);
                 setLabel([...node.labels]);
                 setData({ ...schema.Elements });
                 setNewLabel("");
@@ -313,7 +313,7 @@ export default function DataPanel({ object, setObject, schema, setLabels, setDat
             }, toast, setIndicator);
 
             if (result.ok) {
-                schema.removeLabel(removeLabel, node, false);
+                await schema.removeLabel(removeLabel, node, false);
                 setLabels([...schema.Labels]);
                 setLabel([...node.labels]);
                 setData({ ...schema.Elements });

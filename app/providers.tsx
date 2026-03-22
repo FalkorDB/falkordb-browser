@@ -4,7 +4,7 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef, ConnectionType, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
+import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef, ConnectionType, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue } from "@/lib/utils";
 import { encryptValue, decryptValue, isCryptoAvailable, isEncrypted } from "@/lib/encryption";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
@@ -12,7 +12,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
-import { Graph, GraphData, GraphInfo, HistoryQuery, MemoryValue, Query, Data, Label, Relationship, InfoLabel } from "./api/graph/model";
+import { Graph, GraphInfo } from "./api/graph/model";
 import Header from "./components/Header";
 import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext } from "./components/provider";
 import Tutorial from "./components/Tutorial";
@@ -61,8 +61,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const panelRef = useRef<PanelImperativeHandle>(null);
   const canvasRef = useRef<GraphRef["current"]>(null);
 
-  const [historyQuery, setHistoryQuery] = useState<HistoryQuery>(defaultQueryHistory);
   const [indicator, setIndicator] = useState<"online" | "offline">("online");
+  const [historyQuery, setHistoryQuery] = useState<HistoryQuery>(defaultQueryHistory);
   const [runDefaultQuery, setRunDefaultQuery] = useState(false);
   const [schemaNames, setSchemaNames] = useState<string[]>([]);
   const [graphNames, setGraphNames] = useState<string[]>([]);
@@ -70,7 +70,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [graph, setGraph] = useState<Graph>(Graph.empty());
   const [data, setData] = useState<GraphData>({ ...graph.Elements });
   const [graphData, setGraphData] = useState<CanvasData>();
-  const [graphInfo, setGraphInfo] = useState<GraphInfo>(GraphInfo.empty());
+  const [graphInfo, setGraphInfo] = useState<GraphInfo>(GraphInfo.empty(toast, setIndicator));
   const [schemaName, setSchemaName] = useState<string>("");
   const [graphName, setGraphName] = useState<string>("");
   const [contentPersistence, setContentPersistence] = useState(false);
@@ -375,6 +375,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graphName]);
 
+  const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator), [toast, setIndicator]);
+
   const handelGetNewQueries = useCallback((newQuery: Query) => [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), newQuery], [historyQuery.queries]);
 
   const runQuery = useCallback(async (q: string, name?: string): Promise<void> => {
@@ -390,29 +392,29 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       timestamp: new Date().getTime()
     };
 
+    setIsQueryLoading(true);
+
+    setHistoryQuery(prev => ({
+      ...prev,
+      query: q,
+      currentQuery: newQuery
+    }));
+
+    const [query, existingLimit] = getQueryWithLimit(q, limit);
+    const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}`;
     try {
-      setIsQueryLoading(true);
-
-      setHistoryQuery(prev => ({
-        ...prev,
-        query: q,
-        currentQuery: newQuery
-      }));
-
-      const [query, existingLimit] = getQueryWithLimit(q, limit);
-      const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}`;
       const result = await getSSEGraphResult(url, toast, setIndicator) as { data: Data; metadata: string[] };
 
-      if (!result) throw new Error();
+      if (!result) throw new Error("Failed to execute query");
 
       const graphI = await Promise.all([
-        fetchInfo("(label)", n),
-        fetchInfo("(relationship type)", n),
+        fetchMetaStats(n),
         fetchInfo("(property key)", n),
-      ]).then(async ([newLabels, newRelationships, newPropertyKeys]) => {
+      ]).then(async ([metaStats, newPropertyKeys]) => {
         const memoryUsage = showMemoryUsage ? await getMemoryUsage(n, toast, setIndicator) : new Map<string, MemoryValue>();
-
-        const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage);
+        const newLabels = metaStats?.[0] || [];
+        const newRelationships = metaStats?.[1] || [];
+        const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
         setGraphInfo(gi);
         return gi;
       }).catch((error) => {
@@ -431,7 +433,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       if (!explain.ok) throw new Error("Failed to fetch explain plan");
 
       const explainJson = await explain.json();
-      const g = Graph.create(n, result, showPropertyKeyPrefix, existingLimit, graphI);
+      const g = await Graph.create(n, result, showPropertyKeyPrefix, existingLimit, graphI);
 
       newQuery = {
         ...newQuery,
@@ -450,9 +452,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       if (!tutorialOpen) {
         localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }));
       }
-    } catch (error) {
-      console.error(error);
-    } finally {
+
       const newQueries = handelGetNewQueries(newQuery);
 
       localStorage.setItem("query history", JSON.stringify(newQueries));
@@ -463,12 +463,15 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         currentQuery: newQuery,
         counter: 0
       }));
-      setIsQueryLoading(false);
       setViewport(undefined);
       setGraphData(undefined);
       setSearch("");
       setScrollPosition(0);
       handleCooldown(-1);
+    } catch (error) {
+      // Error already handled in getSSEGraphResult
+    } finally {
+      setIsQueryLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graphName, limit, timeout, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries, showMemoryUsage, captionsKeys, showPropertyKeyPrefix, tutorialOpen]);
@@ -788,7 +791,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
     // Clear current graph to avoid showing deleted demo graph
     setGraph(Graph.empty());
-    setGraphInfo(GraphInfo.empty());
+    setGraphInfo(GraphInfo.empty(toast, setIndicator));
     setData({ nodes: [], links: [] });
 
     if (userGraphBeforeTutorial && userGraphsBeforeTutorial.includes(userGraphBeforeTutorial)) {

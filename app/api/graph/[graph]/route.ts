@@ -162,7 +162,7 @@ export async function GET(
     const { client, user } = session;
     const { graph: graphId } = await params;
     const query = request.nextUrl.searchParams.get("query");
-    const timeout = Number(request.nextUrl.searchParams.get("timeout"));
+    const timeout = Number(request.nextUrl.searchParams.get("timeout")) * 1000;
 
     try {
       if (!query) throw new Error("Missing parameter query");
