@@ -165,8 +165,8 @@ export default function EditorComponent({
             // Register custom language if needed
             if (languageConfigRef.current) {
                 const lc = languageConfigRef.current;
-                const languages = monacoInstance.languages.getLanguages();
-                if (!languages.some((l: { id: string }) => l.id === language)) {
+                const languages: monaco.languages.ILanguageExtensionPoint[] = monacoInstance.languages.getLanguages();
+                if (!languages.some(l => l.id === language)) {
                     monacoInstance.languages.register({ id: language });
                 }
                 if (lc.monarchTokensProvider) {
@@ -177,7 +177,7 @@ export default function EditorComponent({
                 }
                 if (lc.getSuggestions) {
                     const provider = monacoInstance.languages.registerCompletionItemProvider(language, {
-                        provideCompletionItems: async (model: monaco.editor.ITextModel, position: monaco.Position) => {
+                        provideCompletionItems: (async (model, position) => {
                             const currentConfig = languageConfigRef.current;
                             if (!currentConfig?.getSuggestions) return { suggestions: [] };
                             const word = model.getWordUntilPosition(position);
@@ -186,7 +186,7 @@ export default function EditorComponent({
                             return {
                                 suggestions: suggestions.map(s => ({ ...s, range }))
                             };
-                        },
+                        }) as monaco.languages.CompletionItemProvider["provideCompletionItems"],
                     });
                     sugDisposableRef.current = provider;
                 }
