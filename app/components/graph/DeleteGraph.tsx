@@ -71,7 +71,7 @@ export default function DeleteGraph({
       setGraphNames(newGraphNames);
 
       if (successDeletedGraphs.includes(selectedValue)) {
-        setGraphName(successDeletedGraphs.length > 0 ? newGraphNames[successDeletedGraphs.length - 1] : "");
+        setGraphName(newGraphNames.length > 0 ? newGraphNames[newGraphNames.length - 1] : "");
         setGraph(Graph.empty());
       }
 

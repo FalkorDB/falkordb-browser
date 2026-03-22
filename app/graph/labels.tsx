@@ -1,6 +1,5 @@
 import { useRef } from "react";
-import { cn } from "@/lib/utils";
-import { Label, Relationship } from "../api/graph/model";
+import { cn, Label, Relationship } from "@/lib/utils";
 import Button from "../components/ui/Button";
 
 interface Props<T extends Label | Relationship> {

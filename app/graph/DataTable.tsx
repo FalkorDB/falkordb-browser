@@ -4,7 +4,7 @@
 'use client';
 
 import { Check, CirclePlus, Info, Pencil, Trash2, X } from "lucide-react";
-import { cn, prepareArg, securedFetch, GraphRef } from "@/lib/utils";
+import { cn, prepareArg, securedFetch, GraphRef, Link, Node, Value } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Fragment, MutableRefObject, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
@@ -14,7 +14,7 @@ import { getNodeDisplayKey } from "@falkordb/canvas";
 import Input from "../components/ui/Input";
 import DialogComponent from "../components/DialogComponent";
 import CloseDialog from "../components/CloseDialog";
-import { EMPTY_DISPLAY_NAME, Link, Node, Value } from "../api/graph/model";
+import { EMPTY_DISPLAY_NAME } from "../api/graph/model";
 import { BrowserSettingsContext, GraphContext, IndicatorContext } from "../components/provider";
 import ToastButton from "../components/ToastButton";
 import Button from "../components/ui/Button";

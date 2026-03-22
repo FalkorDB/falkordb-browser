@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createNestedObject, getTheme, prepareArg, securedFetch } from "@/lib/utils";
+import { createNestedObject, getTheme, prepareArg, securedFetch, Query } from "@/lib/utils";
 import { JSONTree } from "react-json-tree";
 import { useContext, useMemo, useState } from "react";
 import { Info } from "lucide-react";
@@ -7,7 +7,6 @@ import { useToast } from "@/components/ui/use-toast";
 import { useTheme } from "next-themes";
 import Button from "../components/ui/Button";
 import { IndicatorContext } from "../components/provider";
-import { Query } from "../api/graph/model";
 
 const renderValue = (v: any) => (
     <span className="SofiaSans">{v}</span>
