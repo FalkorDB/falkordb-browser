@@ -69,11 +69,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     useEffect(() => {
         setOpen(false);
     }, [selectedValue]);
-    
+
     const getOptions = useCallback(async () =>
         fetchOptions(type, toast, setIndicator, indicator, setSelectedValue, setOptions, contentPersistence)
-    , [type, toast, setIndicator, indicator, setSelectedValue, setOptions, contentPersistence]);
-    
+        , [type, toast, setIndicator, indicator, setSelectedValue, setOptions, contentPersistence]);
+
     const loadMemory = useCallback((opt: string) =>
         async () => {
             const memoryMap = await getMemoryUsage(opt, toast, setIndicator);
@@ -84,20 +84,28 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const loadNodesCount = useCallback((opt: string) =>
         async () => {
-            const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes`, toast, setIndicator) as { nodes?: number };
+            try {
+                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes`, toast, setIndicator) as { nodes?: number };
 
-            if (!result) return "";
+                if (!result) return "";
 
-            return Number(result.nodes).toLocaleString();
+                return Number(result.nodes).toLocaleString();
+            } catch {
+                return "";
+            }
         }, [toast, setIndicator]);
 
     const loadEdgesCount = useCallback((opt: string) =>
         async () => {
-            const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges`, toast, setIndicator) as { edges?: number };
+            try {
+                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges`, toast, setIndicator) as { edges?: number };
 
-            if (!result) return "";
+                if (!result) return "";
 
-            return Number(result.edges).toLocaleString();
+                return Number(result.edges).toLocaleString();
+            } catch {
+                return "";
+            }
         }, [toast, setIndicator]);
 
     const handleSetOption = useCallback(async (option: string, optionName: string) => {
@@ -120,27 +128,27 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
             // Rebuild rows to reflect the updated option names
             setRows(newOptions.map((opt) => {
-            const baseCell = sessionRole === "Admin"
-                ? { value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" as const }
-                : { value: opt, type: "readonly" as const };
+                const baseCell = sessionRole === "Admin"
+                    ? { value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" as const }
+                    : { value: opt, type: "readonly" as const };
 
-            const cells: Row["cells"] = [baseCell];
+                const cells: Row["cells"] = [baseCell];
 
-            if (showMemoryUsage) {
-                cells.push({ loadCell: loadMemory(opt), type: "readonly" });
-            }
+                if (showMemoryUsage) {
+                    cells.push({ loadCell: loadMemory(opt), type: "readonly" });
+                }
 
-            cells.push(
-                { loadCell: loadNodesCount(opt), type: "readonly" },
-                { loadCell: loadEdgesCount(opt), type: "readonly" }
-            );
+                cells.push(
+                    { loadCell: loadNodesCount(opt), type: "readonly" },
+                    { loadCell: loadEdgesCount(opt), type: "readonly" }
+                );
 
-            return {
-                checked: false,
-                name: opt,
-                cells
-            };
-        }));
+                return {
+                    checked: false,
+                    name: opt,
+                    cells
+                };
+            }));
         }
 
         return result.ok;

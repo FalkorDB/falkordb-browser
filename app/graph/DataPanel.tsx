@@ -4,13 +4,12 @@
 
 'use client';
 
-import { prepareArg, securedFetch, GraphRef } from "@/lib/utils";
+import { prepareArg, securedFetch, GraphRef, Node, Link, Label } from "@/lib/utils";
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Pencil, TableProperties, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
 import Button from "../components/ui/Button";
-import { Label, Link, Node } from "../api/graph/model";
 import { IndicatorContext, GraphContext } from "../components/provider";
 import DataTable from "./DataTable";
 import AddLabel from "./addLabel";
@@ -85,7 +84,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
         }, toast, setIndicator);
 
         if (result.ok) {
-            setLabels([...graph.addLabel(newLabel, node)]);
+            setLabels([...await graph.addLabel(newLabel, node)]);
             setLabel([...node.labels]);
             const newGraphInfo = graph.GraphInfo.clone();
             setGraphInfo(newGraphInfo);
@@ -133,7 +132,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
         }, toast, setIndicator);
 
         if (result.ok) {
-            graph.removeLabel(removeLabel, node);
+            await graph.removeLabel(removeLabel, node);
             setLabels([...graph.Labels]);
             setLabel([...node.labels]);
             const newGraphInfo = graph.GraphInfo.clone();

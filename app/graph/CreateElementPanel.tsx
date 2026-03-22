@@ -8,12 +8,11 @@ import { ArrowRight, ArrowRightLeft, Check, Circle, Info, Pencil, Plus, Trash2, 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
-import { cn } from "@/lib/utils";
+import { cn, Node, Value } from "@/lib/utils";
 import { getNodeDisplayText } from "@falkordb/canvas";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Combobox from "../components/ui/combobox";
-import { Node, Value } from "../api/graph/model";
 import { BrowserSettingsContext, IndicatorContext } from "../components/provider";
 import AddLabel from "./addLabel";
 import RemoveLabel from "./RemoveLabel";

@@ -3,7 +3,7 @@
 'use client';
 
 import { useEffect, useState, useContext, Dispatch, SetStateAction, useRef, useCallback, useMemo } from "react";
-import { cn, GraphRef, formatName, getTheme } from "@/lib/utils";
+import { cn, GraphRef, formatName, Node, Link, getTheme, Query, HistoryQuery } from "@/lib/utils";
 import { History, Info, Maximize2, Trash2 } from "lucide-react";
 import * as monaco from "monaco-editor";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -15,7 +15,7 @@ import CypherEditor, { CYPHER_LANGUAGE_NAME } from "../components/CypherEditor";
 import EditorComponent from "../components/EditorComponent";
 import DialogComponent from "../components/DialogComponent";
 import Toolbar from "./toolbar";
-import { Node, Link, Graph, Query, HistoryQuery } from "../api/graph/model";
+import { Graph } from "../api/graph/model";
 import { Explain, Metadata, Profile } from "./MetadataView";
 import PaginationList from "../components/PaginationList";
 import SelectGraph from "./selectGraph";
