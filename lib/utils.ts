@@ -573,8 +573,8 @@ export async function fetchOptions(
     setSelectedValue(formatName(opts[0]));
 }
 
-export const areCaptionKeysEqual = (left: string[], right: string[]) =>
-  left.length === right.length && left.every((key, index) => key === right[index]);
+export const areCaptionKeysEqual = (left: [string, boolean][], right: [string, boolean][]) =>
+  left.length === right.length && left.every((key, index) => key[0] === right[index][0] && key[1] === right[index][1]);
 
 export function getTheme(theme: string | undefined) {
   let currentTheme = theme;
