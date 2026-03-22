@@ -4,11 +4,10 @@
 
 import { useEffect, Dispatch, SetStateAction, useContext, useCallback } from "react";
 import { GitGraph, ScrollText, Table } from "lucide-react";
-import { cn, GraphRef, Tab } from "@/lib/utils";
+import { cn, GraphRef, Tab, Label, Link, Node, Relationship, HistoryQuery } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GraphContext, ForceGraphContext } from "@/app/components/provider";
 import ForceGraph from "@/app/components/ForceGraph";
-import { Label, Link, Node, Relationship, HistoryQuery } from "../api/graph/model";
 import Button from "../components/ui/Button";
 import TableView from "./TableView";
 import Toolbar from "./toolbar";

@@ -7,9 +7,9 @@ import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, u
 import { useTheme } from "next-themes";
 import type { Data, GraphLink, GraphNode, GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
 import { dataToGraphData } from "@falkordb/canvas";
-import { securedFetch, getTheme, GraphRef } from "@/lib/utils";
+import { securedFetch, getTheme, GraphRef, GraphData, Node, Relationship, Link } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
-import { Link, Node, Relationship, Graph, GraphData } from "../api/graph/model";
+import { Graph } from "../api/graph/model";
 import { BrowserSettingsContext, IndicatorContext } from "./provider";
 
 interface Props {
@@ -137,7 +137,7 @@ export default function ForceGraph({
         if (result.ok) {
             const json = await result.json();
 
-            const elements = graph.extend(json.result, false, true, true);
+            const elements = await graph.extend(json.result, false, true, true);
 
             if (elements.length === 0) {
                 toast({

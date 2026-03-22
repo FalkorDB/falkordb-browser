@@ -9,13 +9,13 @@ import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext, useM
 import * as monaco from "monaco-editor";
 import { Minimize2, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { cn, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
 import EditorComponent, { LINE_HEIGHT, LanguageConfig } from "./EditorComponent";
 import { BrowserSettingsContext, IndicatorContext, UDFContext } from "./provider";
-import { Graph, HistoryQuery } from "../api/graph/model";
+import { Graph } from "../api/graph/model";
 
 interface Props {
     graph: Graph
