@@ -291,6 +291,9 @@ export function prepareArg(arg: string) {
   return encodeURIComponent(arg.trim());
 }
 
+export const between = (hash: number, from: number, to: number) =>
+  (hash % (to - from)) + from;
+
 export const getDefaultQuery = (q?: string) =>
   q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN * LIMIT 100";
 
