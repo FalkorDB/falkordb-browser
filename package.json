@@ -57,7 +57,7 @@
     "embla-carousel-react": "^8.5.2",
     "eventsource": "^4.0.0",
     "falkordb": "^6.6.2",
-    "jose": "^6.1.0",
+    "jose": "^6.2.2",
     "lodash": "^4.17.23",
     "lucide-react": "^0.475.0",
     "monaco-editor": "^0.55.1",
