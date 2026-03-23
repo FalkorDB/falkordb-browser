@@ -851,7 +851,7 @@ export class Graph {
   public visibleLinks(visible: boolean) {
     this.elements.links.forEach((link) => {
       if (
-        this.relationshipsMap.get(link.relationship)!.show &&
+        this.relationshipsMap.get(link.relationship)?.show &&
         visible &&
         this.nodesMap.get(link.source)?.visible &&
         this.nodesMap.get(link.target)?.visible
