@@ -303,7 +303,7 @@ export const getMetaStats = async (name: string, toast: ToastFn, setIndicator: (
   const q = "CALL db.meta.stats() YIELD labels, relTypes RETURN labels, relTypes as relationships";
 
   try {
-    const result = await getSSEGraphResult(`/api/graph/${prepareArg(name)}?query=${q}`, toast, setIndicator) as { data: { labels: { [key: string]: number }, relationships: { [key: string]: number } }[] };
+    const result = await getSSEGraphResult(`/api/graph/${prepareArg(name)}?query=${encodeURIComponent(q)}`, toast, setIndicator) as { data: { labels: { [key: string]: number }, relationships: { [key: string]: number } }[] };
 
     if (!result) return undefined;
 
