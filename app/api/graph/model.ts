@@ -852,8 +852,8 @@ export class Graph {
     this.elements.links.forEach((link) => {
       const rel = this.relationshipsMap.get(link.relationship);
       if (!rel) {
-        // eslint-disable-next-line no-console
-        console.warn(`Missing relationship map entry for "${link.relationship}"`);
+        // eslint-disable-next-line no-param-reassign
+        link.visible = false;
         return;
       }
       if (

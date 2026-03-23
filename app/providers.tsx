@@ -468,14 +468,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setSearch("");
       setScrollPosition(0);
       handleCooldown(-1);
-    } catch (error) {
-      if (error instanceof Error && error.message) {
-        toast({
-          title: "Error",
-          description: error.message,
-          variant: "destructive",
-        });
-      }
+    } catch {
+      // Errors from getSSEGraphResult are already surfaced via toast
     } finally {
       setIsQueryLoading(false);
     }
