@@ -111,7 +111,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                 className="h-6 w-full p-2 rounded-full flex justify-center items-center SofiaSans hover:opacity-80 transition-opacity"
                                                 data-testid={`graphInfo${name}Node`}
                                                 title={`MATCH (n:${name}) RETURN n
-                                                    Elements: ${label.count.toLocaleString()}`}
+                                                    #: ${label.count.toLocaleString()}`}
                                                 label={name}
                                                 onClick={() => runQuery(`MATCH (n:${name}) RETURN n`)}
                                                 disabled={isQueryLoading}
@@ -177,7 +177,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                         <li key={relationship.name} className="max-w-full">
                                             <Button
                                                 title={`MATCH p=()-[:${relationship.name}]-() RETURN p
-                                                    Elements: ${relationship.count.toLocaleString()}`}
+                                                    #: ${relationship.count.toLocaleString()}`}
                                                 style={{
                                                     backgroundColor: relationshipColor,
                                                     color: textColor,
