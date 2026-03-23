@@ -26,8 +26,8 @@ type BrowserSettingsContextType = {
       setNewContentPersistence: Dispatch<SetStateAction<boolean>>;
     };
     captionsKeysSettings: {
-      newCaptionsKeys: string[];
-      setNewCaptionsKeys: Dispatch<SetStateAction<string[]>>;
+      newCaptionsKeys: [string, boolean][];
+      setNewCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
     };
     tableViewSettings: {
       newColumnWidth: number;
@@ -84,8 +84,8 @@ type BrowserSettingsContextType = {
       setShowPropertyKeyPrefix: Dispatch<SetStateAction<boolean>>;
     };
     captionsKeysSettings: {
-      captionsKeys: string[];
-      setCaptionsKeys: Dispatch<SetStateAction<string[]>>;
+      captionsKeys: [string, boolean][];
+      setCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
     };
     tableViewSettings: {
       columnWidth: number;

@@ -109,8 +109,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [customizingLabel, setCustomizingLabel] = useState<InfoLabel | null>(null);
   const [dbVersion, setDbVersion] = useState<string>("");
   const [connectionType, setConnectionType] = useState<ConnectionType>("Standalone");
-  const [captionsKeys, setCaptionsKeys] = useState<string[]>([]);
-  const [newCaptionsKeys, setNewCaptionsKeys] = useState<string[]>([]);
+  const [captionsKeys, setCaptionsKeys] = useState<[string, boolean][]>([]);
+  const [newCaptionsKeys, setNewCaptionsKeys] = useState<[string, boolean][]>([]);
   const [newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix] = useState<boolean>(false);
   const [showPropertyKeyPrefix, setShowPropertyKeyPrefix] = useState<boolean>(false);
   const [newCypherOnly, setNewCypherOnly] = useState<boolean>(false);
@@ -558,10 +558,15 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         console.error("Failed to parse query history from localStorage", error);
       }
       try {
-        setCaptionsKeys(JSON.parse(localStorage.getItem("captionsKeys") || '["name", "title"]'));
+        const raw = JSON.parse(localStorage.getItem("captionsKeys") || '[["name", false], ["title", false]]');
+        // Migrate from old string[] format to [string, boolean][] tuple format
+        const normalized: [string, boolean][] = Array.isArray(raw)
+          ? raw.map((item: unknown) => typeof item === 'string' ? [item, false] as [string, boolean] : item as [string, boolean])
+          : [['name', false], ['title', false]];
+        setCaptionsKeys(normalized);
       } catch (error) {
         console.error("Failed to parse captions keys from localStorage", error);
-        setCaptionsKeys(['name', 'title']);
+        setCaptionsKeys([['name', false], ['title', false]]);
       }
       setTimeout(parseInt(localStorage.getItem("timeout") || "60", 10));
       const l = parseInt(localStorage.getItem("limit") || "300", 10);
