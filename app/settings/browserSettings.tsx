@@ -249,7 +249,7 @@ export default function BrowserSettings() {
 
         const caption = newCaption.trim();
 
-        if (!caption || newCaptionsKeys.some(([key]) => key === caption[0])) return;
+        if (!caption || newCaptionsKeys.some(([key]) => key === caption)) return;
 
         setNewCaptionsKeys(prev => [...prev, [caption, false]]);
         setNewCaption("");
@@ -572,6 +572,7 @@ export default function BrowserSettings() {
                                         <div className="flex items-center gap-2">
                                             <Switch
                                                 id="showPropertyKeyPrefixSwitch"
+                                                aria-label="Add Property Key To Caption"
                                                 className="data-[state=unchecked]:bg-border"
                                                 checked={newShowPropertyKeyPrefix}
                                                 onCheckedChange={() => createChangeHandler(setNewShowPropertyKeyPrefix)(!newShowPropertyKeyPrefix, 'showPropertyKeyPrefixSwitch')}
@@ -593,6 +594,7 @@ export default function BrowserSettings() {
                                                                     <TooltipTrigger asChild>
                                                                         <div tabIndex={-1}>
                                                                             <Switch
+                                                                                aria-label={`Toggle exact match for ${key}`}
                                                                                 className="data-[state=unchecked]:bg-border"
                                                                                 checked={exactMatch}
                                                                                 onCheckedChange={() => {

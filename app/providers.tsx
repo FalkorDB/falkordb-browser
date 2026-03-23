@@ -469,7 +469,13 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setScrollPosition(0);
       handleCooldown(-1);
     } catch (error) {
-      // Error already handled in getSSEGraphResult
+      if (error instanceof Error && error.message) {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsQueryLoading(false);
     }

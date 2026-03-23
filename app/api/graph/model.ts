@@ -850,8 +850,14 @@ export class Graph {
 
   public visibleLinks(visible: boolean) {
     this.elements.links.forEach((link) => {
+      const rel = this.relationshipsMap.get(link.relationship);
+      if (!rel) {
+        // eslint-disable-next-line no-console
+        console.warn(`Missing relationship map entry for "${link.relationship}"`);
+        return;
+      }
       if (
-        this.relationshipsMap.get(link.relationship)?.show &&
+        rel.show &&
         visible &&
         this.nodesMap.get(link.source)?.visible &&
         this.nodesMap.get(link.target)?.visible

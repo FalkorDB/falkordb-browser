@@ -465,7 +465,7 @@ test.describe("Chat Feature Tests", () => {
     await browser.setPageToFullScreen();
     await settings.expandChatSection();
 
-    const maxSavedMessages = Number(await settings.getMaxSavedMessagesValue());
+    const rawMaxSavedMessages = Number(await settings.getMaxSavedMessagesValue());
     const testApiKey = process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY || "test-api-key-placeholder";
     
     await settings.fillChatApiKey(testApiKey);
@@ -491,6 +491,8 @@ test.describe("Chat Feature Tests", () => {
       "List all Person nodes",
       "Who are Alice's friends?"
     ];
+
+    const maxSavedMessages = Math.min(rawMaxSavedMessages, messages.length);
     
     for (let i = 0; i < messages.length; i += 1) {
       const message = messages[i];

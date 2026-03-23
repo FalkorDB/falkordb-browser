@@ -87,7 +87,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             try {
                 const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes`, toast, setIndicator) as { nodes?: number };
 
-                if (!result.nodes) return "";
+                if (result.nodes == null || !Number.isFinite(Number(result.nodes))) return "";
 
                 return Number(result.nodes).toLocaleString();
             } catch {
@@ -100,7 +100,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             try {
                 const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges`, toast, setIndicator) as { edges?: number };
 
-                if (!result.edges) return "";
+                if (result.edges == null || !Number.isFinite(Number(result.edges))) return "";
 
                 return Number(result.edges).toLocaleString();
             } catch {
