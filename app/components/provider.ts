@@ -1,7 +1,7 @@
 import { createContext, Dispatch, SetStateAction } from "react";
-import { ConnectionType, GraphRef, Panel, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
+import { ConnectionType, GraphData, GraphRef, HistoryQuery, Label, Panel, Relationship, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
 import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
-import { Graph, GraphData, GraphInfo, HistoryQuery, Label, Relationship } from "../api/graph/model";
+import { Graph, GraphInfo } from "../api/graph/model";
 
 type BrowserSettingsContextType = {
   newSettings: {
@@ -26,8 +26,8 @@ type BrowserSettingsContextType = {
       setNewContentPersistence: Dispatch<SetStateAction<boolean>>;
     };
     captionsKeysSettings: {
-      newCaptionsKeys: string[];
-      setNewCaptionsKeys: Dispatch<SetStateAction<string[]>>;
+      newCaptionsKeys: [string, boolean][];
+      setNewCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
     };
     tableViewSettings: {
       newColumnWidth: number;
@@ -84,8 +84,8 @@ type BrowserSettingsContextType = {
       setShowPropertyKeyPrefix: Dispatch<SetStateAction<boolean>>;
     };
     captionsKeysSettings: {
-      captionsKeys: string[];
-      setCaptionsKeys: Dispatch<SetStateAction<string[]>>;
+      captionsKeys: [string, boolean][];
+      setCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
     };
     tableViewSettings: {
       columnWidth: number;
@@ -318,7 +318,7 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
 export const GraphContext = createContext<GraphContextType>({
   graph: Graph.empty(),
   setGraph: () => { },
-  graphInfo: GraphInfo.empty(),
+  graphInfo: GraphInfo.empty(() => { }, () => { }),
   setGraphInfo: () => { },
   graphName: "",
   setGraphName: () => { },

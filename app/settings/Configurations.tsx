@@ -5,12 +5,11 @@
 
 "use client";
 
-import React, { useEffect, useState, useContext } from "react";
-import { prepareArg, securedFetch, Row } from "@/lib/utils";
+import { useEffect, useState, useContext } from "react";
+import { prepareArg, securedFetch, Row, DataCell } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import TableComponent from "../components/TableComponent";
 import ToastButton from "../components/ToastButton";
-import { DataCell } from "../api/graph/model";
 import { IndicatorContext } from "../components/provider";
 
 type Config = {

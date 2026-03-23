@@ -2,7 +2,7 @@
   "name": "falkordb-browser",
   "author": "FalkorDB",
   "description": "FalkorDB Browser",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "private": true,
   "engines": {
     "node": ">=20.9.0"
@@ -15,7 +15,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@falkordb/canvas": "^0.0.44",
+    "@falkordb/canvas": "^0.0.45",
     "@falkordb/text-to-cypher": "^0.1.13",
     "@hookform/resolvers": "^5.2.2",
     "@monaco-editor/react": "^4.6.0",
@@ -60,7 +60,7 @@
     "jose": "^6.1.0",
     "lodash": "^4.17.23",
     "lucide-react": "^0.475.0",
-    "monaco-editor": "^0.47.0",
+    "monaco-editor": "^0.55.1",
     "next": "^16.1.6",
     "next-auth": "^4.24.12",
     "next-swagger-doc": "^0.4.1",
@@ -75,8 +75,8 @@
     "react-hook-form": "^7.71.2",
     "react-json-tree": "^0.19.0",
     "react-resizable-panels": "^4.6.5",
-    "swagger-ui-react": "^5.31.2",
-    "swr": "^2.3.2",
+    "swagger-ui-react": "^5.32.1",
+    "swr": "^2.4.1",
     "tailwind-merge": "^2.6.0",
     "tailwindcss": "^3.4.17",
     "uuid": "^13.0.0",

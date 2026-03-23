@@ -3,127 +3,7 @@
 /* eslint-disable no-param-reassign */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-export type Value = string | number | boolean;
-
-export type HistoryQuery = {
-  queries: Query[];
-  currentQuery: Query;
-  query: string;
-  counter: number;
-};
-
-export type Query = {
-  text: string;
-  metadata: string[];
-  explain: string[];
-  profile: string[];
-  graphName: string;
-  timestamp: number;
-  status: "Success" | "Failed" | "Empty";
-  elementsCount: number;
-};
-
-export type Node = {
-  id: number;
-  labels: string[];
-  color: string;
-  visible: boolean;
-  expand: boolean;
-  collapsed: boolean;
-  size?: number;
-  data: {
-    [key: string]: any;
-  };
-};
-
-export type Link = {
-  id: number;
-  relationship: string;
-  color: string;
-  source: number;
-  target: number;
-  visible: boolean;
-  expand: boolean;
-  collapsed: boolean;
-  data: {
-    [key: string]: any;
-  };
-};
-
-export type GraphData = {
-  nodes: Node[];
-  links: Link[];
-};
-
-export type NodeCell = {
-  id: number;
-  labels: string[];
-  properties: {
-    [key: string]: any;
-  };
-};
-
-export type LinkCell = {
-  id: number;
-  relationshipType: string;
-  sourceId: number;
-  destinationId: number;
-  properties: {
-    [key: string]: any;
-  };
-};
-
-export type DataCell = NodeCell | LinkCell | NodeCell[] | LinkCell[] | number | string | null;
-
-export type DataRow = {
-  [key: string]: DataCell;
-};
-
-export type Data = DataRow[];
-
-export type MemoryValue = number | Map<string, MemoryValue>;
-
-export interface LinkStyle {
-  color: string;
-}
-
-export interface LabelStyle extends LinkStyle {
-  size?: number;
-}
-
-export interface InfoLabel {
-  name: string;
-  style: LabelStyle;
-  show: boolean;
-}
-
-export interface Label extends InfoLabel {
-  elements: Node[];
-  textWidth?: number;
-  textHeight?: number;
-  style: LabelStyle;
-}
-
-export interface InfoRelationship {
-  name: string;
-  style: LinkStyle;
-  show: boolean;
-}
-
-export interface Relationship extends InfoRelationship {
-  elements: Link[];
-  textWidth?: number;
-  textHeight?: number;
-  textAscent?: number;
-  textDescent?: number;
-}
-
-export const DEFAULT_COLORS = [
-  "hsl(246, 100%, 70%)",
-  "hsl(330, 100%, 70%)",
-  "hsl(20, 100%, 65%)",
-  "hsl(180, 66%, 70%)",
-];
+import { Data, getMetaStats, GraphData, InfoLabel, InfoRelationship, Label, Link, LinkCell, MemoryValue, Node, NodeCell, Relationship, ToastFn, Value } from "@/lib/utils";
 
 // Color palette for node customization
 export const STYLE_COLORS = [
@@ -219,19 +99,28 @@ export class GraphInfo {
 
   private colorsCounter: number = 0;
 
+  private toast: ToastFn;
+
+  private setIndicator: (indicator: "online" | "offline") => void;
+
   constructor(
     propertyKeys: string[] | undefined,
     labels: Map<string, InfoLabel>,
     relationships: Map<string, InfoRelationship>,
     memoryUsage: Map<string, MemoryValue>,
+    toast: ToastFn,
+    setIndicator: (indicator: "online" | "offline") => void,
     colors?: string[]
   ) {
     this.propertyKeys = propertyKeys;
     this.labels = labels;
     this.relationships = relationships;
     this.memoryUsage = memoryUsage;
-    this.colors = [...(colors || DEFAULT_COLORS)];
+    this.toast = toast;
+    this.setIndicator = setIndicator;
+    this.colors = [...colors || []];
   }
+
 
   get PropertyKeys(): string[] | undefined {
     return this.propertyKeys;
@@ -267,11 +156,15 @@ export class GraphInfo {
       new Map(this.labels),
       new Map(this.relationships),
       new Map(this.memoryUsage),
+      this.toast,
+      this.setIndicator,
       this.colors
     );
   }
 
   public static empty(
+    toast: ToastFn,
+    setIndicator: (indicator: "online" | "offline") => void,
     propertyKeys?: string[],
     memoryUsage?: Map<string, MemoryValue>,
   ): GraphInfo {
@@ -280,64 +173,102 @@ export class GraphInfo {
       new Map(),
       new Map(),
       new Map(memoryUsage),
+      toast,
+      setIndicator
     );
   }
 
-  public static create(
+  public static async create(
     propertyKeys: string[],
-    labels: string[],
-    relationships: string[],
+    labels: [string, number][],
+    relationships: [string, number][],
     memoryUsage: Map<string, MemoryValue>,
-  ): GraphInfo {
-    const graphInfo = GraphInfo.empty(propertyKeys, memoryUsage);
-    graphInfo.createLabel(labels);
-    relationships.forEach((relationship) =>
-      graphInfo.createRelationship(relationship)
+    toast: ToastFn,
+    setIndicator: (indicator: "online" | "offline") => void
+  ): Promise<GraphInfo> {
+    const graphInfo = GraphInfo.empty(toast, setIndicator, propertyKeys, memoryUsage);
+    await graphInfo.createLabel(labels, "");
+    await relationships.reduce(
+      (prev, relationship) => prev.then(() => graphInfo.createRelationship(relationship, "")),
+      Promise.resolve() as Promise<unknown>
     );
 
     return graphInfo;
   }
 
-  public createLabel(labels: string[]): InfoLabel[] {
-    return labels.map((label) => {
-      let c = this.labels.get(label);
+  private async getMetaStatsCount(graphName: string, type: "relationships" | "labels", name: string): Promise<number> {
+    const result = await getMetaStats(graphName, this.toast, this.setIndicator);
 
-      if (!c) {
-        c = {
-          name: label,
-          style: {
-            color: this.getLabelColorValue(this.colorsCounter),
-          },
-          show: true,
-        };
+    if (!result) return 0;
 
-        loadLabelStyle(c);
-
-        this.labels.set(label, c);
-        this.colorsCounter += 1;
-      }
-
-      return c;
-    });
+    return result[type === "labels" ? 0 : 1].find(([itemName]) => itemName === name)?.[1] || 0;
   }
 
-  public createRelationship(relationship: string): InfoRelationship {
-    let c = this.relationships.get(relationship);
+  public async createLabel(labels: [string, number | undefined][], graphName: string): Promise<InfoLabel[]> {
+    return labels.reduce(
+      (prev, [label, count]) => prev.then(async (result) => {
+        let l = this.labels.get(label);
 
-    if (!c) {
-      c = {
+        if (!l) {
+          // eslint-disable-next-line no-await-in-loop
+          const resolvedCount = label === "" ? 0 : count ?? await this.getMetaStatsCount(graphName, "labels", label);
+
+          l = {
+            name: label,
+            style: {
+              color: this.getLabelColorValue(this.colorsCounter),
+            },
+            show: true,
+            count: resolvedCount,
+          };
+
+          loadLabelStyle(l);
+
+          this.labels.set(label, l);
+          this.colorsCounter += 1;
+        }
+
+        result.push(l);
+        return result;
+      }),
+      Promise.resolve([] as InfoLabel[])
+    );
+  }
+
+  public async createRelationship([relationship, count]: [string, number | undefined], graphName: string): Promise<InfoRelationship> {
+    let r = this.relationships.get(relationship);
+
+    if (!r) {
+      const resolvedCount = count ?? await this.getMetaStatsCount(graphName, "relationships", relationship);
+
+      r = {
         name: relationship,
         show: true,
         style: {
           color: this.getLabelColorValue(this.colorsCounter),
         },
+        count: resolvedCount,
       };
 
-      this.relationships.set(relationship, c);
+      this.relationships.set(relationship, r);
       this.colorsCounter += 1;
     }
 
-    return c;
+    return r;
+  }
+
+  /**
+   * Deterministic hash (djb2) for generating consistent colors.
+   * Based on the algorithm used by neo4j-browser (@neo4j-devtools/word-color).
+   */
+  private static hashCode(value: number): number {
+    const str = value.toString();
+    let hash = 0;
+    for (let i = 0; i < str.length; i += 1) {
+      // eslint-disable-next-line no-bitwise
+      hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
+    }
+    return Math.abs(hash);
   }
 
   public getLabelColorValue(index: number) {
@@ -345,7 +276,16 @@ export class GraphInfo {
       return this.colors[index];
     }
 
-    const newColor = `hsl(${(index - DEFAULT_COLORS.length) * 20}, 100%, 70%)`;
+    // Hash the index three times to get independent values for H, S, L.
+    const h1 = GraphInfo.hashCode(index * 6);
+    const h2 = GraphInfo.hashCode(h1);
+    const h3 = GraphInfo.hashCode(h2);
+
+    const hue = h3 % 360;               // full hue range
+    const saturation = (h2 % 36) + 55;   // 55-90%
+    const lightness = (h1 % 26) + 45;    // 45-70%
+
+    const newColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 
     this.colors.push(newColor);
 
@@ -405,7 +345,10 @@ export class Graph {
     this.linksMap = linksMap;
     this.showPropertyKeyPrefix = showPropertyKeyPrefix || false;
     this.currentLimit = currentLimit || 0;
-    this.graphInfo = graphInfo || GraphInfo.empty();
+    this.graphInfo = graphInfo || GraphInfo.empty(
+      (props) => { console.error("Graph toast fallback:", props); },
+      () => { console.error("Graph setIndicator fallback called on empty graph"); }
+    );
   }
 
   get Id(): string {
@@ -505,21 +448,21 @@ export class Graph {
     );
   }
 
-  public static create(
+  public static async create(
     id: string,
     results: { data: Data; metadata: any[] },
     showPropertyKeyPrefix: boolean,
     currentLimit: number,
     graphInfo?: GraphInfo,
     isSchema = false
-  ): Graph {
+  ): Promise<Graph> {
     const graph = Graph.empty(
       undefined,
       showPropertyKeyPrefix,
       currentLimit,
       graphInfo
     );
-    graph.extend(results, isSchema);
+    await graph.extend(results, isSchema);
     graph.id = id;
     return graph;
   }
@@ -557,13 +500,13 @@ export class Graph {
     return curve * 0.4;
   }
 
-  public extendNode(
+  public async extendNode(
     cell: NodeCell,
     collapsed: boolean,
     isSchema: boolean,
     isColor = false
   ) {
-    const labels = this.createLabel(
+    const labels = await this.createLabel(
       cell.labels.length === 0 ? [""] : cell.labels
     );
     const currentNode = this.nodesMap.get(cell.id);
@@ -625,13 +568,13 @@ export class Graph {
     return undefined;
   }
 
-  public extendEdge(
+  public async extendEdge(
     cell: LinkCell,
     collapsed: boolean,
     isSchema: boolean,
     isColor = false
   ) {
-    const relation = this.createRelationship(cell.relationshipType);
+    const relation = await this.createRelationship(cell.relationshipType);
     const currentEdge = this.linksMap.get(cell.id);
 
     if (!currentEdge) {
@@ -642,7 +585,7 @@ export class Graph {
         let source = this.nodesMap.get(cell.sourceId);
 
         if (!source) {
-          [label] = this.createLabel([""]);
+          [label] = await this.createLabel([""]);
           source = {
             id: cell.sourceId,
             labels: [label.name],
@@ -677,7 +620,7 @@ export class Graph {
         let target = this.nodesMap.get(cell.destinationId);
 
         if (!source || !target) {
-          [label] = this.createLabel([""]);
+          [label] = await this.createLabel([""]);
         }
 
         if (!source) {
@@ -768,12 +711,12 @@ export class Graph {
     return undefined;
   }
 
-  public extend(
+  public async extend(
     results: { data: Data; metadata: any[] },
     isSchema = false,
     collapsed = false,
     isMerge = false
-  ): (Node | Link)[] {
+  ): Promise<(Node | Link)[]> {
     const newElements: (Node | Link)[] = [];
     const { data } = results;
 
@@ -794,46 +737,61 @@ export class Graph {
 
     if (!data || data.length === 0) return [];
 
-    data.forEach((row: DataRow) => {
-      Object.values(row).forEach((cell) => {
-        if (Array.isArray(cell) && cell.length > 0 && cell[0] instanceof Object) {
-          cell.forEach((c: any) => {
-            const elements = this.extendCell(c, collapsed, isSchema);
-            if (elements) {
-              if (Array.isArray(elements)) {
-                newElements.push(...elements);
-              } else {
-                newElements.push(elements);
+    await data.reduce(
+      (rowPrev, row) => rowPrev.then(() =>
+        Object.values(row).reduce(
+          (cellPrev, cell) => cellPrev.then(async () => {
+            if (Array.isArray(cell) && cell.length > 0 && cell[0] instanceof Object) {
+              await cell.reduce(
+                (cPrev: Promise<void>, c: any) => cPrev.then(async () => {
+                  const elements = await this.extendCell(c, collapsed, isSchema);
+                  if (elements) {
+                    if (Array.isArray(elements)) {
+                      newElements.push(...elements);
+                    } else {
+                      newElements.push(elements);
+                    }
+                  }
+                }),
+                Promise.resolve()
+              );
+            } else if (cell instanceof Object) {
+              const elements = await this.extendCell(cell, collapsed, isSchema);
+              if (elements) {
+                if (Array.isArray(elements)) {
+                  newElements.push(...elements);
+                } else {
+                  newElements.push(elements);
+                }
               }
             }
-          });
-        } else if (cell instanceof Object) {
-          const elements = this.extendCell(cell, collapsed, isSchema);
-          if (elements) {
-            if (Array.isArray(elements)) {
-              newElements.push(...elements);
-            } else {
-              newElements.push(elements);
-            }
-          }
-        }
-      });
-    });
+          }),
+          Promise.resolve()
+        )
+      ),
+      Promise.resolve()
+    );
 
     this.nodesMap = new Map<number, Node>(this.elements.nodes.map((n) => [n.id, n]));
     this.linksMap = new Map<number, Link>(this.elements.links.map((l) => [l.id, l]));
 
-    newElements
+    await newElements
       .filter((element): element is Node => !!element && "labels" in element)
-      .forEach((node) => {
-        const label = getLabelWithFewestElements(
-          node.labels.map(
-            (l) => this.labelsMap.get(l) || this.createLabel([l])[0]
-          )
-        );
-        // Use custom color if available, otherwise use default label color
-        node.color = label.style.color;
-      });
+      .reduce(
+        (prev, node) => prev.then(async () => {
+          const resolvedLabels = await node.labels.reduce(
+            (lPrev, l) => lPrev.then(async (acc) => {
+              acc.push(this.labelsMap.get(l) || (await this.createLabel([l]))[0]);
+              return acc;
+            }),
+            Promise.resolve([] as Label[])
+          );
+          const label = getLabelWithFewestElements(resolvedLabels);
+          // Use custom color if available, otherwise use default label color
+          node.color = label.style.color;
+        }),
+        Promise.resolve()
+      );
 
     // remove empty category if there are no more empty nodes category
     const emptyCategory = this.labelsMap.get("");
@@ -846,50 +804,60 @@ export class Graph {
     return newElements;
   }
 
-  public createLabel(labels: string[], node?: Node): Label[] {
-    return labels.map((label) => {
-      let c = this.labelsMap.get(label);
+  public async createLabel(labels: string[], node?: Node): Promise<Label[]> {
+    return labels.reduce(
+      (prev, label) => prev.then(async (result) => {
+        let l = this.labelsMap.get(label);
 
-      if (!c) {
-        const [infoLabel] = this.graphInfo.createLabel([label]);
+        if (!l) {
+          const [infoLabel] = await this.graphInfo.createLabel([[label, undefined]], this.id);
 
-        c = {
-          ...infoLabel,
-          elements: [],
-        };
+          l = {
+            ...infoLabel,
+            elements: [],
+          };
 
-        this.labelsMap.set(c.name, c);
-        this.labels.push(c);
-      }
+          this.labelsMap.set(l.name, l);
+          this.labels.push(l);
+        }
 
-      if (node) {
-        c.elements.push(node);
-      }
+        if (node) {
+          l.elements.push(node);
+        }
 
-      return c;
-    });
+        result.push(l);
+        return result;
+      }),
+      Promise.resolve([] as Label[])
+    );
   }
 
-  public createRelationship(relationship: string): Relationship {
-    let l = this.relationshipsMap.get(relationship);
+  public async createRelationship(relationship: string): Promise<Relationship> {
+    let r = this.relationshipsMap.get(relationship);
 
-    if (!l) {
-      const infoRelationship = this.graphInfo.createRelationship(relationship);
-      l = {
+    if (!r) {
+      const infoRelationship = await this.graphInfo.createRelationship([relationship, undefined], this.id);
+      r = {
         ...infoRelationship,
         elements: [],
       };
-      this.relationshipsMap.set(l.name, l);
-      this.relationships.push(l);
+      this.relationshipsMap.set(r.name, r);
+      this.relationships.push(r);
     }
 
-    return l;
+    return r;
   }
 
   public visibleLinks(visible: boolean) {
     this.elements.links.forEach((link) => {
+      const rel = this.relationshipsMap.get(link.relationship);
+      if (!rel) {
+        // eslint-disable-next-line no-param-reassign
+        link.visible = false;
+        return;
+      }
       if (
-        this.RelationshipsMap.get(link.relationship)!.show &&
+        rel.show &&
         visible &&
         this.nodesMap.get(link.source)?.visible &&
         this.nodesMap.get(link.target)?.visible
@@ -1032,7 +1000,7 @@ export class Graph {
       .filter((row) => row !== undefined);
   }
 
-  public removeLabel(label: string, selectedElement: Node, updateData = true) {
+  public async removeLabel(label: string, selectedElement: Node, updateData = true) {
     if (updateData) {
       this.Data = this.Data.map((row) =>
         Object.fromEntries(
@@ -1088,7 +1056,7 @@ export class Graph {
     );
 
     if (selectedElement.labels.length === 0) {
-      const [emptyCategory] = this.createLabel([""], selectedElement);
+      const [emptyCategory] = await this.createLabel([""], selectedElement);
       selectedElement.labels.push(emptyCategory.name);
       const { color, size } = emptyCategory.style;
       selectedElement.color = color;
@@ -1106,12 +1074,12 @@ export class Graph {
     }
   }
 
-  public addLabel(
+  public async addLabel(
     label: string,
     selectedElement: Node,
     updateData = true
-  ): Label[] {
-    const [category] = this.createLabel([label], selectedElement);
+  ): Promise<Label[]> {
+    const [category] = await this.createLabel([label], selectedElement);
 
     if (updateData) {
       this.Data = this.Data.map((row) =>

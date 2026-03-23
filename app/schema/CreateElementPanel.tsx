@@ -9,9 +9,9 @@ import { ArrowRight, ArrowRightLeft, Check, Pencil, Plus, Trash2, X } from "luci
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Link, Node } from "@/lib/utils";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
-import { Link, Node } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import ToastButton from "../components/ToastButton";
 import { IndicatorContext } from "../components/provider";
@@ -20,17 +20,17 @@ import RemoveLabel from "../graph/RemoveLabel";
 
 type Props =
   | {
-      onCreate: (element: [string, string[]][], label: string[]) => Promise<boolean>
-      setIsAdd: (isAdd: boolean) => void
-      type: true
-    }
+    onCreate: (element: [string, string[]][], label: string[]) => Promise<boolean>
+    setIsAdd: (isAdd: boolean) => void
+    type: true
+  }
   | {
-      onCreate: (element: [string, string[]][], label: string[]) => Promise<boolean>
-      setIsAdd: (isAdd: boolean) => void
-      selectedNodes: [Node, Node]
-      setSelectedNodes: Dispatch<SetStateAction<(Node | Link)[]>>
-      type: false
-    };
+    onCreate: (element: [string, string[]][], label: string[]) => Promise<boolean>
+    setIsAdd: (isAdd: boolean) => void
+    selectedNodes: [Node, Node]
+    setSelectedNodes: Dispatch<SetStateAction<(Node | Link)[]>>
+    type: false
+  };
 
 export const ATTRIBUTES = ["Type", "Description", "Unique", "Required"];
 
@@ -242,9 +242,9 @@ export default function SchemaCreateElement(props: Props) {
             <X />
           </Button>
         </div>
-        <ul 
-          className="flex flex-wrap gap-4" 
-          onMouseEnter={() => setLabelsHover(true)} 
+        <ul
+          className="flex flex-wrap gap-4"
+          onMouseEnter={() => setLabelsHover(true)}
           onMouseLeave={() => setLabelsHover(false)}
         >
           {label.map((l) => (

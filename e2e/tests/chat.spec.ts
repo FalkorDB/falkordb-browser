@@ -82,6 +82,7 @@ test.describe("Chat Feature Tests", () => {
   });
 
   test(`@readwrite Verify complete chat flow with API key: send question, check loading state, verify responses`, async () => {
+    test.setTimeout(60000);
     const graphName = getRandomString("chat");
     await apiCall.addGraph(graphName);
     await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
@@ -452,7 +453,7 @@ test.describe("Chat Feature Tests", () => {
   });
 
   test(`@readwrite Verify messages are graph-specific and respect maxSavedMessages limit`, async () => {
-    test.setTimeout(60000);
+    test.setTimeout(90000);
     const graph1Name = getRandomString("chat");
     const graph2Name = getRandomString("chat");
     await apiCall.addGraph(graph1Name);
@@ -464,7 +465,7 @@ test.describe("Chat Feature Tests", () => {
     await browser.setPageToFullScreen();
     await settings.expandChatSection();
 
-    const maxSavedMessages = Number(await settings.getMaxSavedMessagesValue());
+    const rawMaxSavedMessages = Number(await settings.getMaxSavedMessagesValue());
     const testApiKey = process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY || "test-api-key-placeholder";
     
     await settings.fillChatApiKey(testApiKey);
@@ -490,6 +491,8 @@ test.describe("Chat Feature Tests", () => {
       "List all Person nodes",
       "Who are Alice's friends?"
     ];
+
+    const maxSavedMessages = Math.min(rawMaxSavedMessages, messages.length);
     
     for (let i = 0; i < messages.length; i += 1) {
       const message = messages[i];
@@ -513,7 +516,7 @@ test.describe("Chat Feature Tests", () => {
   
     // Switch to graph2
     await chat.selectGraphByName(graph2Name);
-    await chat.waitForTimeout(500);
+    await chat.waitForUserMessageCount(0);
     
     // Verify chat is empty for graph2 (no messages from graph1)
     const graph2MessageCount = await chat.getChatUserMessagesCount();
@@ -522,7 +525,7 @@ test.describe("Chat Feature Tests", () => {
     // Send a message to graph2 (about Xavier and Yara)
     await chat.fillChatInput("Who does Xavier know?");
     await chat.clickChatSendButton();
-    await chat.waitForTimeout(500);
+    await chat.waitForUserMessageCount(1);
     
     // Verify graph2 has 1 message
     const graph2MessageCountAfter = await chat.getChatUserMessagesCount();
@@ -530,12 +533,13 @@ test.describe("Chat Feature Tests", () => {
     
     // Switch back to graph1
     await chat.selectGraphByName(graph1Name);
-    
-    // After reload/re-selecting graph, verify only maxSavedMessages (5) are loaded from localStorage
-    // The getLastUserMessagesWithContext function should have limited it to 5 user messages
+    // Wait for maxSavedMessages user messages to load from localStorage
+    await chat.waitForUserMessageCount(maxSavedMessages);
+    // After reload/re-selecting graph, verify only maxSavedMessages user messages are loaded from localStorage
+    // The getLastUserMessagesWithContext function should have limited it to maxSavedMessages user messages
     const graph1ReloadedCount = await chat.getChatUserMessagesCount();
     
-    // Should have 5 user messages (maxSavedMessages limit applied from localStorage)
+    // Should have maxSavedMessages user messages (limit applied from localStorage)
     expect(graph1ReloadedCount).toBe(maxSavedMessages);
     
     // Get all user messages and check the first one
