@@ -200,6 +200,12 @@ export type UDFEntryWithCode = [...UDFEntry, string, string];
 
 export type ConnectionType = "Standalone" | "Cluster" | "Sentinel";
 
+export interface ConnectionInfo {
+  sentinelMasters?: number;
+  sentinelReplicas?: number;
+  clusterNodes?: number;
+}
+
 export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell | LazyCell;
 
 export interface Row {

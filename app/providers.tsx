@@ -4,7 +4,7 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef, ConnectionType, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue } from "@/lib/utils";
+import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue } from "@/lib/utils";
 import { encryptValue, decryptValue, isCryptoAvailable, isEncrypted } from "@/lib/encryption";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
@@ -109,6 +109,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [customizingLabel, setCustomizingLabel] = useState<InfoLabel | null>(null);
   const [dbVersion, setDbVersion] = useState<string>("");
   const [connectionType, setConnectionType] = useState<ConnectionType>("Standalone");
+  const [connectionInfo, setConnectionInfo] = useState<ConnectionInfo>({});
   const [captionsKeys, setCaptionsKeys] = useState<[string, boolean][]>([]);
   const [newCaptionsKeys, setNewCaptionsKeys] = useState<[string, boolean][]>([]);
   const [newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix] = useState<boolean>(false);
@@ -312,9 +313,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const connectionContext = useMemo(() => ({
     connectionType,
     setConnectionType,
+    connectionInfo,
+    setConnectionInfo,
     dbVersion,
     setDbVersion
-  }), [connectionType, dbVersion]);
+  }), [connectionType, connectionInfo, dbVersion]);
 
   const udfContext = useMemo(() => ({
     udfList,
@@ -544,6 +547,21 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
           default: return "Standalone";
         }
       });
+    })();
+  }, [status, toast]);
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
+
+    (async () => {
+      const result = await securedFetch("/api/connection-info", {
+        method: "GET",
+      }, toast, setIndicator);
+
+      if (!result.ok) return;
+
+      const json = await result.json();
+      setConnectionInfo(json.result);
     })();
   }, [status, toast]);
 
