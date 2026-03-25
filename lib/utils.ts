@@ -44,6 +44,7 @@ export type Query = {
   timestamp: number;
   status: "Success" | "Failed" | "Empty";
   elementsCount: number;
+  fav: boolean;
 };
 
 export type Node = {
