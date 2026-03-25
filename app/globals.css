@@ -27,6 +27,9 @@
         --border: 0 0% 26%;
         --green: 144 61% 20%;
     }
+  .theme {
+        --animate-shine: shine var(--duration) infinite linear;
+    }
 }
 
 @layer components {
@@ -43,7 +46,7 @@
         font-display: swap;
     }
 
-    *:not(.codicon):not(code):not(pre):not(code *):not(pre *):not(.monospace):not(.monospace *) {
+    *:not(.codicon):not(code):not(code *):not(pre *):not(.monospace):not(.monospace *) {
         font-family: 'HyperlegibleSans' !important;
     }
 
@@ -169,6 +172,11 @@
     background: #666666;
 }
 
+input:focus-visible,
+input:focus-visible {
+    outline: none !important;
+}
+
 input[type="color"]::-webkit-color-swatch-wrapper {
     padding: 0;
 }
@@ -179,4 +187,18 @@ input[type="color"]::-webkit-color-swatch {
 
 #launcher {
     z-index: 40 !important;
+}
+
+@theme inline {
+  @keyframes shine {
+  0% {
+    background-position: 0% 0%;
+        }
+  50% {
+    background-position: 100% 100%;
+        }
+  to {
+    background-position: 0% 0%;
+        }
+    }
 }

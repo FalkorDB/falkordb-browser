@@ -1,7 +1,9 @@
 /* eslint-disable no-case-declarations */
 /* eslint-disable react/no-array-index-key */
-import { cn, Message } from "@/lib/utils";
+import { cn, getTheme, Message } from "@/lib/utils";
 import { useContext, useEffect, useState } from "react";
+import { useTheme } from "next-themes";
+import Image from "next/image";
 import { ChevronDown, ChevronRight, Share2, Copy, Loader2, Play, Search, X, Send, MessagesSquare } from "lucide-react";
 import { Tooltip as ShadTooltip, TooltipContent as ShadTooltipContent, TooltipTrigger as ShadTooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
@@ -11,6 +13,7 @@ import Input from "../components/ui/Input";
 import { GraphContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext } from "../components/provider";
 import { EventType } from "../api/chat/route";
 import ToastButton from "../components/ToastButton";
+import { ShineBorder } from "@/components/ui/shine-border";
 
 // Function to get the last maxSavedMessages user messages and all messages in between
 const getLastUserMessagesWithContext = (allMessages: Message[], maxUserMessages: number) => {
@@ -36,6 +39,8 @@ interface Props {
 }
 
 export default function Chat({ onClose }: Props) {
+    const { theme } = useTheme();
+    const { currentTheme } = getTheme(theme);
     const { setIndicator } = useContext(IndicatorContext);
     const { graphName, runQuery } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
@@ -212,7 +217,7 @@ export default function Chat({ onClose }: Props) {
                                 ...prev,
                                 {
                                     role: "assistant",
-                                    content: eventData.trim(),
+                                    content: eventData.trim().replace(/^cypher\s+/i, ""),
                                     type: eventType
                                 }
                             ]);
@@ -317,17 +322,23 @@ export default function Chat({ onClose }: Props) {
                 );
             case "CypherQuery":
                 const i = messages.findIndex(m => m === message);
+                let isCollapse = false;
 
                 return (
-                    <div className="flex gap-2 items-start">
-                        <Button
-                            onClick={() => {
-                                setQueryCollapse(prev => ({ ...prev, [i]: !prev[i] }));
-                            }}
-                            className="p-1 min-w-8 min-h-8"
-                        >
-                            {queryCollapse[i] ? <ChevronRight size={25} /> : <ChevronDown size={25} />}
-                        </Button>
+                    <div ref={r => {
+                        isCollapse = (r?.scrollHeight || 0) > 64;
+                    }} className="flex gap-2 items-start">
+                        {
+                            isCollapse &&
+                            <Button
+                                onClick={() => {
+                                    setQueryCollapse(prev => ({ ...prev, [i]: !prev[i] }));
+                                }}
+                                className="p-1 min-w-8 min-h-8"
+                            >
+                                {queryCollapse[i] ? <ChevronRight size={25} /> : <ChevronDown size={25} />}
+                            </Button>
+                        }
                         <div className="overflow-hidden SofiaSans">
                             {
                                 queryCollapse[i] ? (
@@ -440,9 +451,13 @@ export default function Chat({ onClose }: Props) {
                             }
                             const isUser = message.role === "user";
                             const assistantBg = message.type === "Error" ? "bg-destructive" : "bg-secondary";
-                            const avatar = <div className={cn("h-8 w-8 rounded-full flex items-center justify-center", isUser ? "bg-primary" : assistantBg)}>
-                                <p className="text-foreground text-sm truncate text-center">{message.role.charAt(0).toUpperCase()}</p>
-                            </div>;
+                            const avatar = isUser
+                                ? <div className="h-8 w-8 rounded-full flex items-center justify-center bg-primary">
+                                    <p className="text-foreground text-sm truncate text-center">{message.role.charAt(0).toUpperCase()}</p>
+                                </div>
+                                : <div className="h-8 w-8">
+                                    <Image className="rounded-full" src={`/icons/F-${currentTheme}.svg`} style={{ height: "100%", width: "100%" }} alt="Assistant" width={0} height={0} />
+                                </div>;
                             return (
                                 <li
                                     data-testid={isUser ? "chatUserMessage" : `chatAssistantMessage-${message.type}`}
@@ -501,14 +516,17 @@ export default function Chat({ onClose }: Props) {
                     >
                         <Send size={25} />
                     </Button>
-                    <Input
-                        data-testid="chatInput"
-                        className="w-1 grow bg-transparent border-none text-foreground text-lg SofiaSans"
-                        placeholder="Type your message here..."
-                        aria-describedby="chat-prerequisites"
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                    />
+                    <div className="relative flex-1 basis-0 rounded-lg overflow-hidden">
+                        <ShineBorder shineColor={["#7568F2", "#B66EBD", "#EC806C"]} />
+                        <Input
+                            data-testid="chatInput"
+                            className="w-full bg-background rounded-md border-none text-foreground text-lg SofiaSans"
+                            placeholder="What would you like to know?"
+                            aria-describedby="chat-prerequisites"
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
+                        />
+                    </div>
                 </form>
             </div>
         </div>
