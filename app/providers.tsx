@@ -529,39 +529,55 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   }, [status, toast]);
 
   useEffect(() => {
-    if (status !== "authenticated") return;
+    if (status !== "authenticated") {
+      setConnectionType("Standalone");
+      return;
+    }
 
     (async () => {
-      const result = await securedFetch("/api/info", {
-        method: "GET",
-      }, toast, setIndicator);
+      try {
+        const result = await securedFetch("/api/info", {
+          method: "GET",
+        }, toast, setIndicator);
 
-      if (!result.ok) return;
+        if (!result.ok) return;
 
-      const json = await result.json();
+        const json = await result.json();
 
-      setConnectionType(() => {
-        switch (true) {
-          case json.result.includes("redis_mode:sentinel"): return "Sentinel";
-          case json.result.includes("redis_mode:cluster"): return "Cluster";
-          default: return "Standalone";
-        }
-      });
+        setConnectionType(() => {
+          switch (true) {
+            case json.result.includes("redis_mode:sentinel"): return "Sentinel";
+            case json.result.includes("redis_mode:cluster"): return "Cluster";
+            default: return "Standalone";
+          }
+        });
+      } catch (err) {
+        console.error("Failed to fetch connection type:", err);
+      }
     })();
   }, [status, toast]);
 
   useEffect(() => {
-    if (status !== "authenticated") return;
+    if (status !== "authenticated") {
+      setConnectionInfo({});
+      return;
+    }
 
     (async () => {
-      const result = await securedFetch("/api/connection-info", {
-        method: "GET",
-      }, toast, setIndicator);
+      try {
+        const result = await securedFetch("/api/connection-info", {
+          method: "GET",
+        }, toast, setIndicator);
 
-      if (!result.ok) return;
+        if (!result.ok) return;
 
-      const json = await result.json();
-      setConnectionInfo(json.result);
+        const json = await result.json();
+        if (json?.result) {
+          setConnectionInfo(json.result);
+        }
+      } catch (err) {
+        console.error("Failed to fetch connection info:", err);
+      }
     })();
   }, [status, toast]);
 

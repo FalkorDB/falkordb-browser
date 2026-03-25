@@ -261,7 +261,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
             </div>
             <div className="w-full flex flex-col gap-2 items-center">
                 <Tooltip>
-                    <TooltipTrigger asChild>
+                    <TooltipTrigger>
                         <p>v{pkg.version}</p>
                     </TooltipTrigger>
                     <TooltipContent>
