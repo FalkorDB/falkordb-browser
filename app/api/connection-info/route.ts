@@ -40,7 +40,7 @@ export async function GET(request: Request) {
       }
     } else if (redisMode === "cluster") {
       try {
-        const clusterInfoRaw: string = await connection.sendCommand(["CLUSTER", "INFO"]) as string;
+        const clusterInfoRaw: string = await connection.sendCommand(["CLUSTER", "NODES"]) as string;
         result.clusterNodes = Number(parseInfoField(clusterInfoRaw, "cluster_known_nodes") ?? "0");
       } catch (err) {
         console.error("Failed to get cluster details:", err);
