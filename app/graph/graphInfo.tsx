@@ -1,5 +1,5 @@
 import { Dispatch, SetStateAction, useContext } from "react";
-import { Loader2, X, Palette, Database, Network } from "lucide-react";
+import { Loader2, X, Palette, Network } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn, InfoLabel } from "@/lib/utils";
 import { getContrastTextColor } from "@falkordb/canvas";

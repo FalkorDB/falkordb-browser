@@ -2,7 +2,7 @@
 
 'use client';
 
-import { ArrowUpRight, Database, FileCode, LogOut, MessagesSquare, Monitor, Moon, Network, Plus, Sun } from "lucide-react";
+import { ArrowUpRight, FileCode, LogOut, MessagesSquare, Monitor, Moon, Network, Plus, Sun } from "lucide-react";
 import { useCallback, useContext, useState, useEffect } from "react";
 import Image from "next/image";
 import { cn, getTheme, Panel } from "@/lib/utils";
