@@ -56,6 +56,7 @@ export default function Chat({ onClose }: Props) {
     const [newMessage, setNewMessage] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [queryCollapse, setQueryCollapse] = useState<{ [key: string]: boolean }>({});
+    const [collapseEligible, setCollapseEligible] = useState<{ [key: number]: boolean }>({});
 
     // Load messages and cypher only preference for current graph on mount
     useEffect(() => {
@@ -322,14 +323,18 @@ export default function Chat({ onClose }: Props) {
                 );
             case "CypherQuery":
                 const i = messages.findIndex(m => m === message);
-                let isCollapse = false;
 
                 return (
                     <div ref={r => {
-                        isCollapse = (r?.scrollHeight || 0) > 64;
+                        if (!r) return;
+                        const shouldCollapse = r.scrollHeight > 64;
+                        setCollapseEligible(prev => {
+                            if (prev[i] === shouldCollapse) return prev;
+                            return { ...prev, [i]: shouldCollapse };
+                        });
                     }} className="flex gap-2 items-start">
                         {
-                            isCollapse &&
+                            collapseEligible[i] &&
                             <Button
                                 onClick={() => {
                                     setQueryCollapse(prev => ({ ...prev, [i]: !prev[i] }));

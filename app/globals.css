@@ -172,9 +172,9 @@
     background: #666666;
 }
 
-input:focus-visible,
 input:focus-visible {
-    outline: none !important;
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: 2px;
 }
 
 input[type="color"]::-webkit-color-swatch-wrapper {
@@ -189,16 +189,3 @@ input[type="color"]::-webkit-color-swatch {
     z-index: 40 !important;
 }
 
-@theme inline {
-  @keyframes shine {
-  0% {
-    background-position: 0% 0%;
-        }
-  50% {
-    background-position: 100% 100%;
-        }
-  to {
-    background-position: 0% 0%;
-        }
-    }
-}
