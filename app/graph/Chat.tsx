@@ -356,7 +356,7 @@ export default function Chat({ onClose }: Props) {
                                         </ShadTooltipContent>
                                     </ShadTooltip>
                                 ) : (
-                                    <pre className="text-wrap whitespace-pre-wrap">
+                                    <pre className="text-wrap whitespace-pre-wrap break-all">
                                         {message.content}
                                     </pre>
                                 )
