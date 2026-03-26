@@ -1,5 +1,5 @@
 import { createContext, Dispatch, SetStateAction } from "react";
-import { ConnectionType, GraphData, GraphRef, HistoryQuery, Label, Panel, Relationship, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
+import { ConnectionInfo, ConnectionType, GraphData, GraphRef, HistoryQuery, Label, Panel, Relationship, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
 import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
 import { Graph, GraphInfo } from "../api/graph/model";
 
@@ -198,6 +198,8 @@ type TableViewContextType = {
 type ConnectionContextType = {
   connectionType: ConnectionType;
   setConnectionType: Dispatch<SetStateAction<ConnectionType>>;
+  connectionInfo: ConnectionInfo;
+  setConnectionInfo: Dispatch<SetStateAction<ConnectionInfo>>;
   dbVersion: string;
   setDbVersion: Dispatch<SetStateAction<string>>;
 };
@@ -409,6 +411,8 @@ export const TableViewContext = createContext<TableViewContextType>({
 export const ConnectionContext = createContext<ConnectionContextType>({
   connectionType: "Standalone",
   setConnectionType: () => { },
+  connectionInfo: {},
+  setConnectionInfo: () => { },
   dbVersion: "",
   setDbVersion: () => { },
 });

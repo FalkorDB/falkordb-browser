@@ -2,7 +2,7 @@
 
 'use client';
 
-import { ArrowUpRight, Database, FileCode, LogOut, MessagesSquare, Monitor, Moon, Plus, Sun } from "lucide-react";
+import { ArrowUpRight, FileCode, LogOut, MessagesSquare, Monitor, Moon, Network, Plus, Sun } from "lucide-react";
 import { useCallback, useContext, useState, useEffect } from "react";
 import Image from "next/image";
 import { cn, getTheme, Panel } from "@/lib/utils";
@@ -61,7 +61,7 @@ function formatVersion(version: string | undefined): string {
 export default function Header({ onSetGraphName, graphNames, graphName, onOpenPanel, panelOpen, showUDF }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
-    const { connectionType, dbVersion } = useContext(ConnectionContext);
+    const { connectionType, connectionInfo, dbVersion } = useContext(ConnectionContext);
     const { setPanel, panel } = useContext(PanelContext);
 
     const { theme, setTheme } = useTheme();
@@ -125,6 +125,9 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                         </TooltipTrigger>
                         <TooltipContent>
                             <p>Single</p>
+                            {connectionType === "Standalone" && session?.user && (
+                                <p className="text-xs opacity-75">{session.user.host}:{session.user.port}</p>
+                            )}
                         </TooltipContent>
                     </Tooltip>
                     <Tooltip>
@@ -133,6 +136,13 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                         </TooltipTrigger>
                         <TooltipContent>
                             <p>Sentinel</p>
+                            {connectionType === "Sentinel" && session?.user && (
+                                <div className="text-xs opacity-75">
+                                    <p>{session.user.host}:{session.user.port}</p>
+                                    {connectionInfo.sentinelRole === "master" && connectionInfo.sentinelReplicas !== undefined && <p>Role: Master ({connectionInfo.sentinelReplicas} replicas)</p>}
+                                    {connectionInfo.sentinelRole === "slave" && connectionInfo.sentinelMasterHost && <p>Role: Replica (master: {connectionInfo.sentinelMasterHost}:{connectionInfo.sentinelMasterPort})</p>}
+                                </div>
+                            )}
                         </TooltipContent>
                     </Tooltip>
                     <Tooltip>
@@ -141,6 +151,21 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                         </TooltipTrigger>
                         <TooltipContent>
                             <p>Cluster</p>
+                            {connectionType === "Cluster" && session?.user && (
+                                <div className="text-xs opacity-75">
+                                    <p>{session.user.host}:{session.user.port}</p>
+                                    {connectionInfo.clusterNodes && (
+                                        <div className="mt-1">
+                                            <p>Nodes: {connectionInfo.clusterNodes.length}</p>
+                                            {connectionInfo.clusterNodes.map((node) => (
+                                                <p key={`${node.host}:${node.port}`}>
+                                                    {node.host}:{node.port} ({node.role}{node.slots ? ` ${node.slots}` : ""})
+                                                </p>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </TooltipContent>
                     </Tooltip>
                 </div>
@@ -202,7 +227,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                             onClick={() => onOpenPanel()}
                             data-testid="graphInfoToggle"
                         >
-                            <Database size={iconSize - 5} />
+                            <Network size={iconSize - 5} />
                         </Button>
                     }
                     {
@@ -244,6 +269,15 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                 </div>
             </div>
             <div className="w-full flex flex-col gap-2 items-center">
+                <Tooltip>
+                    <TooltipTrigger>
+                        <p>v{pkg.version}</p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>FalkorDB Browser Version</p>
+                    </TooltipContent>
+                </Tooltip>
+                {separator}
                 <Drawer direction="right">
                     <DropdownMenu>
                         <DropdownMenuTrigger onClick={(e) => e.preventDefault()} asChild>
