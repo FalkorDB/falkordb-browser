@@ -200,12 +200,19 @@ export type UDFEntryWithCode = [...UDFEntry, string, string];
 
 export type ConnectionType = "Standalone" | "Cluster" | "Sentinel";
 
+export interface ClusterNodeInfo {
+  host: string;
+  port: number;
+  role: string;
+  slots?: string;
+}
+
 export interface ConnectionInfo {
   sentinelRole?: string;
   sentinelReplicas?: number;
   sentinelMasterHost?: string;
   sentinelMasterPort?: number;
-  clusterNodes?: number;
+  clusterNodes?: ClusterNodeInfo[];
 }
 
 export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell | LazyCell;

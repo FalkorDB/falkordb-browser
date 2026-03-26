@@ -154,7 +154,16 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                             {connectionType === "Cluster" && session?.user && (
                                 <div className="text-xs opacity-75">
                                     <p>{session.user.host}:{session.user.port}</p>
-                                    {connectionInfo.clusterNodes !== undefined && <p>Nodes: {connectionInfo.clusterNodes}</p>}
+                                    {connectionInfo.clusterNodes && (
+                                        <div className="mt-1">
+                                            <p>Nodes: {connectionInfo.clusterNodes.length}</p>
+                                            {connectionInfo.clusterNodes.map((node) => (
+                                                <p key={`${node.host}:${node.port}`}>
+                                                    {node.host}:{node.port} ({node.role}{node.slots ? ` ${node.slots}` : ""})
+                                                </p>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </TooltipContent>

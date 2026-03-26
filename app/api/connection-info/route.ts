@@ -34,7 +34,19 @@ export async function GET(request: Request) {
     if (clusterEnabled) {
       try {
         const clusterNodesRaw: string = await connection.sendCommand(["CLUSTER", "NODES"]) as string;
-        result.clusterNodes = clusterNodesRaw.split("\n").filter(line => line.trim().length > 0).length;
+        const lines = clusterNodesRaw.split("\n").filter(line => line.trim().length > 0);
+        result.clusterNodes = lines.map(line => {
+          const parts = line.split(" ");
+          const addressPart = parts[1] ?? "";
+          const [addrWithPort, hostname] = addressPart.split(",");
+          const address = addrWithPort?.split("@")[0] ?? "";
+          const [ip, portStr] = address.split(":");
+          const host = hostname || ip;
+          const flags = parts[2] ?? "";
+          const nodeRole = flags.includes("master") ? "master" : "slave";
+          const slots = nodeRole === "master" ? parts.slice(8).join(" ") : undefined;
+          return { host, port: Number(portStr), role: nodeRole, slots };
+        });
       } catch (err) {
         console.error("Failed to get cluster details:", err);
       }
