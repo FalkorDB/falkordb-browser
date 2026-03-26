@@ -419,7 +419,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                         "hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed"
                                     )}
                                 >
-                                    <Star size={16} className={cn(favQueries.length > 0 ? "fill-yellow-400 text-yellow-400" : "text-foreground/50")} />
+                                    <Star size={16} className={cn(favQueries.length > 0 ? "fill-fav text-fav" : "text-foreground/50")} />
                                     <ChevronDown size={14} className="text-foreground/50" />
                                 </button>
                             </PopoverTrigger>
@@ -528,7 +528,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                         title="Filter by favorites"
                                                         onClick={() => handelSetFilteredQueries(undefined, !favFilter)}
                                                     >
-                                                        <Star size={14} className={cn(favFilter ? "fill-yellow-400 text-yellow-400" : "")} />
+                                                        <Star size={14} className={cn(favFilter ? "fill-fav text-fav" : "")} />
                                                         Favorites
                                                     </Button>
                                                 </li>

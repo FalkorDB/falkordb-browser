@@ -292,7 +292,7 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                                     <div
                                         className="absolute right-1 top-1 z-10 flex items-center gap-1"
                                     >
-                                        {item.name && <p className="text-yellow-400 font-medium truncate max-w-[120px]">{item.name}</p>}
+                                        {item.name && <p className="text-fav font-medium truncate max-w-[120px]">{item.name}</p>}
                                         <Button
                                             data-testid={`${dataTestId}${text}Fav`}
                                             title={isFav ? "Remove from favorites" : "Add to favorites"}
@@ -310,7 +310,7 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                                                 e.stopPropagation();
                                             }}
                                         >
-                                            <Star size={16} className={cn(isFav ? "fill-yellow-400 text-yellow-400" : "text-foreground/40")} />
+                                            <Star size={16} className={cn(isFav ? "fill-fav text-fav" : "text-foreground/40")} />
                                         </Button>
                                     </div>
                                 )}
