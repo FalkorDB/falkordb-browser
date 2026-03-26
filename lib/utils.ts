@@ -45,6 +45,7 @@ export type Query = {
   status: "Success" | "Failed" | "Empty";
   elementsCount: number;
   fav: boolean;
+  name?: string;
 };
 
 export type Node = {

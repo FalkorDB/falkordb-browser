@@ -2,6 +2,7 @@ import { cn, Query } from "@/lib/utils";
 import { Fragment, KeyboardEvent, MouseEvent, useEffect, useRef, useState } from "react";
 import { Check, Circle, Loader2, Star, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Button from "./ui/Button";
 import Input from "./ui/Input";
 
@@ -125,7 +126,7 @@ interface Props<T extends Item> {
     afterSearchCallback: (newFilteredList: T[]) => void
     isSelected: (item: T) => boolean
     isDeleteSelected?: (item: T) => boolean
-    onToggleFav?: (item: T) => void
+    onToggleFav?: (item: T, name?: string) => void
     searchRef: React.RefObject<HTMLInputElement>
     isLoading?: boolean
     className?: string
@@ -140,6 +141,8 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
     const [pageCount, setPageCount] = useState(0);
     const [search, setSearch] = useState("");
     const [itemsPerPage, setItemsPerPage] = useState(1);
+    const [favDialogItem, setFavDialogItem] = useState<T | null>(null);
+    const [favName, setFavName] = useState("");
 
     const containerRef = useRef<HTMLUListElement>(null);
 
@@ -286,21 +289,30 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                                 key={text}
                             >
                                 {!isString && onToggleFav && (
-                                    <Button
-                                    className="absolute right-1 top-1/2 -translate-y-1/2 z-10 p-0.5 hover:scale-110 transition-transform"
-                                        data-testid={`${dataTestId}${text}Fav`}
-                                        title={isFav ? "Remove from favorites" : "Add to favorites"}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onToggleFav(item);
-                                        }}
-                                        onContextMenu={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                        }}
+                                    <div
+                                        className="absolute right-1 top-1 z-10 flex items-center gap-1"
                                     >
-                                        <Star size={16} className={cn(isFav ? "fill-yellow-400 text-yellow-400" : "text-foreground/40")} />
-                                    </Button>
+                                        {item.name && <p className="text-yellow-400 font-medium truncate max-w-[120px]">{item.name}</p>}
+                                        <Button
+                                            data-testid={`${dataTestId}${text}Fav`}
+                                            title={isFav ? "Remove from favorites" : "Add to favorites"}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (isFav) {
+                                                    onToggleFav(item);
+                                                } else {
+                                                    setFavDialogItem(item);
+                                                    setFavName("");
+                                                }
+                                            }}
+                                            onContextMenu={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                            }}
+                                        >
+                                            <Star size={16} className={cn(isFav ? "fill-yellow-400 text-yellow-400" : "text-foreground/40")} />
+                                        </Button>
+                                    </div>
                                 )}
                                 {
                                     onClick ?
@@ -365,6 +377,46 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                     <Button disabled={stepCounter > pageCount - 6} label=">>" title="Next 5 pages" onClick={() => handleSetStepCounter(prev => prev < pageCount - 5 ? prev + 5 : prev)} />
                 </li>
             </ul>
+            <Dialog open={!!favDialogItem} onOpenChange={(open) => { if (!open) setFavDialogItem(null); }}>
+                <DialogContent className="max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
+                    <DialogHeader>
+                        <DialogTitle>Add to Favorites</DialogTitle>
+                        <DialogDescription>Enter a nick name (optional)</DialogDescription>
+                    </DialogHeader>
+                    <form
+                        className="flex flex-col gap-4"
+                        onSubmit={(e) => {
+                            e.preventDefault();
+
+                            if (favDialogItem && onToggleFav) {
+                                onToggleFav(favDialogItem, favName.trim());
+                                setFavDialogItem(null);
+                            }
+                            
+                        }}
+                    >
+                        <Input
+                            autoFocus
+                            className="bg-background"
+                            placeholder="Favorite name"
+                            value={favName}
+                            onChange={(e) => setFavName(e.target.value)}
+                        />
+                        <div className="flex justify-end gap-2">
+                            <Button
+                                variant="Secondary"
+                                label="Cancel"
+                                onClick={() => setFavDialogItem(null)}
+                            />
+                            <Button
+                                variant="Primary"
+                                label="Save"
+                                type="submit"
+                            />
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

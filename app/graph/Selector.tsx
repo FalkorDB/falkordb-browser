@@ -352,11 +352,11 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
         setFilteredQueries(current => current.filter(query => deleteElements.some((removeIndex) => historyQuery.queries[removeIndex].timestamp === query.timestamp)));
     }, [historyQuery, setHistoryQuery, deleteElements]);
 
-    const handleToggleFav = useCallback((item: Query) => {
+    const handleToggleFav = useCallback((item: Query, name?: string) => {
         if (!historyQuery || !setHistoryQuery) return;
 
         const newQueries = historyQuery.queries.map(q =>
-            q.text === item.text ? { ...q, fav: !q.fav } : q
+            q.text === item.text ? { ...q, fav: !q.fav, name } : q
         );
 
         localStorage.setItem("query history", JSON.stringify(newQueries));
@@ -365,17 +365,17 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
             ...prev,
             queries: newQueries,
             currentQuery: prev.currentQuery.text === item.text
-                ? { ...prev.currentQuery, fav: !prev.currentQuery.fav }
+                ? { ...prev.currentQuery, fav: !prev.currentQuery.fav, name }
                 : prev.currentQuery,
         }));
 
         setFilteredQueries(prev =>
-            prev.map(q => q.text === item.text ? { ...q, fav: !q.fav } : q)
+            prev.map(q => q.text === item.text ? { ...q, fav: !q.fav, name } : q)
         );
     }, [historyQuery, setHistoryQuery]);
 
     const favQueries = useMemo(() =>
-        (historyQuery?.queries ?? []).filter(q => q.fav),
+        [...(historyQuery?.queries ?? []).filter(q => q.fav && q.name).sort((a, b) => (a.name!).localeCompare(b.name!)), ...(historyQuery?.queries ?? []).filter(q => q.fav && !q.name).sort((a, b) => (a.text).localeCompare(b.text))],
         [historyQuery?.queries]
     );
 
@@ -423,14 +423,13 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                     <ChevronDown size={14} className="text-foreground/50" />
                                 </button>
                             </PopoverTrigger>
-                            <PopoverContent align="start" className="w-80 max-h-64 overflow-y-auto p-2">
+                            <PopoverContent align="start" className="w-[500px] max-h-64 overflow-y-auto p-2">
                                 <p className="text-sm font-medium mb-2 px-1">Favorite Queries</p>
                                 <ul className="flex flex-col gap-1">
                                     {favQueries.map(q => (
                                         <li key={q.text}>
-                                            <button
-                                                type="button"
-                                                className="w-full text-left text-sm px-2 py-1.5 rounded hover:bg-secondary truncate"
+                                            <Button
+                                                className="w-full text-left hover:bg-secondary border-b"
                                                 title={q.text}
                                                 onClick={() => {
                                                     setHistoryQuery!(prev => ({
@@ -442,8 +441,8 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                     setFavOpen(false);
                                                 }}
                                             >
-                                                {q.text}
-                                            </button>
+                                                <p className="truncate text-sm">{q.name ? <><span className="font-bold text-base">{q.name} {`->`}</span> {q.text}</> : q.text}</p>
+                                            </Button>
                                         </li>
                                     ))}
                                 </ul>
@@ -584,14 +583,14 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                     data-testid="queryHistoryClearFav"
                                                     title="Clear all favorites"
                                                     onClick={() => {
-                                                        const newQueries = historyQuery.queries.map(q => ({ ...q, fav: false }));
+                                                        const newQueries = historyQuery.queries.map(q => ({ ...q, fav: false, name: undefined }));
                                                         localStorage.setItem("query history", JSON.stringify(newQueries));
                                                         setHistoryQuery(prev => ({
                                                             ...prev,
                                                             queries: newQueries,
-                                                            currentQuery: { ...prev.currentQuery, fav: false },
+                                                            currentQuery: { ...prev.currentQuery, fav: false, name: undefined },
                                                         }));
-                                                        setFilteredQueries(prev => prev.map(q => ({ ...q, fav: false })));
+                                                        setFilteredQueries(prev => prev.map(q => ({ ...q, fav: false, name: undefined })));
                                                     }}
                                                     disabled={!historyQuery.queries.some(q => q.fav)}
                                                 >

@@ -380,7 +380,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
   const handelGetNewQueries = useCallback((newQuery: Query) => {
     const existing = historyQuery.queries.find(qu => qu.text === newQuery.text);
-    const merged = existing ? { ...newQuery, fav: existing.fav } : newQuery;
+    const merged = existing ? { ...newQuery, fav: existing.fav, name: existing.name } : newQuery;
     return [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), merged];
   }, [historyQuery.queries]);
 
