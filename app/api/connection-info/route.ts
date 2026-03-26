@@ -24,27 +24,27 @@ export async function GET(request: Request) {
     const connection = await client.connection;
 
     const info = await connection.info();
-    const redisMode = parseInfoField(info, "redis_mode") ?? "standalone";
+    const clusterEnabled = parseInfoField(info, "redis_mode") === "cluster";
+    const replicationInfo = await connection.info("replication");
+    const connectedSlaves = Number(parseInfoField(replicationInfo, "connected_slaves") ?? "0");
+    const role = parseInfoField(replicationInfo, "role") ?? "master";
 
     const result: Record<string, unknown> = {};
 
-    if (redisMode === "sentinel") {
+    if (clusterEnabled) {
       try {
-        const sentinelInfo = await connection.info("sentinel");
-        result.sentinelMasters = Number(parseInfoField(sentinelInfo, "sentinel_masters") ?? "0");
-
-        const replicationInfo = await connection.info("replication");
-        result.sentinelReplicas = Number(parseInfoField(replicationInfo, "connected_slaves") ?? "0");
-      } catch (err) {
-        console.error("Failed to get sentinel details:", err);
-      }
-    } else if (redisMode === "cluster") {
-      try {
-        const clusterInfoRaw: string = await connection.sendCommand(["CLUSTER", "INFO"]) as string;
-        result.clusterNodes = Number(parseInfoField(clusterInfoRaw, "cluster_known_nodes") ?? "0");
+        const clusterNodesRaw: string = await connection.sendCommand(["CLUSTER", "NODES"]) as string;
+        result.clusterNodes = clusterNodesRaw.split("\n").filter(line => line.trim().length > 0).length;
       } catch (err) {
         console.error("Failed to get cluster details:", err);
       }
+    } else if (role === "master" && connectedSlaves > 0) {
+      result.sentinelRole = "master";
+      result.sentinelReplicas = connectedSlaves;
+    } else if (role === "slave") {
+      result.sentinelRole = "slave";
+      result.sentinelMasterHost = parseInfoField(replicationInfo, "master_host");
+      result.sentinelMasterPort = Number(parseInfoField(replicationInfo, "master_port") ?? "0");
     }
 
     return NextResponse.json({ result }, { status: 200, headers: getCorsHeaders(request) });

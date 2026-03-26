@@ -533,24 +533,25 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setConnectionType("Standalone");
       return;
     }
-
+    
     (async () => {
       try {
         const result = await securedFetch("/api/info", {
           method: "GET",
         }, toast, setIndicator);
-
+        
         if (!result.ok) return;
 
         const json = await result.json();
 
-        setConnectionType(() => {
+        setConnectionType((() => {
           switch (true) {
-            case json.result.includes("redis_mode:sentinel"): return "Sentinel";
-            case json.result.includes("redis_mode:cluster"): return "Cluster";
+            case json.result.includes("cluster_enabled:1"): return "Cluster";
+            case /role:slave/.test(json.result): return "Sentinel";
+            case /connected_slaves:[1-9]/.test(json.result): return "Sentinel";
             default: return "Standalone";
           }
-        });
+        })());
       } catch (err) {
         console.error("Failed to fetch connection type:", err);
       }

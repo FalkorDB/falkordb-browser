@@ -201,8 +201,10 @@ export type UDFEntryWithCode = [...UDFEntry, string, string];
 export type ConnectionType = "Standalone" | "Cluster" | "Sentinel";
 
 export interface ConnectionInfo {
-  sentinelMasters?: number;
+  sentinelRole?: string;
   sentinelReplicas?: number;
+  sentinelMasterHost?: string;
+  sentinelMasterPort?: number;
   clusterNodes?: number;
 }
 

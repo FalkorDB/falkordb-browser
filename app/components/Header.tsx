@@ -139,8 +139,8 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                             {connectionType === "Sentinel" && session?.user && (
                                 <div className="text-xs opacity-75">
                                     <p>{session.user.host}:{session.user.port}</p>
-                                    {connectionInfo.sentinelMasters !== undefined && <p>Masters: {connectionInfo.sentinelMasters}</p>}
-                                    {connectionInfo.sentinelReplicas !== undefined && <p>Replicas: {connectionInfo.sentinelReplicas}</p>}
+                                    {connectionInfo.sentinelRole === "master" && connectionInfo.sentinelReplicas !== undefined && <p>Role: Master ({connectionInfo.sentinelReplicas} replicas)</p>}
+                                    {connectionInfo.sentinelRole === "slave" && connectionInfo.sentinelMasterHost && <p>Role: Replica (master: {connectionInfo.sentinelMasterHost}:{connectionInfo.sentinelMasterPort})</p>}
                                 </div>
                             )}
                         </TooltipContent>
