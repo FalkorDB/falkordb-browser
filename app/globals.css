@@ -27,6 +27,9 @@
         --border: 0 0% 26%;
         --green: 144 61% 20%;
     }
+  .theme {
+        --animate-shine: shine var(--duration) infinite linear;
+    }
 }
 
 @layer components {
@@ -43,7 +46,7 @@
         font-display: swap;
     }
 
-    *:not(.codicon):not(code):not(pre):not(code *):not(pre *):not(.monospace):not(.monospace *) {
+    *:not(.codicon):not(code):not(code *):not(pre *):not(.monospace):not(.monospace *) {
         font-family: 'HyperlegibleSans' !important;
     }
 
@@ -169,6 +172,11 @@
     background: #666666;
 }
 
+input:focus-visible {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: 2px;
+}
+
 input[type="color"]::-webkit-color-swatch-wrapper {
     padding: 0;
 }
@@ -180,3 +188,4 @@ input[type="color"]::-webkit-color-swatch {
 #launcher {
     z-index: 40 !important;
 }
+
