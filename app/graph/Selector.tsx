@@ -430,6 +430,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                         <li key={q.text}>
                                             <Button
                                                 className="w-full text-left hover:bg-secondary border-b"
+                                                tooltipSide="left"
                                                 title={q.text}
                                                 onClick={async () => {
                                                     await runQuery(q.text);
