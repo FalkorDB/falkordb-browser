@@ -9,6 +9,7 @@ import * as monaco from "monaco-editor";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTheme } from "next-themes";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Button from "../components/ui/Button";
 import { BrowserSettingsContext, GraphContext, IndicatorContext } from "../components/provider";
 import CypherEditor, { CYPHER_LANGUAGE_NAME } from "../components/CypherEditor";
@@ -17,7 +18,6 @@ import DialogComponent from "../components/DialogComponent";
 import Toolbar from "./toolbar";
 import { Graph } from "../api/graph/model";
 import { Explain, Metadata, Profile } from "./MetadataView";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import PaginationList from "../components/PaginationList";
 import SelectGraph from "./selectGraph";
 
@@ -430,14 +430,10 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                         <li key={q.text}>
                                             <Button
                                                 className="w-full text-left hover:bg-secondary border-b"
+                                                tooltipSide="left"
                                                 title={q.text}
-                                                onClick={() => {
-                                                    setHistoryQuery!(prev => ({
-                                                        ...prev,
-                                                        query: q.text,
-                                                        currentQuery: { ...prev.currentQuery, text: q.text },
-                                                        counter: 0
-                                                    }));
+                                                onClick={async () => {
+                                                    await runQuery(q.text);
                                                     setFavOpen(false);
                                                 }}
                                             >
