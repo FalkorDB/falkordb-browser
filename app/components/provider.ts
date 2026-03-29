@@ -366,6 +366,7 @@ export const HistoryQueryContext = createContext<HistoryQueryContextType>({
       timestamp: 0,
       elementsCount: 0,
       status: "Failed",
+      fav: false,
     },
     counter: 0,
   },

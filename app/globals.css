@@ -18,6 +18,7 @@
         --muted: 0 0% 80%;
         --border: 0 0% 40%;
         --green: 142 71% 45%;
+        --fav: 45 93% 47%;
     }
 
     .dark {
@@ -26,6 +27,7 @@
         --secondary: 0 0% 14.1%;
         --border: 0 0% 26%;
         --green: 144 61% 20%;
+        --fav: 48 96% 53%;
     }
   .theme {
         --animate-shine: shine var(--duration) infinite linear;

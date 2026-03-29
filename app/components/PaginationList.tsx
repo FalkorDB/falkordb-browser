@@ -1,7 +1,8 @@
 import { cn, Query } from "@/lib/utils";
 import { Fragment, KeyboardEvent, MouseEvent, useEffect, useRef, useState } from "react";
-import { Check, Circle, Loader2, X } from "lucide-react";
+import { Check, Circle, Loader2, Star, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Button from "./ui/Button";
 import Input from "./ui/Input";
 
@@ -125,13 +126,14 @@ interface Props<T extends Item> {
     afterSearchCallback: (newFilteredList: T[]) => void
     isSelected: (item: T) => boolean
     isDeleteSelected?: (item: T) => boolean
+    onToggleFav?: (item: T, name?: string) => void
     searchRef: React.RefObject<HTMLInputElement>
     isLoading?: boolean
     className?: string
     children?: React.ReactNode
 }
 
-export default function PaginationList<T extends Item>({ list, onClick, dataTestId, afterSearchCallback, isSelected, isDeleteSelected, label, isLoading, className, children, searchRef }: Props<T>) {
+export default function PaginationList<T extends Item>({ list, onClick, dataTestId, afterSearchCallback, isSelected, isDeleteSelected, onToggleFav, label, isLoading, className, children, searchRef }: Props<T>) {
 
     const [filteredList, setFilteredList] = useState<T[]>([...list]);
     const [hoverIndex, setHoverIndex] = useState<number>(0);
@@ -139,6 +141,8 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
     const [pageCount, setPageCount] = useState(0);
     const [search, setSearch] = useState("");
     const [itemsPerPage, setItemsPerPage] = useState(1);
+    const [favDialogItem, setFavDialogItem] = useState<T | null>(null);
+    const [favName, setFavName] = useState("");
 
     const containerRef = useRef<HTMLUListElement>(null);
 
@@ -149,12 +153,13 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
 
     useEffect(() => {
         setStepCounter(0);
-    }, [filteredList]);
+        setHoverIndex(0);
+    }, [search]);
 
     useEffect(() => {
         const newPageCount = Math.ceil(filteredList.length / itemsPerPage);
         setPageCount(newPageCount);
-        if (newPageCount < stepCounter + 1) setStepCounter(0);
+        if (newPageCount < stepCounter + 1) setStepCounter(Math.max(0, newPageCount - 1));
     }, [filteredList, itemsPerPage, stepCounter]);
 
     useEffect(() => {
@@ -182,15 +187,20 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
     }, [itemHeight, items, items.length]);
 
     useEffect(() => {
-        const timeout = setTimeout(() => {
+        const applyFilter = () => {
             const newFilteredList = list.filter((item) => !search || (typeof item === "string" ? item.toLowerCase().includes(search.toLowerCase()) : item.text.toLowerCase().includes(search.toLowerCase()))) || [];
             if (JSON.stringify(newFilteredList) !== JSON.stringify(filteredList)) {
                 setFilteredList([...newFilteredList]);
                 afterSearchCallback([...newFilteredList]);
-                setStepCounter(0);
-                setHoverIndex(0);
             }
-        }, 500);
+        };
+
+        if (!search) {
+            applyFilter();
+            return undefined;
+        }
+
+        const timeout = setTimeout(applyFilter, 500);
 
         return () => {
             clearTimeout(timeout);
@@ -254,6 +264,8 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                         const isString = typeof item === "string";
                         const text = isString ? item : item.text;
 
+                        const isFav = !isString && item.fav;
+
                         const content = (
                             <>
                                 {
@@ -267,7 +279,7 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                         return (
                             <li
                                 className={cn(
-                                    "border-b cursor-pointer",
+                                    "border-b cursor-pointer relative",
                                     getItemClassName(selected, deleteSelected, hover)
                                 )}
                                 data-testid={`${dataTestId}${text}`}
@@ -276,6 +288,32 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                                 style={{ height: `${itemHeight}px` }}
                                 key={text}
                             >
+                                {!isString && onToggleFav && (
+                                    <div
+                                        className="absolute right-1 top-1 z-10 flex items-center gap-1"
+                                    >
+                                        {item.name && <p className="text-fav font-medium truncate max-w-[120px]">{item.name}</p>}
+                                        <Button
+                                            data-testid={`${dataTestId}${text}Fav`}
+                                            title={isFav ? "Remove from favorites" : "Add to favorites"}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (isFav) {
+                                                    onToggleFav(item);
+                                                } else {
+                                                    setFavDialogItem(item);
+                                                    setFavName("");
+                                                }
+                                            }}
+                                            onContextMenu={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                            }}
+                                        >
+                                            <Star size={16} className={cn(isFav ? "fill-fav text-fav" : "text-foreground/40")} />
+                                        </Button>
+                                    </div>
+                                )}
                                 {
                                     onClick ?
                                         <Button
@@ -339,6 +377,46 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                     <Button disabled={stepCounter > pageCount - 6} label=">>" title="Next 5 pages" onClick={() => handleSetStepCounter(prev => prev < pageCount - 5 ? prev + 5 : prev)} />
                 </li>
             </ul>
+            <Dialog open={!!favDialogItem} onOpenChange={(open) => { if (!open) setFavDialogItem(null); }}>
+                <DialogContent className="max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
+                    <DialogHeader>
+                        <DialogTitle>Add to Favorites</DialogTitle>
+                        <DialogDescription>Enter a nick name (optional)</DialogDescription>
+                    </DialogHeader>
+                    <form
+                        className="flex flex-col gap-4"
+                        onSubmit={(e) => {
+                            e.preventDefault();
+
+                            if (favDialogItem && onToggleFav) {
+                                onToggleFav(favDialogItem, favName.trim());
+                                setFavDialogItem(null);
+                            }
+                            
+                        }}
+                    >
+                        <Input
+                            autoFocus
+                            className="bg-background"
+                            placeholder="Favorite name"
+                            value={favName}
+                            onChange={(e) => setFavName(e.target.value)}
+                        />
+                        <div className="flex justify-end gap-2">
+                            <Button
+                                variant="Secondary"
+                                label="Cancel"
+                                onClick={() => setFavDialogItem(null)}
+                            />
+                            <Button
+                                variant="Primary"
+                                label="Save"
+                                type="submit"
+                            />
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
@@ -348,4 +426,5 @@ PaginationList.defaultProps = {
     children: undefined,
     isLoading: undefined,
     isDeleteSelected: undefined,
+    onToggleFav: undefined,
 };

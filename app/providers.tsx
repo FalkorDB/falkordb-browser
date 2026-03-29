@@ -37,7 +37,8 @@ const defaultQueryHistory: HistoryQuery = {
     graphName: "",
     timestamp: 0,
     status: "Failed",
-    elementsCount: 0
+    elementsCount: 0,
+    fav: false
   },
   counter: 0
 };
@@ -380,7 +381,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
   const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator), [toast, setIndicator]);
 
-  const handelGetNewQueries = useCallback((newQuery: Query) => [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), newQuery], [historyQuery.queries]);
+  const handelGetNewQueries = useCallback((newQuery: Query) => {
+    const existing = historyQuery.queries.find(qu => qu.text === newQuery.text);
+    const merged = existing ? { ...newQuery, fav: existing.fav, name: existing.name } : newQuery;
+    return [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), merged];
+  }, [historyQuery.queries]);
 
   const runQuery = useCallback(async (q: string, name?: string): Promise<void> => {
     const n = name || graphName;
@@ -392,7 +397,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       profile: [],
       status: "Failed",
       text: q,
-      timestamp: new Date().getTime()
+      timestamp: new Date().getTime(),
+      fav: false
     };
 
     setIsQueryLoading(true);
@@ -587,7 +593,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
     (async () => {
       try {
-        setHistoryQuery({ ...defaultQueryHistory, queries: JSON.parse(localStorage.getItem("query history") || "[]") });
+        const raw: Query[] = JSON.parse(localStorage.getItem("query history") || "[]");
+        // Migrate old queries that don't have the fav property
+        const queries = raw.map(q => ({ ...q, fav: q.fav ?? false }));
+        setHistoryQuery({ ...defaultQueryHistory, queries });
       } catch (error) {
         setHistoryQuery({ ...defaultQueryHistory, queries: [] });
         console.error("Failed to parse query history from localStorage", error);
