@@ -157,19 +157,24 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                             onMouseLeave={closeTip}
                             onPointerDownCapture={(e) => e.stopPropagation()}
                         >
-                            <p>Single</p>
-                            {
-                                connectionType === "Standalone" && session?.user &&
-                                <>
+                            <div className="flex flex-col">
+                                <div className="flex gap-1">
+                                    <p>Single</p>
+                                    {
+                                        connectionType === "Standalone" && session?.user &&
+                                        <Button
+                                            title="Copy"
+                                            onClick={() => handleCopy(`${session?.user.host}:${session?.user.port}`)}
+                                        >
+                                            <Copy size={16} />
+                                        </Button>
+                                    }
+                                </div>
+                                {
+                                    connectionType === "Standalone" && session?.user &&
                                     <p className="text-xs opacity-75">{session.user.host}:{session.user.port}</p>
-                                    <Button
-                                        title="Copy"
-                                        onClick={() => handleCopy(`${session?.user.host}:${session?.user.port}`)}
-                                    >
-                                        <Copy size={16} />
-                                    </Button>
-                                </>
-                            }
+                                }
+                            </div>
                         </TooltipContent>
                     </Tooltip>
                     <Tooltip open={openTooltip === "sentinel"}>
@@ -185,27 +190,28 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                             onMouseLeave={closeTip}
                             onPointerDownCapture={(e) => e.stopPropagation()}
                         >
-                            <p>Sentinel</p>
-                            {
-                                connectionType === "Sentinel" && session?.user &&
-                                <>
+                            <div className="flex flex-col">
+                                <div className="flex gap-1">
+                                    <p>Sentinel</p>
+                                    {
+                                        connectionType === "Sentinel" && session?.user &&
+                                        <Button
+                                            title="Copy"
+                                            onClick={() => handleCopy(`${session?.user.host}:${session?.user.port}\n${connectionInfo.sentinelRole === "master" && connectionInfo.sentinelReplicas !== undefined ? `Role: Master (${connectionInfo.sentinelReplicas} replicas)` : ""}${connectionInfo.sentinelRole === "slave" && connectionInfo.sentinelMasterHost ? `\nRole: Replica (master: ${connectionInfo.sentinelMasterHost}:${connectionInfo.sentinelMasterPort})` : ""}`)}
+                                        >
+                                            <Copy size={16} />
+                                        </Button>
+                                    }
+                                </div>
+                                {
+                                    connectionType === "Sentinel" && session?.user &&
                                     <div className="text-xs opacity-75">
                                         <p>{session.user.host}:{session.user.port}</p>
                                         {connectionInfo.sentinelRole === "master" && connectionInfo.sentinelReplicas !== undefined && <p>Role: Master ({connectionInfo.sentinelReplicas} replicas)</p>}
                                         {connectionInfo.sentinelRole === "slave" && connectionInfo.sentinelMasterHost && <p>Role: Replica (master: {connectionInfo.sentinelMasterHost}:{connectionInfo.sentinelMasterPort})</p>}
                                     </div>
-                                    <Button
-                                        title="Copy"
-                                        onClick={() => handleCopy(`
-                                ${session?.user.host}:${session?.user.port}
-                                ${connectionInfo.sentinelRole === "master" && connectionInfo.sentinelReplicas !== undefined ? `Role: Master (${connectionInfo.sentinelReplicas} replicas)` : ""}
-                                ${connectionInfo.sentinelRole === "slave" && connectionInfo.sentinelMasterHost ? `Role: Replica (master: ${connectionInfo.sentinelMasterHost}:${connectionInfo.sentinelMasterPort})` : ""}
-                                `)}
-                                    >
-                                        <Copy size={16} />
-                                    </Button>
-                                </>
-                            }
+                                }
+                            </div>
                         </TooltipContent>
                     </Tooltip>
                     <Tooltip open={openTooltip === "cluster"}>
@@ -221,10 +227,21 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                             onMouseLeave={closeTip}
                             onPointerDownCapture={(e) => e.stopPropagation()}
                         >
-                            <p>Cluster</p>
-                            {
-                                connectionType === "Cluster" && session?.user &&
-                                <>
+                            <div className="flex flex-col">
+                                <div className="flex gap-1">
+                                    <p>Cluster</p>
+                                    {
+                                        connectionType === "Cluster" && session?.user &&
+                                        <Button
+                                            title="Copy"
+                                            onClick={() => handleCopy(`${session?.user.host}:${session?.user.port}${connectionInfo.clusterNodes ? `\nNodes: ${connectionInfo.clusterNodes.length}\n${connectionInfo.clusterNodes.map((node) => `${node.host}:${node.port} (${node.role}${node.slots ? ` ${node.slots}` : ""})`).join("\n")}` : ""}`)}
+                                        >
+                                            <Copy size={16} />
+                                        </Button>
+                                    }
+                                </div>
+                                {
+                                    connectionType === "Cluster" && session?.user &&
                                     <div className="text-xs opacity-75">
                                         <p>{session.user.host}:{session.user.port}</p>
                                         {connectionInfo.clusterNodes && (
@@ -238,19 +255,8 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                                             </div>
                                         )}
                                     </div>
-                                    <Button
-                                        title="Copy"
-                                        onClick={() => handleCopy(`
-                                    ${session?.user.host}:${session?.user.port}
-                                    ${connectionInfo.clusterNodes ? connectionInfo.clusterNodes.map((node) => `
-                                        ${node.host}:${node.port} (${node.role}${node.slots ? ` ${node.slots}` : ""})
-                                        `).join("\n") : ""}
-                                        `)}
-                                    >
-                                        <Copy size={16} />
-                                    </Button>
-                                </>
-                            }
+                                }
+                            </div>
                         </TooltipContent>
                     </Tooltip>
                 </div>
