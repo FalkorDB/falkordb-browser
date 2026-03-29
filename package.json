@@ -74,14 +74,14 @@
     "react-gtm-module": "^2.0.11",
     "react-hook-form": "^7.71.2",
     "react-json-tree": "^0.19.0",
-    "react-resizable-panels": "^4.6.5",
+    "react-resizable-panels": "^4.7.6",
     "swagger-ui-react": "^5.32.1",
     "swr": "^2.4.1",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^3.4.17",
     "uuid": "^13.0.0",
     "vaul": "^1.1.2",
-    "yaml": "^2.8.2",
+    "yaml": "^2.8.3",
     "zod": "^3.24.2"
   },
   "devDependencies": {
