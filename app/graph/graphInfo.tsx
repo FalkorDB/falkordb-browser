@@ -1,5 +1,5 @@
 import { Dispatch, SetStateAction, useContext } from "react";
-import { Loader2, X, Palette, Database } from "lucide-react";
+import { Loader2, X, Palette, Network } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn, InfoLabel } from "@/lib/utils";
 import { getContrastTextColor } from "@falkordb/canvas";
@@ -32,7 +32,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                         </Button>
                         <div className=" pr-5 w-full flex justify-between items-center gap-1">
                             <h1 className="text-2xl">Graph Info</h1>
-                            <Database size={25} />
+                            <Network size={25} />
                         </div>
                         <div className="flex gap-2 items-center overflow-hidden">
                             <h2>Graph Name:</h2>
