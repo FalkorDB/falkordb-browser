@@ -1,7 +1,9 @@
 /* eslint-disable no-case-declarations */
 /* eslint-disable react/no-array-index-key */
-import { cn, Message } from "@/lib/utils";
-import { useContext, useEffect, useState } from "react";
+import { cn, getTheme, Message } from "@/lib/utils";
+import { useContext, useEffect, useRef, useState, useCallback } from "react";
+import { useTheme } from "next-themes";
+import Image from "next/image";
 import { ChevronDown, ChevronRight, Share2, Copy, Loader2, Play, Search, X, Send, MessagesSquare } from "lucide-react";
 import { Tooltip as ShadTooltip, TooltipContent as ShadTooltipContent, TooltipTrigger as ShadTooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
@@ -11,6 +13,7 @@ import Input from "../components/ui/Input";
 import { GraphContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext } from "../components/provider";
 import { EventType } from "../api/chat/route";
 import ToastButton from "../components/ToastButton";
+import { ShineBorder } from "@/components/ui/shine-border";
 
 // Function to get the last maxSavedMessages user messages and all messages in between
 const getLastUserMessagesWithContext = (allMessages: Message[], maxUserMessages: number) => {
@@ -36,6 +39,8 @@ interface Props {
 }
 
 export default function Chat({ onClose }: Props) {
+    const { resolvedTheme } = useTheme();
+    const { currentTheme } = getTheme(resolvedTheme);
     const { setIndicator } = useContext(IndicatorContext);
     const { graphName, runQuery } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
@@ -46,11 +51,60 @@ export default function Chat({ onClose }: Props) {
     const { toast } = useToast();
     const route = useRouter();
 
+    const [mounted, setMounted] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
     const [messagesList, setMessagesList] = useState<(Message | [Message[], boolean])[]>([]);
     const [newMessage, setNewMessage] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [queryCollapse, setQueryCollapse] = useState<{ [key: string]: boolean }>({});
+    const [collapseEligible, setCollapseEligible] = useState<{ [key: number]: boolean }>({});
+    const textRefs = useRef<Map<number, HTMLElement>>(new Map());
+    const observerRef = useRef<ResizeObserver | null>(null);
+    const queryCollapseRef = useRef(queryCollapse);
+    queryCollapseRef.current = queryCollapse;
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    // Create a single ResizeObserver that recomputes collapse eligibility on resize
+    useEffect(() => {
+        observerRef.current = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const el = entry.target as HTMLElement;
+                textRefs.current.forEach((ref, i) => {
+                    if (ref !== el) return;
+                    const shouldCollapse = el.scrollHeight > 64;
+                    // Only upgrade to eligible, never downgrade — collapsed items have small height
+                    if (!shouldCollapse) return;
+                    setCollapseEligible(prev => {
+                        if (prev[i]) return prev;
+                        return { ...prev, [i]: true };
+                    });
+                });
+            }
+        });
+
+        return () => observerRef.current?.disconnect();
+    }, []);
+
+    const setTextRef = useCallback((i: number) => (r: HTMLElement | null) => {
+        if (r) {
+            textRefs.current.set(i, r);
+            // Measure on mount — only set eligible if content is tall enough
+            if (r.scrollHeight > 64) {
+                setCollapseEligible(prev => {
+                    if (prev[i]) return prev;
+                    return { ...prev, [i]: true };
+                });
+            }
+            observerRef.current?.observe(r);
+        } else {
+            const prev = textRefs.current.get(i);
+            if (prev) observerRef.current?.unobserve(prev);
+            textRefs.current.delete(i);
+        }
+    }, []);
 
     // Load messages and cypher only preference for current graph on mount
     useEffect(() => {
@@ -212,7 +266,7 @@ export default function Chat({ onClose }: Props) {
                                 ...prev,
                                 {
                                     role: "assistant",
-                                    content: eventData.trim(),
+                                    content: eventData.trim().replace(/^cypher\s+/i, ""),
                                     type: eventType
                                 }
                             ]);
@@ -320,15 +374,18 @@ export default function Chat({ onClose }: Props) {
 
                 return (
                     <div className="flex gap-2 items-start">
-                        <Button
-                            onClick={() => {
-                                setQueryCollapse(prev => ({ ...prev, [i]: !prev[i] }));
-                            }}
-                            className="p-1 min-w-8 min-h-8"
-                        >
-                            {queryCollapse[i] ? <ChevronRight size={25} /> : <ChevronDown size={25} />}
-                        </Button>
-                        <div className="overflow-hidden SofiaSans">
+                        {
+                            collapseEligible[i] &&
+                            <Button
+                                onClick={() => {
+                                    setQueryCollapse(prev => ({ ...prev, [i]: !prev[i] }));
+                                }}
+                                className="p-1 min-w-8 min-h-8"
+                            >
+                                {queryCollapse[i] ? <ChevronRight size={25} /> : <ChevronDown size={25} />}
+                            </Button>
+                        }
+                        <div ref={setTextRef(i)} className="overflow-hidden SofiaSans">
                             {
                                 queryCollapse[i] ? (
                                     <ShadTooltip>
@@ -340,7 +397,7 @@ export default function Chat({ onClose }: Props) {
                                         </ShadTooltipContent>
                                     </ShadTooltip>
                                 ) : (
-                                    <pre className="text-wrap whitespace-pre-wrap">
+                                    <pre className="text-wrap whitespace-pre-wrap break-all">
                                         {message.content}
                                     </pre>
                                 )
@@ -440,9 +497,13 @@ export default function Chat({ onClose }: Props) {
                             }
                             const isUser = message.role === "user";
                             const assistantBg = message.type === "Error" ? "bg-destructive" : "bg-secondary";
-                            const avatar = <div className={cn("h-8 w-8 rounded-full flex items-center justify-center", isUser ? "bg-primary" : assistantBg)}>
-                                <p className="text-foreground text-sm truncate text-center">{message.role.charAt(0).toUpperCase()}</p>
-                            </div>;
+                            const avatar = isUser
+                                ? <div className="h-8 w-8 rounded-full flex items-center justify-center bg-primary">
+                                    <p className="text-foreground text-sm truncate text-center">{message.role.charAt(0).toUpperCase()}</p>
+                                </div>
+                                : <div className="h-8 w-8 relative">
+                                    {mounted && currentTheme && <Image className="rounded-full" src={`/icons/F-${currentTheme}.svg`} alt="Assistant" fill />}
+                                </div>;
                             return (
                                 <li
                                     data-testid={isUser ? "chatUserMessage" : `chatAssistantMessage-${message.type}`}
@@ -501,14 +562,17 @@ export default function Chat({ onClose }: Props) {
                     >
                         <Send size={25} />
                     </Button>
-                    <Input
-                        data-testid="chatInput"
-                        className="w-1 grow bg-transparent border-none text-foreground text-lg SofiaSans"
-                        placeholder="Type your message here..."
-                        aria-describedby="chat-prerequisites"
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                    />
+                    <div className="relative flex-1 basis-0 rounded-lg overflow-hidden">
+                        <ShineBorder shineColor={["#7568F2", "#B66EBD", "#EC806C"]} />
+                        <Input
+                            data-testid="chatInput"
+                            className="w-full bg-background rounded-md border-none text-foreground text-lg SofiaSans"
+                            placeholder="What would you like to know?"
+                            aria-describedby="chat-prerequisites"
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
+                        />
+                    </div>
                 </form>
             </div>
         </div>

@@ -596,6 +596,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                         }}
                         value={blur ? historyQuery.query.replace(/\n/g, ' ') : historyQuery.query}
                         onChange={(val) => {
+                            if (blur) return;
                             if (!historyQuery.counter) {
                                 setHistoryQuery(prev => ({
                                     ...prev,

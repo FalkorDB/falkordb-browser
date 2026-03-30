@@ -4,7 +4,7 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef, ConnectionType, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue } from "@/lib/utils";
+import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue } from "@/lib/utils";
 import { encryptValue, decryptValue, isCryptoAvailable, isEncrypted } from "@/lib/encryption";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
@@ -37,7 +37,8 @@ const defaultQueryHistory: HistoryQuery = {
     graphName: "",
     timestamp: 0,
     status: "Failed",
-    elementsCount: 0
+    elementsCount: 0,
+    fav: false
   },
   counter: 0
 };
@@ -109,6 +110,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [customizingLabel, setCustomizingLabel] = useState<InfoLabel | null>(null);
   const [dbVersion, setDbVersion] = useState<string>("");
   const [connectionType, setConnectionType] = useState<ConnectionType>("Standalone");
+  const [connectionInfo, setConnectionInfo] = useState<ConnectionInfo>({});
   const [captionsKeys, setCaptionsKeys] = useState<[string, boolean][]>([]);
   const [newCaptionsKeys, setNewCaptionsKeys] = useState<[string, boolean][]>([]);
   const [newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix] = useState<boolean>(false);
@@ -312,9 +314,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const connectionContext = useMemo(() => ({
     connectionType,
     setConnectionType,
+    connectionInfo,
+    setConnectionInfo,
     dbVersion,
     setDbVersion
-  }), [connectionType, dbVersion]);
+  }), [connectionType, connectionInfo, dbVersion]);
 
   const udfContext = useMemo(() => ({
     udfList,
@@ -377,7 +381,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
   const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator), [toast, setIndicator]);
 
-  const handelGetNewQueries = useCallback((newQuery: Query) => [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), newQuery], [historyQuery.queries]);
+  const handelGetNewQueries = useCallback((newQuery: Query) => {
+    const existing = historyQuery.queries.find(qu => qu.text === newQuery.text);
+    const merged = existing ? { ...newQuery, fav: existing.fav, name: existing.name } : newQuery;
+    return [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), merged];
+  }, [historyQuery.queries]);
 
   const runQuery = useCallback(async (q: string, name?: string): Promise<void> => {
     const n = name || graphName;
@@ -389,7 +397,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       profile: [],
       status: "Failed",
       text: q,
-      timestamp: new Date().getTime()
+      timestamp: new Date().getTime(),
+      fav: false
     };
 
     setIsQueryLoading(true);
@@ -526,24 +535,56 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   }, [status, toast]);
 
   useEffect(() => {
-    if (status !== "authenticated") return;
+    if (status !== "authenticated") {
+      setConnectionType("Standalone");
+      return;
+    }
 
     (async () => {
-      const result = await securedFetch("/api/info", {
-        method: "GET",
-      }, toast, setIndicator);
+      try {
+        const result = await securedFetch("/api/info", {
+          method: "GET",
+        }, toast, setIndicator);
 
-      if (!result.ok) return;
+        if (!result.ok) return;
 
-      const json = await result.json();
+        const json = await result.json();
 
-      setConnectionType(() => {
-        switch (true) {
-          case json.result.includes("redis_mode:sentinel"): return "Sentinel";
-          case json.result.includes("redis_mode:cluster"): return "Cluster";
-          default: return "Standalone";
+        setConnectionType((() => {
+          switch (true) {
+            case json.result.includes("cluster_enabled:1"): return "Cluster";
+            case /role:slave/.test(json.result): return "Sentinel";
+            case /connected_slaves:[1-9]/.test(json.result): return "Sentinel";
+            default: return "Standalone";
+          }
+        })());
+      } catch (err) {
+        console.error("Failed to fetch connection type:", err);
+      }
+    })();
+  }, [status, toast]);
+
+  useEffect(() => {
+    if (status !== "authenticated") {
+      setConnectionInfo({});
+      return;
+    }
+
+    (async () => {
+      try {
+        const result = await securedFetch("/api/connection-info", {
+          method: "GET",
+        }, toast, setIndicator);
+
+        if (!result.ok) return;
+
+        const json = await result.json();
+        if (json?.result) {
+          setConnectionInfo(json.result);
         }
-      });
+      } catch (err) {
+        console.error("Failed to fetch connection info:", err);
+      }
     })();
   }, [status, toast]);
 
@@ -552,7 +593,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
     (async () => {
       try {
-        setHistoryQuery({ ...defaultQueryHistory, queries: JSON.parse(localStorage.getItem("query history") || "[]") });
+        const raw: Query[] = JSON.parse(localStorage.getItem("query history") || "[]");
+        // Migrate old queries that don't have the fav property
+        const queries = raw.map(q => ({ ...q, fav: q.fav ?? false }));
+        // Persist migrated data so legacy objects are normalized in storage
+        localStorage.setItem("query history", JSON.stringify(queries));
+        setHistoryQuery({ ...defaultQueryHistory, queries });
       } catch (error) {
         setHistoryQuery({ ...defaultQueryHistory, queries: [] });
         console.error("Failed to parse query history from localStorage", error);
@@ -878,7 +924,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                                       />
                                   }
                                 </ResizablePanel>
-                                <ResizableHandle withHandle onMouseUp={() => isCollapsed && onExpand()} className={cn("bg-border", isCollapsed && "hidden")} />
+                                <ResizableHandle
+                                  withHandle
+                                  onMouseUp={() => isCollapsed && onExpand()}
+                                  className={cn("bg-border", isCollapsed && "hidden")}
+                                  disabled={isCollapsed}
+                                />
                                 <ResizablePanel
                                   defaultSize="100%"
                                   minSize="70%"

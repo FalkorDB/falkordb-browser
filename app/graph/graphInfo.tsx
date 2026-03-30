@@ -1,5 +1,5 @@
 import { Dispatch, SetStateAction, useContext } from "react";
-import { Loader2, X, Palette, Database } from "lucide-react";
+import { Loader2, X, Palette, Network } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn, InfoLabel } from "@/lib/utils";
 import { getContrastTextColor } from "@falkordb/canvas";
@@ -32,7 +32,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                         </Button>
                         <div className=" pr-5 w-full flex justify-between items-center gap-1">
                             <h1 className="text-2xl">Graph Info</h1>
-                            <Database size={25} />
+                            <Network size={25} />
                         </div>
                         <div className="flex gap-2 items-center overflow-hidden">
                             <h2>Graph Name:</h2>
@@ -102,13 +102,13 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                     const labelColor = label.style.color;
 
                                     return (
-                                        <li key={`${name}-${labelColor}`} className="max-w-full flex gap-1">
+                                        <li key={`${name}-${labelColor}`} className="max-w-full flex gap-1 overflow-x-hidden">
                                             <Button
                                                 style={{
                                                     backgroundColor: labelColor,
                                                     color: getContrastTextColor(labelColor)
                                                 }}
-                                                className="h-6 w-full p-2 rounded-full flex justify-center items-center SofiaSans hover:opacity-80 transition-opacity"
+                                                className="w-fit max-w-[calc(100%-24px)] h-6 p-2 rounded-full flex justify-center items-center SofiaSans hover:opacity-80 transition-opacity"
                                                 data-testid={`graphInfo${name}Node`}
                                                 title={`MATCH (n:${name}) RETURN n
                                                     #: ${label.count.toLocaleString()}`}
@@ -222,7 +222,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                         <li key={key} className="max-w-full">
                                             <Button
                                                 title={`MATCH (e) WHERE e.${key} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`}
-                                                className="h-6 w-full p-2 bg-secondary flex justify-center items-center rounded text-foreground SofiaSans hover:bg-opacity-40 transition-opacity"
+                                                className="h-6 w-full p-2 bg-secondary flex justify-center items-center rounded text-foreground SofiaSans hover:opacity-80 transition-opacity"
                                                 label={key}
                                                 onClick={() => runQuery(
                                                     `MATCH (e) WHERE e.${key} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`

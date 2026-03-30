@@ -2,8 +2,8 @@
 
 'use client';
 
-import { ArrowUpRight, Database, FileCode, LogOut, MessagesSquare, Monitor, Moon, Plus, Sun } from "lucide-react";
-import { useCallback, useContext, useState, useEffect } from "react";
+import { ArrowUpRight, Copy, Network, FileCode, LogOut, MessagesSquare, Monitor, Moon, Plus, Sun } from "lucide-react";
+import { useCallback, useContext, useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { cn, getTheme, Panel } from "@/lib/utils";
 import { useRouter, usePathname } from "next/navigation";
@@ -15,6 +15,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { useTheme } from "next-themes";
+import { useToast } from "@/components/ui/use-toast";
 import Button from "./ui/Button";
 import CreateGraph from "./CreateGraph";
 import { IndicatorContext, PanelContext, ConnectionContext } from "./provider";
@@ -61,7 +62,7 @@ function formatVersion(version: string | undefined): string {
 export default function Header({ onSetGraphName, graphNames, graphName, onOpenPanel, panelOpen, showUDF }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
-    const { connectionType, dbVersion } = useContext(ConnectionContext);
+    const { connectionType, connectionInfo, dbVersion } = useContext(ConnectionContext);
     const { setPanel, panel } = useContext(PanelContext);
 
     const { theme, setTheme } = useTheme();
@@ -71,6 +72,42 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
     const router = useRouter();
 
     const [mounted, setMounted] = useState(false);
+    const [openTooltip, setOpenTooltip] = useState<string | null>(null);
+    const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const { toast } = useToast();
+
+    const openTip = useCallback((name: string) => {
+        if (closeTimeoutRef.current) {
+            clearTimeout(closeTimeoutRef.current);
+            closeTimeoutRef.current = null;
+        }
+        setOpenTooltip(name);
+    }, []);
+
+    const closeTip = useCallback(() => {
+        closeTimeoutRef.current = setTimeout(() => {
+            setOpenTooltip(null);
+            closeTimeoutRef.current = null;
+        }, 150);
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (closeTimeoutRef.current) {
+                clearTimeout(closeTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    const handleCopy = useCallback((text: string) => {
+        if (!navigator.clipboard?.writeText) {
+            toast({ title: "Clipboard not available", variant: "destructive" });
+            return;
+        }
+        navigator.clipboard.writeText(text)
+            .then(() => toast({ title: "Copied to clipboard" }))
+            .catch(() => toast({ title: "Failed to copy", variant: "destructive" }));
+    }, [toast]);
 
     const type = getPathType(pathname);
     const showCreate = type && type !== "Settings" && type !== "UDF" && session?.user.role && session.user.role !== "Read-Only";
@@ -119,28 +156,119 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                     </Tooltip>
                 }
                 <div className="flex gap-1">
-                    <Tooltip>
+                    <Tooltip open={openTooltip === "single"}>
                         <TooltipTrigger asChild>
-                            <div className={cn("h-6 w-6 rounded-full bg-yellow-500 text-center", connectionType !== "Standalone" && "opacity-25")}>Si</div>
+                            <div
+                                className={cn("h-6 w-6 rounded-full bg-yellow-500 text-center", connectionType !== "Standalone" && "opacity-25")}
+                                onMouseEnter={() => openTip("single")}
+                                onMouseLeave={closeTip}
+                            >Si</div>
                         </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Single</p>
+                        <TooltipContent
+                            onMouseEnter={() => openTip("single")}
+                            onMouseLeave={closeTip}
+                            onPointerDownCapture={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex flex-col">
+                                <div className="flex gap-1">
+                                    <p>Single</p>
+                                    {
+                                        connectionType === "Standalone" && session?.user &&
+                                        <Button
+                                            title="Copy"
+                                            onClick={() => handleCopy(`${session?.user.host}:${session?.user.port}`)}
+                                        >
+                                            <Copy size={16} />
+                                        </Button>
+                                    }
+                                </div>
+                                {
+                                    connectionType === "Standalone" && session?.user &&
+                                    <p className="text-xs opacity-75">{session.user.host}:{session.user.port}</p>
+                                }
+                            </div>
                         </TooltipContent>
                     </Tooltip>
-                    <Tooltip>
+                    <Tooltip open={openTooltip === "sentinel"}>
                         <TooltipTrigger asChild>
-                            <div className={cn("h-6 w-6 rounded-full bg-green-500 text-center", connectionType !== "Sentinel" && "opacity-25")}>Se</div>
+                            <div
+                                className={cn("h-6 w-6 rounded-full bg-green-500 text-center", connectionType !== "Sentinel" && "opacity-25")}
+                                onMouseEnter={() => openTip("sentinel")}
+                                onMouseLeave={closeTip}
+                            >Se</div>
                         </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Sentinel</p>
+                        <TooltipContent
+                            onMouseEnter={() => openTip("sentinel")}
+                            onMouseLeave={closeTip}
+                            onPointerDownCapture={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex flex-col">
+                                <div className="flex gap-1">
+                                    <p>Sentinel</p>
+                                    {
+                                        connectionType === "Sentinel" && session?.user &&
+                                        <Button
+                                            title="Copy"
+                                            onClick={() => handleCopy(`${session?.user.host}:${session?.user.port}\n${connectionInfo.sentinelRole === "master" && connectionInfo.sentinelReplicas !== undefined ? `Role: Master (${connectionInfo.sentinelReplicas} replicas)` : ""}${connectionInfo.sentinelRole === "slave" && connectionInfo.sentinelMasterHost ? `\nRole: Replica (master: ${connectionInfo.sentinelMasterHost}:${connectionInfo.sentinelMasterPort})` : ""}`)}
+                                        >
+                                            <Copy size={16} />
+                                        </Button>
+                                    }
+                                </div>
+                                {
+                                    connectionType === "Sentinel" && session?.user &&
+                                    <div className="text-xs opacity-75">
+                                        <p>{session.user.host}:{session.user.port}</p>
+                                        {connectionInfo.sentinelRole === "master" && connectionInfo.sentinelReplicas !== undefined && <p>Role: Master ({connectionInfo.sentinelReplicas} replicas)</p>}
+                                        {connectionInfo.sentinelRole === "slave" && connectionInfo.sentinelMasterHost && <p>Role: Replica (master: {connectionInfo.sentinelMasterHost}:{connectionInfo.sentinelMasterPort})</p>}
+                                    </div>
+                                }
+                            </div>
                         </TooltipContent>
                     </Tooltip>
-                    <Tooltip>
+                    <Tooltip open={openTooltip === "cluster"}>
                         <TooltipTrigger asChild>
-                            <div className={cn("h-6 w-6 rounded-full bg-green-700 text-center", connectionType !== "Cluster" && "opacity-25")}>C</div>
+                            <div
+                                className={cn("h-6 w-6 rounded-full bg-green-700 text-center", connectionType !== "Cluster" && "opacity-25")}
+                                onMouseEnter={() => openTip("cluster")}
+                                onMouseLeave={closeTip}
+                            >C</div>
                         </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Cluster</p>
+                        <TooltipContent
+                            onMouseEnter={() => openTip("cluster")}
+                            onMouseLeave={closeTip}
+                            onPointerDownCapture={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex flex-col">
+                                <div className="flex gap-1">
+                                    <p>Cluster</p>
+                                    {
+                                        connectionType === "Cluster" && session?.user &&
+                                        <Button
+                                            title="Copy"
+                                            onClick={() => handleCopy(`${session?.user.host}:${session?.user.port}${connectionInfo.clusterNodes ? `\nNodes: ${connectionInfo.clusterNodes.length}\n${connectionInfo.clusterNodes.map((node) => `${node.host}:${node.port} (${node.role}${node.slots ? ` ${node.slots}` : ""})`).join("\n")}` : ""}`)}
+                                        >
+                                            <Copy size={16} />
+                                        </Button>
+                                    }
+                                </div>
+                                {
+                                    connectionType === "Cluster" && session?.user &&
+                                    <div className="text-xs opacity-75">
+                                        <p>{session.user.host}:{session.user.port}</p>
+                                        {connectionInfo.clusterNodes && (
+                                            <div className="mt-1">
+                                                <p>Nodes: {connectionInfo.clusterNodes.length}</p>
+                                                {connectionInfo.clusterNodes.map((node) => (
+                                                    <p key={`${node.host}:${node.port}`}>
+                                                        {node.host}:{node.port} ({node.role}{node.slots ? ` ${node.slots}` : ""})
+                                                    </p>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                }
+                            </div>
                         </TooltipContent>
                     </Tooltip>
                 </div>
@@ -202,7 +330,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                             onClick={() => onOpenPanel()}
                             data-testid="graphInfoToggle"
                         >
-                            <Database size={iconSize - 5} />
+                            <Network size={iconSize - 5} />
                         </Button>
                     }
                     {
@@ -244,6 +372,15 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                 </div>
             </div>
             <div className="w-full flex flex-col gap-2 items-center">
+                <Tooltip>
+                    <TooltipTrigger>
+                        <p>v{pkg.version}</p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>FalkorDB Browser Version</p>
+                    </TooltipContent>
+                </Tooltip>
+                {separator}
                 <Drawer direction="right">
                     <DropdownMenu>
                         <DropdownMenuTrigger onClick={(e) => e.preventDefault()} asChild>

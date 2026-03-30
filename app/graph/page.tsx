@@ -472,6 +472,7 @@ export default function Page() {
                     withHandle
                     onMouseUp={() => isCollapsed && handleSetSelectedElements()}
                     className={cn("ml-2", isCollapsed && "hidden")}
+                    disabled={isCollapsed}
                 />
                 <ResizablePanel
                     panelRef={panelRef}
