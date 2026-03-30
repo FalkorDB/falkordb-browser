@@ -398,7 +398,7 @@ export default function Chat({ onClose }: Props) {
                                     </ShadTooltip>
                                 ) : (
                                     <pre className="text-wrap whitespace-pre-wrap break-all">
-                                        {message.content} DEBUG_LONG_TEXT_DEBUG_LONG_TEXT_DEBUG_LONG_TEXT_DEBUG_LONG_TEXT_DEBUG_LONG_TEXT_DEBUG_LONG_TEXT_DEBUG_LONG_TEXT_DEBUG_LONG_TEXT_DEBUG_LONG_TEXT_DEBUG_LONG_TEXT
+                                        {message.content}
                                     </pre>
                                 )
                             }
