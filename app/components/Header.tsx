@@ -91,7 +91,19 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
         }, 150);
     }, []);
 
+    useEffect(() => {
+        return () => {
+            if (closeTimeoutRef.current) {
+                clearTimeout(closeTimeoutRef.current);
+            }
+        };
+    }, []);
+
     const handleCopy = useCallback((text: string) => {
+        if (!navigator.clipboard?.writeText) {
+            toast({ title: "Clipboard not available", variant: "destructive" });
+            return;
+        }
         navigator.clipboard.writeText(text)
             .then(() => toast({ title: "Copied to clipboard" }))
             .catch(() => toast({ title: "Failed to copy", variant: "destructive" }));

@@ -356,7 +356,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
         if (!historyQuery || !setHistoryQuery) return;
 
         const newQueries = historyQuery.queries.map(q =>
-            q.text === item.text ? { ...q, fav: !q.fav, name } : q
+            q.timestamp === item.timestamp ? { ...q, fav: !q.fav, name } : q
         );
 
         localStorage.setItem("query history", JSON.stringify(newQueries));
@@ -364,13 +364,13 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
         setHistoryQuery(prev => ({
             ...prev,
             queries: newQueries,
-            currentQuery: prev.currentQuery.text === item.text
+            currentQuery: prev.currentQuery.timestamp === item.timestamp
                 ? { ...prev.currentQuery, fav: !prev.currentQuery.fav, name }
                 : prev.currentQuery,
         }));
 
         setFilteredQueries(prev =>
-            prev.map(q => q.text === item.text ? { ...q, fav: !q.fav, name } : q)
+            prev.map(q => q.timestamp === item.timestamp ? { ...q, fav: !q.fav, name } : q)
         );
     }, [historyQuery, setHistoryQuery]);
 
@@ -584,7 +584,9 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                         setHistoryQuery(prev => ({
                                                             ...prev,
                                                             queries: newQueries,
-                                                            currentQuery: { ...prev.currentQuery, fav: false, name: undefined },
+                                                            currentQuery: prev.currentQuery.fav
+                                                                ? { ...prev.currentQuery, fav: false, name: undefined }
+                                                                : prev.currentQuery,
                                                         }));
                                                         setFilteredQueries(prev => prev.map(q => ({ ...q, fav: false, name: undefined })));
                                                     }}

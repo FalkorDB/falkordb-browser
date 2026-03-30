@@ -174,8 +174,7 @@
 }
 
 input:focus-visible {
-    outline: 2px solid hsl(var(--primary));
-    outline-offset: 2px;
+    outline: none;
 }
 
 input[type="color"]::-webkit-color-swatch-wrapper {

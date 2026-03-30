@@ -183,7 +183,7 @@ function GraphView({
                             />
                             {
                                 (labels.length !== 0 || relationships.length !== 0) &&
-                                <div className={cn("w-fit h-1 grow grid gap-2", labels.length !== 0 && relationships.length !== 0 ? "grid-rows-[minmax(0,max-content)_max-content_minmax(0,max-content)]" : "grid-rows-[minmax(0,max-content)]")}>
+                                <div className={cn("w-fit max-w-[200px] h-1 grow grid gap-2", labels.length !== 0 && relationships.length !== 0 ? "grid-rows-[minmax(0,max-content)_max-content_minmax(0,max-content)]" : "grid-rows-[minmax(0,max-content)]")}>
                                     {labels.length !== 0 && <Labels labels={labels} onClick={onLabelClick} label="Labels" type="Graph" />}
                                     {labels.length !== 0 && relationships.length > 0 && <div className="h-px bg-border rounded-full" />}
                                     {relationships.length !== 0 && <Labels labels={relationships} onClick={onRelationshipClick} label="Relationships" type="Graph" />}

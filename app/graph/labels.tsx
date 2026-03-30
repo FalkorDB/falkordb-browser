@@ -14,7 +14,7 @@ export default function Labels<T extends Label | Relationship>({ labels, onClick
     const listRef = useRef<HTMLUListElement>(null);
 
     return (
-        <div className={cn("flex flex-col gap-2 max-w-1/2 bg-background rounded-lg p-1 overflow-hidden")}>
+        <div className={cn("flex flex-col gap-2 bg-background rounded-lg p-1 overflow-hidden")}>
             {
                 label &&
                 <h1>{label}</h1>

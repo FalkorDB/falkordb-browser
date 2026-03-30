@@ -7,7 +7,8 @@ export async function OPTIONS(request: Request) {
 }
 
 function parseInfoField(info: string, field: string): string | undefined {
-  const match = info.match(new RegExp(`${field}:(.+?)\\r?\\n`));
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = info.match(new RegExp(`${escaped}:(.+?)\\r?\\n`));
   return match?.[1]?.trim();
 }
 
@@ -43,10 +44,17 @@ export async function GET(request: Request) {
           const [ip, portStr] = address.split(":");
           const host = hostname || ip;
           const flags = parts[2] ?? "";
-          const nodeRole = flags.includes("master") ? "master" : "slave";
+          const flagList = flags.split(",");
+          // Skip nodes with non-standard flags (e.g., fail, handshake, noaddr)
+          const isMaster = flagList.includes("master") || flagList.includes("myself,master");
+          const isSlave = flagList.includes("slave") || flagList.includes("myself,slave");
+          if (!isMaster && !isSlave) return null;
+          const nodeRole = isMaster ? "master" : "slave";
+          const port = Number(portStr);
+          if (!Number.isFinite(port) || port <= 0) return null;
           const slots = nodeRole === "master" ? parts.slice(8).join(" ") : undefined;
-          return { host, port: Number(portStr), role: nodeRole, slots };
-        });
+          return { host, port, role: nodeRole, slots };
+        }).filter(Boolean);
       } catch (err) {
         console.error("Failed to get cluster details:", err);
       }
@@ -56,7 +64,8 @@ export async function GET(request: Request) {
     } else if (role === "slave") {
       result.sentinelRole = "slave";
       result.sentinelMasterHost = parseInfoField(replicationInfo, "master_host");
-      result.sentinelMasterPort = Number(parseInfoField(replicationInfo, "master_port") ?? "0");
+      const parsedPort = Number(parseInfoField(replicationInfo, "master_port") ?? "0");
+      result.sentinelMasterPort = Number.isFinite(parsedPort) ? parsedPort : 0;
     }
 
     return NextResponse.json({ result }, { status: 200, headers: getCorsHeaders(request) });
