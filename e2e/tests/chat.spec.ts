@@ -483,9 +483,11 @@ test.describe("Chat Feature Tests", () => {
     // state. Without this, every waitForUserMessageCount() call would time out
     // (30 s) because chatUserMessage elements never appear in the DOM.
     const models = await settings.getAvailableModels();
-    if (models.length > 0) {
-      await settings.selectModel(models[0]);
+    if (models.length === 0) {
+      test.skip();
+      return;
     }
+    await settings.selectModel(models[0]);
 
     await settings.fillChatApiKey(testApiKey);
     await settings.clickSaveSettingsButton();
