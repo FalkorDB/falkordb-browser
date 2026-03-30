@@ -207,9 +207,14 @@ export const updateGraphConfig = z.object({
 });
 
 // Chat schemas
+const chatMessage = z.object({
+  role: z.string().min(1),
+  content: z.string(),
+});
+
 export const chatRequest = z.object({
   messages: z
-    .array(z.any(), {
+    .array(chatMessage, {
       error: (issue) => issue.input === undefined ? "Messages are required" : "Invalid Messages",
     })
     .min(1, "Messages are required"),

@@ -539,13 +539,13 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setConnectionType("Standalone");
       return;
     }
-    
+
     (async () => {
       try {
         const result = await securedFetch("/api/info", {
           method: "GET",
         }, toast, setIndicator);
-        
+
         if (!result.ok) return;
 
         const json = await result.json();
@@ -596,6 +596,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         const raw: Query[] = JSON.parse(localStorage.getItem("query history") || "[]");
         // Migrate old queries that don't have the fav property
         const queries = raw.map(q => ({ ...q, fav: q.fav ?? false }));
+        // Persist migrated data so legacy objects are normalized in storage
+        localStorage.setItem("query history", JSON.stringify(queries));
         setHistoryQuery({ ...defaultQueryHistory, queries });
       } catch (error) {
         setHistoryQuery({ ...defaultQueryHistory, queries: [] });
@@ -922,7 +924,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                                       />
                                   }
                                 </ResizablePanel>
-                                <ResizableHandle withHandle onMouseUp={() => isCollapsed && onExpand()} className={cn("bg-border", isCollapsed && "hidden")} />
+                                <ResizableHandle
+                                  withHandle
+                                  onMouseUp={() => isCollapsed && onExpand()}
+                                  className={cn("bg-border", isCollapsed && "hidden")}
+                                  disabled={isCollapsed}
+                                />
                                 <ResizablePanel
                                   defaultSize="100%"
                                   minSize="70%"

@@ -1,7 +1,7 @@
 /* eslint-disable no-case-declarations */
 /* eslint-disable react/no-array-index-key */
 import { cn, getTheme, Message } from "@/lib/utils";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState, useCallback } from "react";
 import { useTheme } from "next-themes";
 import Image from "next/image";
 import { ChevronDown, ChevronRight, Share2, Copy, Loader2, Play, Search, X, Send, MessagesSquare } from "lucide-react";
@@ -39,8 +39,8 @@ interface Props {
 }
 
 export default function Chat({ onClose }: Props) {
-    const { theme } = useTheme();
-    const { currentTheme } = getTheme(theme);
+    const { resolvedTheme } = useTheme();
+    const { currentTheme } = getTheme(resolvedTheme);
     const { setIndicator } = useContext(IndicatorContext);
     const { graphName, runQuery } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
@@ -51,12 +51,60 @@ export default function Chat({ onClose }: Props) {
     const { toast } = useToast();
     const route = useRouter();
 
+    const [mounted, setMounted] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
     const [messagesList, setMessagesList] = useState<(Message | [Message[], boolean])[]>([]);
     const [newMessage, setNewMessage] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [queryCollapse, setQueryCollapse] = useState<{ [key: string]: boolean }>({});
     const [collapseEligible, setCollapseEligible] = useState<{ [key: number]: boolean }>({});
+    const textRefs = useRef<Map<number, HTMLElement>>(new Map());
+    const observerRef = useRef<ResizeObserver | null>(null);
+    const queryCollapseRef = useRef(queryCollapse);
+    queryCollapseRef.current = queryCollapse;
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    // Create a single ResizeObserver that recomputes collapse eligibility on resize
+    useEffect(() => {
+        observerRef.current = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const el = entry.target as HTMLElement;
+                textRefs.current.forEach((ref, i) => {
+                    if (ref !== el) return;
+                    const shouldCollapse = el.scrollHeight > 64;
+                    // Only upgrade to eligible, never downgrade — collapsed items have small height
+                    if (!shouldCollapse) return;
+                    setCollapseEligible(prev => {
+                        if (prev[i]) return prev;
+                        return { ...prev, [i]: true };
+                    });
+                });
+            }
+        });
+
+        return () => observerRef.current?.disconnect();
+    }, []);
+
+    const setTextRef = useCallback((i: number) => (r: HTMLElement | null) => {
+        if (r) {
+            textRefs.current.set(i, r);
+            // Measure on mount — only set eligible if content is tall enough
+            if (r.scrollHeight > 64) {
+                setCollapseEligible(prev => {
+                    if (prev[i]) return prev;
+                    return { ...prev, [i]: true };
+                });
+            }
+            observerRef.current?.observe(r);
+        } else {
+            const prev = textRefs.current.get(i);
+            if (prev) observerRef.current?.unobserve(prev);
+            textRefs.current.delete(i);
+        }
+    }, []);
 
     // Load messages and cypher only preference for current graph on mount
     useEffect(() => {
@@ -325,14 +373,7 @@ export default function Chat({ onClose }: Props) {
                 const i = messages.findIndex(m => m === message);
 
                 return (
-                    <div ref={r => {
-                        if (!r) return;
-                        const shouldCollapse = r.scrollHeight > 64;
-                        setCollapseEligible(prev => {
-                            if (prev[i] === shouldCollapse) return prev;
-                            return { ...prev, [i]: shouldCollapse };
-                        });
-                    }} className="flex gap-2 items-start">
+                    <div className="flex gap-2 items-start">
                         {
                             collapseEligible[i] &&
                             <Button
@@ -344,7 +385,7 @@ export default function Chat({ onClose }: Props) {
                                 {queryCollapse[i] ? <ChevronRight size={25} /> : <ChevronDown size={25} />}
                             </Button>
                         }
-                        <div className="overflow-hidden SofiaSans">
+                        <div ref={setTextRef(i)} className="overflow-hidden SofiaSans">
                             {
                                 queryCollapse[i] ? (
                                     <ShadTooltip>
@@ -460,8 +501,8 @@ export default function Chat({ onClose }: Props) {
                                 ? <div className="h-8 w-8 rounded-full flex items-center justify-center bg-primary">
                                     <p className="text-foreground text-sm truncate text-center">{message.role.charAt(0).toUpperCase()}</p>
                                 </div>
-                                : <div className="h-8 w-8">
-                                    <Image className="rounded-full" src={`/icons/F-${currentTheme}.svg`} style={{ height: "100%", width: "100%" }} alt="Assistant" width={0} height={0} />
+                                : <div className="h-8 w-8 relative">
+                                    {mounted && currentTheme && <Image className="rounded-full" src={`/icons/F-${currentTheme}.svg`} alt="Assistant" fill />}
                                 </div>;
                             return (
                                 <li

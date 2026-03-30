@@ -102,13 +102,13 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                     const labelColor = label.style.color;
 
                                     return (
-                                        <li key={`${name}-${labelColor}`} className="max-w-full flex gap-1">
+                                        <li key={`${name}-${labelColor}`} className="max-w-full flex gap-1 overflow-x-hidden">
                                             <Button
                                                 style={{
                                                     backgroundColor: labelColor,
                                                     color: getContrastTextColor(labelColor)
                                                 }}
-                                                className="h-6 w-full p-2 rounded-full flex justify-center items-center SofiaSans hover:opacity-80 transition-opacity"
+                                                className="w-fit max-w-[calc(100%-24px)] h-6 p-2 rounded-full flex justify-center items-center SofiaSans hover:opacity-80 transition-opacity"
                                                 data-testid={`graphInfo${name}Node`}
                                                 title={`MATCH (n:${name}) RETURN n
                                                     #: ${label.count.toLocaleString()}`}
@@ -222,7 +222,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                         <li key={key} className="max-w-full">
                                             <Button
                                                 title={`MATCH (e) WHERE e.${key} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`}
-                                                className="h-6 w-full p-2 bg-secondary flex justify-center items-center rounded text-foreground SofiaSans hover:bg-opacity-40 transition-opacity"
+                                                className="h-6 w-full p-2 bg-secondary flex justify-center items-center rounded text-foreground SofiaSans hover:opacity-80 transition-opacity"
                                                 label={key}
                                                 onClick={() => runQuery(
                                                     `MATCH (e) WHERE e.${key} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`
