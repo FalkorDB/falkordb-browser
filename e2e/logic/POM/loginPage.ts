@@ -317,7 +317,7 @@ export default class LoginPage extends HeaderComponent {
 
   async getErrorText(): Promise<string> {
     const errorEl = this.page.locator(".text-destructive").first();
-    return errorEl.textContent() ?? "";
+    return await errorEl.textContent() ?? "";
   }
 
   async clickEndpointMode(): Promise<void> {
