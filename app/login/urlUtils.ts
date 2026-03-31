@@ -49,25 +49,26 @@ export function parseUrlString(url: string): ParsedUrl {
     rest = rest.slice(protoMatch[0].length);
   }
 
-  // 2. Split on last @ for credentials vs host+port (password may contain @)
+  // 2. Split on first @ for credentials vs host+port
+  // Passwords containing @ must be percent-encoded as %40 in the URL
   let credStr = "";
   let hostPortStr = rest;
-  const atIndex = rest.lastIndexOf("@");
+  const atIndex = rest.indexOf("@");
   if (atIndex >= 0) {
     credStr = rest.slice(0, atIndex);
     hostPortStr = rest.slice(atIndex + 1);
   }
 
-  // 3. Parse credentials: username[:password]
+  // 3. Parse credentials: username[:password] and decode percent-encoded values
   let username = "";
   let password = "";
   if (atIndex >= 0) {
     const colonIndex = credStr.indexOf(":");
     if (colonIndex >= 0) {
-      username = credStr.slice(0, colonIndex);
-      password = credStr.slice(colonIndex + 1);
+      username = decodeURIComponent(credStr.slice(0, colonIndex));
+      password = decodeURIComponent(credStr.slice(colonIndex + 1));
     } else {
-      username = credStr;
+      username = decodeURIComponent(credStr);
     }
   }
 
@@ -112,14 +113,14 @@ export function validateUrl(url: string): UrlValidation {
   if (hasAt) {
     const protoMatch = trimmed.match(PROTOCOL_REGEX);
     const afterProto = protoMatch ? trimmed.slice(protoMatch[0].length) : trimmed;
-    const credsPart = afterProto.slice(0, afterProto.lastIndexOf("@"));
+    const credsPart = afterProto.slice(0, afterProto.indexOf("@"));
     hasCredColon = credsPart.includes(":");
   }
 
   // Detect : in host+port part 
   let hasPortColon = false;
   if (hasAt) {
-    const afterAt = trimmed.slice(trimmed.lastIndexOf("@") + 1);
+    const afterAt = trimmed.slice(trimmed.indexOf("@") + 1);
     hasPortColon = afterAt.includes(":");
   } else {
     const protoMatch = trimmed.match(PROTOCOL_REGEX);
@@ -210,8 +211,7 @@ export function validateUrl(url: string): UrlValidation {
 
 /** Regex-based URL match for parsing into state (strict match only) */
 export function matchUrl(url: string) {
-  // Password may contain @ so we use (.*) (greedy) to match up to the last @
-  // Host disallows @ to anchor the split correctly
-  const urlPattern = /^(?:(falkor|falkors|redis|rediss):\/\/)?(?:([^:@]*)(?::(.*))?@)?([^@:/\s]*)(?::(\d+))?$/;
+  // Passwords containing @ must be percent-encoded as %40
+  const urlPattern = /^(?:(falkor|falkors|redis|rediss):\/\/)?(?:([^:@]*)(?::([^@]*))?@)?([^:/\s]*)(?::(\d+))?$/;
   return url.match(urlPattern);
 }

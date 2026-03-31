@@ -50,7 +50,7 @@ export default function LoginForm() {
     const h = host || DEFAULT_HOST;
     const protocol = TLS ? "falkors" : "falkor";
     const creds = username || password
-      ? `${username || ""}${password ? `:${password}` : ""}@`
+      ? `${encodeURIComponent(username || "")}${password ? `:${encodeURIComponent(password)}` : ""}@`
       : "";
     return `${protocol}://${creds}${h}${port ? `:${port}` : ""}`;
   };
@@ -63,8 +63,8 @@ export default function LoginForm() {
       const [, protocol, u, p, h, pt] = match || [];
       setHost(h || "");
       setPort(pt || "");
-      setUsername(u || "");
-      setPassword(p || "");
+      setUsername(u ? decodeURIComponent(u) : "");
+      setPassword(p ? decodeURIComponent(p) : "");
       setTLS(protocol === "falkors" || protocol === "rediss");
     } else {
       // Regex didn't match — use manual parser for best-effort

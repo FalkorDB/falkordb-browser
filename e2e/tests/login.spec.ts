@@ -63,7 +63,7 @@ test.describe(`Login tests`, () => {
         const login = await browser.createNewPage(LoginPage, urls.loginUrl);
         await login.Logout();
         await browser.setPageToFullScreen();
-        await login.connectWithUrl(`falkor://readonlyuser:${user.password}@localhost:6379`);
+        await login.connectWithUrl(`falkor://readonlyuser:${encodeURIComponent(user.password)}@localhost:6379`);
         await login.waitForSuccessfulLogin(urls.graphUrl);
         expect(login.getCurrentURL()).toBe(urls.graphUrl);
     });
