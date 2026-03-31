@@ -12,6 +12,7 @@ import { getTheme } from "@/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import FormComponent, { Field } from "../components/FormComponent";
 import Dropzone from "../components/ui/Dropzone";
+import { parseUrlString, validateUrl, matchUrl } from "./urlUtils";
 
 const DEFAULT_HOST = "localhost";
 const DEFAULT_PORT = "6379";
@@ -25,98 +26,135 @@ export default function LoginForm() {
 
   const [mounted, setMounted] = useState(false);
   const [loginMode, setLoginMode] = useState<LoginMode>("manual");
-  const [falkordbUrl, setFalkordbUrl] = useState("");
-  const [endpoint, setEndpoint] = useState("");
-  const [endpointUsername, setEndpointUsername] = useState("");
-  const [endpointPassword, setEndpointPassword] = useState("");
+  const [rawUrl, setRawUrl] = useState("");
   const [host, setHost] = useState("");
   const [port, setPort] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [TLS, setTLS] = useState(false);
   const [CA, setCA] = useState<string>();
   const [uploadedFileName, setUploadedFileName] = useState<string>("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState<{
-    message: string
+    message: React.ReactNode
     show: boolean
   }>({
-    message: "Invalid credentials",
+    message: "",
     show: false
   });
 
   const searchParams = useSearchParams();
-  const endpointFields: Field[] = [
-    {
-      value: endpoint,
-      onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
-        setEndpoint(e.target.value);
-        setError(prev => ({
-          ...prev,
-          show: false
-        }));
-        return true;
-      },
-      label: "Endpoint",
-      type: "text",
-      placeholder: `${DEFAULT_HOST}:${DEFAULT_PORT}`,
-      required: true
-    },
-    {
-      value: endpointUsername,
-      onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
-        setEndpointUsername(e.target.value);
-        setError(prev => ({
-          ...prev,
-          show: false
-        }));
-        return true;
-      },
-      label: "Username",
-      placeholder: "Default",
-      type: "text",
-      required: false
-    },
-    {
-      value: endpointPassword,
-      onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
-        setEndpointPassword(e.target.value);
-        setError(prev => ({
-          ...prev,
-          show: false
-        }));
-        return true;
-      },
-      label: "Password",
-      placeholder: "Default",
-      type: "password",
-      required: false
+
+  // Build a display URL from the shared state
+  const buildUrl = () => {
+    if (!host && !port && !username && !password) return "";
+    const h = host || DEFAULT_HOST;
+    const protocol = TLS ? "falkors" : "falkor";
+    const creds = username || password
+      ? `${username || ""}${password ? `:${password}` : ""}@`
+      : "";
+    return `${protocol}://${creds}${h}${port ? `:${port}` : ""}`;
+  };
+
+  // Parse a URL string and update shared state
+  const parseUrl = (url: string) => {
+    const match = matchUrl(url);
+
+    if (match || !url) {
+      const [, protocol, u, p, h, pt] = match || [];
+      setHost(h || "");
+      setPort(pt || "");
+      setUsername(u || "");
+      setPassword(p || "");
+      setTLS(protocol === "falkors" || protocol === "rediss");
+    } else {
+      // Regex didn't match — use manual parser for best-effort
+      const parsed = parseUrlString(url);
+      setHost(parsed.host);
+      setPort(parsed.port);
+      setUsername(parsed.username);
+      setPassword(parsed.password);
+      setTLS(parsed.tls);
     }
-  ];
+  };
+
+  // Build endpoint display from shared state
+  const endpointValue = `${host}${port ? `:${port}` : ""}`;
+
+  // Parse endpoint string into host and port
+  const parseEndpoint = (value: string) => {
+    const colonIndex = value.lastIndexOf(":");
+    if (colonIndex > 0) {
+      setHost(value.substring(0, colonIndex));
+      setPort(value.substring(colonIndex + 1));
+    } else {
+      setHost(value);
+      setPort("");
+    }
+  };
+
+  const clearError = () => setError(prev => ({ message: "", show: false }));
+
+  const userInputFields: Field[] = [{
+    value: username,
+    onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
+      setUsername(e.target.value);
+      clearError();
+      return true;
+    },
+    label: "Username",
+    placeholder: "Default",
+    info: "You can skip entering your username when deploying a FalkorDB instance \n from localhost with default credentials.",
+    type: "text",
+    required: false
+  },
+  {
+    value: password,
+    onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
+      setPassword(e.target.value);
+      clearError();
+      return true;
+    },
+    label: "Password",
+    placeholder: "Default",
+    info: "You can skip entering your password when deploying a FalkorDB instance \n from localhost with default credentials.",
+    type: "password",
+    required: false
+  }]
 
   const fields: Field[] = loginMode === "url" ?
     [{
-      value: falkordbUrl,
+      value: rawUrl,
       onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
-        setFalkordbUrl(e.target.value);
-        setError(prev => ({
-          ...prev,
-          show: false
-        }));
+        const val = e.target.value;
+        setRawUrl(val);
+        parseUrl(val);
+        clearError();
         return true;
       },
       label: "FalkorDB URL",
       type: "text",
       placeholder: `falkor://Default:Default@${DEFAULT_HOST}:${DEFAULT_PORT}`,
       required: true
-    }] : loginMode === "endpoint" ? endpointFields : [
+    }] : loginMode === "endpoint" ? [
+      {
+        value: endpointValue,
+        onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
+          parseEndpoint(e.target.value);
+          clearError();
+          return true;
+        },
+        label: "Endpoint",
+        type: "text",
+        placeholder: `${DEFAULT_HOST}:${DEFAULT_PORT}`,
+        required: true
+      },
+      ...userInputFields
+    ] : [
       {
         value: host,
         onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
           setHost(e.target.value);
-          setError(prev => ({
-            ...prev,
-            show: false
-          }));
+          clearError();
           return true;
         },
         label: "Host",
@@ -128,10 +166,7 @@ export default function LoginForm() {
         value: port,
         onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
           setPort(e.target.value);
-          setError(prev => ({
-            ...prev,
-            show: false
-          }));
+          clearError();
           return true;
         },
         label: "Port",
@@ -139,38 +174,7 @@ export default function LoginForm() {
         placeholder: DEFAULT_PORT,
         required: true
       },
-      {
-        value: username,
-        onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
-          setUsername(e.target.value);
-          setError(prev => ({
-            ...prev,
-            show: false
-          }));
-          return true;
-        },
-        label: "Username",
-        placeholder: "Default",
-        info: "You can skip entering your username when deploying a FalkorDB instance \n from localhost with default credentials.",
-        type: "text",
-        required: false
-      },
-      {
-        value: password,
-        onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
-          setPassword(e.target.value);
-          setError(prev => ({
-            ...prev,
-            show: false
-          }));
-          return true;
-        },
-        label: "Password",
-        placeholder: "Default",
-        info: "You can skip entering your password when deploying a FalkorDB instance \n from localhost with default credentials.",
-        type: "password",
-        required: false
-      }
+      ...userInputFields
     ];
 
   useEffect(() => {
@@ -192,63 +196,73 @@ export default function LoginForm() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    const params: SignInOptions = {
-      redirect: false,
-    };
+    // Pre-submit validation for URL mode — show colored format errors
+    if (loginMode === "url" && rawUrl.trim()) {
+      const result = validateUrl(rawUrl);
+      const { parts } = result;
 
-    // Handle URL mode
-    if (loginMode === "url") {
-      const trimmedUrl = falkordbUrl.trim();
+      if (!result.valid) {
+        const good = (text: string) => <span className="text-green-500 font-semibold">{text}</span>;
+        const render = (text: string, status: "good" | "warn" | "neutral") => {
+          if (status === "good") return good(text);
+          return text;
+        };
 
-      // Validate URL format: falkor[s]://[[username][:password]@][host][:port][/db-number]
-      // Also supports redis:// and rediss:// protocols
-      const urlPattern = /^(falkor|falkors|redis|rediss):\/\/(?:([^:@]+)(?::([^@]+))?@)?([^:/\s]+)(?::(\d+))?(?:\/(\d+))?$/;
-      if (trimmedUrl && !urlPattern.test(trimmedUrl)) {
+        // Protocol: [prefix[s]://]
+        const protocolNode = render("[prefix[s]://]", parts.protocol);
+
+        // Credentials block: [username[:password]@]
+        let credsNode: React.ReactNode;
+        if (parts.at === "good") {
+          // @ is present — show each sub-part colored, brackets are green since @ is good
+          const userNode = render("[username]", parts.username);
+          const passNode = render("[:password]", parts.password);
+          const atNode = good("@");
+          credsNode = <>{good("[")}{userNode}{passNode}{atNode}{good("]")}</>;
+        } else {
+          credsNode = "[username[:password]@]";
+        }
+
+        // Host
+        const hostNode = render("host", parts.host);
+
+        // Port
+        const portNode = render("[:port]", parts.port);
+
         setError({
-          message: "Invalid URL format. Expected: falkor[s]://[[username][:password]@][host][:port][/db-number] (also supports redis[s]://)",
+          message: (
+            <span className="text-xs text-destructive">
+              Invalid URL format. Expected: {protocolNode}{credsNode}{hostNode}{portNode}
+            </span>
+          ),
           show: true
         });
         return;
       }
-      // Pass URL directly to the client
-      params.url = trimmedUrl;
-    } else if (loginMode === "endpoint") {
-      // Parse endpoint (host:port) into manual format
-      const trimmed = endpoint.trim();
-      const colonIndex = trimmed.lastIndexOf(":");
-      if (colonIndex > 0) {
-        params.host = trimmed.substring(0, colonIndex);
-        params.port = trimmed.substring(colonIndex + 1);
-      } else {
-        params.host = trimmed;
-        params.port = DEFAULT_PORT;
-      }
-      if (endpointUsername) {
-        params.username = endpointUsername;
-      }
-      if (endpointPassword) {
-        params.password = endpointPassword;
-      }
-    } else {
-      // Manual mode
-      params.host = host.trim();
-      params.port = port.trim();
-      params.tls = TLS;
-      params.ca = CA;
-      if (username) {
-        params.username = username;
-      }
-      if (password) {
-        params.password = password;
-      }
+    }
+
+    const params: SignInOptions = {
+      redirect: false,
+    };
+
+    // All modes use the shared state — always submit in manual format
+    params.host = host.trim() || DEFAULT_HOST;
+    params.port = port.trim() || DEFAULT_PORT;
+    params.tls = TLS;
+    params.ca = CA;
+    if (username) {
+      params.username = username;
+    }
+    if (password) {
+      params.password = password;
     }
 
     signIn("credentials", params).then((res?: SignInResponse) => {
       if (res?.error) {
-        setError(prev => ({
-          ...prev,
+        setError({
+          message: "Invalid credentials",
           show: true
-        }));
+        });
       } else {
         router.push("/graph");
       }
@@ -284,7 +298,11 @@ export default function LoginForm() {
           <RadioGroup
             value={loginMode}
             onValueChange={(value) => {
-              setLoginMode(value as LoginMode);
+              const mode = value as LoginMode;
+              setLoginMode(mode);
+              if (mode === "url") {
+                setRawUrl(buildUrl());
+              }
               setError({ message: "Invalid credentials", show: false });
             }}
             className="flex items-center justify-center gap-8 p-4 border border-primary rounded-lg w-full"
@@ -314,7 +332,7 @@ export default function LoginForm() {
             submitButtonLabel="Log in"
           >
             {
-              loginMode === "manual" &&
+              loginMode !== "url" &&
               <div className="flex flex-col gap-4">
                 <div className="flex gap-2 items-center">
                   <Checkbox

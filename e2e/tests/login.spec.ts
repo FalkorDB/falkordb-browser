@@ -85,22 +85,41 @@ test.describe(`Login tests`, () => {
         expect(await login.isManualModeSelected()).toBe(true);
     });
 
-    const invalidUrls = [
-        { description: 'invalid protocol', url: 'invalid://localhost:6379' },
-        { description: 'invalid host', url: 'falkor://invalidhost:6379' },
-        { description: 'invalid port', url: 'falkor://localhost:6378' },
-        { description: 'invalid credentials', url: 'falkor://wronguser:wrongpass@localhost:6379' },
+    // URL format validation tests (pre-submit, no network request)
+    const formatErrors = [
+        { description: 'missing @ with credentials', url: 'redis://falkordb:password.cloud:52649' },
+        { description: 'empty credentials with @', url: 'redis://@localhost:6379' },
+        { description: 'colon before @ but no password', url: 'redis://user:@localhost:6379' },
+        { description: 'colon after host but no port', url: 'redis://user:pass@localhost:' },
     ];
 
-    invalidUrls.forEach(({ description, url }) => {
-        test(`@admin validate user login with invalid URL: ${description}`, async () => {
+    formatErrors.forEach(({ description, url }) => {
+        test(`@admin validate URL format error blocks submit: ${description}`, async () => {
             const login = await browser.createNewPage(LoginPage, urls.loginUrl);
             if (login.getCurrentURL() === urls.graphUrl) await login.Logout();
             await browser.setPageToFullScreen();
-            await login.connectWithUrl(url);
-            // Wait for page to process the invalid login attempt
-            await login.waitForPageIdle();
+            await login.submitUrlWithoutWait(url);
+            expect(await login.isFormatErrorVisible()).toBe(true);
+            // Should NOT navigate — blocked before request
             expect(login.getCurrentURL()).not.toBe(urls.graphUrl);
         });
+    });
+
+    test(`@admin validate valid URL format does not show format error`, async () => {
+        const login = await browser.createNewPage(LoginPage, urls.loginUrl);
+        if (login.getCurrentURL() === urls.graphUrl) await login.Logout();
+        await browser.setPageToFullScreen();
+        await login.submitUrlWithoutWait('falkor://wronguser:wrongpass@localhost:6379');
+        // Format is valid, so format error should NOT appear (credentials error may appear instead)
+        expect(await login.isFormatErrorVisible()).toBe(false);
+    });
+
+    test(`@admin validate endpoint mode login`, async () => {
+        const login = await browser.createNewPage(LoginPage, urls.loginUrl);
+        if (login.getCurrentURL() === urls.graphUrl) await login.Logout();
+        await browser.setPageToFullScreen();
+        await login.connectWithEndpoint('localhost:6379');
+        await login.waitForSuccessfulLogin(urls.graphUrl);
+        expect(login.getCurrentURL()).toBe(urls.graphUrl);
     });
 });

@@ -50,7 +50,7 @@ interface Props {
     handleSubmit: (e: React.FormEvent<HTMLFormElement>) => Promise<void>
     fields: Field[]
     error?: {
-        message: string
+        message: React.ReactNode
         show: boolean
     }
     children?: React.ReactNode
@@ -175,7 +175,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
             }
             {children}
             <div className="min-h-5">
-                {error?.show && <p className="text-sm text-destructive">{error.message}</p>}
+                {error?.show && (typeof error.message === "string" ? <p className="text-sm text-destructive">{error.message}</p> : error?.message)}
             </div>
             <div className="flex justify-end gap-2">
                 <Button
