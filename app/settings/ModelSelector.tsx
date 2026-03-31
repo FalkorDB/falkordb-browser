@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { formatModelDisplayName } from "@/lib/ai-provider-utils";
-import { Search, Check, Sparkles, Zap, Brain, Globe, Server, Cpu, MessageSquare, ChevronRight } from "lucide-react";
+import { Search, Check, Sparkles, Zap, Brain, Globe, Server, Cpu, MessageSquare, ChevronRight, Rocket } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Input from "../components/ui/Input";
 
@@ -21,6 +21,7 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
     ollama: "Ollama",
     groq: "Groq",
     cohere: "Cohere",
+    xai: "xAI",
 };
 
 // Get icon for provider category
@@ -39,6 +40,8 @@ const getCategoryIcon = (category: string) => {
             return <Cpu className={className} />;
         case "Cohere":
             return <MessageSquare className={className} />;
+        case "xAI":
+            return <Rocket className={className} />;
         default:
             return <Sparkles className={className} />;
     }
@@ -84,6 +87,8 @@ const categorizeModels = (models: string[]) => {
                 categoryName = "Groq";
             } else if (model.includes("command") || model.includes("cohere")) {
                 categoryName = "Cohere";
+            } else if (model.includes("grok")) {
+                categoryName = "xAI";
             } else {
                 categoryName = "Other";
             }

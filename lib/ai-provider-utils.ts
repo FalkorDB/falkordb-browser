@@ -2,7 +2,7 @@
  * Utility functions for AI provider detection and model management
  */
 
-export type AIProvider = "openai" | "anthropic" | "gemini" | "ollama" | "groq" | "cohere" | "unknown";
+export type AIProvider = "openai" | "anthropic" | "gemini" | "ollama" | "groq" | "cohere" | "xai" | "unknown";
 
 /**
  * Detects the AI provider based on the API key format
@@ -44,6 +44,11 @@ export function detectProviderFromApiKey(apiKey: string | undefined): AIProvider
         return "groq";
     }
 
+    // xAI: starts with "xai-"
+    if (trimmedKey.startsWith("xai-")) {
+        return "xai";
+    }
+
     // Cohere: typically a long alphanumeric string starting with specific patterns
     // No reliable prefix detection for Cohere, handled by model selection
 
@@ -70,6 +75,8 @@ export function getProviderDisplayName(provider: AIProvider): string {
             return "Groq";
         case "cohere":
             return "Cohere";
+        case "xai":
+            return "xAI";
         default:
             return "Unknown";
     }
@@ -120,6 +127,11 @@ export function getProviderApiKeyInfo(provider: AIProvider): {
                 url: "https://dashboard.cohere.com/api-keys",
                 description: "Get your Cohere API key from the Cohere Dashboard",
             };
+        case "xai":
+            return {
+                url: "https://console.x.ai/",
+                description: "Get your xAI API key from the xAI Console",
+            };
         default:
             return null;
     }
@@ -140,7 +152,7 @@ export function detectProviderFromModel(model: string): AIProvider {
     const doubleSeparatorIndex = model.indexOf("::");
     if (doubleSeparatorIndex !== -1) {
         const prefix = model.substring(0, doubleSeparatorIndex);
-        const knownProviders: AIProvider[] = ["openai", "anthropic", "gemini", "ollama", "groq", "cohere"];
+        const knownProviders: AIProvider[] = ["openai", "anthropic", "gemini", "ollama", "groq", "cohere", "xai"];
         const matched = knownProviders.find(p => p === prefix);
         if (matched) return matched;
     }
@@ -149,7 +161,7 @@ export function detectProviderFromModel(model: string): AIProvider {
     const singleSeparatorIndex = model.indexOf(":");
     if (singleSeparatorIndex !== -1) {
         const prefix = model.substring(0, singleSeparatorIndex);
-        const knownProviders: AIProvider[] = ["openai", "anthropic", "gemini", "ollama", "groq", "cohere"];
+        const knownProviders: AIProvider[] = ["openai", "anthropic", "gemini", "ollama", "groq", "cohere", "xai"];
         const matched = knownProviders.find(p => p === prefix);
         if (matched) return matched;
     }
@@ -161,6 +173,7 @@ export function detectProviderFromModel(model: string): AIProvider {
     if (model.includes("llama") || model.includes("mixtral") || model.includes("phi") || model.includes("deepseek")) return "ollama";
     if (model.includes("groq")) return "groq";
     if (model.includes("command") || model.includes("cohere")) return "cohere";
+    if (model.includes("grok")) return "xai";
 
     return "unknown";
 }
@@ -185,7 +198,7 @@ export function formatModelDisplayName(modelValue: string): string {
         withoutPrefix = modelValue.substring(doubleSepIndex + 2);
     } else {
         // Remove legacy single-colon provider prefix (e.g., "anthropic:claude-3-5-sonnet")
-        const knownPrefixes = ["openai", "anthropic", "gemini", "ollama", "groq", "cohere"];
+        const knownPrefixes = ["openai", "anthropic", "gemini", "ollama", "groq", "cohere", "xai"];
         const singleSepIndex = modelValue.indexOf(":");
         if (singleSepIndex !== -1) {
             const prefix = modelValue.substring(0, singleSepIndex);
