@@ -16,7 +16,7 @@ import Dropzone from "../components/ui/Dropzone";
 const DEFAULT_HOST = "localhost";
 const DEFAULT_PORT = "6379";
 
-type LoginMode = "manual" | "url";
+type LoginMode = "manual" | "url" | "endpoint";
 
 export default function LoginForm() {
   const { theme } = useTheme();
@@ -26,6 +26,9 @@ export default function LoginForm() {
   const [mounted, setMounted] = useState(false);
   const [loginMode, setLoginMode] = useState<LoginMode>("manual");
   const [falkordbUrl, setFalkordbUrl] = useState("");
+  const [endpoint, setEndpoint] = useState("");
+  const [endpointUsername, setEndpointUsername] = useState("");
+  const [endpointPassword, setEndpointPassword] = useState("");
   const [host, setHost] = useState("");
   const [port, setPort] = useState("");
   const [TLS, setTLS] = useState(false);
@@ -42,6 +45,54 @@ export default function LoginForm() {
   });
 
   const searchParams = useSearchParams();
+  const endpointFields: Field[] = [
+    {
+      value: endpoint,
+      onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
+        setEndpoint(e.target.value);
+        setError(prev => ({
+          ...prev,
+          show: false
+        }));
+        return true;
+      },
+      label: "Endpoint",
+      type: "text",
+      placeholder: `${DEFAULT_HOST}:${DEFAULT_PORT}`,
+      required: true
+    },
+    {
+      value: endpointUsername,
+      onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
+        setEndpointUsername(e.target.value);
+        setError(prev => ({
+          ...prev,
+          show: false
+        }));
+        return true;
+      },
+      label: "Username",
+      placeholder: "Default",
+      type: "text",
+      required: false
+    },
+    {
+      value: endpointPassword,
+      onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
+        setEndpointPassword(e.target.value);
+        setError(prev => ({
+          ...prev,
+          show: false
+        }));
+        return true;
+      },
+      label: "Password",
+      placeholder: "Default",
+      type: "password",
+      required: false
+    }
+  ];
+
   const fields: Field[] = loginMode === "url" ?
     [{
       value: falkordbUrl,
@@ -57,7 +108,7 @@ export default function LoginForm() {
       type: "text",
       placeholder: `falkor://Default:Default@${DEFAULT_HOST}:${DEFAULT_PORT}`,
       required: true
-    }] : [
+    }] : loginMode === "endpoint" ? endpointFields : [
       {
         value: host,
         onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -148,7 +199,7 @@ export default function LoginForm() {
     // Handle URL mode
     if (loginMode === "url") {
       const trimmedUrl = falkordbUrl.trim();
-      
+
       // Validate URL format: falkor[s]://[[username][:password]@][host][:port][/db-number]
       // Also supports redis:// and rediss:// protocols
       const urlPattern = /^(falkor|falkors|redis|rediss):\/\/(?:([^:@]+)(?::([^@]+))?@)?([^:/\s]+)(?::(\d+))?(?:\/(\d+))?$/;
@@ -161,6 +212,23 @@ export default function LoginForm() {
       }
       // Pass URL directly to the client
       params.url = trimmedUrl;
+    } else if (loginMode === "endpoint") {
+      // Parse endpoint (host:port) into manual format
+      const trimmed = endpoint.trim();
+      const colonIndex = trimmed.lastIndexOf(":");
+      if (colonIndex > 0) {
+        params.host = trimmed.substring(0, colonIndex);
+        params.port = trimmed.substring(colonIndex + 1);
+      } else {
+        params.host = trimmed;
+        params.port = DEFAULT_PORT;
+      }
+      if (endpointUsername) {
+        params.username = endpointUsername;
+      }
+      if (endpointPassword) {
+        params.password = endpointPassword;
+      }
     } else {
       // Manual mode
       params.host = host.trim();
@@ -221,13 +289,18 @@ export default function LoginForm() {
             }}
             className="flex items-center justify-center gap-8 p-4 border border-primary rounded-lg w-full"
           >
-            <div className="flex items-center space-x-2">
+            <div className="grow basis-0 flex items-center space-x-2">
               <RadioGroupItem value="manual" id="manual" />
               {/* Label is correctly associated via htmlFor, but eslint doesn't recognize Radix RadioGroupItem */}
               {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
               <label htmlFor="manual" className="text-base font-medium cursor-pointer">Manual Configuration</label>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="grow basis-0 flex items-center space-x-2">
+              <RadioGroupItem value="endpoint" id="endpoint" />
+              {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+              <label htmlFor="endpoint" className="text-base font-medium cursor-pointer">Endpoint</label>
+            </div>
+            <div className="grow basis-0 flex items-center space-x-2">
               <RadioGroupItem value="url" id="url" />
               {/* Label is correctly associated via htmlFor, but eslint doesn't recognize Radix RadioGroupItem */}
               {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
@@ -323,8 +396,8 @@ export default function LoginForm() {
               </div>
             }
           </FormComponent>
-          <Link 
-            href="/docs" 
+          <Link
+            href="/docs"
             className="flex items-center gap-2 text-sm text-muted hover:text-primary transition-colors duration-200"
           >
             <FileText className="w-4 h-4" />
