@@ -93,7 +93,7 @@ export default function LoginForm() {
     }
   };
 
-  const clearError = () => setError(prev => ({ message: "", show: false }));
+  const clearError = () => setError({ message: "", show: false });
 
   const userInputFields: Field[] = [{
     value: username,
