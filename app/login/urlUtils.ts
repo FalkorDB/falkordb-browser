@@ -49,10 +49,10 @@ export function parseUrlString(url: string): ParsedUrl {
     rest = rest.slice(protoMatch[0].length);
   }
 
-  // 2. Split on @ for credentials vs host+port
+  // 2. Split on last @ for credentials vs host+port (password may contain @)
   let credStr = "";
   let hostPortStr = rest;
-  const atIndex = rest.indexOf("@");
+  const atIndex = rest.lastIndexOf("@");
   if (atIndex >= 0) {
     credStr = rest.slice(0, atIndex);
     hostPortStr = rest.slice(atIndex + 1);
@@ -112,14 +112,14 @@ export function validateUrl(url: string): UrlValidation {
   if (hasAt) {
     const protoMatch = trimmed.match(PROTOCOL_REGEX);
     const afterProto = protoMatch ? trimmed.slice(protoMatch[0].length) : trimmed;
-    const credsPart = afterProto.slice(0, afterProto.indexOf("@"));
+    const credsPart = afterProto.slice(0, afterProto.lastIndexOf("@"));
     hasCredColon = credsPart.includes(":");
   }
 
   // Detect : in host+port part 
   let hasPortColon = false;
   if (hasAt) {
-    const afterAt = trimmed.slice(trimmed.indexOf("@") + 1);
+    const afterAt = trimmed.slice(trimmed.lastIndexOf("@") + 1);
     hasPortColon = afterAt.includes(":");
   } else {
     const protoMatch = trimmed.match(PROTOCOL_REGEX);
@@ -210,6 +210,8 @@ export function validateUrl(url: string): UrlValidation {
 
 /** Regex-based URL match for parsing into state (strict match only) */
 export function matchUrl(url: string) {
-  const urlPattern = /^(?:(falkor|falkors|redis|rediss):\/\/)?(?:([^:@]*)(?::([^@]*))?@)?([^:/\s]*)(?::(\d+))?$/;
+  // Password may contain @ so we use (.*) (greedy) to match up to the last @
+  // Host disallows @ to anchor the split correctly
+  const urlPattern = /^(?:(falkor|falkors|redis|rediss):\/\/)?(?:([^:@]*)(?::(.*))?@)?([^@:/\s]*)(?::(\d+))?$/;
   return url.match(urlPattern);
 }
