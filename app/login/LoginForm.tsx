@@ -84,8 +84,9 @@ export default function LoginForm() {
   const parseEndpoint = (value: string) => {
     const colonIndex = value.lastIndexOf(":");
     if (colonIndex > 0) {
+      const portCandidate = value.substring(colonIndex + 1);
       setHost(value.substring(0, colonIndex));
-      setPort(value.substring(colonIndex + 1));
+      setPort(/^\d+$/.test(portCandidate) ? portCandidate : "");
     } else {
       setHost(value);
       setPort("");
@@ -119,7 +120,7 @@ export default function LoginForm() {
     info: "You can skip entering your password when deploying a FalkorDB instance \n from localhost with default credentials.",
     type: "password",
     required: false
-  }]
+  }];
 
   const fields: Field[] = loginMode === "url" ?
     [{

@@ -6,7 +6,6 @@
 // host: just the hostname (optional — defaults provided)
 // port: optional, requires : before it (after host), must be digits
 
-const PROTOCOLS = ["falkor", "falkors", "redis", "rediss"] as const;
 const PROTOCOL_REGEX = /^(falkor|falkors|redis|rediss):\/\//;
 
 export interface ParsedUrl {
