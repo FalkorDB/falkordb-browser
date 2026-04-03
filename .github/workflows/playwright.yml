@@ -82,7 +82,7 @@ jobs:
             fi
           done
       - name: Install Playwright Browsers
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox
       - name: Build application
         run: npm run build
       - name: Upload build output
