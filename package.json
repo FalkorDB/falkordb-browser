@@ -66,7 +66,7 @@
     "next-swagger-doc": "^0.4.1",
     "next-themes": "^0.4.6",
     "node-cache": "^5.1.2",
-    "playwright": "^1.58.2",
+    "playwright": "^1.59.1",
     "react": "^18.3.1",
     "react-cytoscapejs": "^2.0.0",
     "react-dom": "^19.2.4",
