@@ -12,6 +12,7 @@ import { useTheme } from "next-themes";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Button from "../components/ui/Button";
 import { BrowserSettingsContext, GraphContext, IndicatorContext } from "../components/provider";
+import { getConnectionItem, setConnectionItem, removeConnectionItem } from "@/lib/connection-storage";
 import CypherEditor, { CYPHER_LANGUAGE_NAME } from "../components/CypherEditor";
 import EditorComponent from "../components/EditorComponent";
 import DialogComponent from "../components/DialogComponent";
@@ -319,8 +320,8 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
 
         const newQueries = historyQuery.queries.filter((_, idx) => !deleteElements.some((removeIndex) => idx === removeIndex));
 
-        if (newQueries.length === 0) localStorage.removeItem("query history");
-        else localStorage.setItem("query history", JSON.stringify(newQueries));
+        if (newQueries.length === 0) removeConnectionItem("query history");
+        else setConnectionItem("query history", JSON.stringify(newQueries));
 
         // Check if counter points to a deleted query (counter is 1-indexed, so counter - 1 is the index)
         const isCounterDeleted = historyQuery.counter > 0 && deleteElements.includes(historyQuery.counter - 1);
@@ -359,7 +360,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
             q.timestamp === item.timestamp ? { ...q, fav: !q.fav, name } : q
         );
 
-        localStorage.setItem("query history", JSON.stringify(newQueries));
+        setConnectionItem("query history", JSON.stringify(newQueries));
 
         setHistoryQuery(prev => ({
             ...prev,
@@ -559,7 +560,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                     data-testid="queryHistoryDelete"
                                                     title="Remove all queries from history"
                                                     onClick={() => {
-                                                        localStorage.removeItem("query history");
+                                                        removeConnectionItem("query history");
                                                         setHistoryQuery(prev => ({
                                                             ...prev,
                                                             queries: [],
@@ -580,7 +581,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                     title="Clear all favorites"
                                                     onClick={() => {
                                                         const newQueries = historyQuery.queries.map(q => ({ ...q, fav: false, name: undefined }));
-                                                        localStorage.setItem("query history", JSON.stringify(newQueries));
+                                                        setConnectionItem("query history", JSON.stringify(newQueries));
                                                         setHistoryQuery(prev => ({
                                                             ...prev,
                                                             queries: newQueries,

@@ -6,6 +6,7 @@ import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useS
 import dynamic from "next/dynamic";
 import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue } from "@/lib/utils";
 import { encryptValue, decryptValue, isCryptoAvailable, isEncrypted } from "@/lib/encryption";
+import { getConnectionItem, setConnectionItem, setConnectionPrefix, clearConnectionPrefix } from "@/lib/connection-storage";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -56,8 +57,17 @@ const defaultQueryHistory: HistoryQuery = {
 function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { toast } = useToast();
-  const { status } = useSession();
+  const { status, data: sessionData } = useSession();
   const router = useRouter();
+
+  // Set connection prefix for scoped localStorage
+  useEffect(() => {
+    if (status === "authenticated" && sessionData?.user) {
+      setConnectionPrefix(sessionData.user.host, sessionData.user.port);
+    } else {
+      clearConnectionPrefix();
+    }
+  }, [status, sessionData]);
 
   const panelRef = useRef<PanelImperativeHandle>(null);
   const canvasRef = useRef<GraphRef["current"]>(null);
@@ -459,12 +469,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setLastLimit(limit);
 
       if (!tutorialOpen) {
-        localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }));
+        setConnectionItem("savedContent", JSON.stringify({ graphName: n, query: q }));
       }
 
       const newQueries = handelGetNewQueries(newQuery);
 
-      localStorage.setItem("query history", JSON.stringify(newQueries));
+      setConnectionItem("query history", JSON.stringify(newQueries));
 
       setHistoryQuery(prev => ({
         ...prev,
@@ -593,11 +603,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
     (async () => {
       try {
-        const raw: Query[] = JSON.parse(localStorage.getItem("query history") || "[]");
+        const raw: Query[] = JSON.parse(getConnectionItem("query history") || "[]");
         // Migrate old queries that don't have the fav property
         const queries = raw.map(q => ({ ...q, fav: q.fav ?? false }));
         // Persist migrated data so legacy objects are normalized in storage
-        localStorage.setItem("query history", JSON.stringify(queries));
+        setConnectionItem("query history", JSON.stringify(queries));
         setHistoryQuery({ ...defaultQueryHistory, queries });
       } catch (error) {
         setHistoryQuery({ ...defaultQueryHistory, queries: [] });
