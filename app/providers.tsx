@@ -6,7 +6,7 @@ import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useS
 import dynamic from "next/dynamic";
 import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue } from "@/lib/utils";
 import { encryptValue, decryptValue, isCryptoAvailable, isEncrypted } from "@/lib/encryption";
-import { getConnectionItem, setConnectionItem, setConnectionPrefix, clearConnectionPrefix } from "@/lib/connection-storage";
+import { getConnectionItem, setConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -61,11 +61,16 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   // Set connection prefix for scoped localStorage
+  const [prefixReady, setPrefixReady] = useState(false);
+
   useEffect(() => {
     if (status === "authenticated" && sessionData?.user) {
       setConnectionPrefix(sessionData.user.host, sessionData.user.port);
+      migrateToScopedStorage();
+      setPrefixReady(true);
     } else {
       clearConnectionPrefix();
+      setPrefixReady(false);
     }
   }, [status, sessionData]);
 
@@ -599,7 +604,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   }, [status, toast]);
 
   useEffect(() => {
-    if (status !== "authenticated") return;
+    if (status !== "authenticated" || !prefixReady) return;
 
     (async () => {
       try {
@@ -701,7 +706,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         }
       })();
     })();
-  }, [status, toast]);
+  }, [status, prefixReady, toast]);
 
   const onPanelResize = useCallback((size: PanelSize) => {
     setIsCollapsed(size.asPercentage === 0);
