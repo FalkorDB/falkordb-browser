@@ -1,11 +1,12 @@
-import { Dispatch, SetStateAction, useContext } from "react";
-import { Loader2, X, Palette, Network } from "lucide-react";
+import { Dispatch, SetStateAction, useContext, useState } from "react";
+import { Loader2, X, Palette, Network, Search } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn, InfoLabel } from "@/lib/utils";
 import { getContrastTextColor } from "@falkordb/canvas";
 import Button from "../components/ui/Button";
 import { BrowserSettingsContext, GraphContext, QueryLoadingContext } from "../components/provider";
 import CustomizeStylePanel from "./CustomizeStylePanel";
+import Input from "../components/ui/Input";
 
 /**
  * Render a side panel showing graph metadata and interactive controls to run representative queries.
@@ -16,10 +17,14 @@ import CustomizeStylePanel from "./CustomizeStylePanel";
 export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizingLabel }: { onClose: () => void, customizingLabel: InfoLabel | null, setCustomizingLabel: Dispatch<SetStateAction<InfoLabel | null>> }) {
     const { graphInfo: { Labels, Relationships, PropertyKeys, MemoryUsage }, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
-    const { settings: { graphInfo: { showMemoryUsage } } } = useContext(BrowserSettingsContext);
+    const { settings: { graphInfo: { showMemoryUsage, maxItemsForSearch } } } = useContext(BrowserSettingsContext);
+
+    const [nodesSearch, setNodesSearch] = useState("");
+    const [edgesSearch, setEdgesSearch] = useState("");
+    const [propertyKeysSearch, setPropertyKeysSearch] = useState("");
 
     return (
-        <div aria-disabled={nodesCount === undefined || edgesCount === undefined} data-testid="graphInfoPanel" className={cn(`relative h-full w-full p-2 grid grid-rows-[max-content_max-content_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)] gap-2`)}>
+        <div aria-disabled={nodesCount === undefined || edgesCount === undefined} data-testid="graphInfoPanel" className={cn(`relative h-full w-full p-2 grid grid-rows-[max-content_max-content_max-content_1fr_1fr_1fr] gap-2`)}>
             {
                 !customizingLabel ? (
                     <>
@@ -85,6 +90,13 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                         </Tooltip>
                                         : <Loader2 data-testid="nodesCountLoader" className="animate-spin" />
                                 }
+                                {
+                                    Labels.size > maxItemsForSearch &&
+                                    <div className="basis-0 grow flex gap-1 items-center">
+                                        <Search size={16} />
+                                        <Input value={nodesSearch} onChange={(e) => setNodesSearch(e.target.value)} className="w-1 grow" />
+                                    </div>
+                                }
                             </div>
                             <ul className="flex flex-wrap gap-2 p-2 overflow-auto">
                                 <li className="max-w-full">
@@ -97,7 +109,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                         disabled={isQueryLoading}
                                     />
                                 </li>
-                                {Array.from(Labels.values()).sort((a, b) => b.count - a.count).map((label) => {
+                                {Array.from(Labels.values()).filter(label => label.name.toLowerCase().includes(nodesSearch.toLowerCase())).sort((a, b) => b.count - a.count).map((label) => {
                                     const name = label.name || "Empty";
                                     const labelColor = label.style.color;
 
@@ -157,6 +169,13 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                         :
                                         <Loader2 data-testid="edgesCountLoader" className="animate-spin" />
                                 }
+                                {
+                                    Relationships.size > maxItemsForSearch &&
+                                    <div className="basis-0 grow flex gap-1 items-center">
+                                        <Search size={16} />
+                                        <Input value={edgesSearch} onChange={(e) => setEdgesSearch(e.target.value)} className="w-1 grow" />
+                                    </div>
+                                }
                             </div>
                             <ul className="flex flex-wrap gap-2 p-2 overflow-auto">
                                 <li className="max-w-full">
@@ -169,7 +188,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                         disabled={isQueryLoading}
                                     />
                                 </li>
-                                {Array.from(Relationships.values()).sort((a, b) => b.count - a.count).map((relationship) => {
+                                {Array.from(Relationships.values()).filter(relationship => relationship.name.toLowerCase().includes(edgesSearch.toLowerCase())).sort((a, b) => b.count - a.count).map((relationship) => {
                                     const relationshipColor = relationship.style.color;
                                     const textColor = getContrastTextColor(relationshipColor);
 
@@ -215,10 +234,17 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                         :
                                         <Loader2 className="animate-spin" />
                                 }
+                                {
+                                    PropertyKeys && PropertyKeys.length > maxItemsForSearch &&
+                                    <div className="basis-0 grow flex gap-1 items-center">
+                                        <Search size={16} />
+                                        <Input value={propertyKeysSearch} onChange={(e) => setPropertyKeysSearch(e.target.value)} className="w-1 grow" />
+                                    </div>
+                                }
                             </div>
                             <ul className="flex flex-wrap gap-2 p-2 overflow-auto">
                                 {
-                                    PropertyKeys && PropertyKeys.map((key) => (
+                                    PropertyKeys && PropertyKeys.filter(key => key.toLowerCase().includes(propertyKeysSearch.toLowerCase())).map((key) => (
                                         <li key={key} className="max-w-full">
                                             <Button
                                                 title={`MATCH (e) WHERE e.${key} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`}
@@ -230,7 +256,8 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                 disabled={isQueryLoading}
                                             />
                                         </li>
-                                    ))}
+                                    ))
+                                }
                             </ul>
                         </div>
                     </>
