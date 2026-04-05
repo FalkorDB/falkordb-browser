@@ -2,7 +2,7 @@
 
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2 } from "lucide-react";
+import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2, Info } from "lucide-react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
 import { areCaptionKeysEqual, cn, getDefaultQuery, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
@@ -473,7 +473,17 @@ export default function BrowserSettings() {
                                     {/* Limit Setting */}
                                     <div className="flex-1 basis-0 flex flex-col items-center sm:flex-row sm:justify-between gap-2 p-2 bg-muted/10 rounded-lg">
                                         <div className="flex flex-col gap-2 flex-1">
-                                            <h3 className="text-lg font-semibold">Limit</h3>
+                                            <div className="flex flex gap-1 items-center">
+                                                <h3 className="text-lg font-semibold">Limit</h3>
+                                                <Tooltip>
+                                                    <TooltipTrigger>
+                                                        <Info size={16} />
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p>Be aware that "RESULTSET_SIZE" caps the maximum number of rows returned by a query. (you can modify this configuration in the "DB Configurations" tab)</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </div>
                                             <p className="text-sm text-muted-foreground">
                                                 Limits the number of rows returned by the query.
                                                 <a
