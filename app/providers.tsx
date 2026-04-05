@@ -186,6 +186,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       localStorage.setItem("columnWidth", newColumnWidth.toString());
       localStorage.setItem("rowHeight", newRowHeight.toString());
       localStorage.setItem("rowHeightExpandMultiple", newRowHeightExpandMultiple.toString());
+      localStorage.setItem("maxItemsForSearch", newMaxItemsForSearch.toString());
 
       // Only encrypt and save secret key if it has changed
       if (newSecretKey !== secretKey) {

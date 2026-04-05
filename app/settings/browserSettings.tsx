@@ -370,7 +370,7 @@ export default function BrowserSettings() {
                     </CardHeader>
                     {expandedSections.graphInfo && (
                         <CardContent>
-                            <div className="flex gap-2">
+                            <div className="flex flex-col sm:flex-row gap-2">
                                 {/* Refresh Interval */}
                                 <div className="basis-0 grow flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 p-2 bg-muted/10 rounded-lg">
                                     <div className="flex flex-col gap-2 flex-1">

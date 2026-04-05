@@ -1,4 +1,4 @@
-import { Dispatch, SetStateAction, useContext, useState } from "react";
+import { Dispatch, SetStateAction, useContext, useEffect, useState } from "react";
 import { Loader2, X, Palette, Network, Search } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn, InfoLabel } from "@/lib/utils";
@@ -22,6 +22,10 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     const [nodesSearch, setNodesSearch] = useState("");
     const [edgesSearch, setEdgesSearch] = useState("");
     const [propertyKeysSearch, setPropertyKeysSearch] = useState("");
+
+    useEffect(() => { setNodesSearch(""); }, [Labels]);
+    useEffect(() => { setEdgesSearch(""); }, [Relationships]);
+    useEffect(() => { setPropertyKeysSearch(""); }, [PropertyKeys]);
 
     return (
         <div aria-disabled={nodesCount === undefined || edgesCount === undefined} data-testid="graphInfoPanel" className={cn(`relative h-full w-full p-2 grid grid-rows-[max-content_max-content_max-content_1fr_1fr_1fr] gap-2`)}>
@@ -94,7 +98,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                     Labels.size > maxItemsForSearch &&
                                     <div className="basis-0 grow flex gap-1 items-center">
                                         <Search size={16} />
-                                        <Input value={nodesSearch} onChange={(e) => setNodesSearch(e.target.value)} className="w-1 grow" />
+                                        <Input aria-label="Search node labels" value={nodesSearch} onChange={(e) => setNodesSearch(e.target.value)} className="w-1 grow" />
                                     </div>
                                 }
                             </div>
@@ -173,7 +177,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                     Relationships.size > maxItemsForSearch &&
                                     <div className="basis-0 grow flex gap-1 items-center">
                                         <Search size={16} />
-                                        <Input value={edgesSearch} onChange={(e) => setEdgesSearch(e.target.value)} className="w-1 grow" />
+                                        <Input aria-label="Search relationship types" value={edgesSearch} onChange={(e) => setEdgesSearch(e.target.value)} className="w-1 grow" />
                                     </div>
                                 }
                             </div>
@@ -238,7 +242,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                     PropertyKeys && PropertyKeys.length > maxItemsForSearch &&
                                     <div className="basis-0 grow flex gap-1 items-center">
                                         <Search size={16} />
-                                        <Input value={propertyKeysSearch} onChange={(e) => setPropertyKeysSearch(e.target.value)} className="w-1 grow" />
+                                        <Input aria-label="Search property keys" value={propertyKeysSearch} onChange={(e) => setPropertyKeysSearch(e.target.value)} className="w-1 grow" />
                                     </div>
                                 }
                             </div>
