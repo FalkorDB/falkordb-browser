@@ -14,6 +14,7 @@ import { GraphContext, IndicatorContext, QueryLoadingContext, BrowserSettingsCon
 import { EventType } from "../api/chat/route";
 import ToastButton from "../components/ToastButton";
 import { ShineBorder } from "@/components/ui/shine-border";
+import { getConnectionItem, setConnectionItem } from "@/lib/connection-storage";
 
 // Function to get the last maxSavedMessages user messages and all messages in between
 const getLastUserMessagesWithContext = (allMessages: Message[], maxUserMessages: number) => {
@@ -108,11 +109,11 @@ export default function Chat({ onClose }: Props) {
 
     // Load messages and cypher only preference for current graph on mount
     useEffect(() => {
-        const savedMessages = localStorage.getItem(`chat-${graphName}`);
+        const savedMessages = getConnectionItem(`chat-${graphName}`);
         const currentMessages = JSON.parse(savedMessages || "[]");
         setMessages(currentMessages);
 
-        const savedCypherOnly = localStorage.getItem(`cypherOnly-${graphName}`);
+        const savedCypherOnly = getConnectionItem(`cypherOnly-${graphName}`);
         setCypherOnly(savedCypherOnly === "true");
     }, [graphName, maxSavedMessages]);
 
@@ -120,7 +121,7 @@ export default function Chat({ onClose }: Props) {
         let statusGroup: Message[];
 
         if (messages.length > 0) {
-            localStorage.setItem(`chat-${graphName}`, JSON.stringify(getLastUserMessagesWithContext(messages, maxSavedMessages)));
+            setConnectionItem(`chat-${graphName}`, JSON.stringify(getLastUserMessagesWithContext(messages, maxSavedMessages)));
         }
 
         const newMessagesList = messages.map((message, i): Message | [Message[], boolean] | undefined => {
@@ -536,7 +537,7 @@ export default function Chat({ onClose }: Props) {
                                 onClick={() => {
                                     const next = !cypherOnly;
                                     setCypherOnly(next);
-                                    localStorage.setItem(`cypherOnly-${graphName}`, String(next));
+                                    setConnectionItem(`cypherOnly-${graphName}`, String(next));
                                 }}
                                 className={cn(
                                     "shrink-0 flex items-center justify-center rounded-md transition-all duration-150 active:scale-[0.96]",
