@@ -54,6 +54,8 @@ type BrowserSettingsContextType = {
     graphInfo: {
       newRefreshInterval: number;
       setNewRefreshInterval: Dispatch<SetStateAction<number>>;
+      newMaxItemsForSearch: number;
+      setNewMaxItemsForSearch: Dispatch<SetStateAction<number>>;
     };
   };
   settings: {
@@ -109,6 +111,8 @@ type BrowserSettingsContextType = {
       showMemoryUsage: boolean;
       refreshInterval: number;
       setRefreshInterval: Dispatch<SetStateAction<number>>;
+      maxItemsForSearch: number;
+      setMaxItemsForSearch: Dispatch<SetStateAction<number>>;
     };
   };
   hasChanges: boolean;
@@ -257,6 +261,8 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
       graphInfo: {
         newRefreshInterval: 0,
         setNewRefreshInterval: () => { },
+        newMaxItemsForSearch: 0,
+        setNewMaxItemsForSearch: () => { },
       },
     },
     settings: {
@@ -306,6 +312,8 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         showMemoryUsage: false,
         refreshInterval: 0,
         setRefreshInterval: () => { },
+        maxItemsForSearch: 0,
+        setMaxItemsForSearch: () => { },
       },
     },
     hasChanges: false,
