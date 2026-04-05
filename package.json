@@ -125,6 +125,7 @@
     "refractor": {
       "prismjs": "^1.30.0"
     },
-    "prismjs": "^1.30.0"
+    "prismjs": "^1.30.0",
+    "dompurify": "^3.3.3"
   }
 }
