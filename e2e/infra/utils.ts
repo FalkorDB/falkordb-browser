@@ -27,19 +27,23 @@ export function normalizeUrl(url: string | null | undefined): string {
 }
 
 /**
- * Initialize localStorage with default values required by the application
- * This prevents initialization errors in CI environments
+ * Initialize localStorage with default values required by the application.
+ * Global user preferences use plain keys. Per-connection data (e.g. query history)
+ * is prefixed with host:port: to match the runtime connection-scoped storage.
  */
-export const initializeLocalStorage = () => `
+export const initializeLocalStorage = (host = "localhost", port = 6379) => {
+    const prefix = `${host}:${port}:`;
+    return `
         if (!localStorage.getItem("timeout")) localStorage.setItem("timeout", "0");
         if (!localStorage.getItem("limit")) localStorage.setItem("limit", "300");
         if (!localStorage.getItem("defaultQuery")) localStorage.setItem("defaultQuery", "");
         if (!localStorage.getItem("runDefaultQuery")) localStorage.setItem("runDefaultQuery", "false");
         if (!localStorage.getItem("contentPersistence")) localStorage.setItem("contentPersistence", "false");
-        if (!localStorage.getItem("query history")) localStorage.setItem("query history", "[]");
+        if (!localStorage.getItem("${prefix}query history")) localStorage.setItem("${prefix}query history", "[]");
         if (!localStorage.getItem("refreshInterval")) localStorage.setItem("refreshInterval", "60");
         if (!localStorage.getItem("tutorial")) localStorage.setItem("tutorial", "false");
     `;
+};
 
 export function delay(ms: number) {
   return new Promise((resolve) => {

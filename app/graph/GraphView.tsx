@@ -8,6 +8,7 @@ import { cn, GraphRef, Tab, Label, Link, Node, Relationship, HistoryQuery } from
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GraphContext, ForceGraphContext } from "@/app/components/provider";
 import ForceGraph from "@/app/components/ForceGraph";
+import { setConnectionItem } from "@/lib/connection-storage";
 import Button from "../components/ui/Button";
 import TableView from "./TableView";
 import Toolbar from "./toolbar";
@@ -283,7 +284,7 @@ function GraphView({
 
                             const newQueries = prev.queries.map(q => q.text === newQuery.text ? newQuery : q);
 
-                            localStorage.setItem("query history", JSON.stringify(newQueries));
+                            setConnectionItem("query history", JSON.stringify(newQueries));
 
                             return {
                                 ...prev,

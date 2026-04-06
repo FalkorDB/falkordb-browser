@@ -37,8 +37,10 @@ export default class BrowserWrapper {
         if (!this.page) {
             this.page = await this.context.newPage();
             
-            // Initialize localStorage before any navigation
-            await this.page.addInitScript(initializeLocalStorage());
+            // Initialize localStorage before any navigation.
+            // Explicitly pass host/port so the scoped storage prefix
+            // matches the runtime connection context used by the app.
+            await this.page.addInitScript(initializeLocalStorage("localhost", 6379));
         }
         if (url) {
             await this.navigateTo(url)

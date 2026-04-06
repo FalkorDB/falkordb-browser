@@ -6,6 +6,7 @@ import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useS
 import dynamic from "next/dynamic";
 import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue } from "@/lib/utils";
 import { encryptValue, decryptValue, isCryptoAvailable, isEncrypted } from "@/lib/encryption";
+import { getConnectionItem, setConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -56,8 +57,22 @@ const defaultQueryHistory: HistoryQuery = {
 function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { toast } = useToast();
-  const { status } = useSession();
+  const { status, data: sessionData } = useSession();
   const router = useRouter();
+
+  // Set connection prefix for scoped localStorage
+  const [prefixReady, setPrefixReady] = useState(false);
+
+  useEffect(() => {
+    if (status === "authenticated" && sessionData?.user) {
+      setConnectionPrefix(sessionData.user.host, sessionData.user.port);
+      migrateToScopedStorage();
+      setPrefixReady(true);
+    } else {
+      clearConnectionPrefix();
+      setPrefixReady(false);
+    }
+  }, [status, sessionData]);
 
   const panelRef = useRef<PanelImperativeHandle>(null);
   const canvasRef = useRef<GraphRef["current"]>(null);
@@ -119,13 +134,15 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [cypherOnly, setCypherOnly] = useState<boolean>(false);
   const [udfList, setUdfList] = useState<UDFEntry[]>([]);
   const [selectedUdf, setSelectedUdf] = useState<UDFEntryWithCode>();
-  const [columnWidth, setColumnWidth] = useState<number>(25);
-  const [rowHeight, setRowHeight] = useState<number>(40);
-  const [newColumnWidth, setNewColumnWidth] = useState<number>(25);
-  const [newRowHeight, setNewRowHeight] = useState<number>(40);
-  const [newRowHeightExpandMultiple, setNewRowHeightExpandMultiple] = useState<number>(3);
-  const [rowHeightExpandMultiple, setRowHeightExpandMultiple] = useState<number>(3);
+  const [columnWidth, setColumnWidth] = useState<number>(0);
+  const [rowHeight, setRowHeight] = useState<number>(0);
+  const [newColumnWidth, setNewColumnWidth] = useState<number>(0);
+  const [newRowHeight, setNewRowHeight] = useState<number>(0);
+  const [newRowHeightExpandMultiple, setNewRowHeightExpandMultiple] = useState<number>(0);
+  const [rowHeightExpandMultiple, setRowHeightExpandMultiple] = useState<number>(0);
   const [showUDF, setShowUDF] = useState<boolean>(true);
+  const [maxItemsForSearch, setMaxItemsForSearch] = useState<number>(0);
+  const [newMaxItemsForSearch, setNewMaxItemsForSearch] = useState<number>(0);
 
   const replayTutorial = useCallback(() => {
     router.push("/graph");
@@ -149,7 +166,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       captionsKeysSettings: { newCaptionsKeys, setNewCaptionsKeys },
       showPropertyKeyPrefixSettings: { newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
       chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly },
-      graphInfo: { newRefreshInterval, setNewRefreshInterval },
+      graphInfo: { newRefreshInterval, setNewRefreshInterval, newMaxItemsForSearch, setNewMaxItemsForSearch },
       tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple }
     },
     settings: {
@@ -161,7 +178,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       captionsKeysSettings: { captionsKeys, setCaptionsKeys },
       showPropertyKeyPrefixSettings: { showPropertyKeyPrefix, setShowPropertyKeyPrefix },
       chatSettings: { secretKey, setSecretKey, model, setModel, maxSavedMessages, setMaxSavedMessages, cypherOnly, setCypherOnly },
-      graphInfo: { showMemoryUsage, refreshInterval, setRefreshInterval },
+      graphInfo: { showMemoryUsage, refreshInterval, setRefreshInterval, maxItemsForSearch, setMaxItemsForSearch },
       tableViewSettings: { columnWidth, setColumnWidth, rowHeight, setRowHeight, rowHeightExpandMultiple, setRowHeightExpandMultiple }
     },
     hasChanges,
@@ -184,6 +201,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       localStorage.setItem("columnWidth", newColumnWidth.toString());
       localStorage.setItem("rowHeight", newRowHeight.toString());
       localStorage.setItem("rowHeightExpandMultiple", newRowHeightExpandMultiple.toString());
+      localStorage.setItem("maxItemsForSearch", newMaxItemsForSearch.toString());
 
       // Only encrypt and save secret key if it has changed
       if (newSecretKey !== secretKey) {
@@ -241,6 +259,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setColumnWidth(newColumnWidth);
       setRowHeight(newRowHeight);
       setRowHeightExpandMultiple(newRowHeightExpandMultiple);
+      setMaxItemsForSearch(newMaxItemsForSearch);
       // Reset has changes
       setHasChanges(false);
 
@@ -266,10 +285,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setNewColumnWidth(columnWidth);
       setNewRowHeight(rowHeight);
       setNewRowHeightExpandMultiple(rowHeightExpandMultiple);
+      setNewMaxItemsForSearch(maxItemsForSearch);
       setHasChanges(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, toast]);
+  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, toast]);
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -459,12 +479,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setLastLimit(limit);
 
       if (!tutorialOpen) {
-        localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }));
+        setConnectionItem("savedContent", JSON.stringify({ graphName: n, query: q }));
       }
 
       const newQueries = handelGetNewQueries(newQuery);
 
-      localStorage.setItem("query history", JSON.stringify(newQueries));
+      setConnectionItem("query history", JSON.stringify(newQueries));
 
       setHistoryQuery(prev => ({
         ...prev,
@@ -589,15 +609,15 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   }, [status, toast]);
 
   useEffect(() => {
-    if (status !== "authenticated") return;
+    if (status !== "authenticated" || !prefixReady) return;
 
     (async () => {
       try {
-        const raw: Query[] = JSON.parse(localStorage.getItem("query history") || "[]");
+        const raw: Query[] = JSON.parse(getConnectionItem("query history") || "[]");
         // Migrate old queries that don't have the fav property
         const queries = raw.map(q => ({ ...q, fav: q.fav ?? false }));
         // Persist migrated data so legacy objects are normalized in storage
-        localStorage.setItem("query history", JSON.stringify(queries));
+        setConnectionItem("query history", JSON.stringify(queries));
         setHistoryQuery({ ...defaultQueryHistory, queries });
       } catch (error) {
         setHistoryQuery({ ...defaultQueryHistory, queries: [] });
@@ -629,7 +649,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setColumnWidth(parseInt(localStorage.getItem("columnWidth") || "25", 10));
       setRowHeight(parseInt(localStorage.getItem("rowHeight") || "40", 10));
       setRowHeightExpandMultiple(parseInt(localStorage.getItem("rowHeightExpandMultiple") || "3", 10));
-
+      setMaxItemsForSearch(parseInt(localStorage.getItem("maxItemsForSearch") || "20", 10));
       // Decrypt secret key if encrypted, or migrate plain text keys to encrypted format
       const storedSecretKey = localStorage.getItem("secretKey") || "";
       if (storedSecretKey) {
@@ -691,7 +711,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         }
       })();
     })();
-  }, [status, toast]);
+  }, [status, prefixReady, toast]);
 
   const onPanelResize = useCallback((size: PanelSize) => {
     setIsCollapsed(size.asPercentage === 0);

@@ -2,7 +2,7 @@
 
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2 } from "lucide-react";
+import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2, Info } from "lucide-react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
 import { areCaptionKeysEqual, cn, getDefaultQuery, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
@@ -27,7 +27,7 @@ export default function BrowserSettings() {
             captionsKeysSettings: { newCaptionsKeys, setNewCaptionsKeys },
             showPropertyKeyPrefixSettings: { newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
             chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly },
-            graphInfo: { newRefreshInterval, setNewRefreshInterval },
+            graphInfo: { newRefreshInterval, setNewRefreshInterval, newMaxItemsForSearch, setNewMaxItemsForSearch },
             tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple }
         },
         settings: {
@@ -39,7 +39,7 @@ export default function BrowserSettings() {
             captionsKeysSettings: { captionsKeys },
             showPropertyKeyPrefixSettings: { showPropertyKeyPrefix },
             chatSettings: { secretKey, model, setModel, maxSavedMessages, cypherOnly },
-            graphInfo: { refreshInterval },
+            graphInfo: { refreshInterval, maxItemsForSearch },
             tableViewSettings: { columnWidth, rowHeight, rowHeightExpandMultiple }
         },
         hasChanges,
@@ -131,7 +131,8 @@ export default function BrowserSettings() {
         setNewColumnWidth(columnWidth);
         setNewRowHeight(rowHeight);
         setNewRowHeightExpandMultiple(rowHeightExpandMultiple);
-    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, model, setNewModel, setNewRefreshInterval, refreshInterval, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, rowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple]);
+        setNewMaxItemsForSearch(maxItemsForSearch);
+    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, model, setNewModel, setNewRefreshInterval, refreshInterval, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, rowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch]);
 
     useEffect(() => {
         setHasChanges(
@@ -149,9 +150,10 @@ export default function BrowserSettings() {
             newCypherOnly !== cypherOnly ||
             newColumnWidth !== columnWidth ||
             newRowHeight !== rowHeight ||
-            newRowHeightExpandMultiple !== rowHeightExpandMultiple
+            newRowHeightExpandMultiple !== rowHeightExpandMultiple ||
+            newMaxItemsForSearch !== maxItemsForSearch
         );
-    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey, newModel, model, refreshInterval, newRefreshInterval, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple]);
+    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey, newModel, model, refreshInterval, newRefreshInterval, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch]);
 
     const handleSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
         e?.preventDefault();
@@ -368,31 +370,56 @@ export default function BrowserSettings() {
                     </CardHeader>
                     {expandedSections.graphInfo && (
                         <CardContent>
-                            {/* Refresh Interval */}
-                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 p-2 bg-muted/10 rounded-lg">
-                                <div className="flex flex-col gap-2 flex-1">
-                                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                                    <label htmlFor="refreshInterval" className="text-lg font-semibold">Refresh Interval</label>
-                                    <p className="text-sm text-muted-foreground">
-                                        Reload graph info data every {newRefreshInterval} seconds
-                                    </p>
+                            <div className="flex flex-col sm:flex-row gap-2">
+                                {/* Refresh Interval */}
+                                <div className="basis-0 grow flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 p-2 bg-muted/10 rounded-lg">
+                                    <div className="flex flex-col gap-2 flex-1">
+                                        {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+                                        <label htmlFor="refreshInterval" className="text-lg font-semibold">Refresh Interval</label>
+                                        <p className="text-sm text-muted-foreground">
+                                            Reload graph info data every {newRefreshInterval} seconds
+                                        </p>
+                                    </div>
+                                    <div className="w-full sm:w-64">
+                                        <Slider
+                                            id="refreshInterval"
+                                            className="w-full"
+                                            min={5}
+                                            max={60}
+                                            value={[newRefreshInterval]}
+                                            onValueChange={(value) => createChangeHandler(setNewRefreshInterval)(value[value.length - 1], "refreshInterval")}
+                                        />
+                                        <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                                            <span>5s</span>
+                                            <span>60s</span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="w-full sm:w-64">
-                                    <Slider
-                                        id="refreshInterval"
-                                        className="w-full"
-                                        min={5}
-                                        max={60}
-                                        value={[newRefreshInterval]}
-                                        onValueChange={(value) => createChangeHandler(setNewRefreshInterval)(value[value.length - 1], "refreshInterval")}
-                                    />
-                                    <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                                        <span>5s</span>
-                                        <span>60s</span>
+                                {/* Max Items For Search */}
+                                <div className="basis-0 grow flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 p-2 bg-muted/10 rounded-lg">
+                                    <div className="flex flex-col gap-2 flex-1">
+                                        {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+                                        <label htmlFor="maxItemsForSearch" className="text-lg font-semibold">Max Items For Search</label>
+                                        <p className="text-sm text-muted-foreground">
+                                            Set the maximum number of items before search display.
+                                        </p>
+                                    </div>
+                                    <div className="w-full sm:w-64">
+                                        <Slider
+                                            id="maxItemsForSearch"
+                                            className="w-full"
+                                            min={10}
+                                            max={50}
+                                            value={[newMaxItemsForSearch]}
+                                            onValueChange={(value) => createChangeHandler(setNewMaxItemsForSearch)(value[value.length - 1], "maxItemsForSearch")}
+                                        />
+                                        <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                                            <span>10 Items</span>
+                                            <span>50 Items</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-
                         </CardContent>
                     )}
                 </Card>
@@ -446,7 +473,17 @@ export default function BrowserSettings() {
                                     {/* Limit Setting */}
                                     <div className="flex-1 basis-0 flex flex-col items-center sm:flex-row sm:justify-between gap-2 p-2 bg-muted/10 rounded-lg">
                                         <div className="flex flex-col gap-2 flex-1">
-                                            <h3 className="text-lg font-semibold">Limit</h3>
+                                            <div className="flex flex gap-1 items-center">
+                                                <h3 className="text-lg font-semibold">Limit</h3>
+                                                <Tooltip>
+                                                    <TooltipTrigger>
+                                                        <Info size={16} />
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p>Be aware that "RESULTSET_SIZE" caps the maximum number of rows returned by a query. (you can modify this configuration in the "DB Configurations" tab)</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </div>
                                             <p className="text-sm text-muted-foreground">
                                                 Limits the number of rows returned by the query.
                                                 <a
