@@ -59,7 +59,7 @@
     "falkordb": "^6.6.2",
     "jose": "^6.1.0",
     "lodash": "^4.18.0",
-    "lucide-react": "^0.475.0",
+    "lucide-react": "^1.7.0",
     "monaco-editor": "^0.55.1",
     "next": "^16.2.2",
     "next-auth": "^4.24.12",
