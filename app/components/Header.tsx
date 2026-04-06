@@ -1,12 +1,11 @@
 /* eslint-disable react/require-default-props */
 
-'use client'
+'use client';
 
-import { ArrowUpRight, Database, FileCode, LogOut, Monitor, Moon, Settings, Sun } from "lucide-react";
-import { useCallback, useContext, useState, useEffect } from "react";
+import { ArrowUpRight, Copy, Network, FileCode, LogOut, MessagesSquare, Monitor, Moon, Plus, Sun } from "lucide-react";
+import { useCallback, useContext, useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { cn, getTheme, Panel } from "@/lib/utils";
-import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
 import { useRouter, usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import pkg from '@/package.json';
@@ -15,73 +14,117 @@ import { Drawer, DrawerContent, DrawerDescription, DrawerTitle, DrawerTrigger } 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
-import { useToast } from "@/components/ui/use-toast";
 import { useTheme } from "next-themes";
+import { useToast } from "@/components/ui/use-toast";
 import Button from "./ui/Button";
 import CreateGraph from "./CreateGraph";
-import { IndicatorContext, PanelContext, BrowserSettingsContext } from "./provider";
+import { IndicatorContext, PanelContext, ConnectionContext } from "./provider";
 
 interface Props {
     onSetGraphName: (newGraphName: string) => void
     graphNames: string[]
     graphName: string
-    onOpenGraphInfo: () => void
-    navigateToSettings: boolean
+    onOpenPanel: () => void
+    panelOpen: boolean
+    showUDF: boolean
 }
 
-function getPathType(pathname: string): "Schema" | "Graph" | undefined {
-    if (pathname.includes("/schema")) return "Schema"
-    if (pathname.includes("/graph")) return "Graph"
-    return undefined
+function getPathType(pathname: string): "Schema" | "Graph" | "Settings" | "UDF" | undefined {
+    if (pathname.includes("/schema")) return "Schema";
+    if (pathname.includes("/graph")) return "Graph";
+    if (pathname.includes("/settings")) return "Settings";
+    if (pathname.includes("/udf")) return "UDF";
+    return undefined;
 }
 
-const iconSize = 30
+const iconSize = 30;
 
-export default function Header({ onSetGraphName, graphNames, graphName, onOpenGraphInfo, navigateToSettings }: Props) {
+/**
+ * Format version number to include dots (e.g., "11111" -> "1.11.11")
+ */
+function formatVersion(version: string | undefined): string {
+    if (!version) return '';
 
-    const { indicator } = useContext(IndicatorContext)
-    const { setPanel } = useContext(PanelContext)
-    const { hasChanges, saveSettings, resetSettings, settings: { chatSettings: { model, secretKey, displayChat } } } = useContext(BrowserSettingsContext)
+    // If already formatted with dots, return as is
+    if (version.includes('.')) return version;
 
-    const { theme, setTheme } = useTheme()
-    const { currentTheme } = getTheme(theme)
-    const { data: session } = useSession()
-    const pathname = usePathname()
-    const router = useRouter()
-    const { toast } = useToast()
+    // Format as Major.Minor.Patch (e.g., "11111" -> "1.11.11")
+    if (version.length >= 5) {
+        const major = version.slice(0, 1);
+        const minor = version.slice(1, 3);
+        const patch = version.slice(3);
+        return `${major}.${minor}.${patch}`;
+    }
 
-    const [mounted, setMounted] = useState(false)
+    return version;
+}
 
-    const type = getPathType(pathname)
-    const showCreate = type && session?.user.role && session.user.role !== "Read-Only"
+export default function Header({ onSetGraphName, graphNames, graphName, onOpenPanel, panelOpen, showUDF }: Props) {
+
+    const { indicator } = useContext(IndicatorContext);
+    const { connectionType, connectionInfo, dbVersion } = useContext(ConnectionContext);
+    const { setPanel, panel } = useContext(PanelContext);
+
+    const { theme, setTheme } = useTheme();
+    const { currentTheme } = getTheme(theme);
+    const { data: session } = useSession();
+    const pathname = usePathname();
+    const router = useRouter();
+
+    const [mounted, setMounted] = useState(false);
+    const [openTooltip, setOpenTooltip] = useState<string | null>(null);
+    const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const { toast } = useToast();
+
+    const openTip = useCallback((name: string) => {
+        if (closeTimeoutRef.current) {
+            clearTimeout(closeTimeoutRef.current);
+            closeTimeoutRef.current = null;
+        }
+        setOpenTooltip(name);
+    }, []);
+
+    const closeTip = useCallback(() => {
+        closeTimeoutRef.current = setTimeout(() => {
+            setOpenTooltip(null);
+            closeTimeoutRef.current = null;
+        }, 150);
+    }, []);
 
     useEffect(() => {
-        setMounted(true)
-    }, [])
+        return () => {
+            if (closeTimeoutRef.current) {
+                clearTimeout(closeTimeoutRef.current);
+            }
+        };
+    }, []);
 
-    const navigateBack = useCallback(() => {
-        if (hasChanges) {
-            getQuerySettingsNavigationToast(toast, () => {
-                saveSettings()
-                router.back()
-            }, () => {
-                resetSettings()
-                router.back()
-            })
-        } else {
-            router.back()
+    const handleCopy = useCallback((text: string) => {
+        if (!navigator.clipboard?.writeText) {
+            toast({ title: "Clipboard not available", variant: "destructive" });
+            return;
         }
-    }, [hasChanges, resetSettings, saveSettings, router, toast])
+        navigator.clipboard.writeText(text)
+            .then(() => toast({ title: "Copied to clipboard" }))
+            .catch(() => toast({ title: "Failed to copy", variant: "destructive" }));
+    }, [toast]);
+
+    const type = getPathType(pathname);
+    const showCreate = type && type !== "Settings" && type !== "UDF" && session?.user.role && session.user.role !== "Read-Only";
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     const handleSetCurrentPanel = useCallback((newPanel: Panel) => {
-        setPanel(prev => prev === newPanel ? undefined : newPanel)
-    }, [setPanel])
+        setPanel(prev => prev === newPanel ? undefined : newPanel);
+    }, [setPanel]);
 
-    const separator = <div className="h-px w-[80%] bg-border rounded-full" />
+    const separator = <div className="h-px w-[80%] bg-border rounded-full" />;
 
     return (
         <div className="py-5 px-2 flex flex-col justify-between items-center border-r border-border">
-            <div className="w-full flex flex-col gap-4 items-center">
+            <div className="w-full flex flex-col gap-2 items-center">
                 {
                     mounted && currentTheme &&
                     <Link
@@ -93,87 +136,255 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                         <Image style={{ width: 'auto', height: '48px' }} priority src={`/icons/F-${currentTheme}.svg`} alt="FalkorDB Logo" width={0} height={0} />
                     </Link>
                 }
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <h2>{session?.user.username || "Default"}</h2>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>User Name</p>
+                    </TooltipContent>
+                </Tooltip>
                 {
-                    showCreate &&
-                    <>
+                    formatVersion(dbVersion) &&
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <h2>v{formatVersion(dbVersion)}</h2>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>FalkorDB Server Version</p>
+                        </TooltipContent>
+                    </Tooltip>
+                }
+                <div className="flex gap-1">
+                    <Tooltip open={openTooltip === "single"}>
+                        <TooltipTrigger asChild>
+                            <div
+                                className={cn("h-6 w-6 rounded-full bg-yellow-500 text-center", connectionType !== "Standalone" && "opacity-25")}
+                                onMouseEnter={() => openTip("single")}
+                                onMouseLeave={closeTip}
+                            >Si</div>
+                        </TooltipTrigger>
+                        <TooltipContent
+                            onMouseEnter={() => openTip("single")}
+                            onMouseLeave={closeTip}
+                            onPointerDownCapture={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex flex-col">
+                                <div className="flex gap-1">
+                                    <p>Single</p>
+                                    {
+                                        connectionType === "Standalone" && session?.user &&
+                                        <Button
+                                            title="Copy"
+                                            onClick={() => handleCopy(`${session?.user.host}:${session?.user.port}`)}
+                                        >
+                                            <Copy size={16} />
+                                        </Button>
+                                    }
+                                </div>
+                                {
+                                    connectionType === "Standalone" && session?.user &&
+                                    <p className="text-xs opacity-75">{session.user.host}:{session.user.port}</p>
+                                }
+                            </div>
+                        </TooltipContent>
+                    </Tooltip>
+                    <Tooltip open={openTooltip === "sentinel"}>
+                        <TooltipTrigger asChild>
+                            <div
+                                className={cn("h-6 w-6 rounded-full bg-green-500 text-center", connectionType !== "Sentinel" && "opacity-25")}
+                                onMouseEnter={() => openTip("sentinel")}
+                                onMouseLeave={closeTip}
+                            >Se</div>
+                        </TooltipTrigger>
+                        <TooltipContent
+                            onMouseEnter={() => openTip("sentinel")}
+                            onMouseLeave={closeTip}
+                            onPointerDownCapture={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex flex-col">
+                                <div className="flex gap-1">
+                                    <p>Sentinel</p>
+                                    {
+                                        connectionType === "Sentinel" && session?.user &&
+                                        <Button
+                                            title="Copy"
+                                            onClick={() => handleCopy(`${session?.user.host}:${session?.user.port}\n${connectionInfo.sentinelRole === "master" && connectionInfo.sentinelReplicas !== undefined ? `Role: Master (${connectionInfo.sentinelReplicas} replicas)` : ""}${connectionInfo.sentinelRole === "slave" && connectionInfo.sentinelMasterHost ? `\nRole: Replica (master: ${connectionInfo.sentinelMasterHost}:${connectionInfo.sentinelMasterPort})` : ""}`)}
+                                        >
+                                            <Copy size={16} />
+                                        </Button>
+                                    }
+                                </div>
+                                {
+                                    connectionType === "Sentinel" && session?.user &&
+                                    <div className="text-xs opacity-75">
+                                        <p>{session.user.host}:{session.user.port}</p>
+                                        {connectionInfo.sentinelRole === "master" && connectionInfo.sentinelReplicas !== undefined && <p>Role: Master ({connectionInfo.sentinelReplicas} replicas)</p>}
+                                        {connectionInfo.sentinelRole === "slave" && connectionInfo.sentinelMasterHost && <p>Role: Replica (master: {connectionInfo.sentinelMasterHost}:{connectionInfo.sentinelMasterPort})</p>}
+                                    </div>
+                                }
+                            </div>
+                        </TooltipContent>
+                    </Tooltip>
+                    <Tooltip open={openTooltip === "cluster"}>
+                        <TooltipTrigger asChild>
+                            <div
+                                className={cn("h-6 w-6 rounded-full bg-green-700 text-center", connectionType !== "Cluster" && "opacity-25")}
+                                onMouseEnter={() => openTip("cluster")}
+                                onMouseLeave={closeTip}
+                            >C</div>
+                        </TooltipTrigger>
+                        <TooltipContent
+                            onMouseEnter={() => openTip("cluster")}
+                            onMouseLeave={closeTip}
+                            onPointerDownCapture={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex flex-col">
+                                <div className="flex gap-1">
+                                    <p>Cluster</p>
+                                    {
+                                        connectionType === "Cluster" && session?.user &&
+                                        <Button
+                                            title="Copy"
+                                            onClick={() => handleCopy(`${session?.user.host}:${session?.user.port}${connectionInfo.clusterNodes ? `\nNodes: ${connectionInfo.clusterNodes.length}\n${connectionInfo.clusterNodes.map((node) => `${node.host}:${node.port} (${node.role}${node.slots ? ` ${node.slots}` : ""})`).join("\n")}` : ""}`)}
+                                        >
+                                            <Copy size={16} />
+                                        </Button>
+                                    }
+                                </div>
+                                {
+                                    connectionType === "Cluster" && session?.user &&
+                                    <div className="text-xs opacity-75">
+                                        <p>{session.user.host}:{session.user.port}</p>
+                                        {connectionInfo.clusterNodes && (
+                                            <div className="mt-1">
+                                                <p>Nodes: {connectionInfo.clusterNodes.length}</p>
+                                                {connectionInfo.clusterNodes.map((node) => (
+                                                    <p key={`${node.host}:${node.port}`}>
+                                                        {node.host}:{node.port} ({node.role}{node.slots ? ` ${node.slots}` : ""})
+                                                    </p>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                }
+                            </div>
+                        </TooltipContent>
+                    </Tooltip>
+                </div>
+                <div data-testid="NavigationButtons" className="p-1 flex flex-col items-center gap-2 bg-foreground/5 rounded-lg">
+                    <Button
+                        data-testid="settings"
+                        className={cn(
+                            "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/15",
+                            type === "Settings" && "!text-primary"
+                        )}
+                        title="Adjust application settings"
+                        label="SETTINGS"
+                        onClick={() => router.push("/settings")}
+                    />
+                    {
+                        showUDF ?
+                            <Button
+                                label="UDFs"
+                                title="User Defined Functions: View and manage your UDFs"
+                                className={cn(
+                                    "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
+                                    type === "UDF" && "!text-primary"
+                                )}
+                                onClick={() => router.push("/udf")}
+                                data-testid="UdfButton"
+                            /> : null
+                    }
+                    <Button
+                        label="GRAPHS"
+                        title="View and manage your graphs"
+                        className={cn(
+                            "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
+                            type === "Graph" && "!text-primary"
+                        )}
+                        onClick={() => router.push("/graph")}
+                        data-testid="GraphsButton"
+                    />
+                </div>
+                {/*
+                <Button
+                label="SCHEMAS"
+                title="View and manage your schemas"
+                className={cn("w-full flex justify-center text-foreground p-1 rounded-lg", type === "Schema" && "text-primary bg-border")}
+                onClick={() => router.push("/schema")}
+                data-testid="SchemasButton"
+                /> 
+                {separator}
+                */}
+                <div className="flex flex-col items-center gap-1">
+                    {
+                        type === "Graph" && graphName &&
+                        <Button
+                            indicator={indicator}
+                            className={cn(
+                                "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
+                                panelOpen && "!text-primary"
+                            )}
+                            title="Graph info"
+                            onClick={() => onOpenPanel()}
+                            data-testid="graphInfoToggle"
+                        >
+                            <Network size={iconSize - 5} />
+                        </Button>
+                    }
+                    {
+                        type === "Graph" && graphName &&
+                        <Button
+                            data-testid="chatToggleButton"
+                            className={cn(
+                                "text-foreground font-semibold text-xl p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
+                                panel === "chat" && "!text-primary"
+                            )}
+                            indicator={indicator}
+                            title="Chat"
+                            onClick={() => {
+                                handleSetCurrentPanel("chat");
+                            }}
+                        >
+                            <MessagesSquare size={iconSize - 5} />
+                        </Button>
+                    }
+                    {
+                        showCreate &&
                         <CreateGraph
                             label="Header"
                             onSetGraphName={onSetGraphName}
                             type={type}
                             graphNames={graphNames}
+                            trigger={
+                                <Button
+                                    data-testid={`create${type}`}
+                                    variant="Primary"
+                                    className="hover:!bg-primary/70 p-1"
+                                    title={`Create New ${type}`}
+                                >
+                                    <Plus size={iconSize - 5} />
+                                </Button>
+                            }
                         />
-                        {separator}
-                    </>
-                }
-                <Button
-                    label="GRAPHS"
-                    title="View and manage your graphs"
-                    className={cn(type === "Graph" ? "text-primary" : "text-foreground")}
-                    onClick={() => router.push("/graph")}
-                    data-testid="GraphsButton"
-                />
-                {/* {separator}
-                <Button
-                    label="SCHEMAS"
-                    title="View and manage your schemas"
-                    className={cn(type === "Schema" ? "text-primary" : "text-foreground")}
-                    onClick={() => router.push("/schema")}
-                    data-testid="SchemasButton"
-                /> */}
-                {
-                    type === "Graph" && graphName &&
-                    <>
-                        {separator}
-                        <Button
-                            indicator={indicator}
-                            title="Graph info"
-                            onClick={() => onOpenGraphInfo()}
-                            data-testid="graphInfoToggle"
-                        >
-                            <Database size={iconSize} />
-                        </Button>
-                    </>
-                }
-                {
-                    type === "Graph" && graphName && displayChat &&
-                    <>
-                        {separator}
-                        <Button
-                            className="Gradient bg-clip-text text-transparent font-semibold text-xl"
-                            indicator={indicator}
-                            title={`Use English to query the graph. 
-                                The feature requires LLM model and API key.
-                                Update local user parameters in Settings.`}
-                            label="CHAT"
-                            onClick={() => {
-                                if (navigateToSettings && (!model || !secretKey)) {
-                                    router.push("/settings")
-                                    toast({
-                                        title: "Incomplete Chat Settings",
-                                        description: "Please complete the chat settings to use the chat feature.",
-                                        variant: "destructive",
-                                    })
-                                } else {
-                                    handleSetCurrentPanel("chat")
-                                }
-                            }}
-                        />
-                    </>
-                }
+                    }
+                </div>
             </div>
-            <div className="w-full flex flex-col gap-4 items-center">
-                <Button
-                    data-testid="settings"
-                    title="Adjust application settings"
-                    onClick={() => pathname.includes("/settings") ? navigateBack() : router.push("/settings")}
-                >
-                    <Settings size={iconSize} />
-                </Button>
+            <div className="w-full flex flex-col gap-2 items-center">
+                <Tooltip>
+                    <TooltipTrigger>
+                        <p>v{pkg.version}</p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>FalkorDB Browser Version</p>
+                    </TooltipContent>
+                </Tooltip>
                 {separator}
                 <Drawer direction="right">
                     <DropdownMenu>
                         <DropdownMenuTrigger onClick={(e) => e.preventDefault()} asChild>
-                            <Button title="Help">
+                            <Button className="text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10" title="Help">
                                 <FileCode size={iconSize} />
                             </Button>
                         </DropdownMenuTrigger>
@@ -246,13 +457,14 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                         {separator}
                         <Button
                             data-testid="themeToggle"
+                            className="text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10"
                             title={`Toggle theme current theme: ${theme}`}
                             onClick={() => {
-                                let newTheme = ""
-                                if (theme === "dark") newTheme = "light"
-                                else if (theme === "light") newTheme = "system"
-                                else newTheme = "dark"
-                                setTheme(newTheme)
+                                let newTheme = "";
+                                if (theme === "dark") newTheme = "light";
+                                else if (theme === "light") newTheme = "system";
+                                else newTheme = "dark";
+                                setTheme(newTheme);
                             }}
                         >
                             {theme === "dark" && <Sun size={iconSize} />}
@@ -280,6 +492,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                 {separator}
                 <Button
                     title="Log Out"
+                    className="text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10"
                     data-testid="logoutButton"
                     onClick={() => signOut({ redirect: false }).then(() => router.push("/login"))}
                 >
@@ -287,5 +500,5 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                 </Button>
             </div>
         </div >
-    )
+    );
 }

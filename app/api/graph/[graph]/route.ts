@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { renameGraph, validateBody } from "../../validate-body";
+import { getCorsHeaders } from "../../utils";
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
+}
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ graph: string }> }
 ) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -23,20 +28,23 @@ export async function DELETE(
 
         await graph.delete();
 
-        return NextResponse.json({ message: `${graphId} graph deleted` });
+        return NextResponse.json(
+          { message: `${graphId} graph deleted` },
+          { headers: getCorsHeaders(request) }
+        );
       }
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }
@@ -46,7 +54,7 @@ export async function POST(
   { params }: { params: Promise<{ graph: string }> }
 ) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -64,20 +72,20 @@ export async function POST(
 
       return NextResponse.json(
         { message: "Graph created successfully" },
-        { status: 200 }
+        { status: 200, headers: getCorsHeaders(request) }
       );
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }
@@ -87,7 +95,7 @@ export async function PATCH(
   { params }: { params: Promise<{ graph: string }> }
 ) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -106,7 +114,7 @@ export async function PATCH(
       if (!validation.success) {
         return NextResponse.json(
           { message: validation.error },
-          { status: 400 }
+          { status: 400, headers: getCorsHeaders(request) }
         );
       }
 
@@ -117,19 +125,19 @@ export async function PATCH(
 
       if (!data) throw new Error(`${graphId} already exists`);
 
-      return NextResponse.json({ data });
+      return NextResponse.json({ data }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: getCorsHeaders(request)  }
     );
   }
 }
@@ -145,7 +153,7 @@ export async function GET(
   const writer = writable.getWriter();
 
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       throw new Error(await session.text());
@@ -154,7 +162,7 @@ export async function GET(
     const { client, user } = session;
     const { graph: graphId } = await params;
     const query = request.nextUrl.searchParams.get("query");
-    const timeout = Number(request.nextUrl.searchParams.get("timeout"));
+    const timeout = Number(request.nextUrl.searchParams.get("timeout")) * 1000;
 
     try {
       if (!query) throw new Error("Missing parameter query");
@@ -244,6 +252,7 @@ export async function GET(
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
+      ...getCorsHeaders(request),
     },
   });
 }

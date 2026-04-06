@@ -4,6 +4,7 @@ import {
   interactWhenVisible,
   waitForElementToNotBeVisible,
 } from "@/e2e/infra/utils";
+import { EMPTY_DISPLAY_NAME } from "@/app/api/graph/model";
 import GraphInfoPage from "./graphInfoPage";
 
 export default class CustomizeStylePage extends GraphInfoPage {
@@ -16,7 +17,7 @@ export default class CustomizeStylePage extends GraphInfoPage {
   }
 
   private get panelTitle(): Locator {
-    return this.page.getByText("Style Settings");
+    return this.page.getByText("Customize Style");
   }
 
   private get colorSection(): Locator {
@@ -27,20 +28,12 @@ export default class CustomizeStylePage extends GraphInfoPage {
     return this.page.getByText("Size:");
   }
 
-  private get captionSection(): Locator {
-    return this.page.getByText("Caption:");
-  }
-
   private get colorButtons(): Locator {
     return this.page.locator('button[aria-label^="Select color"]');
   }
 
   private get sizeButtons(): Locator {
     return this.page.locator('button[aria-label^="Select size"]');
-  }
-
-  private captionOption(caption: string): Locator {
-    return this.page.getByText(caption).last();
   }
 
   private get closeButton(): Locator {
@@ -95,10 +88,6 @@ export default class CustomizeStylePage extends GraphInfoPage {
     return waitForElementToBeVisible(this.sizeSection);
   }
 
-  async isCaptionSectionVisible(): Promise<boolean> {
-    return waitForElementToBeVisible(this.captionSection);
-  }
-
   async selectFirstColor(): Promise<void> {
     await interactWhenVisible(
       this.colorButtons.first(),
@@ -131,14 +120,6 @@ export default class CustomizeStylePage extends GraphInfoPage {
     );
   }
 
-  async selectCaption(caption: string): Promise<void> {
-    await interactWhenVisible(
-      this.captionOption(caption),
-      (el) => el.click(),
-      `Caption Option ${caption}`
-    );
-  }
-
   async closePanel(): Promise<void> {
     await interactWhenVisible(
       this.closeButton,
@@ -152,27 +133,25 @@ export default class CustomizeStylePage extends GraphInfoPage {
   }
 
   async getLabelButtonColor(label: string): Promise<string> {
+    // Wait for the button to be visible first
+    await waitForElementToBeVisible(this.labelButton(label));
+
+    // Get the color from the inline style attribute which is the source of truth
     const color = await this.labelButton(label).evaluate((el: HTMLElement) =>
-      window.getComputedStyle(el).backgroundColor
+      el.style.backgroundColor || window.getComputedStyle(el).backgroundColor
     );
     return color;
   }
 
   async getLabelStyleFromLocalStorage(label: string): Promise<{
-    customColor?: string;
-    customSize?: number;
-    customCaption?: string;
+    color?: string;
+    size?: number;
   } | null> {
     const style = await this.page.evaluate((labelName) => {
       const stored = localStorage.getItem(`labelStyle_${labelName}`);
       return stored ? JSON.parse(stored) : null;
     }, label);
     return style;
-  }
-
-  async hoverOnNode(x: number, y: number): Promise<void> {
-    await this.page.mouse.move(x, y);
-    await this.page.waitForTimeout(500);
   }
 
   async getSelectedSizeButtonIndex(): Promise<number> {
@@ -206,7 +185,7 @@ export default class CustomizeStylePage extends GraphInfoPage {
       throw new Error(`Node with id ${nodeId} not found`);
     }
     // displayName is a tuple [line1, line2]
-    const [line1, line2] = node.displayName || ["", ""];
+    const [line1, line2] = node.displayName || EMPTY_DISPLAY_NAME;
     return [line1, line2].filter(Boolean).join(" ");
   }
 

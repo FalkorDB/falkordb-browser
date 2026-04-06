@@ -5,14 +5,19 @@ import {
   deleteSchemaElement,
   validateBody,
 } from "@/app/api/validate-body";
+import { getCorsHeaders } from "@/app/api/utils";
 import { formatAttributes } from "./utils";
+
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
+}
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ schema: string; element: string }> }
 ) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -36,19 +41,19 @@ export async function GET(
           ? await schema.roQuery(query, { params: { id: elementId } })
           : await schema.query(query, { params: { id: elementId } });
 
-      return NextResponse.json({ result }, { status: 200 });
+      return NextResponse.json({ result }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }
@@ -58,7 +63,7 @@ export async function POST(
   { params }: { params: Promise<{ schema: string; element: string }> }
 ) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -72,7 +77,7 @@ export async function POST(
     const validation = validateBody(createSchemaElement, body);
 
     if (!validation.success) {
-      return NextResponse.json({ message: validation.error }, { status: 400 });
+      return NextResponse.json({ message: validation.error }, { status: 400, headers: getCorsHeaders(request) });
     }
 
     const { type, label, attributes, selectedNodes } = validation.data;
@@ -121,18 +126,18 @@ export async function POST(
           ? await graph.roQuery(query, { params: queryParams })
           : await graph.query(query, { params: queryParams });
 
-      return NextResponse.json({ result }, { status: 200 });
+      return NextResponse.json({ result }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }
@@ -142,7 +147,7 @@ export async function DELETE(
   { params }: { params: Promise<{ schema: string; element: string }> }
 ) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -157,7 +162,7 @@ export async function DELETE(
     const validation = validateBody(deleteSchemaElement, body);
 
     if (!validation.success) {
-      return NextResponse.json({ message: validation.error }, { status: 400 });
+      return NextResponse.json({ message: validation.error }, { status: 400, headers: getCorsHeaders(request) });
     }
 
     const { type } = validation.data;
@@ -174,19 +179,19 @@ export async function DELETE(
 
       return NextResponse.json(
         { message: "Element deleted successfully" },
-        { status: 200 }
+        { status: 200, headers: getCorsHeaders(request) }
       );
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }

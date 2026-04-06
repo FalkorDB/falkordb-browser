@@ -70,18 +70,18 @@ test.describe("Graph Tests", () => {
     expect(fs.existsSync(downloadPath)).toBe(true);
     await apiCall.removeGraph(graphName);
   });
-   
+
   queryData.queries[0].failedQueries.forEach((query) => {
-       test(`@admin Validate failure & error message when user runs an invalid queries: ${query.name}`, async () => {
-           const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-           const graphName = getRandomString('graph');
-           await graph.addGraph(graphName);
-           await graph.insertQuery(query.query);
-           await graph.clickRunQuery(false);
-           expect(await graph.getNotificationErrorToast()).toBe(true);
-           await apiCall.removeGraph(graphName);
-       });
-   })
+    test(`@admin Validate failure & error message when user runs an invalid queries: ${query.name}`, async () => {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      const graphName = getRandomString('graph');
+      await graph.addGraph(graphName);
+      await graph.insertQuery(query.query);
+      await graph.clickRunQuery(false);
+      expect(await graph.getNotificationErrorToast()).toBe(true);
+      await apiCall.removeGraph(graphName);
+    });
+  });
 
   test(`@admin Validate that modifying the graph name updates it correctly`, async () => {
     const graphName = getRandomString("graph");
@@ -128,7 +128,7 @@ test.describe("Graph Tests", () => {
     await apiCall.removeGraph(graphName1);
     await apiCall.removeGraph(graphName2);
   });
-    
+
   test(`@readwrite Validate that running multiple queries updates the node and edge count correctly`, async () => {
     const graphName = getRandomString('graph');
     await apiCall.addGraph(graphName);

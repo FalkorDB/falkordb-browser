@@ -1,18 +1,18 @@
 /* eslint-disable react/destructuring-assignment */
 
-'use client'
+'use client';
 
 import { Fragment, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
-import { ArrowRight, ArrowRightLeft, Check, Info, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ArrowRight, ArrowRightLeft, Check, Circle, Info, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
-import { cn, getNodeDisplayText } from "@/lib/utils";
+import { cn, Node, Value } from "@/lib/utils";
+import { getNodeDisplayText } from "@falkordb/canvas";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Combobox from "../components/ui/combobox";
-import { Node, Value } from "../api/graph/model";
 import { BrowserSettingsContext, IndicatorContext } from "../components/provider";
 import AddLabel from "./addLabel";
 import RemoveLabel from "./RemoveLabel";
@@ -33,7 +33,7 @@ type Props =
         type: false;
     };
 
-type ValueType = "string" | "number" | "boolean"
+type ValueType = "string" | "number" | "boolean";
 
 export default function CreateElementPanel(props: Props) {
     const { onCreate, onClose, type } = props;
@@ -41,150 +41,150 @@ export default function CreateElementPanel(props: Props) {
     const selectedNodes = !type ? props.selectedNodes : undefined;
     const setSelectedNodes = !type ? props.setSelectedNodes : undefined;
 
-    const { indicator } = useContext(IndicatorContext)
-    const { settings: { graphInfo: { displayTextPriority } } } = useContext(BrowserSettingsContext)
-    const { toast } = useToast()
+    const { indicator } = useContext(IndicatorContext);
+    const { settings: { captionsKeysSettings: { captionsKeys }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
+    const { toast } = useToast();
 
-    const setInputRef = useRef<HTMLInputElement>(null)
-    const scrollableContainerRef = useRef<HTMLDivElement>(null)
+    const setInputRef = useRef<HTMLInputElement>(null);
+    const scrollableContainerRef = useRef<HTMLDivElement>(null);
 
-    const [attributes, setAttributes] = useState<[string, Value][]>([])
-    const [newKey, setNewKey] = useState<string>("")
-    const [newVal, setNewVal] = useState<Value>("")
-    const [newType, setNewType] = useState<ValueType>("string")
-    const [editVal, setEditVal] = useState<Value>("")
-    const [editType, setEditType] = useState<ValueType>("string")
-    const [labels, setLabels] = useState<string[]>([])
-    const [labelsHover, setLabelsHover] = useState<boolean>(false)
-    const [isLoading, setIsLoading] = useState<boolean>(false)
-    const [hover, setHover] = useState<string>("")
-    const [expandedAttributes, setExpandedAttributes] = useState<Record<string, boolean>>({})
-    const [editable, setEditable] = useState<string>("")
-    const valueParagraphRefs = useRef<Record<string, HTMLParagraphElement | null>>({})
-    const [valueOverflowMap, setValueOverflowMap] = useState<Record<string, boolean>>({})
+    const [attributes, setAttributes] = useState<[string, Value][]>([]);
+    const [newKey, setNewKey] = useState<string>("");
+    const [newVal, setNewVal] = useState<Value>("");
+    const [newType, setNewType] = useState<ValueType>("string");
+    const [editVal, setEditVal] = useState<Value>("");
+    const [editType, setEditType] = useState<ValueType>("string");
+    const [labels, setLabels] = useState<string[]>([]);
+    const [labelsHover, setLabelsHover] = useState<boolean>(false);
+    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [hover, setHover] = useState<string>("");
+    const [expandedAttributes, setExpandedAttributes] = useState<Record<string, boolean>>({});
+    const [editable, setEditable] = useState<string>("");
+    const valueParagraphRefs = useRef<Record<string, HTMLParagraphElement | null>>({});
+    const [valueOverflowMap, setValueOverflowMap] = useState<Record<string, boolean>>({});
 
     const setValueParagraphRef = useCallback((key: string) => (el: HTMLParagraphElement | null) => {
         if (!el) {
-            delete valueParagraphRefs.current[key]
-            return
+            delete valueParagraphRefs.current[key];
+            return;
         }
-        valueParagraphRefs.current[key] = el
-    }, [])
+        valueParagraphRefs.current[key] = el;
+    }, []);
 
     const measureValueOverflow = useCallback(() => {
-        if (typeof window === "undefined") return
+        if (typeof window === "undefined") return;
 
-        const nextMap: Record<string, boolean> = {}
+        const nextMap: Record<string, boolean> = {};
 
         attributes.forEach(([key]) => {
-            const element = valueParagraphRefs.current[key]
-            if (!element) return
+            const element = valueParagraphRefs.current[key];
+            if (!element) return;
 
-            const computedStyle = window.getComputedStyle(element)
-            let lineHeight = parseFloat(computedStyle.lineHeight)
+            const computedStyle = window.getComputedStyle(element);
+            let lineHeight = parseFloat(computedStyle.lineHeight);
 
             if (Number.isNaN(lineHeight)) {
-                const fontSize = parseFloat(computedStyle.fontSize)
-                lineHeight = Number.isNaN(fontSize) ? 16 : fontSize * 1.2
+                const fontSize = parseFloat(computedStyle.fontSize);
+                lineHeight = Number.isNaN(fontSize) ? 16 : fontSize * 1.2;
             }
 
-            const collapsedHeight = lineHeight * 3
-            nextMap[key] = element.scrollHeight - collapsedHeight > 1
-        })
+            const collapsedHeight = lineHeight * 3;
+            nextMap[key] = element.scrollHeight - collapsedHeight > 1;
+        });
 
         setValueOverflowMap((prev) => {
-            const prevKeys = Object.keys(prev)
-            const nextKeys = Object.keys(nextMap)
+            const prevKeys = Object.keys(prev);
+            const nextKeys = Object.keys(nextMap);
 
             if (prevKeys.length === nextKeys.length && prevKeys.every((key) => prev[key] === nextMap[key])) {
-                return prev
+                return prev;
             }
 
-            return nextMap
-        })
-    }, [attributes])
+            return nextMap;
+        });
+    }, [attributes]);
 
     useLayoutEffect(() => {
-        measureValueOverflow()
-        if (typeof window === "undefined") return undefined
+        measureValueOverflow();
+        if (typeof window === "undefined") return undefined;
 
-        window.addEventListener("resize", measureValueOverflow)
+        window.addEventListener("resize", measureValueOverflow);
         return () => {
-            window.removeEventListener("resize", measureValueOverflow)
-        }
-    }, [measureValueOverflow])
+            window.removeEventListener("resize", measureValueOverflow);
+        };
+    }, [measureValueOverflow]);
 
     useLayoutEffect(() => {
-        if (typeof ResizeObserver === "undefined") return undefined
-        if (!scrollableContainerRef.current) return undefined
+        if (typeof ResizeObserver === "undefined") return undefined;
+        if (!scrollableContainerRef.current) return undefined;
 
-        const observer = new ResizeObserver(() => measureValueOverflow())
-        observer.observe(scrollableContainerRef.current)
+        const observer = new ResizeObserver(() => measureValueOverflow());
+        observer.observe(scrollableContainerRef.current);
 
         return () => {
-            observer.disconnect()
-        }
-    }, [measureValueOverflow])
+            observer.disconnect();
+        };
+    }, [measureValueOverflow]);
 
     const handleClose = useCallback((e?: KeyboardEvent) => {
-        if (e && e.key !== "Escape") return
-        setAttributes([])
-        setLabels([])
-        setNewKey("")
-        setNewVal("")
-        setNewType("string")
-        setEditVal("")
-        setEditType("string")
-        setEditable("")
-        setHover("")
-        setExpandedAttributes({})
-        onClose()
-    }, [onClose])
+        if (e && e.key !== "Escape") return;
+        setAttributes([]);
+        setLabels([]);
+        setNewKey("");
+        setNewVal("");
+        setNewType("string");
+        setEditVal("");
+        setEditType("string");
+        setEditable("");
+        setHover("");
+        setExpandedAttributes({});
+        onClose();
+    }, [onClose]);
 
     useEffect(() => {
-        window.addEventListener("keydown", handleClose)
+        window.addEventListener("keydown", handleClose);
         return () => {
-            window.removeEventListener("keydown", handleClose)
-        }
-    }, [handleClose])
+            window.removeEventListener("keydown", handleClose);
+        };
+    }, [handleClose]);
 
     useEffect(() => {
         if (setInputRef.current && editable) {
-            setInputRef.current.focus()
+            setInputRef.current.focus();
         }
-    }, [editable])
+    }, [editable]);
 
-    const handleGetNodeTextPriority = useCallback((node: Node) => getNodeDisplayText(node, displayTextPriority), [displayTextPriority])
+    const handleGetNodeTextPriority = useCallback((node: Node) => getNodeDisplayText(node, captionsKeys, showPropertyKeyPrefix), [captionsKeys, showPropertyKeyPrefix]);
 
     const getDefaultVal = (t: ValueType): Value => {
         switch (t) {
             case "boolean":
-                return false
+                return false;
             case "number":
-                return 0
+                return 0;
             default:
-                return ""
+                return "";
         }
-    }
+    };
 
     const getStringValue = (value: Value) => {
         switch (typeof value) {
             case "number":
-                return String(value)
+                return String(value);
             case "boolean":
-                return value ? "true" : "false"
+                return value ? "true" : "false";
             case "object":
-                return String(value)
+                return String(value);
             default:
-                return value
+                return value;
         }
-    }
+    };
 
     const handleSetEditable = (key: string, value?: Value) => {
-        setEditable(key)
-        setEditVal(value || "")
-        setEditType(typeof value === "undefined" ? "string" : typeof value as ValueType)
-    }
+        setEditable(key);
+        setEditVal(value || "");
+        setEditType(typeof value === "undefined" ? "string" : typeof value as ValueType);
+    };
 
     const handleUpdateAttribute = (oldKey: string) => {
         if (editVal === "") {
@@ -192,37 +192,37 @@ export default function CreateElementPanel(props: Props) {
                 title: "Error",
                 description: "Value cannot be empty",
                 variant: "destructive"
-            })
-            return
+            });
+            return;
         }
 
         setAttributes(prev => prev.map(([key, val]) =>
             key === oldKey ? [key, editVal] : [key, val]
-        ))
+        ));
 
-        setEditable("")
-        setEditVal("")
-        setEditType("string")
+        setEditable("");
+        setEditVal("");
+        setEditType("string");
         setExpandedAttributes(prev => ({
             ...prev,
             [oldKey]: false
-        }))
-    }
+        }));
+    };
 
     const handleSetKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, key: string) => {
         if (e.key === "Escape") {
-            e.preventDefault()
-            setEditable("")
-            setEditVal("")
-            setEditType("string")
-            return
+            e.preventDefault();
+            setEditable("");
+            setEditVal("");
+            setEditType("string");
+            return;
         }
 
-        if (e.key !== 'Enter') return
+        if (e.key !== 'Enter') return;
 
-        e.preventDefault()
-        handleUpdateAttribute(key)
-    }
+        e.preventDefault();
+        handleUpdateAttribute(key);
+    };
 
     const handleAddAttribute = () => {
         if (!newKey || newVal === "") {
@@ -230,9 +230,9 @@ export default function CreateElementPanel(props: Props) {
                 title: "Error",
                 description: "Key or value cannot be empty",
                 variant: "destructive"
-            })
+            });
 
-            return
+            return;
         }
 
         if (attributes.some(([key]) => key === newKey)) {
@@ -240,47 +240,47 @@ export default function CreateElementPanel(props: Props) {
                 title: "Error",
                 description: "An attribute with this key already exists",
                 variant: "destructive"
-            })
+            });
 
-            return
+            return;
         }
 
-        setAttributes(prev => [...prev, [newKey, newVal]])
-        setNewKey("")
-        setNewVal("")
-        setNewType("string")
-    }
+        setAttributes(prev => [...prev, [newKey, newVal]]);
+        setNewKey("");
+        setNewVal("");
+        setNewType("string");
+    };
 
     const handleAddKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.code === "Escape") {
-            e.preventDefault()
-            setNewKey("")
-            setNewVal("")
-            setNewType("string")
-            return
+            e.preventDefault();
+            setNewKey("");
+            setNewVal("");
+            setNewType("string");
+            return;
         }
 
-        if (e.key !== 'Enter') return
+        if (e.key !== 'Enter') return;
 
-        e.preventDefault()
-        handleAddAttribute()
-    }
+        e.preventDefault();
+        handleAddAttribute();
+    };
 
-    const valueNeedsExpansion = (key: string) => Boolean(valueOverflowMap[key])
+    const valueNeedsExpansion = (key: string) => Boolean(valueOverflowMap[key]);
 
     const handleToggleValueExpansion = (key: string, event: ReactMouseEvent<HTMLElement> | ReactKeyboardEvent<HTMLElement>) => {
-        event.preventDefault()
-        event.stopPropagation()
+        event.preventDefault();
+        event.stopPropagation();
         setExpandedAttributes(prev => ({
             ...prev,
             [key]: !prev[key]
-        }))
-    }
+        }));
+    };
 
     const getCellEditableContent = (actionType: "set" | "add" = "add", key?: string) => {
-        const value = actionType === "set" ? editVal : newVal
-        const valueType = actionType === "set" ? editType : newType
-        const setValue = actionType === "set" ? setEditVal : setNewVal
+        const value = actionType === "set" ? editVal : newVal;
+        const valueType = actionType === "set" ? editType : newType;
+        const setValue = actionType === "set" ? setEditVal : setNewVal;
 
         switch (valueType) {
             case "boolean":
@@ -288,18 +288,18 @@ export default function CreateElementPanel(props: Props) {
                     className="data-[state=unchecked]:bg-border"
                     checked={value as boolean}
                     onCheckedChange={(checked) => setValue(checked)}
-                />
+                />;
             case "number":
                 return <Input
                     className="w-full"
                     ref={actionType === "set" ? setInputRef : undefined}
                     value={value as number}
                     onChange={(e) => {
-                        const num = Number(e.target.value)
-                        if (!Number.isNaN(num)) setValue(num)
+                        const num = Number(e.target.value);
+                        if (!Number.isNaN(num)) setValue(num);
                     }}
                     onKeyDown={actionType === "set" ? (e) => handleSetKeyDown(e, key!) : handleAddKeyDown}
-                />
+                />;
             default:
                 return <Input
                     className="w-full"
@@ -307,36 +307,36 @@ export default function CreateElementPanel(props: Props) {
                     value={value as string}
                     onChange={(e) => setValue(e.target.value)}
                     onKeyDown={actionType === "set" ? (e) => handleSetKeyDown(e, key!) : handleAddKeyDown}
-                />
+                />;
         }
-    }
+    };
 
     const getNewTypeInput = (actionType: "set" | "add" = "add") => {
-        const valueType = actionType === "set" ? editType : newType
-        const setType = actionType === "set" ? setEditType : setNewType
-        const value = actionType === "set" ? editVal : newVal
-        const setValue = actionType === "set" ? setEditVal : setNewVal
+        const valueType = actionType === "set" ? editType : newType;
+        const setType = actionType === "set" ? setEditType : setNewType;
+        const value = actionType === "set" ? editVal : newVal;
+        const setValue = actionType === "set" ? setEditVal : setNewVal;
 
         return (
             <Combobox
-                className="w-fit"
+                className="w-full"
                 inTable
                 options={["string", "number", "boolean"]}
                 selectedValue={valueType}
                 setSelectedValue={(val) => {
-                    const t = val as ValueType
-                    setType(t)
-                    setValue(typeof value === t ? value : getDefaultVal(t))
+                    const t = val as ValueType;
+                    setType(t);
+                    setValue(typeof value === t ? value : getDefaultVal(t));
                 }}
                 label="Type"
             />
-        )
-    }
+        );
+    };
 
     const isComplexType = (value: Value) => {
-        const valueType = typeof value
-        return valueType !== "string" && valueType !== "number" && valueType !== "boolean"
-    }
+        const valueType = typeof value;
+        return valueType !== "string" && valueType !== "number" && valueType !== "boolean";
+    };
 
     const handleAddLabel = async (newLabel: string) => {
         if (newLabel === "") {
@@ -344,8 +344,8 @@ export default function CreateElementPanel(props: Props) {
                 title: "Error",
                 description: "Label cannot be empty",
                 variant: "destructive"
-            })
-            return false
+            });
+            return false;
         }
 
         if (labels.includes(newLabel)) {
@@ -353,8 +353,8 @@ export default function CreateElementPanel(props: Props) {
                 title: "Error",
                 description: "Label already exists",
                 variant: "destructive"
-            })
-            return false
+            });
+            return false;
         }
 
         // For edges, only allow one label
@@ -363,20 +363,20 @@ export default function CreateElementPanel(props: Props) {
                 title: "Error",
                 description: "Edge can only have one label",
                 variant: "destructive"
-            })
-            return false
+            });
+            return false;
         }
 
-        setLabels(prev => [...prev, newLabel])
+        setLabels(prev => [...prev, newLabel]);
 
-        return true
-    }
+        return true;
+    };
 
     const handleRemoveLabel = async (removeLabel: string) => {
-        setLabels(prev => prev.filter(l => l !== removeLabel))
+        setLabels(prev => prev.filter(l => l !== removeLabel));
 
-        return true
-    }
+        return true;
+    };
 
     const handleOnCreate = async () => {
         if (!type) {
@@ -385,53 +385,59 @@ export default function CreateElementPanel(props: Props) {
                     title: "Error",
                     description: "Edge must have a label (relationship type)",
                     variant: "destructive"
-                })
-                return
+                });
+                return;
             }
         }
 
         try {
-            setIsLoading(true)
-            const ok = await onCreate(attributes, labels)
+            setIsLoading(true);
+            const ok = await onCreate(attributes, labels);
 
-            if (!ok) return
+            if (!ok) return;
 
-            setAttributes([])
-            setNewKey("")
-            setNewVal("")
-            setNewType("string")
-            setEditVal("")
-            setEditType("string")
-            setLabels([])
+            setAttributes([]);
+            setNewKey("");
+            setNewVal("");
+            setNewType("string");
+            setEditVal("");
+            setEditType("string");
+            setLabels([]);
         } finally {
-            setIsLoading(false)
+            setIsLoading(false);
         }
-    }
+    };
 
     return (
-        <div className="DataPanel p-4">
-            <div className="relative flex flex-col gap-6 pb-4 border-b border-border">
-                <div className="flex flex-row justify-between">
-                    <div className="flex flex-col gap-2 font-medium text-xl text-nowrap">
-                        <p>Attributes: <span className="Gradient text-transparent bg-clip-text">{attributes.length}</span></p>
-                    </div>
-                    <Button
-                        className="h-fit"
-                        title="Close"
-                        onClick={onClose}
-                    >
-                        <X />
-                    </Button>
+        <div className="DataPanel p-4 gap-1 relative">
+            <Button
+                className="absolute top-2 right-2"
+                title="Close"
+                onClick={onClose}
+            >
+                <X size={16} />
+            </Button>
+            <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between pr-5">
+                    <h1 className="text-2xl">Create {type ? "Node" : "Edge"}</h1>
+                    {
+                        type
+                            ? <Circle className="text-brandGreen" size={25} />
+                            : <ArrowRight className="text-brandGreen" size={25} />
+                    }
+                </div>
+                <div className="flex flex-col gap-2 font-medium text-xl text-nowrap">
+                    <p>Attributes: <span className="Gradient text-transparent bg-clip-text">{attributes.length}</span></p>
                 </div>
                 <ul
-                    className="flex flex-wrap gap-4"
+                    className="flex flex-wrap gap-2"
                     onMouseEnter={() => setLabelsHover(true)}
                     onMouseLeave={() => setLabelsHover(false)}
                 >
                     {labels.map((l) => (
                         <li
                             key={l}
-                            className="flex gap-2 px-2 py-1 bg-secondary rounded-full items-center"
+                            className="flex gap-2 p-1 bg-secondary rounded-full items-center"
                         >
                             <p>{l}</p>
                             <RemoveLabel
@@ -470,16 +476,16 @@ export default function CreateElementPanel(props: Props) {
             <div className="w-full h-1 grow flex flex-col justify-between items-start font-medium">
                 <div ref={scrollableContainerRef} className="h-1 grow overflow-y-auto overflow-x-hidden w-full">
                     <div className="grid grid-cols-[minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)_minmax(60px,1fr)]">
-                        <div className="flex items-center font-medium text-muted-foreground px-2 border-b border-border h-10">Key</div>
-                        <div className="flex items-center font-medium text-muted-foreground px-2 border-b border-border h-10">Value</div>
-                        <div className="flex items-center font-medium text-muted-foreground px-2 border-b border-border h-10">Type</div>
-                        <div className="flex items-center px-2 border-b border-border h-10"><div className="w-6" /></div>
+                        <div className="flex items-center font-medium text-muted-foreground px-2 border-y border-border h-10">Key</div>
+                        <div className="flex items-center font-medium text-muted-foreground px-2 border-y border-border h-10">Value</div>
+                        <div className="flex items-center font-medium text-muted-foreground px-2 border-y border-border h-10">Type</div>
+                        <div className="flex items-center px-2 border-y border-border h-10"><div className="w-6" /></div>
                         {attributes.map(([key, value]) => {
-                            const isComplex = isComplexType(value)
-                            const stringValue = getStringValue(value)
-                            const isExpanded = expandedAttributes[key]
-                            const shouldShowToggle = valueNeedsExpansion(key)
-                            const rowHeightClass = editable === key ? "py-2 min-h-14" : "py-2 min-h-10"
+                            const isComplex = isComplexType(value);
+                            const stringValue = getStringValue(value);
+                            const isExpanded = expandedAttributes[key];
+                            const shouldShowToggle = valueNeedsExpansion(key);
+                            const rowHeightClass = editable === key ? "py-2 min-h-14" : "py-2 min-h-10";
 
                             return (
                                 <Fragment key={key}>
@@ -526,7 +532,7 @@ export default function CreateElementPanel(props: Props) {
                                                                     onClick={(event) => handleToggleValueExpansion(key, event)}
                                                                     onKeyDown={(event) => {
                                                                         if (event.key === "Enter" || event.key === " ") {
-                                                                            handleToggleValueExpansion(key, event)
+                                                                            handleToggleValueExpansion(key, event);
                                                                         }
                                                                     }}
                                                                 >
@@ -564,9 +570,9 @@ export default function CreateElementPanel(props: Props) {
                                                         variant="button"
                                                         title="Cancel"
                                                         onClick={() => {
-                                                            setEditable("")
-                                                            setEditVal("")
-                                                            setEditType("string")
+                                                            setEditable("");
+                                                            setEditVal("");
+                                                            setEditType("string");
                                                         }}
                                                     >
                                                         <X size={20} />
@@ -620,7 +626,7 @@ export default function CreateElementPanel(props: Props) {
                                         }
                                     </div>
                                 </Fragment>
-                            )
+                            );
                         })}
                         <div className="flex items-center px-2 border-b border-border h-14">
                             <Input
@@ -649,9 +655,9 @@ export default function CreateElementPanel(props: Props) {
                                 variant="button"
                                 title="Cancel"
                                 onClick={() => {
-                                    setNewKey("")
-                                    setNewVal("")
-                                    setNewType("string")
+                                    setNewKey("");
+                                    setNewVal("");
+                                    setNewType("string");
                                 }}
                             >
                                 <X size={20} />
@@ -673,7 +679,7 @@ export default function CreateElementPanel(props: Props) {
                         </div>
                         <div className="flex items-center px-2 border-b border-border h-14 opacity-50">
                             <Combobox
-                                className="w-fit"
+                                className="w-full"
                                 inTable
                                 disabled
                                 options={["string", "number", "boolean"]}
@@ -756,5 +762,5 @@ export default function CreateElementPanel(props: Props) {
                 </div>
             </div>
         </div>
-    )
+    );
 }

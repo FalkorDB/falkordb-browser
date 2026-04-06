@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
 import { getClient } from "../../[...nextauth]/options";
+import { getCorsHeaders } from "../../../utils";
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
+}
 
 /**
  * Fetches token details by token_id using storage abstraction
  */
-async function fetchTokenById(tokenId: string): Promise<{
+async function fetchTokenById(tokenId: string, request: Request): Promise<{
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tokenData?: any;
   error?: NextResponse;
@@ -17,7 +22,7 @@ async function fetchTokenById(tokenId: string): Promise<{
     return {
       error: NextResponse.json(
         { message: "Token not found" },
-        { status: 404 }
+        { status: 404, headers: getCorsHeaders(request) }
       ),
     };
   }
@@ -47,7 +52,8 @@ function checkViewPermission(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   authenticatedUser: any,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tokenData: any
+  tokenData: any,
+  request: Request
 ): { authorized: boolean; error?: NextResponse } {
   const isAdmin = authenticatedUser.role === "Admin";
 
@@ -66,7 +72,7 @@ function checkViewPermission(
       authorized: false,
       error: NextResponse.json(
         { message: "Forbidden: You can only view your own tokens" },
-        { status: 403 }
+        { status: 403, headers: getCorsHeaders(request) }
       ),
     };
   }
@@ -81,7 +87,8 @@ function checkRevokePermission(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   authenticatedUser: any,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tokenData: any
+  tokenData: any,
+  request: Request
 ): { authorized: boolean; error?: NextResponse } {
   const isAdmin = authenticatedUser.role === "Admin";
 
@@ -100,7 +107,7 @@ function checkRevokePermission(
       authorized: false,
       error: NextResponse.json(
         { message: "Forbidden: You can only revoke your own tokens" },
-        { status: 403 }
+        { status: 403, headers: getCorsHeaders(request) }
       ),
     };
   }
@@ -118,7 +125,7 @@ export async function GET(
 ) {
   try {
     // Authenticate the user making the request
-    const session = await getClient();
+    const session = await getClient(request);
     if (session instanceof NextResponse) {
       return session;
     }
@@ -128,7 +135,7 @@ export async function GET(
     const { tokenId } = await params;
 
     // Fetch token from database
-    const fetchResult = await fetchTokenById(tokenId);
+    const fetchResult = await fetchTokenById(tokenId, request);
     if (fetchResult.error) {
       return fetchResult.error;
     }
@@ -136,7 +143,8 @@ export async function GET(
     // Check view permissions
     const permissionCheck = checkViewPermission(
       authenticatedUser,
-      fetchResult.tokenData
+      fetchResult.tokenData,
+      request
     );
     if (!permissionCheck.authorized) {
       return permissionCheck.error!;
@@ -145,14 +153,14 @@ export async function GET(
     // Return token data
     return NextResponse.json(
       { token: fetchResult.tokenData },
-      { status: 200 }
+      { status: 200, headers: getCorsHeaders(request) }
     );
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("Error fetching token:", error);
     return NextResponse.json(
       { message: "Internal server error" },
-      { status: 500 }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }
@@ -167,7 +175,7 @@ export async function DELETE(
 ) {
   try {
     // Authenticate the user making the request
-    const session = await getClient();
+    const session = await getClient(request);
     if (session instanceof NextResponse) {
       return session;
     }
@@ -177,7 +185,7 @@ export async function DELETE(
     const { tokenId } = await params;
 
     // Fetch token from database
-    const fetchResult = await fetchTokenById(tokenId);
+    const fetchResult = await fetchTokenById(tokenId, request);
     if (fetchResult.error) {
       return fetchResult.error;
     }
@@ -186,14 +194,15 @@ export async function DELETE(
     if (!fetchResult.tokenData.is_active) {
       return NextResponse.json(
         { message: "Token is already revoked" },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
 
     // Check revoke permissions
     const permissionCheck = checkRevokePermission(
       authenticatedUser,
-      fetchResult.tokenData
+      fetchResult.tokenData,
+      request
     );
     if (!permissionCheck.authorized) {
       return permissionCheck.error!;
@@ -208,7 +217,7 @@ export async function DELETE(
     if (!success) {
       return NextResponse.json(
         { message: "Failed to revoke token" },
-        { status: 500 }
+        { status: 500, headers: getCorsHeaders(request) }
       );
     }
 
@@ -218,14 +227,14 @@ export async function DELETE(
         message: "Token revoked successfully",
         tokenId
       },
-      { status: 200 }
+      { status: 200, headers: getCorsHeaders(request) }
     );
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("Error revoking token:", error);
     return NextResponse.json(
       { message: "Internal server error" },
-      { status: 500 }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }

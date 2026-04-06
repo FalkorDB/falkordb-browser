@@ -248,8 +248,7 @@ export default class SettingsQueryPage extends GraphPage {
       this.queryExecutionSectionHeader,
       async (el) => {
         await el.click();
-        // Wait a bit for the section to expand
-        await this.page.waitForTimeout(300);
+        await this.runDefaultQuerySwitch.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
       },
       "expand query execution section"
     );
@@ -260,8 +259,7 @@ export default class SettingsQueryPage extends GraphPage {
       this.userExperienceSectionHeader,
       async (el) => {
         await el.click();
-        // Wait a bit for the section to expand
-        await this.page.waitForTimeout(300);
+        await this.contentPersistenceSwitch.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
       },
       "expand user experience section"
     );

@@ -2,15 +2,14 @@
 /* eslint-disable no-param-reassign */
 /* eslint-disable react/require-default-props */
 
-'use client'
+'use client';
 
-import { prepareArg, securedFetch } from "@/lib/utils";
+import { prepareArg, securedFetch, GraphRef, Node, Link, Label } from "@/lib/utils";
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { Pencil, X } from "lucide-react";
+import { Pencil, TableProperties, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
 import Button from "../components/ui/Button";
-import { Label, Link, Node } from "../api/graph/model";
 import { IndicatorContext, GraphContext } from "../components/provider";
 import DataTable from "./DataTable";
 import AddLabel from "./addLabel";
@@ -20,91 +19,109 @@ interface Props {
     object: Node | Link;
     onClose: () => void;
     setLabels: Dispatch<SetStateAction<Label[]>>;
+    canvasRef: GraphRef;
 }
 
-export default function DataPanel({ object, onClose, setLabels }: Props) {
-    const { setIndicator } = useContext(IndicatorContext)
-    const { graph, setGraphInfo } = useContext(GraphContext)
+export default function DataPanel({ object, onClose, setLabels, canvasRef }: Props) {
+    const { setIndicator } = useContext(IndicatorContext);
+    const { graph, setGraphInfo } = useContext(GraphContext);
 
-    const lastObjId = useRef<number | undefined>(undefined)
-    const labelsListRef = useRef<HTMLUListElement>(null)
+    const lastObjId = useRef<number | undefined>(undefined);
+    const labelsListRef = useRef<HTMLUListElement>(null);
 
-    const { toast } = useToast()
-    const { data: session } = useSession()
+    const { toast } = useToast();
+    const { data: session } = useSession();
 
-    const [labelsHover, setLabelsHover] = useState(false)
+    const [labelsHover, setLabelsHover] = useState(false);
     const [label, setLabel] = useState<string[]>([]);
-    const type = !object.source
+    const type = !("source" in object);
 
     const handleClose = useCallback((e: KeyboardEvent) => {
         if (e.key === "Escape") {
-            onClose()
+            onClose();
         }
-    }, [onClose])
+    }, [onClose]);
 
     useEffect(() => {
-        window.addEventListener("keydown", handleClose)
+        window.addEventListener("keydown", handleClose);
 
         return () => {
-            window.removeEventListener("keydown", handleClose)
-        }
-    }, [handleClose])
+            window.removeEventListener("keydown", handleClose);
+        };
+    }, [handleClose]);
 
     useEffect(() => {
         if (lastObjId.current !== object.id) {
-            setLabelsHover(false)
+            setLabelsHover(false);
         }
         setLabel(type ? [...(object as Node).labels.filter((c) => c !== "")] : [object.relationship]);
-        lastObjId.current = object.id
+        lastObjId.current = object.id;
     }, [object, type]);
 
     const handleAddLabel = async (newLabel: string) => {
-        const node = object as Node
+        const node = object as Node;
         if (newLabel === "") {
             toast({
                 title: "Error",
                 description: "Please fill the label",
                 variant: "destructive"
-            })
-            return false
+            });
+            return false;
         }
         if (label.includes(newLabel)) {
             toast({
                 title: "Error",
                 description: "Label already exists",
                 variant: "destructive"
-            })
-            return false
+            });
+            return false;
         }
         const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label`, {
             method: "POST",
             body: JSON.stringify({
                 label: newLabel
             })
-        }, toast, setIndicator)
+        }, toast, setIndicator);
 
         if (result.ok) {
-            setLabels([...graph.addLabel(newLabel, node)])
-            setLabel([...node.labels])
-            const newGraphInfo = graph.GraphInfo.clone()
-            setGraphInfo(newGraphInfo)
-            graph.GraphInfo = newGraphInfo
-            return true
+            setLabels([...await graph.addLabel(newLabel, node)]);
+            setLabel([...node.labels]);
+            const newGraphInfo = graph.GraphInfo.clone();
+            setGraphInfo(newGraphInfo);
+            graph.GraphInfo = newGraphInfo;
+
+            const canvas = canvasRef.current;
+
+            if (canvas) {
+                const currentData = canvas.getGraphData();
+
+                currentData.nodes.forEach(canvasNode => {
+                    if (canvasNode.id === node.id) {
+                        canvasNode.labels = [...node.labels];
+                        canvasNode.color = node.color;
+                        canvasNode.size = node.size || canvasNode.size;
+                    }
+                });
+
+                canvas.setGraphData({ ...currentData });
+            }
+
+            return true;
         }
 
-        return false
-    }
+        return false;
+    };
 
     const handleRemoveLabel = async (removeLabel: string) => {
-        const node = object as Node
+        const node = object as Node;
 
         if (removeLabel === "") {
             toast({
                 title: "Error",
                 description: "You cannot remove the default label",
                 variant: "destructive"
-            })
-            return false
+            });
+            return false;
         }
 
         const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label`, {
@@ -112,42 +129,62 @@ export default function DataPanel({ object, onClose, setLabels }: Props) {
             body: JSON.stringify({
                 label: removeLabel
             })
-        }, toast, setIndicator)
+        }, toast, setIndicator);
 
         if (result.ok) {
-            graph.removeLabel(removeLabel, node)
-            setLabels([...graph.Labels])
-            setLabel([...node.labels])
-            const newGraphInfo = graph.GraphInfo.clone()
-            setGraphInfo(newGraphInfo)
-            graph.GraphInfo = newGraphInfo
-            return true
+            await graph.removeLabel(removeLabel, node);
+            setLabels([...graph.Labels]);
+            setLabel([...node.labels]);
+            const newGraphInfo = graph.GraphInfo.clone();
+            setGraphInfo(newGraphInfo);
+            graph.GraphInfo = newGraphInfo;
+
+            const canvas = canvasRef.current;
+            if (canvas) {
+                const currentData = canvas.getGraphData();
+
+                currentData.nodes.forEach(canvasNode => {
+                    if (canvasNode.id === node.id) {
+
+                        // Update canvas node to match the updated graph node
+                        canvasNode.labels = [...node.labels];
+                        canvasNode.color = node.color;
+                        canvasNode.size = node.size || canvasNode.size;
+                    }
+                });
+
+                canvas.setGraphData({ ...currentData });
+            }
+
+            return true;
         }
 
-        return false
-    }
+        return false;
+    };
 
     return (
-        <div data-testid="DataPanel" className="DataPanel p-4">
-            <div className="relative flex flex-col gap-6 pb-4 border-b border-border">
-                <div className="flex flex-row justify-between">
-                    <div className="flex flex-col gap-2 font-medium text-xl text-nowrap">
-                        <p>ID: <span className="Gradient text-transparent bg-clip-text">{object.id}</span></p>
-                        <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text">{Object.keys(object.data).length}</span></p>
-                    </div>
-                    <Button
-                        className="h-fit"
-                        data-testid="DataPanelClose"
-                        title="Close"
-                        onClick={() => onClose()}
-                    >
-                        <X />
-                    </Button>
+        <div data-testid="DataPanel" className="DataPanel gap-1 p-2 relative">
+            <Button
+                className="absolute top-2 right-2"
+                data-testid="DataPanelClose"
+                title="Close"
+                onClick={() => onClose()}
+            >
+                <X size={16} />
+            </Button>
+            <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between pr-5">
+                    <h1 className="text-2xl">{type ? "Node" : "Edge"} Data</h1>
+                    <TableProperties size={25} />
+                </div>
+                <div className="flex flex-col gap-1 font-medium text-xl text-nowrap">
+                    <p>ID: <span className="Gradient text-transparent bg-clip-text">{object.id}</span></p>
+                    <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text">{Object.keys(object.data).length}</span></p>
                 </div>
                 <ul
                     ref={labelsListRef}
                     data-testid="DataPanelLabel"
-                    className="flex flex-wrap gap-4"
+                    className="flex flex-wrap gap-2"
                     onMouseEnter={() => setLabelsHover(true)}
                     onMouseLeave={() => setLabelsHover(false)}
                 >
@@ -155,7 +192,7 @@ export default function DataPanel({ object, onClose, setLabels }: Props) {
                         <li
                             data-testid={`DataPanelLabel${l}`}
                             key={l}
-                            className="flex gap-2 px-2 py-1 bg-secondary rounded-full items-center"
+                            className="flex gap-1 p-1 bg-secondary rounded-full items-center"
                         >
                             <p>{l || "No Label"}</p>
                             {
@@ -201,7 +238,8 @@ export default function DataPanel({ object, onClose, setLabels }: Props) {
                 lastObjId={lastObjId}
                 object={object}
                 type={type}
+                canvasRef={canvasRef}
             />
         </div >
-    )
+    );
 }

@@ -5,19 +5,18 @@
 
 "use client";
 
-import React, { useEffect, useState, useContext } from "react";
-import { prepareArg, securedFetch, Row } from "@/lib/utils";
+import { useEffect, useState, useContext } from "react";
+import { prepareArg, securedFetch, Row, DataCell } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import TableComponent from "../components/TableComponent";
 import ToastButton from "../components/ToastButton";
-import { DataCell } from "../api/graph/model";
 import { IndicatorContext } from "../components/provider";
 
 type Config = {
     name: string,
     description: string,
     value: string | number
-}
+};
 
 const disableRunTimeConfigs = new Set([
     "THREAD_COUNT",
@@ -26,7 +25,7 @@ const disableRunTimeConfigs = new Set([
     "NODE_CREATION_BUFFER",
     "BOLT_PORT",
     "IMPORT_FOLDER"
-])
+]);
 
 const Configs: Map<string, Config> = new Map([
     ["THREAD_COUNT", {
@@ -124,7 +123,7 @@ const Configs: Map<string, Config> = new Map([
         description: "Controls how graphs are discarded, when set to `yes` graphs are freed on a dedicated thread leaving the server's main thread free, otherwise graphs are freed on the server's main thread.",
         value: ""
     }]
-])
+]);
 
 export default function Configurations() {
     const [configs, setConfigs] = useState<Row[]>([]);
@@ -174,7 +173,7 @@ export default function Configurations() {
             return currentConfigs.map((config: Row) => {
                 if (config.cells[0].value !== name) return config;
 
-                const newConfig = { ...config }
+                const newConfig = { ...config };
                 newConfig.cells[2].value = value;
                 return newConfig;
             });
@@ -194,7 +193,7 @@ export default function Configurations() {
         });
 
         return true;
-    }
+    };
 
     const fetchConfigs = async () => {
         const result = await securedFetch("/api/graph/config", {
@@ -229,11 +228,11 @@ export default function Configurations() {
                             type: "readonly"
                         }
                 ]
-            }
+            };
         });
 
         setConfigs(newConfigs);
-    }
+    };
 
     useEffect(() => {
         fetchConfigs();

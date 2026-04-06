@@ -1,6 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.js";
 
 @layer base {
     :root {
@@ -17,6 +16,8 @@
         --text-muted-foreground: var(--foreground);
         --muted: 0 0% 80%;
         --border: 0 0% 40%;
+        --green: 142 71% 45%;
+        --fav: 45 93% 47%;
     }
 
     .dark {
@@ -24,18 +25,19 @@
         --foreground: 0 0% 100%;
         --secondary: 0 0% 14.1%;
         --border: 0 0% 26%;
+        --green: 144 61% 20%;
+        --fav: 48 96% 53%;
     }
-
-    :focus-visible {
-        @apply outline-none;
+  .theme {
+        --animate-shine: shine var(--duration) infinite linear;
     }
 }
 
 @layer components {
 
     @font-face {
-        font-family: 'Inter';
-        src: url('/fonts/Inter.ttf') format('truetype');
+        font-family: 'HyperlegibleSans';
+        src: url('/fonts/HyperlegibleSans.ttf') format('truetype');
         font-display: swap;
     }
 
@@ -45,8 +47,8 @@
         font-display: swap;
     }
 
-    * {
-        font-family: 'Inter' !important;
+    *:not(.codicon):not(code):not(code *):not(pre *):not(.monospace):not(.monospace *) {
+        font-family: 'HyperlegibleSans' !important;
     }
 
     .SofiaSans,
@@ -57,7 +59,7 @@
     }
 
     .tabs-trigger {
-        @apply !p-0 rounded-lg data-[state=active]:!text-primary text-foreground !bg-transparent;
+        @apply !p-0 rounded-lg border border-transparent text-foreground hover:!bg-secondary hover:!border-border/10 data-[state=active]:!text-primary;
     }
 
     .hide-scrollbar {
@@ -112,13 +114,45 @@
         /* 32px */
     }
 
-    .json-tree-container ul > li > div {
+    .json-tree-container>ul>li>div {
         @apply !hidden;
+    }
+
+    .json-tree-container>ul>li {
+        @apply !pl-0 !pt-0;
+        text-indent: 0 !important;
+    }
+
+    .json-tree-container>ul {
+        @apply !pt-0 !m-0;
+    }
+
+    .json-tree-container>ul>li {
+        @apply !ml-0;
+    }
+
+    /* Custom scrollbar for model selector */
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: hsl(var(--border));
+        border-radius: 4px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: hsl(var(--muted-foreground) / 0.5);
     }
 }
 
 ::-webkit-scrollbar {
     width: 10px;
+    height: 10px;
 }
 
 ::-webkit-scrollbar-corner {
@@ -132,19 +166,15 @@
 }
 
 .light ::-webkit-scrollbar-thumb {
-    background: hsl(0 0% 90%);
+    background: #666666;
 }
 
 .dark ::-webkit-scrollbar-thumb {
-    background: hsl(0 0% 14.1%);
+    background: #666666;
 }
 
-.light .graphsFilter::-webkit-scrollbar-thumb {
-    background: hsl(0 0% 80%);
-}
-
-.dark .graphsFilter::-webkit-scrollbar-thumb {
-    background: hsl(0 0% 24.1%);
+input:focus-visible {
+    outline: none;
 }
 
 input[type="color"]::-webkit-color-swatch-wrapper {
@@ -154,3 +184,8 @@ input[type="color"]::-webkit-color-swatch-wrapper {
 input[type="color"]::-webkit-color-swatch {
     border: none;
 }
+
+#launcher {
+    z-index: 40 !important;
+}
+

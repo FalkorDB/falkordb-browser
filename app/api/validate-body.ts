@@ -3,20 +3,17 @@ import { z } from "zod";
 export const createUser = z.object({
   username: z
     .string({
-      required_error: "Username is required",
-      invalid_type_error: "Invalid Username",
+      error: (issue) => issue.input === undefined ? "Username is required" : "Invalid Username",
     })
     .min(1, "Username cannot be empty"),
   password: z
     .string({
-      required_error: "Password is required",
-      invalid_type_error: "Invalid Password",
+      error: (issue) => issue.input === undefined ? "Password is required" : "Invalid Password",
     })
     .min(1, "Password cannot be empty"),
   role: z
     .string({
-      required_error: "Role is required",
-      invalid_type_error: "Invalid Role",
+      error: (issue) => issue.input === undefined ? "Role is required" : "Invalid Role",
     })
     .min(1, "Role cannot be empty"),
 });
@@ -34,8 +31,7 @@ export const deleteUsers = z.object({
 export const updateUserRole = z.object({
   role: z
     .string({
-      required_error: "Role is required",
-      invalid_type_error: "Invalid Role",
+      error: (issue) => issue.input === undefined ? "Role is required" : "Invalid Role",
     })
     .min(1, "Role cannot be empty"),
 });
@@ -44,8 +40,7 @@ export const updateUserRole = z.object({
 export const renameSchema = z.object({
   sourceName: z
     .string({
-      required_error: "Source name is required",
-      invalid_type_error: "Invalid Source name",
+      error: (issue) => issue.input === undefined ? "Source name is required" : "Invalid Source name",
     })
     .min(1, "Source name cannot be empty"),
 });
@@ -53,8 +48,7 @@ export const renameSchema = z.object({
 export const duplicateSchema = z.object({
   sourceName: z
     .string({
-      required_error: "Source name is required",
-      invalid_type_error: "Invalid Source name",
+      error: (issue) => issue.input === undefined ? "Source name is required" : "Invalid Source name",
     })
     .min(1, "Source name cannot be empty"),
 });
@@ -84,8 +78,7 @@ export const deleteSchemaElement = z.object({
 export const addSchemaElementLabel = z.object({
   label: z
     .string({
-      required_error: "Label is required",
-      invalid_type_error: "Invalid Label",
+      error: (issue) => issue.input === undefined ? "Label is required" : "Invalid Label",
     })
     .min(1, "Label cannot be empty"),
 });
@@ -93,8 +86,7 @@ export const addSchemaElementLabel = z.object({
 export const removeSchemaElementLabel = z.object({
   label: z
     .string({
-      required_error: "Label is required",
-      invalid_type_error: "Invalid Label",
+      error: (issue) => issue.input === undefined ? "Label is required" : "Invalid Label",
     })
     .min(1, "Label cannot be empty"),
 });
@@ -112,8 +104,7 @@ export const deleteSchemaElementAttribute = z.object({
 export const renameGraph = z.object({
   sourceName: z
     .string({
-      required_error: "Source name is required",
-      invalid_type_error: "Invalid Source name",
+      error: (issue) => issue.input === undefined ? "Source name is required" : "Invalid Source name",
     })
     .min(1, "Source name cannot be empty"),
 });
@@ -121,8 +112,7 @@ export const renameGraph = z.object({
 export const duplicateGraph = z.object({
   sourceName: z
     .string({
-      required_error: "Source name is required",
-      invalid_type_error: "Invalid Source name",
+      error: (issue) => issue.input === undefined ? "Source name is required" : "Invalid Source name",
     })
     .min(1, "Source name cannot be empty"),
 });
@@ -156,8 +146,7 @@ export const deleteGraphElement = z.object({
 export const addGraphElementLabel = z.object({
   label: z
     .string({
-      required_error: "Label is required",
-      invalid_type_error: "Invalid Label",
+      error: (issue) => issue.input === undefined ? "Label is required" : "Invalid Label",
     })
     .min(1, "Label cannot be empty"),
 });
@@ -165,8 +154,7 @@ export const addGraphElementLabel = z.object({
 export const removeGraphElementLabel = z.object({
   label: z
     .string({
-      required_error: "Label is required",
-      invalid_type_error: "Invalid Label",
+      error: (issue) => issue.input === undefined ? "Label is required" : "Invalid Label",
     })
     .min(1, "Label cannot be empty"),
 });
@@ -182,101 +170,129 @@ export const updateGraphElementAttribute = z.object({
 
 export const deleteGraphElementAttribute = z.object({
   type: z.boolean({
-    required_error: "Type is required",
-    invalid_type_error: "Invalid Type",
+    error: (issue) => issue.input === undefined ? "Type is required" : "Invalid Type",
   }),
+});
+
+// UDF schemas
+export const loadUdf = z.object({
+  code: z
+    .string({
+      error: (issue) => issue.input === undefined ? "Code is required" : "Invalid Code",
+    })
+    .min(1, "Code cannot be empty"),
+  replace: z
+    .boolean({
+      error: "Invalid Replace value",
+    })
+    .optional()
+    .default(false),
+});
+
+export const deleteUdf = z.object({
+  name: z
+    .string({
+      error: (issue) => issue.input === undefined ? "Name is required" : "Invalid Name",
+    })
+    .min(1, "Name cannot be empty"),
 });
 
 // Graph config schemas
 export const updateGraphConfig = z.object({
   value: z
     .string({
-      required_error: "Value is required",
-      invalid_type_error: "Invalid Value",
+      error: (issue) => issue.input === undefined ? "Value is required" : "Invalid Value",
     })
     .min(1, "Value cannot be empty"),
 });
 
 // Chat schemas
+const chatMessage = z.object({
+  role: z.string().min(1),
+  content: z.string(),
+});
+
 export const chatRequest = z.object({
   messages: z
-    .array(z.any(), {
-      required_error: "Messages are required",
-      invalid_type_error: "Invalid Messages",
+    .array(chatMessage, {
+      error: (issue) => issue.input === undefined ? "Messages are required" : "Invalid Messages",
     })
     .min(1, "Messages are required"),
   graphName: z
     .string({
-      required_error: "Graph name is required",
-      invalid_type_error: "Invalid Graph name",
+      error: (issue) => issue.input === undefined ? "Graph name is required" : "Invalid Graph name",
     })
     .min(1, "Graph name cannot be empty"),
   key: z
     .string({
-      invalid_type_error: "Invalid API key",
+      error: (issue) => issue.input === undefined ? "API key is required" : "Invalid API key",
     })
-    .min(1, "API key cannot be empty")
-    .optional(),
+    .min(1, "API key cannot be empty"),
   model: z
     .string({
-      invalid_type_error: "Invalid Model",
+      error: (issue) => issue.input === undefined ? "Model is required" : "Invalid Model",
     })
-    .min(1, "Model cannot be empty")
-    .optional(),
+    .min(1, "Model cannot be empty"),
+  cypherOnly: z
+    .boolean({
+      error: "Invalid Cypher Only value",
+    })
+    .optional()
+    .default(false),
 });
 
 // Auth schemas
 export const login = z.object({
   username: z
     .string({
-      invalid_type_error: "Invalid Username",
+      error: "Invalid Username",
     })
     .min(1, "Username cannot be empty")
     .optional(),
   password: z
     .string({
-      invalid_type_error: "Invalid Password",
+      error: "Invalid Password",
     })
     .min(1, "Password cannot be empty")
     .optional(),
   host: z
     .string({
-      invalid_type_error: "Invalid Host",
+      error: "Invalid Host",
     })
     .min(1, "Host cannot be empty")
     .default("localhost"),
   port: z
     .string({
-      invalid_type_error: "Invalid Port",
+      error: "Invalid Port",
     })
     .min(1, "Port cannot be empty")
     .default("6379"),
   tls: z
     .string({
-      invalid_type_error: "Invalid TLS value",
+      error: "Invalid TLS value",
     })
     .min(1, "TLS value cannot be empty")
     .default("false"),
   ca: z
     .string({
-      invalid_type_error: "Invalid CA certificate",
+      error: "Invalid CA certificate",
     })
     .min(1, "CA certificate cannot be empty")
     .optional(),
   name: z
     .string({
-      invalid_type_error: "Invalid token name",
+      error: "Invalid token name",
     })
     .optional(),
   expiresAt: z
     .string({
-      invalid_type_error: "Invalid expiration date",
+      error: "Invalid expiration date",
     })
     .nullable()
     .optional(),
   ttlSeconds: z
     .number({
-      invalid_type_error: "Invalid TTL value",
+      error: "Invalid TTL value",
     })
     .optional(),
 });
@@ -284,8 +300,7 @@ export const login = z.object({
 export const revokeToken = z.object({
   token: z
     .string({
-      required_error: "Token is required",
-      invalid_type_error: "Invalid Token",
+      error: (issue) => issue.input === undefined ? "Token is required" : "Invalid Token",
     })
     .min(1, "Token cannot be empty"),
 });
@@ -300,7 +315,7 @@ export function validateBody<T extends z.ZodTypeAny>(
     return { success: true, data: result };
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const errorMessage = error.errors
+      const errorMessage = error.issues
         .map((err) => `${err.path.join(".")}: ${err.message}`)
         .join(", ");
       return { success: false, error: errorMessage };

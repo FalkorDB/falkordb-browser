@@ -25,7 +25,14 @@ export default class BrowserWrapper {
             this.browser = await launchBrowser(projectName);
         }
         if (!this.context) {
-            this.context = await this.browser.newContext();
+            const projectName = test.info().project.name;
+            const isFirefox = projectName.toLowerCase().includes('firefox');
+            
+            // Grant clipboard permissions only for Chromium-based browsers
+            // Firefox doesn't support clipboard-read/clipboard-write permissions
+            this.context = await this.browser.newContext(
+                isFirefox ? {} : { permissions: ['clipboard-read', 'clipboard-write'] }
+            );
         }
         if (!this.page) {
             this.page = await this.context.newPage();

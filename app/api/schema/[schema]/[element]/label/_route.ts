@@ -1,13 +1,18 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
+import { getCorsHeaders } from "@/app/api/utils";
 import { addSchemaElementLabel, removeSchemaElementLabel, validateBody } from "@/app/api/validate-body";
 import { NextRequest, NextResponse } from "next/server";
+
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
+}
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ schema: string; element: string }> }
 ) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -25,7 +30,7 @@ export async function DELETE(
       const validation = validateBody(removeSchemaElementLabel, body);
 
       if (!validation.success) {
-        return NextResponse.json({ message: validation.error }, { status: 400 });
+        return NextResponse.json({ message: validation.error }, { status: 400, headers: getCorsHeaders(request) });
       }
 
       const { label } = validation.data;
@@ -38,19 +43,19 @@ export async function DELETE(
 
       return NextResponse.json(
         { message: "Label removed successfully" },
-        { status: 200 }
+        { status: 200, headers: getCorsHeaders(request) }
       );
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }
@@ -60,7 +65,7 @@ export async function POST(
   { params }: { params: Promise<{ schema: string; element: string }> }
 ) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -78,7 +83,7 @@ export async function POST(
       const validation = validateBody(addSchemaElementLabel, body);
 
       if (!validation.success) {
-        return NextResponse.json({ message: validation.error }, { status: 400 });
+        return NextResponse.json({ message: validation.error }, { status: 400, headers: getCorsHeaders(request) });
       }
 
       const { label } = validation.data;
@@ -93,19 +98,19 @@ export async function POST(
 
       return NextResponse.json(
         { message: "Label added successfully" },
-        { status: 200 }
+        { status: 200, headers: getCorsHeaders(request) }
       );
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }

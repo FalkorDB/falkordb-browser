@@ -1,130 +1,134 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable no-param-reassign */
 
-import { Check, CirclePlus, Info, Pencil, Trash2, X } from "lucide-react"
-import { cn, prepareArg, securedFetch } from "@/lib/utils"
-import { toast } from "@/components/ui/use-toast"
-import { Fragment, MutableRefObject, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react"
-import { useSession } from "next-auth/react"
-import { Switch } from "@/components/ui/switch"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import Input from "../components/ui/Input"
-import DialogComponent from "../components/DialogComponent"
-import CloseDialog from "../components/CloseDialog"
-import { Link, Node, Value } from "../api/graph/model"
-import { GraphContext, IndicatorContext, BrowserSettingsContext } from "../components/provider"
-import ToastButton from "../components/ToastButton"
-import Button from "../components/ui/Button"
-import Combobox from "../components/ui/combobox"
+'use client';
 
-type ValueType = "string" | "number" | "boolean"
+import { Check, CirclePlus, Info, Pencil, Trash2, X } from "lucide-react";
+import { cn, prepareArg, securedFetch, GraphRef, Link, Node, Value } from "@/lib/utils";
+import { useToast } from "@/components/ui/use-toast";
+import { Fragment, MutableRefObject, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useSession } from "next-auth/react";
+import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { getNodeDisplayKey } from "@falkordb/canvas";
+import Input from "../components/ui/Input";
+import DialogComponent from "../components/DialogComponent";
+import CloseDialog from "../components/CloseDialog";
+import { EMPTY_DISPLAY_NAME } from "../api/graph/model";
+import { BrowserSettingsContext, GraphContext, IndicatorContext } from "../components/provider";
+import ToastButton from "../components/ToastButton";
+import Button from "../components/ui/Button";
+import Combobox from "../components/ui/combobox";
+
+type ValueType = "string" | "number" | "boolean";
 
 interface Props {
     object: Node | Link
     type: boolean
     lastObjId: MutableRefObject<number | undefined>
+    canvasRef: GraphRef
     className?: string
 }
 
-export default function DataTable({ object, type, lastObjId, className }: Props) {
+export default function DataTable({ object, type, lastObjId, canvasRef, className }: Props) {
 
-    const { graph, graphInfo, setGraphInfo } = useContext(GraphContext)
-    const { settings: { graphInfo: graphInfoSettings } } = useContext(BrowserSettingsContext)
-    const { displayTextPriority } = graphInfoSettings
+    const { graph, graphInfo, setGraphInfo } = useContext(GraphContext);
+    const { settings: { captionsKeysSettings: { captionsKeys }} } = useContext(BrowserSettingsContext);
+    const { toast } = useToast();
 
-    const setInputRef = useRef<HTMLInputElement>(null)
-    const setTextareaRef = useRef<HTMLTextAreaElement>(null)
-    const addInputRef = useRef<HTMLInputElement>(null)
-    const scrollableContainerRef = useRef<HTMLDivElement>(null)
+    const setInputRef = useRef<HTMLInputElement>(null);
+    const setTextareaRef = useRef<HTMLTextAreaElement>(null);
+    const addInputRef = useRef<HTMLInputElement>(null);
+    const scrollableContainerRef = useRef<HTMLDivElement>(null);
 
-    const [hover, setHover] = useState<string>("")
-    const [editable, setEditable] = useState<string>("")
-    const [isAddValue, setIsAddValue] = useState<boolean>(false)
-    const [newKey, setNewKey] = useState<string>("")
-    const [newVal, setNewVal] = useState<Value>("")
-    const [newType, setNewType] = useState<ValueType>("string")
-    const [isSetLoading, setIsSetLoading] = useState(false)
-    const [isAddLoading, setIsAddLoading] = useState(false)
-    const [isRemoveLoading, setIsRemoveLoading] = useState(false)
-    const { indicator, setIndicator } = useContext(IndicatorContext)
-    const { data: session } = useSession()
-    const [attributes, setAttributes] = useState<string[]>([])
-    const [expandedAttributes, setExpandedAttributes] = useState<Record<string, boolean>>({})
-    const valueParagraphRefs = useRef<Record<string, HTMLParagraphElement | null>>({})
-    const [valueOverflowMap, setValueOverflowMap] = useState<Record<string, boolean>>({})
+    const [hover, setHover] = useState<string>("");
+    const [editable, setEditable] = useState<string>("");
+    const [isAddValue, setIsAddValue] = useState<boolean>(false);
+    const [newKey, setNewKey] = useState<string>("");
+    const [newVal, setNewVal] = useState<Value>("");
+    const [newType, setNewType] = useState<ValueType>("string");
+    const [isSetLoading, setIsSetLoading] = useState(false);
+    const [isAddLoading, setIsAddLoading] = useState(false);
+    const [isRemoveLoading, setIsRemoveLoading] = useState(false);
+    const { indicator, setIndicator } = useContext(IndicatorContext);
+    const { data: session } = useSession();
+    const [attributes, setAttributes] = useState<string[]>([]);
+    const [expandedAttributes, setExpandedAttributes] = useState<Record<string, boolean>>({});
+    const valueParagraphRefs = useRef<Record<string, HTMLParagraphElement | null>>({});
+    const [valueOverflowMap, setValueOverflowMap] = useState<Record<string, boolean>>({});
 
     const setValueParagraphRef = useCallback((key: string) => (el: HTMLParagraphElement | null) => {
         if (!el) {
-            delete valueParagraphRefs.current[key]
-            return
+            delete valueParagraphRefs.current[key];
+            return;
         }
-        valueParagraphRefs.current[key] = el
-    }, [])
+        valueParagraphRefs.current[key] = el;
+    }, []);
 
     const measureValueOverflow = useCallback(() => {
-        if (typeof window === "undefined") return
+        if (typeof window === "undefined") return;
 
-        const nextMap: Record<string, boolean> = {}
+        const nextMap: Record<string, boolean> = {};
 
         attributes.forEach((key) => {
-            const element = valueParagraphRefs.current[key]
-            if (!element) return
+            const element = valueParagraphRefs.current[key];
+            if (!element) return;
 
-            const computedStyle = window.getComputedStyle(element)
-            let lineHeight = parseFloat(computedStyle.lineHeight)
+            const computedStyle = window.getComputedStyle(element);
+            let lineHeight = parseFloat(computedStyle.lineHeight);
 
             if (Number.isNaN(lineHeight)) {
-                const fontSize = parseFloat(computedStyle.fontSize)
-                lineHeight = Number.isNaN(fontSize) ? 16 : fontSize * 1.2
+                const fontSize = parseFloat(computedStyle.fontSize);
+                lineHeight = Number.isNaN(fontSize) ? 16 : fontSize * 1.2;
             }
 
-            const collapsedHeight = lineHeight * 3
-            nextMap[key] = element.scrollHeight - collapsedHeight > 1
-        })
+            const collapsedHeight = lineHeight * 3;
+            nextMap[key] = element.scrollHeight - collapsedHeight > 1;
+        });
 
         setValueOverflowMap((prev) => {
-            const prevKeys = Object.keys(prev)
-            const nextKeys = Object.keys(nextMap)
+            const prevKeys = Object.keys(prev);
+            const nextKeys = Object.keys(nextMap);
 
             if (prevKeys.length === nextKeys.length && prevKeys.every((key) => prev[key] === nextMap[key])) {
-                return prev
+                return prev;
             }
 
-            return nextMap
-        })
-    }, [attributes])
+            return nextMap;
+        });
+    }, [attributes]);
 
     useLayoutEffect(() => {
-        measureValueOverflow()
-        if (typeof window === "undefined") return undefined
+        measureValueOverflow();
+        if (typeof window === "undefined") return undefined;
 
-        window.addEventListener("resize", measureValueOverflow)
+        window.addEventListener("resize", measureValueOverflow);
         return () => {
-            window.removeEventListener("resize", measureValueOverflow)
-        }
-    }, [measureValueOverflow])
+            window.removeEventListener("resize", measureValueOverflow);
+        };
+    }, [measureValueOverflow]);
 
     useLayoutEffect(() => {
-        if (typeof ResizeObserver === "undefined") return undefined
-        if (!scrollableContainerRef.current) return undefined
+        if (typeof ResizeObserver === "undefined") return undefined;
+        if (!scrollableContainerRef.current) return undefined;
 
-        const observer = new ResizeObserver(() => measureValueOverflow())
-        observer.observe(scrollableContainerRef.current)
+        const observer = new ResizeObserver(() => measureValueOverflow());
+        observer.observe(scrollableContainerRef.current);
 
         return () => {
-            observer.disconnect()
-        }
-    }, [measureValueOverflow])
+            observer.disconnect();
+        };
+    }, [measureValueOverflow]);
 
     useEffect(() => {
         if (editable) {
             if (setInputRef.current) {
-                setInputRef.current.focus()
+                setInputRef.current.focus();
             } else if (setTextareaRef.current) {
-                setTextareaRef.current.focus()
+                setTextareaRef.current.focus();
             }
         }
-    }, [editable])
+    }, [editable]);
 
     useEffect(() => {
         if (isAddValue) {
@@ -133,139 +137,128 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                     scrollableContainerRef.current?.scrollTo({
                         top: scrollableContainerRef.current.scrollHeight,
                         behavior: "smooth"
-                    })
-                }, 0)
+                    });
+                }, 0);
             }
 
             if (addInputRef.current) {
-                addInputRef.current.focus()
+                addInputRef.current.focus();
             }
         }
-    }, [isAddValue])
+    }, [isAddValue]);
 
     useEffect(() => {
         if (lastObjId.current !== object.id) {
-            setEditable("")
-            setNewVal("")
-            setNewKey("")
-            setIsAddValue(false)
+            setEditable("");
+            setNewVal("");
+            setNewKey("");
+            setIsAddValue(false);
         }
-        setAttributes(Object.keys(object.data))
-        setExpandedAttributes({})
-    }, [lastObjId, object, setAttributes, type])
-
-    const getNodeDisplayKey = (node: Node) => {
-        const { data: nodeData } = node;
-
-        const displayText = displayTextPriority.find(({ name, ignore }) => {
-            const key = ignore
-                ? Object.keys(nodeData).find(
-                    (k) => k.toLowerCase() === name.toLowerCase()
-                )
-                : name;
-
-            return (
-                key &&
-                nodeData[key] &&
-                typeof nodeData[key] === "string" &&
-                nodeData[key].trim().length > 0
-            );
-        });
-
-        if (displayText) {
-            const key = displayText.ignore
-                ? Object.keys(nodeData).find(
-                    (k) => k.toLowerCase() === displayText.name.toLowerCase()
-                )
-                : displayText.name;
-
-            if (key) {
-                return key;
-            }
-        }
-
-        return "id";
-    }
+        setAttributes(Object.keys(object.data));
+        setExpandedAttributes({});
+    }, [lastObjId, object, setAttributes, type]);
 
     const getDefaultVal = (t: ValueType) => {
         switch (t) {
             case "boolean":
-                return false
+                return false;
             case "number":
-                return 0
+                return 0;
             default:
-                return ""
+                return "";
         }
-    }
+    };
 
     const isComplexType = (value: Value) => {
-        const valueType = typeof value
-        return valueType !== "string" && valueType !== "number" && valueType !== "boolean"
-    }
+        const valueType = typeof value;
+        return valueType !== "string" && valueType !== "number" && valueType !== "boolean";
+    };
 
     const handleSetEditable = (key: string, value?: Value) => {
         if (key !== "") {
-            setIsAddValue(false)
+            setIsAddValue(false);
         }
 
         // Don't allow editing complex types
         if (value !== undefined && isComplexType(value)) {
-            return
+            return;
         }
 
-        setEditable(key)
-        setNewVal(value ?? "")
-        setNewType(typeof value === "undefined" ? "string" : typeof value as ValueType)
+        setEditable(key);
+        setNewVal(value ?? "");
+        setNewType(typeof value === "undefined" ? "string" : typeof value as ValueType);
 
-        if (typeof value !== "undefined" && typeof value !== "string") return
+        if (typeof value !== "undefined" && typeof value !== "string") return;
 
         setTimeout(() => {
             if (setTextareaRef.current) {
-                setTextareaRef.current.style.height = 'auto'
-                setTextareaRef.current.style.height = `${setTextareaRef.current.scrollHeight}px`
+                setTextareaRef.current.style.height = 'auto';
+                setTextareaRef.current.style.height = `${setTextareaRef.current.scrollHeight}px`;
             }
-        }, 0)
-    }
+        }, 0);
+    };
 
     const setProperty = async (key: string, val: Value, isUndo: boolean, actionType: ("added" | "set") = "set") => {
-        const { id } = object
+        const { id } = object;
         if (val === "") {
             toast({
                 title: "Error",
                 description: "Please fill in the value field",
                 variant: "destructive"
-            })
-            return false
+            });
+            return false;
         }
         try {
-            if (actionType === "set") setIsSetLoading(true)
+            if (actionType === "set") setIsSetLoading(true);
             const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${key}`, {
                 method: "POST",
                 body: JSON.stringify({
                     value: val,
                     type
                 })
-            }, toast, setIndicator)
+            }, toast, setIndicator);
 
             if (result.ok) {
-                const value = object.data[key]
+                const value = object.data[key];
 
-                graph.setProperty(key, val, id, type)
+                graph.setProperty(key, val, id, type);
 
                 graphInfo.PropertyKeys = [...(graphInfo.PropertyKeys || []).filter((k) => k !== key), key];
                 const graphI = graphInfo.clone();
-                graph.GraphInfo = graphI
-                setGraphInfo(graphI)
+                graph.GraphInfo = graphI;
+                setGraphInfo(graphI);
 
-                object.data[key] = val
+                object.data[key] = val;
 
-                if (object.labels && getNodeDisplayKey(object as Node) === key) {
-                    object.displayName = ['', '']
+                setAttributes(Object.keys(object.data));
+
+                const canvas = canvasRef.current;
+
+                if (canvas) {
+                    const currentData = canvas.getGraphData();
+
+                    if (type) {
+                        const canvasNode = currentData.nodes.find(n => n.id === object.id);
+
+                        if (canvasNode) {
+                            canvasNode.data[key] = val;
+
+                            if (getNodeDisplayKey(object as Node, captionsKeys) === key) {
+                                canvasNode.displayName = EMPTY_DISPLAY_NAME;
+                            }
+                        }
+                    } else {
+                        const canvasLink = currentData.links.find(l => l.id === object.id);
+
+                        if (canvasLink) {
+                            canvasLink.data[key] = val;
+                        }
+                    }
+
+                    canvas.setGraphData({ ...currentData });
                 }
 
-                setAttributes(Object.keys(object.data))
-
-                handleSetEditable("")
+                handleSetEditable("");
                 toast({
                     title: "Success",
                     description: `Attribute ${actionType}`,
@@ -276,14 +269,14 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                             onClick={() => setProperty(key, value, false)}
                         />
                         : undefined
-                })
+                });
             }
 
-            return result.ok
+            return result.ok;
         } finally {
-            if (actionType === "set") setIsSetLoading(false)
+            if (actionType === "set") setIsSetLoading(false);
         }
-    }
+    };
 
     const handleAddValue = async (key: string, value: Value) => {
         if (!key || key === "" || value === "") {
@@ -291,42 +284,65 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                 title: "Error",
                 description: "Please fill in both fields",
                 variant: "destructive"
-            })
-            return
+            });
+            return;
         }
         try {
-            setIsAddLoading(true)
-            const success = await setProperty(key, value, false, "added")
-            if (!success) return
-            setIsAddValue(false)
-            setNewKey("")
-            setNewVal("")
+            setIsAddLoading(true);
+            const success = await setProperty(key, value, false, "added");
+            if (!success) return;
+            setIsAddValue(false);
+            setNewKey("");
+            setNewVal("");
         } finally {
-            setIsAddLoading(false)
+            setIsAddLoading(false);
         }
-    }
+    };
 
     const removeProperty = async (key: string) => {
         try {
-            setIsRemoveLoading(true)
-            const { id } = object
+            setIsRemoveLoading(true);
+            const { id } = object;
             const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${key}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type }),
-            }, toast, setIndicator)).ok
+            }, toast, setIndicator)).ok;
 
             if (success) {
-                const value = object.data[key]
+                const value = object.data[key];
+                const isDisplayKey = getNodeDisplayKey(object as Node, captionsKeys) === key;
 
-                graph.removeProperty(key, id, type)
+                graph.removeProperty(key, id, type);
 
-                if (object.labels && getNodeDisplayKey(object as Node) === key) {
-                    object.displayName = ['', ''];
+                delete object.data[key];
+
+                setAttributes(Object.keys(object.data));
+
+                const canvas = canvasRef.current;
+
+                if (canvas) {
+                    const currentData = canvas.getGraphData();
+
+                    if (type) {
+                        const canvasNode = currentData.nodes.find(n => n.id === object.id);
+
+                        if (canvasNode) {
+                            delete canvasNode.data[key];
+
+                            if (isDisplayKey) {
+                                canvasNode.displayName = EMPTY_DISPLAY_NAME;
+                            }
+                        }
+                    } else {
+                        const canvasLink = currentData.links.find(l => l.id === object.id);
+
+                        if (canvasLink) {
+                            delete canvasLink.data[key];
+                        }
+                    }
+
+                    canvas.setGraphData({ ...currentData });
                 }
-
-                delete object.data[key]
-
-                setAttributes(Object.keys(object.data))
 
                 toast({
                     title: "Success",
@@ -337,46 +353,46 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                             onClick={() => setProperty(key, value, false)}
                         />,
                     variant: "default"
-                })
+                });
             }
 
-            return success
+            return success;
         } finally {
-            setIsRemoveLoading(false)
+            setIsRemoveLoading(false);
         }
-    }
+    };
 
     const handleAddKeyDown = async (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         if (e.key === "Escape") {
-            setIsAddValue(false)
-            setNewKey("")
-            setNewVal("")
-            e.stopPropagation()
+            setIsAddValue(false);
+            setNewKey("");
+            setNewVal("");
+            e.stopPropagation();
         }
 
         if (e.key === "Enter" && !e.shiftKey) {
-            if (isAddLoading || indicator === "offline") return
-            e.preventDefault()
-            handleAddValue(newKey, newVal)
+            if (isAddLoading || indicator === "offline") return;
+            e.preventDefault();
+            handleAddValue(newKey, newVal);
         }
-    }
+    };
 
     const handleSetKeyDown = async (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         if (e.key === "Escape") {
-            handleSetEditable("", "")
-            setNewKey("")
-            e.stopPropagation()
+            handleSetEditable("", "");
+            setNewKey("");
+            e.stopPropagation();
         }
 
         if (e.key === "Enter" && !e.shiftKey) {
-            if (isSetLoading || indicator === "offline") return
-            e.preventDefault()
-            setProperty(editable, newVal, true)
+            if (isSetLoading || indicator === "offline") return;
+            e.preventDefault();
+            setProperty(editable, newVal, true);
         }
-    }
+    };
 
     const getCellEditableContent = (t: ValueType, actionType: "set" | "add" = "set") => {
-        const dataTestId = `DataPanel${actionType === "set" ? "Set" : "Add"}AttributeValue`
+        const dataTestId = `DataPanel${actionType === "set" ? "Set" : "Add"}AttributeValue`;
 
         switch (t) {
             case "boolean":
@@ -385,7 +401,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                     checked={newVal as boolean}
                     data-testid={dataTestId}
                     onCheckedChange={(checked) => setNewVal(checked)}
-                />
+                />;
             case "number":
                 return <Input
                     className="w-full"
@@ -393,11 +409,11 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                     data-testid={dataTestId}
                     value={newVal as number}
                     onChange={(e) => {
-                        const num = Number(e.target.value)
-                        if (!Number.isNaN(num)) setNewVal(num)
+                        const num = Number(e.target.value);
+                        if (!Number.isNaN(num)) setNewVal(num);
                     }}
                     onKeyDown={actionType === "set" ? handleSetKeyDown : handleAddKeyDown}
-                />
+                />;
             default:
                 return <textarea
                     className="w-full border border-border p-1 rounded-lg disabled:cursor-not-allowed disabled:opacity-50 bg-input text-foreground resize-none overflow-hidden"
@@ -408,71 +424,73 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                     onKeyDown={actionType === "set" ? handleSetKeyDown : handleAddKeyDown}
                     rows={1}
                     onInput={(e) => {
-                        const target = e.target as HTMLTextAreaElement
-                        target.style.height = 'auto'
-                        target.style.height = `${target.scrollHeight}px`
+                        const target = e.target as HTMLTextAreaElement;
+                        target.style.height = 'auto';
+                        target.style.height = `${target.scrollHeight}px`;
                     }}
-                />
+                />;
         }
-    }
+    };
 
     const getNewTypeInput = () => (
         <Combobox
             options={["string", "number", "boolean"]}
             selectedValue={newType}
             setSelectedValue={(t) => {
-                setNewType(t)
-                setNewVal(typeof newVal === t ? newVal : getDefaultVal(t))
+                setNewType(t);
+                setNewVal(typeof newVal === t ? newVal : getDefaultVal(t));
             }}
             label="Type"
         />
-    )
+    );
 
-    const valueNeedsExpansion = (key: string) => Boolean(valueOverflowMap[key])
+    const valueNeedsExpansion = (key: string) => Boolean(valueOverflowMap[key]);
 
     const handleToggleValueExpansion = (key: string, event: React.MouseEvent<HTMLElement> | React.KeyboardEvent<HTMLElement>) => {
-        event.preventDefault()
-        event.stopPropagation()
+        event.preventDefault();
+        event.stopPropagation();
         setExpandedAttributes(prev => ({
             ...prev,
             [key]: !prev[key]
-        }))
-    }
+        }));
+    };
 
     const getStringValue = (value: Value) => {
         switch (typeof value) {
             case "object":
             case "number":
-                return String(value)
+                return String(value);
             case "boolean":
-                return value ? "true" : "false"
+                return value ? "true" : "false";
             default:
-                return typeof value === "undefined" ? "" : value as string
+                return typeof value === "undefined" ? "" : value as string;
         }
-    }
+    };
+
+    const iconSize = 15;
 
     return (
         <div className={cn("flex flex-col gap-4 bg-background rounded-lg overflow-hidden", className)}>
             <div ref={scrollableContainerRef} className="h-1 grow overflow-y-auto overflow-x-hidden">
-                <div className="w-full grid grid-cols-[minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)_minmax(60px,1fr)]">
-                    <div className="flex items-center font-medium text-muted-foreground px-1 border-b border-border h-10">Key</div>
-                    <div className="flex items-center font-medium text-muted-foreground px-1 border-b border-border h-10">Value</div>
-                    <div className="flex items-center font-medium text-muted-foreground px-1 border-b border-border h-10">Type</div>
-                    <div className="flex items-center px-1 border-b border-border h-10"><div className="w-6" /></div>
+                <div className="w-full grid grid-cols-[minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)_38px]">
+                    <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Key</div>
+                    <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Value</div>
+                    <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Type</div>
+                    <div className="flex items-center px-1 border-y border-border h-10"><div className="w-6" /></div>
                     {
                         attributes.map((key) => {
-                            const value = object.data[key]
-                            const isComplex = isComplexType(value)
-                            const stringValue = getStringValue(value)
-                            const isExpanded = expandedAttributes[key]
-                            const shouldShowToggle = valueNeedsExpansion(key)
-                            const rowClass = cn("flex items-center px-1 py-1 border-b border-border", editable === key ? "min-h-14" : "min-h-10")
-                            const buttonTitle = session?.user.role === "Read-Only" ? undefined : (isComplex && "Complex values cannot be edited") || "Click to edit the attribute value"
+                            const value = object.data[key];
+                            const isComplex = isComplexType(value);
+                            const stringValue = getStringValue(value);
+                            const isExpanded = expandedAttributes[key];
+                            const shouldShowToggle = valueNeedsExpansion(key);
+                            const cellClass = cn("flex items-center px-1 border-b border-border min-h-6");
+                            const buttonTitle = session?.user.role === "Read-Only" ? undefined : (isComplex && "Complex values cannot be edited") || "Click to edit the attribute value";
 
                             return (
                                 <Fragment key={key}>
                                     <div
-                                        className={rowClass}
+                                        className={cellClass}
                                         data-testid={`DataPanelAttribute${key}`}
                                         onMouseEnter={() => setHover(key)}
                                         onMouseLeave={() => setHover("")}
@@ -481,7 +499,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                         <p className="w-full truncate">{key}:</p>
                                     </div>
                                     <div
-                                        className={rowClass}
+                                        className={cellClass}
                                         data-testid={`DataPanelAttribute${value}`}
                                         onMouseEnter={() => setHover(key)}
                                         onMouseLeave={() => setHover("")}
@@ -519,7 +537,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                                                     onClick={(event) => handleToggleValueExpansion(key, event)}
                                                                     onKeyDown={(event) => {
                                                                         if (event.key === "Enter" || event.key === " ") {
-                                                                            handleToggleValueExpansion(key, event)
+                                                                            handleToggleValueExpansion(key, event);
                                                                         }
                                                                     }}
                                                                 >
@@ -532,7 +550,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                         }
                                     </div>
                                     <div
-                                        className={rowClass}
+                                        className={cellClass}
                                         onMouseEnter={() => setHover(key)}
                                         onMouseLeave={() => setHover("")}
                                         key={`${key}-type`}
@@ -540,7 +558,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                         {editable === key ? getNewTypeInput() : <p className="w-full truncate">{typeof value}</p>}
                                     </div>
                                     <div
-                                        className={rowClass}
+                                        className={cellClass}
                                         onMouseEnter={() => setHover(key)}
                                         onMouseLeave={() => setHover("")}
                                         key={`${key}-actions`}
@@ -554,12 +572,12 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                                             indicator={indicator}
                                                             variant="button"
                                                             onClick={(e) => {
-                                                                e.stopPropagation()
-                                                                setProperty(key, newVal, true)
+                                                                e.stopPropagation();
+                                                                setProperty(key, newVal, true);
                                                             }}
                                                             isLoading={isSetLoading}
                                                         >
-                                                            <Check size={20} />
+                                                            <Check size={iconSize} />
                                                         </Button>
                                                         {
                                                             !isSetLoading &&
@@ -567,11 +585,11 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                                                 data-testid="DataPanelSetAttributeCancel"
                                                                 variant="button"
                                                                 onClick={(e) => {
-                                                                    e.stopPropagation()
-                                                                    handleSetEditable("", "")
+                                                                    e.stopPropagation();
+                                                                    handleSetEditable("", "");
                                                                 }}
                                                             >
-                                                                <X size={20} />
+                                                                <X size={iconSize} />
                                                             </Button>
                                                         }
                                                     </>
@@ -584,7 +602,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                                                         variant="button"
                                                                         title="Complex values can only be added from Cypher"
                                                                     >
-                                                                        <Info size={20} />
+                                                                        <Info size={iconSize} />
                                                                     </Button>
                                                                 </TooltipTrigger>
                                                                 <TooltipContent>
@@ -599,7 +617,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                                                 onClick={() => handleSetEditable(key, value)}
                                                                 disabled={isAddValue}
                                                             >
-                                                                <Pencil size={20} />
+                                                                <Pencil size={iconSize} />
                                                             </Button>
                                                         )}
                                                         <DialogComponent
@@ -609,7 +627,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                                                     variant="button"
                                                                     title="Delete Attribute"
                                                                 >
-                                                                    <Trash2 size={20} />
+                                                                    <Trash2 size={iconSize} />
                                                                 </Button>
                                                             }
                                                             title="Delete Attribute"
@@ -635,7 +653,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                         }
                                     </div>
                                 </Fragment>
-                            )
+                            );
                         }
                         )
                     }
@@ -667,7 +685,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                         isLoading={isAddLoading}
                                         indicator={indicator}
                                     >
-                                        <Check size={20} />
+                                        <Check size={iconSize} />
                                     </Button>
                                     {
                                         !isAddLoading &&
@@ -677,7 +695,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                             onClick={() => setIsAddValue(false)}
                                             title="Cancel"
                                         >
-                                            <X size={20} />
+                                            <X size={iconSize} />
                                         </Button>
                                     }
                                 </div>
@@ -695,14 +713,14 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                         title="Add a new attribute"
                         onClick={() => setIsAddValue(true)}
                     >
-                        <CirclePlus size={20} />
+                        <CirclePlus size={iconSize} />
                     </Button>
                 }
             </div>
         </div>
-    )
+    );
 }
 
 DataTable.defaultProps = {
     className: undefined
-}
+};

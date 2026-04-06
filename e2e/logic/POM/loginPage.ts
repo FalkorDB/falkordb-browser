@@ -1,6 +1,7 @@
 import { Locator } from "@playwright/test";
 import {
   interactWhenVisible,
+  waitForElementToBeVisible,
   waitForElementToNotBeVisible,
   waitForURL,
 } from "@/e2e/infra/utils";
@@ -185,6 +186,8 @@ export default class LoginPage extends HeaderComponent {
   }
 
   async handleSkipTutorial(): Promise<void> {
+    const isVisible = await waitForElementToBeVisible(this.skipTutorial);
+    if (!isVisible) return;
     await this.clickSkipTutorial();
     await waitForElementToNotBeVisible(this.tutorialSpotlight);
   }
@@ -266,9 +269,82 @@ export default class LoginPage extends HeaderComponent {
     );
   }
 
+  private get endpointModeRadio(): Locator {
+    return this.page.getByRole("radio", { name: "Endpoint" });
+  }
+
+  private get endpointInput(): Locator {
+    return this.page.locator("//input[@id='Endpoint']");
+  }
+
+  private get errorMessage(): Locator {
+    return this.page.locator("text=Invalid URL format");
+  }
+
+  private get credentialsError(): Locator {
+    return this.page.locator("text=Invalid credentials");
+  }
+
   async connectWithUrl(url: string): Promise<void> {
     await this.clickUrlMode();
     await this.fillFalkorDBUrl(url);
+    await this.clickConnect();
+  }
+
+  async submitUrlWithoutWait(url: string): Promise<void> {
+    await this.clickUrlMode();
+    await this.fillFalkorDBUrl(url);
+    await this.clickConnect();
+  }
+
+  async isFormatErrorVisible(): Promise<boolean> {
+    try {
+      await this.errorMessage.waitFor({ state: "visible", timeout: 3000 });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async isCredentialsErrorVisible(): Promise<boolean> {
+    try {
+      await this.credentialsError.waitFor({ state: "visible", timeout: 3000 });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async getErrorText(): Promise<string> {
+    const errorEl = this.page.locator(".text-destructive").first();
+    return (await errorEl.textContent()) ?? "";
+  }
+
+  async clickEndpointMode(): Promise<void> {
+    await interactWhenVisible(
+      this.endpointModeRadio,
+      (el) => el.click(),
+      "Endpoint mode radio button"
+    );
+  }
+
+  async isEndpointModeSelected(): Promise<boolean> {
+    return (await this.endpointModeRadio.getAttribute("data-state")) === "checked";
+  }
+
+  async fillEndpoint(endpoint: string): Promise<void> {
+    await interactWhenVisible(
+      this.endpointInput,
+      (el) => el.fill(endpoint),
+      "endpoint input"
+    );
+  }
+
+  async connectWithEndpoint(endpoint: string, username?: string, password?: string): Promise<void> {
+    await this.clickEndpointMode();
+    await this.fillEndpoint(endpoint);
+    if (username) await this.fillUsername(username);
+    if (password) await this.fillPassword(password);
     await this.clickConnect();
   }
 }

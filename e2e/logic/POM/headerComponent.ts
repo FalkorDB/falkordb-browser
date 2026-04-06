@@ -37,7 +37,7 @@ export default class HeaderComponent extends BasePage {
     }
 
     private get settingsButton(): Locator {
-        return this.page.getByRole("button", { name: "Settings" })
+        return this.page.getByTestId("settings")
     }
 
     private get LogoutButton(): Locator {

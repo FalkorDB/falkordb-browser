@@ -723,15 +723,14 @@ export default class GraphPage extends Page {
     });
     await this.clickDeleteElement();
     await this.clickDeleteElementConfirm();
-    await waitForElementToNotBeVisible(this.deleteElement("Graph"));
+    await waitForElementToNotBeVisible(this.deleteElementConfirm("Graph"));
   }
 
   async deleteElementByName(name: string): Promise<void> {
     await this.searchElementInCanvas(name);
     await this.clickDeleteElement();
     await this.clickDeleteElementConfirm();
-    await waitForElementToNotBeVisible(this.deleteElement("Graph"));
-    await this.waitForCanvasAnimationToEnd();
+    await waitForElementToNotBeVisible(this.deleteElementConfirm("Graph"));
   }
 
   async getNotificationToast(): Promise<boolean> {
@@ -752,9 +751,9 @@ export default class GraphPage extends Page {
   }
 
   async getNodeCanvasToolTip(): Promise<string | null> {
-    await this.page.waitForTimeout(1000);
-    const toolTipText = await this.getNodeCanvasToolTipContent();
-    return toolTipText;
+      await this.page.waitForTimeout(1000);
+      const toolTipText = await this.getNodeCanvasToolTipContent();
+      return toolTipText;
   }
 
   // eslint-disable-next-line class-methods-use-this
@@ -830,7 +829,6 @@ export default class GraphPage extends Page {
   }
 
   async rightClickElement(x: number, y: number): Promise<void> {
-    console.log(`Right-clicking element at position (${x}, ${y})`);
     await this.page.mouse.click(x, y, { button: "right" });
     await this.page.waitForTimeout(500);
   }

@@ -1,5 +1,5 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { runQuery } from "@/app/api/utils";
+import { runQuery, getCorsHeaders } from "@/app/api/utils";
 import { NextResponse, NextRequest } from "next/server";
 
 /**
@@ -19,7 +19,7 @@ export async function GET(
   const writer = writable.getWriter();
 
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       throw new Error(await session.text());
@@ -79,6 +79,7 @@ export async function GET(
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
+      ...getCorsHeaders(request),
     },
   });
 }

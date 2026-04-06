@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable no-param-reassign */
 // eslint-disable-next-line import/prefer-default-export
 
 "use client";
@@ -5,8 +7,7 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { MutableRefObject } from "react";
-import { ForceGraphMethods } from "react-force-graph-2d";
-import { Node, Link, DataCell, MemoryValue } from "@/app/api/graph/model";
+import type { FalkorDBCanvas } from "@falkordb/canvas";
 
 export type ToastArguments = {
   title: string;
@@ -24,81 +25,129 @@ export const screenSize = {
   "2xl": 1536,
 };
 
-/**
- * Calculates the appropriate text color (black or white) based on background color brightness
- * Uses the relative luminance formula from WCAG guidelines
- * @param bgColor Background color in hex format (e.g., "#ff5733")
- * @returns "white" for dark backgrounds, "black" for light backgrounds
- */
-export const getContrastTextColor = (bgColor: string): string => {
-  let r: number;
-  let g: number;
-  let b: number;
 
-  // Handle HSL colors
-  if (bgColor.startsWith('hsl')) {
-    // Parse HSL: hsl(h, s%, l%)
-    const hslMatch = bgColor.match(/hsl\((\d+),\s*([\d.]+)%,\s*([\d.]+)%\)/);
-    if (hslMatch) {
-      const h = parseInt(hslMatch[1], 10) / 360;
-      const s = parseFloat(hslMatch[2]) / 100;
-      const l = parseFloat(hslMatch[3]) / 100;
+export type Value = string | number | boolean;
 
-      // Convert HSL to RGB
-      const hue2rgb = (p: number, q: number, tParam: number) => {
-        let t = tParam;
-        if (t < 0) t += 1;
-        if (t > 1) t -= 1;
-        if (t < 1/6) return p + (q - p) * 6 * t;
-        if (t < 1/2) return q;
-        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-        return p;
-      };
-
-      if (s === 0) {
-        r = l;
-        g = l;
-        b = l; // achromatic
-      } else {
-        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-        const p = 2 * l - q;
-        r = hue2rgb(p, q, h + 1/3);
-        g = hue2rgb(p, q, h);
-        b = hue2rgb(p, q, h - 1/3);
-      }
-    } else {
-      // Fallback if parsing fails
-      return 'white';
-    }
-  } else {
-    // Handle hex colors
-    let hex = bgColor.replace('#', '');
-    // Support 3-digit shorthand hex codes
-    if (hex.length === 3) {
-      hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
-    }
-    r = parseInt(hex.substring(0, 2), 16) / 255;
-    g = parseInt(hex.substring(2, 4), 16) / 255;
-    b = parseInt(hex.substring(4, 6), 16) / 255;
-  }
-
-  // Calculate relative luminance
-  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-
-  // Return white for dark backgrounds, black for light backgrounds
-  return luminance > 0.5 ? 'black' : 'white';
+export type HistoryQuery = {
+  queries: Query[];
+  currentQuery: Query;
+  query: string;
+  counter: number;
 };
 
-export type GraphRef = MutableRefObject<
-  ForceGraphMethods<Node, Link> | undefined
->;
+export type Query = {
+  text: string;
+  metadata: string[];
+  explain: string[];
+  profile: string[];
+  graphName: string;
+  timestamp: number;
+  status: "Success" | "Failed" | "Empty";
+  elementsCount: number;
+  fav: boolean;
+  name?: string;
+};
+
+export type Node = {
+  id: number;
+  labels: string[];
+  color: string;
+  visible: boolean;
+  expand: boolean;
+  collapsed: boolean;
+  size?: number;
+  data: {
+    [key: string]: any;
+  };
+};
+
+export type Link = {
+  id: number;
+  relationship: string;
+  color: string;
+  source: number;
+  target: number;
+  visible: boolean;
+  expand: boolean;
+  collapsed: boolean;
+  data: {
+    [key: string]: any;
+  };
+};
+
+export type GraphData = {
+  nodes: Node[];
+  links: Link[];
+};
+
+export type NodeCell = {
+  id: number;
+  labels: string[];
+  properties: {
+    [key: string]: any;
+  };
+};
+
+export type LinkCell = {
+  id: number;
+  relationshipType: string;
+  sourceId: number;
+  destinationId: number;
+  properties: {
+    [key: string]: any;
+  };
+};
+
+export type DataCell = NodeCell | LinkCell | NodeCell[] | LinkCell[] | number | string | null;
+
+export type DataRow = {
+  [key: string]: DataCell;
+};
+
+export type Data = DataRow[];
+
+export type MemoryValue = number | Map<string, MemoryValue>;
+
+export interface LinkStyle {
+  color: string;
+}
+
+export interface LabelStyle extends LinkStyle {
+  size?: number;
+}
+
+export interface InfoLabel {
+  name: string;
+  style: LabelStyle;
+  show: boolean;
+  count: number;
+}
+
+export interface Label extends Omit<InfoLabel, "count"> {
+  elements: Node[];
+  textWidth?: number;
+  textHeight?: number;
+  style: LabelStyle;
+}
+
+export interface InfoRelationship {
+  name: string;
+  style: LinkStyle;
+  show: boolean;
+  count: number;
+}
+
+export interface Relationship extends Omit<InfoRelationship, "count"> {
+  elements: Link[];
+  textWidth?: number;
+  textHeight?: number;
+  textAscent?: number;
+  textDescent?: number;
+}
+
+export type GraphRef = MutableRefObject<FalkorDBCanvas | null>;
 
 export type Panel = "chat" | "data" | "add" | undefined;
-
-export type TextPriority = {
-  name: string;
-  ignore: boolean;
-};
 
 export type SelectCell = {
   value: string;
@@ -145,13 +194,30 @@ export type Message = {
   | "Schema";
 };
 
-export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell | LazyCell;
+// [library_name, type, 'functions', function_names[]]
+export type UDFEntry = [string, string, string, string[]];
 
-export type ViewportState = {
-  zoom: number;
-  centerX: number;
-  centerY: number;
-};
+// [...UDFEntry, library_code, code]
+export type UDFEntryWithCode = [...UDFEntry, string, string];
+
+export type ConnectionType = "Standalone" | "Cluster" | "Sentinel";
+
+export interface ClusterNodeInfo {
+  host: string;
+  port: number;
+  role: string;
+  slots?: string;
+}
+
+export interface ConnectionInfo {
+  sentinelRole?: string;
+  sentinelReplicas?: number;
+  sentinelMasterHost?: string;
+  sentinelMasterPort?: number;
+  clusterNodes?: ClusterNodeInfo[];
+}
+
+export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell | LazyCell;
 
 export interface Row {
   cells: Cell[];
@@ -188,7 +254,7 @@ export async function getSSEGraphResult(
 
       if (status === 401 || status >= 500) setIndicator("offline");
 
-      reject();
+      reject(new Error(message));
     });
 
     evtSource.onerror = () => {
@@ -201,7 +267,7 @@ export async function getSSEGraphResult(
         variant: "destructive",
       });
       setIndicator("offline");
-      reject();
+      reject(new Error("Network or server error"));
     };
   });
 }
@@ -228,7 +294,7 @@ export async function securedFetch(
       description: message,
       variant: "destructive",
     });
-    
+
     if (status === 401 || status >= 500) {
       setIndicator("offline");
     }
@@ -242,8 +308,35 @@ export function prepareArg(arg: string) {
   return encodeURIComponent(arg.trim());
 }
 
+export const between = (hash: number, from: number, to: number) => {
+  if (to <= from) return from;
+  return (Math.abs(hash) % (to - from)) + from;
+};
+
 export const getDefaultQuery = (q?: string) =>
   q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN * LIMIT 100";
+
+export const getMetaStats = async (name: string, toast: ToastFn, setIndicator: (indicator: "online" | "offline") => void) => {
+  const q = "CALL db.meta.stats() YIELD labels, relTypes RETURN labels, relTypes as relationships";
+
+  try {
+    const result = await getSSEGraphResult(`/api/graph/${prepareArg(name)}?query=${encodeURIComponent(q)}`, toast, setIndicator) as { data: { labels: { [key: string]: number }, relationships: { [key: string]: number } }[] };
+
+    if (!result) return undefined;
+
+    const row = result.data?.[0];
+
+    if (!row) return undefined;
+
+    const l = Object.entries(row.labels);
+    const r = Object.entries(row.relationships);
+
+    return [l, r];
+  } catch (error) {
+    console.error("Failed to fetch meta stats:", error);
+    return undefined;
+  }
+};
 
 export function rgbToHSL(hex: string): string {
   // Remove the # if present
@@ -287,39 +380,6 @@ export function rgbToHSL(hex: string): string {
   const lPct = Math.round(l * 100);
 
   return `hsl(${hDeg}, ${sPct}%, ${lPct}%)`;
-}
-
-/**
- * Fits the force-graph view to show all (optionally filtered) nodes within the canvas bounds.
- *
- * The function computes padding as 10% of the smaller canvas dimension, scales it by
- * `paddingMultiplier`, and invokes the graph's `zoomToFit` with a 500ms duration.
- *
- * @param chartRef - Optional reference to the force-graph instance to operate on.
- * @param filter - Optional predicate to include only nodes that should be considered when fitting.
- * @param paddingMultiplier - Multiplier applied to the computed padding (default: 1).
- */
-export function handleZoomToFit(
-  chartRef?: GraphRef,
-  filter?: (node: Node) => boolean,
-  paddingMultiplier = 1
-) {
-  const chart = chartRef?.current;
-  if (chart) {
-    // Get canvas dimensions
-    const canvas = document.querySelector(
-      ".force-graph-container canvas"
-    ) as HTMLCanvasElement;
-
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-
-    // Calculate padding as 10% of the smallest canvas dimension
-    const minDimension = Math.min(rect.width, rect.height);
-    const padding = minDimension * 0.1;
-    chart.zoomToFit(500, padding * paddingMultiplier, filter);
-  }
 }
 
 type MemoryValueType = (string | number | MemoryValueType)[];
@@ -376,6 +436,92 @@ export function createNestedObject(arr: string[]): object {
   return { [first]: createNestedObject(rest) };
 }
 
+/**
+ * Finds the index of the closing brace that matches the opening brace at startIndex.
+ * Properly handles nested braces in Cypher queries (e.g., map literals, nested CALL blocks).
+ * Also handles braces inside string literals (single or double quoted).
+ * 
+ * @param str - The string to search in
+ * @param startIndex - The index of the opening brace
+ * @returns The index of the matching closing brace, or -1 if not found
+ */
+function findMatchingBrace(str: string, startIndex: number): number {
+  let depth = 0;
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+
+  for (let i = startIndex; i < str.length; i += 1) {
+    const char = str[i];
+    const prevChar = i > 0 ? str[i - 1] : '';
+
+    // Toggle quote state (ignore escaped quotes)
+    if (char === "'" && prevChar !== '\\') {
+      inSingleQuote = !inSingleQuote;
+    } else if (char === '"' && prevChar !== '\\') {
+      inDoubleQuote = !inDoubleQuote;
+    }
+
+    // Only count braces when not inside a string literal
+    if (!inSingleQuote && !inDoubleQuote) {
+      if (char === '{') {
+        depth += 1;
+      } else if (char === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          return i;
+        }
+      }
+    }
+  }
+  return -1;
+}
+
+/**
+ * Checks if query contains any CALL block followed by RETURN without LIMIT.
+ * Handles nested braces correctly (e.g., map literals like {key: "val"}).
+ * Only matches if RETURN immediately follows the CALL block (before other clauses).
+ * Iterates through ALL CALL blocks to handle multiple subqueries (e.g., UNION queries).
+ * 
+ * @param query - The Cypher query to check
+ * @returns true if any CALL block with RETURN but no LIMIT is found
+ */
+function hasCallBlockWithReturnNoLimit(query: string): boolean {
+  let searchStart = 0;
+
+  // Iterate through all CALL blocks in the query
+  while (searchStart < query.length) {
+    const callMatch = /\bCALL\s*\{/i.exec(query.substring(searchStart));
+    if (!callMatch) break;
+
+    const absoluteIndex = searchStart + callMatch.index;
+    const openBraceIndex = absoluteIndex + callMatch[0].indexOf('{');
+    const closeBraceIndex = findMatchingBrace(query, openBraceIndex);
+
+    if (closeBraceIndex !== -1) {
+      // Check only the immediate continuation after this CALL block
+      // Stop at the next major clause (UNION, WITH, MATCH, CALL, etc.) or end of query
+      const afterCallBlock = query.substring(closeBraceIndex + 1);
+      const nextClauseMatch = afterCallBlock.match(/\b(UNION|WITH|MATCH|CALL|CREATE|MERGE|DELETE|SET|REMOVE)\b/i);
+      const relevantPart = nextClauseMatch
+        ? afterCallBlock.substring(0, nextClauseMatch.index)
+        : afterCallBlock;
+
+      // Check if this immediate part has RETURN without LIMIT
+      if (/\bRETURN\b/i.test(relevantPart) && !/\bLIMIT\b/i.test(relevantPart)) {
+        return true;
+      }
+
+      // Move search position past this CALL block
+      searchStart = closeBraceIndex + 1;
+    } else {
+      // If no matching brace found, move past the opening brace and continue
+      searchStart = openBraceIndex + 1;
+    }
+  }
+
+  return false;
+}
+
 export function getQueryWithLimit(
   query: string,
   limit: number
@@ -383,7 +529,7 @@ export function getQueryWithLimit(
   let existingLimit = 0;
 
   const finalReturnMatch = query.match(
-    /\bRETURN\b(?!\s+.+?\bCALL\b)[^;]*?\bLIMIT\s+(\d+)/
+    /\bRETURN\b(?!\s+.+?\bCALL\b)[^;]*?\bLIMIT\s+(\d+)/is
   );
   if (finalReturnMatch) {
     existingLimit = parseInt(finalReturnMatch[1], 10);
@@ -396,49 +542,16 @@ export function getQueryWithLimit(
       return [`CALL { ${query} } RETURN * LIMIT ${limit}`, limit];
     }
 
-    if (query.match(/\bCALL\s*\{.*?\}\s*RETURN\b(?!\s+.+?\s+\bLIMIT\b)/i)) {
+    if (hasCallBlockWithReturnNoLimit(query)) {
       return [`${query} LIMIT ${limit}`, limit];
     }
   }
 
-  if (query.match(/\bRETURN\b(?!\s+.+?\s+\bLIMIT\b)/i)) {
+  if (query.match(/\bRETURN\b(?![^;]*\bLIMIT\b)/i)) {
     return [`${query} LIMIT ${limit}`, limit];
   }
 
   return [query, existingLimit];
-}
-
-export const getNodeDisplayText = (node: Node, displayTextPriority: TextPriority[]) => {
-  const { data: nodeData } = node;
-
-  const displayText = displayTextPriority.find(({ name, ignore }) => {
-    const key = ignore
-      ? Object.keys(nodeData).find(
-        (k) => k.toLowerCase() === name.toLowerCase()
-      )
-      : name;
-
-    return (
-      key &&
-      nodeData[key] &&
-      typeof nodeData[key] === "string" &&
-      nodeData[key].trim().length > 0
-    );
-  });
-
-  if (displayText) {
-    const key = displayText.ignore
-      ? Object.keys(nodeData).find(
-        (k) => k.toLowerCase() === displayText.name.toLowerCase()
-      )
-      : displayText.name;
-
-    if (key) {
-      return String(nodeData[key]);
-    }
-  }
-
-  return String(node.id);
 }
 
 export const formatName = (newGraphName: string) =>
@@ -466,6 +579,7 @@ export async function fetchOptions(
 
   if (!result.ok) return;
 
+
   const { opts } = (await result.json()) as { opts: string[] };
 
   setOptions(opts);
@@ -477,6 +591,9 @@ export async function fetchOptions(
   )
     setSelectedValue(formatName(opts[0]));
 }
+
+export const areCaptionKeysEqual = (left: [string, boolean][], right: [string, boolean][]) =>
+  left.length === right.length && left.every((key, index) => key[0] === right[index][0] && key[1] === right[index][1]);
 
 export function getTheme(theme: string | undefined) {
   let currentTheme = theme;
@@ -497,5 +614,5 @@ export function getTheme(theme: string | undefined) {
 // Type guard: runtime check that proves elements is [Node, Node]
 export function isTwoNodes(elements: (Node | Link)[]): elements is [Node, Node] {
   return elements.length === 2 &&
-    elements.every((e): e is Node => !!e.labels)
+    elements.every((e): e is Node => "labels" in e);
 }
