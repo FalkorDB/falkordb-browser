@@ -375,7 +375,7 @@ export default function BrowserSettings() {
                                 <div className="basis-0 grow flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 p-2 bg-muted/10 rounded-lg">
                                     <div className="flex flex-col gap-2 flex-1">
                                         {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                                        <label htmlFor="refreshInterval" className="text-lg font-semibold">Refresh Interval</label>
+                                        <label id="refreshIntervalLabel" htmlFor="refreshInterval" className="text-lg font-semibold">Refresh Interval</label>
                                         <p className="text-sm text-muted-foreground">
                                             Reload graph info data every {newRefreshInterval} seconds
                                         </p>
@@ -383,6 +383,7 @@ export default function BrowserSettings() {
                                     <div className="w-full sm:w-64">
                                         <Slider
                                             id="refreshInterval"
+                                            aria-labelledby="refreshIntervalLabel"
                                             className="w-full"
                                             min={5}
                                             max={60}
@@ -399,7 +400,7 @@ export default function BrowserSettings() {
                                 <div className="basis-0 grow flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 p-2 bg-muted/10 rounded-lg">
                                     <div className="flex flex-col gap-2 flex-1">
                                         {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                                        <label htmlFor="maxItemsForSearch" className="text-lg font-semibold">Max Items For Search</label>
+                                        <label id="maxItemsForSearchLabel" htmlFor="maxItemsForSearch" className="text-lg font-semibold">Max Items For Search</label>
                                         <p className="text-sm text-muted-foreground">
                                             Set the maximum number of items before search display.
                                         </p>
@@ -407,6 +408,7 @@ export default function BrowserSettings() {
                                     <div className="w-full sm:w-64">
                                         <Slider
                                             id="maxItemsForSearch"
+                                            aria-labelledby="maxItemsForSearchLabel"
                                             className="w-full"
                                             min={10}
                                             max={50}
@@ -690,7 +692,7 @@ export default function BrowserSettings() {
                                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
                                             <div className="flex flex-col gap-2 flex-1">
                                                 {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                                                <label htmlFor="columnWidth" className="font-semibold">Column Width</label>
+                                                <label id="columnWidthLabel" htmlFor="columnWidth" className="font-semibold">Column Width</label>
                                                 <p className="text-sm text-muted-foreground">
                                                     Set the width of the table columns.
                                                 </p>
@@ -698,6 +700,7 @@ export default function BrowserSettings() {
                                             <div className="w-full sm:w-64">
                                                 <Slider
                                                     id="columnWidth"
+                                                    aria-labelledby="columnWidthLabel"
                                                     className="w-full"
                                                     type="%"
                                                     min={20}
@@ -715,7 +718,7 @@ export default function BrowserSettings() {
                                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
                                             <div className="flex flex-col gap-2 flex-1">
                                                 {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                                                <label htmlFor="rowHeight" className="font-semibold">Row Height</label>
+                                                <label id="rowHeightLabel" htmlFor="rowHeight" className="font-semibold">Row Height</label>
                                                 <p className="text-sm text-muted-foreground">
                                                     Set the height of the table rows.
                                                 </p>
@@ -723,6 +726,7 @@ export default function BrowserSettings() {
                                             <div className="w-full sm:w-64">
                                                 <Slider
                                                     id="rowHeight"
+                                                    aria-labelledby="rowHeightLabel"
                                                     className="w-full"
                                                     type="px"
                                                     min={40}
@@ -739,7 +743,7 @@ export default function BrowserSettings() {
                                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
                                             <div className="flex flex-col gap-2 flex-1">
                                                 {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                                                <label htmlFor="rowHeightExpandMultiple" className="font-semibold">Row Height Expand Multiplier</label>
+                                                <label id="rowHeightExpandMultipleLabel" htmlFor="rowHeightExpandMultiple" className="font-semibold">Row Height Expand Multiplier</label>
                                                 <p className="text-sm text-muted-foreground">
                                                     Height multiplier for expanded rows.
                                                 </p>
@@ -747,6 +751,7 @@ export default function BrowserSettings() {
                                             <div className="w-full sm:w-64">
                                                 <Slider
                                                     id="rowHeightExpandMultiple"
+                                                    aria-labelledby="rowHeightExpandMultipleLabel"
                                                     className="w-full"
                                                     type="px"
                                                     min={2}

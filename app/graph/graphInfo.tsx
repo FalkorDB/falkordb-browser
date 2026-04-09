@@ -23,9 +23,9 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     const [edgesSearch, setEdgesSearch] = useState("");
     const [propertyKeysSearch, setPropertyKeysSearch] = useState("");
 
-    useEffect(() => { setNodesSearch(""); }, [Labels]);
-    useEffect(() => { setEdgesSearch(""); }, [Relationships]);
-    useEffect(() => { setPropertyKeysSearch(""); }, [PropertyKeys]);
+    useEffect(() => { setNodesSearch(""); }, [Labels, maxItemsForSearch]);
+    useEffect(() => { setEdgesSearch(""); }, [Relationships, maxItemsForSearch]);
+    useEffect(() => { setPropertyKeysSearch(""); }, [PropertyKeys, maxItemsForSearch]);
 
     return (
         <div aria-disabled={nodesCount === undefined || edgesCount === undefined} data-testid="graphInfoPanel" className={cn(`relative h-full w-full p-2 grid grid-rows-[max-content_max-content_max-content_1fr_1fr_1fr] gap-2`)}>
@@ -248,7 +248,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             </div>
                             <ul className="flex flex-wrap gap-2 p-2 overflow-auto">
                                 {
-                                    PropertyKeys && PropertyKeys.filter(key => key.toLowerCase().includes(propertyKeysSearch.toLowerCase())).map((key) => (
+                                    PropertyKeys && PropertyKeys.filter(key => key.toLowerCase().includes(propertyKeysSearch.toLowerCase())).sort((a, b) => a.localeCompare(b)).map((key) => (
                                         <li key={key} className="max-w-full">
                                             <Button
                                                 title={`MATCH (e) WHERE e.${key} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`}
