@@ -724,7 +724,13 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
     if ((pathname === "/graph" && graphName) || pathname === "/udf") {
       if (currentPanel.isCollapsed()) currentPanel.expand();
-    } else if (!currentPanel.isCollapsed()) currentPanel.collapse();
+    } else if (!currentPanel.isCollapsed()) {
+      // Defer collapse to next frame so the collapsible prop change
+      // (e.g. from false on /udf to true on /settings) takes effect first
+      requestAnimationFrame(() => {
+        if (!currentPanel.isCollapsed()) currentPanel.collapse();
+      });
+    }
   }, [graphName, pathname]);
 
   const checkStatus = useCallback(() => {
