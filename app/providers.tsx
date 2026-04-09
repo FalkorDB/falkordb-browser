@@ -6,7 +6,7 @@ import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useS
 import dynamic from "next/dynamic";
 import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue } from "@/lib/utils";
 import { encryptValue, decryptValue, isCryptoAvailable, isEncrypted } from "@/lib/encryption";
-import { getConnectionItem, setConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
+import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -69,6 +69,9 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       migrateToScopedStorage();
       setPrefixReady(true);
     } else {
+      // Clean up scoped data before clearing the prefix,
+      // so removeConnectionItem can still resolve the scoped key.
+      removeConnectionItem("savedContent");
       clearConnectionPrefix();
       setPrefixReady(false);
     }
@@ -134,15 +137,15 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [cypherOnly, setCypherOnly] = useState<boolean>(false);
   const [udfList, setUdfList] = useState<UDFEntry[]>([]);
   const [selectedUdf, setSelectedUdf] = useState<UDFEntryWithCode>();
-  const [columnWidth, setColumnWidth] = useState<number>(0);
-  const [rowHeight, setRowHeight] = useState<number>(0);
-  const [newColumnWidth, setNewColumnWidth] = useState<number>(0);
-  const [newRowHeight, setNewRowHeight] = useState<number>(0);
-  const [newRowHeightExpandMultiple, setNewRowHeightExpandMultiple] = useState<number>(0);
-  const [rowHeightExpandMultiple, setRowHeightExpandMultiple] = useState<number>(0);
+  const [columnWidth, setColumnWidth] = useState<number>(25);
+  const [rowHeight, setRowHeight] = useState<number>(40);
+  const [newColumnWidth, setNewColumnWidth] = useState<number>(25);
+  const [newRowHeight, setNewRowHeight] = useState<number>(40);
+  const [newRowHeightExpandMultiple, setNewRowHeightExpandMultiple] = useState<number>(3);
+  const [rowHeightExpandMultiple, setRowHeightExpandMultiple] = useState<number>(3);
   const [showUDF, setShowUDF] = useState<boolean>(true);
-  const [maxItemsForSearch, setMaxItemsForSearch] = useState<number>(0);
-  const [newMaxItemsForSearch, setNewMaxItemsForSearch] = useState<number>(0);
+  const [maxItemsForSearch, setMaxItemsForSearch] = useState<number>(20);
+  const [newMaxItemsForSearch, setNewMaxItemsForSearch] = useState<number>(20);
 
   const replayTutorial = useCallback(() => {
     router.push("/graph");
@@ -478,13 +481,15 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       fetchCount(n);
       setLastLimit(limit);
 
-      if (!tutorialOpen) {
+      if (!tutorialOpen && prefixReady) {
         setConnectionItem("savedContent", JSON.stringify({ graphName: n, query: q }));
       }
 
       const newQueries = handelGetNewQueries(newQuery);
 
-      setConnectionItem("query history", JSON.stringify(newQueries));
+      if (prefixReady) {
+        setConnectionItem("query history", JSON.stringify(newQueries));
+      }
 
       setHistoryQuery(prev => ({
         ...prev,
@@ -503,7 +508,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setIsQueryLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graphName, limit, timeout, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries, showMemoryUsage, captionsKeys, showPropertyKeyPrefix, tutorialOpen]);
+  }, [graphName, limit, timeout, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries, showMemoryUsage, captionsKeys, showPropertyKeyPrefix, tutorialOpen, prefixReady]);
 
   const graphContext = useMemo(() => ({
     graph,
@@ -649,7 +654,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setColumnWidth(parseInt(localStorage.getItem("columnWidth") || "25", 10));
       setRowHeight(parseInt(localStorage.getItem("rowHeight") || "40", 10));
       setRowHeightExpandMultiple(parseInt(localStorage.getItem("rowHeightExpandMultiple") || "3", 10));
-      setMaxItemsForSearch(parseInt(localStorage.getItem("maxItemsForSearch") || "20", 10));
+      const parsedMaxItems = parseInt(localStorage.getItem("maxItemsForSearch") || "20", 10);
+      setMaxItemsForSearch(Number.isFinite(parsedMaxItems) ? Math.min(Math.max(parsedMaxItems, 10), 50) : 20);
       // Decrypt secret key if encrypted, or migrate plain text keys to encrypted format
       const storedSecretKey = localStorage.getItem("secretKey") || "";
       if (storedSecretKey) {

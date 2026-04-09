@@ -14,7 +14,7 @@ import { GraphContext, IndicatorContext, QueryLoadingContext, BrowserSettingsCon
 import { EventType } from "../api/chat/route";
 import ToastButton from "../components/ToastButton";
 import { ShineBorder } from "@/components/ui/shine-border";
-import { getConnectionItem, setConnectionItem } from "@/lib/connection-storage";
+import { getConnectionItem, setConnectionItem, getConnectionPrefix } from "@/lib/connection-storage";
 
 // Function to get the last maxSavedMessages user messages and all messages in between
 const getLastUserMessagesWithContext = (allMessages: Message[], maxUserMessages: number) => {
@@ -109,6 +109,7 @@ export default function Chat({ onClose }: Props) {
 
     // Load messages and cypher only preference for current graph on mount
     useEffect(() => {
+        if (!getConnectionPrefix()) return;
         const savedMessages = getConnectionItem(`chat-${graphName}`);
         const currentMessages = JSON.parse(savedMessages || "[]");
         setMessages(currentMessages);
