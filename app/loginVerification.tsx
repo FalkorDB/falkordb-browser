@@ -13,6 +13,7 @@ export default function LoginVerification({ children }: { children: React.ReactN
 
     useEffect(() => {
         if (data?.user || data === undefined) return;
+        // Clear legacy unscoped savedContent (scoped cleanup handled by providers.tsx)
         localStorage.removeItem("savedContent");
     }, [data]);
 

@@ -8,6 +8,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import { Graph, GraphInfo } from "../api/graph/model";
 import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ForceGraphContext } from "../components/provider";
+import { getConnectionItem } from "@/lib/connection-storage";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
 
@@ -211,7 +212,7 @@ export default function Page() {
         if (!graphInfo) return;
 
         if (contentPersistence) {
-            const content = localStorage.getItem("savedContent");
+            const content = getConnectionItem("savedContent");
 
             if (content) {
                 const { graphName: name, query } = JSON.parse(content);

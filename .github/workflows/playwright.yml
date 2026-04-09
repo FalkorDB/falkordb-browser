@@ -47,8 +47,9 @@ jobs:
             ~/.npm
             node_modules
             ~/.cache/ms-playwright
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}-${{ hashFiles('.github/workflows/playwright.yml') }}
           restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}-
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
             ${{ runner.os }}-node-
       - name: Install dependencies with enhanced retry logic
@@ -82,7 +83,7 @@ jobs:
             fi
           done
       - name: Install Playwright Browsers
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox
       - name: Build application
         run: npm run build
       - name: Upload build output
@@ -127,8 +128,9 @@ jobs:
             ~/.npm
             node_modules
             ~/.cache/ms-playwright
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}-${{ hashFiles('.github/workflows/playwright.yml') }}
           restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}-
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
             ${{ runner.os }}-node-
       - name: Download build output
@@ -204,8 +206,9 @@ jobs:
             ~/.npm
             node_modules
             ~/.cache/ms-playwright
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}-${{ hashFiles('.github/workflows/playwright.yml') }}
           restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}-
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
             ${{ runner.os }}-node-
       - name: Download build output
@@ -340,8 +343,9 @@ jobs:
             ~/.npm
             node_modules
             ~/.cache/ms-playwright
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}-${{ hashFiles('.github/workflows/playwright.yml') }}
           restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}-
             ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
             ${{ runner.os }}-node-
       - name: Download build output
