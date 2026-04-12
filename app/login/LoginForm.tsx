@@ -19,6 +19,58 @@ const DEFAULT_PORT = "6379";
 
 type LoginMode = "manual" | "url" | "endpoint";
 
+const handlePortIsNumber = (value: string) => !Number.isFinite(Number(value));
+
+const handleIsPortFormat = (value: string) => {
+  const port = Number(value);
+
+  return !(port >= 1 && port <= 65535);
+};
+
+const handleIsPortValid = (value: string) => value.startsWith("0");
+
+const getPortErrors = (func?: (value: string) => string) => {
+  const getValue = (v: string) => func ? func(v) : v;
+
+  return [
+    {
+      condition: (value: string) => { console.log(getValue(value)); return getValue(value) !== "" && handleIsPortFormat(getValue(value)) },
+      message: "Port must be a number between 1 and 65535"
+    },
+    {
+      condition: (value: string) => handleIsPortValid(getValue(value)),
+      message: "Invalid port format (port cant start with 0)"
+    },
+    {
+      condition: (value: string) => handlePortIsNumber(getValue(value)),
+      message: "Port must be a number"
+    }
+  ]
+}
+
+// Parse a URL string and update shared state
+const parseUrl = (url: string) => {
+  debugger;
+  const match = matchUrl(url);
+  let parsed: ReturnType<typeof parseUrlString>;
+
+  if (match || !url) {
+    const [, protocol = "", u = "", p = "", h = "", pt = ""] = match || [];
+    parsed = {
+      protocol: protocol,
+      username: decodeURIComponent(u),
+      password: decodeURIComponent(p),
+      host: h,
+      port: pt,
+      tls: protocol === "falkors" || protocol === "rediss",
+    };
+  } else {
+    parsed = parseUrlString(url);
+  }
+
+  return parsed;
+};
+
 export default function LoginForm() {
   const { theme } = useTheme();
   const { currentTheme } = getTheme(theme);
@@ -55,41 +107,18 @@ export default function LoginForm() {
     return `${protocol}://${creds}${h}${port ? `:${port}` : ""}`;
   };
 
-  // Parse a URL string and update shared state
-  const parseUrl = (url: string) => {
-    const match = matchUrl(url);
-
-    if (match || !url) {
-      const [, protocol, u, p, h, pt] = match || [];
-      setHost(h || "");
-      setPort(pt || "");
-      setUsername(u ? decodeURIComponent(u) : "");
-      setPassword(p ? decodeURIComponent(p) : "");
-      setTLS(protocol === "falkors" || protocol === "rediss");
-    } else {
-      // Regex didn't match — use manual parser for best-effort
-      const parsed = parseUrlString(url);
-      setHost(parsed.host);
-      setPort(parsed.port);
-      setUsername(parsed.username);
-      setPassword(parsed.password);
-      setTLS(parsed.tls);
-    }
-  };
-
   // Build endpoint display from shared state
   const endpointValue = `${host}${port ? `:${port}` : ""}`;
 
   // Parse endpoint string into host and port
   const parseEndpoint = (value: string) => {
     const colonIndex = value.lastIndexOf(":");
+
     if (colonIndex > 0) {
       const portCandidate = value.substring(colonIndex + 1);
-      setHost(value.substring(0, colonIndex));
-      setPort(/^\d+$/.test(portCandidate) ? portCandidate : "");
+      return { host: value.substring(0, colonIndex), port: /^\d+$/.test(portCandidate) ? portCandidate : "" };
     } else {
-      setHost(value);
-      setPort("");
+      return { host: value, port: "" };
     }
   };
 
@@ -100,6 +129,7 @@ export default function LoginForm() {
     onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
       setUsername(e.target.value);
       clearError();
+
       return true;
     },
     label: "Username",
@@ -113,6 +143,7 @@ export default function LoginForm() {
     onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
       setPassword(e.target.value);
       clearError();
+
       return true;
     },
     label: "Password",
@@ -127,11 +158,24 @@ export default function LoginForm() {
       value: rawUrl,
       onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
+        const parsed = parseUrl(val);
+
+        console.log(parsed);
+
+        setHost(parsed.host);
+        setPort(parsed.port);
+        setUsername(parsed.username);
+        setPassword(parsed.password);
+        setTLS(parsed.tls);
         setRawUrl(val);
-        parseUrl(val);
+
         clearError();
+
         return true;
       },
+      errors: [
+        ...getPortErrors((value) => parseUrl(value).port)
+      ],
       label: "FalkorDB URL",
       type: "text",
       placeholder: `falkor://Default:Default@${DEFAULT_HOST}:${DEFAULT_PORT}`,
@@ -140,10 +184,18 @@ export default function LoginForm() {
       {
         value: endpointValue,
         onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
-          parseEndpoint(e.target.value);
+          const { host, port } = parseEndpoint(e.target.value);
+
+          setHost(host);
+          setPort(port);
+
           clearError();
+
           return true;
         },
+        errors: [
+          ...getPortErrors((value) => parseEndpoint(value).port)
+        ],
         label: "Endpoint",
         type: "text",
         placeholder: `${DEFAULT_HOST}:${DEFAULT_PORT}`,
@@ -156,6 +208,7 @@ export default function LoginForm() {
         onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
           setHost(e.target.value);
           clearError();
+
           return true;
         },
         label: "Host",
@@ -168,8 +221,10 @@ export default function LoginForm() {
         onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
           setPort(e.target.value);
           clearError();
+
           return true;
         },
+        errors: [...getPortErrors()],
         label: "Port",
         type: "text",
         placeholder: DEFAULT_PORT,
@@ -231,11 +286,11 @@ export default function LoginForm() {
         const portNode = render("[:port]", parts.port);
 
         setError({
-          message: (
+          message:
             <span className="text-xs text-destructive">
               Invalid URL format. Expected: {protocolNode}{credsNode}{hostNode}{portNode}
             </span>
-          ),
+          ,
           show: true
         });
         return;
@@ -261,7 +316,7 @@ export default function LoginForm() {
     signIn("credentials", params).then((res?: SignInResponse) => {
       if (res?.error) {
         setError({
-          message: "Invalid credentials",
+          message: <p className="text-xs text-destructive">Invalid credentials please recheck username and password or your connection settings {loginMode === "url" ? <span className="text-green-700">[prefix[s]://][[username][:password]@]host[:port]</span> : null}</p>,
           show: true
         });
       } else {
@@ -274,16 +329,9 @@ export default function LoginForm() {
     const reader = new FileReader();
 
     reader.onload = () => {
-      setError(prev => ({
-        ...prev,
-        show: false
-      }));
+      clearError();
       setCA((reader.result as string).split(',').pop());
       setUploadedFileName(acceptedFiles[0].name);
-      setError(prev => ({
-        ...prev,
-        show: false
-      }));
     };
 
     reader.readAsDataURL(acceptedFiles[0]);
@@ -291,7 +339,7 @@ export default function LoginForm() {
 
   return (
     <div className="relative h-full w-full flex flex-col">
-      <div className="grow basis-0 flex items-center justify-center overflow-auto">
+      <div className="grow basis-0 flex justify-center overflow-auto mt-8">
         <div className="flex flex-col gap-8 items-center max-h-full w-[500px]">
           {mounted && currentTheme && <Image style={{ width: 'auto', height: '80px' }} priority src={`/icons/Browser-${currentTheme}.svg`} alt="FalkorDB Browser Logo" width={0} height={0} />}
 
@@ -304,7 +352,7 @@ export default function LoginForm() {
               if (mode === "url") {
                 setRawUrl(buildUrl());
               }
-              setError({ message: "Invalid credentials", show: false });
+              clearError();
             }}
             className="flex items-center justify-center gap-8 p-4 border border-primary rounded-lg w-full"
           >
@@ -341,10 +389,7 @@ export default function LoginForm() {
                     checked={TLS}
                     onCheckedChange={(checked) => {
                       setTLS(checked as boolean);
-                      setError(prev => ({
-                        ...prev,
-                        show: false
-                      }));
+                      clearError();
                       if (!checked) {
                         // Clear certificate when TLS is disabled
                         setCA(undefined);
@@ -391,10 +436,7 @@ export default function LoginForm() {
                           <button
                             type="button"
                             onClick={() => {
-                              setError(prev => ({
-                                ...prev,
-                                show: false
-                              }));
+                              clearError();
                               setCA(undefined);
                               setUploadedFileName("");
                             }}
