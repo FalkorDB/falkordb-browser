@@ -14,10 +14,11 @@ import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphInfo } from "./api/graph/model";
-import Header from "./components/Header";
+import Navbar from "./components/Navbar";
 import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext } from "./components/provider";
 import Tutorial from "./components/Tutorial";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
+import Header from "./components/Header";
 
 const GraphInfoPanel = dynamic(() => import("./graph/graphInfo"), {
   ssr: false,
@@ -146,6 +147,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [showUDF, setShowUDF] = useState<boolean>(true);
   const [maxItemsForSearch, setMaxItemsForSearch] = useState<number>(20);
   const [newMaxItemsForSearch, setNewMaxItemsForSearch] = useState<number>(20);
+  const showNavbarAndHeader = pathname !== "/" && pathname !== "/login";
 
   const replayTutorial = useCallback(() => {
     router.push("/graph");
@@ -931,59 +933,65 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                                 />
                               }
                               {
-                                pathname !== "/" && pathname !== "/login" &&
-                                <Header
-                                  graphName={graphName}
-                                  graphNames={pathname.includes("/schema") ? schemaNames : graphNames}
-                                  onSetGraphName={handleOnSetGraphName}
-                                  showUDF={showUDF}
-                                  onOpenPanel={onExpand}
-                                  panelOpen={!isCollapsed}
-                                />
+                                showNavbarAndHeader &&
+                                <Header />
                               }
-                              <ResizablePanelGroup orientation="horizontal" className="w-1 grow">
-                                <ResizablePanel
-                                  panelRef={panelRef}
-                                  defaultSize="0%"
-                                  collapsible={pathname !== "/udf"}
-                                  minSize="15%"
-                                  maxSize="30%"
-                                  onResize={onPanelResize}
-                                  data-testid="graphInfoPanel"
-                                >
-                                  {
-                                    pathname === "/udf" ?
-                                      <UdfPanel />
-                                      : pathname === "/graph" &&
-                                      <GraphInfoPanel
-                                        onClose={onExpand}
-                                        customizingLabel={customizingLabel}
-                                        setCustomizingLabel={setCustomizingLabel}
-                                      />
-                                  }
-                                </ResizablePanel>
-                                <ResizableHandle
-                                  withHandle
-                                  onMouseUp={() => isCollapsed && onExpand()}
-                                  className={cn("bg-border", isCollapsed && "hidden")}
-                                  disabled={isCollapsed}
-                                />
-                                <ResizablePanel
-                                  defaultSize="100%"
-                                  minSize="70%"
-                                  maxSize="100%"
-                                >
-                                  {
-                                    (pathname === "/graph" || pathname === "/schema") ?
-                                      <div className="h-full w-full flex flex-col">
-                                        {children}
-                                        <div className="h-4 w-full Gradient" />
-                                      </div>
-                                      :
-                                      children
-                                  }
-                                </ResizablePanel>
-                              </ResizablePanelGroup>
+                              <div className="basis-0 grow min-h-0 flex">
+                                {
+                                  showNavbarAndHeader &&
+                                  <Navbar
+                                    graphName={graphName}
+                                    graphNames={pathname.includes("/schema") ? schemaNames : graphNames}
+                                    onSetGraphName={handleOnSetGraphName}
+                                    showUDF={showUDF}
+                                    onOpenPanel={onExpand}
+                                    panelOpen={!isCollapsed}
+                                  />
+                                }
+                                <ResizablePanelGroup orientation="horizontal" className="w-1 grow">
+                                  <ResizablePanel
+                                    panelRef={panelRef}
+                                    defaultSize="0%"
+                                    collapsible={pathname !== "/udf"}
+                                    minSize="15%"
+                                    maxSize="30%"
+                                    onResize={onPanelResize}
+                                    data-testid="graphInfoPanel"
+                                  >
+                                    {
+                                      pathname === "/udf" ?
+                                        <UdfPanel />
+                                        : pathname === "/graph" &&
+                                        <GraphInfoPanel
+                                          onClose={onExpand}
+                                          customizingLabel={customizingLabel}
+                                          setCustomizingLabel={setCustomizingLabel}
+                                        />
+                                    }
+                                  </ResizablePanel>
+                                  <ResizableHandle
+                                    withHandle
+                                    onMouseUp={() => isCollapsed && onExpand()}
+                                    className={cn("bg-border", isCollapsed && "hidden")}
+                                    disabled={isCollapsed}
+                                  />
+                                  <ResizablePanel
+                                    defaultSize="100%"
+                                    minSize="70%"
+                                    maxSize="100%"
+                                  >
+                                    {
+                                      (pathname === "/graph" || pathname === "/schema") ?
+                                        <div className="h-full w-full flex flex-col">
+                                          {children}
+                                          <div className="h-4 w-full Gradient" />
+                                        </div>
+                                        :
+                                        children
+                                    }
+                                  </ResizablePanel>
+                                </ResizablePanelGroup>
+                              </div>
                             </UDFContext.Provider>
                           </ConnectionContext.Provider>
                         </TableViewContext.Provider>
