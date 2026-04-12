@@ -98,7 +98,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
     const separator = <div className="h-px w-[80%] bg-border rounded-full" />;
 
     return (
-        <div className="py-5 px-2 flex flex-col justify-between items-center border-r border-border">
+        <div className="w-30 py-5 px-2 flex flex-col justify-between items-center border-r border-border">
             <div className="w-full flex flex-col gap-2 items-center">
                 {
                     mounted && currentTheme &&
@@ -132,9 +132,9 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenPa
                 }
                 {
                     session?.user &&
-                    <div className="w-full flex flex-col items-center gap-0.5 text-[10px] leading-tight text-center opacity-75 break-all">
-                        <div className="flex items-center gap-1">
-                            <p>{session.user.host}:{session.user.port}</p>
+                    <div className="w-full text-no-wrap flex flex-col items-center text-center gap-1 text-sm">
+                        <div className="w-full flex items-center gap-1">
+                            <p className="grow basis-0 truncate">{session.user.host}:{session.user.port}</p>
                             <Button
                                 title="Copy connection info"
                                 className="p-0.5 shrink-0"
