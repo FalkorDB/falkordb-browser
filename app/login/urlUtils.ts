@@ -8,6 +8,14 @@
 
 const PROTOCOL_REGEX = /^(falkor|falkors|redis|rediss):\/\//;
 
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 export interface ParsedUrl {
   protocol: string;
   username: string;
@@ -65,10 +73,10 @@ export function parseUrlString(url: string): ParsedUrl {
   if (atIndex >= 0) {
     const colonIndex = credStr.indexOf(":");
     if (colonIndex >= 0) {
-      username = decodeURIComponent(credStr.slice(0, colonIndex));
-      password = decodeURIComponent(credStr.slice(colonIndex + 1));
+      username = safeDecode(credStr.slice(0, colonIndex));
+      password = safeDecode(credStr.slice(colonIndex + 1));
     } else {
-      username = decodeURIComponent(credStr);
+      username = safeDecode(credStr);
     }
   }
 
@@ -78,8 +86,10 @@ export function parseUrlString(url: string): ParsedUrl {
   const lastColon = hostPortStr.lastIndexOf(":");
   if (lastColon >= 0) {
     const portCandidate = hostPortStr.slice(lastColon + 1);
-    host = hostPortStr.slice(0, lastColon);
-    port = portCandidate;
+    if (/^\d+$/.test(portCandidate)) {
+      host = hostPortStr.slice(0, lastColon);
+      port = portCandidate;
+    }
     // If portCandidate is not all digits, keep it as part of host
     // (this handles the case of a missing @ where host:password looks ambiguous)
   }

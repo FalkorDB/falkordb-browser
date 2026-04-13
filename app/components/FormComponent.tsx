@@ -64,14 +64,13 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
     const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
+        const newErrors: { [key: string]: boolean } = {};
         fields.forEach(field => {
             if (field.errors) {
-                setErrors(prev => ({
-                    ...prev,
-                    [field.label]: field.errors!.some(err => err.condition(field.value))
-                }));
+                newErrors[field.label] = field.errors.some(err => err.condition(field.value));
             }
         });
+        setErrors(prev => ({ ...prev, ...newErrors }));
     }, [fields]);
 
     const onHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {

@@ -19,7 +19,7 @@ const DEFAULT_PORT = "6379";
 
 type LoginMode = "manual" | "url" | "endpoint";
 
-const handlePortIsNumber = (value: string) => !Number.isFinite(Number(value));
+const handlePortIsNumber = (value: string) => !/^\d+$/.test(value);
 
 const handleIsPortFormat = (value: string) => {
   const port = Number(value);
@@ -34,23 +34,30 @@ const getPortErrors = (func?: (value: string) => string) => {
 
   return [
     {
-      condition: (value: string) => { console.log(getValue(value)); return getValue(value) !== "" && handleIsPortFormat(getValue(value)) },
+      condition: (value: string) => getValue(value) !== "" && handlePortIsNumber(getValue(value)),
+      message: "Port must be a number"
+    },
+    {
+      condition: (value: string) => getValue(value) !== "" && !handlePortIsNumber(getValue(value)) && handleIsPortFormat(getValue(value)),
       message: "Port must be a number between 1 and 65535"
     },
     {
-      condition: (value: string) => handleIsPortValid(getValue(value)),
-      message: "Invalid port format (port cant start with 0)"
-    },
-    {
-      condition: (value: string) => handlePortIsNumber(getValue(value)),
-      message: "Port must be a number"
+      condition: (value: string) => getValue(value) !== "" && !handlePortIsNumber(getValue(value)) && handleIsPortValid(getValue(value)),
+      message: "Invalid port format (port can't start with 0)"
     }
   ]
 }
 
+const safeDecode = (value: string): string => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
+
 // Parse a URL string and update shared state
 const parseUrl = (url: string) => {
-  debugger;
   const match = matchUrl(url);
   let parsed: ReturnType<typeof parseUrlString>;
 
@@ -58,8 +65,8 @@ const parseUrl = (url: string) => {
     const [, protocol = "", u = "", p = "", h = "", pt = ""] = match || [];
     parsed = {
       protocol: protocol,
-      username: decodeURIComponent(u),
-      password: decodeURIComponent(p),
+      username: safeDecode(u),
+      password: safeDecode(p),
       host: h,
       port: pt,
       tls: protocol === "falkors" || protocol === "rediss",
@@ -116,7 +123,7 @@ export default function LoginForm() {
 
     if (colonIndex > 0) {
       const portCandidate = value.substring(colonIndex + 1);
-      return { host: value.substring(0, colonIndex), port: /^\d+$/.test(portCandidate) ? portCandidate : "" };
+      return { host: value.substring(0, colonIndex), port: portCandidate };
     } else {
       return { host: value, port: "" };
     }
@@ -159,8 +166,6 @@ export default function LoginForm() {
       onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
         const parsed = parseUrl(val);
-
-        console.log(parsed);
 
         setHost(parsed.host);
         setPort(parsed.port);
@@ -339,7 +344,7 @@ export default function LoginForm() {
 
   return (
     <div className="relative h-full w-full flex flex-col">
-      <div className="grow basis-0 flex justify-center overflow-auto mt-8">
+      <div className="grow basis-0 flex items-center justify-center overflow-auto">
         <div className="flex flex-col gap-8 items-center max-h-full w-[500px]">
           {mounted && currentTheme && <Image style={{ width: 'auto', height: '80px' }} priority src={`/icons/Browser-${currentTheme}.svg`} alt="FalkorDB Browser Logo" width={0} height={0} />}
 
