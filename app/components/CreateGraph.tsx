@@ -39,7 +39,7 @@ export default function CreateGraph({
 }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext);
-    const { connectionInfo } = useContext(ConnectionContext);
+    const { isReadOnly } = useContext(ConnectionContext);
 
     const { toast } = useToast();
 
@@ -75,7 +75,7 @@ export default function CreateGraph({
                 });
                 return;
             }
-            const result = await securedFetch(`api/${type === "Schema" ? "schema" : "graph"}/${prepareArg(name)}${connectionInfo.sentinelRole ? `?sentinel=${connectionInfo.sentinelRole}` : ''}`, {
+            const result = await securedFetch(`api/${type === "Schema" ? "schema" : "graph"}/${prepareArg(name)}${isReadOnly ? '?readOnly=true' : ''}`, {
                 method: "POST",
             }, toast, setIndicator);
 

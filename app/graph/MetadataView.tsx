@@ -25,7 +25,7 @@ export function Profile({ graphName, query, setQuery, fetchCount, background }: 
 }) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext);
-    const { connectionInfo } = useContext(ConnectionContext);
+    const { isReadOnly } = useContext(ConnectionContext);
 
     const { toast } = useToast();
     const { theme } = useTheme();
@@ -38,8 +38,8 @@ export function Profile({ graphName, query, setQuery, fetchCount, background }: 
     const handleProfile = async () => {
         setIsLoading(true);
         try {
-            const sentinel = connectionInfo.sentinelRole ? `&sentinel=${connectionInfo.sentinelRole}` : '';
-            const result = await securedFetch(`/api/graph/${graphName}/profile?query=${prepareArg(query.text)}${sentinel}`, {
+            const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
+            const result = await securedFetch(`/api/graph/${graphName}/profile?query=${prepareArg(query.text)}${readOnlyParam}`, {
                 method: "GET",
             }, toast, setIndicator);
 

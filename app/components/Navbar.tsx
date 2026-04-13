@@ -17,7 +17,7 @@ import Link from "next/link";
 import { useTheme } from "next-themes";
 import Button from "./ui/Button";
 import CreateGraph from "./CreateGraph";
-import { IndicatorContext, PanelContext } from "./provider";
+import { ConnectionContext, IndicatorContext, PanelContext } from "./provider";
 
 interface Props {
     onSetGraphName: (newGraphName: string) => void
@@ -42,6 +42,7 @@ export default function Navbar({ onSetGraphName, graphNames, graphName, onOpenPa
 
     const { indicator } = useContext(IndicatorContext);
     const { setPanel, panel } = useContext(PanelContext);
+    const { isReadOnly } = useContext(ConnectionContext);
 
     const { theme, setTheme } = useTheme();
     const { currentTheme } = getTheme(theme);
@@ -52,7 +53,7 @@ export default function Navbar({ onSetGraphName, graphNames, graphName, onOpenPa
     const [mounted, setMounted] = useState(false);
 
     const type = getPathType(pathname);
-    const showCreate = type && type !== "Settings" && type !== "UDF" && session?.user.role && session.user.role !== "Read-Only";
+    const showCreate = type && type !== "Settings" && type !== "UDF" && session?.user.role && !isReadOnly;
 
     useEffect(() => {
         setMounted(true);

@@ -218,7 +218,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const { indicator, setIndicator } = useContext(IndicatorContext);
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { udfList } = useContext(UDFContext);
-    const { connectionInfo } = useContext(ConnectionContext);
+    const { isReadOnly } = useContext(ConnectionContext);
 
     const { toast } = useToast();
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -231,7 +231,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const graphNameRef = useRef(graphName);
     const queryRef = useRef(historyQuery.query);
     const tutorialOpenRef = useRef(tutorialOpen);
-    const connectionInfoRef = useRef(connectionInfo);
+    const isReadOnlyRef = useRef(isReadOnly);
     const monacoRef = useRef<Monaco | null>(null);
 
     const [lineNumber, setLineNumber] = useState(1);
@@ -271,8 +271,8 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     }, [graph.Id]);
 
     useEffect(() => {
-        connectionInfoRef.current = connectionInfo;
-    }, [connectionInfo]);
+        isReadOnlyRef.current = isReadOnly;
+    }, [isReadOnly]);
 
     useEffect(() => {
         if (!containerRef.current) return;
@@ -300,8 +300,8 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const fetchSuggestions = async (detail: string): Promise<monaco.languages.CompletionItem[]> => {
         if (indicator === "offline") return [];
 
-        const sentinel = connectionInfoRef.current.sentinelRole ? `&sentinel=${connectionInfoRef.current.sentinelRole}` : '';
-        const result = await securedFetch(`api/graph/${graphIdRef.current}/info?type=${prepareArg(detail)}${sentinel}`, {
+        const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
+        const result = await securedFetch(`api/graph/${graphIdRef.current}/info?type=${prepareArg(detail)}${readOnlyParam}`, {
             method: 'GET',
         }, toast, setIndicator);
 

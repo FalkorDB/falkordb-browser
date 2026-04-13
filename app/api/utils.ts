@@ -1,8 +1,7 @@
-import { Role } from "next-auth";
 import type { Graph } from "falkordb";
 
-export const runQuery = async (graph: Graph, query: string, role: Role, sentinel?: string | null) => {
-    const result = role === "Read-Only" || sentinel === "slave" ? await graph.roQuery(query) : await graph.query(query);
+export const runQuery = async (graph: Graph, query: string, isReadOnly: boolean) => {
+    const result = isReadOnly ? await graph.roQuery(query) : await graph.query(query);
     return result;
 };
 

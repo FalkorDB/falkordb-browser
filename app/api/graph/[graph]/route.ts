@@ -60,15 +60,15 @@ export async function POST(
       return session;
     }
 
-    const { client, user } = session;
+    const { client } = session;
 
     const { graph: graphId } = await params;
-    const sentinel = request.nextUrl.searchParams.get("sentinel");
+    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
 
     try {
       const graph = client.selectGraph(graphId);
 
-      if (user.role === "Read-Only" || sentinel === "slave") await graph.roQuery("RETURN 1");
+      if (isReadOnly) await graph.roQuery("RETURN 1");
       else await graph.query("RETURN 1");
 
       return NextResponse.json(
@@ -160,11 +160,11 @@ export async function GET(
       throw new Error(await session.text());
     }
 
-    const { client, user } = session;
+    const { client } = session;
     const { graph: graphId } = await params;
     const query = request.nextUrl.searchParams.get("query");
     const timeout = Number(request.nextUrl.searchParams.get("timeout")) * 1000;
-    const sentinel = request.nextUrl.searchParams.get("sentinel");
+    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
 
     try {
       if (!query) throw new Error("Missing parameter query");
@@ -172,8 +172,7 @@ export async function GET(
 
       const graph = client.selectGraph(graphId);
 
-      const result =
-        user.role === "Read-Only" || sentinel === "slave"
+      const result = isReadOnly
           ? await graph.roQuery(query, { TIMEOUT: timeout })
           : await graph.query(query, { TIMEOUT: timeout });
 

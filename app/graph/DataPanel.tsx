@@ -8,7 +8,6 @@ import { prepareArg, securedFetch, GraphRef, Node, Link, Label } from "@/lib/uti
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Pencil, TableProperties, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { useSession } from "next-auth/react";
 import Button from "../components/ui/Button";
 import { IndicatorContext, GraphContext, ConnectionContext } from "../components/provider";
 import DataTable from "./DataTable";
@@ -25,13 +24,12 @@ interface Props {
 export default function DataPanel({ object, onClose, setLabels, canvasRef }: Props) {
     const { setIndicator } = useContext(IndicatorContext);
     const { graph, setGraphInfo } = useContext(GraphContext);
-    const { connectionInfo } = useContext(ConnectionContext);
+    const { isReadOnly } = useContext(ConnectionContext);
 
     const lastObjId = useRef<number | undefined>(undefined);
     const labelsListRef = useRef<HTMLUListElement>(null);
 
     const { toast } = useToast();
-    const { data: session } = useSession();
 
     const [labelsHover, setLabelsHover] = useState(false);
     const [label, setLabel] = useState<string[]>([]);
@@ -77,7 +75,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
             });
             return false;
         }
-        const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label${connectionInfo.sentinelRole ? `?sentinel=${connectionInfo.sentinelRole}` : ''}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label${isReadOnly ? '?readOnly=true' : ''}`, {
             method: "POST",
             body: JSON.stringify({
                 label: newLabel
@@ -125,7 +123,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
             return false;
         }
 
-        const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label${connectionInfo.sentinelRole ? `?sentinel=${connectionInfo.sentinelRole}` : ''}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label${isReadOnly ? '?readOnly=true' : ''}`, {
             method: "DELETE",
             body: JSON.stringify({
                 label: removeLabel
@@ -197,7 +195,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
                         >
                             <p>{l || "No Label"}</p>
                             {
-                                type && l && session?.user.role !== "Read-Only" &&
+                                type && l && !isReadOnly &&
                                 <RemoveLabel
                                     onRemoveLabel={handleRemoveLabel}
                                     selectedLabel={l}
@@ -216,7 +214,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
                     ))}
                     <li className="h-8 w-[106px] flex justify-center items-center" key="addLabel">
                         {
-                            type && (labelsHover || label.length === 0) && session?.user.role !== "Read-Only" &&
+                            type && (labelsHover || label.length === 0) && !isReadOnly &&
                             <AddLabel
                                 onAddLabel={handleAddLabel}
                                 trigger={

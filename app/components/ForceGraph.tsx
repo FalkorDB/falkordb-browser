@@ -71,7 +71,7 @@ export default function ForceGraph({
 
     const { setIndicator } = useContext(IndicatorContext);
     const { settings: { captionsKeysSettings: { captionsKeys }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
-    const { connectionInfo } = useContext(ConnectionContext);
+    const { isReadOnly } = useContext(ConnectionContext);
 
     const { theme } = useTheme();
     const { toast } = useToast();
@@ -128,7 +128,7 @@ export default function ForceGraph({
         const canvas = canvasRef.current;
         if (!canvas || !canvasLoaded) return;
 
-        const result = await securedFetch(`/api/${type}/${graph.Id}/${node.id}${connectionInfo.sentinelRole ? `?sentinel=${connectionInfo.sentinelRole}` : ''}`, {
+        const result = await securedFetch(`/api/${type}/${graph.Id}/${node.id}${isReadOnly ? '?readOnly=true' : ''}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'

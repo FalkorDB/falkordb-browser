@@ -37,6 +37,7 @@ export default function Header() {
     const [usedMemory, setUsedMemory] = useState<string | null>(null);
 
     useEffect(() => {
+        setUsedMemory(null);
         (async () => {
             const result = await securedFetch("/api/info?section=memory", {
                 method: "GET"
@@ -48,13 +49,11 @@ export default function Header() {
 
             const match = data.match(/used_memory_human:(\S+)/);
 
-            console.log(match);
-
             if (!match) return;
 
             setUsedMemory(match[1]);
         })();
-    }, [toast, setIndicator]);
+    }, [toast, setIndicator, connectionType, connectionInfo]);
 
     const handleCopy = useCallback((text: string) => {
         if (!navigator.clipboard?.writeText) {
@@ -97,9 +96,11 @@ export default function Header() {
             <div className="flex gap-1 items-center">
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <div
+                        <button
+                            type="button"
+                            aria-label="Single connection"
                             className={cn("h-6 w-6 rounded-full bg-yellow-500 text-center", connectionType !== "Standalone" && "opacity-25")}
-                        >Si</div>
+                        >Si</button>
                     </TooltipTrigger>
                     <TooltipContent>
                         <p>Single</p>
@@ -107,9 +108,11 @@ export default function Header() {
                 </Tooltip>
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <div
+                        <button
+                            type="button"
+                            aria-label="Sentinel connection"
                             className={cn("h-6 w-6 rounded-full bg-green-500 text-center", connectionType !== "Sentinel" && "opacity-25")}
-                        >Se</div>
+                        >Se</button>
                     </TooltipTrigger>
                     <TooltipContent>
                         <p>Sentinel</p>
@@ -117,9 +120,11 @@ export default function Header() {
                 </Tooltip>
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <div
+                        <button
+                            type="button"
+                            aria-label="Cluster connection"
                             className={cn("h-6 w-6 rounded-full bg-green-700 text-center", connectionType !== "Cluster" && "opacity-25")}
-                        >C</div>
+                        >C</button>
                     </TooltipTrigger>
                     <TooltipContent>
                         <p>Cluster</p>

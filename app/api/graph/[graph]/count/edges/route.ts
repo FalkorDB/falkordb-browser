@@ -23,16 +23,16 @@ export async function GET(
       throw new Error(await session.text());
     }
 
-    const { client, user } = session;
+    const { client } = session;
     const { graph: graphId } = await params;
-    const sentinel = request.nextUrl.searchParams.get("sentinel");
+    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
 
     try {
       const graph = client.selectGraph(graphId);
 
       // Execute edges count query
       const edgesQuery = "MATCH ()-[e]->() RETURN count(e) as edges";
-      const edgesResult = await runQuery(graph, edgesQuery, user.role, sentinel);
+      const edgesResult = await runQuery(graph, edgesQuery, isReadOnly);
 
       if (!edgesResult) throw new Error("Something went wrong");
 

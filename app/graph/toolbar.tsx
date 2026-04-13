@@ -2,12 +2,11 @@ import { ArrowRight, Circle, Info } from "lucide-react";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { cn, GraphRef, Link, Node } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useSession } from "next-auth/react";
 import { Graph } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import DeleteElement from "./DeleteElement";
-import { BrowserSettingsContext, GraphContext } from "../components/provider";
+import { BrowserSettingsContext, ConnectionContext, GraphContext } from "../components/provider";
 
 interface Props {
     graph: Graph
@@ -44,6 +43,7 @@ export default function Toolbar({
 }: Props) {
 
     const { isLoading: isLoadingGraph } = useContext(GraphContext);
+    const { isReadOnly } = useContext(ConnectionContext);
     const { settings: { showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
     const {
         settings: {
@@ -53,7 +53,6 @@ export default function Toolbar({
 
 
     const suggestionRef = useRef<HTMLDivElement>(null);
-    const { data: session } = useSession();
 
     const [suggestions, setSuggestions] = useState<(Node | Link)[]>([]);
     const [suggestionIndex, setSuggestionIndex] = useState(0);
@@ -286,7 +285,7 @@ export default function Toolbar({
             </div>
             <div data-testid={`elementCanvasToolbarAction${label}`} className={cn("flex flex-row-reverse gap-2 pointer-events-auto", label === "Schema" && "h-full")}>
                 {
-                    graphName && session?.user.role !== "Read-Only" &&
+                    graphName && !isReadOnly &&
                     <>
                         <Button
                             data-testid={`elementCanvasInfo${label}`}

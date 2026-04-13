@@ -51,7 +51,7 @@ export default function Page() {
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext);
     const { setData, canvasRef } = useContext(ForceGraphContext);
-    const { connectionInfo } = useContext(ConnectionContext);
+    const { isReadOnly } = useContext(ConnectionContext);
     const {
         graph,
         setGraph,
@@ -159,8 +159,8 @@ export default function Page() {
     const fetchInfo = useCallback(async (type: string) => {
         if (!graphName) return [];
 
-        const sentinel = connectionInfo.sentinelRole ? `&sentinel=${connectionInfo.sentinelRole}` : '';
-        const result = await securedFetch(`/api/graph/${graphName}/info?type=${type}${sentinel}`, {
+        const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
+        const result = await securedFetch(`/api/graph/${graphName}/info?type=${type}${readOnlyParam}`, {
             method: "GET",
         }, toast, setIndicator);
 
@@ -171,7 +171,7 @@ export default function Page() {
         return json.result.data.map(({ info }: { info: string }) => info);
     }, [graphName, setIndicator, toast]);
 
-    const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator, connectionInfo.sentinelRole), [setIndicator, toast, connectionInfo.sentinelRole]);
+    const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator, isReadOnly), [setIndicator, toast, isReadOnly]);
 
     useEffect(() => {
         if (!graphName) return undefined;
@@ -278,8 +278,8 @@ export default function Page() {
 
     const handleCreateElement = useCallback(async (attributes: [string, Value][], label: string[]) => {
         const fakeId = "-1";
-        const sentinel = connectionInfo.sentinelRole ? `?sentinel=${connectionInfo.sentinelRole}` : '';
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/${fakeId}${sentinel}`, {
+        const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/${fakeId}${readOnlyParam}`, {
             method: "POST",
             body: JSON.stringify({
                 attributes,
@@ -321,8 +321,8 @@ export default function Page() {
     const handleDeleteElement = useCallback(async () => {
         const deletedElements = (await Promise.all(selectedElements.map(async (element) => {
             const type = !('source' in element);
-            const sentinel = connectionInfo.sentinelRole ? `?sentinel=${connectionInfo.sentinelRole}` : '';
-            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${prepareArg(element.id.toString())}${sentinel}`, {
+            const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
+            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${prepareArg(element.id.toString())}${readOnlyParam}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type })
             }, toast, setIndicator);
