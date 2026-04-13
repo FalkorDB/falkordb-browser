@@ -7,7 +7,6 @@ import { Check, Pencil, PlusCircle, Trash2, X } from "lucide-react";
 import { useContext, useEffect, useState, useCallback, Dispatch, SetStateAction  } from "react";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
-import { useSession } from "next-auth/react";
 import { Switch } from "@/components/ui/switch";
 import { GraphData, Label, Link, Node, prepareArg, securedFetch } from "@/lib/utils";
 import Button from "../components/ui/Button";
@@ -18,7 +17,7 @@ import Input from "../components/ui/Input";
 import ToastButton from "../components/ToastButton";
 import DialogComponent from "../components/DialogComponent";
 import CloseDialog from "../components/CloseDialog";
-import { IndicatorContext } from "../components/provider";
+import { ConnectionContext, IndicatorContext } from "../components/provider";
 
 interface Props {
     object: Node | Link
@@ -31,8 +30,8 @@ interface Props {
 export default function DataPanel({ object, setObject, schema, setLabels, setData }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext);
+    const { isReadOnly } = useContext(ConnectionContext);
 
-    const { data: session } = useSession();
     const { toast } = useToast();
 
     const [attribute, setAttribute] = useState<[string, string[]]>(getDefaultAttribute());
@@ -82,7 +81,7 @@ export default function DataPanel({ object, setObject, schema, setLabels, setDat
     };
 
     const onSetAttribute = async (att: [string, string[]]) => {
-        const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/${prepareArg(att[0])}`, {
+        const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/${prepareArg(att[0])}${isReadOnly ? '?readOnly=true' : ''}`, {
             method: "POST",
             body: JSON.stringify({ type, attribute: att[1] })
         }, toast, setIndicator);
@@ -148,7 +147,7 @@ export default function DataPanel({ object, setObject, schema, setLabels, setDat
         try {
             setIsRemoveLoading(true);
 
-            const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/${prepareArg(key)}`, {
+            const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/${prepareArg(key)}${isReadOnly ? '?readOnly=true' : ''}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type })
             }, toast, setIndicator);
@@ -276,7 +275,7 @@ export default function DataPanel({ object, setObject, schema, setLabels, setDat
         try {
             setIsLabelLoading(true);
 
-            const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/label`, {
+            const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/label${isReadOnly ? '?readOnly=true' : ''}`, {
                 method: "POST",
                 body: JSON.stringify({ label: newLabel })
             }, toast, setIndicator);
@@ -307,7 +306,7 @@ export default function DataPanel({ object, setObject, schema, setLabels, setDat
 
         try {
             setIsRemoveLabelLoading(true);
-            const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/label`, {
+            const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/label${isReadOnly ? '?readOnly=true' : ''}`, {
                 method: "DELETE",
                 body: JSON.stringify({ label: removeLabel })
             }, toast, setIndicator);
@@ -339,7 +338,7 @@ export default function DataPanel({ object, setObject, schema, setLabels, setDat
                         <li key={l} className="flex gap-2 px-2 py-1 bg-secondary rounded-full items-center">
                             <p>{l}</p>
                             {
-                                type && session?.user.role !== "Read-Only" &&
+                                type && !isReadOnly &&
                                 <Button
                                     indicator={indicator}
                                     title="Remove"
@@ -355,7 +354,7 @@ export default function DataPanel({ object, setObject, schema, setLabels, setDat
                     ))}
                     <li className="h-8 flex flex-wrap gap-2">
                         {
-                            type && labelsHover && !labelsEditable && session?.user?.role !== "Read-Only" &&
+                            type && labelsHover && !labelsEditable && !isReadOnly &&
                             <Button
                                 className="p-2 text-xs justify-center border border-border"
                                 variant="Secondary"
@@ -518,7 +517,7 @@ export default function DataPanel({ object, setObject, schema, setLabels, setDat
                                 <TableCell>
                                     <div className="flex gap-2 w-44">
                                         {
-                                            session?.user.role !== "Read-Only" && (
+                                            !isReadOnly && (
                                                 editable === key ?
                                                     <>
                                                         <Button
@@ -717,7 +716,7 @@ export default function DataPanel({ object, setObject, schema, setLabels, setDat
                 </TableBody>
                 <TableCaption>
                     {
-                        session?.user.role !== "Read-Only" &&
+                        !isReadOnly &&
                         <Button
                             disabled={attributes.some(att => att[0] === editable)}
                             variant="Primary"

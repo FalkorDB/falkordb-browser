@@ -14,7 +14,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
 import EditorComponent, { LINE_HEIGHT, LanguageConfig } from "./EditorComponent";
-import { BrowserSettingsContext, IndicatorContext, UDFContext } from "./provider";
+import { BrowserSettingsContext, IndicatorContext, UDFContext, ConnectionContext } from "./provider";
 import { Graph } from "../api/graph/model";
 
 interface Props {
@@ -218,6 +218,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const { indicator, setIndicator } = useContext(IndicatorContext);
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { udfList } = useContext(UDFContext);
+    const { isReadOnly } = useContext(ConnectionContext);
 
     const { toast } = useToast();
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -230,6 +231,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const graphNameRef = useRef(graphName);
     const queryRef = useRef(historyQuery.query);
     const tutorialOpenRef = useRef(tutorialOpen);
+    const isReadOnlyRef = useRef(isReadOnly);
     const monacoRef = useRef<Monaco | null>(null);
 
     const [lineNumber, setLineNumber] = useState(1);
@@ -269,6 +271,10 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     }, [graph.Id]);
 
     useEffect(() => {
+        isReadOnlyRef.current = isReadOnly;
+    }, [isReadOnly]);
+
+    useEffect(() => {
         if (!containerRef.current) return;
 
         const handleResize = () => {
@@ -294,7 +300,8 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const fetchSuggestions = async (detail: string): Promise<monaco.languages.CompletionItem[]> => {
         if (indicator === "offline") return [];
 
-        const result = await securedFetch(`api/graph/${graphIdRef.current}/info?type=${prepareArg(detail)}`, {
+        const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
+        const result = await securedFetch(`api/graph/${graphIdRef.current}/info?type=${prepareArg(detail)}${readOnlyParam}`, {
             method: 'GET',
         }, toast, setIndicator);
 

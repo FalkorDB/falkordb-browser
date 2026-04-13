@@ -25,15 +25,16 @@ export async function GET(
       throw new Error(await session.text());
     }
 
-    const { client, user } = session;
+    const { client } = session;
     const { graph: graphId } = await params;
+    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
 
     try {
       const graph = client.selectGraph(graphId);
 
       // Execute nodes count query
       const nodesQuery = "MATCH (n) RETURN count(n) as nodes";
-      const nodesResult = await runQuery(graph, nodesQuery, user.role);
+      const nodesResult = await runQuery(graph, nodesQuery, isReadOnly);
 
       if (!nodesResult) throw new Error("Something went wrong");
 

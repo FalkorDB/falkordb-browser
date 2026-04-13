@@ -22,9 +22,10 @@ export async function DELETE(
       return session;
     }
 
-    const { client, user } = session;
+    const { client } = session;
     const { graph: graphId, element } = await params;
     const elementId = Number(element);
+    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
 
     try {
       const body = await request.json();
@@ -40,7 +41,7 @@ export async function DELETE(
       const query = `MATCH (n) WHERE ID(n) = $id REMOVE n:${label}`;
       const graph = client.selectGraph(graphId);
 
-      if (user.role === "Read-Only")
+      if (isReadOnly)
         await graph.roQuery(query, { params: { id: elementId } });
       else await graph.query(query, { params: { id: elementId } });
 
@@ -75,9 +76,10 @@ export async function POST(
       return session;
     }
 
-    const { client, user } = session;
+    const { client } = session;
     const { graph: graphId, element } = await params;
     const elementId = Number(element);
+    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
 
     try {
       const body = await request.json();
@@ -93,7 +95,7 @@ export async function POST(
       const query = `MATCH (n) WHERE ID(n) = $id SET n:${label}`;
       const graph = client.selectGraph(graphId);
 
-      if (user.role === "Read-Only")
+      if (isReadOnly)
         await graph.roQuery(query, { params: { id: elementId } });
       else
         await graph.query(query, { params: { id: elementId } });
