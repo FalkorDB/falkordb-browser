@@ -9,7 +9,7 @@ function LoginVerificationInner({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const { status } = useSession();
     const url = usePathname();
-    const { data } = useSession();  
+    const { data } = useSession();
     const searchParams = useSearchParams();
 
     useEffect(() => {
@@ -29,12 +29,12 @@ function LoginVerificationInner({ children }: { children: React.ReactNode }) {
 
         const differentConnectionParams = hostParam !== data?.user.host || portParam !== String(data?.user.port) || usernameParam !== data?.user.username || tls !== String(data?.user.tls);
 
-        if (((url === "/login" && !differentConnectionParams) || url === "/") && status === "authenticated") {
+        if (((url === "/login" || url === "/") && !differentConnectionParams) && status === "authenticated") {
             router.push("/graph");
         } else if (status === "unauthenticated" && url !== "/login") {
             router.push("/login");
         }
-    }, [status, url, router, searchParams]);
+    }, [status, url, router, searchParams, data?.user]);
 
     return children;
 }
