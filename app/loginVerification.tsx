@@ -27,7 +27,8 @@ function LoginVerificationInner({ children }: { children: React.ReactNode }) {
         const usernameParam = searchParams.get("username");
         const tls = searchParams.get("tls");
 
-        const differentConnectionParams = hostParam !== data?.user.host || portParam !== String(data?.user.port) || usernameParam !== data?.user.username || tls !== String(data?.user.tls);
+        const hasConnectionParams = hostParam !== null || portParam !== null || usernameParam !== null || tls !== null;
+        const differentConnectionParams = hasConnectionParams && (hostParam !== data?.user.host || portParam !== String(data?.user.port) || usernameParam !== data?.user.username || tls !== String(data?.user.tls));
 
         if (((url === "/login" || url === "/") && !differentConnectionParams) && status === "authenticated") {
             router.push("/graph");
