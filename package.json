@@ -73,7 +73,7 @@
     "react-gtm-module": "^2.0.11",
     "react-hook-form": "^7.72.1",
     "react-json-tree": "^0.20.0",
-    "react-resizable-panels": "^4.9.0",
+    "react-resizable-panels": "^4.10.0",
     "swagger-ui-react": "^5.32.2",
     "swr": "^2.4.1",
     "tailwind-merge": "^3.5.0",
