@@ -10,7 +10,7 @@ import { dataToGraphData } from "@falkordb/canvas";
 import { securedFetch, getTheme, GraphRef, GraphData, Node, Relationship, Link } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Graph } from "../api/graph/model";
-import { BrowserSettingsContext, IndicatorContext } from "./provider";
+import { BrowserSettingsContext, IndicatorContext, ConnectionContext } from "./provider";
 
 interface Props {
     graph: Graph
@@ -71,6 +71,7 @@ export default function ForceGraph({
 
     const { setIndicator } = useContext(IndicatorContext);
     const { settings: { captionsKeysSettings: { captionsKeys }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
+    const { connectionInfo } = useContext(ConnectionContext);
 
     const { theme } = useTheme();
     const { toast } = useToast();
@@ -127,7 +128,7 @@ export default function ForceGraph({
         const canvas = canvasRef.current;
         if (!canvas || !canvasLoaded) return;
 
-        const result = await securedFetch(`/api/${type}/${graph.Id}/${node.id}`, {
+        const result = await securedFetch(`/api/${type}/${graph.Id}/${node.id}${connectionInfo.sentinelRole ? `?sentinel=${connectionInfo.sentinelRole}` : ''}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'

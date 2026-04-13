@@ -15,7 +15,7 @@ import Input from "../components/ui/Input";
 import DialogComponent from "../components/DialogComponent";
 import CloseDialog from "../components/CloseDialog";
 import { EMPTY_DISPLAY_NAME } from "../api/graph/model";
-import { BrowserSettingsContext, GraphContext, IndicatorContext } from "../components/provider";
+import { BrowserSettingsContext, GraphContext, IndicatorContext, ConnectionContext } from "../components/provider";
 import ToastButton from "../components/ToastButton";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
@@ -34,6 +34,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
 
     const { graph, graphInfo, setGraphInfo } = useContext(GraphContext);
     const { settings: { captionsKeysSettings: { captionsKeys }} } = useContext(BrowserSettingsContext);
+    const { connectionInfo } = useContext(ConnectionContext);
     const { toast } = useToast();
 
     const setInputRef = useRef<HTMLInputElement>(null);
@@ -210,7 +211,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
         }
         try {
             if (actionType === "set") setIsSetLoading(true);
-            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${key}`, {
+            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${key}${connectionInfo.sentinelRole ? `?sentinel=${connectionInfo.sentinelRole}` : ''}`, {
                 method: "POST",
                 body: JSON.stringify({
                     value: val,
@@ -303,7 +304,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
         try {
             setIsRemoveLoading(true);
             const { id } = object;
-            const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${key}`, {
+            const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${key}${connectionInfo.sentinelRole ? `?sentinel=${connectionInfo.sentinelRole}` : ''}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type }),
             }, toast, setIndicator)).ok;

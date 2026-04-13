@@ -22,6 +22,7 @@ export async function GET(
       | "(label)"
       | "(relationship type)"
       | undefined;
+    const sentinel = request.nextUrl.searchParams.get("sentinel");
 
     try {
       const getQuery = () => {
@@ -42,7 +43,7 @@ export async function GET(
       const graph = client.selectGraph(graphId);
 
       const result =
-        user.role === "Read-Only"
+        user.role === "Read-Only" || sentinel === "slave"
           ? await graph.roQuery(getQuery())
           : await graph.query(getQuery());
 

@@ -9,7 +9,7 @@ import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
 import { ChevronDown, ChevronUp, PlusCircle, Settings } from "lucide-react";
 import Button from "../components/ui/Button";
-import { IndicatorContext, BrowserSettingsContext } from "../components/provider";
+import { IndicatorContext, BrowserSettingsContext, ConnectionContext } from "../components/provider";
 import PaginationList from "../components/PaginationList";
 import TableComponent from "../components/TableComponent";
 import ExportGraph from "../components/ExportGraph";
@@ -44,6 +44,7 @@ interface Props {
 export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, type, setGraph }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext);
+    const { connectionInfo } = useContext(ConnectionContext);
     const {
         settings: {
             contentPersistenceSettings: {
@@ -85,7 +86,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const loadNodesCount = useCallback((opt: string) =>
         async () => {
             try {
-                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes`, toast, setIndicator) as { nodes?: number };
+                const sentinel = connectionInfo.sentinelRole ? `?sentinel=${connectionInfo.sentinelRole}` : '';
+                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes${sentinel}`, toast, setIndicator) as { nodes?: number };
 
                 if (result.nodes == null || !Number.isFinite(Number(result.nodes))) return "";
 
@@ -93,12 +95,13 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             } catch {
                 return "";
             }
-        }, [toast, setIndicator]);
+        }, [toast, setIndicator, connectionInfo.sentinelRole]);
 
     const loadEdgesCount = useCallback((opt: string) =>
         async () => {
             try {
-                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges`, toast, setIndicator) as { edges?: number };
+                const sentinel = connectionInfo.sentinelRole ? `?sentinel=${connectionInfo.sentinelRole}` : '';
+                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges${sentinel}`, toast, setIndicator) as { edges?: number };
 
                 if (result.edges == null || !Number.isFinite(Number(result.edges))) return "";
 
@@ -106,7 +109,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             } catch {
                 return "";
             }
-        }, [toast, setIndicator]);
+        }, [toast, setIndicator, connectionInfo.sentinelRole]);
 
     const handleSetOption = useCallback(async (option: string, optionName: string) => {
         const result = await securedFetch(

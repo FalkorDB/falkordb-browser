@@ -7,7 +7,7 @@ import dynamicImport from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import { Graph, GraphInfo } from "../api/graph/model";
-import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ForceGraphContext } from "../components/provider";
+import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ForceGraphContext, ConnectionContext } from "../components/provider";
 import { getConnectionItem } from "@/lib/connection-storage";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
@@ -51,6 +51,7 @@ export default function Page() {
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext);
     const { setData, canvasRef } = useContext(ForceGraphContext);
+    const { connectionInfo } = useContext(ConnectionContext);
     const {
         graph,
         setGraph,
@@ -158,7 +159,8 @@ export default function Page() {
     const fetchInfo = useCallback(async (type: string) => {
         if (!graphName) return [];
 
-        const result = await securedFetch(`/api/graph/${graphName}/info?type=${type}`, {
+        const sentinel = connectionInfo.sentinelRole ? `&sentinel=${connectionInfo.sentinelRole}` : '';
+        const result = await securedFetch(`/api/graph/${graphName}/info?type=${type}${sentinel}`, {
             method: "GET",
         }, toast, setIndicator);
 
@@ -169,7 +171,7 @@ export default function Page() {
         return json.result.data.map(({ info }: { info: string }) => info);
     }, [graphName, setIndicator, toast]);
 
-    const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator), [setIndicator, toast]);
+    const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator, connectionInfo.sentinelRole), [setIndicator, toast, connectionInfo.sentinelRole]);
 
     useEffect(() => {
         if (!graphName) return undefined;
@@ -276,7 +278,8 @@ export default function Page() {
 
     const handleCreateElement = useCallback(async (attributes: [string, Value][], label: string[]) => {
         const fakeId = "-1";
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/${fakeId}`, {
+        const sentinel = connectionInfo.sentinelRole ? `?sentinel=${connectionInfo.sentinelRole}` : '';
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/${fakeId}${sentinel}`, {
             method: "POST",
             body: JSON.stringify({
                 attributes,
@@ -317,8 +320,9 @@ export default function Page() {
 
     const handleDeleteElement = useCallback(async () => {
         const deletedElements = (await Promise.all(selectedElements.map(async (element) => {
-            const type = !("source" in element);
-            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${prepareArg(element.id.toString())}`, {
+            const type = !('source' in element);
+            const sentinel = connectionInfo.sentinelRole ? `?sentinel=${connectionInfo.sentinelRole}` : '';
+            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${prepareArg(element.id.toString())}${sentinel}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type })
             }, toast, setIndicator);

@@ -25,13 +25,14 @@ export async function GET(
 
     const { client, user } = session;
     const { graph: graphId } = await params;
+    const sentinel = request.nextUrl.searchParams.get("sentinel");
 
     try {
       const graph = client.selectGraph(graphId);
 
       // Execute edges count query
       const edgesQuery = "MATCH ()-[e]->() RETURN count(e) as edges";
-      const edgesResult = await runQuery(graph, edgesQuery, user.role);
+      const edgesResult = await runQuery(graph, edgesQuery, user.role, sentinel);
 
       if (!edgesResult) throw new Error("Something went wrong");
 

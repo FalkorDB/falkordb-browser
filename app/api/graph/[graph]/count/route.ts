@@ -20,6 +20,7 @@ export async function GET(
 
     const { client, user } = session;
     const { graph: graphId } = await params;
+    const sentinel = request.nextUrl.searchParams.get("sentinel");
 
     try {
       const graph = client.selectGraph(graphId);
@@ -29,10 +30,10 @@ export async function GET(
       const edgesQuery = "MATCH ()-[e]->() RETURN count(e) as edges";
 
       // Execute nodes count query
-      const nodesResult = await runQuery(graph, nodesQuery, user.role);
+      const nodesResult = await runQuery(graph, nodesQuery, user.role, sentinel);
 
       // Execute edges count query  
-      const edgesResult = await runQuery(graph, edgesQuery, user.role);
+      const edgesResult = await runQuery(graph, edgesQuery, user.role, sentinel);
 
       if (!nodesResult || !edgesResult) throw new Error("Something went wrong");
 

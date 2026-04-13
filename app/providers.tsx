@@ -370,7 +370,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setNodesCount(undefined);
 
     try {
-      const result = await getSSEGraphResult(`api/graph/${prepareArg(n)}/count`, toast, setIndicator) as { nodes?: number; edges?: number };
+      const sentinel = connectionInfo.sentinelRole ? `?sentinel=${connectionInfo.sentinelRole}` : '';
+      const result = await getSSEGraphResult(`api/graph/${prepareArg(n)}/count${sentinel}`, toast, setIndicator) as { nodes?: number; edges?: number };
 
       if (!result) return;
 
@@ -392,7 +393,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const fetchInfo = useCallback(async (type: string, name: string) => {
     if (!graphName) return [];
 
-    const result = await securedFetch(`/api/graph/${name}/info?type=${type}`, {
+    const sentinel = connectionInfo.sentinelRole ? `&sentinel=${connectionInfo.sentinelRole}` : '';
+    const result = await securedFetch(`/api/graph/${name}/info?type=${type}${sentinel}`, {
       method: "GET",
     }, toast, setIndicator);
 
@@ -404,7 +406,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graphName]);
 
-  const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator), [toast, setIndicator]);
+  const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator, connectionInfo.sentinelRole), [toast, setIndicator, connectionInfo.sentinelRole]);
 
   const handelGetNewQueries = useCallback((newQuery: Query) => {
     const existing = historyQuery.queries.find(qu => qu.text === newQuery.text);
@@ -435,7 +437,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     }));
 
     const [query, existingLimit] = getQueryWithLimit(q, limit);
-    const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}`;
+    const sentinel = connectionInfo.sentinelRole ? `&sentinel=${connectionInfo.sentinelRole}` : '';
+    const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}${sentinel}`;
     try {
       const result = await getSSEGraphResult(url, toast, setIndicator) as { data: Data; metadata: string[] };
 
@@ -460,7 +463,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         return undefined;
       });
 
-      const explain = await securedFetch(`api/graph/${prepareArg(n)}/explain?query=${prepareArg(query)}`, {
+      const explain = await securedFetch(`api/graph/${prepareArg(n)}/explain?query=${prepareArg(query)}${sentinel}`, {
         method: "GET"
       }, toast, setIndicator);
 

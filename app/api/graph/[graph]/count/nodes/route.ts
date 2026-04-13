@@ -27,13 +27,14 @@ export async function GET(
 
     const { client, user } = session;
     const { graph: graphId } = await params;
+    const sentinel = request.nextUrl.searchParams.get("sentinel");
 
     try {
       const graph = client.selectGraph(graphId);
 
       // Execute nodes count query
       const nodesQuery = "MATCH (n) RETURN count(n) as nodes";
-      const nodesResult = await runQuery(graph, nodesQuery, user.role);
+      const nodesResult = await runQuery(graph, nodesQuery, user.role, sentinel);
 
       if (!nodesResult) throw new Error("Something went wrong");
 

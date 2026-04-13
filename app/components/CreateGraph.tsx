@@ -11,7 +11,7 @@ import DialogComponent from "./DialogComponent";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
 import Input from "./ui/Input";
-import { IndicatorContext } from "./provider";
+import { IndicatorContext, ConnectionContext } from "./provider";
 
 interface Props {
     onSetGraphName: (name: string) => void
@@ -39,6 +39,7 @@ export default function CreateGraph({
 }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext);
+    const { connectionInfo } = useContext(ConnectionContext);
 
     const { toast } = useToast();
 
@@ -74,7 +75,7 @@ export default function CreateGraph({
                 });
                 return;
             }
-            const result = await securedFetch(`api/${type === "Schema" ? "schema" : "graph"}/${prepareArg(name)}`, {
+            const result = await securedFetch(`api/${type === "Schema" ? "schema" : "graph"}/${prepareArg(name)}${connectionInfo.sentinelRole ? `?sentinel=${connectionInfo.sentinelRole}` : ''}`, {
                 method: "POST",
             }, toast, setIndicator);
 

@@ -6,7 +6,7 @@ import { Info } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useTheme } from "next-themes";
 import Button from "../components/ui/Button";
-import { IndicatorContext } from "../components/provider";
+import { IndicatorContext, ConnectionContext } from "../components/provider";
 
 const renderValue = (v: any) => (
     <span className="SofiaSans">{v}</span>
@@ -25,6 +25,7 @@ export function Profile({ graphName, query, setQuery, fetchCount, background }: 
 }) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext);
+    const { connectionInfo } = useContext(ConnectionContext);
 
     const { toast } = useToast();
     const { theme } = useTheme();
@@ -37,7 +38,8 @@ export function Profile({ graphName, query, setQuery, fetchCount, background }: 
     const handleProfile = async () => {
         setIsLoading(true);
         try {
-            const result = await securedFetch(`/api/graph/${graphName}/profile?query=${prepareArg(query.text)}`, {
+            const sentinel = connectionInfo.sentinelRole ? `&sentinel=${connectionInfo.sentinelRole}` : '';
+            const result = await securedFetch(`/api/graph/${graphName}/profile?query=${prepareArg(query.text)}${sentinel}`, {
                 method: "GET",
             }, toast, setIndicator);
 

@@ -10,7 +10,7 @@ import { Pencil, TableProperties, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
 import Button from "../components/ui/Button";
-import { IndicatorContext, GraphContext } from "../components/provider";
+import { IndicatorContext, GraphContext, ConnectionContext } from "../components/provider";
 import DataTable from "./DataTable";
 import AddLabel from "./addLabel";
 import RemoveLabel from "./RemoveLabel";
@@ -25,6 +25,7 @@ interface Props {
 export default function DataPanel({ object, onClose, setLabels, canvasRef }: Props) {
     const { setIndicator } = useContext(IndicatorContext);
     const { graph, setGraphInfo } = useContext(GraphContext);
+    const { connectionInfo } = useContext(ConnectionContext);
 
     const lastObjId = useRef<number | undefined>(undefined);
     const labelsListRef = useRef<HTMLUListElement>(null);
@@ -76,7 +77,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
             });
             return false;
         }
-        const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label${connectionInfo.sentinelRole ? `?sentinel=${connectionInfo.sentinelRole}` : ''}`, {
             method: "POST",
             body: JSON.stringify({
                 label: newLabel
@@ -124,7 +125,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
             return false;
         }
 
-        const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label${connectionInfo.sentinelRole ? `?sentinel=${connectionInfo.sentinelRole}` : ''}`, {
             method: "DELETE",
             body: JSON.stringify({
                 label: removeLabel
