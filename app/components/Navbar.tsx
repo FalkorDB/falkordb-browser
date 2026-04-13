@@ -15,10 +15,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { useTheme } from "next-themes";
-import { useToast } from "@/components/ui/use-toast";
 import Button from "./ui/Button";
 import CreateGraph from "./CreateGraph";
-import { IndicatorContext, PanelContext, ConnectionContext } from "./provider";
+import { IndicatorContext, PanelContext } from "./provider";
 
 interface Props {
     onSetGraphName: (newGraphName: string) => void
