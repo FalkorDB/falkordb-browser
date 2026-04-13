@@ -36,7 +36,7 @@ export default class SettingsTokensPage extends HeaderComponent {
   }
 
   private get copyTokenButton(): Locator {
-    return this.page.getByRole("button", { name: /Copy/i });
+    return this.page.getByTestId("copyGeneratedTokenButton");
   }
 
   private get dismissTokenButton(): Locator {

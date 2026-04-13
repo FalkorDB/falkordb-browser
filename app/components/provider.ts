@@ -206,6 +206,7 @@ type ConnectionContextType = {
   setConnectionInfo: Dispatch<SetStateAction<ConnectionInfo>>;
   dbVersion: string;
   setDbVersion: Dispatch<SetStateAction<string>>;
+  isReadOnly: boolean;
 };
 
 type UDFContextType = {
@@ -423,6 +424,7 @@ export const ConnectionContext = createContext<ConnectionContextType>({
   setConnectionInfo: () => { },
   dbVersion: "",
   setDbVersion: () => { },
+  isReadOnly: false,
 });
 
 export const UDFContext = createContext<UDFContextType>({

@@ -24,9 +24,10 @@ export async function POST(
       return session;
     }
 
-    const { client, user } = session;
+    const { client } = session;
     const { graph: graphId, element, key } = await params;
     const elementId = Number(element);
+    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
 
     try {
       const body = await request.json();
@@ -48,7 +49,7 @@ export async function POST(
         ? `MATCH (n) WHERE ID(n) = $id SET n.${key} = $value`
         : `MATCH ()-[e]->() WHERE ID(e) = $id SET e.${key} = $value`;
 
-      if (user.role === "Read-Only")
+      if (isReadOnly)
         await graph.roQuery(query, { params: { id: elementId, value } });
       else await graph.query(query, { params: { id: elementId, value } });
 
@@ -85,10 +86,11 @@ export async function DELETE(
       return session;
     }
 
-    const { client, user } = session;
+    const { client } = session;
 
     const { graph: graphId, element, key } = await params;
     const elementId = Number(element);
+    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
 
     try {
       const body = await request.json();
@@ -110,7 +112,7 @@ export async function DELETE(
         ? `MATCH (n) WHERE ID(n) = $id SET n.${key} = NULL`
         : `MATCH ()-[e]->() WHERE ID(e) = $id SET e.${key} = NULL`;
 
-      if (user.role === "Read-Only")
+      if (isReadOnly)
         await graph.roQuery(query, { params: { id: elementId } });
       else await graph.query(query, { params: { id: elementId } });
 
