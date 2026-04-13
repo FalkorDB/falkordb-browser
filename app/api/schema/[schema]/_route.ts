@@ -13,10 +13,11 @@ export async function GET(
       return session;
     }
 
-    const { client, user } = session;
+    const { client } = session;
     const { schema } = await params;
     const schemaName = `${schema}_schema`;
     const create = request.nextUrl.searchParams.get("create");
+    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
 
     try {
       const schemas = await client.list();
@@ -29,7 +30,7 @@ export async function GET(
 
       const graph = client.selectGraph(schemaName);
       const result =
-        user.role === "Read-Only"
+        isReadOnly
           ? await graph.roQuery(
               "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN * LIMIT 100"
             )

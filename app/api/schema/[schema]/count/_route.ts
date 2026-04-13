@@ -18,9 +18,10 @@ export async function GET(
       throw new Error(await session.text());
     }
 
-    const { client, user } = session;
+    const { client } = session;
     const { schema } = await params;
     const schemaName = `${schema}_schema`;
+    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
 
     try {
       const graph = client.selectGraph(schemaName);
@@ -30,10 +31,10 @@ export async function GET(
       const edgesQuery = "MATCH ()-[e]->() RETURN count(e) as edges";
 
       // Execute nodes count query
-      const nodesResult = await runQuery(graph, nodesQuery, user.role);
+      const nodesResult = await runQuery(graph, nodesQuery, isReadOnly);
 
       // Execute edges count query  
-      const edgesResult = await runQuery(graph, edgesQuery, user.role);
+      const edgesResult = await runQuery(graph, edgesQuery, isReadOnly);
 
       if (!nodesResult || !edgesResult) throw new Error("Something went wrong");
 

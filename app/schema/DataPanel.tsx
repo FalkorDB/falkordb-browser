@@ -81,7 +81,7 @@ export default function DataPanel({ object, setObject, schema, setLabels, setDat
     };
 
     const onSetAttribute = async (att: [string, string[]]) => {
-        const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/${prepareArg(att[0])}`, {
+        const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/${prepareArg(att[0])}${isReadOnly ? '?readOnly=true' : ''}`, {
             method: "POST",
             body: JSON.stringify({ type, attribute: att[1] })
         }, toast, setIndicator);
@@ -147,7 +147,7 @@ export default function DataPanel({ object, setObject, schema, setLabels, setDat
         try {
             setIsRemoveLoading(true);
 
-            const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/${prepareArg(key)}`, {
+            const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/${prepareArg(key)}${isReadOnly ? '?readOnly=true' : ''}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type })
             }, toast, setIndicator);
@@ -275,7 +275,7 @@ export default function DataPanel({ object, setObject, schema, setLabels, setDat
         try {
             setIsLabelLoading(true);
 
-            const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/label`, {
+            const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/label${isReadOnly ? '?readOnly=true' : ''}`, {
                 method: "POST",
                 body: JSON.stringify({ label: newLabel })
             }, toast, setIndicator);
@@ -306,7 +306,7 @@ export default function DataPanel({ object, setObject, schema, setLabels, setDat
 
         try {
             setIsRemoveLabelLoading(true);
-            const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/label`, {
+            const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/label${isReadOnly ? '?readOnly=true' : ''}`, {
                 method: "DELETE",
                 body: JSON.stringify({ label: removeLabel })
             }, toast, setIndicator);
