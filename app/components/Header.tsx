@@ -29,7 +29,7 @@ function formatVersion(version: string | undefined): string {
 }
 
 export default function Header() {
-    const { setIndicator } = useContext(IndicatorContext);
+    const { indicator, setIndicator } = useContext(IndicatorContext);
     const { connectionType, connectionInfo, dbVersion } = useContext(ConnectionContext);
     const { data: session } = useSession();
     const { toast } = useToast();
@@ -66,7 +66,7 @@ export default function Header() {
     }, [toast]);
 
     return (
-        <header className="flex gap-4 w-full border-b border-border p-1 py-1 items-center">
+        <header className="flex gap-4 w-full border-b border-border/50 px-3 py-1.5 items-center text-sm">
             <div className="flex gap-1 items-center">
                 <label className="font-bold">User:</label>
                 <h2>{session?.user.username || "Default"}</h2>
@@ -96,38 +96,30 @@ export default function Header() {
             <div className="flex gap-1 items-center">
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <button
-                            type="button"
-                            aria-label="Single connection"
-                            className={cn("h-6 w-6 rounded-full bg-yellow-500 text-center", connectionType !== "Standalone" && "opacity-25")}
-                        >Si</button>
+                        <div
+                            tabIndex={0}
+                            role="status"
+                            aria-label={`Connection type: ${connectionType}, Status: ${indicator}`}
+                            className={cn(
+                                indicator === "offline" ? "text-destructive border-destructive bg-destructive/10" : "text-green border-green bg-green/10",
+                                "h-6 px-2 rounded-full flex items-center gap-1.5 text-xs font-medium border",
+                            )}>
+                            <span className={cn(
+                                indicator === "offline" ? "bg-destructive" : "bg-green",
+                                "h-2 w-2 rounded-full",
+                            )} />
+                            {connectionType === "Standalone" && "Single"}
+                            {connectionType === "Sentinel" && "Sentinel"}
+                            {connectionType === "Cluster" && "Cluster"}
+                        </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                        <p>Single</p>
-                    </TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <button
-                            type="button"
-                            aria-label="Sentinel connection"
-                            className={cn("h-6 w-6 rounded-full bg-green-500 text-center", connectionType !== "Sentinel" && "opacity-25")}
-                        >Se</button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>Sentinel</p>
-                    </TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <button
-                            type="button"
-                            aria-label="Cluster connection"
-                            className={cn("h-6 w-6 rounded-full bg-green-700 text-center", connectionType !== "Cluster" && "opacity-25")}
-                        >C</button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>Cluster</p>
+                        <div className="flex flex-col gap-1">
+                            <p>Connection type: {connectionType}</p>
+                            <p className={cn(
+                                indicator === "offline" ? "text-destructive" : "text-green",
+                            )}>Status: {indicator}</p>
+                        </div>
                     </TooltipContent>
                 </Tooltip>
             </div>
@@ -155,11 +147,10 @@ export default function Header() {
                         <Popover>
                             <PopoverTrigger asChild>
                                 <Button
-                                    className={connectionType === "Sentinel" ? "text-green-500" : "text-green-700"}
                                     label={`${session.user.host}:${session.user.port}`}
                                 />
                             </PopoverTrigger>
-                            <PopoverContent className={cn("w-fit max-w-full mt-2 border-foreground", connectionType === "Sentinel" ? "text-green-500" : "text-green-700")}>
+                            <PopoverContent className="w-fit max-w-full mt-2 border-foreground">
                                 <div className="flex flex-col gap-1.5 text-sm">
                                     <p className="font-medium">{session.user.host}:{session.user.port}</p>
                                     {connectionType === "Sentinel" && (
@@ -188,7 +179,7 @@ export default function Header() {
                             </PopoverContent>
                         </Popover>
                     ) : (
-                        <p className="grow basis-0 truncate text-yellow-500">{session.user.host}:{session.user.port}</p>
+                        <p className="grow basis-0 truncate">{session.user.host}:{session.user.port}</p>
                     )}
                 </div>
             }

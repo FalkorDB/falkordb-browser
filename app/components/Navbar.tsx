@@ -2,7 +2,7 @@
 
 'use client';
 
-import { ArrowUpRight, Network, FileCode, LogOut, MessagesSquare, Monitor, Moon, Plus, Sun } from "lucide-react";
+import { ArrowUpRight, Network, FileCode, LogOut, MessagesSquare, Monitor, Moon, Plus, Sun, Settings, FunctionSquare, GitGraph } from "lucide-react";
 import { useCallback, useContext, useState, useEffect } from "react";
 import Image from "next/image";
 import { cn, getTheme, Panel } from "@/lib/utils";
@@ -63,11 +63,11 @@ export default function Navbar({ onSetGraphName, graphNames, graphName, onOpenPa
         setPanel(prev => prev === newPanel ? undefined : newPanel);
     }, [setPanel]);
 
-    const separator = <div className="h-px w-[80%] bg-border rounded-full" />;
+    const separator = <div className="h-px w-[80%] bg-border/50 rounded-full" />;
 
     return (
-        <div className="w-30 py-5 px-2 flex flex-col justify-between items-center border-r border-border">
-            <div className="w-full flex flex-col gap-2 items-center">
+        <div className="py-5 px-4 flex flex-col justify-between items-center border-r border-border/50">
+            <div className="w-full flex flex-col gap-3 items-center">
                 {
                     mounted && currentTheme &&
                     <Link
@@ -87,13 +87,13 @@ export default function Navbar({ onSetGraphName, graphNames, graphName, onOpenPa
                             type === "Settings" && "!text-primary"
                         )}
                         title="Adjust application settings"
-                        label="SETTINGS"
                         onClick={() => router.push("/settings")}
-                    />
+                    >
+                        <Settings size={iconSize} />
+                    </Button>
                     {
                         showUDF ?
                             <Button
-                                label="UDFs"
                                 title="User Defined Functions: View and manage your UDFs"
                                 className={cn(
                                     "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
@@ -101,10 +101,11 @@ export default function Navbar({ onSetGraphName, graphNames, graphName, onOpenPa
                                 )}
                                 onClick={() => router.push("/udf")}
                                 data-testid="UdfButton"
-                            /> : null
+                            >
+                                <FunctionSquare size={iconSize} />
+                            </Button> : null
                     }
                     <Button
-                        label="GRAPHS"
                         title="View and manage your graphs"
                         className={cn(
                             "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
@@ -112,18 +113,11 @@ export default function Navbar({ onSetGraphName, graphNames, graphName, onOpenPa
                         )}
                         onClick={() => router.push("/graph")}
                         data-testid="GraphsButton"
-                    />
+                    >
+                        <GitGraph size={iconSize} />
+                    </Button>
                 </div>
-                {/*
-                <Button
-                label="SCHEMAS"
-                title="View and manage your schemas"
-                className={cn("w-full flex justify-center text-foreground p-1 rounded-lg", type === "Schema" && "text-primary bg-border")}
-                onClick={() => router.push("/schema")}
-                data-testid="SchemasButton"
-                /> 
                 {separator}
-                */}
                 <div className="flex flex-col items-center gap-1">
                     {
                         type === "Graph" && graphName &&
@@ -137,7 +131,7 @@ export default function Navbar({ onSetGraphName, graphNames, graphName, onOpenPa
                             onClick={() => onOpenPanel()}
                             data-testid="graphInfoToggle"
                         >
-                            <Network size={iconSize - 5} />
+                            <Network size={iconSize - 10} />
                         </Button>
                     }
                     {
@@ -154,7 +148,7 @@ export default function Navbar({ onSetGraphName, graphNames, graphName, onOpenPa
                                 handleSetCurrentPanel("chat");
                             }}
                         >
-                            <MessagesSquare size={iconSize - 5} />
+                            <MessagesSquare size={iconSize - 10} />
                         </Button>
                     }
                     {
@@ -171,7 +165,7 @@ export default function Navbar({ onSetGraphName, graphNames, graphName, onOpenPa
                                     className="hover:!bg-primary/70 p-1"
                                     title={`Create New ${type}`}
                                 >
-                                    <Plus size={iconSize - 5} />
+                                    <Plus size={iconSize - 10} />
                                 </Button>
                             }
                         />
@@ -179,15 +173,6 @@ export default function Navbar({ onSetGraphName, graphNames, graphName, onOpenPa
                 </div>
             </div>
             <div className="w-full flex flex-col gap-2 items-center">
-                <Tooltip>
-                    <TooltipTrigger>
-                        <p>v{pkg.version}</p>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>FalkorDB Browser Version</p>
-                    </TooltipContent>
-                </Tooltip>
-                {separator}
                 <Drawer direction="right">
                     <DropdownMenu>
                         <DropdownMenuTrigger onClick={(e) => e.preventDefault()} asChild>
@@ -280,30 +265,14 @@ export default function Navbar({ onSetGraphName, graphNames, graphName, onOpenPa
                         </Button>
                     </>
                 }
-                {
-                    indicator === "offline" &&
-                    <>
-                        {separator}
-                        <div className="flex gap-2 rounded-lg p-2 border border-destructive">
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <p className="text-destructive text-xs">Offline</p>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>The FalkorDB server is offline</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </div>
-                    </>
-                }
                 {separator}
                 <Button
                     title="Log Out"
-                    className="text-foreground p-2 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10"
+                    className="text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10"
                     data-testid="logoutButton"
                     onClick={() => signOut({ redirect: false }).then(() => router.push("/login"))}
                 >
-                    <LogOut size={iconSize - 5} />
+                    <LogOut size={iconSize} />
                 </Button>
             </div>
         </div >

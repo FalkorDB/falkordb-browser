@@ -131,7 +131,7 @@ test.describe("Graph Info Panel Tests", () => {
     // Click person1 label button and verify the query inserted in editor
     await graph.clickGraphInfoNodeButton("person1");
     const editorQuery = await graph.getEditorInput();
-    expect(editorQuery).toBe("MATCH (n:person1) RETURN n");
+    expect(editorQuery).toBe("MATCH (n:`person1`) RETURN n");
     await apiCall.removeGraph(graphName);
   });
 
@@ -149,7 +149,7 @@ test.describe("Graph Info Panel Tests", () => {
     // Click KNOWS relationship button and verify the query inserted in editor
     await graph.clickGraphInfoEdgeButton("KNOWS");
     const editorQuery = await graph.getEditorInput();
-    expect(editorQuery).toBe("MATCH p=()-[:KNOWS]-() RETURN p");
+    expect(editorQuery).toBe("MATCH p=()-[:`KNOWS`]-() RETURN p");
     await apiCall.removeGraph(graphName);
   });
 

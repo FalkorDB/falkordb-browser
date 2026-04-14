@@ -91,30 +91,20 @@ export default function Page() {
         setIsCollapsed(size.asPercentage === 0);
     }, []);
 
+    const panelSizes: Record<string, { size: string; min: string }> = {
+        data: { size: "200px", min: "200px" },
+        add: { size: "30%", min: "25%" },
+        chat: { size: "35%", min: "30%" },
+    };
+
     const getPanelSize = useCallback(() => {
-        switch (panel) {
-            case "data":
-                return "200px";
-            case "add":
-                return "30%";
-            case "chat":
-                return "40%";
-            default:
-                return "0%";
-        }
+        if (!panel) return "0%";
+        return panelSizes[panel]?.size ?? "0%";
     }, [panel]);
 
     const panelMinSize = useMemo(() => {
-        switch (panel) {
-            case "data":
-                return "200px";
-            case "add":
-                return "25%";
-            case "chat":
-                return "45%";
-            default:
-                return "0%";
-        }
+        if (!panel) return "0%";
+        return panelSizes[panel]?.min ?? "0%";
     }, [panel]);
 
     useEffect(() => {
@@ -432,7 +422,7 @@ export default function Page() {
     }, [graphName, panel, handleSetSelectedElements, setPanel, isAddNode, selectedElements, handleCreateElement, setLabels, canvasRef]);
 
     return (
-        <div className="Page p-2 gap-2">
+        <div className="Page p-3 gap-3">
             <Selector
                 type="Graph"
                 graph={graph}
