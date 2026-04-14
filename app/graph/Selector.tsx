@@ -731,6 +731,8 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                             setIsAddNode={setIsAddNode}
                             setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => "labels" in e) ? setIsAddEdge : undefined}
                             canvasRef={canvasRef}
+                            setExpand={() => {}}
+                            expand={true}
                             isLoadingSchema={!!isCanvasLoading}
                             isAddNode={isAddNode}
                             isAddEdge={isAddEdge}
