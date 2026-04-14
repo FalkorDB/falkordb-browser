@@ -29,7 +29,7 @@ function formatVersion(version: string | undefined): string {
 }
 
 export default function Header() {
-    const { setIndicator } = useContext(IndicatorContext);
+    const { indicator, setIndicator } = useContext(IndicatorContext);
     const { connectionType, connectionInfo, dbVersion } = useContext(ConnectionContext);
     const { data: session } = useSession();
     const { toast } = useToast();
@@ -101,16 +101,12 @@ export default function Header() {
                             role="status"
                             aria-label={`Connection type: ${connectionType}`}
                             className={cn(
-                            "h-6 px-2 rounded-full flex items-center gap-1.5 text-xs font-medium border",
-                            connectionType === "Standalone" && "border-yellow-500/40 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400",
-                            connectionType === "Sentinel" && "border-green-500/40 bg-green-500/10 text-green-600 dark:text-green-400",
-                            connectionType === "Cluster" && "border-green-700/40 bg-green-700/10 text-green-700 dark:text-green-400",
-                        )}>
+                                indicator === "offline" ? "text-destructive border-destructive bg-destructive/10" : "text-green border-green bg-green/10",
+                                "h-6 px-2 rounded-full flex items-center gap-1.5 text-xs font-medium border",
+                            )}>
                             <span className={cn(
+                                indicator === "offline" ? "bg-destructive" : "bg-green",
                                 "h-2 w-2 rounded-full",
-                                connectionType === "Standalone" && "bg-yellow-500",
-                                connectionType === "Sentinel" && "bg-green-500",
-                                connectionType === "Cluster" && "bg-green-700",
                             )} />
                             {connectionType === "Standalone" && "Single"}
                             {connectionType === "Sentinel" && "Sentinel"}
@@ -118,7 +114,12 @@ export default function Header() {
                         </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                        <p>Connection type: {connectionType}</p>
+                        <div className="flex flex-col gap-1">
+                            <p>Connection type: {connectionType}</p>
+                            <p className={cn(
+                                indicator === "offline" ? "text-destructive" : "text-green",
+                            )}>Status: {indicator}</p>
+                        </div>
                     </TooltipContent>
                 </Tooltip>
             </div>
@@ -146,11 +147,10 @@ export default function Header() {
                         <Popover>
                             <PopoverTrigger asChild>
                                 <Button
-                                    className={connectionType === "Sentinel" ? "text-green-500" : "text-green-700"}
                                     label={`${session.user.host}:${session.user.port}`}
                                 />
                             </PopoverTrigger>
-                            <PopoverContent className={cn("w-fit max-w-full mt-2 border-foreground", connectionType === "Sentinel" ? "text-green-500" : "text-green-700")}>
+                            <PopoverContent className="w-fit max-w-full mt-2 border-foreground">
                                 <div className="flex flex-col gap-1.5 text-sm">
                                     <p className="font-medium">{session.user.host}:{session.user.port}</p>
                                     {connectionType === "Sentinel" && (
@@ -179,7 +179,7 @@ export default function Header() {
                             </PopoverContent>
                         </Popover>
                     ) : (
-                        <p className="grow basis-0 truncate text-yellow-500">{session.user.host}:{session.user.port}</p>
+                        <p className="grow basis-0 truncate">{session.user.host}:{session.user.port}</p>
                     )}
                 </div>
             }

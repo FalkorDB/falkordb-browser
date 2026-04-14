@@ -120,14 +120,9 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                     const labelColor = label.style.color;
 
                                     return (
-                                        <li key={`${name}-${labelColor}`} className="max-w-full flex gap-1 overflow-x-hidden">
+                                        <li key={`${name}-${labelColor}`} className="max-w-full flex gap-1 items-center overflow-x-hidden">
                                             <Button
-                                                style={{
-                                                    borderLeftColor: labelColor,
-                                                    borderLeftWidth: '3px',
-                                                    borderLeftStyle: 'solid',
-                                                }}
-                                                className="w-fit max-w-[calc(100%-24px)] h-6 px-2 rounded-md flex items-center gap-1.5 bg-secondary text-foreground text-xs hover:bg-secondary/80 transition-colors"
+                                                className="w-fit max-w-[calc(100%-16px)] h-6 px-2 rounded-md flex items-center gap-1.5 bg-secondary text-foreground text-xs hover:bg-secondary/80 transition-colors"
                                                 data-testid={`graphInfo${name}Node`}
                                                 title={`MATCH (n:${name}) RETURN n
                                                     #: ${label.count.toLocaleString()}`}
@@ -140,7 +135,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
                                                     <Button
-                                                        className="h-6 w-6 p-1 rounded-full flex justify-center items-center bg-muted hover:bg-muted/80"
+                                                        className="h-4 w-4 p-1 rounded-full flex justify-center items-center bg-muted hover:bg-muted/80"
                                                         data-testid={`customizeStyle${name}`}
                                                         title="Customize Style"
                                                         onClick={() => setCustomizingLabel(label)}
@@ -208,11 +203,6 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                             <Button
                                                 title={`MATCH p=()-[:${relationship.name}]-() RETURN p
                                                     #: ${relationship.count.toLocaleString()}`}
-                                                style={{
-                                                    borderLeftColor: relationshipColor,
-                                                    borderLeftWidth: '3px',
-                                                    borderLeftStyle: 'solid',
-                                                }}
                                                 className="h-6 max-w-full px-2 rounded-md flex items-center gap-1.5 bg-secondary text-foreground text-xs hover:bg-secondary/80 transition-colors overflow-hidden"
                                                 data-testid={`graphInfo${relationship.name}Edge`}
                                                 onClick={() => runQuery(`MATCH p=()-[:${relationship.name}]-() RETURN p`)}
@@ -259,13 +249,13 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                 }
                             </div>
                             <div className="p-2 overflow-auto">
-                                <ul className="flex flex-wrap text-sm text-foreground/80 leading-relaxed list-none p-0 m-0" role="list">
+                                <ul className="flex gap-1 flex-wrap text-sm text-foreground/80 leading-relaxed list-none p-0 m-0" role="list">
                                     {
                                         PropertyKeys && PropertyKeys.filter(key => key.toLowerCase().includes(propertyKeysSearch.toLowerCase())).sort((a, b) => a.localeCompare(b)).map((key, index, arr) => (
                                             <li key={key} className="inline">
                                                 <Button
                                                     title={`MATCH (e) WHERE e.${key} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`}
-                                                    className="inline text-sm text-foreground/80 hover:text-primary transition-colors"
+                                                    className="inline text-foreground/80 hover:text-primary transition-colors"
                                                     onClick={() => runQuery(
                                                         `MATCH (e) WHERE e.${key} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`
                                                     )}

@@ -56,7 +56,7 @@ module.exports = {
   				DEFAULT: 'hsl(var(--card))',
   				foreground: 'hsl(var(--card-foreground))'
   			},
-  			brandGreen: 'hsl(var(--green))',
+  			green: 'hsl(var(--green))',
   			fav: 'hsl(var(--fav))',
   			sidebar: {
   				DEFAULT: 'hsl(var(--sidebar-background))',
