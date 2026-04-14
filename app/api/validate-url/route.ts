@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    const validation = validateBody(validateUrl, body)
+    const validation = validateBody(validateUrl, body);
 
     if (!validation.success) {
         return NextResponse.json(
