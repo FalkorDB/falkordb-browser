@@ -7,7 +7,6 @@ import { Check, CirclePlus, Info, Pencil, Trash2, X } from "lucide-react";
 import { cn, prepareArg, securedFetch, GraphRef, Link, Node, Value } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Fragment, MutableRefObject, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useSession } from "next-auth/react";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getNodeDisplayKey } from "@falkordb/canvas";
@@ -15,7 +14,7 @@ import Input from "../components/ui/Input";
 import DialogComponent from "../components/DialogComponent";
 import CloseDialog from "../components/CloseDialog";
 import { EMPTY_DISPLAY_NAME } from "../api/graph/model";
-import { BrowserSettingsContext, GraphContext, IndicatorContext } from "../components/provider";
+import { BrowserSettingsContext, GraphContext, IndicatorContext, ConnectionContext } from "../components/provider";
 import ToastButton from "../components/ToastButton";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
@@ -34,6 +33,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
 
     const { graph, graphInfo, setGraphInfo } = useContext(GraphContext);
     const { settings: { captionsKeysSettings: { captionsKeys }} } = useContext(BrowserSettingsContext);
+    const { isReadOnly } = useContext(ConnectionContext);
     const { toast } = useToast();
 
     const setInputRef = useRef<HTMLInputElement>(null);
@@ -51,7 +51,6 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
     const [isAddLoading, setIsAddLoading] = useState(false);
     const [isRemoveLoading, setIsRemoveLoading] = useState(false);
     const { indicator, setIndicator } = useContext(IndicatorContext);
-    const { data: session } = useSession();
     const [attributes, setAttributes] = useState<string[]>([]);
     const [expandedAttributes, setExpandedAttributes] = useState<Record<string, boolean>>({});
     const valueParagraphRefs = useRef<Record<string, HTMLParagraphElement | null>>({});
@@ -210,7 +209,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
         }
         try {
             if (actionType === "set") setIsSetLoading(true);
-            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${key}`, {
+            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${key}${isReadOnly ? '?readOnly=true' : ''}`, {
                 method: "POST",
                 body: JSON.stringify({
                     value: val,
@@ -303,7 +302,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
         try {
             setIsRemoveLoading(true);
             const { id } = object;
-            const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${key}`, {
+            const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${key}${isReadOnly ? '?readOnly=true' : ''}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type }),
             }, toast, setIndicator)).ok;
@@ -485,7 +484,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                             const isExpanded = expandedAttributes[key];
                             const shouldShowToggle = valueNeedsExpansion(key);
                             const cellClass = cn("flex items-center px-1 border-b border-border min-h-6");
-                            const buttonTitle = session?.user.role === "Read-Only" ? undefined : (isComplex && "Complex values cannot be edited") || "Click to edit the attribute value";
+                            const buttonTitle = isReadOnly ? undefined : (isComplex && "Complex values cannot be edited") || "Click to edit the attribute value";
 
                             return (
                                 <Fragment key={key}>
@@ -516,7 +515,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                                                             title={buttonTitle}
                                                             variant="button"
                                                             onClick={() => handleSetEditable(key, value)}
-                                                            disabled={isAddValue || isComplex || session?.user.role === "Read-Only"}
+                                                            disabled={isAddValue || isComplex || isReadOnly}
                                                         >
                                                             <p
                                                                 ref={setValueParagraphRef(key)}
@@ -564,7 +563,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                                         key={`${key}-actions`}
                                     >
                                         {
-                                            session?.user.role !== "Read-Only" && (
+                                            !isReadOnly && (
                                                 editable === key ?
                                                     <>
                                                         <Button
@@ -704,7 +703,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                     }
                 </div>
                 {
-                    session?.user.role !== "Read-Only" &&
+                    !isReadOnly &&
                     <Button
                         className="mt-4"
                         disabled={attributes.some((key) => key === editable)}

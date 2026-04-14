@@ -14,12 +14,12 @@ export default function Labels<T extends Label | Relationship>({ labels, onClick
     const listRef = useRef<HTMLUListElement>(null);
 
     return (
-        <div className={cn("flex flex-col gap-2 bg-background rounded-lg p-1 overflow-hidden")}>
+        <div className={cn("flex flex-col gap-1.5 bg-background/90 backdrop-blur-sm rounded-lg p-2 overflow-hidden border border-border/30")}>
             {
                 label &&
-                <h1>{label}</h1>
+                <h1 className="text-xs uppercase tracking-wider text-foreground/60 font-medium px-1">{label}</h1>
             }
-            <ul ref={listRef} className={cn("flex flex-col gap-2 w-full overflow-auto pointer-events-auto")}>
+            <ul ref={listRef} className={cn("flex flex-col gap-1 w-full overflow-auto pointer-events-auto")}>
                 {
                     labels.length > 0 &&
                     labels.map((l) => (
@@ -27,13 +27,13 @@ export default function Labels<T extends Label | Relationship>({ labels, onClick
                             <Button
                                 aria-pressed={l.show}
                                 data-testid={`${type}${label}Button${l.name}`}
-                                className={cn("w-full SofiaSans", l.show ? "opacity-100" : "opacity-50")}
+                                className={cn("w-full text-xs px-1.5 py-0.5 rounded-md hover:bg-secondary/60 transition-colors", l.show ? "opacity-100" : "opacity-40")}
                                 label={l.name}
                                 onClick={() => {
                                     onClick(l);
                                 }}
                             >
-                                <div style={{ backgroundColor: l.style.color }} className={cn("min-w-6 min-h-6 rounded-full")} />
+                                <div style={{ backgroundColor: l.style.color }} className={cn("min-w-4 min-h-4 rounded-full shrink-0")} />
                             </Button>
                         </li>
                     ))

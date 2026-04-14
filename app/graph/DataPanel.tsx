@@ -8,9 +8,8 @@ import { prepareArg, securedFetch, GraphRef, Node, Link, Label } from "@/lib/uti
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Pencil, TableProperties, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { useSession } from "next-auth/react";
 import Button from "../components/ui/Button";
-import { IndicatorContext, GraphContext } from "../components/provider";
+import { IndicatorContext, GraphContext, ConnectionContext } from "../components/provider";
 import DataTable from "./DataTable";
 import AddLabel from "./addLabel";
 import RemoveLabel from "./RemoveLabel";
@@ -25,12 +24,12 @@ interface Props {
 export default function DataPanel({ object, onClose, setLabels, canvasRef }: Props) {
     const { setIndicator } = useContext(IndicatorContext);
     const { graph, setGraphInfo } = useContext(GraphContext);
+    const { isReadOnly } = useContext(ConnectionContext);
 
     const lastObjId = useRef<number | undefined>(undefined);
     const labelsListRef = useRef<HTMLUListElement>(null);
 
     const { toast } = useToast();
-    const { data: session } = useSession();
 
     const [labelsHover, setLabelsHover] = useState(false);
     const [label, setLabel] = useState<string[]>([]);
@@ -76,7 +75,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
             });
             return false;
         }
-        const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label${isReadOnly ? '?readOnly=true' : ''}`, {
             method: "POST",
             body: JSON.stringify({
                 label: newLabel
@@ -124,7 +123,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
             return false;
         }
 
-        const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label${isReadOnly ? '?readOnly=true' : ''}`, {
             method: "DELETE",
             body: JSON.stringify({
                 label: removeLabel
@@ -163,7 +162,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
     };
 
     return (
-        <div data-testid="DataPanel" className="DataPanel gap-1 p-2 relative">
+        <div data-testid="DataPanel" className="DataPanel gap-2 p-3 relative">
             <Button
                 className="absolute top-2 right-2"
                 data-testid="DataPanelClose"
@@ -174,12 +173,12 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
             </Button>
             <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between pr-5">
-                    <h1 className="text-2xl">{type ? "Node" : "Edge"} Data</h1>
-                    <TableProperties size={25} />
+                    <h1 className="text-lg font-semibold">{type ? "Node" : "Edge"} Data</h1>
+                    <TableProperties size={20} className="text-foreground/50" />
                 </div>
-                <div className="flex flex-col gap-1 font-medium text-xl text-nowrap">
-                    <p>ID: <span className="Gradient text-transparent bg-clip-text">{object.id}</span></p>
-                    <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text">{Object.keys(object.data).length}</span></p>
+                <div className="flex flex-col gap-1 text-sm text-nowrap">
+                    <p>ID: <span className="Gradient text-transparent bg-clip-text font-semibold">{object.id}</span></p>
+                    <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text font-semibold">{Object.keys(object.data).length}</span></p>
                 </div>
                 <ul
                     ref={labelsListRef}
@@ -196,7 +195,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
                         >
                             <p>{l || "No Label"}</p>
                             {
-                                type && l && session?.user.role !== "Read-Only" &&
+                                type && l && !isReadOnly &&
                                 <RemoveLabel
                                     onRemoveLabel={handleRemoveLabel}
                                     selectedLabel={l}
@@ -215,7 +214,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
                     ))}
                     <li className="h-8 w-[106px] flex justify-center items-center" key="addLabel">
                         {
-                            type && (labelsHover || label.length === 0) && session?.user.role !== "Read-Only" &&
+                            type && (labelsHover || label.length === 0) && !isReadOnly &&
                             <AddLabel
                                 onAddLabel={handleAddLabel}
                                 trigger={

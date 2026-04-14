@@ -14,7 +14,7 @@ export async function GET(
       return session;
     }
 
-    const { client, user } = session;
+    const { client } = session;
     const { graph: graphId } = await params;
     const type = request.nextUrl.searchParams.get("type") as
       | "(function)"
@@ -22,6 +22,7 @@ export async function GET(
       | "(label)"
       | "(relationship type)"
       | undefined;
+    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
 
     try {
       const getQuery = () => {
@@ -41,8 +42,7 @@ export async function GET(
 
       const graph = client.selectGraph(graphId);
 
-      const result =
-        user.role === "Read-Only"
+      const result = isReadOnly
           ? await graph.roQuery(getQuery())
           : await graph.query(getQuery());
 

@@ -23,9 +23,10 @@ export async function GET(
       return session;
     }
 
-    const { client, user } = session;
+    const { client } = session;
     const { graph: graphId, element } = await params;
     const elementId = Number(element);
+    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
 
     try {
       const graph = client.selectGraph(graphId);
@@ -35,8 +36,7 @@ export async function GET(
                           WHERE ID(n) = $id
                           RETURN *`;
 
-      const result =
-        user.role === "Read-Only"
+      const result = isReadOnly
           ? await graph.roQuery(query, { params: { id: elementId } })
           : await graph.query(query, { params: { id: elementId } });
 
@@ -68,8 +68,9 @@ export async function POST(
       return session;
     }
 
-    const { client, user } = session;
+    const { client } = session;
     const { graph: graphId } = await params;
+    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
 
     try {
       const body = await request.json();
@@ -119,8 +120,7 @@ export async function POST(
         });
       }
 
-      const result =
-        user.role === "Read-Only"
+      const result = isReadOnly
           ? await graph.roQuery(query, { params: queryParams })
           : await graph.query(query, { params: queryParams });
 
@@ -152,9 +152,10 @@ export async function DELETE(
       return session;
     }
 
-    const { client, user } = session;
+    const { client } = session;
     const { graph: graphId, element } = await params;
     const elementId = Number(element);
+    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
 
     try {
       const body = await request.json();
@@ -175,7 +176,7 @@ export async function DELETE(
         ? `MATCH (n) WHERE ID(n) = $id DELETE n`
         : `MATCH ()-[e]->() WHERE ID(e) = $id DELETE e`;
 
-      if (user.role === "Read-Only")
+      if (isReadOnly)
         await graph.roQuery(query, { params: { id: elementId } });
       else await graph.query(query, { params: { id: elementId } });
 

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { getCorsHeaders } from "@/app/api/utils";
 
@@ -7,7 +7,7 @@ export async function OPTIONS(request: Request) {
 }
 
 // eslint-disable-next-line import/prefer-default-export, @typescript-eslint/no-unused-vars
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const session = await getClient(request);
 
@@ -16,9 +16,10 @@ export async function GET(request: Request) {
     }
 
     const { client } = session;
+    const section = request.nextUrl.searchParams.get("section") || "";
 
     try {
-      const result = await (await client.connection).info();
+      const result = await (await client.connection).info(section);
 
       return NextResponse.json({ result }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {

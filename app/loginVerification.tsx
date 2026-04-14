@@ -3,7 +3,6 @@
 import { useSession } from "next-auth/react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { removeConnectionItem } from "@/lib/connection-storage";
 
 export default function LoginVerification({ children }: { children: React.ReactNode }) {
 
@@ -14,9 +13,8 @@ export default function LoginVerification({ children }: { children: React.ReactN
 
     useEffect(() => {
         if (data?.user || data === undefined) return;
-        // Clear both legacy unscoped and connection-scoped savedContent
+        // Clear legacy unscoped savedContent (scoped cleanup handled by providers.tsx)
         localStorage.removeItem("savedContent");
-        removeConnectionItem("savedContent");
     }, [data]);
 
     useEffect(() => {

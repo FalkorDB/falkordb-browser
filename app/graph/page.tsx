@@ -7,7 +7,7 @@ import dynamicImport from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import { Graph, GraphInfo } from "../api/graph/model";
-import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ForceGraphContext } from "../components/provider";
+import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ForceGraphContext, ConnectionContext } from "../components/provider";
 import { getConnectionItem } from "@/lib/connection-storage";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
@@ -51,6 +51,7 @@ export default function Page() {
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext);
     const { setData, canvasRef } = useContext(ForceGraphContext);
+    const { isReadOnly } = useContext(ConnectionContext);
     const {
         graph,
         setGraph,
@@ -90,30 +91,20 @@ export default function Page() {
         setIsCollapsed(size.asPercentage === 0);
     }, []);
 
+    const panelSizes: Record<string, { size: string; min: string }> = {
+        data: { size: "200px", min: "200px" },
+        add: { size: "30%", min: "25%" },
+        chat: { size: "35%", min: "30%" },
+    };
+
     const getPanelSize = useCallback(() => {
-        switch (panel) {
-            case "data":
-                return "200px";
-            case "add":
-                return "30%";
-            case "chat":
-                return "40%";
-            default:
-                return "0%";
-        }
+        if (!panel) return "0%";
+        return panelSizes[panel]?.size ?? "0%";
     }, [panel]);
 
     const panelMinSize = useMemo(() => {
-        switch (panel) {
-            case "data":
-                return "200px";
-            case "add":
-                return "25%";
-            case "chat":
-                return "45%";
-            default:
-                return "0%";
-        }
+        if (!panel) return "0%";
+        return panelSizes[panel]?.min ?? "0%";
     }, [panel]);
 
     useEffect(() => {
@@ -158,7 +149,8 @@ export default function Page() {
     const fetchInfo = useCallback(async (type: string) => {
         if (!graphName) return [];
 
-        const result = await securedFetch(`/api/graph/${graphName}/info?type=${type}`, {
+        const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
+        const result = await securedFetch(`/api/graph/${graphName}/info?type=${type}${readOnlyParam}`, {
             method: "GET",
         }, toast, setIndicator);
 
@@ -169,7 +161,7 @@ export default function Page() {
         return json.result.data.map(({ info }: { info: string }) => info);
     }, [graphName, setIndicator, toast]);
 
-    const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator), [setIndicator, toast]);
+    const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator, isReadOnly), [setIndicator, toast, isReadOnly]);
 
     useEffect(() => {
         if (!graphName) return undefined;
@@ -276,7 +268,8 @@ export default function Page() {
 
     const handleCreateElement = useCallback(async (attributes: [string, Value][], label: string[]) => {
         const fakeId = "-1";
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/${fakeId}`, {
+        const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/${fakeId}${readOnlyParam}`, {
             method: "POST",
             body: JSON.stringify({
                 attributes,
@@ -317,8 +310,9 @@ export default function Page() {
 
     const handleDeleteElement = useCallback(async () => {
         const deletedElements = (await Promise.all(selectedElements.map(async (element) => {
-            const type = !("source" in element);
-            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${prepareArg(element.id.toString())}`, {
+            const type = !('source' in element);
+            const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
+            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${prepareArg(element.id.toString())}${readOnlyParam}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type })
             }, toast, setIndicator);
@@ -428,7 +422,7 @@ export default function Page() {
     }, [graphName, panel, handleSetSelectedElements, setPanel, isAddNode, selectedElements, handleCreateElement, setLabels, canvasRef]);
 
     return (
-        <div className="Page p-2 gap-2">
+        <div className="Page p-3 gap-3">
             <Selector
                 type="Graph"
                 graph={graph}

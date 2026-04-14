@@ -8,7 +8,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import type { GraphData as CanvasData } from "@falkordb/canvas";
 import { Graph } from "../api/graph/model";
-import { BrowserSettingsContext, IndicatorContext, SchemaContext } from "../components/provider";
+import { BrowserSettingsContext, ConnectionContext, IndicatorContext, SchemaContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import DataPanel from "./DataPanel";
 import SchemaCreateElement from "./CreateElementPanel";
@@ -30,6 +30,7 @@ const SchemaView = dynamic(() => import("./SchemaView"), {
 export default function Page() {
 
     const { setIndicator } = useContext(IndicatorContext);
+    const { isReadOnly } = useContext(ConnectionContext);
     const {
         schema,
         setSchema,
@@ -110,14 +111,15 @@ export default function Page() {
     };
 
     const fetchSchema = useCallback(async () => {
-        const result = await securedFetch(`/api/schema/${prepareArg(schemaName)}`, {
+        const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
+        const result = await securedFetch(`/api/schema/${prepareArg(schemaName)}${readOnlyParam}`, {
             method: "GET"
         }, toast, setIndicator);
         if (!result.ok) return;
         const json = await result.json();
         const schemaGraph = await Graph.create(schemaName, json.result, showPropertyKeyPrefix, 0, undefined, true);
         setSchema(schemaGraph);
-    }, [setIndicator, setSchema, toast, schemaName, showPropertyKeyPrefix]);
+    }, [setIndicator, setSchema, toast, schemaName, showPropertyKeyPrefix, isReadOnly]);
 
     useEffect(() => {
         if (!schemaName) return;
@@ -131,7 +133,7 @@ export default function Page() {
         await Promise.all(stateSelectedElements.map(async (element) => {
             const { id } = element;
             const type = !("source" in element);
-            const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(id.toString())}`, {
+            const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(id.toString())}${isReadOnly ? '?readOnly=true' : ''}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type }),
             }, toast, setIndicator);
@@ -180,7 +182,7 @@ export default function Page() {
 
     const handleCreateElement = async (attributes: [string, string[]][], elementLabel: string[]) => {
         const fakeId = "-1";
-        const result = await securedFetch(`api/schema/${prepareArg(schemaName)}/${prepareArg(fakeId)}`, {
+        const result = await securedFetch(`api/schema/${prepareArg(schemaName)}/${prepareArg(fakeId)}${isReadOnly ? '?readOnly=true' : ''}`, {
             method: "POST",
             body: JSON.stringify({ type: isAddNode, label: elementLabel, attributes, selectedNodes: isAddNode ? undefined : selectedElements })
         }, toast, setIndicator);
