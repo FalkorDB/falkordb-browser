@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowRight, ArrowUp, Circle, Info, Search, X } from "lucide-react";
+import { ArrowRight, Circle, Info, Search, X } from "lucide-react";
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { cn, GraphRef, Link, Node } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -198,7 +198,7 @@ export default function Toolbar({
                         />
                     }
                     {
-                        suggestions.length > 0 &&
+                        expand && suggestions.length > 0 &&
                         <div tabIndex={-1} onScroll={handleScroll} ref={suggestionRef} className="max-h-[30dvh] overflow-auto absolute left-0 top-14 w-full border border-border p-2 rounded-lg bg-background">
                             <ul
                                 data-testid={`elementCanvasSuggestionsList${label}`}
@@ -259,7 +259,7 @@ export default function Toolbar({
                                                             role="option"
                                                             aria-selected={actualIndex === suggestionIndex}
                                                             data-testid={`elementCanvasSuggestion${label}${suggestion.data.name || suggestion.id}`}
-                                                            className={cn("w-full h-full p-2 rounded-lg flex gap-2", actualIndex === suggestionIndex ? "bg-gray-300" : "bg-gray-500")}
+                                                            className={cn("w-full h-full p-2 rounded-lg flex gap-2", actualIndex === suggestionIndex ? "bg-accent" : "bg-secondary")}
                                                             onClick={() => handleSearchElement(suggestion)}
                                                             onMouseEnter={() => setSuggestionIndex(actualIndex)}
                                                         >
@@ -270,7 +270,7 @@ export default function Toolbar({
                                                                 <p className="text-foreground text-sm font-bold truncate">{type ? (suggestion as Link).relationship : (suggestion as Node).labels[0]}</p>
                                                             </div>
                                                             <div
-                                                                className={cn("w-1 grow text-center truncate", actualIndex === suggestionIndex ? "text-black" : "text-foreground")}
+                                                                className={cn("w-1 grow text-center truncate", actualIndex === suggestionIndex ? "text-accent-foreground" : "text-foreground")}
                                                             >
                                                                 {suggestion.data.name || suggestion.id}
                                                             </div>

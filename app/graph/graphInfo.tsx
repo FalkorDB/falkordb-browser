@@ -7,6 +7,11 @@ import { BrowserSettingsContext, GraphContext, QueryLoadingContext } from "../co
 import CustomizeStylePanel from "./CustomizeStylePanel";
 import Input from "../components/ui/Input";
 
+/** Escape a Cypher identifier by wrapping it in backticks (doubles any internal backticks). */
+function escapeIdentifier(id: string): string {
+    return `\`${id.replace(/`/g, '``')}\``;
+}
+
 /**
  * Render a side panel showing graph metadata and interactive controls to run representative queries.
  *
@@ -124,9 +129,9 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                             <Button
                                                 className="w-fit max-w-[calc(100%-16px)] h-6 px-2 rounded-md flex items-center gap-1.5 bg-secondary text-foreground text-xs hover:bg-secondary/80 transition-colors"
                                                 data-testid={`graphInfo${name}Node`}
-                                                title={`MATCH (n:${name}) RETURN n
+                                                title={`MATCH (n:${escapeIdentifier(name)}) RETURN n
                                                     #: ${label.count.toLocaleString()}`}
-                                                onClick={() => runQuery(`MATCH (n:${name}) RETURN n`)}
+                                                onClick={() => runQuery(`MATCH (n:${escapeIdentifier(name)}) RETURN n`)}
                                                 disabled={isQueryLoading}
                                             >
                                                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: labelColor }} />
@@ -201,11 +206,11 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                     return (
                                         <li key={relationship.name} className="max-w-full">
                                             <Button
-                                                title={`MATCH p=()-[:${relationship.name}]-() RETURN p
+                                                title={`MATCH p=()-[:${escapeIdentifier(relationship.name)}]-() RETURN p
                                                     #: ${relationship.count.toLocaleString()}`}
                                                 className="h-6 max-w-full px-2 rounded-md flex items-center gap-1.5 bg-secondary text-foreground text-xs hover:bg-secondary/80 transition-colors overflow-hidden"
                                                 data-testid={`graphInfo${relationship.name}Edge`}
-                                                onClick={() => runQuery(`MATCH p=()-[:${relationship.name}]-() RETURN p`)}
+                                                onClick={() => runQuery(`MATCH p=()-[:${escapeIdentifier(relationship.name)}]-() RETURN p`)}
                                                 disabled={isQueryLoading}
                                             >
                                                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: relationshipColor }} />
@@ -254,10 +259,10 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                         PropertyKeys && PropertyKeys.filter(key => key.toLowerCase().includes(propertyKeysSearch.toLowerCase())).sort((a, b) => a.localeCompare(b)).map((key, index, arr) => (
                                             <li key={key} className="inline">
                                                 <Button
-                                                    title={`MATCH (e) WHERE e.${key} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`}
+                                                    title={`MATCH (e) WHERE e.${escapeIdentifier(key)} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${escapeIdentifier(key)} IS NOT NULL RETURN e`}
                                                     className="inline text-foreground/80 hover:text-primary transition-colors"
                                                     onClick={() => runQuery(
-                                                        `MATCH (e) WHERE e.${key} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`
+                                                        `MATCH (e) WHERE e.${escapeIdentifier(key)} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${escapeIdentifier(key)} IS NOT NULL RETURN e`
                                                     )}
                                                     disabled={isQueryLoading}
                                                     label={index < arr.length - 1 ? `${key}, ` : key}

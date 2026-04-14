@@ -99,7 +99,7 @@ export default function Header() {
                         <div
                             tabIndex={0}
                             role="status"
-                            aria-label={`Connection type: ${connectionType}`}
+                            aria-label={`Connection type: ${connectionType}, Status: ${indicator}`}
                             className={cn(
                                 indicator === "offline" ? "text-destructive border-destructive bg-destructive/10" : "text-green border-green bg-green/10",
                                 "h-6 px-2 rounded-full flex items-center gap-1.5 text-xs font-medium border",
