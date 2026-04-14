@@ -48,6 +48,7 @@ export default function Controls({
                             {cooldownTicks === undefined ? <Pause size={18} /> : <Play size={18} />}
                             <Switch
                                 data-testid="animationControl"
+                                aria-label={cooldownTicks === undefined ? "Pause animation" : "Resume animation"}
                                 className="pointer-events-auto data-[state=unchecked]:bg-border"
                                 checked={cooldownTicks !== 0}
                                 onCheckedChange={() => {

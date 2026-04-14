@@ -46,7 +46,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Name</h2>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <p className="truncate pointer-events-auto text-sm font-semibold">{graphName}</p>
+                                    <p tabIndex={0} role="text" aria-label={graphName} className="truncate pointer-events-auto text-sm font-semibold">{graphName}</p>
                                 </TooltipTrigger>
                                 <TooltipContent>
                                     {graphName}
@@ -62,7 +62,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                         MemoryUsage.get("total_graph_sz_mb") !== undefined
                                             ? <Tooltip>
                                                 <TooltipTrigger asChild>
-                                                    <p className="truncate pointer-events-auto text-sm font-semibold">{MemoryUsage.get("total_graph_sz_mb") || "<1"} MB</p>
+                                                    <p tabIndex={0} role="text" aria-label={`${MemoryUsage.get("total_graph_sz_mb") || "<1"} MB`} className="truncate pointer-events-auto text-sm font-semibold">{MemoryUsage.get("total_graph_sz_mb") || "<1"} MB</p>
                                                 </TooltipTrigger>
                                                 <TooltipContent>
                                                     {MemoryUsage.get("total_graph_sz_mb")} MB
@@ -82,6 +82,9 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                             <TooltipTrigger asChild>
                                                 <p
                                                     data-testid="nodesCount"
+                                                    tabIndex={0}
+                                                    role="text"
+                                                    aria-label={`${nodesCount.toLocaleString()} nodes`}
                                                     className="truncate pointer-events-auto text-sm font-semibold"
                                                 >
                                                     {nodesCount.toLocaleString()}
@@ -163,6 +166,9 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                             <TooltipTrigger asChild>
                                                 <p
                                                     data-testid="edgesCount"
+                                                    tabIndex={0}
+                                                    role="text"
+                                                    aria-label={`${edgesCount.toLocaleString()} edges`}
                                                     className="truncate pointer-events-auto text-sm font-semibold"
                                                 >
                                                     {edgesCount.toLocaleString()}
@@ -229,6 +235,9 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                             <TooltipTrigger asChild>
                                                 <p
                                                     data-testid="propertyKeysCount"
+                                                    tabIndex={0}
+                                                    role="text"
+                                                    aria-label={`${PropertyKeys.length.toLocaleString()} property keys`}
                                                     className="truncate pointer-events-auto text-sm font-semibold"
                                                 >
                                                     {PropertyKeys.length.toLocaleString()}

@@ -141,11 +141,11 @@ export default class CustomizeStylePage extends GraphInfoPage {
       // Check for left border color (new style)
       const computedStyle = window.getComputedStyle(el);
       const borderColor = el.style.borderLeftColor || computedStyle.borderLeftColor;
-      if (borderColor && borderColor !== 'rgb(0, 0, 0)' && borderColor !== '' && borderColor !== 'transparent') {
+      if (borderColor && borderColor !== 'rgb(0, 0, 0)' && borderColor !== '' && borderColor !== 'transparent' && borderColor !== 'rgba(0, 0, 0, 0)') {
         return borderColor;
       }
-      // Check inner color dot span (new style)
-      const dotSpan = el.querySelector('span[class*="rounded-full"]');
+      // Check inner color dot element (new style)
+      const dotSpan = el.querySelector('[class*="rounded-full"]');
       if (dotSpan) {
         const dotBg = window.getComputedStyle(dotSpan).backgroundColor;
         if (dotBg && dotBg !== 'rgba(0, 0, 0, 0)' && dotBg !== 'transparent') {
