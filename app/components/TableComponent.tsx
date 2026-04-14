@@ -29,7 +29,7 @@ interface Props {
     itemHeightExpandMultiple?: number
     itemWidth?: number
     valueClassName?: string
-    inputRef?: React.RefObject<HTMLInputElement>,
+    inputRef?: React.RefObject<HTMLInputElement | null>,
     children?: React.ReactNode,
     setRows?: Dispatch<SetStateAction<Row[]>>,
     className?: string
