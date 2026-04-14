@@ -62,8 +62,14 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
     const [show, setShow] = useState<{ [key: string]: boolean }>({});
     const [errors, setErrors] = useState<{ [key: string]: boolean }>({});
     const [isLoading, setIsLoading] = useState(false);
+    const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
+        if (!isMounted) {
+            setIsMounted(true);
+            return () => { };
+        }
+
         const newErrors: { [key: string]: boolean } = {};
         fields.forEach(field => {
             if (field.errors) {
@@ -71,7 +77,12 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
             }
         });
         setErrors(prev => ({ ...prev, ...newErrors }));
-    }, [fields]);
+
+
+        return () => {
+            setIsMounted(false);
+        }
+    }, [fields.length]);
 
     const onHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();

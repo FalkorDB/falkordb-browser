@@ -86,12 +86,8 @@ export function parseUrlString(url: string): ParsedUrl {
   const lastColon = hostPortStr.lastIndexOf(":");
   if (lastColon >= 0) {
     const portCandidate = hostPortStr.slice(lastColon + 1);
-    if (/^\d+$/.test(portCandidate)) {
-      host = hostPortStr.slice(0, lastColon);
-      port = portCandidate;
-    }
-    // If portCandidate is not all digits, keep it as part of host
-    // (this handles the case of a missing @ where host:password looks ambiguous)
+    host = hostPortStr.slice(0, lastColon);
+    port = portCandidate;
   }
 
   const tls = protocol === "falkors" || protocol === "rediss";

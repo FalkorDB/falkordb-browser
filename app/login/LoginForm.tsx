@@ -1,18 +1,20 @@
 "use client";
 
 import { SignInOptions, SignInResponse, signIn } from "next-auth/react";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useContext, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Check, Info, FileText } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useTheme } from "next-themes";
-import { getTheme } from "@/lib/utils";
+import { getTheme, securedFetch } from "@/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import FormComponent, { Field } from "../components/FormComponent";
 import Dropzone from "../components/ui/Dropzone";
-import { parseUrlString, validateUrl, matchUrl } from "./urlUtils";
+import { IndicatorContext } from "../components/provider";
+import { useToast } from "@/components/ui/use-toast";
+import { matchUrl, parseUrlString, validateUrl } from "../login/urlUtils";
 
 const DEFAULT_HOST = "localhost";
 const DEFAULT_PORT = "6379";
@@ -30,11 +32,11 @@ const handleIsPortFormat = (value: string) => {
 const handleIsPortValid = (value: string) => value.startsWith("0");
 
 const getPortErrors = (func?: (value: string) => string) => {
-  const getValue = (v: string) => func ? func(v) : v;
+  const getValue = (v: string) => func ? func(v) : v;  
 
   return [
     {
-      condition: (value: string) => getValue(value) !== "" && handlePortIsNumber(getValue(value)),
+      condition: (value: string) => { console.log(getValue(value)); return getValue(value) !== "" && handlePortIsNumber(getValue(value)) },
       message: "Port must be a number"
     },
     {
@@ -58,6 +60,7 @@ const safeDecode = (value: string): string => {
 
 // Parse a URL string and update shared state
 const parseUrl = (url: string) => {
+  debugger;
   const match = matchUrl(url);
   let parsed: ReturnType<typeof parseUrlString>;
 
@@ -82,9 +85,12 @@ export default function LoginForm() {
   const { theme } = useTheme();
   const { currentTheme } = getTheme(theme);
   const router = useRouter();
+  const { toast } = useToast();
+  const { setIndicator } = useContext(IndicatorContext);
 
   const [mounted, setMounted] = useState(false);
   const [loginMode, setLoginMode] = useState<LoginMode>("manual");
+  const [missingFields, setMissingFields] = useState(false);
   const [rawUrl, setRawUrl] = useState("");
   const [host, setHost] = useState("");
   const [port, setPort] = useState("");
@@ -121,7 +127,7 @@ export default function LoginForm() {
   const parseEndpoint = (value: string) => {
     const colonIndex = value.lastIndexOf(":");
 
-    if (colonIndex > 0) {
+    if (colonIndex !== -1) {
       const portCandidate = value.substring(colonIndex + 1);
       return { host: value.substring(0, colonIndex), port: portCandidate };
     } else {
@@ -160,32 +166,35 @@ export default function LoginForm() {
     required: false
   }];
 
+  const urlFields: Field[] = !missingFields ? [{
+    value: rawUrl,
+    onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = e.target.value;
+      const parsed = parseUrl(val);
+
+      setHost(parsed.host);
+      setPort(parsed.port);
+      setUsername(parsed.username);
+      setPassword(parsed.password);
+      setTLS(parsed.tls);
+      setRawUrl(val);
+
+      clearError();
+
+      return true;
+    },
+    errors: [
+      ...getPortErrors((value) => parseUrl(value).port)
+    ],
+    label: "FalkorDB URL",
+    type: "text",
+    placeholder: `falkor://Default:Default@${DEFAULT_HOST}:${DEFAULT_PORT}`,
+    required: true
+  }] : userInputFields;
+
   const fields: Field[] = loginMode === "url" ?
-    [{
-      value: rawUrl,
-      onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = e.target.value;
-        const parsed = parseUrl(val);
-
-        setHost(parsed.host);
-        setPort(parsed.port);
-        setUsername(parsed.username);
-        setPassword(parsed.password);
-        setTLS(parsed.tls);
-        setRawUrl(val);
-
-        clearError();
-
-        return true;
-      },
-      errors: [
-        ...getPortErrors((value) => parseUrl(value).port)
-      ],
-      label: "FalkorDB URL",
-      type: "text",
-      placeholder: `falkor://Default:Default@${DEFAULT_HOST}:${DEFAULT_PORT}`,
-      required: true
-    }] : loginMode === "endpoint" ? [
+    urlFields
+    : loginMode === "endpoint" ? [
       {
         value: endpointValue,
         onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -258,11 +267,31 @@ export default function LoginForm() {
     e.preventDefault();
 
     // Pre-submit validation for URL mode — show colored format errors
-    if (loginMode === "url" && rawUrl.trim()) {
-      const result = validateUrl(rawUrl);
-      const { parts } = result;
+    if (loginMode === "url") {
+      let url = rawUrl || "falkor://localhost:6379";
+      
+      if (missingFields) {
+        url = buildUrl();
+      }
+      
+      const result = await securedFetch("/api/validate-url", {
+        method: "POST",
+        body: JSON.stringify({ url })
+      }, toast, setIndicator);
 
-      if (!result.valid) {
+      if (!result.ok) return
+
+      const json = await result.json();
+
+      if (json.result) {
+        setMissingFields(true);
+        return;
+      }
+
+      const res = validateUrl(url);
+      const { parts } = res;
+
+      if (!res.valid) {
         const good = (text: string) => <span className="text-green-500 font-semibold">{text}</span>;
         const render = (text: string, status: "good" | "warn" | "neutral") => {
           if (status === "good") return good(text);
