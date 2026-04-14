@@ -242,7 +242,7 @@ export default function LoginForm() {
         body: JSON.stringify({ url })
       }, toast, setIndicator);
 
-      if (!result.ok) return
+      if (!result.ok) return;
 
       const json = await result.json();
 
@@ -346,6 +346,7 @@ export default function LoginForm() {
             onValueChange={(value) => {
               const mode = value as LoginMode;
               setLoginMode(mode);
+              setMissingFields(false);
               if (mode === "url") {
                 setRawUrl(buildUrl());
               }

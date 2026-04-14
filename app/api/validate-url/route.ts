@@ -2,8 +2,18 @@ import { FalkorDB } from "falkordb";
 import { NextRequest, NextResponse } from "next/server";
 import { validateBody, validateUrl } from "../validate-body";
 
+
 export async function POST(request: NextRequest) {
-    const body = await request.json();
+    let body: unknown;
+    
+    try {
+        body = await request.json();
+    } catch {
+        return NextResponse.json(
+            { message: "Invalid JSON" },
+            { status: 400 }
+        );
+    }
 
     const validation = validateBody(validateUrl, body)
 
@@ -19,7 +29,7 @@ export async function POST(request: NextRequest) {
 
     if (isMissingPasswordAndUsername) {
         try {
-            const falkordb = await FalkorDB.connect({ url })
+            await FalkorDB.connect({ url });
         } catch (err) {
             if (err instanceof Error && err.message.includes("NOAUTH")) {
                 return NextResponse.json({ result: true }, { status: 200 });
