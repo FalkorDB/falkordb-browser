@@ -5,6 +5,12 @@
 export type AIProvider = "openai" | "anthropic" | "gemini" | "ollama" | "groq" | "cohere" | "xai" | "unknown";
 
 /**
+ * Known provider prefixes used for model name parsing.
+ * Add new providers here to enable detection across all functions.
+ */
+export const KNOWN_PROVIDERS: AIProvider[] = ["openai", "anthropic", "gemini", "ollama", "groq", "cohere", "xai"];
+
+/**
  * Detects the AI provider based on the API key format
  *
  * @param apiKey - The API key to analyze
@@ -152,8 +158,7 @@ export function detectProviderFromModel(model: string): AIProvider {
     const doubleSeparatorIndex = model.indexOf("::");
     if (doubleSeparatorIndex !== -1) {
         const prefix = model.substring(0, doubleSeparatorIndex);
-        const knownProviders: AIProvider[] = ["openai", "anthropic", "gemini", "ollama", "groq", "cohere", "xai"];
-        const matched = knownProviders.find(p => p === prefix);
+        const matched = KNOWN_PROVIDERS.find(p => p === prefix);
         if (matched) return matched;
     }
 
@@ -161,8 +166,7 @@ export function detectProviderFromModel(model: string): AIProvider {
     const singleSeparatorIndex = model.indexOf(":");
     if (singleSeparatorIndex !== -1) {
         const prefix = model.substring(0, singleSeparatorIndex);
-        const knownProviders: AIProvider[] = ["openai", "anthropic", "gemini", "ollama", "groq", "cohere", "xai"];
-        const matched = knownProviders.find(p => p === prefix);
+        const matched = KNOWN_PROVIDERS.find(p => p === prefix);
         if (matched) return matched;
     }
 
@@ -198,11 +202,10 @@ export function formatModelDisplayName(modelValue: string): string {
         withoutPrefix = modelValue.substring(doubleSepIndex + 2);
     } else {
         // Remove legacy single-colon provider prefix (e.g., "anthropic:claude-3-5-sonnet")
-        const knownPrefixes = ["openai", "anthropic", "gemini", "ollama", "groq", "cohere", "xai"];
         const singleSepIndex = modelValue.indexOf(":");
         if (singleSepIndex !== -1) {
             const prefix = modelValue.substring(0, singleSepIndex);
-            if (knownPrefixes.includes(prefix)) {
+            if ((KNOWN_PROVIDERS as readonly string[]).includes(prefix)) {
                 withoutPrefix = modelValue.substring(singleSepIndex + 1);
             }
         }

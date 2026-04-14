@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { formatModelDisplayName } from "@/lib/ai-provider-utils";
+import { formatModelDisplayName, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { Search, Check, Sparkles, Zap, Brain, Globe, Server, Cpu, MessageSquare, ChevronRight, Rocket } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Input from "../components/ui/Input";
@@ -12,17 +12,6 @@ interface ModelSelectorProps {
     disabled?: boolean;
     isLoading?: boolean;
 }
-
-// Map provider prefix to display category name
-const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
-    openai: "OpenAI",
-    anthropic: "Anthropic",
-    gemini: "Google",
-    ollama: "Ollama",
-    groq: "Groq",
-    cohere: "Cohere",
-    xai: "xAI",
-};
 
 // Get icon for provider category
 const getCategoryIcon = (category: string) => {
@@ -53,45 +42,13 @@ const categorizeModels = (models: string[]) => {
     const categories: Record<string, string[]> = {};
 
     uniqueModels.forEach((model) => {
-        let categoryName: string | undefined;
+        const provider = detectProviderFromModel(model);
+        let categoryName: string;
 
-        // New format: double-colon prefix (e.g., "anthropic::claude-sonnet-4-5")
-        const doubleSepIndex = model.indexOf("::");
-        if (doubleSepIndex !== -1) {
-            const prefix = model.substring(0, doubleSepIndex);
-            categoryName = PROVIDER_DISPLAY_NAMES[prefix] || prefix.charAt(0).toUpperCase() + prefix.slice(1);
-        }
-
-        // Legacy format: single-colon prefix (e.g., "anthropic:claude-3-5-sonnet")
-        if (!categoryName) {
-            const singleSepIndex = model.indexOf(":");
-            if (singleSepIndex !== -1) {
-                const prefix = model.substring(0, singleSepIndex);
-                if (PROVIDER_DISPLAY_NAMES[prefix]) {
-                    categoryName = PROVIDER_DISPLAY_NAMES[prefix];
-                }
-            }
-        }
-
-        // Fallback: substring heuristics for unprefixed model names
-        if (!categoryName) {
-            if (model.startsWith("gpt") || model.startsWith("o1") || model.startsWith("o3")) {
-                categoryName = "OpenAI";
-            } else if (model.includes("claude")) {
-                categoryName = "Anthropic";
-            } else if (model.includes("gemini")) {
-                categoryName = "Google";
-            } else if (model.includes("llama") || model.includes("mixtral") || model.includes("phi") || model.includes("deepseek")) {
-                categoryName = "Ollama";
-            } else if (model.includes("groq")) {
-                categoryName = "Groq";
-            } else if (model.includes("command") || model.includes("cohere")) {
-                categoryName = "Cohere";
-            } else if (model.includes("grok")) {
-                categoryName = "xAI";
-            } else {
-                categoryName = "Other";
-            }
+        if (provider !== "unknown") {
+            categoryName = provider === "gemini" ? "Google" : getProviderDisplayName(provider);
+        } else {
+            categoryName = "Other";
         }
 
         if (!categories[categoryName]) {
