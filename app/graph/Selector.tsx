@@ -445,7 +445,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                 </ul>
                             </PopoverContent>
                         </Popover>
-                        <div className="h-full w-[120px] flex gap-3 items-center p-2 border border-border rounded-lg bg-background">
+                        <div className="h-full w-fit min-w-[120px] flex gap-3 items-center p-2 border border-border rounded-lg bg-background">
                             <Button
                                 className="cursor-default"
                                 title={`Run (Enter)

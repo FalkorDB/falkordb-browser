@@ -170,7 +170,7 @@
 }
 
 .dark ::-webkit-scrollbar-thumb {
-    background: #555555;
+    background: #666666;
 }
 
 input:focus-visible {

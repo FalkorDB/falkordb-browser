@@ -96,7 +96,11 @@ export default function Header() {
             <div className="flex gap-1 items-center">
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <div className={cn(
+                        <div
+                            tabIndex={0}
+                            role="status"
+                            aria-label={`Connection type: ${connectionType}`}
+                            className={cn(
                             "h-6 px-2 rounded-full flex items-center gap-1.5 text-xs font-medium border",
                             connectionType === "Standalone" && "border-yellow-500/40 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400",
                             connectionType === "Sentinel" && "border-green-500/40 bg-green-500/10 text-green-600 dark:text-green-400",

@@ -122,6 +122,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                 style={{
                                                     borderLeftColor: labelColor,
                                                     borderLeftWidth: '3px',
+                                                    borderLeftStyle: 'solid',
                                                 }}
                                                 className="w-fit max-w-[calc(100%-24px)] h-6 px-2 rounded-md flex items-center gap-1.5 bg-secondary text-foreground text-xs hover:bg-secondary/80 transition-colors"
                                                 data-testid={`graphInfo${name}Node`}
@@ -204,8 +205,9 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                 style={{
                                                     borderLeftColor: relationshipColor,
                                                     borderLeftWidth: '3px',
+                                                    borderLeftStyle: 'solid',
                                                 }}
-                                                className="h-6 w-fit px-2 rounded-md flex items-center gap-1.5 bg-secondary text-foreground text-xs hover:bg-secondary/80 transition-colors"
+                                                className="h-6 max-w-full px-2 rounded-md flex items-center gap-1.5 bg-secondary text-foreground text-xs hover:bg-secondary/80 transition-colors overflow-hidden"
                                                 data-testid={`graphInfo${relationship.name}Edge`}
                                                 onClick={() => runQuery(`MATCH p=()-[:${relationship.name}]-() RETURN p`)}
                                                 disabled={isQueryLoading}
@@ -248,22 +250,23 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                 }
                             </div>
                             <div className="p-2 overflow-auto">
-                                <p className="text-sm text-foreground/80 leading-relaxed">
+                                <ul className="flex flex-wrap text-sm text-foreground/80 leading-relaxed list-none p-0 m-0" role="list">
                                     {
                                         PropertyKeys && PropertyKeys.filter(key => key.toLowerCase().includes(propertyKeysSearch.toLowerCase())).sort((a, b) => a.localeCompare(b)).map((key, index, arr) => (
-                                            <Button
-                                                key={key}
-                                                title={`MATCH (e) WHERE e.${key} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`}
-                                                className="inline text-sm text-foreground/80 hover:text-primary transition-colors"
-                                                onClick={() => runQuery(
-                                                    `MATCH (e) WHERE e.${key} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`
-                                                )}
-                                                disabled={isQueryLoading}
-                                                label={index < arr.length - 1 ? `${key}, ` : key}
-                                            />
+                                            <li key={key} className="inline">
+                                                <Button
+                                                    title={`MATCH (e) WHERE e.${key} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`}
+                                                    className="inline text-sm text-foreground/80 hover:text-primary transition-colors"
+                                                    onClick={() => runQuery(
+                                                        `MATCH (e) WHERE e.${key} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`
+                                                    )}
+                                                    disabled={isQueryLoading}
+                                                    label={index < arr.length - 1 ? `${key}, ` : key}
+                                                />
+                                            </li>
                                         ))
                                     }
-                                </p>
+                                </ul>
                             </div>
                         </div>
                     </>

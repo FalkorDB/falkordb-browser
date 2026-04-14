@@ -136,15 +136,24 @@ export default class CustomizeStylePage extends GraphInfoPage {
     // Wait for the button to be visible first
     await waitForElementToBeVisible(this.labelButton(label));
 
-    // Get the color from the border-left or the inner color dot span
+    // Get the color from the border-left, inner color dot span, or background
     const color = await this.labelButton(label).evaluate((el: HTMLElement) => {
       // Check for left border color (new style)
-      const borderColor = el.style.borderLeftColor || window.getComputedStyle(el).borderLeftColor;
+      const computedStyle = window.getComputedStyle(el);
+      const borderColor = el.style.borderLeftColor || computedStyle.borderLeftColor;
       if (borderColor && borderColor !== 'rgb(0, 0, 0)' && borderColor !== '' && borderColor !== 'transparent') {
         return borderColor;
       }
+      // Check inner color dot span (new style)
+      const dotSpan = el.querySelector('span[class*="rounded-full"]');
+      if (dotSpan) {
+        const dotBg = window.getComputedStyle(dotSpan).backgroundColor;
+        if (dotBg && dotBg !== 'rgba(0, 0, 0, 0)' && dotBg !== 'transparent') {
+          return dotBg;
+        }
+      }
       // Fall back to background color (old style)
-      return el.style.backgroundColor || window.getComputedStyle(el).backgroundColor;
+      return el.style.backgroundColor || computedStyle.backgroundColor;
     });
     return color;
   }

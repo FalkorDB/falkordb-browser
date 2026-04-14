@@ -91,30 +91,20 @@ export default function Page() {
         setIsCollapsed(size.asPercentage === 0);
     }, []);
 
+    const panelSizes: Record<string, { size: string; min: string }> = {
+        data: { size: "200px", min: "200px" },
+        add: { size: "30%", min: "25%" },
+        chat: { size: "35%", min: "30%" },
+    };
+
     const getPanelSize = useCallback(() => {
-        switch (panel) {
-            case "data":
-                return "200px";
-            case "add":
-                return "30%";
-            case "chat":
-                return "35%";
-            default:
-                return "0%";
-        }
+        if (!panel) return "0%";
+        return panelSizes[panel]?.size ?? "0%";
     }, [panel]);
 
     const panelMinSize = useMemo(() => {
-        switch (panel) {
-            case "data":
-                return "200px";
-            case "add":
-                return "25%";
-            case "chat":
-                return "30%";
-            default:
-                return "0%";
-        }
+        if (!panel) return "0%";
+        return panelSizes[panel]?.min ?? "0%";
     }, [panel]);
 
     useEffect(() => {

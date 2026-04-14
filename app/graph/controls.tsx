@@ -45,7 +45,7 @@ export default function Controls({
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <div className="flex items-center gap-2">
-                            {cooldownTicks === undefined ? <Play size={18} /> : <Pause size={18} />}
+                            {cooldownTicks === undefined ? <Pause size={18} /> : <Play size={18} />}
                             <Switch
                                 data-testid="animationControl"
                                 className="pointer-events-auto data-[state=unchecked]:bg-border"
@@ -57,7 +57,7 @@ export default function Controls({
                         </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                        <p>{cooldownTicks === undefined ? "Resume animation" : "Pause animation"}</p>
+                        <p>{cooldownTicks === undefined ? "Pause animation" : "Resume animation"}</p>
                     </TooltipContent>
                 </Tooltip>
             }
