@@ -162,7 +162,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
     };
 
     return (
-        <div data-testid="DataPanel" className="DataPanel gap-1 p-2 relative">
+        <div data-testid="DataPanel" className="DataPanel gap-2 p-3 relative">
             <Button
                 className="absolute top-2 right-2"
                 data-testid="DataPanelClose"
@@ -173,12 +173,12 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
             </Button>
             <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between pr-5">
-                    <h1 className="text-2xl">{type ? "Node" : "Edge"} Data</h1>
-                    <TableProperties size={25} />
+                    <h1 className="text-lg font-semibold">{type ? "Node" : "Edge"} Data</h1>
+                    <TableProperties size={20} className="text-foreground/50" />
                 </div>
-                <div className="flex flex-col gap-1 font-medium text-xl text-nowrap">
-                    <p>ID: <span className="Gradient text-transparent bg-clip-text">{object.id}</span></p>
-                    <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text">{Object.keys(object.data).length}</span></p>
+                <div className="flex flex-col gap-1 text-sm text-nowrap">
+                    <p>ID: <span className="Gradient text-transparent bg-clip-text font-semibold">{object.id}</span></p>
+                    <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text font-semibold">{Object.keys(object.data).length}</span></p>
                 </div>
                 <ul
                     ref={labelsListRef}

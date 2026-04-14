@@ -39,13 +39,13 @@ export default function Controls({
 
 
     return (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
             {
                 graph.getElements().length > 0 &&
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <div className="flex items-center gap-2">
-                            {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
+                            {cooldownTicks === undefined ? <Play size={18} /> : <Pause size={18} />}
                             <Switch
                                 data-testid="animationControl"
                                 className="pointer-events-auto data-[state=unchecked]:bg-border"
@@ -57,40 +57,43 @@ export default function Controls({
                         </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                        <p>Animation Control</p>
+                        <p>{cooldownTicks === undefined ? "Resume animation" : "Pause animation"}</p>
                     </TooltipContent>
                 </Tooltip>
             }
-            <Button
-                data-testid="zoomInControl"
-                className="text-nowrap p-0 pointer-events-auto"
-                disabled={disabled}
-                indicator={indicator}
-                title="Zoom in for a closer view"
-                onClick={() => handleZoomClick(1.1)}
-            >
-                <ZoomIn size={20} />
-            </Button>
-            <Button
-                data-testid="zoomOutControl"
-                className="text-nowrap p-0 pointer-events-auto"
-                disabled={disabled}
-                indicator={indicator}
-                title="Zoom out for a broader view"
-                onClick={() => handleZoomClick(0.9)}
-            >
-                <ZoomOut size={20} />
-            </Button>
-            <Button
-                data-testid="centerControl"
-                className="text-nowrap p-0 pointer-events-auto"
-                disabled={disabled}
-                indicator={indicator}
-                title="Center and fit the graph to the screen"
-                onClick={() => handleCenterClick()}
-            >
-                <Shrink size={20} />
-            </Button>
+            <div className="h-4 w-px bg-border rounded-full" />
+            <div className="flex items-center gap-1">
+                <Button
+                    data-testid="zoomInControl"
+                    className="text-nowrap p-1 pointer-events-auto rounded-md hover:bg-secondary"
+                    disabled={disabled}
+                    indicator={indicator}
+                    title="Zoom in"
+                    onClick={() => handleZoomClick(1.1)}
+                >
+                    <ZoomIn size={18} />
+                </Button>
+                <Button
+                    data-testid="zoomOutControl"
+                    className="text-nowrap p-1 pointer-events-auto rounded-md hover:bg-secondary"
+                    disabled={disabled}
+                    indicator={indicator}
+                    title="Zoom out"
+                    onClick={() => handleZoomClick(0.9)}
+                >
+                    <ZoomOut size={18} />
+                </Button>
+                <Button
+                    data-testid="centerControl"
+                    className="text-nowrap p-1 pointer-events-auto rounded-md hover:bg-secondary"
+                    disabled={disabled}
+                    indicator={indicator}
+                    title="Fit graph to screen"
+                    onClick={() => handleCenterClick()}
+                >
+                    <Shrink size={18} />
+                </Button>
+            </div>
         </div>
     );
 }

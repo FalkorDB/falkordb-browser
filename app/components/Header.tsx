@@ -66,7 +66,7 @@ export default function Header() {
     }, [toast]);
 
     return (
-        <header className="flex gap-4 w-full border-b border-border p-1 py-1 items-center">
+        <header className="flex gap-4 w-full border-b border-border/50 px-3 py-1.5 items-center text-sm">
             <div className="flex gap-1 items-center">
                 <label className="font-bold">User:</label>
                 <h2>{session?.user.username || "Default"}</h2>
@@ -96,38 +96,25 @@ export default function Header() {
             <div className="flex gap-1 items-center">
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <button
-                            type="button"
-                            aria-label="Single connection"
-                            className={cn("h-6 w-6 rounded-full bg-yellow-500 text-center", connectionType !== "Standalone" && "opacity-25")}
-                        >Si</button>
+                        <div className={cn(
+                            "h-6 px-2 rounded-full flex items-center gap-1.5 text-xs font-medium border",
+                            connectionType === "Standalone" && "border-yellow-500/40 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400",
+                            connectionType === "Sentinel" && "border-green-500/40 bg-green-500/10 text-green-600 dark:text-green-400",
+                            connectionType === "Cluster" && "border-green-700/40 bg-green-700/10 text-green-700 dark:text-green-400",
+                        )}>
+                            <span className={cn(
+                                "h-2 w-2 rounded-full",
+                                connectionType === "Standalone" && "bg-yellow-500",
+                                connectionType === "Sentinel" && "bg-green-500",
+                                connectionType === "Cluster" && "bg-green-700",
+                            )} />
+                            {connectionType === "Standalone" && "Single"}
+                            {connectionType === "Sentinel" && "Sentinel"}
+                            {connectionType === "Cluster" && "Cluster"}
+                        </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                        <p>Single</p>
-                    </TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <button
-                            type="button"
-                            aria-label="Sentinel connection"
-                            className={cn("h-6 w-6 rounded-full bg-green-500 text-center", connectionType !== "Sentinel" && "opacity-25")}
-                        >Se</button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>Sentinel</p>
-                    </TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <button
-                            type="button"
-                            aria-label="Cluster connection"
-                            className={cn("h-6 w-6 rounded-full bg-green-700 text-center", connectionType !== "Cluster" && "opacity-25")}
-                        >C</button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>Cluster</p>
+                        <p>Connection type: {connectionType}</p>
                     </TooltipContent>
                 </Tooltip>
             </div>

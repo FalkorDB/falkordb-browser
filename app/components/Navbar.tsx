@@ -63,11 +63,11 @@ export default function Navbar({ onSetGraphName, graphNames, graphName, onOpenPa
         setPanel(prev => prev === newPanel ? undefined : newPanel);
     }, [setPanel]);
 
-    const separator = <div className="h-px w-[80%] bg-border rounded-full" />;
+    const separator = <div className="h-px w-[80%] bg-border/50 rounded-full" />;
 
     return (
-        <div className="w-30 py-5 px-2 flex flex-col justify-between items-center border-r border-border">
-            <div className="w-full flex flex-col gap-2 items-center">
+        <div className="w-30 py-5 px-2 flex flex-col justify-between items-center border-r border-border/50">
+            <div className="w-full flex flex-col gap-3 items-center">
                 {
                     mounted && currentTheme &&
                     <Link
@@ -114,16 +114,7 @@ export default function Navbar({ onSetGraphName, graphNames, graphName, onOpenPa
                         data-testid="GraphsButton"
                     />
                 </div>
-                {/*
-                <Button
-                label="SCHEMAS"
-                title="View and manage your schemas"
-                className={cn("w-full flex justify-center text-foreground p-1 rounded-lg", type === "Schema" && "text-primary bg-border")}
-                onClick={() => router.push("/schema")}
-                data-testid="SchemasButton"
-                /> 
                 {separator}
-                */}
                 <div className="flex flex-col items-center gap-1">
                     {
                         type === "Graph" && graphName &&
@@ -179,15 +170,6 @@ export default function Navbar({ onSetGraphName, graphNames, graphName, onOpenPa
                 </div>
             </div>
             <div className="w-full flex flex-col gap-2 items-center">
-                <Tooltip>
-                    <TooltipTrigger>
-                        <p>v{pkg.version}</p>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>FalkorDB Browser Version</p>
-                    </TooltipContent>
-                </Tooltip>
-                {separator}
                 <Drawer direction="right">
                     <DropdownMenu>
                         <DropdownMenuTrigger onClick={(e) => e.preventDefault()} asChild>

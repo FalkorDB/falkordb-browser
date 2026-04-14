@@ -383,7 +383,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     const separator = <div className="h-[80%] w-0.5 bg-border rounded-full" />;
 
     return (
-        <div className="z-20 w-full h-[40px] flex flex-row gap-2 items-center">
+        <div className="z-20 w-full h-[44px] flex flex-row gap-3 items-center">
             <SelectGraph
                 options={options}
                 setOptions={setOptions}
@@ -445,7 +445,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                 </ul>
                             </PopoverContent>
                         </Popover>
-                        <div className="h-full w-[120px] flex gap-2 items-center p-2 border border-border rounded-lg bg-background">
+                        <div className="h-full w-[120px] flex gap-3 items-center p-2 border border-border rounded-lg bg-background">
                             <Button
                                 className="cursor-default"
                                 title={`Run (Enter)

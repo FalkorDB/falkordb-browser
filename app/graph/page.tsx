@@ -98,7 +98,7 @@ export default function Page() {
             case "add":
                 return "30%";
             case "chat":
-                return "40%";
+                return "35%";
             default:
                 return "0%";
         }
@@ -111,7 +111,7 @@ export default function Page() {
             case "add":
                 return "25%";
             case "chat":
-                return "45%";
+                return "30%";
             default:
                 return "0%";
         }
@@ -432,7 +432,7 @@ export default function Page() {
     }, [graphName, panel, handleSetSelectedElements, setPanel, isAddNode, selectedElements, handleCreateElement, setLabels, canvasRef]);
 
     return (
-        <div className="Page p-2 gap-2">
+        <div className="Page p-3 gap-3">
             <Selector
                 type="Graph"
                 graph={graph}

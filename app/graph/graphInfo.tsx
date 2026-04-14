@@ -2,7 +2,6 @@ import { Dispatch, SetStateAction, useContext, useEffect, useState } from "react
 import { Loader2, X, Palette, Network, Search } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn, InfoLabel } from "@/lib/utils";
-import { getContrastTextColor } from "@falkordb/canvas";
 import Button from "../components/ui/Button";
 import { BrowserSettingsContext, GraphContext, QueryLoadingContext } from "../components/provider";
 import CustomizeStylePanel from "./CustomizeStylePanel";
@@ -28,7 +27,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     useEffect(() => { setPropertyKeysSearch(""); }, [PropertyKeys, maxItemsForSearch]);
 
     return (
-        <div aria-disabled={nodesCount === undefined || edgesCount === undefined} data-testid="graphInfoPanel" className={cn(`relative h-full w-full p-2 grid grid-rows-[max-content_max-content_max-content_1fr_1fr_1fr] gap-2`)}>
+        <div aria-disabled={nodesCount === undefined || edgesCount === undefined} data-testid="graphInfoPanel" className={cn(`relative h-full w-full p-3 grid grid-rows-[max-content_max-content_max-content_1fr_1fr_1fr] gap-3`)}>
             {
                 !customizingLabel ? (
                     <>
@@ -39,15 +38,15 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                         >
                             <X size={16} />
                         </Button>
-                        <div className=" pr-5 w-full flex justify-between items-center gap-1">
-                            <h1 className="text-2xl">Graph Info</h1>
-                            <Network size={25} />
+                        <div className="pr-5 w-full flex justify-between items-center gap-1">
+                            <h1 className="text-lg font-semibold">Graph Info</h1>
+                            <Network size={20} className="text-foreground/50" />
                         </div>
                         <div className="flex gap-2 items-center overflow-hidden">
-                            <h2>Graph Name:</h2>
+                            <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Name</h2>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <p className="truncate pointer-events-auto SofiaSans">{graphName}</p>
+                                    <p className="truncate pointer-events-auto text-sm font-semibold">{graphName}</p>
                                 </TooltipTrigger>
                                 <TooltipContent>
                                     {graphName}
@@ -58,12 +57,12 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             showMemoryUsage &&
                             <div className="flex flex-col gap-2">
                                 <div className="flex gap-2 items-center">
-                                    <h2>Memory Usage:</h2>
+                                    <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Memory</h2>
                                     {
                                         MemoryUsage.get("total_graph_sz_mb") !== undefined
                                             ? <Tooltip>
                                                 <TooltipTrigger asChild>
-                                                    <p className="truncate pointer-events-auto SofiaSans">{MemoryUsage.get("total_graph_sz_mb") || "<1"} MB</p>
+                                                    <p className="truncate pointer-events-auto text-sm font-semibold">{MemoryUsage.get("total_graph_sz_mb") || "<1"} MB</p>
                                                 </TooltipTrigger>
                                                 <TooltipContent>
                                                     {MemoryUsage.get("total_graph_sz_mb")} MB
@@ -74,18 +73,18 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                 </div>
                             </div>
                         }
-                        <div className="flex flex-col gap-2 overflow-hidden">
+                        <div className="flex flex-col gap-3 overflow-hidden">
                             <div className="flex gap-2 items-center">
-                                <h2>Nodes</h2>
+                                <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Nodes</h2>
                                 {
                                     nodesCount !== undefined ?
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <p
                                                     data-testid="nodesCount"
-                                                    className="truncate pointer-events-auto SofiaSans"
+                                                    className="truncate pointer-events-auto text-sm font-semibold"
                                                 >
-                                                    ({nodesCount.toLocaleString()})
+                                                    {nodesCount.toLocaleString()}
                                                 </p>
                                             </TooltipTrigger>
                                             <TooltipContent>
@@ -97,12 +96,12 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                 {
                                     Labels.size > maxItemsForSearch &&
                                     <div className="basis-0 grow flex gap-1 items-center">
-                                        <Search size={16} />
+                                        <Search size={14} />
                                         <Input aria-label="Search node labels" value={nodesSearch} onChange={(e) => setNodesSearch(e.target.value)} className="w-1 grow" />
                                     </div>
                                 }
                             </div>
-                            <ul className="flex flex-wrap gap-2 p-2 overflow-auto">
+                            <ul className="flex flex-wrap gap-1.5 p-1 overflow-auto">
                                 <li className="max-w-full">
                                     <Button
                                         className="pt-1 h-6 w-6 rounded-full flex justify-center items-center bg-border text-white"
@@ -121,17 +120,19 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                         <li key={`${name}-${labelColor}`} className="max-w-full flex gap-1 overflow-x-hidden">
                                             <Button
                                                 style={{
-                                                    backgroundColor: labelColor,
-                                                    color: getContrastTextColor(labelColor)
+                                                    borderLeftColor: labelColor,
+                                                    borderLeftWidth: '3px',
                                                 }}
-                                                className="w-fit max-w-[calc(100%-24px)] h-6 p-2 rounded-full flex justify-center items-center SofiaSans hover:opacity-80 transition-opacity"
+                                                className="w-fit max-w-[calc(100%-24px)] h-6 px-2 rounded-md flex items-center gap-1.5 bg-secondary text-foreground text-xs hover:bg-secondary/80 transition-colors"
                                                 data-testid={`graphInfo${name}Node`}
                                                 title={`MATCH (n:${name}) RETURN n
                                                     #: ${label.count.toLocaleString()}`}
-                                                label={name}
                                                 onClick={() => runQuery(`MATCH (n:${name}) RETURN n`)}
                                                 disabled={isQueryLoading}
-                                            />
+                                            >
+                                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: labelColor }} />
+                                                <span className="truncate">{name}</span>
+                                            </Button>
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
                                                     <Button
@@ -152,18 +153,18 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                 })}
                             </ul>
                         </div>
-                        <div className="flex flex-col gap-2 overflow-hidden">
+                        <div className="flex flex-col gap-3 overflow-hidden">
                             <div className="flex gap-2 items-center">
-                                <h2>Edges</h2>
+                                <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Edges</h2>
                                 {
                                     edgesCount !== undefined ?
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <p
                                                     data-testid="edgesCount"
-                                                    className="truncate pointer-events-auto SofiaSans"
+                                                    className="truncate pointer-events-auto text-sm font-semibold"
                                                 >
-                                                    ({edgesCount.toLocaleString()})
+                                                    {edgesCount.toLocaleString()}
                                                 </p>
                                             </TooltipTrigger>
                                             <TooltipContent>
@@ -176,12 +177,12 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                 {
                                     Relationships.size > maxItemsForSearch &&
                                     <div className="basis-0 grow flex gap-1 items-center">
-                                        <Search size={16} />
+                                        <Search size={14} />
                                         <Input aria-label="Search relationship types" value={edgesSearch} onChange={(e) => setEdgesSearch(e.target.value)} className="w-1 grow" />
                                     </div>
                                 }
                             </div>
-                            <ul className="flex flex-wrap gap-2 p-2 overflow-auto">
+                            <ul className="flex flex-wrap gap-1.5 p-1 overflow-auto">
                                 <li className="max-w-full">
                                     <Button
                                         className="pt-1 h-6 w-6 rounded-full flex justify-center items-center bg-border text-white"
@@ -194,7 +195,6 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                 </li>
                                 {Array.from(Relationships.values()).filter(relationship => relationship.name.toLowerCase().includes(edgesSearch.toLowerCase())).sort((a, b) => b.count - a.count).map((relationship) => {
                                     const relationshipColor = relationship.style.color;
-                                    const textColor = getContrastTextColor(relationshipColor);
 
                                     return (
                                         <li key={relationship.name} className="max-w-full">
@@ -202,33 +202,34 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                 title={`MATCH p=()-[:${relationship.name}]-() RETURN p
                                                     #: ${relationship.count.toLocaleString()}`}
                                                 style={{
-                                                    backgroundColor: relationshipColor,
-                                                    color: textColor,
-                                                    clipPath: 'polygon(8px 0%, calc(100% - 8px) 0%, 100% 50%, calc(100% - 8px) 100%, 8px 100%, 0% 50%)',
+                                                    borderLeftColor: relationshipColor,
+                                                    borderLeftWidth: '3px',
                                                 }}
-                                                className="h-6 w-fit px-2 py-1 flex justify-center items-center SofiaSans hover:opacity-80 transition-opacity"
+                                                className="h-6 w-fit px-2 rounded-md flex items-center gap-1.5 bg-secondary text-foreground text-xs hover:bg-secondary/80 transition-colors"
                                                 data-testid={`graphInfo${relationship.name}Edge`}
-                                                label={relationship.name}
                                                 onClick={() => runQuery(`MATCH p=()-[:${relationship.name}]-() RETURN p`)}
                                                 disabled={isQueryLoading}
-                                            />
+                                            >
+                                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: relationshipColor }} />
+                                                <span className="truncate">{relationship.name}</span>
+                                            </Button>
                                         </li>
                                     );
                                 })}
                             </ul>
                         </div>
-                        <div className="flex flex-col gap-2 overflow-hidden">
+                        <div className="flex flex-col gap-3 overflow-hidden">
                             <div className="flex gap-2 items-center">
-                                <h2>Property Keys</h2>
+                                <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Property Keys</h2>
                                 {
                                     PropertyKeys !== undefined ?
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <p
                                                     data-testid="propertyKeysCount"
-                                                    className="truncate pointer-events-auto SofiaSans"
+                                                    className="truncate pointer-events-auto text-sm font-semibold"
                                                 >
-                                                    ({PropertyKeys.length.toLocaleString()})
+                                                    {PropertyKeys.length.toLocaleString()}
                                                 </p>
                                             </TooltipTrigger>
                                             <TooltipContent>
@@ -241,28 +242,29 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                 {
                                     PropertyKeys && PropertyKeys.length > maxItemsForSearch &&
                                     <div className="basis-0 grow flex gap-1 items-center">
-                                        <Search size={16} />
+                                        <Search size={14} />
                                         <Input aria-label="Search property keys" value={propertyKeysSearch} onChange={(e) => setPropertyKeysSearch(e.target.value)} className="w-1 grow" />
                                     </div>
                                 }
                             </div>
-                            <ul className="flex flex-wrap gap-2 p-2 overflow-auto">
-                                {
-                                    PropertyKeys && PropertyKeys.filter(key => key.toLowerCase().includes(propertyKeysSearch.toLowerCase())).sort((a, b) => a.localeCompare(b)).map((key) => (
-                                        <li key={key} className="max-w-full">
+                            <div className="p-2 overflow-auto">
+                                <p className="text-sm text-foreground/80 leading-relaxed">
+                                    {
+                                        PropertyKeys && PropertyKeys.filter(key => key.toLowerCase().includes(propertyKeysSearch.toLowerCase())).sort((a, b) => a.localeCompare(b)).map((key, index, arr) => (
                                             <Button
+                                                key={key}
                                                 title={`MATCH (e) WHERE e.${key} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`}
-                                                className="h-6 w-full p-2 bg-secondary flex justify-center items-center rounded text-foreground SofiaSans hover:opacity-80 transition-opacity"
-                                                label={key}
+                                                className="inline text-sm text-foreground/80 hover:text-primary transition-colors"
                                                 onClick={() => runQuery(
                                                     `MATCH (e) WHERE e.${key} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`
                                                 )}
                                                 disabled={isQueryLoading}
+                                                label={index < arr.length - 1 ? `${key}, ` : key}
                                             />
-                                        </li>
-                                    ))
-                                }
-                            </ul>
+                                        ))
+                                    }
+                                </p>
+                            </div>
                         </div>
                     </>
                 ) : (
