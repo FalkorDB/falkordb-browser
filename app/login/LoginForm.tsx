@@ -19,7 +19,7 @@ import { matchUrl, parseUrlString, validateUrl } from "../login/urlUtils";
 const DEFAULT_HOST = "localhost";
 const DEFAULT_PORT = "6379";
 
-type LoginMode = "manual" | "url" | "endpoint";
+type LoginMode = "manual" | "url";
 
 const handlePortIsNumber = (value: string) => !/^\d+$/.test(value);
 
@@ -120,21 +120,6 @@ export default function LoginForm() {
     return `${protocol}://${creds}${h}${port ? `:${port}` : ""}`;
   };
 
-  // Build endpoint display from shared state
-  const endpointValue = `${host}${port ? `:${port}` : ""}`;
-
-  // Parse endpoint string into host and port
-  const parseEndpoint = (value: string) => {
-    const colonIndex = value.lastIndexOf(":");
-
-    if (colonIndex !== -1) {
-      const portCandidate = value.substring(colonIndex + 1);
-      return { host: value.substring(0, colonIndex), port: portCandidate };
-    } else {
-      return { host: value, port: "" };
-    }
-  };
-
   const clearError = () => setError({ message: "", show: false });
 
   const userInputFields: Field[] = [{
@@ -194,29 +179,7 @@ export default function LoginForm() {
 
   const fields: Field[] = loginMode === "url" ?
     urlFields
-    : loginMode === "endpoint" ? [
-      {
-        value: endpointValue,
-        onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
-          const { host, port } = parseEndpoint(e.target.value);
-
-          setHost(host);
-          setPort(port);
-
-          clearError();
-
-          return true;
-        },
-        errors: [
-          ...getPortErrors((value) => parseEndpoint(value).port)
-        ],
-        label: "Endpoint",
-        type: "text",
-        placeholder: `${DEFAULT_HOST}:${DEFAULT_PORT}`,
-        required: true
-      },
-      ...userInputFields
-    ] : [
+    : [
       {
         value: host,
         onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -395,11 +358,6 @@ export default function LoginForm() {
               {/* Label is correctly associated via htmlFor, but eslint doesn't recognize Radix RadioGroupItem */}
               {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
               <label htmlFor="manual" className="text-base font-medium cursor-pointer">Manual Configuration</label>
-            </div>
-            <div className="grow basis-0 flex items-center space-x-2">
-              <RadioGroupItem value="endpoint" id="endpoint" />
-              {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-              <label htmlFor="endpoint" className="text-base font-medium cursor-pointer">Endpoint</label>
             </div>
             <div className="grow basis-0 flex items-center space-x-2">
               <RadioGroupItem value="url" id="url" />
