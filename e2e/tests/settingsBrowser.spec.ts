@@ -18,6 +18,8 @@ test.describe('@browser Browser Settings tests', () => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     let geminiModel: string;
     let xaiModel: string;
+    // Whether model listing actually returned results from the AI providers
+    let modelsAvailable = false;
 
     test.beforeAll(async () => {
         // Fetch available models from each provider before running tests
@@ -31,12 +33,13 @@ test.describe('@browser Browser Settings tests', () => {
             const xaiModels = await tempApiCall.getModelsByProvider('xai');
 
             // Store first model from each provider
-            openaiModel = openaiModels.models[0] || 'gpt-4o-mini';
-            anthropicModel = anthropicModels.models[0] || 'claude-3-5-sonnet';
-            geminiModel = geminiModels.models[0] || 'gemini-2.0-flash-exp';
-            xaiModel = xaiModels.models[0] || 'grok-3-mini';
+            openaiModel = openaiModels.models?.[0] || 'gpt-4o-mini';
+            anthropicModel = anthropicModels.models?.[0] || 'claude-3-5-sonnet';
+            geminiModel = geminiModels.models?.[0] || 'gemini-2.0-flash-exp';
+            xaiModel = xaiModels.models?.[0] || 'grok-3-mini';
 
-            // console.log('Test models:', { openaiModel, anthropicModel, geminiModel });
+            // Models are available if at least one provider returned results
+            modelsAvailable = !!(openaiModels.models?.length || anthropicModels.models?.length || geminiModels.models?.length || xaiModels.models?.length);
         } catch (error) {
             // Fallback to default models if API call fails
             console.warn('Failed to fetch models, using defaults:', error);
@@ -64,6 +67,15 @@ test.describe('@browser Browser Settings tests', () => {
 
         // Wait for models to load
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+
+        // Skip if models are not available (e.g., no AI provider API keys in CI)
+        if (!modelsAvailable) {
+            const isVisible = await settingsBrowserPage.isModelVisible(openaiModel);
+            if (!isVisible) {
+                test.skip();
+                return;
+            }
+        }
 
         // Select a model - use the first available OpenAI model
         await settingsBrowserPage.selectModel(openaiModel);
@@ -94,6 +106,15 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
+        // Skip if models are not available
+        if (!modelsAvailable) {
+            const isVisible = await settingsBrowserPage.isModelVisible(openaiModel);
+            if (!isVisible) {
+                test.skip();
+                return;
+            }
+        }
+
         // Select model and fill API key - use first available OpenAI model
         const testApiKey = "sk-persist-test-key";
         await settingsBrowserPage.selectModel(openaiModel);
@@ -123,6 +144,12 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
+        // Skip if models are not available
+        if (!modelsAvailable && !(await settingsBrowserPage.isModelVisible(openaiModel))) {
+            test.skip();
+            return;
+        }
+
         // Search for "gpt" - should only show OpenAI models
         await settingsBrowserPage.searchModels("gpt");
         await settingsBrowserPage.waitForTimeout(300); // Wait for debounce
@@ -141,6 +168,12 @@ test.describe('@browser Browser Settings tests', () => {
 
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+
+        // Skip if models are not available
+        if (!modelsAvailable && !(await settingsBrowserPage.isModelVisible(anthropicModel))) {
+            test.skip();
+            return;
+        }
 
         // Search for "claude" - should only show Anthropic category
         await settingsBrowserPage.searchModels("claude");
@@ -176,6 +209,12 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
+        // Skip if models are not available
+        if (!modelsAvailable && !(await settingsBrowserPage.isCategoryVisible("OpenAI"))) {
+            test.skip();
+            return;
+        }
+
         // Verify all main categories are visible
         const isOpenAICategoryVisible = await settingsBrowserPage.isCategoryVisible("OpenAI");
         const isAnthropicCategoryVisible = await settingsBrowserPage.isCategoryVisible("Anthropic");
@@ -208,6 +247,12 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
+        // Skip if models are not available
+        if (!modelsAvailable && !(await settingsBrowserPage.isModelVisible(openaiModel))) {
+            test.skip();
+            return;
+        }
+
         // Search for specific model
         await settingsBrowserPage.searchModels("gpt");
 
@@ -231,6 +276,12 @@ test.describe('@browser Browser Settings tests', () => {
 
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+
+        // Skip if models are not available
+        if (!modelsAvailable && !(await settingsBrowserPage.isModelVisible(openaiModel))) {
+            test.skip();
+            return;
+        }
 
         // Select OpenAI model
         await settingsBrowserPage.selectModel(openaiModel);
@@ -260,6 +311,13 @@ test.describe('@browser Browser Settings tests', () => {
 
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+
+        // Skip if models are not available
+        if (!modelsAvailable && !(await settingsBrowserPage.isModelVisible(anthropicModel))) {
+            await apiCall.removeGraph(graphName);
+            test.skip();
+            return;
+        }
 
         // Select Anthropic model
         await settingsBrowserPage.selectModel(anthropicModel);
