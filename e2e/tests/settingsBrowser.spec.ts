@@ -305,60 +305,61 @@ test.describe('@browser Browser Settings tests', () => {
         await apiCall.addGraph(graphName);
         await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
 
-        // Navigate to settings and configure with mismatched model and API key
-        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
-        await browser.setPageToFullScreen();
+        try {
+            // Navigate to settings and configure with mismatched model and API key
+            const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+            await browser.setPageToFullScreen();
 
-        await settingsBrowserPage.expandChatSection();
-        await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+            await settingsBrowserPage.expandChatSection();
+            await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
-        // Skip if models are not available
-        if (!modelsAvailable && !(await settingsBrowserPage.isModelVisible(anthropicModel))) {
+            // Skip if models are not available
+            if (!modelsAvailable && !(await settingsBrowserPage.isModelVisible(anthropicModel))) {
+                test.skip();
+                return;
+            }
+
+            // Select Anthropic model
+            await settingsBrowserPage.selectModel(anthropicModel);
+
+            // Use OpenAI API key (mismatch - starts with sk- but not sk-ant-)
+            const testApiKey = process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY || "sk-test-openai-key-placeholder";
+            await settingsBrowserPage.fillChatApiKey(testApiKey);
+
+            // Save the settings
+            await settingsBrowserPage.clickSaveSettingsButton();
+            await settingsBrowserPage.waitForTimeout(1000);
+
+            // Navigate to graph page using header component
+            const headerComponent = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
+            await headerComponent.clickOnGraphsButton();
+
+            // Create chat component and select the graph
+            const chatComponent = await browser.createNewPage(ChatComponent, urls.graphUrl);
+            await chatComponent.selectGraphByName(graphName);
+
+            // Open chat panel
+            await chatComponent.openChat();
+            await chatComponent.waitForChatPanel();
+
+            // Verify chat input is visible
+            expect(await chatComponent.isChatInputVisible()).toBe(true);
+
+            // Send a question to trigger the model/API key mismatch error
+            await chatComponent.fillChatInput("Who is Alice?");
+            await chatComponent.clickChatSendButton();
+
+            // Verify user message was sent (appears in chat)
+            await chatComponent.waitForChatUserMessage();
+
+            // Verify error toast is displayed due to model/API key mismatch
+            // The error message should be: "Model/API key mismatch: You selected a Anthropic model but provided a OpenAI API key..."
+            const isErrorToastVisible = await chatComponent.getNotificationErrorToast();
+            expect(isErrorToastVisible).toBe(true);
+        } finally {
+            // Clean up - always remove graph even if test fails
             await apiCall.removeGraph(graphName);
-            test.skip();
-            return;
         }
-
-        // Select Anthropic model
-        await settingsBrowserPage.selectModel(anthropicModel);
-
-        // Use OpenAI API key (mismatch - starts with sk- but not sk-ant-)
-        const testApiKey = process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY || "sk-test-openai-key-placeholder";
-        await settingsBrowserPage.fillChatApiKey(testApiKey);
-
-        // Save the settings
-        await settingsBrowserPage.clickSaveSettingsButton();
-        await settingsBrowserPage.waitForTimeout(1000);
-
-        // Navigate to graph page using header component
-        const headerComponent = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
-        await headerComponent.clickOnGraphsButton();
-
-        // Create chat component and select the graph
-        const chatComponent = await browser.createNewPage(ChatComponent, urls.graphUrl);
-        await chatComponent.selectGraphByName(graphName);
-
-        // Open chat panel
-        await chatComponent.openChat();
-        await chatComponent.waitForChatPanel();
-
-        // Verify chat input is visible
-        expect(await chatComponent.isChatInputVisible()).toBe(true);
-
-        // Send a question to trigger the model/API key mismatch error
-        await chatComponent.fillChatInput("Who is Alice?");
-        await chatComponent.clickChatSendButton();
-
-        // Verify user message was sent (appears in chat)
-        await chatComponent.waitForChatUserMessage();
-
-        // Verify error toast is displayed due to model/API key mismatch
-        // The error message should be: "Model/API key mismatch: You selected a Anthropic model but provided a OpenAI API key..."
-        const isErrorToastVisible = await chatComponent.getNotificationErrorToast();
-        expect(isErrorToastVisible).toBe(true);
-
-        // Clean up
-        await apiCall.removeGraph(graphName);
     });
 
     test('@readwrite Verify xAI API key mismatch shows error toast in chat', async () => {
@@ -367,57 +368,58 @@ test.describe('@browser Browser Settings tests', () => {
         await apiCall.addGraph(graphName);
         await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
 
-        // Navigate to settings and configure with mismatched model and API key
-        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
-        await browser.setPageToFullScreen();
+        try {
+            // Navigate to settings and configure with mismatched model and API key
+            const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+            await browser.setPageToFullScreen();
 
-        await settingsBrowserPage.expandChatSection();
-        await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+            await settingsBrowserPage.expandChatSection();
+            await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
-        // Skip if xAI model is not available
-        const isXaiModelVisible = await settingsBrowserPage.isModelVisible(xaiModel);
-        if (!isXaiModelVisible) {
+            // Skip if xAI model is not available
+            const isXaiModelVisible = await settingsBrowserPage.isModelVisible(xaiModel);
+            if (!isXaiModelVisible) {
+                test.skip();
+                return;
+            }
+
+            // Select xAI model
+            await settingsBrowserPage.selectModel(xaiModel);
+
+            // Use OpenAI API key (mismatch with xAI model)
+            const testApiKey = process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY || "sk-test-openai-key-placeholder";
+            await settingsBrowserPage.fillChatApiKey(testApiKey);
+
+            // Save the settings
+            await settingsBrowserPage.clickSaveSettingsButton();
+            await settingsBrowserPage.waitForTimeout(1000);
+
+            // Navigate to graph page using header component
+            const headerComponent = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
+            await headerComponent.clickOnGraphsButton();
+
+            // Create chat component and select the graph
+            const chatComponent = await browser.createNewPage(ChatComponent, urls.graphUrl);
+            await chatComponent.selectGraphByName(graphName);
+
+            // Open chat panel
+            await chatComponent.openChat();
+            await chatComponent.waitForChatPanel();
+
+            // Send a question to trigger the model/API key mismatch error
+            await chatComponent.fillChatInput("Who is Alice?");
+            await chatComponent.clickChatSendButton();
+
+            // Verify user message was sent
+            await chatComponent.waitForChatUserMessage();
+
+            // Verify error toast is displayed due to model/API key mismatch
+            const isErrorToastVisible = await chatComponent.getNotificationErrorToast();
+            expect(isErrorToastVisible).toBe(true);
+        } finally {
+            // Clean up - always remove graph even if test fails
             await apiCall.removeGraph(graphName);
-            test.skip();
-            return;
         }
-
-        // Select xAI model
-        await settingsBrowserPage.selectModel(xaiModel);
-
-        // Use OpenAI API key (mismatch with xAI model)
-        const testApiKey = process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY || "sk-test-openai-key-placeholder";
-        await settingsBrowserPage.fillChatApiKey(testApiKey);
-
-        // Save the settings
-        await settingsBrowserPage.clickSaveSettingsButton();
-        await settingsBrowserPage.waitForTimeout(1000);
-
-        // Navigate to graph page using header component
-        const headerComponent = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
-        await headerComponent.clickOnGraphsButton();
-
-        // Create chat component and select the graph
-        const chatComponent = await browser.createNewPage(ChatComponent, urls.graphUrl);
-        await chatComponent.selectGraphByName(graphName);
-
-        // Open chat panel
-        await chatComponent.openChat();
-        await chatComponent.waitForChatPanel();
-
-        // Send a question to trigger the model/API key mismatch error
-        await chatComponent.fillChatInput("Who is Alice?");
-        await chatComponent.clickChatSendButton();
-
-        // Verify user message was sent
-        await chatComponent.waitForChatUserMessage();
-
-        // Verify error toast is displayed due to model/API key mismatch
-        const isErrorToastVisible = await chatComponent.getNotificationErrorToast();
-        expect(isErrorToastVisible).toBe(true);
-
-        // Clean up
-        await apiCall.removeGraph(graphName);
     });
 
 });
