@@ -87,7 +87,7 @@ jobs:
       - name: Build application
         run: npm run build
       - name: Upload build output
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nextjs-build-${{ github.run_id }}
           path: .next/
@@ -164,7 +164,7 @@ jobs:
             --reporter=dot,list
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-results-shard-${{ matrix.shard }}-${{ github.run_id }}
           path: test-results/
@@ -172,7 +172,7 @@ jobs:
           if-no-files-found: ignore
       - name: Upload HTML report
         if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-report-shard-${{ matrix.shard }}-${{ github.run_id }}
           path: playwright-report/
@@ -180,7 +180,7 @@ jobs:
           if-no-files-found: ignore
       - name: Upload server logs
         if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nextjs-logs-shard-${{ matrix.shard }}-${{ github.run_id }}
           path: nextjs.log
@@ -301,7 +301,7 @@ jobs:
         run: docker stop falkordb-tls || true
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-results-tls-${{ github.run_id }}
           path: test-results/
@@ -309,7 +309,7 @@ jobs:
           if-no-files-found: ignore
       - name: Upload HTML report
         if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-report-tls-${{ github.run_id }}
           path: playwright-report/
@@ -317,7 +317,7 @@ jobs:
           if-no-files-found: ignore
       - name: Upload server logs
         if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nextjs-logs-tls-${{ github.run_id }}
           path: nextjs.log
@@ -438,7 +438,7 @@ jobs:
           done
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-results-cluster-${{ github.run_id }}
           path: test-results/
@@ -446,7 +446,7 @@ jobs:
           if-no-files-found: ignore
       - name: Upload HTML report
         if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-report-cluster-${{ github.run_id }}
           path: playwright-report/
@@ -454,7 +454,7 @@ jobs:
           if-no-files-found: ignore
       - name: Upload server logs
         if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nextjs-logs-cluster-${{ github.run_id }}
           path: nextjs.log
