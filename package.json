@@ -39,7 +39,7 @@
     "@radix-ui/react-toast": "^1.2.6",
     "@radix-ui/react-tooltip": "^1.1.8",
     "@radix-ui/react-visually-hidden": "^1.1.1",
-    "@redis/client": "^5.5.6",
+    "@redis/client": "^5.12.1",
     "@types/d3": "^7.4.3",
     "@types/date-fns": "^2.6.3",
     "@types/node-cache": "^4.2.5",
