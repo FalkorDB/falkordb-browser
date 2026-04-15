@@ -3,7 +3,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EyeIcon, EyeOffIcon, InfoIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -62,6 +62,24 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
     const [show, setShow] = useState<{ [key: string]: boolean }>({});
     const [errors, setErrors] = useState<{ [key: string]: boolean }>({});
     const [isLoading, setIsLoading] = useState(false);
+    const isMountedRef = useRef(false);
+
+    const fieldValues = fields.map(f => f.value).join("\0");
+
+    useEffect(() => {
+        if (!isMountedRef.current) {
+            isMountedRef.current = true;
+            return;
+        }
+
+        const newErrors: { [key: string]: boolean } = {};
+        fields.forEach(field => {
+            if (field.errors) {
+                newErrors[field.label] = field.errors.some(err => err.condition(field.value));
+            }
+        });
+        setErrors(prev => ({ ...prev, ...newErrors }));
+    }, [fieldValues]);
 
     const onHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();

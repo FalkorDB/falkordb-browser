@@ -113,13 +113,4 @@ test.describe(`Login tests`, () => {
         // Format is valid, so format error should NOT appear (credentials error may appear instead)
         expect(await login.isFormatErrorVisible()).toBe(false);
     });
-
-    test(`@admin validate endpoint mode login`, async () => {
-        const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-        if (login.getCurrentURL() === urls.graphUrl) await login.Logout();
-        await browser.setPageToFullScreen();
-        await login.connectWithEndpoint('localhost:6379');
-        await login.waitForSuccessfulLogin(urls.graphUrl);
-        expect(login.getCurrentURL()).toBe(urls.graphUrl);
-    });
 });

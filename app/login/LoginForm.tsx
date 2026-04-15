@@ -1,31 +1,96 @@
 "use client";
 
 import { SignInOptions, SignInResponse, signIn } from "next-auth/react";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useContext, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Check, Info, FileText } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useTheme } from "next-themes";
-import { getTheme } from "@/lib/utils";
+import { getTheme, securedFetch } from "@/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import FormComponent, { Field } from "../components/FormComponent";
 import Dropzone from "../components/ui/Dropzone";
-import { parseUrlString, validateUrl, matchUrl } from "./urlUtils";
+import { IndicatorContext } from "../components/provider";
+import { useToast } from "@/components/ui/use-toast";
+import { matchUrl, parseUrlString, validateUrl } from "../login/urlUtils";
 
 const DEFAULT_HOST = "localhost";
 const DEFAULT_PORT = "6379";
 
-type LoginMode = "manual" | "url" | "endpoint";
+type LoginMode = "manual" | "url";
+
+const handlePortIsNumber = (value: string) => !/^\d+$/.test(value);
+
+const handleIsPortFormat = (value: string) => {
+  const port = Number(value);
+
+  return !(port >= 1 && port <= 65535);
+};
+
+const handleIsPortValid = (value: string) => value.startsWith("0");
+
+const getPortErrors = (func?: (value: string) => string) => {
+  const getValue = (v: string) => func ? func(v) : v;  
+
+  return [
+    {
+      condition: (value: string) => { console.log(getValue(value)); return getValue(value) !== "" && handlePortIsNumber(getValue(value)) },
+      message: "Port must be a number"
+    },
+    {
+      condition: (value: string) => getValue(value) !== "" && !handlePortIsNumber(getValue(value)) && handleIsPortFormat(getValue(value)),
+      message: "Port must be a number between 1 and 65535"
+    },
+    {
+      condition: (value: string) => getValue(value) !== "" && !handlePortIsNumber(getValue(value)) && handleIsPortValid(getValue(value)),
+      message: "Invalid port format (port can't start with 0)"
+    }
+  ]
+}
+
+const safeDecode = (value: string): string => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
+
+// Parse a URL string and update shared state
+const parseUrl = (url: string) => {
+  debugger;
+  const match = matchUrl(url);
+  let parsed: ReturnType<typeof parseUrlString>;
+
+  if (match || !url) {
+    const [, protocol = "", u = "", p = "", h = "", pt = ""] = match || [];
+    parsed = {
+      protocol: protocol,
+      username: safeDecode(u),
+      password: safeDecode(p),
+      host: h,
+      port: pt,
+      tls: protocol === "falkors" || protocol === "rediss",
+    };
+  } else {
+    parsed = parseUrlString(url);
+  }
+
+  return parsed;
+};
 
 export default function LoginForm() {
   const { theme } = useTheme();
   const { currentTheme } = getTheme(theme);
   const router = useRouter();
+  const { toast } = useToast();
+  const { setIndicator } = useContext(IndicatorContext);
 
   const [mounted, setMounted] = useState(false);
   const [loginMode, setLoginMode] = useState<LoginMode>("manual");
+  const [missingFields, setMissingFields] = useState(false);
   const [rawUrl, setRawUrl] = useState("");
   const [host, setHost] = useState("");
   const [port, setPort] = useState("");
@@ -55,44 +120,6 @@ export default function LoginForm() {
     return `${protocol}://${creds}${h}${port ? `:${port}` : ""}`;
   };
 
-  // Parse a URL string and update shared state
-  const parseUrl = (url: string) => {
-    const match = matchUrl(url);
-
-    if (match || !url) {
-      const [, protocol, u, p, h, pt] = match || [];
-      setHost(h || "");
-      setPort(pt || "");
-      setUsername(u ? decodeURIComponent(u) : "");
-      setPassword(p ? decodeURIComponent(p) : "");
-      setTLS(protocol === "falkors" || protocol === "rediss");
-    } else {
-      // Regex didn't match — use manual parser for best-effort
-      const parsed = parseUrlString(url);
-      setHost(parsed.host);
-      setPort(parsed.port);
-      setUsername(parsed.username);
-      setPassword(parsed.password);
-      setTLS(parsed.tls);
-    }
-  };
-
-  // Build endpoint display from shared state
-  const endpointValue = `${host}${port ? `:${port}` : ""}`;
-
-  // Parse endpoint string into host and port
-  const parseEndpoint = (value: string) => {
-    const colonIndex = value.lastIndexOf(":");
-    if (colonIndex > 0) {
-      const portCandidate = value.substring(colonIndex + 1);
-      setHost(value.substring(0, colonIndex));
-      setPort(/^\d+$/.test(portCandidate) ? portCandidate : "");
-    } else {
-      setHost(value);
-      setPort("");
-    }
-  };
-
   const clearError = () => setError({ message: "", show: false });
 
   const userInputFields: Field[] = [{
@@ -100,6 +127,7 @@ export default function LoginForm() {
     onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
       setUsername(e.target.value);
       clearError();
+
       return true;
     },
     label: "Username",
@@ -113,6 +141,7 @@ export default function LoginForm() {
     onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
       setPassword(e.target.value);
       clearError();
+
       return true;
     },
     label: "Password",
@@ -122,40 +151,41 @@ export default function LoginForm() {
     required: false
   }];
 
+  const urlFields: Field[] = !missingFields ? [{
+    value: rawUrl,
+    onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = e.target.value;
+      const parsed = parseUrl(val);
+
+      setHost(parsed.host);
+      setPort(parsed.port);
+      setUsername(parsed.username);
+      setPassword(parsed.password);
+      setTLS(parsed.tls);
+      setRawUrl(val);
+
+      clearError();
+
+      return true;
+    },
+    errors: [
+      ...getPortErrors((value) => parseUrl(value).port)
+    ],
+    label: "FalkorDB URL",
+    type: "text",
+    placeholder: `falkor://Default:Default@${DEFAULT_HOST}:${DEFAULT_PORT}`,
+    required: true
+  }] : userInputFields;
+
   const fields: Field[] = loginMode === "url" ?
-    [{
-      value: rawUrl,
-      onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = e.target.value;
-        setRawUrl(val);
-        parseUrl(val);
-        clearError();
-        return true;
-      },
-      label: "FalkorDB URL",
-      type: "text",
-      placeholder: `falkor://Default:Default@${DEFAULT_HOST}:${DEFAULT_PORT}`,
-      required: true
-    }] : loginMode === "endpoint" ? [
-      {
-        value: endpointValue,
-        onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
-          parseEndpoint(e.target.value);
-          clearError();
-          return true;
-        },
-        label: "Endpoint",
-        type: "text",
-        placeholder: `${DEFAULT_HOST}:${DEFAULT_PORT}`,
-        required: true
-      },
-      ...userInputFields
-    ] : [
+    urlFields
+    : [
       {
         value: host,
         onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
           setHost(e.target.value);
           clearError();
+
           return true;
         },
         label: "Host",
@@ -168,8 +198,10 @@ export default function LoginForm() {
         onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
           setPort(e.target.value);
           clearError();
+
           return true;
         },
+        errors: [...getPortErrors()],
         label: "Port",
         type: "text",
         placeholder: DEFAULT_PORT,
@@ -198,11 +230,31 @@ export default function LoginForm() {
     e.preventDefault();
 
     // Pre-submit validation for URL mode — show colored format errors
-    if (loginMode === "url" && rawUrl.trim()) {
-      const result = validateUrl(rawUrl);
-      const { parts } = result;
+    if (loginMode === "url") {
+      let url = rawUrl || "falkor://localhost:6379";
+      
+      if (missingFields) {
+        url = buildUrl();
+      }
+      
+      const result = await securedFetch("/api/validate-url", {
+        method: "POST",
+        body: JSON.stringify({ url })
+      }, toast, setIndicator);
 
-      if (!result.valid) {
+      if (!result.ok) return;
+
+      const json = await result.json();
+
+      if (json.result) {
+        setMissingFields(true);
+        return;
+      }
+
+      const res = validateUrl(url);
+      const { parts } = res;
+
+      if (!res.valid) {
         const good = (text: string) => <span className="text-green-500 font-semibold">{text}</span>;
         const render = (text: string, status: "good" | "warn" | "neutral") => {
           if (status === "good") return good(text);
@@ -231,11 +283,11 @@ export default function LoginForm() {
         const portNode = render("[:port]", parts.port);
 
         setError({
-          message: (
+          message:
             <span className="text-xs text-destructive">
               Invalid URL format. Expected: {protocolNode}{credsNode}{hostNode}{portNode}
             </span>
-          ),
+          ,
           show: true
         });
         return;
@@ -261,7 +313,7 @@ export default function LoginForm() {
     signIn("credentials", params).then((res?: SignInResponse) => {
       if (res?.error) {
         setError({
-          message: "Invalid credentials",
+          message: <p className="text-xs text-destructive">Invalid credentials please recheck username and password or your connection settings {loginMode === "url" ? <span className="text-green-700">[prefix[s]://][[username][:password]@]host[:port]</span> : null}</p>,
           show: true
         });
       } else {
@@ -274,16 +326,9 @@ export default function LoginForm() {
     const reader = new FileReader();
 
     reader.onload = () => {
-      setError(prev => ({
-        ...prev,
-        show: false
-      }));
+      clearError();
       setCA((reader.result as string).split(',').pop());
       setUploadedFileName(acceptedFiles[0].name);
-      setError(prev => ({
-        ...prev,
-        show: false
-      }));
     };
 
     reader.readAsDataURL(acceptedFiles[0]);
@@ -301,10 +346,11 @@ export default function LoginForm() {
             onValueChange={(value) => {
               const mode = value as LoginMode;
               setLoginMode(mode);
+              setMissingFields(false);
               if (mode === "url") {
                 setRawUrl(buildUrl());
               }
-              setError({ message: "Invalid credentials", show: false });
+              clearError();
             }}
             className="flex items-center justify-center gap-8 p-4 border border-primary rounded-lg w-full"
           >
@@ -313,11 +359,6 @@ export default function LoginForm() {
               {/* Label is correctly associated via htmlFor, but eslint doesn't recognize Radix RadioGroupItem */}
               {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
               <label htmlFor="manual" className="text-base font-medium cursor-pointer">Manual Configuration</label>
-            </div>
-            <div className="grow basis-0 flex items-center space-x-2">
-              <RadioGroupItem value="endpoint" id="endpoint" />
-              {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-              <label htmlFor="endpoint" className="text-base font-medium cursor-pointer">Endpoint</label>
             </div>
             <div className="grow basis-0 flex items-center space-x-2">
               <RadioGroupItem value="url" id="url" />
@@ -341,10 +382,7 @@ export default function LoginForm() {
                     checked={TLS}
                     onCheckedChange={(checked) => {
                       setTLS(checked as boolean);
-                      setError(prev => ({
-                        ...prev,
-                        show: false
-                      }));
+                      clearError();
                       if (!checked) {
                         // Clear certificate when TLS is disabled
                         setCA(undefined);
@@ -391,10 +429,7 @@ export default function LoginForm() {
                           <button
                             type="button"
                             onClick={() => {
-                              setError(prev => ({
-                                ...prev,
-                                show: false
-                              }));
+                              clearError();
                               setCA(undefined);
                               setUploadedFileName("");
                             }}
