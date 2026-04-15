@@ -148,6 +148,8 @@ type GraphContextType = {
   cooldownTicks: number | undefined;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
+  expand: boolean;
+  setExpand: Dispatch<SetStateAction<boolean>>;
 };
 
 type SchemaContextType = {
@@ -351,6 +353,8 @@ export const GraphContext = createContext<GraphContextType>({
   cooldownTicks: undefined,
   isLoading: false,
   setIsLoading: () => { },
+  expand: true,
+  setExpand: () => { },
 });
 
 export const SchemaContext = createContext<SchemaContextType>({

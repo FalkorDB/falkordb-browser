@@ -147,6 +147,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [showUDF, setShowUDF] = useState<boolean>(true);
   const [maxItemsForSearch, setMaxItemsForSearch] = useState<number>(20);
   const [newMaxItemsForSearch, setNewMaxItemsForSearch] = useState<number>(20);
+  const [expandFilter, setExpandFilter] = useState(true);
   const showNavbarAndHeader = pathname !== "/" && pathname !== "/login";
 
   const replayTutorial = useCallback(() => {
@@ -336,7 +337,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     dataHash
   }), [scrollPosition, search, expand, dataHash]);
 
-  const isReadOnly = useMemo(() => 
+  const isReadOnly = useMemo(() =>
     sessionData?.user?.role === "Read-Only" || connectionInfo.sentinelRole === "slave",
     [sessionData?.user?.role, connectionInfo.sentinelRole]
   );
@@ -545,8 +546,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     handleCooldown,
     cooldownTicks,
     isLoading,
-    setIsLoading
-  }), [graph, graphInfo, graphName, graphNames, labels, relationships, nodesCount, edgesCount, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading]);
+    setIsLoading,
+    expand: expandFilter,
+    setExpand: setExpandFilter
+  }), [graph, graphInfo, graphName, graphNames, labels, relationships, nodesCount, edgesCount, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter]);
 
   useEffect(() => {
     setRelationships([...graph.Relationships]);
