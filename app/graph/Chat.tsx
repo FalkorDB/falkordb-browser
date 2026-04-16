@@ -359,7 +359,7 @@ export default function Chat({ onClose }: Props) {
                         messages[messages.length - 1].type === "Status" && messages[messages.length - 1] === message &&
                         <Loader2 className="animate-spin" size={15} />
                     }
-                    <p className="text-sm">{message.content}</p>
+                    <p className="text-smm">{message.content}</p>
                 </>;
 
                 return index !== undefined ? (
@@ -392,14 +392,14 @@ export default function Chat({ onClose }: Props) {
                                 queryCollapse[i] ? (
                                     <ShadTooltip>
                                         <ShadTooltipTrigger asChild>
-                                            <p className="truncate">{message.content}</p>
+                                            <p className="text-sm truncate">{message.content}</p>
                                         </ShadTooltipTrigger>
                                         <ShadTooltipContent>
                                             {message.content}
                                         </ShadTooltipContent>
                                     </ShadTooltip>
                                 ) : (
-                                    <pre className="text-wrap whitespace-pre-wrap break-all">
+                                    <pre className="text-sm text-wrap whitespace-pre-wrap break-all">
                                         {message.content}
                                     </pre>
                                 )
@@ -432,7 +432,7 @@ export default function Chat({ onClose }: Props) {
                 );
             default:
                 return (
-                    <p className="text-wrap whitespace-pre-wrap">{message.content}</p>
+                    <p className="text-sm text-wrap whitespace-pre-wrap">{message.content}</p>
                 );
         }
     };
@@ -449,8 +449,8 @@ export default function Chat({ onClose }: Props) {
                     <X className="h-4 w-4" />
                 </Button>
                 <div className="w-full flex justify-between items-center pr-8">
-                    <h1 className="text-2xl">Chat</h1>
-                    <MessagesSquare size={25} />
+                    <h1 className="text-lg font-semibold">Chat</h1>
+                    <MessagesSquare size={20} className="text-foreground/50" />
                 </div>
                 <span id="chat-prerequisites" className="text-center">Use English to query the graph. The feature requires LLM model and API key. Update local user parameters in Settings.</span>
                 <ul data-testid="chatMessagesList" className="w-full h-1 grow flex flex-col gap-[12px] overflow-x-hidden overflow-y-auto chat-container">
