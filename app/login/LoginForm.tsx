@@ -371,7 +371,7 @@ export default function LoginForm() {
               setLoginMode(mode);
               setMissingFields(false);
               if (mode === "url") {
-                setRawUrl(buildUrl());
+                setRawUrl(buildUrl({}));
               }
               clearError();
             }}

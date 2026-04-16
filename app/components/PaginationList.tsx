@@ -128,7 +128,7 @@ interface Props<T extends Item> {
     isDeleteSelected?: (item: T) => boolean
     onDoubleClick?: (label: string, evt: MouseEvent<HTMLButtonElement>) => void
     onToggleFav?: (item: T, name?: string) => void
-    searchRef: React.RefObject<HTMLInputElement | null>
+    searchRef: React.RefObject<HTMLInputElement>
     isLoading?: boolean
     className?: string
     children?: React.ReactNode
