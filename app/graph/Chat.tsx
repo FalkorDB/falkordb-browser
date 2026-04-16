@@ -4,7 +4,7 @@ import { cn, getTheme, Message } from "@/lib/utils";
 import { useContext, useEffect, useRef, useState, useCallback } from "react";
 import { useTheme } from "next-themes";
 import Image from "next/image";
-import { ChevronDown, ChevronRight, Share2, Copy, Loader2, Play, Search, X, Send, MessagesSquare } from "lucide-react";
+import { ChevronDown, ChevronRight, Share2, Copy, Loader2, Play, Search, X, Send, Sparkles } from "lucide-react";
 import { Tooltip as ShadTooltip, TooltipContent as ShadTooltipContent, TooltipTrigger as ShadTooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
@@ -450,7 +450,7 @@ export default function Chat({ onClose }: Props) {
                 </Button>
                 <div className="w-full flex justify-between items-center pr-8">
                     <h1 className="text-2xl">Chat</h1>
-                    <MessagesSquare size={25} />
+                    <Sparkles size={25} />
                 </div>
                 <span id="chat-prerequisites" className="text-center">Use English to query the graph. The feature requires LLM model and API key. Update local user parameters in Settings.</span>
                 <ul data-testid="chatMessagesList" className="w-full h-1 grow flex flex-col gap-[12px] overflow-x-hidden overflow-y-auto chat-container">

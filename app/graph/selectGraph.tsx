@@ -267,7 +267,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 }}
                 hideClose
                 preventOutsideClose={tutorialOpen}
-                className="flex flex-col border-none rounded-lg max-w-none h-[90dvh] w-[80dvw] p-2"
+                className="flex flex-col border-none rounded-lg max-w-none h-[90dvh] w-[41dvw] p-2"
             >
                 <DialogHeader className="flex-row justify-between items-center border-b border-border pb-4">
                     <DialogTitle className="text-2xl font-medium">Manage Graphs</DialogTitle>
@@ -282,14 +282,14 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     entityName={type}
                     headers={[
                         "Name",
-                        ...(showMemoryUsage ? ["Memory Usage"] : []),
-                        "Nodes #",
-                        "Edges #"
+                        ...(showMemoryUsage ? [{name : "Memory Usage", width: "15%"}] : []),
+                        { name: "Nodes #", width: "15%" },
+                        { name: "Edges #", width: "15%" }
                     ]}
                     rows={rows}
                     setRows={setRows}
                     inputRef={inputRef}
-                    itemHeight={36}
+                    itemHeight={24}
                 >
                     {
                         !isReadOnly &&

@@ -37,7 +37,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     useEffect(() => { setPropertyKeysSearch(""); }, [PropertyKeys, maxItemsForSearch]);
 
     return (
-        <div aria-disabled={nodesCount === undefined || edgesCount === undefined} data-testid="graphInfoPanel" className={cn(`relative h-full w-full p-3 grid grid-rows-[max-content_max-content_max-content_1fr_1fr_1fr] gap-3`)}>
+        <div aria-disabled={nodesCount === undefined || edgesCount === undefined} data-testid="graphInfoPanel" className={cn("relative h-full w-full p-3 grid gap-3 overflow-hidden", showMemoryUsage ? "grid-rows-[max-content_max-content_max-content_1fr_1fr_1fr]" : "grid-rows-[max-content_max-content_1fr_1fr_1fr]")}>
             {
                 !customizingLabel ? (
                     <>
@@ -52,7 +52,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             <h1 className="text-lg font-semibold">Graph Info</h1>
                             <Network size={20} className="text-foreground/50" />
                         </div>
-                        <div className="flex gap-2 items-center">
+                        <div className="w-full flex gap-2 items-center">
                             <SelectGraph
                                 options={graphNames}
                                 setOptions={(opts) => setGraphNames(opts as unknown as string[])}
@@ -85,43 +85,41 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                         </div>
                         {
                             showMemoryUsage &&
-                            <div className="flex flex-col gap-2">
-                                <div className="flex gap-2 items-center">
+                            <div className="w-full flex items-center gap-2">
                                     <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Memory</h2>
                                     {
-                                        MemoryUsage.get("total_graph_sz_mb") !== undefined
+                                        MemoryUsage.get("total_graph_sz_mb") !== undefined || graphName === ""
                                             ? <Tooltip>
                                                 <TooltipTrigger asChild>
-                                                    <p tabIndex={0} role="text" aria-label={`${MemoryUsage.get("total_graph_sz_mb") || "<1"} MB`} className="truncate pointer-events-auto text-sm font-semibold">{MemoryUsage.get("total_graph_sz_mb") || "<1"} MB</p>
+                                                    <p tabIndex={0} role="text" aria-label={graphName === "" ? "0" : `${ MemoryUsage.get("total_graph_sz_mb") || "<1"} MB`} className="truncate pointer-events-auto text-sm font-semibold">{graphName === "" ? "0" : `${MemoryUsage.get("total_graph_sz_mb") || "<1"} MB`}</p>
                                                 </TooltipTrigger>
                                                 <TooltipContent>
-                                                    {MemoryUsage.get("total_graph_sz_mb")} MB
+                                                    {graphName === "" ? "0" : `${MemoryUsage.get("total_graph_sz_mb") || "<1"} MB`}
                                                 </TooltipContent>
                                             </Tooltip>
                                             : <Loader2 className="animate-spin" />
                                     }
-                                </div>
                             </div>
                         }
-                        <div className="flex flex-col gap-3 overflow-hidden">
+                        <div className="flex flex-col gap-3 overflow-hidden min-h-0">
                             <div className="flex gap-2 items-center">
                                 <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Nodes</h2>
                                 {
-                                    nodesCount !== undefined ?
+                                    nodesCount !== undefined || graphName === "" ?
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <p
                                                     data-testid="nodesCount"
                                                     tabIndex={0}
                                                     role="text"
-                                                    aria-label={`${nodesCount.toLocaleString()} nodes`}
+                                                    aria-label={`${nodesCount?.toLocaleString() || 0} nodes`}
                                                     className="truncate pointer-events-auto text-sm font-semibold"
                                                 >
-                                                    {nodesCount.toLocaleString()}
+                                                    {nodesCount?.toLocaleString() || 0}
                                                 </p>
                                             </TooltipTrigger>
                                             <TooltipContent>
-                                                {nodesCount.toLocaleString()}
+                                                {nodesCount?.toLocaleString() || 0}
                                             </TooltipContent>
                                         </Tooltip>
                                         : <Loader2 data-testid="nodesCountLoader" className="animate-spin" />
@@ -191,25 +189,25 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                 })}
                             </ul>
                         </div>
-                        <div className="flex flex-col gap-3 overflow-hidden">
+                        <div className="flex flex-col gap-3 overflow-hidden min-h-0">
                             <div className="flex gap-2 items-center">
                                 <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Edges</h2>
                                 {
-                                    edgesCount !== undefined ?
+                                    edgesCount !== undefined || graphName === "" ?
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <p
                                                     data-testid="edgesCount"
                                                     tabIndex={0}
                                                     role="text"
-                                                    aria-label={`${edgesCount.toLocaleString()} edges`}
+                                                    aria-label={`${edgesCount?.toLocaleString() || 0} edges`}
                                                     className="truncate pointer-events-auto text-sm font-semibold"
                                                 >
-                                                    {edgesCount.toLocaleString()}
+                                                    {edgesCount?.toLocaleString() || 0}
                                                 </p>
                                             </TooltipTrigger>
                                             <TooltipContent>
-                                                {edgesCount.toLocaleString()}
+                                                {edgesCount?.toLocaleString() || 0}
                                             </TooltipContent>
                                         </Tooltip>
                                         :
@@ -255,7 +253,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                 })}
                             </ul>
                         </div>
-                        <div className="flex flex-col gap-3 overflow-hidden">
+                        <div className="flex flex-col gap-3 overflow-hidden min-h-0">
                             <div className="flex gap-2 items-center">
                                 <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Property Keys</h2>
                                 {

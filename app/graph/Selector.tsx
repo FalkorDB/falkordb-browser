@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useContext, Dispatch, SetStateAction, useRef, useCallback, useMemo } from "react";
 import { cn, GraphRef, formatName, Node, Link, getTheme, Query, HistoryQuery } from "@/lib/utils";
-import { ChevronDown, History, Info, Maximize2, MessagesSquare, Network, Star, Trash2 } from "lucide-react";
+import { ChevronDown, History, Info, Maximize2, Sparkles, Network, Star, Trash2 } from "lucide-react";
 import * as monaco from "monaco-editor";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -396,8 +396,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                     setGraph={setGraph}
                 />
             }
-            {
-                historyQuery && graphName &&
+                
                 <Button
                     indicator={indicator}
                     className={cn(
@@ -410,7 +409,6 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                 >
                     <Network size={20} />
                 </Button>
-            }
             {
                 historyQuery ?
                     <>
@@ -750,7 +748,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                     setPanel(prev => prev === "chat" ? undefined : "chat");
                                 }}
                             >
-                                <MessagesSquare size={20} />
+                                <Sparkles size={20} />
                             </Button>
                     </>
                     : selectedElements && handleDeleteElement && setSelectedElements && setIsAddNode && setIsAddEdge && canvasRef && isCanvasLoading !== undefined && <div className="w-full h-full">

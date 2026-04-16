@@ -60,7 +60,6 @@ const safeDecode = (value: string): string => {
 
 // Parse a URL string and update shared state
 const parseUrl = (url: string) => {
-  debugger;
   const match = matchUrl(url);
   let parsed: ReturnType<typeof parseUrlString>;
 
