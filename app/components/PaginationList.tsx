@@ -127,7 +127,7 @@ interface Props<T extends Item> {
     isSelected: (item: T) => boolean
     isDeleteSelected?: (item: T) => boolean
     onToggleFav?: (item: T, name?: string) => void
-    searchRef: React.RefObject<HTMLInputElement | null>
+    searchRef: React.RefObject<HTMLInputElement>
     isLoading?: boolean
     className?: string
     children?: React.ReactNode

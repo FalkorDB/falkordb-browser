@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 
 interface TableProps extends React.HTMLAttributes<HTMLTableElement> {
   parentClassName?: string
-  parentRef?: React.RefObject<HTMLDivElement | null>
+  parentRef?: React.RefObject<HTMLDivElement>
   parentOnScroll?: (e: React.UIEvent<HTMLTableElement>) => void
 }
 
