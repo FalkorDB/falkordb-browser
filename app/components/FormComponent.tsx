@@ -111,7 +111,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                 fields.map((field) => {
                     const passwordType = show[field.label] ? "text" : "password";
                     return (
-                        <div className="flex flex-col gap-2" key={field.label}>
+                        <div className="flex flex-col gap-1" key={field.label}>
                             <div className={cn(field.info && "flex gap-2 items-center")}>
                                 <label className={cn(errors[field.label] && "text-destructive")} htmlFor={field.label}>{field.required && <span>*</span>} {field.label}</label>
                                 {
@@ -126,7 +126,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                     </Tooltip>
                                 }
                             </div>
-                            <div className="relative flex flex-col gap-2">
+                            <div className="relative flex flex-col gap-1">
                                 {
                                     field.type === "password" &&
                                     <Button
@@ -180,19 +180,22 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                             }} />
                                 }
                                 <p className="text-sm text-gray-500">{field.description}</p>
-                                <div className="h-5">
-                                    {
-                                        field.errors && errors[field.label] &&
-                                        <p className="text-sm text-destructive">{field.errors.find((err) => err.condition(field.value))?.message}</p>
-                                    }
-                                </div>
+                                {
+                                    field.errors &&
+                                    <div className="h-5">
+                                        {
+                                            errors[field.label] &&
+                                            <p className="text-sm text-destructive">{field.errors.find((err) => err.condition(field.value))?.message}</p>
+                                        }
+                                    </div>
+                                }
                             </div>
                         </div>
                     );
                 })
             }
             {children}
-            <div className="min-h-5">
+            <div className="min-h-8">
                 {error?.show && (typeof error.message === "string" ? <p className="text-sm text-destructive">{error.message}</p> : error?.message)}
             </div>
             <div className="flex justify-end gap-2">
