@@ -398,7 +398,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                 />
             }
             {
-                historyQuery && graphName &&
+                historyQuery &&
                 <Button
                     indicator={indicator}
                     className={cn(

@@ -368,7 +368,7 @@ export default function LoginForm() {
               setLoginMode(mode);
               setMissingFields(false);
               if (mode === "url") {
-                setRawUrl(buildUrl({}));
+                setRawUrl(buildUrl({ host, port, username, password, TLS }));
               }
               clearError();
             }}
@@ -402,7 +402,7 @@ export default function LoginForm() {
                     checked={TLS}
                     onCheckedChange={(checked) => {
                       setTLS(checked as boolean);
-                      setRawUrl(buildUrl({ TLS: checked as boolean }));
+                      setRawUrl(buildUrl({ host, port, username, password, TLS: checked as boolean }));
                       clearError();
                       if (!checked) {
                         // Clear certificate when TLS is disabled
