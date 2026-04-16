@@ -419,14 +419,14 @@ export default function CreateElementPanel(props: Props) {
             </Button>
             <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between pr-5">
-                    <h1 className="text-2xl">Create {type ? "Node" : "Edge"}</h1>
+                    <h1 className="text-lg font-semibold">Create {type ? "Node" : "Edge"}</h1>
                     {
                         type
-                            ? <Circle className="text-brandGreen" size={25} />
-                            : <ArrowRight className="text-brandGreen" size={25} />
+                            ? <Circle className="text-foreground/50" size={20} />
+                            : <ArrowRight className="text-foreground/50" size={20} />
                     }
                 </div>
-                <div className="flex flex-col gap-2 font-medium text-xl text-nowrap">
+                <div className="flex flex-col gap-2 font-medium text-sm text-nowrap">
                     <p>Attributes: <span className="Gradient text-transparent bg-clip-text">{attributes.length}</span></p>
                 </div>
                 <ul
