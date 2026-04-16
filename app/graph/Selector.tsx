@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTheme } from "next-themes";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Button from "../components/ui/Button";
-import { BrowserSettingsContext, GraphContext, IndicatorContext, PanelContext } from "../components/provider";
+import { BrowserSettingsContext, GraphContext, IndicatorContext, ConnectionContext, PanelContext } from "../components/provider";
 import { setConnectionItem, removeConnectionItem } from "@/lib/connection-storage";
 import CypherEditor, { CYPHER_LANGUAGE_NAME } from "../components/CypherEditor";
 import EditorComponent from "../components/EditorComponent";

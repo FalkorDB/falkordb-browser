@@ -1,5 +1,5 @@
 import { Dispatch, SetStateAction, useContext, useEffect, useState } from "react";
-import { Loader2, X, Palette, Play, PlusCircle, Network, Search } from "lucide-react";
+import { Loader2, X, Palette, Play, Plus, Network, Search } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger, PopoverClose } from "@/components/ui/popover";
 import { cn, formatName, InfoLabel } from "@/lib/utils";
@@ -74,10 +74,10 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                         <Button
                                             data-testid="createGraph"
                                             variant="Primary"
-                                            className="hover:!bg-primary/70"
+                                            className="hover:!bg-primary/70 p-1"
                                             title="Create New Graph"
                                         >
-                                            <PlusCircle size={20} />
+                                            <Plus size={20} />
                                         </Button>
                                     }
                                 />
