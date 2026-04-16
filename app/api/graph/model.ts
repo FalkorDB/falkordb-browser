@@ -699,7 +699,7 @@ export class Graph {
           this.extendEdge(edge, collapsed, isSchema)
         )
       );
-      return [...nodes, ...edges] as (Node | Link)[];
+      return [...nodes, ...edges].filter((el): el is Node | Link => el !== undefined);
     }
 
     if (cell.relationshipType) {
