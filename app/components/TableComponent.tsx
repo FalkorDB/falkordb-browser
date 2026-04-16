@@ -532,7 +532,7 @@ export default function TableComponent({
                                         i + 1 !== headerNames.length && "border-r",
                                         "border-border",
                                     )}
-                                    key={header.name}
+                                    key={`${header.name}-${i}`}
                                 >
                                     <div className="flex gap-2 justify-between items-center">
                                         <p className={!isObjectType ? "w-full text-center" : ""}>{header.name}</p>

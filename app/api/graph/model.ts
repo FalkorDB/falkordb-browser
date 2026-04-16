@@ -695,7 +695,7 @@ export class Graph {
         )
       );
       const edges = await Promise.all(
-        cell.edges.map((edge: any) =>
+        (cell.edges ?? []).map((edge: any) =>
           this.extendEdge(edge, collapsed, isSchema)
         )
       );
