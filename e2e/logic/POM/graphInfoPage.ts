@@ -102,11 +102,20 @@ export default class GraphInfoPage extends GraphPage {
     await this.waitForCanvasAnimationToEnd();
   }
 
+  private runLabelButton(label: string): Locator {
+    return this.page.getByTestId(`runLabel${label}`);
+  }
+
   async clickGraphInfoNodeButton(label: string): Promise<void> {
     await interactWhenVisible(
       this.graphInfoNodeButton(label),
       (el) => el.click(),
       `Graph Info Node Button ${label}`
+    );
+    await interactWhenVisible(
+      this.runLabelButton(label),
+      (el) => el.click(),
+      `Run Label Button ${label}`
     );
     await this.waitForCanvasAnimationToEnd();
   }

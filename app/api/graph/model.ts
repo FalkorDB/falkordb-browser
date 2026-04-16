@@ -687,16 +687,19 @@ export class Graph {
     return undefined;
   }
 
-  public extendCell(cell: any, collapsed: boolean, isSchema: boolean) {
+  public async extendCell(cell: any, collapsed: boolean, isSchema: boolean) {
     if (cell.nodes) {
-      return [
-        ...cell.nodes.map((node: any) =>
+      const nodes = await Promise.all(
+        cell.nodes.map((node: any) =>
           this.extendNode(node, collapsed, isSchema)
-        ),
-        ...cell.edges.map((edge: any) =>
+        )
+      );
+      const edges = await Promise.all(
+        cell.edges.map((edge: any) =>
           this.extendEdge(edge, collapsed, isSchema)
-        ),
-      ] as (Node | Link)[];
+        )
+      );
+      return [...nodes, ...edges] as (Node | Link)[];
     }
 
     if (cell.relationshipType) {

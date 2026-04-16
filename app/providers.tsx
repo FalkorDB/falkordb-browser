@@ -307,10 +307,24 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setIndicator,
   }), [indicator]);
 
+  const onExpand = useCallback(() => {
+    const currentPanel = panelRef.current;
+
+    if (!currentPanel) return;
+
+    if (currentPanel.isCollapsed()) {
+      currentPanel.expand();
+    } else {
+      currentPanel.collapse();
+    }
+  }, []);
+
   const panelContext = useMemo(() => ({
     panel,
     setPanel,
-  }), [panel]);
+    panelOpen: !isCollapsed,
+    onTogglePanel: onExpand,
+  }), [panel, isCollapsed, onExpand]);
 
   const queryLoadingContext = useMemo(() => ({
     isQueryLoading,
@@ -801,18 +815,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     handleFetchOptions();
   }, [handleFetchOptions, status]);
 
-  const onExpand = () => {
-    const currentPanel = panelRef.current;
-
-    if (!currentPanel) return;
-
-    if (currentPanel.isCollapsed()) {
-      currentPanel.expand();
-    } else {
-      currentPanel.collapse();
-    }
-  };
-
   const handleCloseTutorial = () => {
     setTutorialOpen(false);
   };
@@ -952,12 +954,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                                 {
                                   showNavbarAndHeader &&
                                   <Navbar
-                                    graphName={graphName}
-                                    graphNames={pathname.includes("/schema") ? schemaNames : graphNames}
-                                    onSetGraphName={handleOnSetGraphName}
                                     showUDF={showUDF}
-                                    onOpenPanel={onExpand}
-                                    panelOpen={!isCollapsed}
                                   />
                                 }
                                 <ResizablePanelGroup orientation="horizontal" className="w-1 grow">
