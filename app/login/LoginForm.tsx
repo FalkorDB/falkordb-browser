@@ -36,7 +36,7 @@ const getPortErrors = (func?: (value: string) => string) => {
 
   return [
     {
-      condition: (value: string) => { console.log(getValue(value)); return getValue(value) !== "" && handlePortIsNumber(getValue(value)) },
+      condition: (value: string) => getValue(value) !== "" && handlePortIsNumber(getValue(value)),
       message: "Port must be a number"
     },
     {
@@ -60,7 +60,6 @@ const safeDecode = (value: string): string => {
 
 // Parse a URL string and update shared state
 const parseUrl = (url: string) => {
-  debugger;
   const match = matchUrl(url);
   let parsed: ReturnType<typeof parseUrlString>;
 
@@ -126,7 +125,7 @@ export default function LoginForm() {
     value: username,
     onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
       setUsername(e.target.value);
-      setRawUrl(buildUrl({ username: e.target.value }));
+      setRawUrl(buildUrl({ host, port, username: e.target.value, password, TLS }));
       clearError();
       
       return true;
@@ -141,7 +140,7 @@ export default function LoginForm() {
     value: password,
     onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
       setPassword(e.target.value);
-      setRawUrl(buildUrl({ password: e.target.value }));
+      setRawUrl(buildUrl({ host, port, username, password: e.target.value, TLS }));
       clearError();
       
       return true;
@@ -186,7 +185,7 @@ export default function LoginForm() {
         value: host,
         onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
           setHost(e.target.value);
-          setRawUrl(buildUrl({ host: e.target.value }));
+          setRawUrl(buildUrl({ host: e.target.value, port, username, password, TLS }));
           clearError();
           
           return true;
@@ -199,7 +198,7 @@ export default function LoginForm() {
       {
         value: port,
         onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
-          setRawUrl(buildUrl({ port: e.target.value }));
+          setRawUrl(buildUrl({ host, port: e.target.value, username, password, TLS }));
           setPort(e.target.value);
           clearError();
           
@@ -266,8 +265,6 @@ export default function LoginForm() {
       if (!result.ok) return;
 
       const json = await result.json();
-
-      debugger;
 
       if (json.result) {
         setMissingFields(true);

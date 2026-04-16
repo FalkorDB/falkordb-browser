@@ -564,7 +564,9 @@ ${graph.ShowPropertyKeyPrefix !== showPropertyKeyPrefix ? "Rerun the query to ap
                                                 setTab("text");
                                                 try {
                                                     setIsLoading(true);
-                                                    await runQuery!(counter.trim());
+                                                    if (counter.trim()) {
+                                                        await runQuery!(counter.trim());
+                                                    }
                                                     setQueriesOpen(false);
                                                 } finally {
                                                     setIsLoading(false);

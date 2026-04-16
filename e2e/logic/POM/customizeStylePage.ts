@@ -69,6 +69,7 @@ export default class CustomizeStylePage extends GraphInfoPage {
     const visible = await waitForElementToBeVisible(this.customizeStyleButton(label));
     // Close the popover by pressing Escape
     await this.page.keyboard.press("Escape");
+    await waitForElementToNotBeVisible(this.customizeStyleButton(label));
     return visible;
   }
 

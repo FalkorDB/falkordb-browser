@@ -112,6 +112,7 @@ export default class GraphInfoPage extends GraphPage {
       (el) => el.click(),
       `Graph Info Node Button ${label}`
     );
+    await waitForElementToBeVisible(this.runLabelButton(label));
     await interactWhenVisible(
       this.runLabelButton(label),
       (el) => el.click(),
