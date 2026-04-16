@@ -2,29 +2,21 @@
 
 'use client';
 
-import { ArrowUpRight, Network, FileCode, LogOut, MessagesSquare, Monitor, Moon, Plus, Sun, Settings, FunctionSquare, GitGraph } from "lucide-react";
-import { useCallback, useContext, useState, useEffect } from "react";
+import { ArrowUpRight, FileCode, LogOut, Monitor, Moon, Sun, Settings, FunctionSquare, GitGraph } from "lucide-react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
-import { cn, getTheme, Panel } from "@/lib/utils";
+import { cn, getTheme } from "@/lib/utils";
 import { useRouter, usePathname } from "next/navigation";
-import { signOut, useSession } from "next-auth/react";
+import { signOut } from "next-auth/react";
 import pkg from '@/package.json';
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import Button from "./ui/Button";
-import CreateGraph from "./CreateGraph";
-import { ConnectionContext, IndicatorContext, PanelContext } from "./provider";
 
 interface Props {
-    onSetGraphName: (newGraphName: string) => void
-    graphNames: string[]
-    graphName: string
-    onOpenPanel: () => void
-    panelOpen: boolean
     showUDF: boolean
 }
 
@@ -38,35 +30,25 @@ function getPathType(pathname: string): "Schema" | "Graph" | "Settings" | "UDF" 
 
 const iconSize = 30;
 
-export default function Navbar({ onSetGraphName, graphNames, graphName, onOpenPanel, panelOpen, showUDF }: Props) {
-
-    const { indicator } = useContext(IndicatorContext);
-    const { setPanel, panel } = useContext(PanelContext);
-    const { isReadOnly } = useContext(ConnectionContext);
+export default function Navbar({ showUDF }: Props) {
 
     const { theme, setTheme } = useTheme();
     const { currentTheme } = getTheme(theme);
-    const { data: session } = useSession();
     const pathname = usePathname();
     const router = useRouter();
 
     const [mounted, setMounted] = useState(false);
 
     const type = getPathType(pathname);
-    const showCreate = type && type !== "Settings" && type !== "UDF" && session?.user.role && !isReadOnly;
 
     useEffect(() => {
         setMounted(true);
     }, []);
 
-    const handleSetCurrentPanel = useCallback((newPanel: Panel) => {
-        setPanel(prev => prev === newPanel ? undefined : newPanel);
-    }, [setPanel]);
-
     const separator = <div className="h-px w-[80%] bg-border/50 rounded-full" />;
 
     return (
-        <div className="py-5 px-4 flex flex-col justify-between items-center border-r border-border/50">
+        <div className="py-5 p-2 flex flex-col justify-between items-center border-r border-border/50">
             <div className="w-full flex flex-col gap-3 items-center">
                 {
                     mounted && currentTheme &&
@@ -116,60 +98,6 @@ export default function Navbar({ onSetGraphName, graphNames, graphName, onOpenPa
                     >
                         <GitGraph size={iconSize} />
                     </Button>
-                </div>
-                {separator}
-                <div className="flex flex-col items-center gap-1">
-                    {
-                        type === "Graph" && graphName &&
-                        <Button
-                            indicator={indicator}
-                            className={cn(
-                                "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
-                                panelOpen && "!text-primary"
-                            )}
-                            title="Graph info"
-                            onClick={() => onOpenPanel()}
-                            data-testid="graphInfoToggle"
-                        >
-                            <Network size={iconSize - 10} />
-                        </Button>
-                    }
-                    {
-                        type === "Graph" && graphName &&
-                        <Button
-                            data-testid="chatToggleButton"
-                            className={cn(
-                                "text-foreground font-semibold text-xl p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
-                                panel === "chat" && "!text-primary"
-                            )}
-                            indicator={indicator}
-                            title="Chat"
-                            onClick={() => {
-                                handleSetCurrentPanel("chat");
-                            }}
-                        >
-                            <MessagesSquare size={iconSize - 10} />
-                        </Button>
-                    }
-                    {
-                        showCreate &&
-                        <CreateGraph
-                            label="Header"
-                            onSetGraphName={onSetGraphName}
-                            type={type}
-                            graphNames={graphNames}
-                            trigger={
-                                <Button
-                                    data-testid={`create${type}`}
-                                    variant="Primary"
-                                    className="hover:!bg-primary/70 p-1"
-                                    title={`Create New ${type}`}
-                                >
-                                    <Plus size={iconSize - 10} />
-                                </Button>
-                            }
-                        />
-                    }
                 </div>
             </div>
             <div className="w-full flex flex-col gap-2 items-center">

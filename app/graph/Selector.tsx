@@ -4,14 +4,14 @@
 
 import { useEffect, useState, useContext, Dispatch, SetStateAction, useRef, useCallback, useMemo } from "react";
 import { cn, GraphRef, formatName, Node, Link, getTheme, Query, HistoryQuery } from "@/lib/utils";
-import { ChevronDown, History, Info, Maximize2, Star, Trash2 } from "lucide-react";
+import { ChevronDown, History, Info, Maximize2, MessagesSquare, Network, Star, Trash2 } from "lucide-react";
 import * as monaco from "monaco-editor";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTheme } from "next-themes";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Button from "../components/ui/Button";
-import { BrowserSettingsContext, GraphContext, IndicatorContext } from "../components/provider";
+import { BrowserSettingsContext, GraphContext, IndicatorContext, PanelContext } from "../components/provider";
 import { setConnectionItem, removeConnectionItem } from "@/lib/connection-storage";
 import CypherEditor, { CYPHER_LANGUAGE_NAME } from "../components/CypherEditor";
 import EditorComponent from "../components/EditorComponent";
@@ -102,6 +102,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     const { indicator } = useContext(IndicatorContext);
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { graphNames } = useContext(GraphContext);
+    const { panel, setPanel, panelOpen, onTogglePanel } = useContext(PanelContext);
 
     const { theme } = useTheme();
     const { secondary } = getTheme(theme);
@@ -384,14 +385,32 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
 
     return (
         <div className="z-20 w-full h-[44px] flex flex-row gap-3 items-center">
-            <SelectGraph
-                options={options}
-                setOptions={setOptions}
-                selectedValue={graphName}
-                setSelectedValue={handleOnChange}
-                type={type}
-                setGraph={setGraph}
-            />
+            {
+                type === "Schema" &&
+                <SelectGraph
+                    options={options}
+                    setOptions={setOptions}
+                    selectedValue={graphName}
+                    setSelectedValue={handleOnChange}
+                    type={type}
+                    setGraph={setGraph}
+                />
+            }
+            {
+                historyQuery && graphName &&
+                <Button
+                    indicator={indicator}
+                    className={cn(
+                        "h-full text-foreground p-2 rounded-lg border border-border bg-background hover:bg-secondary",
+                        panelOpen && "!text-primary"
+                    )}
+                    title="Graph info"
+                    onClick={() => onTogglePanel()}
+                    data-testid="graphInfoToggle"
+                >
+                    <Network size={20} />
+                </Button>
+            }
             {
                 historyQuery ?
                     <>
@@ -719,6 +738,20 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                 <Maximize2 size={20} />
                             </Button>
                         </div>
+                        <Button
+                                data-testid="chatToggleButton"
+                                className={cn(
+                                    "text-foreground border border-border rounded-lg p-2 hover:bg-secondary",
+                                    panel === "chat" && "!text-primary"
+                                )}
+                                indicator={indicator}
+                                title="Chat"
+                                onClick={() => {
+                                    setPanel(prev => prev === "chat" ? undefined : "chat");
+                                }}
+                            >
+                                <MessagesSquare size={20} />
+                            </Button>
                     </>
                     : selectedElements && handleDeleteElement && setSelectedElements && setIsAddNode && setIsAddEdge && canvasRef && isCanvasLoading !== undefined && <div className="w-full h-full">
                         <Toolbar
