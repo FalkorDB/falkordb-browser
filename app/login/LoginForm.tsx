@@ -110,7 +110,7 @@ export default function LoginForm() {
   const searchParams = useSearchParams();
 
   // Build a display URL from the shared state
-  const buildUrl = () => {
+  const buildUrl = ({ host, port, username, password, TLS }: { host?: string, port?: string, username?: string, password?: string, TLS?: boolean }) => {
     if (!host && !port && !username && !password) return "";
     const h = host || DEFAULT_HOST;
     const protocol = TLS ? "falkors" : "falkor";
@@ -126,8 +126,9 @@ export default function LoginForm() {
     value: username,
     onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
       setUsername(e.target.value);
+      setRawUrl(buildUrl({ username: e.target.value }));
       clearError();
-
+      
       return true;
     },
     label: "Username",
@@ -140,8 +141,9 @@ export default function LoginForm() {
     value: password,
     onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
       setPassword(e.target.value);
+      setRawUrl(buildUrl({ password: e.target.value }));
       clearError();
-
+      
       return true;
     },
     label: "Password",
@@ -156,16 +158,16 @@ export default function LoginForm() {
     onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value;
       const parsed = parseUrl(val);
-
+      
       setHost(parsed.host);
       setPort(parsed.port);
       setUsername(parsed.username);
       setPassword(parsed.password);
       setTLS(parsed.tls);
       setRawUrl(val);
-
+      
       clearError();
-
+      
       return true;
     },
     errors: [
@@ -176,16 +178,17 @@ export default function LoginForm() {
     placeholder: `falkor://Default:Default@${DEFAULT_HOST}:${DEFAULT_PORT}`,
     required: true
   }] : userInputFields;
-
+  
   const fields: Field[] = loginMode === "url" ?
-    urlFields
-    : [
+  urlFields
+  : [
       {
         value: host,
         onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
           setHost(e.target.value);
+          setRawUrl(buildUrl({ host: e.target.value }));
           clearError();
-
+          
           return true;
         },
         label: "Host",
@@ -196,9 +199,10 @@ export default function LoginForm() {
       {
         value: port,
         onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
+          setRawUrl(buildUrl({ port: e.target.value }));
           setPort(e.target.value);
           clearError();
-
+          
           return true;
         },
         errors: [...getPortErrors()],
@@ -231,12 +235,29 @@ export default function LoginForm() {
 
     // Pre-submit validation for URL mode — show colored format errors
     if (loginMode === "url") {
-      let url = rawUrl || "falkor://localhost:6379";
-      
-      if (missingFields) {
-        url = buildUrl();
+      // Fill in missing parts with defaults (protocol, host, port)
+      const parsed = parseUrlString(rawUrl);
+      const proto = parsed.protocol || "falkor";
+      const h = parsed.host || DEFAULT_HOST;
+      const p = parsed.port || DEFAULT_PORT;
+      const creds = parsed.username || parsed.password
+        ? `${encodeURIComponent(parsed.username)}${parsed.password ? `:${encodeURIComponent(parsed.password)}` : ""}@`
+        : "";
+      const url = `${proto}://${creds}${h}:${p}`;
+
+      setRawUrl(url);
+      setPort(p);
+      setHost(h);
+
+      if (parsed.username) {
+        setUsername(parsed.username);
       }
-      
+
+      if (parsed.password) {
+        setPassword(parsed.password);
+      }
+
+
       const result = await securedFetch("/api/validate-url", {
         method: "POST",
         body: JSON.stringify({ url })
@@ -245,6 +266,8 @@ export default function LoginForm() {
       if (!result.ok) return;
 
       const json = await result.json();
+
+      debugger;
 
       if (json.result) {
         setMissingFields(true);
@@ -382,6 +405,7 @@ export default function LoginForm() {
                     checked={TLS}
                     onCheckedChange={(checked) => {
                       setTLS(checked as boolean);
+                      setRawUrl(buildUrl({ TLS: checked as boolean }));
                       clearError();
                       if (!checked) {
                         // Clear certificate when TLS is disabled

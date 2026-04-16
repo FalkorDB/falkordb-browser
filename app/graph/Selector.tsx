@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTheme } from "next-themes";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Button from "../components/ui/Button";
-import { BrowserSettingsContext, GraphContext, IndicatorContext } from "../components/provider";
+import { BrowserSettingsContext, ConnectionContext, GraphContext, IndicatorContext } from "../components/provider";
 import { setConnectionItem, removeConnectionItem } from "@/lib/connection-storage";
 import CypherEditor, { CYPHER_LANGUAGE_NAME } from "../components/CypherEditor";
 import EditorComponent from "../components/EditorComponent";
@@ -100,7 +100,8 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
 }: Props<T>) {
 
     const { indicator } = useContext(IndicatorContext);
-    const { tutorialOpen } = useContext(BrowserSettingsContext);
+    const { tutorialOpen, settings: { limitSettings: { limit, lastLimit }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
+    const { isReadOnly } = useContext(ConnectionContext);
     const { graphNames } = useContext(GraphContext);
 
     const { theme } = useTheme();
@@ -454,6 +455,35 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                             >
                                 <Info />
                             </Button>
+                            {
+                                graphName && !isReadOnly &&
+                                <Button
+                                    data-testid="selectorCanvasInfo"
+                                    className="cursor-default"
+                                    title={`Select And Show Properties (Right Click)
+                                        Select Multiple Entities (Right Click + Left Ctrl)
+                                        Select 2 Nodes to Create Edge`}
+                                >
+                                    <Info size={16} className="text-primary" />
+                                </Button>
+                            }
+                            {
+                                (() => {
+                                    const hasLimitWarning = graph.CurrentLimit && graph.Data.length >= graph.CurrentLimit;
+                                    const hasLimitChangeWarning = graph.CurrentLimit && lastLimit !== limit;
+                                    return (hasLimitWarning || hasLimitChangeWarning) ? (
+                                        <Button
+                                            data-testid="selectorLimitWarning"
+                                            className="cursor-default"
+                                            title={`${hasLimitWarning ? `Data currently limited to ${graph.Data.length} rows` : ""}
+${hasLimitChangeWarning ? "Rerun the query to apply the new limit." : ""}
+${graph.ShowPropertyKeyPrefix !== showPropertyKeyPrefix ? "Rerun the query to apply the new property key prefix settings." : ""}`}
+                                        >
+                                            <Info size={16} className="text-orange-300" />
+                                        </Button>
+                                    ) : null;
+                                })()
+                            }
                             {separator}
                             <div className="flex gap-4 items-center">
                                 <DialogComponent
@@ -503,6 +533,22 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                         ...prev,
                                                         counter: index + 1 === historyQuery.counter ? 0 : index + 1
                                                     }));
+                                                    setTab("text");
+                                                }
+                                            }}
+                                            onDoubleClick={async (counter) => {
+                                                const index = historyQuery.queries.findIndex(q => q.text === counter);
+                                                setHistoryQuery(prev => ({
+                                                    ...prev,
+                                                    counter: index + 1
+                                                }));
+                                                setTab("text");
+                                                try {
+                                                    setIsLoading(true);
+                                                    await runQuery!(counter.trim());
+                                                    setQueriesOpen(false);
+                                                } finally {
+                                                    setIsLoading(false);
                                                 }
                                             }}
                                             searchRef={searchQueryRef}
