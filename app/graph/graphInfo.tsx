@@ -2,7 +2,7 @@ import { Dispatch, SetStateAction, useContext, useEffect, useState } from "react
 import { Loader2, X, Palette, Play, PlusCircle, Network, Search } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger, PopoverClose } from "@/components/ui/popover";
-import { cn, formatName, InfoLabel } from "@/lib/utils";
+import { formatName, InfoLabel } from "@/lib/utils";
 import Button from "../components/ui/Button";
 import { BrowserSettingsContext, ConnectionContext, GraphContext, QueryLoadingContext } from "../components/provider";
 import CustomizeStylePanel from "./CustomizeStylePanel";
@@ -37,7 +37,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     useEffect(() => { setPropertyKeysSearch(""); }, [PropertyKeys, maxItemsForSearch]);
 
     return (
-        <div aria-disabled={nodesCount === undefined || edgesCount === undefined} data-testid="graphInfoPanel" className={cn(`relative h-full w-full p-3 grid grid-rows-[max-content_max-content_max-content_1fr_1fr_1fr] gap-3`)}>
+        <div data-testid="graphInfoPanel" className="relative h-full w-full p-3 grid grid-rows-[max-content_max-content_max-content_1fr_1fr_1fr] gap-3">
             {
                 !customizingLabel ? (
                     <>
