@@ -174,6 +174,8 @@ type IndicatorContextType = {
 type PanelContextType = {
   panel: Panel;
   setPanel: Dispatch<SetStateAction<Panel>>;
+  panelOpen: boolean;
+  onTogglePanel: () => void;
 };
 
 type QueryLoadingContextType = {
@@ -394,6 +396,8 @@ export const IndicatorContext = createContext<IndicatorContextType>({
 export const PanelContext = createContext<PanelContextType>({
   panel: undefined,
   setPanel: () => { },
+  panelOpen: false,
+  onTogglePanel: () => { },
 });
 
 export const QueryLoadingContext = createContext<QueryLoadingContextType>({

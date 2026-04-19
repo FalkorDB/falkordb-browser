@@ -723,7 +723,7 @@ export default function TableComponent({
                                                                                 : cell.type === "text" &&
                                                                                 <Input
                                                                                     data-testid={`input${label}`}
-                                                                                    ref={inputRef}
+                                                                                    ref={inputRef as React.RefObject<HTMLInputElement>}
                                                                                     className="grow"
                                                                                     value={newValue}
                                                                                     onChange={(e) => setNewValue(e.target.value)}

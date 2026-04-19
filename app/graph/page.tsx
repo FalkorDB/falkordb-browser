@@ -22,8 +22,8 @@ const CreateElementPanel = dynamicImport(() => import("./CreateElementPanel"), {
 
 const Selector = dynamicImport(() => import("./Selector"), {
     ssr: false,
-    loading: () => <div className="h-[50px] flex flex-row gap-2 items-center">
-        <div className="w-[230px] h-full animate-pulse rounded-md border border-border bg-background" />
+    loading: () => <div className="h-[50px] flex flex-row gap-3 items-center">
+        <div className="w-[44px] h-full animate-pulse rounded-lg border border-border bg-background" />
         <div className="w-1 grow h-full animate-pulse rounded-md border border-border bg-background" />
         <div className="w-[120px] h-full animate-pulse rounded-md border border-border bg-background" />
     </div>

@@ -687,16 +687,19 @@ export class Graph {
     return undefined;
   }
 
-  public extendCell(cell: any, collapsed: boolean, isSchema: boolean) {
+  public async extendCell(cell: any, collapsed: boolean, isSchema: boolean) {
     if (cell.nodes) {
-      return [
-        ...cell.nodes.map((node: any) =>
-          this.extendNode(node, collapsed, isSchema)
-        ),
-        ...cell.edges.map((edge: any) =>
-          this.extendEdge(edge, collapsed, isSchema)
-        ),
-      ] as (Node | Link)[];
+      const nodes: (Node | undefined)[] = [];
+      for (const node of cell.nodes) {
+        // eslint-disable-next-line no-await-in-loop
+        nodes.push(await this.extendNode(node, collapsed, isSchema));
+      }
+      const edges: (Link | undefined)[] = [];
+      for (const edge of cell.edges ?? []) {
+        // eslint-disable-next-line no-await-in-loop
+        edges.push(await this.extendEdge(edge, collapsed, isSchema));
+      }
+      return [...nodes, ...edges].filter((e): e is Node | Link => !!e);
     }
 
     if (cell.relationshipType) {
