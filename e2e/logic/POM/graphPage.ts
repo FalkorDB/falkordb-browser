@@ -83,6 +83,10 @@ export default class GraphPage extends Page {
     return this.page.getByTestId("duplicateGraph");
   }
 
+  private get graphInfoToggle(): Locator {
+    return this.page.getByTestId("graphInfoToggle");
+  }
+
   private get duplicateGraphInput(): Locator {
     return this.page.getByTestId("duplicateGraphInput");
   }
@@ -193,8 +197,17 @@ export default class GraphPage extends Page {
   }
 
   async clickCreateGraph(): Promise<void> {
+    // Open graph info panel first if createGraph button is not visible
+    const createBtn = this.create("Graph");
+    if (!(await createBtn.isVisible().catch(() => false))) {
+      await interactWhenVisible(
+        this.graphInfoToggle,
+        (el) => el.click(),
+        "Graph Info Toggle"
+      );
+    }
     await interactWhenVisible(
-      this.create("Graph"),
+      createBtn,
       (el) => el.click(),
       "Create Graph"
     );
@@ -277,6 +290,17 @@ export default class GraphPage extends Page {
   }
 
   async clickSelect(type: Type = "Graph"): Promise<void> {
+    // For Graph type, the selector is now inside the graph info panel
+    if (type === "Graph") {
+      const selectBtn = this.select(type);
+      if (!(await selectBtn.isVisible().catch(() => false))) {
+        await interactWhenVisible(
+          this.graphInfoToggle,
+          (el) => el.click(),
+          "Graph Info Toggle"
+        );
+      }
+    }
     await interactWhenVisible(
       this.select(type),
       (el) => el.click(),

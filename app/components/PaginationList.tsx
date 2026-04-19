@@ -218,7 +218,7 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
             {children}
             <div className="flex gap-2 items-center">
                 <Input
-                    ref={searchRef as React.RefObject<HTMLInputElement>}
+                    ref={searchRef}
                     data-testid={`${label}Search`}
                     className="w-full bg-background text-foreground"
                     value={search}

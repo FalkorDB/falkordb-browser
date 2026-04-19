@@ -490,13 +490,14 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                 (() => {
                                     const hasLimitWarning = graph.CurrentLimit && graph.Data.length >= graph.CurrentLimit;
                                     const hasLimitChangeWarning = graph.CurrentLimit && lastLimit !== limit;
-                                    return (hasLimitWarning || hasLimitChangeWarning) ? (
+                                    const hasPrefixChange = graph.ShowPropertyKeyPrefix !== showPropertyKeyPrefix;
+                                    return (hasLimitWarning || hasLimitChangeWarning || hasPrefixChange) ? (
                                         <Button
                                             data-testid="selectorLimitWarning"
                                             className="cursor-default"
                                             title={`${hasLimitWarning ? `Data currently limited to ${graph.Data.length} rows` : ""}
 ${hasLimitChangeWarning ? "Rerun the query to apply the new limit." : ""}
-${graph.ShowPropertyKeyPrefix !== showPropertyKeyPrefix ? "Rerun the query to apply the new property key prefix settings." : ""}`}
+${hasPrefixChange ? "Rerun the query to apply the new property key prefix settings." : ""}`}
                                         >
                                             <Info size={16} className="text-orange-300" />
                                         </Button>

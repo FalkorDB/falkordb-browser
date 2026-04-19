@@ -235,7 +235,7 @@ export default function LoginForm() {
     // Pre-submit validation for URL mode — show colored format errors
     if (loginMode === "url") {
       // Fill in missing parts with defaults (protocol, host, port)
-      const parsed = parseUrlString(rawUrl);
+      const parsed = parseUrl(rawUrl);
       const proto = parsed.protocol || "falkor";
       const h = parsed.host || DEFAULT_HOST;
       const p = parsed.port || DEFAULT_PORT;
