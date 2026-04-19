@@ -128,7 +128,7 @@ interface Props<T extends Item> {
     isDeleteSelected?: (item: T) => boolean
     onDoubleClick?: (label: string, evt: MouseEvent<HTMLButtonElement>) => void
     onToggleFav?: (item: T, name?: string) => void
-    searchRef: React.RefObject<HTMLInputElement>
+    searchRef: React.RefObject<HTMLInputElement | null>
     isLoading?: boolean
     className?: string
     children?: React.ReactNode
@@ -218,7 +218,7 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
             {children}
             <div className="flex gap-2 items-center">
                 <Input
-                    ref={searchRef}
+                    ref={searchRef as React.RefObject<HTMLInputElement>}
                     data-testid={`${label}Search`}
                     className="w-full bg-background text-foreground"
                     value={search}
