@@ -787,23 +787,21 @@ ${hasPrefixChange ? "Rerun the query to apply the new property key prefix settin
                                 <Maximize2 size={20} />
                             </Button>
                         </div>
-                        {
-                            graphName &&
-                            <Button
-                                data-testid="chatToggleButton"
-                                className={cn(
-                                    "text-foreground border border-border rounded-lg p-2 hover:bg-secondary",
-                                    panel === "chat" && "!text-primary"
-                                )}
-                                indicator={indicator}
-                                title="Chat"
-                                onClick={() => {
-                                    setPanel(prev => prev === "chat" ? undefined : "chat");
-                                }}
-                            >
-                                <MessagesSquare size={20} />
-                            </Button>
-                        }
+                        <Button
+                            data-testid="chatToggleButton"
+                            className={cn(
+                                "text-foreground border border-border rounded-lg p-2 hover:bg-secondary",
+                                panel === "chat" && "!text-primary"
+                            )}
+                            indicator={indicator}
+                            title="Chat"
+                            disabled={!graphName}
+                            onClick={() => {
+                                setPanel(prev => prev === "chat" ? undefined : "chat");
+                            }}
+                        >
+                            <MessagesSquare size={20} />
+                        </Button>
                     </>
                     : selectedElements && handleDeleteElement && setSelectedElements && setIsAddNode && setIsAddEdge && canvasRef && isCanvasLoading !== undefined && <div className="w-full h-full">
                         <Toolbar
