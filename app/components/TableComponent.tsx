@@ -735,7 +735,7 @@ export default function TableComponent({
                                                                                 />
                                                                 : cell.type === "text" &&
                                                                 <Input
-                                                                    ref={inputRef}
+                                                                    ref={inputRef as React.RefObject<HTMLInputElement>}
                                                                     data-testid={`input${label}`}
                                                                     className="h-full grow basis-0"
                                                                                     value={newValue}
