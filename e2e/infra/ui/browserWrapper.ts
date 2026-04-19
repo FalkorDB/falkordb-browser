@@ -1,7 +1,23 @@
 import { chromium, Browser, BrowserContext, Page, firefox } from 'playwright';
+import { existsSync } from 'fs';
 import { test } from '@playwright/test';
 import BasePage from './basePage';
 import { initializeLocalStorage } from '../utils';
+
+// Map each Playwright project to its pre-created auth state file so that
+// BrowserWrapper contexts are authenticated.  The 'setup' project and special
+// projects (TLS, cluster) are intentionally omitted — they either create the
+// files or require a clean session.
+const AUTH_STATE_MAP: Record<string, string> = {
+    '[Admin] Chromium': 'playwright/.auth/admin.json',
+    '[Admin] Firefox': 'playwright/.auth/admin.json',
+    '[Read-Write] - Chromium': 'playwright/.auth/readwriteuser.json',
+    '[Read-Write] - Firefox': 'playwright/.auth/readwriteuser.json',
+    '[Read-Only] - Chromium': 'playwright/.auth/readonlyuser.json',
+    '[Read-Only] - Firefox': 'playwright/.auth/readonlyuser.json',
+    '[Admin: Settings - Chromium]': 'playwright/.auth/admin.json',
+    '[Admin: Settings - Firefox]': 'playwright/.auth/admin.json',
+};
 
 async function launchBrowser(projectName: string): Promise<Browser> {
     if (projectName.toLowerCase().includes('firefox')) {
@@ -27,12 +43,20 @@ export default class BrowserWrapper {
         if (!this.context) {
             const projectName = test.info().project.name;
             const isFirefox = projectName.toLowerCase().includes('firefox');
-            
+
+            // Resolve auth state for this project (only if the file exists —
+            // gracefully handles the case where setup hasn't run yet).
+            const storageStatePath = AUTH_STATE_MAP[projectName];
+            const storageState = storageStatePath && existsSync(storageStatePath)
+                ? storageStatePath
+                : undefined;
+
             // Grant clipboard permissions only for Chromium-based browsers
             // Firefox doesn't support clipboard-read/clipboard-write permissions
-            this.context = await this.browser.newContext(
-                isFirefox ? {} : { permissions: ['clipboard-read', 'clipboard-write'] }
-            );
+            this.context = await this.browser.newContext({
+                ...(isFirefox ? {} : { permissions: ['clipboard-read', 'clipboard-write'] }),
+                ...(storageState ? { storageState } : {}),
+            });
         }
         if (!this.page) {
             this.page = await this.context.newPage();

@@ -314,6 +314,10 @@ export default class GraphPage extends Page {
   async clickSelect(type: Type = "Graph"): Promise<void> {
     if (type === "Graph") {
       await this.ensureGraphInfoPanelOpen();
+      // In the new UI selectGraph lives inside the Graph Info panel.
+      // It is disabled while graphNames is loading (options.length === 0).
+      // Wait until it becomes enabled before trying to click it.
+      await waitForElementToBeEnabled(this.select(type), 500, 20);
     }
     await interactWhenVisible(
       this.select(type),
