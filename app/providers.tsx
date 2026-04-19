@@ -385,7 +385,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const fetchCount = useCallback(async (name?: string) => {
     const n = name || graphName;
 
-    if (!n) return;
+    if (!n || status === "unauthenticated") return;
 
     setEdgesCount(undefined);
     setNodesCount(undefined);

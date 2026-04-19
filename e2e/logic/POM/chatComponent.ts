@@ -123,6 +123,10 @@ export default class ChatComponent extends GraphPage {
     return this.chatToggleButton.isVisible();
   }
 
+  async isChatToggleButtonDisabled(): Promise<boolean> {
+    return this.chatToggleButton.isDisabled();
+  }
+
   async isChatPanelVisible(): Promise<boolean> {
     return this.chatPanel.isVisible();
   }

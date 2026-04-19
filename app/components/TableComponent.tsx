@@ -733,11 +733,11 @@ export default function TableComponent({
                                                                                     label={cell.selectType}
                                                                                     selectedValue={cell.value.toString()}
                                                                                 />
-                                                                : cell.type === "text" &&
-                                                                <Input
-                                                                    ref={inputRef as React.RefObject<HTMLInputElement>}
-                                                                    data-testid={`input${label}`}
-                                                                    className="h-full grow basis-0"
+                                                                                : cell.type === "text" &&
+                                                                                <Input
+                                                                                    data-testid={`input${label}`}
+                                                                                    ref={inputRef as React.RefObject<HTMLInputElement>}
+                                                                                    className="grow"
                                                                                     value={newValue}
                                                                                     onChange={(e) => setNewValue(e.target.value)}
                                                                                     onKeyDown={async (e) => {

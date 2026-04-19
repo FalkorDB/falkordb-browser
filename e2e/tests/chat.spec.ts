@@ -20,13 +20,15 @@ test.describe("Chat Feature Tests", () => {
     await browser.closeBrowser();
   });
 
-  test(`@readwrite Verify chat button is not displayed when no graph is selected`, async () => {
+  test(`@readwrite Verify chat button is disabled when no graph is selected`, async () => {
     const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
     await browser.setPageToFullScreen();
     
-    // Verify chat toggle button is not visible when no graph is selected
+    // Verify chat toggle button is disabled when no graph is selected
     const isChatButtonVisible = await chat.isChatToggleButtonVisible();
-    expect(isChatButtonVisible).toBe(false);
+    expect(isChatButtonVisible).toBe(true);
+    const isChatButtonDisabled = await chat.isChatToggleButtonDisabled();
+    expect(isChatButtonDisabled).toBe(true);
   });
 
   test(`@readwrite Verify chat button is displayed when a graph is selected`, async () => {

@@ -4,14 +4,14 @@
 
 import { useEffect, useState, useContext, Dispatch, SetStateAction, useRef, useCallback, useMemo } from "react";
 import { cn, GraphRef, formatName, Node, Link, getTheme, Query, HistoryQuery } from "@/lib/utils";
-import { ChevronDown, History, Info, Maximize2, Sparkles, Network, Star, Trash2 } from "lucide-react";
+import { ChevronDown, History, Info, Maximize2, MessagesSquare, Network, Star, Trash2 } from "lucide-react";
 import * as monaco from "monaco-editor";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTheme } from "next-themes";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Button from "../components/ui/Button";
-import { BrowserSettingsContext, GraphContext, IndicatorContext, PanelContext } from "../components/provider";
+import { BrowserSettingsContext, ConnectionContext, GraphContext, IndicatorContext, PanelContext } from "../components/provider";
 import { setConnectionItem, removeConnectionItem } from "@/lib/connection-storage";
 import CypherEditor, { CYPHER_LANGUAGE_NAME } from "../components/CypherEditor";
 import EditorComponent from "../components/EditorComponent";
@@ -100,7 +100,8 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
 }: Props<T>) {
 
     const { indicator } = useContext(IndicatorContext);
-    const { tutorialOpen } = useContext(BrowserSettingsContext);
+    const { tutorialOpen, settings: { limitSettings: { limit, lastLimit }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
+    const { isReadOnly } = useContext(ConnectionContext);
     const { graphNames } = useContext(GraphContext);
     const { panel, setPanel, panelOpen, onTogglePanel } = useContext(PanelContext);
 
@@ -396,7 +397,8 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                     setGraph={setGraph}
                 />
             }
-                
+            {
+                historyQuery &&
                 <Button
                     aria-label="Graph info panel"
                     aria-pressed={panelOpen && panel !== "chat"}
@@ -417,6 +419,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                 >
                     <Network size={20} />
                 </Button>
+            }
             {
                 historyQuery ?
                     <>
@@ -479,6 +482,36 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                             >
                                 <Info />
                             </Button>
+                            {
+                                graphName && !isReadOnly &&
+                                <Button
+                                    data-testid="selectorCanvasInfo"
+                                    className="cursor-default"
+                                    title={`Select And Show Properties (Right Click)
+                                        Select Multiple Entities (Right Click + Left Ctrl)
+                                        Select 2 Nodes to Create Edge`}
+                                >
+                                    <Info size={16} className="text-primary" />
+                                </Button>
+                            }
+                            {
+                                (() => {
+                                    const hasLimitWarning = graph.CurrentLimit && graph.Data.length >= graph.CurrentLimit;
+                                    const hasLimitChangeWarning = graph.CurrentLimit && lastLimit !== limit;
+                                    const hasPrefixChange = graph.ShowPropertyKeyPrefix !== showPropertyKeyPrefix;
+                                    return (hasLimitWarning || hasLimitChangeWarning || hasPrefixChange) ? (
+                                        <Button
+                                            data-testid="selectorLimitWarning"
+                                            className="cursor-default"
+                                            title={`${hasLimitWarning ? `Data currently limited to ${graph.Data.length} rows` : ""}
+${hasLimitChangeWarning ? "Rerun the query to apply the new limit." : ""}
+${hasPrefixChange ? "Rerun the query to apply the new property key prefix settings." : ""}`}
+                                        >
+                                            <Info size={16} className="text-orange-300" />
+                                        </Button>
+                                    ) : null;
+                                })()
+                            }
                             {separator}
                             <div className="flex gap-4 items-center">
                                 <DialogComponent
@@ -528,6 +561,24 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                         ...prev,
                                                         counter: index + 1 === historyQuery.counter ? 0 : index + 1
                                                     }));
+                                                    setTab("text");
+                                                }
+                                            }}
+                                            onDoubleClick={async (counter) => {
+                                                const index = historyQuery.queries.findIndex(q => q.text === counter);
+                                                setHistoryQuery(prev => ({
+                                                    ...prev,
+                                                    counter: index + 1
+                                                }));
+                                                setTab("text");
+                                                try {
+                                                    setIsLoading(true);
+                                                    if (counter.trim()) {
+                                                        await runQuery!(counter.trim());
+                                                    }
+                                                    setQueriesOpen(false);
+                                                } finally {
+                                                    setIsLoading(false);
                                                 }
                                             }}
                                             searchRef={searchQueryRef}
@@ -754,6 +805,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                 )}
                                 indicator={indicator}
                                 title="Chat"
+                                disabled={!graphName}
                                 onClick={() => {
                                     if (panel === "chat") {
                                         setPanel(undefined);
@@ -764,7 +816,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                     }
                                 }}
                             >
-                                <Sparkles size={20} />
+                                <MessagesSquare size={20} />
                             </Button>
                     </>
                     : selectedElements && handleDeleteElement && setSelectedElements && setIsAddNode && setIsAddEdge && canvasRef && isCanvasLoading !== undefined && <div className="w-full h-full">
