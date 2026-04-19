@@ -99,7 +99,10 @@ export default class GraphPage extends Page {
    * bounding box width instead.
    */
   private async ensureGraphInfoPanelOpen(): Promise<void> {
-    const box = await this.graphInfoPanel.boundingBox().catch(() => null);
+    // Use .first() to avoid strict-mode violations: two elements share
+    // data-testid="graphInfoPanel" (the ResizablePanel wrapper in providers.tsx
+    // and the inner div in graphInfo.tsx).
+    const box = await this.graphInfoPanel.first().boundingBox().catch(() => null);
     if (!box || box.width < 50) {
       await interactWhenVisible(
         this.graphInfoToggle,
@@ -107,7 +110,7 @@ export default class GraphPage extends Page {
         "Graph Info Toggle"
       );
       // Wait for the panel expansion animation to complete
-      await this.graphInfoPanel.waitFor({ state: "visible" });
+      await this.graphInfoPanel.first().waitFor({ state: "visible" });
       await this.page.waitForTimeout(300);
     }
   }
