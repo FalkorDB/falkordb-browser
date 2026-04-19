@@ -271,7 +271,9 @@ export default function LoginForm() {
         return;
       }
 
-      const res = validateUrl(url);
+      // Validate the original rawUrl (not the reconstructed url) so format
+      // issues like empty credentials with '@' are still detected.
+      const res = validateUrl(rawUrl || url);
       const { parts } = res;
 
       if (!res.valid) {
