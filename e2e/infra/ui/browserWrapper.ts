@@ -44,18 +44,27 @@ export default class BrowserWrapper {
             const projectName = test.info().project.name;
             const isFirefox = projectName.toLowerCase().includes('firefox');
 
-            // Resolve auth state for this project (only if the file exists —
-            // gracefully handles the case where setup hasn't run yet).
-            const storageStatePath = AUTH_STATE_MAP[projectName];
-            const storageState = storageStatePath && existsSync(storageStatePath)
-                ? storageStatePath
-                : undefined;
+            // Prefer the storageState configured on the current Playwright
+            // project itself. This keeps BrowserWrapper aligned with
+            // playwright.config.ts and avoids project-name drift.
+            const configuredStorageState = test.info().project.use.storageState;
+
+            // Fall back to the explicit map for extra resilience in case the
+            // project configuration changes shape in the future.
+            const fallbackStorageStatePath = AUTH_STATE_MAP[projectName];
+            const resolvedStorageState =
+                typeof configuredStorageState === 'string'
+                    ? (existsSync(configuredStorageState) ? configuredStorageState : undefined)
+                    : configuredStorageState
+                        ?? (fallbackStorageStatePath && existsSync(fallbackStorageStatePath)
+                            ? fallbackStorageStatePath
+                            : undefined);
 
             // Grant clipboard permissions only for Chromium-based browsers
             // Firefox doesn't support clipboard-read/clipboard-write permissions
             this.context = await this.browser.newContext({
                 ...(isFirefox ? {} : { permissions: ['clipboard-read', 'clipboard-write'] }),
-                ...(storageState ? { storageState } : {}),
+                ...(resolvedStorageState ? { storageState: resolvedStorageState } : {}),
             });
         }
         if (!this.page) {

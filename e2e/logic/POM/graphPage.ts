@@ -316,8 +316,11 @@ export default class GraphPage extends Page {
       await this.ensureGraphInfoPanelOpen();
       // In the new UI selectGraph lives inside the Graph Info panel.
       // It is disabled while graphNames is loading (options.length === 0).
-      // Wait until it becomes enabled before trying to click it.
-      await waitForElementToBeEnabled(this.select(type), 500, 20);
+      // Allow up to 30 s for the post-auth fetchOptions round-trip to finish.
+      const isEnabled = await waitForElementToBeEnabled(this.select(type), 500, 60);
+      if (!isEnabled) {
+        throw new Error(`Select ${type} is still disabled after 30 s — graphNames never loaded`);
+      }
     }
     await interactWhenVisible(
       this.select(type),
