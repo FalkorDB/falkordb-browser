@@ -29,7 +29,7 @@ interface Props {
     itemHeightExpandMultiple?: number
     itemWidth?: number
     valueClassName?: string
-    inputRef?: React.RefObject<HTMLInputElement>,
+    inputRef?: React.RefObject<HTMLInputElement | null>,
     children?: React.ReactNode,
     setRows?: Dispatch<SetStateAction<Row[]>>,
     className?: string
@@ -723,7 +723,7 @@ export default function TableComponent({
                                                                                 : cell.type === "text" &&
                                                                                 <Input
                                                                                     data-testid={`input${label}`}
-                                                                                    ref={inputRef}
+                                                                                    ref={inputRef as React.RefObject<HTMLInputElement>}
                                                                                     className="grow"
                                                                                     value={newValue}
                                                                                     onChange={(e) => setNewValue(e.target.value)}
