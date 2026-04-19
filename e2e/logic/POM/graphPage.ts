@@ -198,6 +198,8 @@ export default class GraphPage extends Page {
   }
 
   async clickEditorInput(): Promise<void> {
+    // Dismiss any open Radix tooltips that may overlay the editor
+    await this.page.keyboard.press("Escape");
     await interactWhenVisible(
       this.editorContainer,
       (el) => el.click(),
