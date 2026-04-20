@@ -396,6 +396,7 @@ const authOptions: AuthOptions = {
                 host: credentials.host || "localhost",
                 port: credentials.port ? parseInt(credentials.port, 10) : 6379,
                 password: credentials.password,
+                kind: 'session',
               });
             } catch (storageError) {
               // eslint-disable-next-line no-console
@@ -479,15 +480,17 @@ const authOptions: AuthOptions = {
       const t = token as Record<string, unknown> | null;
       const credentialRef = t?.credentialRef as string | undefined;
       const id = t?.id as string | undefined;
-      const username = (t?.username as string | undefined) || "default";
 
+      // Session credentials are ephemeral and have no audit value beyond
+      // the session itself, so we hard-delete the Token DB row on sign-out
+      // rather than soft-revoking it (which is the PAT behavior).
       if (credentialRef) {
         try {
           const storage = StorageFactory.getStorage();
-          await storage.revokeToken(credentialRef, username);
+          await storage.deleteToken(credentialRef);
         } catch (e) {
           // eslint-disable-next-line no-console
-          console.warn("Failed to revoke session credential on signOut:", e);
+          console.warn("Failed to delete session credential on signOut:", e);
         }
       }
 

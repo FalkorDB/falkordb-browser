@@ -1,4 +1,11 @@
 /**
+ * Distinguishes rows created for a NextAuth browser session (ephemeral,
+ * hard-deleted on sign-out) from user-issued personal access tokens
+ * (long-lived, soft-revoked with audit trail).
+ */
+export type TokenKind = 'session' | 'pat';
+
+/**
  * Token data structure
  */
 export interface TokenData {
@@ -15,6 +22,12 @@ export interface TokenData {
   last_used: number; // Unix timestamp, -1 means never used
   is_active: boolean;
   encrypted_password: string;
+  /**
+   * Discriminates between session credentials and PATs. Optional for
+   * backward compatibility with rows written before this field existed
+   * (treated as 'pat' by readers).
+   */
+  kind?: TokenKind;
 }
 
 /**
@@ -51,6 +64,13 @@ export interface ITokenStorage {
    * Revoke a token (mark as inactive)
    */
   revokeToken(tokenId: string, revokerUsername: string): Promise<boolean>;
+
+  /**
+   * Permanently delete a token. Use this for ephemeral session credentials
+   * that have no audit value once the session ends. For user-issued PATs
+   * prefer revokeToken to preserve the REVOKED_BY trail.
+   */
+  deleteToken(tokenId: string): Promise<boolean>;
 
   /**
    * Update last used timestamp for a token
