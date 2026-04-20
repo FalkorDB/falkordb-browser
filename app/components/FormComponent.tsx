@@ -4,7 +4,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { EyeIcon, EyeOffIcon, InfoIcon } from "lucide-react";
+import { EyeIcon, EyeOffIcon, ExternalLink, InfoIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Button from "./ui/Button";
@@ -25,6 +25,11 @@ export type DefaultField = {
     description?: string
     errors?: Error[]
     info?: string
+    disabled?: boolean
+    link?: {
+        label: string
+        url: string
+    }
 };
 
 export type SelectField = DefaultField & {
@@ -62,13 +67,11 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
     const [show, setShow] = useState<{ [key: string]: boolean }>({});
     const [errors, setErrors] = useState<{ [key: string]: boolean }>({});
     const [isLoading, setIsLoading] = useState(false);
-    const isMountedRef = useRef(false);
-
-    const fieldValues = fields.map(f => f.value).join("\0");
+    const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
-        if (!isMountedRef.current) {
-            isMountedRef.current = true;
+        if (!isMounted) {
+            setIsMounted(true);
             return;
         }
 
@@ -79,7 +82,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
             }
         });
         setErrors(prev => ({ ...prev, ...newErrors }));
-    }, [fieldValues]);
+    }, []);
 
     const onHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -160,6 +163,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                             type={field.type === "password" ? passwordType : field.type}
                                             placeholder={field.placeholder}
                                             value={field.value}
+                                            disabled={field.disabled}
                                             onChange={(e) => {
                                                 field.onChange(e);
                                                 if (field.type === "password") {
@@ -180,6 +184,18 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                             }} />
                                 }
                                 <p className="text-sm text-gray-500">{field.description}</p>
+                                {
+                                    field.link &&
+                                    <a
+                                        href={field.link.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-sm text-primary flex items-center gap-1 hover:underline w-fit"
+                                    >
+                                        {field.link.label}
+                                        <ExternalLink size={14} />
+                                    </a>
+                                }
                                 {
                                     field.errors &&
                                     <div className="h-5">

@@ -3,23 +3,16 @@
 "use client";
 
 import React, { useEffect, useState, useContext } from "react";
+import { Save } from "lucide-react";
 import { CreateUser, User } from "@/app/api/user/model";
 import { prepareArg, securedFetch, Row } from "@/lib/utils";
 import TableComponent from "@/app/components/TableComponent";
 import { useToast } from "@/components/ui/use-toast";
-import { ToastAction } from "@/components/ui/toast";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import CloseDialog from "@/app/components/CloseDialog";
+import ActionButton from "@/app/components/ui/Button";
 import { IndicatorContext } from "@/app/components/provider";
 import DeleteUser from "./DeleteUser";
 import AddUser from "./AddUser";
-
-type SetUser = {
-    username: string
-    role: string
-    oldRole?: string
-};
+import EditUser from "./EditUser";
 
 const ROLES = [
     "Admin",
@@ -32,35 +25,8 @@ export default function Users() {
 
     const [users, setUsers] = useState<User[]>([]);
     const [rows, setRows] = useState<Row[]>([]);
-    const [newUser, setNewUser] = useState<SetUser | null>(null);
-    const [open, setOpen] = useState(false);
     const { toast } = useToast();
     const { setIndicator } = useContext(IndicatorContext);
-
-    useEffect(() => {
-        if (!open) {
-            setNewUser(null);
-        }
-    }, [open]);
-
-    const handleSetRole = async (user: SetUser) => {
-        const { username, role, oldRole } = user;
-        const result = await securedFetch(`api/user/${prepareArg(username)}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ role })
-        }, toast, setIndicator);
-
-        if (result.ok) {
-            setUsers(prev => prev.map(u => u.username === username ? { ...u, role } : u));
-            setRows(prev => prev.map((row): Row => row.cells[0].value === username ? { ...row, cells: [row.cells[0], { ...row.cells[1], value: role }] } : row));
-            toast({
-                title: "Success",
-                description: `${username} role updated successfully`,
-                action: oldRole ? <ToastAction altText="Undo" onClick={() => handleSetRole({ username, role: oldRole })}>Undo</ToastAction> : undefined
-            });
-            setOpen(false);
-        }
-    };
 
     useEffect(() => {
         (async () => {
@@ -74,24 +40,17 @@ export default function Users() {
             if (result.ok) {
                 const data = await result.json();
                 setUsers(data.result.map((user: User) => ({ ...user, selected: false })));
-                setRows(data.result.map(({ username, role }: User): Row => ({
+                setRows(data.result.map(({ username, role, keys }: { username: string, role: string, keys: string }): Row => ({
                     name: username,
                     cells: [{
                         value: username,
                         type: "readonly"
-                    }, username === "default" ? {
+                    }, {
                         value: role,
                         type: "readonly",
-                    } : {
-                        value: role,
-                        type: "select",
-                        onChange: async (value: string) => {
-                            setNewUser({ username, role: value, oldRole: role });
-                            setOpen(true);
-                            return true;
-                        },
-                        options: ROLES,
-                        selectType: "Role"
+                    }, {
+                        value: keys || "*",
+                        type: "readonly"
                     }],
                     checked: false,
                 })));
@@ -99,13 +58,26 @@ export default function Users() {
         })();
     }, [toast, setIndicator]);
 
-    const handleAddUser = async ({ username, password, role }: CreateUser) => {
+    const handleSaveUsers = async () => {
+        const response = await securedFetch('/api/user/save', {
+            method: 'POST',
+        }, toast, setIndicator);
+
+        if (response.ok) {
+            toast({
+                title: "Success",
+                description: "Users saved to disk",
+            });
+        }
+    };
+
+    const handleAddUser = async ({ username, password, role }: CreateUser, keys: string) => {
         const response = await securedFetch('/api/user/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ username, password, role })
+            body: JSON.stringify({ username, password, role, keys })
         }, toast, setIndicator);
 
         if (response.ok) {
@@ -121,48 +93,71 @@ export default function Users() {
                     type: "readonly"
                 }, {
                     value: role,
-                    onChange: async (value: string) => {
-                        setNewUser({ username, role: value, oldRole: role });
-                        setOpen(true);
-                        return true;
-                    },
-                    type: "select",
-                    options: ROLES,
-                    selectType: "Role"
+                    type: "readonly",
+                }, {
+                    value: keys || "*",
+                    type: "readonly"
                 }],
                 checked: false,
             }] as Row[]);
         }
     };
 
+    const handleEditUser = async (username: string, role: string, keys: string, password?: string) => {
+        const result = await securedFetch(`api/user/${prepareArg(username)}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ role, keys, password })
+        }, toast, setIndicator);
+
+        if (result.ok) {
+            setUsers(prev => prev.map(u => u.username === username ? { ...u, role } : u));
+            setRows(prev => prev.map((row): Row => row.cells[0].value === username ? { ...row, cells: [row.cells[0], { ...row.cells[1], value: role }, { ...row.cells[2], value: keys || "*" }] } : row));
+            toast({
+                title: "Success",
+                description: `${username} updated successfully`,
+            });
+        }
+
+        return result.ok;
+    };
+
+    const checkedRows = rows.filter(row => row.checked);
+    const selectedUserData = checkedRows.length === 1 ? {
+        username: checkedRows[0].cells[0].value,
+        role: checkedRows[0].cells[1].value,
+        keys: checkedRows[0].cells[2].value,
+    } : null;
+
     return (
         <div className="w-full h-full flex flex-col space-y-4">
             <TableComponent
                 label="Users"
                 entityName="User"
-                headers={["Name", "Role"]}
+                headers={["Name", "Role", "Key / Graph Permissions"]}
                 rows={rows}
                 setRows={setRows}
                 itemHeight={40}
             >
                 <div className="flex flex-row-reverse gap-4">
                     <AddUser onAddUser={handleAddUser} />
-                    <DeleteUser users={rows.filter(row => row.checked).map(row => users.find(user => user.username === row.cells[0].value)!)} setUsers={setUsers} setRows={setRows} />
+                    <EditUser
+                        username={selectedUserData?.username || ""}
+                        role={selectedUserData?.role || ""}
+                        keys={selectedUserData?.keys || "*"}
+                        onEditUser={handleEditUser}
+                        disabled={!selectedUserData || selectedUserData.username === "default"}
+                    />
+                    <DeleteUser users={rows.filter(row => row.checked && row.cells[0].value !== "default").map(row => users.find(user => user.username === row.cells[0].value)!)} setUsers={setUsers} setRows={setRows} />
+                    <ActionButton
+                        variant="Primary"
+                        label="Save Users"
+                        title="Save users to disk"
+                        onClick={handleSaveUsers}
+                    >
+                        <Save />
+                    </ActionButton>
                 </div>
             </TableComponent>
-            <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="bg-background p-8 flex flex-col gap-8 rounded-lg border-none" hideClose>
-                    <DialogHeader className="flex-row justify-between items-center border-b border-border pb-4">
-                        <DialogTitle className="text-2xl font-medium">Set User Role</DialogTitle>
-                        <CloseDialog />
-                    </DialogHeader>
-                    <DialogDescription>Are you sure you want to set the user role to {newUser?.role}?</DialogDescription>
-                    <div className="flex justify-end gap-4">
-                        <Button onClick={() => handleSetRole(newUser!)}>Set User</Button>
-                        <CloseDialog label="Cancel" />
-                    </div>
-                </DialogContent>
-            </Dialog>
         </div >
     );
 }

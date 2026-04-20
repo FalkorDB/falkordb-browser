@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "../../auth/[...nextauth]/options";
-import { ROLE } from "../model";
-import { updateUserRole, validateBody } from "../../validate-body";
+import { ROLE, getRoleWithKeys } from "../model";
+import { updateUser, validateBody } from "../../validate-body";
 import { getCorsHeaders } from "../../utils";
 
 export async function OPTIONS(request: Request) {
@@ -28,7 +28,7 @@ export async function PATCH(
       const body = await request.json();
       
       // Validate request body
-      const validation = validateBody(updateUserRole, body);
+      const validation = validateBody(updateUser, body);
       
       if (!validation.success) {
         return NextResponse.json(
@@ -37,11 +37,15 @@ export async function PATCH(
         );
       }
 
-      const { role: roleKey } = validation.data;
+      const { role: roleKey, keys, password } = validation.data;
       const role = ROLE.get(roleKey);
       if (!role) throw new Error("Invalid role");
 
-      await (await client.connection).aclSetUser(username, role);
+      const finalRole = getRoleWithKeys(role, keys);
+      if (password) {
+        finalRole.push(`>${password}`);
+      }
+      await (await client.connection).aclSetUser(username, finalRole);
       return NextResponse.json({ message: "User role updated" }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
