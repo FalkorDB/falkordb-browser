@@ -83,6 +83,7 @@ export default function Page() {
     const panelRef = useRef<PanelImperativeHandle>(null);
 
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
+    const [chatOpen, setChatOpen] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(true);
     const [isAddNode, setIsAddNode] = useState(false);
     const [isAddEdge, setIsAddEdge] = useState(false);
@@ -94,7 +95,6 @@ export default function Page() {
     const panelSizes: Record<string, { size: string; min: string }> = {
         data: { size: "200px", min: "200px" },
         add: { size: "30%", min: "25%" },
-        chat: { size: "35%", min: "30%" },
     };
 
     const getPanelSize = useCallback(() => {
@@ -122,12 +122,6 @@ export default function Page() {
             return () => cancelAnimationFrame(frameId);
         }
         currentPanel.collapse();
-
-        if (panel !== "chat") return;
-
-        setSelectedElements([]);
-        setIsAddNode(false);
-        setIsAddEdge(false);
 
     }, [getPanelSize, panel]);
 
@@ -238,18 +232,15 @@ export default function Page() {
                 return "data";
             }
 
-            if (prev !== "chat") {
-                return undefined;
-            }
-
-            return prev;
+            return undefined;
         });
 
         if (el.length !== 0) {
+            setChatOpen(false);
             setIsAddEdge(false);
             setIsAddNode(false);
         }
-    }, [setPanel]);
+    }, [setPanel, setChatOpen]);
 
     useEffect(() => {
         handleSetSelectedElements();
@@ -371,13 +362,6 @@ export default function Page() {
         if (!graphName) return undefined;
 
         switch (panel) {
-            case "chat":
-                return (
-                    <Chat
-                        onClose={() => setPanel(undefined)}
-                    />
-                );
-
             case "data":
 
                 if (selectedElements.length === 0) return undefined;
@@ -436,8 +420,10 @@ export default function Page() {
                 setHistoryQuery={setHistoryQuery}
                 fetchCount={fetchCount}
                 isQueryLoading={isQueryLoading}
+                chatOpen={chatOpen}
+                setChatOpen={setChatOpen}
             />
-            <ResizablePanelGroup orientation="horizontal" className="h-1 grow">
+            <ResizablePanelGroup orientation="horizontal" className="h-1 grow relative">
                 <ResizablePanel
                     defaultSize="100%"
                     collapsible
@@ -466,7 +452,7 @@ export default function Page() {
                 <ResizableHandle
                     withHandle
                     onMouseUp={() => isCollapsed && handleSetSelectedElements()}
-                    className={cn("ml-2", isCollapsed && "hidden")}
+                    className={cn("bg-transparent", isCollapsed && "hidden")}
                     disabled={isCollapsed}
                 />
                 <ResizablePanel
@@ -478,6 +464,12 @@ export default function Page() {
                 >
                     {getCurrentPanel()}
                 </ResizablePanel>
+                {
+                    chatOpen && graphName &&
+                    <div className="absolute bottom-3 right-3 w-[400px] h-[500px] max-h-[80%] max-w-[95%] z-30">
+                        <Chat onClose={() => setChatOpen(false)} />
+                    </div>
+                }
             </ResizablePanelGroup>
         </div >
     );

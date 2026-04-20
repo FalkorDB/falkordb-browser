@@ -147,7 +147,7 @@ export interface Relationship extends Omit<InfoRelationship, "count"> {
 
 export type GraphRef = MutableRefObject<FalkorDBCanvas | null>;
 
-export type Panel = "chat" | "data" | "add" | undefined;
+export type Panel = "data" | "add" | undefined;
 
 export type SelectCell = {
   value: string;
