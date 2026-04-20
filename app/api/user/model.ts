@@ -30,7 +30,7 @@ const READ_ONLY_ROLE = [
 ];
 
 export function getRoleWithKeys(role: string[], keys?: string): string[] {
-  return [role[0], `~${keys || "*"}`, ...role.slice(1)];
+  return [role[0], "resetkeys", `~${keys || "*"}`, ...role.slice(1)];
 }
 
 export const ROLE = new Map<string, string[]>([
