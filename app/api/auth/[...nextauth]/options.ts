@@ -350,7 +350,13 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
   return null;
 }
 
+const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60; // 30 days; keep in sync with session.maxAge below
+
 const authOptions: AuthOptions = {
+  session: {
+    strategy: "jwt",
+    maxAge: SESSION_MAX_AGE_SECONDS,
+  },
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -397,6 +403,10 @@ const authOptions: AuthOptions = {
                 port: credentials.port ? parseInt(credentials.port, 10) : 6379,
                 password: credentials.password,
                 kind: 'session',
+                // Align with NextAuth session lifetime so abandoned rows
+                // (e.g. browser closed before signOut fires) are eligible
+                // for cleanup instead of living forever.
+                expiresAtUnix: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS,
               });
             } catch (storageError) {
               // eslint-disable-next-line no-console
