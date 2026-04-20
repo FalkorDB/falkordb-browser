@@ -216,7 +216,7 @@ test.describe("Graph Info Panel Tests", () => {
     await apiCall.addGraph(graphName2);
     const graph = await browser.createNewPage(GraphInfoPage, urls.graphUrl);
     await browser.setPageToFullScreen();
-    // Panel is open by default but shows zero counts when no graph is selected
+    await graph.openGraphInfoButton();
     const nodesCount = await graph.getGraphInfoNodesCount();
     expect(nodesCount).toBe("0");
     await apiCall.removeGraph(graphName1);

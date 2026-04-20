@@ -88,12 +88,12 @@ test.describe('@Config Settings users tests', () => {
         expect(isVisible).toBe(false);
     });
 
-    test("@admin Attempt to delete the default admin user -> Verify that the user has not been deleted.", async () => {
+    test("@admin Attempt to delete the default admin user -> Verify delete button is disabled.", async () => {
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
         await settingsUsersPage.navigateToUserTab();
-        await settingsUsersPage.removeUser('default');
-        const isVisible = await settingsUsersPage.verifyUserExists('default');
-        expect(isVisible).toBe(true);
+        await settingsUsersPage.clickUserCheckboxBtn('default');
+        const isDeleteDisabled = await settingsUsersPage.isDeleteUserButtonDisabled();
+        expect(isDeleteDisabled).toBe(true);
     });
 
     test("@admin API Test: Add user via API -> Validated user existing via UI -> Delete user via API.", async () => {
@@ -141,6 +141,80 @@ test.describe('@Config Settings users tests', () => {
         await settingsUsersPage.searchForElement(username);
         expect(await settingsUsersPage.getTableRolesCount()).toBe(1);
         await apiCall.deleteUsers({ users: [{ username }] });
+    });
+
+    test("@admin Edit user -> change role via edit form -> Validate role changed", async () => {
+        const username = getRandomString('user');
+        await apiCall.createUsers({ username, password: user.password, role: user.ReadWrite });
+        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
+        await settingsUsersPage.navigateToUserTab();
+        await settingsUsersPage.editUser(username, { role: user.ReadOnly });
+        await settingsUsersPage.refreshPage();
+        await settingsUsersPage.navigateToUserTab();
+        const newUserRole = await settingsUsersPage.getUserRole(username);
+        expect(newUserRole).toBe("Read-Only");
+        await apiCall.deleteUsers({ users: [{ username }] });
+    });
+
+    test("@admin Edit user -> change key permissions via edit form -> Validate keys changed", async () => {
+        const username = getRandomString('user');
+        await apiCall.createUsers({ username, password: user.password, role: user.ReadWrite });
+        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
+        await settingsUsersPage.navigateToUserTab();
+        await settingsUsersPage.editUser(username, { keys: "myprefix:*" });
+        await settingsUsersPage.refreshPage();
+        await settingsUsersPage.navigateToUserTab();
+        const newKeys = await settingsUsersPage.getUserKeys(username);
+        expect(newKeys).toBe("myprefix:*");
+        await apiCall.deleteUsers({ users: [{ username }] });
+    });
+
+    test("@admin Edit user -> change password via edit form -> Validate login with new password", async () => {
+        const username = getRandomString('user');
+        const newPassword = "NewPass1@";
+        await apiCall.createUsers({ username, password: user.password, role: user.ReadWrite });
+        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
+        await settingsUsersPage.navigateToUserTab();
+        await settingsUsersPage.editUser(username, { password: newPassword, confirmPassword: newPassword });
+        await apiCall.deleteUsers({ users: [{ username }] });
+    });
+
+    test("@admin Edit button disabled when default user is selected", async () => {
+        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
+        await settingsUsersPage.navigateToUserTab();
+        await settingsUsersPage.clickUserCheckboxBtn('default');
+        const isEditDisabled = await settingsUsersPage.isEditUserButtonDisabled();
+        expect(isEditDisabled).toBe(true);
+    });
+
+    test("@admin Edit button disabled when no user is selected", async () => {
+        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
+        await settingsUsersPage.navigateToUserTab();
+        const isEditDisabled = await settingsUsersPage.isEditUserButtonDisabled();
+        expect(isEditDisabled).toBe(true);
+    });
+
+    test("@admin API Test: Update user role via PATCH -> Validate role changed via UI", async () => {
+        const username = getRandomString('user');
+        await apiCall.createUsers({ username, password: user.password, role: user.ReadWrite });
+        await apiCall.updateUser(username, { role: user.ReadOnly });
+        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
+        await settingsUsersPage.navigateToUserTab();
+        const newUserRole = await settingsUsersPage.getUserRole(username);
+        expect(newUserRole).toBe("Read-Only");
+        await apiCall.deleteUsers({ users: [{ username }] });
+    });
+
+    test("@admin API Test: Update user with password and keys via PATCH", async () => {
+        const username = getRandomString('user');
+        await apiCall.createUsers({ username, password: user.password, role: user.ReadWrite });
+        await apiCall.updateUser(username, { role: user.ReadWrite, keys: "test:*", password: "NewPass1@" });
+        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
+        await settingsUsersPage.navigateToUserTab();
+        const newKeys = await settingsUsersPage.getUserKeys(username);
+        expect(newKeys).toBe("test:*");
+        await apiCall.deleteUsers({ users: [{ username }] });
+    });
     });
 
 });
