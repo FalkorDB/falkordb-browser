@@ -110,7 +110,7 @@ export default function Users() {
         }, toast, setIndicator);
 
         if (result.ok) {
-            setUsers(prev => prev.map(u => u.username === username ? { ...u, role } : u));
+            setUsers(prev => prev.map(u => u.username === username ? { ...u, role, keys: keys || "*" } : u));
             setRows(prev => prev.map((row): Row => row.cells[0].value === username ? { ...row, cells: [row.cells[0], { ...row.cells[1], value: role }, { ...row.cells[2], value: keys || "*" }] } : row));
             toast({
                 title: "Success",

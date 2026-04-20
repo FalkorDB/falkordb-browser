@@ -2589,7 +2589,7 @@ const swaggerSpec = {
                   },
                   password: {
                     type: "string",
-                    description: "New password for the user (optional, omit to keep current password)"
+                    description: "New password for the user (optional, omit to keep current password). Must be at least 8 characters with uppercase, lowercase, digit, and special character."
                   }
                 },
                 required: ["role"]
@@ -2599,7 +2599,26 @@ const swaggerSpec = {
         },
         responses: {
           "200": {
-            description: "User updated successfully"
+            description: "User updated successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "User role updated"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            description: "Bad request - validation error or invalid role"
+          },
+          "500": {
+            description: "Internal server error"
           }
         }
       }

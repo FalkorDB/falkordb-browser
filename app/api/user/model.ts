@@ -1,6 +1,7 @@
 export interface User {
   username: string;
   role: string;
+  keys?: string;
 }
 
 export interface CreateUser {
@@ -55,6 +56,8 @@ export const ROLE = new Map<string, string[]>([
 ]);
 
 export function extractKeysFromACL(userDetails: string[]): string {
-  const keyPattern = userDetails.find((part) => part.startsWith("~"));
-  return keyPattern ? keyPattern.slice(1) : "*";
+  const keyPatterns = userDetails
+    .filter((part) => part.startsWith("~"))
+    .map((part) => part.slice(1));
+  return keyPatterns.length > 0 ? keyPatterns.join(" ") : "*";
 }

@@ -40,8 +40,7 @@ export const updateUser = z.object({
     .min(1, "Role cannot be empty"),
   keys: z
     .string()
-    .optional()
-    .default("*"),
+    .optional(),
   password: z
     .string()
     .optional(),

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "../../auth/[...nextauth]/options";
-import { ROLE, getRoleWithKeys } from "../model";
+import { ROLE, getRoleWithKeys, extractKeysFromACL } from "../model";
 import { updateUser, validateBody } from "../../validate-body";
 import { getCorsHeaders } from "../../utils";
 
@@ -41,11 +41,23 @@ export async function PATCH(
       const role = ROLE.get(roleKey);
       if (!role) throw new Error("Invalid role");
 
-      const finalRole = getRoleWithKeys(role, keys);
+      const connection = await client.connection;
+
+      // Preserve existing key permissions when keys not provided (true PATCH semantics)
+      let effectiveKeys = keys;
+      if (effectiveKeys === undefined) {
+        const aclList = await connection.aclList();
+        const userLine = aclList.find((line: string) => line.split(" ")[1] === username);
+        if (userLine) {
+          effectiveKeys = extractKeysFromACL(userLine.split(" "));
+        }
+      }
+
+      const finalRole = getRoleWithKeys(role, effectiveKeys);
       if (password) {
         finalRole.push(`>${password}`);
       }
-      await (await client.connection).aclSetUser(username, finalRole);
+      await connection.aclSetUser(username, finalRole);
       return NextResponse.json({ message: "User role updated" }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
