@@ -215,6 +215,4 @@ test.describe('@Config Settings users tests', () => {
         expect(newKeys).toBe("test:*");
         await apiCall.deleteUsers({ users: [{ username }] });
     });
-    });
-
 });
