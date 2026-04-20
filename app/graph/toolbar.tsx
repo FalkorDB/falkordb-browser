@@ -8,7 +8,6 @@ import Button from "../components/ui/Button";
 import DeleteElement from "./DeleteElement";
 import { BrowserSettingsContext, ConnectionContext, GraphContext } from "../components/provider";
 import { getNodeDisplayText } from "@falkordb/canvas";
-import BrowserSettings from "../settings/browserSettings";
 
 interface Props {
     graph: Graph
