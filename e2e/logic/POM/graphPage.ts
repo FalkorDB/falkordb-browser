@@ -91,8 +91,28 @@ export default class GraphPage extends Page {
     return this.page.getByTestId("duplicateGraphConfirm");
   }
 
+  private get graphInfoToggle(): Locator {
+    return this.page.getByTestId("graphInfoToggle");
+  }
+
+  private get graphInfoPanel(): Locator {
+    return this.page.getByTestId("graphInfoPanel");
+  }
+
   private get closeHelpMessage(): Locator {
     return this.page.locator("iframe[title='Close message']");
+  }
+
+  async ensureGraphInfoPanelOpen(): Promise<void> {
+    const box = await this.graphInfoPanel.boundingBox();
+    if (!box || box.width < 50) {
+      await interactWhenVisible(
+        this.graphInfoToggle,
+        (el) => el.click(),
+        "Graph Info Toggle"
+      );
+      await this.page.waitForTimeout(500);
+    }
   }
 
   async getBoundingBoxCanvasElement(): Promise<null | {
@@ -169,6 +189,7 @@ export default class GraphPage extends Page {
   }
 
   async clickEditorInput(): Promise<void> {
+    await this.page.keyboard.press("Escape");
     await interactWhenVisible(
       this.editorContainer,
       (el) => el.click(),
@@ -193,6 +214,7 @@ export default class GraphPage extends Page {
   }
 
   async clickCreateGraph(): Promise<void> {
+    await this.ensureGraphInfoPanelOpen();
     await interactWhenVisible(
       this.create("Graph"),
       (el) => el.click(),
@@ -277,6 +299,9 @@ export default class GraphPage extends Page {
   }
 
   async clickSelect(type: Type = "Graph"): Promise<void> {
+    if (type === "Graph") {
+      await this.ensureGraphInfoPanelOpen();
+    }
     await interactWhenVisible(
       this.select(type),
       (el) => el.click(),

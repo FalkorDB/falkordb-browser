@@ -744,6 +744,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                 )}
                                 indicator={indicator}
                                 title="Chat"
+                                disabled={!graphName}
                                 onClick={() => {
                                     setPanel(prev => prev === "chat" ? undefined : "chat");
                                 }}

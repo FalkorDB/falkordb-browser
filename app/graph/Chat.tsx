@@ -449,7 +449,7 @@ export default function Chat({ onClose }: Props) {
                     <X className="h-4 w-4" />
                 </Button>
                 <div className="w-full flex justify-between items-center pr-8">
-                    <h1 className="ext-lg font-semibold">Chat</h1>
+                    <h1 className="text-lg font-semibold">Chat</h1>
                     <Sparkles size={25} />
                 </div>
                 <span id="chat-prerequisites" className="text-center">Use English to query the graph. The feature requires LLM model and API key. Update local user parameters in Settings.</span>
