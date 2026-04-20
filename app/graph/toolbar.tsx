@@ -1,4 +1,4 @@
-import { ArrowRight, Circle, Info, Search, X } from "lucide-react";
+import { ArrowRight, Circle, Search, X } from "lucide-react";
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { cn, GraphRef, Link, Node } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -6,7 +6,7 @@ import { Graph } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import DeleteElement from "./DeleteElement";
-import { BrowserSettingsContext, ConnectionContext, GraphContext } from "../components/provider";
+import { ConnectionContext, GraphContext } from "../components/provider";
 
 interface Props {
     graph: Graph
@@ -48,12 +48,6 @@ export default function Toolbar({
 
     const { isLoading: isLoadingGraph } = useContext(GraphContext);
     const { isReadOnly } = useContext(ConnectionContext);
-    const { settings: { showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
-    const {
-        settings: {
-            limitSettings: { limit, lastLimit },
-        }
-    } = useContext(BrowserSettingsContext);
 
 
     const suggestionRef = useRef<HTMLDivElement>(null);
@@ -67,9 +61,6 @@ export default function Toolbar({
     const [topFakeItemHeight, setTopFakeItemHeight] = useState(0);
     const [bottomFakeItemHeight, setBottomFakeItemHeight] = useState(0);
     const [visibleSuggestions, setVisibleSuggestions] = useState<(Node | Link)[]>([]);
-
-    const hasLimitWarning = graph.CurrentLimit && graph.Data.length >= graph.CurrentLimit;
-    const hasLimitChangeWarning = graph.CurrentLimit && lastLimit !== limit;
 
     const isLoading = isLoadingSchema || isLoadingGraph;
 
@@ -306,34 +297,6 @@ export default function Toolbar({
                 {
                     graphName && !isReadOnly &&
                     <>
-                        <Button
-                            data-testid={`elementCanvasInfo${label}`}
-                            className="p-1 bg-background cursor-default border-primary"
-                            variant="Secondary"
-                            tooltipVariant="Primary"
-                            tooltipSide="bottom"
-                            title={`Select And Show Properties (Right Click)
-                                Select Multiple Entities (Right Click + Left Ctrl)
-                                Select 2 Nodes to Create Edge`}
-                        >
-                            <Info size={20} />
-                        </Button>
-                        {
-                            (hasLimitWarning || hasLimitChangeWarning) ?
-                                <Button
-                                    data-testid={`elementCanvasLimitWarning${label}`}
-                                    className="p-1 bg-background cursor-default border-orange-300"
-                                    variant="Secondary"
-                                    tooltipVariant="Primary"
-                                    tooltipSide="bottom"
-                                    title={`${hasLimitWarning ? `Data currently limited to ${graph.Data.length} rows` : ""}
-                        ${hasLimitChangeWarning ? "Rerun the query to apply the new limit." : ""}
-                        ${graph.ShowPropertyKeyPrefix !== showPropertyKeyPrefix ? "Rerun the query to apply the new property key prefix settings." : ""}`}
-                                >
-                                    <Info className="text-orange-300" size={20} />
-                                </Button>
-                                : null
-                        }
                         <Button
                             data-testid={`elementCanvasAddNode${label}`}
                             className="p-1 bg-background border-green text-green"

@@ -455,6 +455,7 @@ export default function TableComponent({
                                 <TableHead className="w-5 border-r border-border !p-1 !pr-0" key={headerNames[0]}>
                                     <Checkbox
                                         data-testid={`tableCheckbox${label}`}
+                                        aria-label={`Select all ${label}`}
                                         className="w-5 h-5 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
                                         checked={filteredRows.length > 0 && filteredRows.every(row => row.checked)}
                                         onCheckedChange={() => {
@@ -623,6 +624,7 @@ export default function TableComponent({
                                                     <Checkbox
                                                         className="w-5 h-5 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
                                                         data-testid={`tableCheckbox${rowTestID}`}
+                                                        aria-label={`Select row ${row.name}`}
                                                         checked={row.checked}
                                                         onCheckedChange={() => {
                                                             setRows(rows.map((r) => {
@@ -734,7 +736,8 @@ export default function TableComponent({
                                                                                 : cell.type === "text" &&
                                                                                 <Input
                                                                                     data-testid={`input${label}`}
-                                                                                    className="h-full grow basis-0"
+                                                                                    ref={inputRef as React.RefObject<HTMLInputElement>}
+                                                                                    className="grow"
                                                                                     value={newValue}
                                                                                     onChange={(e) => setNewValue(e.target.value)}
                                                                                     onKeyDown={async (e) => {

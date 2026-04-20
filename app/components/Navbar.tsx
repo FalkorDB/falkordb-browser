@@ -48,7 +48,7 @@ export default function Navbar({ showUDF }: Props) {
     const separator = <div className="h-px w-[80%] bg-border/50 rounded-full" />;
 
     return (
-        <div className="py-5 p-2 flex flex-col justify-between items-center border-r border-border/50">
+        <div className="py-5 px-2 flex flex-col justify-between items-center border-r border-border/50">
             <div className="w-full flex flex-col gap-3 items-center">
                 {
                     mounted && currentTheme &&

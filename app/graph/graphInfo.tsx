@@ -105,7 +105,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             <div className="flex gap-2 items-center">
                                 <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Nodes</h2>
                                 {
-                                    nodesCount !== undefined || graphName === "" ?
+                                    nodesCount !== undefined ?
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <p
@@ -193,7 +193,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             <div className="flex gap-2 items-center">
                                 <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Edges</h2>
                                 {
-                                    edgesCount !== undefined || graphName === "" ?
+                                    edgesCount !== undefined ?
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <p

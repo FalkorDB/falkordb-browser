@@ -40,8 +40,17 @@ export default class GraphInfoPage extends GraphPage {
   }
 
   async isGraphInfoPanelContainerVisible(): Promise<boolean> {
-      await this.page.waitForTimeout(1000);
-      return waitForElementToBeVisible(this.graphInfoNodesCount);
+    // In the new UI the SelectGraph lives inside the Graph Info panel, so
+    // the panel can be open (expanded) while nodesCount is still loading
+    // (the loader is rendered instead of the p[data-testid="nodesCount"]).
+    // Checking nodesCount visibility would incorrectly report the panel as
+    // closed during loading, causing openGraphInfoButton() to toggle it shut.
+    // Use the panel's bounding-box width instead: > 50 px means expanded.
+    // .first() is needed because both the ResizablePanel wrapper (providers.tsx)
+    // and the inner GraphInfoPanel div (graphInfo.tsx) share the same test-id.
+    await this.page.waitForTimeout(300);
+    const box = await this.page.getByTestId("graphInfoPanel").first().boundingBox().catch(() => null);
+    return !!(box && box.width > 50);
   }
 
   async clickGraphInfoButton(): Promise<void> {
@@ -112,6 +121,7 @@ export default class GraphInfoPage extends GraphPage {
       (el) => el.click(),
       `Graph Info Node Button ${label}`
     );
+    await waitForElementToBeVisible(this.runLabelButton(label));
     await interactWhenVisible(
       this.runLabelButton(label),
       (el) => el.click(),

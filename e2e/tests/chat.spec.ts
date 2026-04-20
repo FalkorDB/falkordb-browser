@@ -24,7 +24,7 @@ test.describe("Chat Feature Tests", () => {
     const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
     await browser.setPageToFullScreen();
     
-    // Verify chat toggle button is visible but disabled when no graph is selected
+    // Verify chat toggle button is disabled when no graph is selected
     const isChatButtonVisible = await chat.isChatToggleButtonVisible();
     expect(isChatButtonVisible).toBe(true);
     const isChatButtonDisabled = await chat.isChatToggleButtonDisabled();

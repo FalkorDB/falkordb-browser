@@ -36,7 +36,7 @@ const getPortErrors = (func?: (value: string) => string) => {
 
   return [
     {
-      condition: (value: string) => { console.log(getValue(value)); return getValue(value) !== "" && handlePortIsNumber(getValue(value)) },
+      condition: (value: string) => getValue(value) !== "" && handlePortIsNumber(getValue(value)),
       message: "Port must be a number"
     },
     {
@@ -109,7 +109,7 @@ export default function LoginForm() {
   const searchParams = useSearchParams();
 
   // Build a display URL from the shared state
-  const buildUrl = () => {
+  const buildUrl = ({ host, port, username, password, TLS }: { host?: string, port?: string, username?: string, password?: string, TLS?: boolean }) => {
     if (!host && !port && !username && !password) return "";
     const h = host || DEFAULT_HOST;
     const protocol = TLS ? "falkors" : "falkor";
@@ -125,8 +125,9 @@ export default function LoginForm() {
     value: username,
     onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
       setUsername(e.target.value);
+      setRawUrl(buildUrl({ host, port, username: e.target.value, password, TLS }));
       clearError();
-
+      
       return true;
     },
     label: "Username",
@@ -139,8 +140,9 @@ export default function LoginForm() {
     value: password,
     onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
       setPassword(e.target.value);
+      setRawUrl(buildUrl({ host, port, username, password: e.target.value, TLS }));
       clearError();
-
+      
       return true;
     },
     label: "Password",
@@ -155,16 +157,16 @@ export default function LoginForm() {
     onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value;
       const parsed = parseUrl(val);
-
+      
       setHost(parsed.host);
       setPort(parsed.port);
       setUsername(parsed.username);
       setPassword(parsed.password);
       setTLS(parsed.tls);
       setRawUrl(val);
-
+      
       clearError();
-
+      
       return true;
     },
     errors: [
@@ -175,16 +177,17 @@ export default function LoginForm() {
     placeholder: `falkor://Default:Default@${DEFAULT_HOST}:${DEFAULT_PORT}`,
     required: true
   }] : userInputFields;
-
+  
   const fields: Field[] = loginMode === "url" ?
-    urlFields
-    : [
+  urlFields
+  : [
       {
         value: host,
         onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
           setHost(e.target.value);
+          setRawUrl(buildUrl({ host: e.target.value, port, username, password, TLS }));
           clearError();
-
+          
           return true;
         },
         label: "Host",
@@ -195,9 +198,10 @@ export default function LoginForm() {
       {
         value: port,
         onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
+          setRawUrl(buildUrl({ host, port: e.target.value, username, password, TLS }));
           setPort(e.target.value);
           clearError();
-
+          
           return true;
         },
         errors: [...getPortErrors()],
@@ -230,12 +234,29 @@ export default function LoginForm() {
 
     // Pre-submit validation for URL mode — show colored format errors
     if (loginMode === "url") {
-      let url = rawUrl || "falkor://localhost:6379";
-      
-      if (missingFields) {
-        url = buildUrl();
+      // Fill in missing parts with defaults (protocol, host, port)
+      const parsed = parseUrl(rawUrl);
+      const proto = parsed.protocol || "falkor";
+      const h = parsed.host || DEFAULT_HOST;
+      const p = parsed.port || DEFAULT_PORT;
+      const creds = parsed.username || parsed.password
+        ? `${encodeURIComponent(parsed.username)}${parsed.password ? `:${encodeURIComponent(parsed.password)}` : ""}@`
+        : "";
+      const url = `${proto}://${creds}${h}:${p}`;
+
+      setRawUrl(url);
+      setPort(p);
+      setHost(h);
+
+      if (parsed.username) {
+        setUsername(parsed.username);
       }
-      
+
+      if (parsed.password) {
+        setPassword(parsed.password);
+      }
+
+
       const result = await securedFetch("/api/validate-url", {
         method: "POST",
         body: JSON.stringify({ url })
@@ -250,7 +271,9 @@ export default function LoginForm() {
         return;
       }
 
-      const res = validateUrl(url);
+      // Validate the original rawUrl (not the reconstructed url) so format
+      // issues like empty credentials with '@' are still detected.
+      const res = validateUrl(rawUrl || url);
       const { parts } = res;
 
       if (!res.valid) {
@@ -347,7 +370,7 @@ export default function LoginForm() {
               setLoginMode(mode);
               setMissingFields(false);
               if (mode === "url") {
-                setRawUrl(buildUrl());
+                setRawUrl(buildUrl({ host, port, username, password, TLS }));
               }
               clearError();
             }}
@@ -381,6 +404,7 @@ export default function LoginForm() {
                     checked={TLS}
                     onCheckedChange={(checked) => {
                       setTLS(checked as boolean);
+                      setRawUrl(buildUrl({ host, port, username, password, TLS: checked as boolean }));
                       clearError();
                       if (!checked) {
                         // Clear certificate when TLS is disabled
