@@ -561,8 +561,14 @@ export async function getClient(
         // eslint-disable-next-line no-console
         console.warn("Failed to resolve session credential from Token DB:", pwErr);
         return NextResponse.json(
-          { message: "Session credential could not be resolved; please sign in again." },
-          { status: 401, headers: getCorsHeaders(request) }
+          { message: "Session credential could not be resolved; please sign in again.", code: "SESSION_INVALID" },
+          {
+            status: 401,
+            headers: {
+              ...getCorsHeaders(request),
+              "X-Session-Invalid": "1",
+            },
+          }
         );
       }
     }
