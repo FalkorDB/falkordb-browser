@@ -7,8 +7,7 @@ import { PlusCircle } from "lucide-react";
 import { CreateUser } from "@/app/api/user/model";
 import Button from "@/app/components/ui/Button";
 import FormComponent, { Field } from "@/app/components/FormComponent";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { Drawer, DrawerDescription, DrawerContent, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
+import { Drawer, DrawerDescription, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 
 export default function AddUser({ onAddUser }: {
     onAddUser: (user: CreateUser, keys: string) => Promise<void>
@@ -152,11 +151,13 @@ export default function AddUser({ onAddUser }: {
                     <PlusCircle size={20} />
                 </Button>
             </DrawerTrigger>
-            <DrawerContent side="right" className="gap-2 after:hidden">
-                <VisuallyHidden>
-                    <DrawerTitle />
-                    <DrawerDescription />
-                </VisuallyHidden>
+            <DrawerContent side="right" className="w-[28rem] max-w-[90vw] gap-2 after:hidden overflow-y-auto">
+                <DrawerHeader className="px-4 pt-4 pb-0">
+                    <DrawerTitle>Add User</DrawerTitle>
+                    <DrawerDescription>
+                        Create a new user with role-based access permissions.
+                    </DrawerDescription>
+                </DrawerHeader>
                 <FormComponent
                     className="p-4"
                     handleSubmit={handleAddUser}
