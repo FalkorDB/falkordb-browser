@@ -20,7 +20,7 @@ export default class SettingsUsersPage extends BasePage {
   }
 
   private get submitEditUser(): Locator {
-    return this.page.getByRole("button", { name: "Save" });
+    return this.page.getByRole("button", { name: "Save", exact: true });
   }
 
   private get selectRoleBtn(): Locator {

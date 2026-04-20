@@ -4,7 +4,6 @@ export interface GetUsersResponse {
     role: string;
     selected: boolean;
     keys: string;
-    checked: boolean;
   }[];
 }
 
