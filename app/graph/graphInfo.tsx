@@ -37,7 +37,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     useEffect(() => { setPropertyKeysSearch(""); }, [PropertyKeys, maxItemsForSearch]);
 
     return (
-        <div data-testid="graphInfoPanel" className={cn("relative h-full w-full p-3 grid gap-3 overflow-hidden", showMemoryUsage ? "grid-rows-[max-content_max-content_max-content_1fr_1fr_1fr]" : "grid-rows-[max-content_max-content_1fr_1fr_1fr]")}>
+        <div data-testid="graphInfoPanel" className={cn("relative h-full w-full p-3 grid gap-3", showMemoryUsage ? "grid-rows-[max-content_max-content_max-content_1fr_1fr_1fr]" : "grid-rows-[max-content_max-content_1fr_1fr_1fr]")}>
             {
                 !customizingLabel ? (
                     <>
@@ -52,7 +52,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             <h1 className="text-lg font-semibold">Graph Info</h1>
                             <Network size={20} className="text-foreground/50" />
                         </div>
-                        <div className="w-full flex gap-2 items-center">
+                        <div className="w-full flex gap-2 items-center overflow-hidden">
                             <SelectGraph
                                 options={graphNames}
                                 setOptions={(opts) => setGraphNames(opts as unknown as string[])}
@@ -105,8 +105,8 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             <div className="flex gap-2 items-center">
                                 <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Nodes</h2>
                                 {
-                                    nodesCount !== undefined ?
-                                        <Tooltip>
+                                    nodesCount !== undefined || graphName === "" ?
+                                     <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <p
                                                     data-testid="nodesCount"
@@ -193,7 +193,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             <div className="flex gap-2 items-center">
                                 <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Edges</h2>
                                 {
-                                    edgesCount !== undefined ?
+                                    edgesCount !== undefined || graphName === "" ?
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <p

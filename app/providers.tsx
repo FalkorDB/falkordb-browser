@@ -758,7 +758,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
     let rafId: number | undefined;
 
-    if ((pathname === "/graph" && graphName) || pathname === "/udf") {
+    if (pathname === "/graph" || pathname === "/udf") {
       if (currentPanel.isCollapsed()) currentPanel.expand();
     } else if (!currentPanel.isCollapsed()) {
       // Defer collapse to next frame so the collapsible prop change
@@ -771,7 +771,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     return () => {
       if (rafId !== undefined) cancelAnimationFrame(rafId);
     };
-  }, [graphName, pathname]);
+  }, [pathname]);
 
   const checkStatus = useCallback(() => {
     securedFetch("/api/status", {

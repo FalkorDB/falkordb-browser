@@ -83,14 +83,6 @@ export default class GraphPage extends Page {
     return this.page.getByTestId("duplicateGraph");
   }
 
-  private get graphInfoToggle(): Locator {
-    return this.page.getByTestId("graphInfoToggle");
-  }
-
-  private get graphInfoPanel(): Locator {
-    return this.page.getByTestId("graphInfoPanel");
-  }
-
   /**
    * Ensures the graph info side panel is expanded.
    * react-resizable-panels v4 renders content inside collapsed panels
@@ -121,6 +113,14 @@ export default class GraphPage extends Page {
 
   private get duplicateGraphConfirm(): Locator {
     return this.page.getByTestId("duplicateGraphConfirm");
+  }
+
+  private get graphInfoToggle(): Locator {
+    return this.page.getByTestId("graphInfoToggle");
+  }
+
+  private get graphInfoPanel(): Locator {
+    return this.page.getByTestId("graphInfoPanel");
   }
 
   private get closeHelpMessage(): Locator {

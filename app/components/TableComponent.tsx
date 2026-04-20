@@ -251,12 +251,6 @@ export default function TableComponent({
         }
     }, [inputRef, editable]);
 
-    useEffect(() => {
-        if (searchRef.current) {
-            searchRef.current.focus();
-        }
-    }, []);
-
     const handleSearchFilter = useCallback((cell: Cell): boolean => {
         if (!cell.value) return false;
 
