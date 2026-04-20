@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useContext, Dispatch, SetStateAction, useRef, useCallback, useMemo } from "react";
 import { cn, GraphRef, formatName, Node, Link, getTheme, Query, HistoryQuery } from "@/lib/utils";
-import { ChevronDown, History, Info, Maximize2, MessagesSquare, Network, Sparkles, Star, Trash2 } from "lucide-react";
+import { ChevronDown, History, Info, Network, Sparkles, Star, Trash2 } from "lucide-react";
 import * as monaco from "monaco-editor";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
