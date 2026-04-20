@@ -60,7 +60,7 @@ export async function newClient(
             host: credentials.host ?? "localhost",
             port: credentials.port ? parseInt(credentials.port, 10) : 6379,
             tls: credentials.tls === "true",
-            checkServerIdentity: () => undefined,
+            ...(process.env.SKIP_SERVER_IDENTITY_CHECK === "true" ? { checkServerIdentity: () => undefined } : {}),
             ca:
               !credentials.ca || credentials.ca === "undefined"
                 ? undefined

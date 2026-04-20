@@ -3,6 +3,8 @@ export interface GetUsersResponse {
     username: string;
     role: string;
     selected: boolean;
+    keys: string;
+    checked: boolean;
   }[];
 }
 
