@@ -248,9 +248,17 @@ export async function getSSEGraphResult(
 
     evtSource.addEventListener("error", (event: MessageEvent) => {
       handled = true;
-      const { message, status } = JSON.parse(event.data);
+      const { message, status, code } = JSON.parse(event.data);
 
       evtSource.close();
+
+      if (status === 401 && code === "SESSION_INVALID") {
+        triggerSessionInvalidationSignOut();
+        setIndicator("offline");
+        reject(new Error(message));
+        return;
+      }
+
       toast({ title: "Error", description: message, variant: "destructive" });
 
       if (status === 401 || status >= 500) setIndicator("offline");
@@ -277,6 +285,14 @@ export async function getSSEGraphResult(
 // in-flight requests hit a newly-invalidated session at the same time.
 let sessionInvalidationInFlight = false;
 
+function triggerSessionInvalidationSignOut(): void {
+  if (sessionInvalidationInFlight) return;
+  sessionInvalidationInFlight = true;
+  signOut({ callbackUrl: "/login" }).catch(() => {
+    sessionInvalidationInFlight = false;
+  });
+}
+
 export async function securedFetch(
   input: string,
   init: RequestInit,
@@ -290,12 +306,7 @@ export async function securedFetch(
   // header. We only sign out on this explicit signal so that ordinary 401s
   // (e.g. login form with wrong password) don't log out unrelated users.
   if (status === 401 && response.headers.get("X-Session-Invalid") === "1") {
-    if (!sessionInvalidationInFlight) {
-      sessionInvalidationInFlight = true;
-      signOut({ callbackUrl: "/login" }).catch(() => {
-        sessionInvalidationInFlight = false;
-      });
-    }
+    triggerSessionInvalidationSignOut();
     setIndicator("offline");
     return response;
   }

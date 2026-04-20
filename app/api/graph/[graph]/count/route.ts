@@ -1,5 +1,5 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { runQuery, getCorsHeaders } from "@/app/api/utils";
+import { runQuery, getCorsHeaders, writeGetClientErrorAsSSE } from "@/app/api/utils";
 import { NextResponse, NextRequest } from "next/server";
 
 // eslint-disable-next-line import/prefer-default-export
@@ -15,7 +15,15 @@ export async function GET(
     const session = await getClient(request);
 
     if (session instanceof NextResponse) {
-      throw new Error(await session.text());
+      await writeGetClientErrorAsSSE(session, writer, encoder);
+      return new Response(readable, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+          ...getCorsHeaders(request),
+        },
+      });
     }
 
     const { client } = session;
