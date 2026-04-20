@@ -151,18 +151,20 @@ export default function AddUser({ onAddUser }: {
                     <PlusCircle size={20} />
                 </Button>
             </DrawerTrigger>
-            <DrawerContent side="right" className="w-[28rem] max-w-[90vw] gap-2 after:hidden overflow-y-auto">
-                <DrawerHeader className="px-4 pt-4 pb-0">
-                    <DrawerTitle>Add User</DrawerTitle>
-                    <DrawerDescription>
-                        Create a new user with role-based access permissions.
-                    </DrawerDescription>
-                </DrawerHeader>
-                <FormComponent
-                    className="p-4"
-                    handleSubmit={handleAddUser}
-                    fields={fields}
-                />
+            <DrawerContent side="right" className="w-[30rem] max-w-[90vw] gap-2 after:hidden">
+                <div className="flex-1 flex flex-col overflow-y-auto">
+                    <DrawerHeader className="px-6 pt-6 pb-2 text-left border-b border-border">
+                        <DrawerTitle className="text-xl">Add User</DrawerTitle>
+                        <DrawerDescription>
+                            Create a new user with role-based access permissions.
+                        </DrawerDescription>
+                    </DrawerHeader>
+                    <FormComponent
+                        className="px-6 py-4"
+                        handleSubmit={handleAddUser}
+                        fields={fields}
+                    />
+                </div>
             </DrawerContent>
         </Drawer>
     );
