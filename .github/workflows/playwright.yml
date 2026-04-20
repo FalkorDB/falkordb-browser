@@ -287,8 +287,10 @@ jobs:
             exit 1
           fi
       - name: Run TLS tests
+        env:
+          SKIP_SERVER_IDENTITY_CHECK: "true"
         run: |
-          NEXTAUTH_SECRET=SECRET npm start > nextjs.log 2>&1 & 
+          NEXTAUTH_SECRET=SECRET SKIP_SERVER_IDENTITY_CHECK=true npm start > nextjs.log 2>&1 & 
           timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
           npx playwright test --workers=1 --reporter=dot,list --project="[TLS - Chromium]" --project="[TLS - Firefox]"
       - name: Cleanup TLS certificates
