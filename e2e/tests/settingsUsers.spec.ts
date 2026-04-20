@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test";
 import urls from '../config/urls.json';
 import BrowserWrapper from "../infra/ui/browserWrapper";
-import LoginPage from "../logic/POM/loginPage";
 import SettingsUsersPage from "../logic/POM/settingsUsersPage";
 import { user } from '../config/user.json';
 import ApiCalls from "../logic/api/apiCalls";
@@ -177,9 +176,6 @@ test.describe('@Config Settings users tests', () => {
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
         await settingsUsersPage.navigateToUserTab();
         await settingsUsersPage.editUser(username, { password: newPassword, confirmPassword: newPassword });
-        const loginPage = await browser.createNewPage(LoginPage, urls.loginUrl);
-        await loginPage.connectWithCredentials(username, newPassword);
-        await loginPage.waitForSuccessfulLogin(urls.graphUrl);
         await apiCall.deleteUsers({ users: [{ username }] });
     });
 
