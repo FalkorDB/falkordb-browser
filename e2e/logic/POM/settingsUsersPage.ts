@@ -241,6 +241,7 @@ export default class SettingsUsersPage extends BasePage {
 
   async modifyUserRole(selectedUser: string, role: string): Promise<void> {
     await this.waitForPageIdle();
+    await this.searchForElement(selectedUser);
     await this.clickUserCheckboxBtn(selectedUser);
     await this.clickOnEditUserBtn();
     await this.clickEditSelectRoleBtn();
@@ -251,6 +252,7 @@ export default class SettingsUsersPage extends BasePage {
 
   async editUser(selectedUser: string, options: { role?: string, keys?: string, password?: string, confirmPassword?: string }): Promise<void> {
     await this.waitForPageIdle();
+    await this.searchForElement(selectedUser);
     await this.clickUserCheckboxBtn(selectedUser);
     await this.clickOnEditUserBtn();
     if (options.password) {
@@ -330,6 +332,7 @@ export default class SettingsUsersPage extends BasePage {
 
   async getUserKeys(selectedUser: string): Promise<string | null> {
     await this.waitForPageIdle();
+    await this.searchForElement(selectedUser);
     const keys = await this.userKeysContent(selectedUser).textContent();
     return keys;
   }
