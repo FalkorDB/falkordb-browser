@@ -796,28 +796,28 @@ ${hasPrefixChange ? "Rerun the query to apply the new property key prefix settin
                             </Button>
                         </div>
                         <Button
-                                aria-label="Chat panel"
-                                aria-pressed={panel === "chat" && panelOpen}
-                                data-testid="chatToggleButton"
-                                className={cn(
-                                    "text-foreground border border-border rounded-lg p-2 hover:bg-secondary",
-                                    panel === "chat" && panelOpen && "!text-primary"
-                                )}
-                                indicator={indicator}
-                                title="Chat"
-                                disabled={!graphName}
-                                onClick={() => {
-                                    if (panel === "chat") {
-                                        setPanel(undefined);
-                                        onTogglePanel();
-                                    } else {
-                                        setPanel("chat");
-                                        if (!panelOpen) onTogglePanel();
-                                    }
-                                }}
-                            >
-                                <MessagesSquare size={20} />
-                            </Button>
+                            aria-label="Chat panel"
+                            aria-pressed={panel === "chat" && panelOpen}
+                            data-testid="chatToggleButton"
+                            className={cn(
+                                "text-foreground border border-border rounded-lg p-2 hover:bg-secondary",
+                                panel === "chat" && panelOpen && "!text-primary"
+                            )}
+                            indicator={indicator}
+                            title="Chat"
+                            disabled={!graphName}
+                            onClick={() => {
+                                if (panel === "chat") {
+                                    setPanel(undefined);
+                                    onTogglePanel();
+                                } else {
+                                    setPanel("chat");
+                                    if (!panelOpen) onTogglePanel();
+                                }
+                            }}
+                        >
+                            <MessagesSquare size={20} />
+                        </Button>
                     </>
                     : selectedElements && handleDeleteElement && setSelectedElements && setIsAddNode && setIsAddEdge && canvasRef && isCanvasLoading !== undefined && <div className="w-full h-full">
                         <Toolbar
@@ -830,7 +830,7 @@ ${hasPrefixChange ? "Rerun the query to apply the new property key prefix settin
                             setIsAddNode={setIsAddNode}
                             setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => "labels" in e) ? setIsAddEdge : undefined}
                             canvasRef={canvasRef}
-                            setExpand={() => {}}
+                            setExpand={() => { }}
                             expand={true}
                             isLoadingSchema={!!isCanvasLoading}
                             isAddNode={isAddNode}
