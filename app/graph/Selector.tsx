@@ -400,13 +400,21 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
             {
                 historyQuery &&
                 <Button
+                    aria-label="Graph info panel"
+                    aria-pressed={panelOpen && panel !== "chat"}
                     indicator={indicator}
                     className={cn(
                         "h-full text-foreground p-2 rounded-lg border border-border bg-background hover:bg-secondary",
-                        panelOpen && "!text-primary"
+                        panelOpen && panel !== "chat" && "!text-primary"
                     )}
                     title="Graph info"
-                    onClick={() => onTogglePanel()}
+                    onClick={() => {
+                        if (panel === "chat") {
+                            setPanel(undefined);
+                        } else {
+                            onTogglePanel();
+                        }
+                    }}
                     data-testid="graphInfoToggle"
                 >
                     <Network size={20} />
@@ -788,20 +796,28 @@ ${hasPrefixChange ? "Rerun the query to apply the new property key prefix settin
                             </Button>
                         </div>
                         <Button
-                            data-testid="chatToggleButton"
-                            className={cn(
-                                "text-foreground border border-border rounded-lg p-2 hover:bg-secondary",
-                                panel === "chat" && "!text-primary"
-                            )}
-                            indicator={indicator}
-                            title="Chat"
-                            disabled={!graphName}
-                            onClick={() => {
-                                setPanel(prev => prev === "chat" ? undefined : "chat");
-                            }}
-                        >
-                            <MessagesSquare size={20} />
-                        </Button>
+                                aria-label="Chat panel"
+                                aria-pressed={panel === "chat" && panelOpen}
+                                data-testid="chatToggleButton"
+                                className={cn(
+                                    "text-foreground border border-border rounded-lg p-2 hover:bg-secondary",
+                                    panel === "chat" && panelOpen && "!text-primary"
+                                )}
+                                indicator={indicator}
+                                title="Chat"
+                                disabled={!graphName}
+                                onClick={() => {
+                                    if (panel === "chat") {
+                                        setPanel(undefined);
+                                        onTogglePanel();
+                                    } else {
+                                        setPanel("chat");
+                                        if (!panelOpen) onTogglePanel();
+                                    }
+                                }}
+                            >
+                                <MessagesSquare size={20} />
+                            </Button>
                     </>
                     : selectedElements && handleDeleteElement && setSelectedElements && setIsAddNode && setIsAddEdge && canvasRef && isCanvasLoading !== undefined && <div className="w-full h-full">
                         <Toolbar
