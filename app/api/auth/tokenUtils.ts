@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import crypto from "crypto";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
+import { encrypt } from "./encryption";
 
 /**
  * Validates JWT secret exists in environment
@@ -102,4 +103,41 @@ export async function getPasswordFromTokenDB(tokenId: string): Promise<string> {
     }
     throw new Error(`Failed to retrieve password for token: ${tokenId}`);
   }
+}
+
+/**
+ * Persist an encrypted credential entry in the Token DB.
+ * Shared helper used by the NextAuth session flow (bound to a session credentialRef)
+ * and the personal-access-token flows (bound to a JWT).
+ */
+export async function storeEncryptedCredential(params: {
+  tokenHash: string;
+  tokenId: string;
+  userId: string;
+  username: string;
+  name: string;
+  role: string;
+  host: string;
+  port: number;
+  password: string;
+  expiresAtUnix?: number;
+}): Promise<void> {
+  const storage = StorageFactory.getStorage();
+  const nowUnix = Math.floor(Date.now() / 1000);
+
+  await storage.createToken({
+    token_hash: params.tokenHash,
+    token_id: params.tokenId,
+    user_id: params.userId,
+    username: params.username,
+    name: params.name,
+    role: params.role,
+    host: params.host,
+    port: params.port,
+    created_at: nowUnix,
+    expires_at: params.expiresAtUnix ?? -1,
+    last_used: -1,
+    is_active: true,
+    encrypted_password: encrypt(params.password),
+  });
 }

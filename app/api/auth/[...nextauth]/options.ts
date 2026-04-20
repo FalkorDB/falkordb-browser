@@ -4,8 +4,14 @@ import { NextResponse } from "next/server";
 import { FalkorDB, type FalkorDBOptions } from "falkordb";
 import { v4 as uuidv4 } from "uuid";
 import crypto from "crypto";
+import { getToken } from "next-auth/jwt";
+import StorageFactory from "@/lib/token-storage/StorageFactory";
 import { getCorsHeaders } from "../../utils";
-import { isTokenActive } from "../tokenUtils";
+import {
+  isTokenActive,
+  getPasswordFromTokenDB,
+  storeEncryptedCredential,
+} from "../tokenUtils";
 
 interface CustomJWTPayload {
   sub: string;
@@ -28,6 +34,11 @@ interface AuthenticatedUser {
   tls: boolean;
   ca?: string;
   url?: string;
+  credentialRef?: string;
+}
+
+interface AuthenticatedUserWithPassword extends AuthenticatedUser {
+  password?: string;
 }
 
 const connections = new Map<string, FalkorDB>();
@@ -208,7 +219,7 @@ function createUserFromJWTPayload(payload: CustomJWTPayload): AuthenticatedUser 
 /**
  * Attempts JWT authentication and returns client and user if successful
  */
-async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: AuthenticatedUser } | null> {
+async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: AuthenticatedUserWithPassword } | null> {
   // Try to get authorization header
   const authorizationHeader = await getAuthorizationHeader();
 
@@ -243,6 +254,18 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
         return null;
       }
 
+      // Resolve password server-side from Token DB (never from the JWT payload).
+      let password: string | undefined;
+      try {
+        password = await getPasswordFromTokenDB(payload.jti);
+      } catch (pwErr) {
+        if (pwErr instanceof Error && pwErr.message.includes("ENCRYPTION_KEY")) {
+          throw pwErr;
+        }
+        // eslint-disable-next-line no-console
+        console.warn("Failed to resolve JWT credential from Token DB:", pwErr);
+      }
+
       // Try to reuse existing connection (performance optimization)
       let client = connections.get(payload.sub);
 
@@ -253,7 +276,10 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
           await connection.ping();
 
           // Connection is healthy, reuse it
-          const user = createUserFromJWTPayload(payload);
+          const user: AuthenticatedUserWithPassword = {
+            ...createUserFromJWTPayload(payload),
+            password,
+          };
           return { client, user };
         } catch (pingError) {
           // Connection is dead, remove from pool and recreate
@@ -271,11 +297,11 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
         }
       }
 
-      // No existing connection or health check failed - fetch password from Token DB and reconnect
+      // No existing connection or health check failed - reconnect with decrypted password
       try {
-        // Fetch password from Token DB (6380) - NOT from JWT
-        const { getPasswordFromTokenDB } = await import('../tokenUtils');
-        const password = await getPasswordFromTokenDB(payload.jti);
+        if (!password) {
+          throw new Error("No password available to re-establish connection");
+        }
 
         // Create new connection with retrieved password
         const { client: reconnectedClient } = await newClient(
@@ -305,7 +331,10 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
       }
 
       // At this point, client is guaranteed to be defined (either reused or recreated)
-      const user = createUserFromJWTPayload(payload);
+      const user: AuthenticatedUserWithPassword = {
+        ...createUserFromJWTPayload(payload),
+        password,
+      };
 
       return { client, user };
     } catch (error) {
@@ -344,12 +373,50 @@ const authOptions: AuthOptions = {
 
           const { role } = await newClient(credentials, id);
 
+          // Persist the password encrypted in the Token DB and keep only an
+          // opaque credentialRef in the JWT. The password itself never enters
+          // the JWT, the NextAuth session, or any client-visible payload.
+          let credentialRef: string | undefined;
+          if (credentials.password) {
+            try {
+              credentialRef = generateTimeUUID();
+              const tokenHash = crypto
+                .createHash("sha256")
+                .update(`session:${credentialRef}`)
+                .digest("hex");
+
+              await storeEncryptedCredential({
+                tokenHash,
+                tokenId: credentialRef,
+                userId: id,
+                username: credentials.username || "default",
+                name: `session:${id}`,
+                role,
+                host: credentials.host || "localhost",
+                port: credentials.port ? parseInt(credentials.port, 10) : 6379,
+                password: credentials.password,
+              });
+            } catch (storageError) {
+              // eslint-disable-next-line no-console
+              console.error(
+                "Failed to persist session credential; aborting login:",
+                storageError
+              );
+              const conn = connections.get(id);
+              if (conn) {
+                connections.delete(id);
+                try { await conn.close(); } catch { /* ignore */ }
+              }
+              return null;
+            }
+          }
+
           const res: User = {
             id,
             url: credentials.url,
             host: credentials.host || "localhost",
             port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-            password: credentials.password,
+            credentialRef,
             username: credentials.username,
             tls: credentials.tls === "true",
             ca: credentials.url ? undefined : credentials.ca,
@@ -372,7 +439,7 @@ const authOptions: AuthOptions = {
           id: user.id,
           host: user.host,
           port: user.port,
-          password: user.password,
+          credentialRef: user.credentialRef,
           username: user.username,
           tls: user.tls,
           ca: user.ca,
@@ -396,7 +463,6 @@ const authOptions: AuthOptions = {
             host: token.host as string,
             port: parseInt(token.port as string, 10),
             username: token.username as string,
-            password: token.password as string,
             tls: token.tls as boolean,
             ca: token.ca,
             role: token.role as Role,
@@ -407,9 +473,40 @@ const authOptions: AuthOptions = {
       return session;
     },
   },
+  events: {
+    async signOut({ token }) {
+      const t = token as Record<string, unknown> | null;
+      const credentialRef = t?.credentialRef as string | undefined;
+      const id = t?.id as string | undefined;
+      const username = (t?.username as string | undefined) || "default";
+
+      if (credentialRef) {
+        try {
+          const storage = StorageFactory.getStorage();
+          await storage.revokeToken(credentialRef, username);
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.warn("Failed to revoke session credential on signOut:", e);
+        }
+      }
+
+      if (id) {
+        const conn = connections.get(id);
+        if (conn) {
+          connections.delete(id);
+          try { await conn.close(); } catch { /* ignore */ }
+        }
+      }
+    },
+  },
 };
 
-export async function getClient(request: Request) {
+export async function getClient(
+  request: Request
+): Promise<
+  | NextResponse
+  | { client: FalkorDB; user: AuthenticatedUserWithPassword }
+> {
   // Check if this is a JWT-only request (from /docs)
   const jwtOnlyRequired = await isJWTOnlyRequest();
 
@@ -436,6 +533,26 @@ export async function getClient(request: Request) {
 
   const { user } = session;
 
+  // Resolve the password server-side from the Token DB via the JWT's
+  // credentialRef. The password is never stored in the session/JWT payload.
+  let password: string | undefined;
+  try {
+    const jwt = await getToken({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      req: request as any,
+      secret: process.env.NEXTAUTH_SECRET,
+    });
+    const credentialRef = jwt?.credentialRef as string | undefined;
+    if (credentialRef) {
+      password = await getPasswordFromTokenDB(credentialRef);
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("Failed to resolve session credential from Token DB:", err);
+  }
+
+  const userWithPassword: AuthenticatedUserWithPassword = { ...user, password };
+
   let connection = connections.get(id);
 
   // Health check: if connection exists, verify it's still alive
@@ -445,7 +562,7 @@ export async function getClient(request: Request) {
       await conn.ping();
 
       // Connection is healthy, reuse it
-      return { client: connection, user };
+      return { client: connection, user: userWithPassword };
     } catch (pingError) {
       // Connection is dead, remove from pool and recreate
       // eslint-disable-next-line no-console
@@ -468,7 +585,7 @@ export async function getClient(request: Request) {
       host: user.host,
       port: (user.port || 6379).toString(),
       username: user.username,
-      password: user.password,
+      password,
       tls: String(user.tls),
       ca: user.ca,
       url: user.url,
@@ -476,7 +593,7 @@ export async function getClient(request: Request) {
     user.id
   );
 
-  return { client, user };
+  return { client, user: userWithPassword };
 }
 
 export default authOptions;

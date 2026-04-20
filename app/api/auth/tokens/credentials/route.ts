@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { SignJWT } from "jose";
 import crypto from "crypto";
-import StorageFactory from "@/lib/token-storage/StorageFactory";
 import { newClient, generateTimeUUID } from "../../[...nextauth]/options";
-import { encrypt } from "../../encryption";
+import { storeEncryptedCredential } from "../../tokenUtils";
 import { login, validateBody } from "../../../validate-body";
 
 // Typed shape for the validated login request body
@@ -163,35 +162,22 @@ export async function POST(request: NextRequest) {
 
     const token = await signer.sign(jwtSecret);
 
-    // 7. Encrypt password and store token using storage abstraction
+    // 7. Encrypt password and store token using shared helper
     try {
-      const storage = StorageFactory.getStorage();
-
-      const encryptedPassword = encrypt(userPassword);
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-      const nowUnix = Math.floor(Date.now() / 1000);
       const expiresAtUnix = expiresAtDate ? Math.floor(expiresAtDate.getTime() / 1000) : -1;
 
-      // Normalize host and port with defaults
-      const tokenUsername = authenticatedUser.username || "default";
-      const tokenHost = authenticatedUser.host || "localhost";
-      const tokenPort = authenticatedUser.port || 6379;
-      const { role: tokenRole } = authenticatedUser;
-
-      await storage.createToken({
-        token_hash: tokenHash,
-        token_id: tokenId,
-        user_id: authenticatedUser.id,
-        username: tokenUsername,
+      await storeEncryptedCredential({
+        tokenHash,
+        tokenId,
+        userId: authenticatedUser.id,
+        username: authenticatedUser.username || "default",
         name,
-        role: tokenRole,
-        host: tokenHost,
-        port: tokenPort,
-        created_at: nowUnix,
-        expires_at: expiresAtUnix,
-        last_used: -1,
-        is_active: true,
-        encrypted_password: encryptedPassword,
+        role: authenticatedUser.role,
+        host: authenticatedUser.host || "localhost",
+        port: authenticatedUser.port || 6379,
+        password: userPassword,
+        expiresAtUnix,
       });
 
       // eslint-disable-next-line no-console

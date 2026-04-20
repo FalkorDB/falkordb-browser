@@ -11,7 +11,7 @@ declare module "next-auth" {
     url: string;
     ca?: string;
     username?: string;
-    password?: string;
+    credentialRef?: string;
   }
 
   interface Session {
