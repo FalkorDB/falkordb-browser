@@ -401,22 +401,25 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                     setGraph={setGraph}
                 />
             }
-            <Button
-                aria-label="Graph info panel"
-                aria-pressed={panelOpen}
-                indicator={indicator}
-                className={cn(
-                    "h-full text-foreground p-2 rounded-lg border border-border bg-background hover:bg-secondary",
-                    panelOpen && "!text-primary"
-                )}
-                title="Graph info"
-                onClick={() => {
-                    onTogglePanel();
-                }}
-                data-testid="graphInfoToggle"
-            >
-                <Network size={20} />
-            </Button>
+            {
+                type === "Graph" &&
+                <Button
+                    aria-label="Graph info panel"
+                    aria-pressed={panelOpen}
+                    indicator={indicator}
+                    className={cn(
+                        "h-full text-foreground p-2 rounded-lg border border-border bg-background hover:bg-secondary",
+                        panelOpen && "!text-primary"
+                    )}
+                    title="Graph info"
+                    onClick={() => {
+                        onTogglePanel();
+                    }}
+                    data-testid="graphInfoToggle"
+                >
+                    <Network size={20} />
+                </Button>
+            }
             {
                 historyQuery ?
                     <>

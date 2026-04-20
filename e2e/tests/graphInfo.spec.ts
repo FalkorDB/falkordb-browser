@@ -209,17 +209,16 @@ test.describe("Graph Info Panel Tests", () => {
     await apiCall.removeGraph(graphName, "admin");
   });
 
-  test(`@readwrite Validate graph info panel is not visible when no graph is selected`, async () => {
+  test(`@readwrite Validate graph info panel shows zero counts when no graph is selected`, async () => {
     const graphName1 = getRandomString("graph");
     const graphName2 = getRandomString("graph");
     await apiCall.addGraph(graphName1);
     await apiCall.addGraph(graphName2);
     const graph = await browser.createNewPage(GraphInfoPage, urls.graphUrl);
     await browser.setPageToFullScreen();
-    // When no graph is selected, getting nodes count should fail
-    await expect(async () => {
-      await graph.getGraphInfoNodesCount();
-    }).rejects.toThrow();
+    // Panel is open by default but shows zero counts when no graph is selected
+    const nodesCount = await graph.getGraphInfoNodesCount();
+    expect(nodesCount).toBe("0");
     await apiCall.removeGraph(graphName1);
     await apiCall.removeGraph(graphName2);
   });

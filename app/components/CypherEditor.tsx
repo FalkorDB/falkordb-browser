@@ -4,6 +4,7 @@
 "use client";
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Monaco } from "@monaco-editor/react";
 import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext, useMemo, useCallback } from "react";
 import * as monaco from "monaco-editor";
@@ -654,14 +655,18 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                     >
                         <Maximize2 size={20} />
                     </Button>
-                    <Button
-                        className="cursor-default"
-                        title={`Run (Enter)
-                                     History (Arrow Up/Down)
-                                     Insert new line (Shift + Enter)`}
-                    >
-                        <Info />
-                    </Button>
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span className="flex items-center cursor-default" aria-label="Keyboard shortcuts" tabIndex={-1}>
+                                    <Info />
+                                </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                {"Run (Enter) | History (Arrow Up/Down) | Insert new line (Shift + Enter)"}
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
                     <Button
                         data-testid="editorRun"
                         ref={submitQuery}
