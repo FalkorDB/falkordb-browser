@@ -1,23 +1,7 @@
 import { chromium, Browser, BrowserContext, Page, firefox } from 'playwright';
-import { existsSync } from 'fs';
 import { test } from '@playwright/test';
 import BasePage from './basePage';
 import { initializeLocalStorage } from '../utils';
-
-// Map each Playwright project to its pre-created auth state file so that
-// BrowserWrapper contexts are authenticated.  The 'setup' project and special
-// projects (TLS, cluster) are intentionally omitted — they either create the
-// files or require a clean session.
-const AUTH_STATE_MAP: Record<string, string> = {
-    '[Admin] Chromium': 'playwright/.auth/admin.json',
-    '[Admin] Firefox': 'playwright/.auth/admin.json',
-    '[Read-Write] - Chromium': 'playwright/.auth/readwriteuser.json',
-    '[Read-Write] - Firefox': 'playwright/.auth/readwriteuser.json',
-    '[Read-Only] - Chromium': 'playwright/.auth/readonlyuser.json',
-    '[Read-Only] - Firefox': 'playwright/.auth/readonlyuser.json',
-    '[Admin: Settings - Chromium]': 'playwright/.auth/admin.json',
-    '[Admin: Settings - Firefox]': 'playwright/.auth/admin.json',
-};
 
 async function launchBrowser(projectName: string): Promise<Browser> {
     if (projectName.toLowerCase().includes('firefox')) {
@@ -43,29 +27,12 @@ export default class BrowserWrapper {
         if (!this.context) {
             const projectName = test.info().project.name;
             const isFirefox = projectName.toLowerCase().includes('firefox');
-
-            // Prefer the storageState configured on the current Playwright
-            // project itself. This keeps BrowserWrapper aligned with
-            // playwright.config.ts and avoids project-name drift.
-            const configuredStorageState = test.info().project.use.storageState;
-
-            // Fall back to the explicit map for extra resilience in case the
-            // project configuration changes shape in the future.
-            const fallbackStorageStatePath = AUTH_STATE_MAP[projectName];
-            const resolvedStorageState =
-                typeof configuredStorageState === 'string'
-                    ? (existsSync(configuredStorageState) ? configuredStorageState : undefined)
-                    : configuredStorageState
-                        ?? (fallbackStorageStatePath && existsSync(fallbackStorageStatePath)
-                            ? fallbackStorageStatePath
-                            : undefined);
-
+            
             // Grant clipboard permissions only for Chromium-based browsers
             // Firefox doesn't support clipboard-read/clipboard-write permissions
-            this.context = await this.browser.newContext({
-                ...(isFirefox ? {} : { permissions: ['clipboard-read', 'clipboard-write'] }),
-                ...(resolvedStorageState ? { storageState: resolvedStorageState } : {}),
-            });
+            this.context = await this.browser.newContext(
+                isFirefox ? {} : { permissions: ['clipboard-read', 'clipboard-write'] }
+            );
         }
         if (!this.page) {
             this.page = await this.context.newPage();

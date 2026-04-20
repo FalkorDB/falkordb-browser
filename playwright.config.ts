@@ -20,10 +20,6 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 2 : undefined,
-  /* In the new UI the graph selector lives inside the Graph Info panel and is
-   * disabled until graphNames loads after authentication.  Give each test 60 s
-   * so the auth → fetchOptions → button-enabled chain has time to complete. */
-  timeout: 60000,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [['html', { outputFolder: 'playwright-report' }]],
   outputDir: 'test-results',
