@@ -255,7 +255,11 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
       }
 
       // Resolve password server-side from Token DB (never from the JWT payload).
-      let password: string | undefined;
+      // Fail closed: if the jti is known but password resolution fails, the
+      // session is unusable downstream (reconnect, URL building, PAT issuance),
+      // so we refuse the request rather than returning a partially-authenticated
+      // user.
+      let password: string;
       try {
         password = await getPasswordFromTokenDB(payload.jti);
       } catch (pwErr) {
@@ -264,6 +268,7 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
         }
         // eslint-disable-next-line no-console
         console.warn("Failed to resolve JWT credential from Token DB:", pwErr);
+        return null;
       }
 
       // Try to reuse existing connection (performance optimization)
@@ -299,10 +304,6 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
 
       // No existing connection or health check failed - reconnect with decrypted password
       try {
-        if (!password) {
-          throw new Error("No password available to re-establish connection");
-        }
-
         // Create new connection with retrieved password
         const { client: reconnectedClient } = await newClient(
           {
@@ -535,6 +536,10 @@ export async function getClient(
 
   // Resolve the password server-side from the Token DB via the JWT's
   // credentialRef. The password is never stored in the session/JWT payload.
+  // Fail closed: if the session was minted with a credentialRef but we cannot
+  // resolve it, refuse the request instead of continuing with an undefined
+  // password (which would break chat URL building and could mint empty-
+  // password PATs).
   let password: string | undefined;
   try {
     const jwt = await getToken({
@@ -544,11 +549,29 @@ export async function getClient(
     });
     const credentialRef = jwt?.credentialRef as string | undefined;
     if (credentialRef) {
-      password = await getPasswordFromTokenDB(credentialRef);
+      try {
+        password = await getPasswordFromTokenDB(credentialRef);
+      } catch (pwErr) {
+        if (pwErr instanceof Error && pwErr.message.includes("ENCRYPTION_KEY")) {
+          throw pwErr;
+        }
+        // eslint-disable-next-line no-console
+        console.warn("Failed to resolve session credential from Token DB:", pwErr);
+        return NextResponse.json(
+          { message: "Session credential could not be resolved; please sign in again." },
+          { status: 401, headers: getCorsHeaders(request) }
+        );
+      }
     }
   } catch (err) {
+    if (err instanceof Error && err.message.includes("ENCRYPTION_KEY")) {
+      return NextResponse.json(
+        { message: "Server configuration error" },
+        { status: 500, headers: getCorsHeaders(request) }
+      );
+    }
     // eslint-disable-next-line no-console
-    console.warn("Failed to resolve session credential from Token DB:", err);
+    console.warn("Failed to read JWT for session credential lookup:", err);
   }
 
   const userWithPassword: AuthenticatedUserWithPassword = { ...user, password };

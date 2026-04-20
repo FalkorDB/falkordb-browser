@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
     // 7. Encrypt password and store token using shared helper
     try {
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-      const expiresAtUnix = expiresAtDate ? Math.floor(expiresAtDate.getTime() / 1000) : -1;
+      const expiresAtUnix = expirationTime ?? -1;
 
       await storeEncryptedCredential({
         tokenHash,

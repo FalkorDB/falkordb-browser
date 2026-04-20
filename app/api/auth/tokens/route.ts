@@ -202,9 +202,13 @@ export async function POST(request: NextRequest) {
 
     // 7. Store token using shared helper
     try {
-      const password = user.password || '';
+      // At this point getClient() has either (a) resolved the password from
+      // the Token DB successfully, or (b) confirmed the session has no
+      // credentialRef (no-auth FalkorDB). An empty password here therefore
+      // corresponds to a legitimate no-auth setup, not a resolution failure.
+      const password = user.password ?? '';
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-      const expiresAtUnix = expiresAtDate ? Math.floor(expiresAtDate.getTime() / 1000) : -1;
+      const expiresAtUnix = expirationTime ?? -1;
 
       await storeEncryptedCredential({
         tokenHash,
