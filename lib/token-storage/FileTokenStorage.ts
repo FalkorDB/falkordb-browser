@@ -83,8 +83,9 @@ class FileTokenStorage implements ITokenStorage {
   async fetchTokens(options: TokenFetchOptions): Promise<TokenData[]> {
     const tokens = await this.readTokens();
 
-    // Filter active tokens only
-    let filtered = tokens.filter(t => t.is_active);
+    // Only PAT rows are surfaced in the tokens listing. Session rows are
+    // internal and must never appear in the UI or API surface.
+    let filtered = tokens.filter(t => t.is_active && (t.kind ?? 'pat') === 'pat');
 
     // Apply role-based filtering
     if (!options.isAdmin) {
@@ -116,6 +117,16 @@ class FileTokenStorage implements ITokenStorage {
 
     token.is_active = false;
     await this.writeTokens(tokens);
+    return true;
+  }
+
+  async deleteToken(tokenId: string): Promise<boolean> {
+    const tokens = await this.readTokens();
+    const next = tokens.filter(t => t.token_id !== tokenId);
+    if (next.length === tokens.length) {
+      return false;
+    }
+    await this.writeTokens(next);
     return true;
   }
 

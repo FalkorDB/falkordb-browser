@@ -163,6 +163,7 @@ export default class SettingsBrowserPage extends BasePage {
 
   // Combined Actions
   async expandChatSection(): Promise<void> {
+    await this.chatSectionHeader.waitFor({ state: "visible" });
     const isInputVisible = await this.chatApiKeyInput.isVisible();
     if (!isInputVisible) {
       await this.clickChatSectionHeader();

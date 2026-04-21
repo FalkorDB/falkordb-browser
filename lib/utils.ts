@@ -8,6 +8,7 @@ import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { MutableRefObject } from "react";
 import type { FalkorDBCanvas } from "@falkordb/canvas";
+import { signOut } from "next-auth/react";
 
 export type ToastArguments = {
   title: string;
@@ -247,9 +248,17 @@ export async function getSSEGraphResult(
 
     evtSource.addEventListener("error", (event: MessageEvent) => {
       handled = true;
-      const { message, status } = JSON.parse(event.data);
+      const { message, status, code } = JSON.parse(event.data);
 
       evtSource.close();
+
+      if (status === 401 && code === "SESSION_INVALID") {
+        triggerSessionInvalidationSignOut();
+        setIndicator("offline");
+        reject(new Error(message));
+        return;
+      }
+
       toast({ title: "Error", description: message, variant: "destructive" });
 
       if (status === 401 || status >= 500) setIndicator("offline");
@@ -272,6 +281,18 @@ export async function getSSEGraphResult(
   });
 }
 
+// Guards against triggering multiple concurrent signOut calls when many
+// in-flight requests hit a newly-invalidated session at the same time.
+let sessionInvalidationInFlight = false;
+
+function triggerSessionInvalidationSignOut(): void {
+  if (sessionInvalidationInFlight) return;
+  sessionInvalidationInFlight = true;
+  signOut({ callbackUrl: "/login" }).catch(() => {
+    sessionInvalidationInFlight = false;
+  });
+}
+
 export async function securedFetch(
   input: string,
   init: RequestInit,
@@ -280,6 +301,16 @@ export async function securedFetch(
 ): Promise<Response> {
   const response = await fetch(input, init);
   const { status } = response;
+
+  // The server signals "your session is orphaned, sign out now" via this
+  // header. We only sign out on this explicit signal so that ordinary 401s
+  // (e.g. login form with wrong password) don't log out unrelated users.
+  if (status === 401 && response.headers.get("X-Session-Invalid") === "1") {
+    triggerSessionInvalidationSignOut();
+    setIndicator("offline");
+    return response;
+  }
+
   if (status >= 300) {
     let message = await response.text();
 
