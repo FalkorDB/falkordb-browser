@@ -4,8 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Pencil } from "lucide-react";
 import Button from "@/app/components/ui/Button";
 import FormComponent, { Field } from "@/app/components/FormComponent";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { Drawer, DrawerDescription, DrawerContent, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
+import { Drawer, DrawerDescription, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 
 interface EditUserProps {
     username: string
@@ -139,17 +138,21 @@ export default function EditUser({ username, role: initialRole, keys: initialKey
                     <Pencil size={20} />
                 </Button>
             </DrawerTrigger>
-            <DrawerContent side="right" className="gap-2 after:hidden">
-                <VisuallyHidden>
-                    <DrawerTitle />
-                    <DrawerDescription />
-                </VisuallyHidden>
-                <FormComponent
-                    className="p-4"
-                    handleSubmit={handleEditUser}
-                    fields={fields}
-                    submitButtonLabel="Save"
-                />
+            <DrawerContent side="right" className="w-[30rem] max-w-[90vw] gap-2 after:hidden">
+                <div className="flex-1 flex flex-col overflow-y-auto">
+                    <DrawerHeader className="px-6 pt-6 pb-2 text-left border-b border-border">
+                        <DrawerTitle className="text-xl">Edit User</DrawerTitle>
+                        <DrawerDescription>
+                            Update role, key/graph permissions, or password for this user.
+                        </DrawerDescription>
+                    </DrawerHeader>
+                    <FormComponent
+                        className="px-6 py-4"
+                        handleSubmit={handleEditUser}
+                        fields={fields}
+                        submitButtonLabel="Save"
+                    />
+                </div>
             </DrawerContent>
         </Drawer>
     );
