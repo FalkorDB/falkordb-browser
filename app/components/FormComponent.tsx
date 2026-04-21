@@ -75,18 +75,20 @@ function TagInput({ field }: { field: TagField }) {
     const [inputValue, setInputValue] = useState("");
     const inputRef = useRef<HTMLInputElement>(null);
 
-    const addTag = () => {
-        const trimmed = inputValue.trim();
-        if (trimmed && !field.tags.includes(trimmed)) {
-            field.onAddTag(trimmed);
-        }
+    const addTags = (value: string) => {
+        const parts = value.split(",").map(p => p.trim().replace(/^~/, "")).filter(Boolean);
+        parts.forEach(part => {
+            if (!field.tags.includes(part)) {
+                field.onAddTag(part);
+            }
+        });
         setInputValue("");
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === "Enter" || e.key === ",") {
             e.preventDefault();
-            addTag();
+            addTags(inputValue);
         } else if (e.key === "Backspace" && inputValue === "" && field.tags.length > 0) {
             field.onRemoveTag(field.tags.length - 1);
         }
@@ -122,7 +124,7 @@ function TagInput({ field }: { field: TagField }) {
                 placeholder={field.tags.length === 0 ? (field.placeholder || "Type and press Enter") : ""}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
-                onBlur={addTag}
+                onBlur={() => addTags(inputValue)}
                 disabled={field.disabled}
             />
         </div>
@@ -137,16 +139,17 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
 
     // Stable identifier for the current set of fields — triggers re-validation when the form layout changes
     const fieldsKey = fields.map(f => f.label).join(",");
+    const fieldValues = fields.map(f => f.value).join("\0");
 
     useEffect(() => {
-        const clearMOuntedFlag = () => {
+        const clearMountedFlag = () => {
             isMountedRef.current = false;
         };
         
         if (!isMountedRef.current) {
             isMountedRef.current = true;
 
-            return clearMOuntedFlag;
+            return clearMountedFlag;
         }
 
         const newErrors: { [key: string]: boolean } = {};
@@ -159,8 +162,8 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
 
         setErrors(prev => ({ ...prev, ...newErrors }));
 
-        return clearMOuntedFlag;
-    }, [fieldsKey]);
+        return clearMountedFlag;
+    }, [fieldsKey, fieldValues]);
 
     const onHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
