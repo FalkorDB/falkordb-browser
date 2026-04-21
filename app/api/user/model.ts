@@ -1,7 +1,7 @@
 export interface User {
   username: string;
   role: string;
-  keys?: string;
+  keys?: string[];
 }
 
 export interface CreateUser {
@@ -29,8 +29,8 @@ const READ_ONLY_ROLE = [
   "+expiretime",
 ];
 
-export function getRoleWithKeys(role: string[], keys?: string): string[] {
-  return [role[0], "resetkeys", `~${keys || "*"}`, ...role.slice(1)];
+export function getRoleWithKeys(role: string[], keys?: string[]): string[] {
+  return [role[0], "resetkeys", ...(keys?.map((key) => `~${key}`) || ["~*"]), ...role.slice(1)];
 }
 
 export const ROLE = new Map<string, string[]>([
@@ -55,9 +55,9 @@ export const ROLE = new Map<string, string[]>([
   ["Read-Only", READ_ONLY_ROLE],
 ]);
 
-export function extractKeysFromACL(userDetails: string[]): string {
+export function extractKeysFromACL(userDetails: string[]): string[] {
   const keyPatterns = userDetails
     .filter((part) => part.startsWith("~"))
     .map((part) => part.slice(1));
-  return keyPatterns.length > 0 ? keyPatterns.join(" ") : "*";
+  return keyPatterns.length > 0 ? keyPatterns : ["*"];
 }
