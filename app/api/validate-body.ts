@@ -16,6 +16,10 @@ export const createUser = z.object({
       error: (issue) => issue.input === undefined ? "Role is required" : "Invalid Role",
     })
     .min(1, "Role cannot be empty"),
+  keys: z
+    .string()
+    .optional()
+    .default("*"),
 });
 
 export const deleteUsers = z.object({
@@ -28,12 +32,18 @@ export const deleteUsers = z.object({
     .min(1, "At least one user is required"),
 });
 
-export const updateUserRole = z.object({
+export const updateUser = z.object({
   role: z
     .string({
       error: (issue) => issue.input === undefined ? "Role is required" : "Invalid Role",
     })
     .min(1, "Role cannot be empty"),
+  keys: z
+    .string()
+    .optional(),
+  password: z
+    .string()
+    .optional(),
 });
 
 // Schema (graph schema) schemas
@@ -303,6 +313,14 @@ export const revokeToken = z.object({
       error: (issue) => issue.input === undefined ? "Token is required" : "Invalid Token",
     })
     .min(1, "Token cannot be empty"),
+});
+
+export const validateUrl = z.object({
+  url: z
+    .string({
+      error: (issue) => issue.input === undefined ? "URL is required" : "Invalid URL",
+    })
+    .min(1, "URL cannot be empty"),
 });
 
 // Validation helper function

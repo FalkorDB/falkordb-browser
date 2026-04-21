@@ -126,14 +126,15 @@ interface Props<T extends Item> {
     afterSearchCallback: (newFilteredList: T[]) => void
     isSelected: (item: T) => boolean
     isDeleteSelected?: (item: T) => boolean
+    onDoubleClick?: (label: string, evt: MouseEvent<HTMLButtonElement>) => void
     onToggleFav?: (item: T, name?: string) => void
-    searchRef: React.RefObject<HTMLInputElement>
+    searchRef: React.RefObject<HTMLInputElement | null>
     isLoading?: boolean
     className?: string
     children?: React.ReactNode
 }
 
-export default function PaginationList<T extends Item>({ list, onClick, dataTestId, afterSearchCallback, isSelected, isDeleteSelected, onToggleFav, label, isLoading, className, children, searchRef }: Props<T>) {
+export default function PaginationList<T extends Item>({ list, onClick, onDoubleClick, dataTestId, afterSearchCallback, isSelected, isDeleteSelected, onToggleFav, label, isLoading, className, children, searchRef }: Props<T>) {
 
     const [filteredList, setFilteredList] = useState<T[]>([...list]);
     const [hoverIndex, setHoverIndex] = useState<number>(0);
@@ -217,7 +218,7 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
             {children}
             <div className="flex gap-2 items-center">
                 <Input
-                    ref={searchRef}
+                    ref={searchRef as React.RefObject<HTMLInputElement>}
                     data-testid={`${label}Search`}
                     className="w-full bg-background text-foreground"
                     value={search}
@@ -322,6 +323,11 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                                             title={text}
                                             onClick={(e) => {
                                                 onClick(text, e);
+                                            }}
+                                            onDoubleClick={(e) => {
+                                                if (onDoubleClick) {
+                                                    onDoubleClick(text, e);
+                                                }
                                             }}
                                             onContextMenu={(e) => {
                                                 e.preventDefault();

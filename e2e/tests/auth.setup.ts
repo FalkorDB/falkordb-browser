@@ -10,6 +10,10 @@ import ApiCalls from "../logic/api/apiCalls";
 const adminAuthFile = 'playwright/.auth/admin.json';
 const readWriteAuthFile = 'playwright/.auth/readwriteuser.json';
 const readOnlyAuthFile = 'playwright/.auth/readonlyuser.json';
+// Dedicated auth files for sign-out tests — these are invalidated by the
+// sign-out test itself and must not be shared with any other project.
+const signOutReadWriteAuthFile = 'playwright/.auth/signout-readwriteuser.json';
+const signOutReadOnlyAuthFile = 'playwright/.auth/signout-readonlyuser.json';
 
 setup("setup authentication", async () => {
     try {
@@ -31,6 +35,27 @@ setup("setup authentication", async () => {
         ];
 
         for (const { file, userName } of userRoles) {
+            const userBrowserWrapper = new BrowserWrapper();
+            const userLoginPage = await userBrowserWrapper.createNewPage(LoginPage, urls.loginUrl);
+            await userBrowserWrapper.setPageToFullScreen();
+            await userLoginPage.connectWithCredentials(userName, user.password);
+            await userLoginPage.handleSkipTutorial();
+            const userContext = userBrowserWrapper.getContext();
+            await userContext!.storageState({ path: file });
+        }
+
+        // Create and authenticate dedicated sign-out users.
+        // These are separate accounts whose sessions can be safely invalidated
+        // by the sign-out test without affecting any other test's auth state.
+        await apiCall.createUsers({ username: 'signoutreadwriteuser', role: user.ReadWrite, password: user.password }, adminContext);
+        await apiCall.createUsers({ username: 'signoutreadonlyuser', role: user.ReadOnly, password: user.password }, adminContext);
+
+        const signOutUserRoles = [
+            { file: signOutReadWriteAuthFile, userName: 'signoutreadwriteuser' },
+            { file: signOutReadOnlyAuthFile, userName: 'signoutreadonlyuser' },
+        ];
+
+        for (const { file, userName } of signOutUserRoles) {
             const userBrowserWrapper = new BrowserWrapper();
             const userLoginPage = await userBrowserWrapper.createNewPage(LoginPage, urls.loginUrl);
             await userBrowserWrapper.setPageToFullScreen();

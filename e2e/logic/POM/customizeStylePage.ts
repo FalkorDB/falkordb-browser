@@ -61,10 +61,24 @@ export default class CustomizeStylePage extends GraphInfoPage {
   }
 
   async isCustomizeStyleButtonVisible(label: string): Promise<boolean> {
-    return waitForElementToBeVisible(this.customizeStyleButton(label));
+    await interactWhenVisible(
+      this.labelButton(label),
+      (el) => el.click(),
+      `Label Button ${label}`
+    );
+    const visible = await waitForElementToBeVisible(this.customizeStyleButton(label));
+    // Close the popover by pressing Escape
+    await this.page.keyboard.press("Escape");
+    await waitForElementToNotBeVisible(this.customizeStyleButton(label));
+    return visible;
   }
 
   async clickCustomizeStyleButton(label: string): Promise<void> {
+    await interactWhenVisible(
+      this.labelButton(label),
+      (el) => el.click(),
+      `Label Button ${label}`
+    );
     await interactWhenVisible(
       this.customizeStyleButton(label),
       (el) => el.click(),

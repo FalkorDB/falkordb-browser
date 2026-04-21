@@ -20,8 +20,10 @@ import Input from "./ui/Input";
 import Combobox from "./ui/combobox";
 import { IndicatorContext } from "./provider";
 
+export type HeaderDef = string | { name: string; width?: string };
+
 interface Props {
-    headers: string[],
+    headers: HeaderDef[],
     rows: Row[],
     label: "Graphs" | "Schemas" | "Configs" | "Users" | "TableView",
     entityName: "Graph" | "Schema" | "Config" | "User" | "Element",
@@ -29,7 +31,7 @@ interface Props {
     itemHeightExpandMultiple?: number
     itemWidth?: number
     valueClassName?: string
-    inputRef?: React.RefObject<HTMLInputElement>,
+    inputRef?: React.RefObject<HTMLInputElement | null>,
     children?: React.ReactNode,
     setRows?: Dispatch<SetStateAction<Row[]>>,
     className?: string
@@ -93,6 +95,9 @@ export default function TableComponent({
     const { theme } = useTheme();
     const { currentTheme } = getTheme(theme);
 
+    const normalizedHeaders = useMemo(() => headers.map(h => typeof h === 'string' ? { name: h } : h), [headers]);
+    const headerNames = useMemo(() => normalizedHeaders.map(h => h.name), [normalizedHeaders]);
+
     const searchRef = useRef<HTMLInputElement>(null);
     const headerRef = useRef<HTMLTableRowElement>(null);
     const tableRef = useRef<HTMLTableElement>(null);
@@ -128,18 +133,18 @@ export default function TableComponent({
     }, []);
 
     const colMinWidth = useMemo(() => {
-        if (!containerWidth || headers.length === 0) return 0;
+        if (!containerWidth || headerNames.length === 0) return 0;
         const headerRow = headerRef.current;
         let fixedColsWidth = 0;
         if (headerRow) {
             const cells = Array.from(headerRow.cells);
             // All columns before the data columns (checkbox + index) are fixed
-            const fixedCols = cells.slice(0, cells.length - headers.length);
+            const fixedCols = cells.slice(0, cells.length - headerNames.length);
             fixedColsWidth = fixedCols.reduce((sum, cell) => sum + cell.getBoundingClientRect().width, 0);
         }
         const availableWidth = containerWidth - fixedColsWidth;
-        return Math.floor(availableWidth / Math.min(headers.length, 100 / itemWidth));
-    }, [containerWidth, headers.length, itemWidth]);
+        return Math.floor(availableWidth / Math.min(headerNames.length, 100 / itemWidth));
+    }, [containerWidth, headerNames.length, itemWidth]);
 
     const height = useMemo(() => itemHeightExpandMultiple !== undefined ? expandArr.size === 0 ? itemHeight : itemHeight * itemHeightExpandMultiple : itemHeight, [expandArr.size, itemHeight, itemHeightExpandMultiple]);
 
@@ -245,12 +250,6 @@ export default function TableComponent({
             inputRef.current.focus();
         }
     }, [inputRef, editable]);
-
-    useEffect(() => {
-        if (searchRef.current) {
-            searchRef.current.focus();
-        }
-    }, []);
 
     const handleSearchFilter = useCallback((cell: Cell): boolean => {
         if (!cell.value) return false;
@@ -391,7 +390,7 @@ export default function TableComponent({
         </svg>`
     ), [itemHeight]);
     const stripBackground = useMemo(() => `url("data:image/svg+xml,${stripSVG}")`, [stripSVG]);
-    const columnCount = (setRows ? headers.length + 1 : headers.length) + 1;
+    const columnCount = (setRows ? headerNames.length + 1 : headerNames.length) + 1;
 
     const renderValue = (v: any) => (
         <span className={cn("pointer-events-auto", valueClassName)}>{v}</span>
@@ -406,9 +405,9 @@ export default function TableComponent({
         if (index !== undefined) {
             isActive = expandArr.get(index) === level;
         } else if (level === undefined) {
-            isActive = headers.every((_, i) => !expandArr.has(i));
+            isActive = headerNames.every((_, i) => !expandArr.has(i));
         } else {
-            isActive = headers.length > 0 && headers.every((_, i) => expandArr.get(i) === level);
+            isActive = headerNames.length > 0 && headerNames.every((_, i) => expandArr.get(i) === level);
         }
         return cn("text-foreground rounded-lg border border-transparent hover:border-border/10 hover:bg-secondary", isActive && "text-primary");
     };
@@ -447,10 +446,11 @@ export default function TableComponent({
                     <TableRow ref={headerRef} className="text-nowrap border-border">
                         {
                             setRows ?
-                                <TableHead className="w-5 border-r border-border p-2 !pr-2" key={headers[0]}>
+                                <TableHead className="w-5 border-r border-border !p-1 !pr-0" key={headerNames[0]}>
                                     <Checkbox
                                         data-testid={`tableCheckbox${label}`}
-                                        className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
+                                        aria-label={`Select all ${label}`}
+                                        className="w-5 h-5 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
                                         checked={filteredRows.length > 0 && filteredRows.every(row => row.checked)}
                                         onCheckedChange={() => {
                                             const checked = filteredRows.every(row => row.checked);
@@ -467,9 +467,9 @@ export default function TableComponent({
                                 </TableHead>
                                 : null
                         }
-                        <TableHead key="index" className="w-fit min-w-fit max-w-fit border-r border-border p-2">
+                        <TableHead key="index" className="w-5 border-r border-border p-2">
                             <div className="flex">
-                                <p className={!isObjectType ? "w-full text-center" : ""}>Index</p>
+                                <p className={!isObjectType ? "grow basis-0 text-center" : ""}>Index</p>
                                 {
                                     isObjectType &&
                                     <>
@@ -478,7 +478,7 @@ export default function TableComponent({
                                             title="Expand Root"
                                             onClick={() => {
                                                 const newExpandArr = new Map<number, number>();
-                                                headers.forEach((_, idx) => newExpandArr.set(idx, 1));
+                                                headerNames.forEach((_, idx) => newExpandArr.set(idx, 1));
                                                 setExpandArr(newExpandArr);
 
                                                 if (onExpandChange) onExpandChange(newExpandArr);
@@ -491,7 +491,7 @@ export default function TableComponent({
                                             className={getClassName(undefined, -1)}
                                             onClick={() => {
                                                 const newExpandArr = new Map<number, number>();
-                                                headers.forEach((_, idx) => newExpandArr.set(idx, -1));
+                                                headerNames.forEach((_, idx) => newExpandArr.set(idx, -1));
                                                 setExpandArr(newExpandArr);
 
                                                 if (onExpandChange) onExpandChange(newExpandArr);
@@ -516,17 +516,21 @@ export default function TableComponent({
                             </div>
                         </TableHead>
                         {
-                            headers.map((header, i) => (
+                            normalizedHeaders.map((header, i) => (
                                 <TableHead
-                                    style={{ minWidth: colMinWidth > 0 ? colMinWidth : undefined }}
+                                    style={
+                                        header.width !== undefined
+                                            ? { width: header.width, minWidth: header.width, maxWidth: header.width }
+                                            : { width: 'fit-content' }
+                                    }
                                     className={cn(
-                                        i + 1 !== headers.length && "border-r",
+                                        i + 1 !== headerNames.length && "border-r",
                                         "border-border",
                                     )}
-                                    key={header}
+                                    key={`${header.name}-${i}`}
                                 >
                                     <div className="flex gap-2 justify-between items-center">
-                                        <p className={!isObjectType ? "w-full text-center" : ""}>{header}</p>
+                                        <p className={!isObjectType ? "w-full text-center" : ""}>{header.name}</p>
                                         {
                                             isObjectType &&
                                             <div className="flex">
@@ -604,29 +608,33 @@ export default function TableComponent({
                                     data-testid={`tableRow${rowTestID}`}
                                     onMouseEnter={() => setHover(row.name)}
                                     onMouseLeave={() => setHover("")}
+                                    style={{ height }}
                                     key={row.name}
                                 >
                                     {
                                         setRows ?
-                                            <TableCell className="w-5 border-r border-border p-2 !pr-2">
-                                                <Checkbox
-                                                    className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
-                                                    data-testid={`tableCheckbox${rowTestID}`}
-                                                    checked={row.checked}
-                                                    onCheckedChange={() => {
-                                                        setRows(rows.map((r) => {
-                                                            if (r.name === row.name) {
-                                                                r.checked = !r.checked;
-                                                            }
-                                                            return r;
-                                                        }));
-                                                    }}
-                                                />
+                                            <TableCell className="w-5 border-r border-border !p-1">
+                                                <div className="h-full min-w-full flex justify-center items-center">
+                                                    <Checkbox
+                                                        className="w-5 h-5 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
+                                                        data-testid={`tableCheckbox${rowTestID}`}
+                                                        aria-label={`Select row ${row.name}`}
+                                                        checked={row.checked}
+                                                        onCheckedChange={() => {
+                                                            setRows(rows.map((r) => {
+                                                                if (r.name === row.name) {
+                                                                    r.checked = !r.checked;
+                                                                }
+                                                                return r;
+                                                            }));
+                                                        }}
+                                                    />
+                                                </div>
                                             </TableCell>
                                             : null
                                     }
                                     <TableCell className="border-r border-border p-1">
-                                        <p className="w-full h-full text-start">{actualIndex + 1}.</p>
+                                        <p className={cn(!isObjectType && "grow basis-0 text-center")}>{actualIndex + 1}.</p>
                                     </TableCell>
                                     {
                                         row.cells.map((cell, j) => {
@@ -647,14 +655,14 @@ export default function TableComponent({
                                                 return (
                                                     <TableCell
                                                         className={cn(
+                                                            "border-border p-0 items-center",
                                                             j + 1 !== row.cells.length && "border-r",
-                                                            row.cells[0]?.value === editable && (cell.type !== "readonly" && cell.type !== "object") && "p-2",
-                                                            cell.type === "object" && "p-1",
-                                                            "border-border"
                                                         )}
                                                         key={j}
                                                     >
-                                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                                        <div style={{ height }} className="overflow-auto flex items-center justify-center">
+                                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                                        </div>
                                                     </TableCell>
                                                 );
                                             }
@@ -669,7 +677,6 @@ export default function TableComponent({
                                                     key={cellKey}
                                                 >
                                                     <div
-                                                        style={{ height }}
                                                         className="overflow-auto"
                                                     >
                                                         {
@@ -678,7 +685,7 @@ export default function TableComponent({
                                                                     <JSONTree
                                                                         key={`${Array.from(expandArr.values()).join(",")}-${j}`}
                                                                         shouldExpandNodeInitially={(keyPath) => expandArr.get(j) === -1 || keyPath.length === expandArr.get(j)}
-                                                                        keyPath={[headers[j]]}
+                                                                        keyPath={[headerNames[j]]}
                                                                         valueRenderer={renderValue}
                                                                         labelRenderer={(keyPath) => renderLabel(keyPath)}
                                                                         theme={{
@@ -723,7 +730,7 @@ export default function TableComponent({
                                                                                 : cell.type === "text" &&
                                                                                 <Input
                                                                                     data-testid={`input${label}`}
-                                                                                    ref={inputRef}
+                                                                                    ref={inputRef as React.RefObject<HTMLInputElement>}
                                                                                     className="grow"
                                                                                     value={newValue}
                                                                                     onChange={(e) => setNewValue(e.target.value)}
@@ -783,7 +790,7 @@ export default function TableComponent({
                                                                     : <div className="flex items-center gap-2 justify-center">
                                                                         <Tooltip>
                                                                             <TooltipTrigger asChild>
-                                                                                <p data-testid={`content${cellTestId}${headers[j]}`} >{cell.value}</p>
+                                                                                <p data-testid={`content${cellTestId}${headerNames[j]}`} >{cell.value}</p>
                                                                             </TooltipTrigger>
                                                                             <TooltipContent>
                                                                                 {cell.value}

@@ -269,14 +269,6 @@ export default class LoginPage extends HeaderComponent {
     );
   }
 
-  private get endpointModeRadio(): Locator {
-    return this.page.getByRole("radio", { name: "Endpoint" });
-  }
-
-  private get endpointInput(): Locator {
-    return this.page.locator("//input[@id='Endpoint']");
-  }
-
   private get errorMessage(): Locator {
     return this.page.locator("text=Invalid URL format");
   }
@@ -318,33 +310,5 @@ export default class LoginPage extends HeaderComponent {
   async getErrorText(): Promise<string> {
     const errorEl = this.page.locator(".text-destructive").first();
     return (await errorEl.textContent()) ?? "";
-  }
-
-  async clickEndpointMode(): Promise<void> {
-    await interactWhenVisible(
-      this.endpointModeRadio,
-      (el) => el.click(),
-      "Endpoint mode radio button"
-    );
-  }
-
-  async isEndpointModeSelected(): Promise<boolean> {
-    return (await this.endpointModeRadio.getAttribute("data-state")) === "checked";
-  }
-
-  async fillEndpoint(endpoint: string): Promise<void> {
-    await interactWhenVisible(
-      this.endpointInput,
-      (el) => el.fill(endpoint),
-      "endpoint input"
-    );
-  }
-
-  async connectWithEndpoint(endpoint: string, username?: string, password?: string): Promise<void> {
-    await this.clickEndpointMode();
-    await this.fillEndpoint(endpoint);
-    if (username) await this.fillUsername(username);
-    if (password) await this.fillPassword(password);
-    await this.clickConnect();
   }
 }

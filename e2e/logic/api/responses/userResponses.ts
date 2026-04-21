@@ -2,7 +2,8 @@ export interface GetUsersResponse {
   result: {
     username: string;
     role: string;
-    checked: boolean;
+    selected: boolean;
+    keys: string;
   }[];
 }
 
@@ -11,5 +12,9 @@ export interface CreateUsersResponse {
 }
 
 export interface DeleteUsersResponse {
+  message: string;
+}
+
+export interface UpdateUserResponse {
   message: string;
 }

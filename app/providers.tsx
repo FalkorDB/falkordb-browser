@@ -147,6 +147,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [showUDF, setShowUDF] = useState<boolean>(true);
   const [maxItemsForSearch, setMaxItemsForSearch] = useState<number>(20);
   const [newMaxItemsForSearch, setNewMaxItemsForSearch] = useState<number>(20);
+  const [expandFilter, setExpandFilter] = useState(true);
   const showNavbarAndHeader = pathname !== "/" && pathname !== "/login";
 
   const replayTutorial = useCallback(() => {
@@ -306,10 +307,24 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setIndicator,
   }), [indicator]);
 
+  const onExpand = useCallback(() => {
+    const currentPanel = panelRef.current;
+
+    if (!currentPanel) return;
+
+    if (currentPanel.isCollapsed()) {
+      currentPanel.expand();
+    } else {
+      currentPanel.collapse();
+    }
+  }, []);
+
   const panelContext = useMemo(() => ({
     panel,
     setPanel,
-  }), [panel]);
+    panelOpen: !isCollapsed,
+    onTogglePanel: onExpand,
+  }), [panel, isCollapsed, onExpand]);
 
   const queryLoadingContext = useMemo(() => ({
     isQueryLoading,
@@ -336,7 +351,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     dataHash
   }), [scrollPosition, search, expand, dataHash]);
 
-  const isReadOnly = useMemo(() => 
+  const isReadOnly = useMemo(() =>
     sessionData?.user?.role === "Read-Only" || connectionInfo.sentinelRole === "slave",
     [sessionData?.user?.role, connectionInfo.sentinelRole]
   );
@@ -370,7 +385,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const fetchCount = useCallback(async (name?: string) => {
     const n = name || graphName;
 
-    if (!n) return;
+    if (!n || status === "unauthenticated") return;
 
     setEdgesCount(undefined);
     setNodesCount(undefined);
@@ -545,8 +560,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     handleCooldown,
     cooldownTicks,
     isLoading,
-    setIsLoading
-  }), [graph, graphInfo, graphName, graphNames, labels, relationships, nodesCount, edgesCount, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading]);
+    setIsLoading,
+    expand: expandFilter,
+    setExpand: setExpandFilter
+  }), [graph, graphInfo, graphName, graphNames, labels, relationships, nodesCount, edgesCount, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter]);
 
   useEffect(() => {
     setRelationships([...graph.Relationships]);
@@ -741,7 +758,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
     let rafId: number | undefined;
 
-    if ((pathname === "/graph" && graphName) || pathname === "/udf") {
+    if (pathname === "/graph" || pathname === "/udf") {
       if (currentPanel.isCollapsed()) currentPanel.expand();
     } else if (!currentPanel.isCollapsed()) {
       // Defer collapse to next frame so the collapsible prop change
@@ -754,7 +771,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     return () => {
       if (rafId !== undefined) cancelAnimationFrame(rafId);
     };
-  }, [graphName, pathname]);
+  }, [pathname]);
 
   const checkStatus = useCallback(() => {
     securedFetch("/api/status", {
@@ -797,18 +814,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
     handleFetchOptions();
   }, [handleFetchOptions, status]);
-
-  const onExpand = () => {
-    const currentPanel = panelRef.current;
-
-    if (!currentPanel) return;
-
-    if (currentPanel.isCollapsed()) {
-      currentPanel.expand();
-    } else {
-      currentPanel.collapse();
-    }
-  };
 
   const handleCloseTutorial = () => {
     setTutorialOpen(false);
@@ -949,12 +954,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                                 {
                                   showNavbarAndHeader &&
                                   <Navbar
-                                    graphName={graphName}
-                                    graphNames={pathname.includes("/schema") ? schemaNames : graphNames}
-                                    onSetGraphName={handleOnSetGraphName}
                                     showUDF={showUDF}
-                                    onOpenPanel={onExpand}
-                                    panelOpen={!isCollapsed}
                                   />
                                 }
                                 <ResizablePanelGroup orientation="horizontal" className="w-1 grow">

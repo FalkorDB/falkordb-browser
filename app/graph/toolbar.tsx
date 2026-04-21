@@ -1,4 +1,4 @@
-import { ArrowRight, Circle, Info, Search, X } from "lucide-react";
+import { ArrowRight, Circle, Search, X } from "lucide-react";
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { cn, GraphRef, Link, Node } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -7,6 +7,7 @@ import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import DeleteElement from "./DeleteElement";
 import { BrowserSettingsContext, ConnectionContext, GraphContext } from "../components/provider";
+import { getNodeDisplayText } from "@falkordb/canvas";
 
 interface Props {
     graph: Graph
@@ -47,13 +48,8 @@ export default function Toolbar({
 }: Props) {
 
     const { isLoading: isLoadingGraph } = useContext(GraphContext);
+    const { settings: { captionsKeysSettings: { captionsKeys }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix} } } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
-    const { settings: { showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
-    const {
-        settings: {
-            limitSettings: { limit, lastLimit },
-        }
-    } = useContext(BrowserSettingsContext);
 
 
     const suggestionRef = useRef<HTMLDivElement>(null);
@@ -67,9 +63,6 @@ export default function Toolbar({
     const [topFakeItemHeight, setTopFakeItemHeight] = useState(0);
     const [bottomFakeItemHeight, setBottomFakeItemHeight] = useState(0);
     const [visibleSuggestions, setVisibleSuggestions] = useState<(Node | Link)[]>([]);
-
-    const hasLimitWarning = graph.CurrentLimit && graph.Data.length >= graph.CurrentLimit;
-    const hasLimitChangeWarning = graph.CurrentLimit && lastLimit !== limit;
 
     const isLoading = isLoadingSchema || isLoadingGraph;
 
@@ -159,7 +152,7 @@ export default function Toolbar({
                         <Input
                             data-testid={`elementCanvasSearch${label}`}
                             className={cn("w-full text-foreground border border-primary", label === "Schema" && "h-full")}
-                            placeholder="Search for element in the graph"
+                            placeholder="Search for element"
                             value={searchElement}
                             onChange={(e) => setSearchElement(e.target.value)}
                             onKeyDown={(e) => {
@@ -199,7 +192,7 @@ export default function Toolbar({
                     }
                     {
                         expand && suggestions.length > 0 &&
-                        <div tabIndex={-1} onScroll={handleScroll} ref={suggestionRef} className="max-h-[30dvh] overflow-auto absolute left-0 top-14 w-full border border-border p-2 rounded-lg bg-background">
+                        <div tabIndex={-1} onScroll={handleScroll} ref={suggestionRef} className="z-10 max-h-[30dvh] overflow-auto absolute left-0 top-14 w-full border border-border p-2 rounded-lg bg-background">
                             <ul
                                 data-testid={`elementCanvasSuggestionsList${label}`}
                                 className="flex flex-col gap-2"
@@ -259,20 +252,19 @@ export default function Toolbar({
                                                             role="option"
                                                             aria-selected={actualIndex === suggestionIndex}
                                                             data-testid={`elementCanvasSuggestion${label}${suggestion.data.name || suggestion.id}`}
-                                                            className={cn("w-full h-full p-2 rounded-lg flex gap-2", actualIndex === suggestionIndex ? "bg-accent" : "bg-secondary")}
+                                                            className={cn("w-full h-full p-1 rounded-lg flex gap-2", actualIndex === suggestionIndex ? "bg-border" : "bg-secondary")}
                                                             onClick={() => handleSearchElement(suggestion)}
                                                             onMouseEnter={() => setSuggestionIndex(actualIndex)}
                                                         >
                                                             <div
-                                                                className="rounded-full h-8 w-8 p-2 flex items-center justify-center"
+                                                                className="rounded-full h-4 w-4 p-1"
                                                                 style={{ backgroundColor: suggestion.color }}
-                                                            >
-                                                                <p className="text-foreground text-sm font-bold truncate">{type ? (suggestion as Link).relationship : (suggestion as Node).labels[0]}</p>
-                                                            </div>
+                                                            />
+                                                            <p>{type ? (suggestion as Link).relationship : (suggestion as Node).labels[0]}</p>
                                                             <div
                                                                 className={cn("w-1 grow text-center truncate", actualIndex === suggestionIndex ? "text-accent-foreground" : "text-foreground")}
                                                             >
-                                                                {suggestion.data.name || suggestion.id}
+                                                                {type ? suggestion.relationship : getNodeDisplayText(suggestion as Node, captionsKeys, showPropertyKeyPrefix)}
                                                             </div>
                                                         </Button>
                                                     </TooltipTrigger>
@@ -306,34 +298,6 @@ export default function Toolbar({
                 {
                     graphName && !isReadOnly &&
                     <>
-                        <Button
-                            data-testid={`elementCanvasInfo${label}`}
-                            className="p-1 bg-background cursor-default border-primary"
-                            variant="Secondary"
-                            tooltipVariant="Primary"
-                            tooltipSide="bottom"
-                            title={`Select And Show Properties (Right Click)
-                                Select Multiple Entities (Right Click + Left Ctrl)
-                                Select 2 Nodes to Create Edge`}
-                        >
-                            <Info size={20} />
-                        </Button>
-                        {
-                            (hasLimitWarning || hasLimitChangeWarning) ?
-                                <Button
-                                    data-testid={`elementCanvasLimitWarning${label}`}
-                                    className="p-1 bg-background cursor-default border-orange-300"
-                                    variant="Secondary"
-                                    tooltipVariant="Primary"
-                                    tooltipSide="bottom"
-                                    title={`${hasLimitWarning ? `Data currently limited to ${graph.Data.length} rows` : ""}
-                        ${hasLimitChangeWarning ? "Rerun the query to apply the new limit." : ""}
-                        ${graph.ShowPropertyKeyPrefix !== showPropertyKeyPrefix ? "Rerun the query to apply the new property key prefix settings." : ""}`}
-                                >
-                                    <Info className="text-orange-300" size={20} />
-                                </Button>
-                                : null
-                        }
                         <Button
                             data-testid={`elementCanvasAddNode${label}`}
                             className="p-1 bg-background border-green text-green"

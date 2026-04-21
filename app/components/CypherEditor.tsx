@@ -4,10 +4,11 @@
 "use client";
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Monaco } from "@monaco-editor/react";
 import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext, useMemo, useCallback } from "react";
 import * as monaco from "monaco-editor";
-import { Minimize2, X } from "lucide-react";
+import { Info, Maximize2, Minimize2, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { cn, HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -348,7 +349,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                 detail: "(udf function)"
             }))
         )
-    , [udfList]);
+        , [udfList]);
 
     const getAllSuggestions = useCallback(async (): Promise<monaco.languages.CompletionItem[]> => {
         const remoteSuggestions = graphIdRef.current ? await getRemoteSuggestions() : [];
@@ -647,6 +648,25 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                             <X />
                         </Button>
                     }
+                    <Button
+                        data-testid="editorMaximize"
+                        title="Maximize"
+                        onClick={() => setMaximize(true)}
+                    >
+                        <Maximize2 size={20} />
+                    </Button>
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span className="flex items-center cursor-default" aria-label="Keyboard shortcuts" tabIndex={-1}>
+                                    <Info />
+                                </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                {"Run (Enter) | History (Arrow Up/Down) | Insert new line (Shift + Enter)"}
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
                     <Button
                         data-testid="editorRun"
                         ref={submitQuery}

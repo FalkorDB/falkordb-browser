@@ -2362,6 +2362,11 @@ const swaggerSpec = {
                           selected: {
                             type: "boolean",
                             example: false
+                          },
+                          keys: {
+                            type: "string",
+                            description: "Key permissions pattern for accessible keys",
+                            example: "*"
                           }
                         }
                       }
@@ -2406,6 +2411,11 @@ const swaggerSpec = {
                     enum: ["Admin", "Read-Write", "Read-Only"],
                     description: "Role to assign to the user",
                     example: "Read-Write"
+                  },
+                  keys: {
+                    type: "string",
+                    description: "Key permissions pattern for accessible keys (defaults to * if omitted)",
+                    example: "*"
                   }
                 },
                 required: ["username", "password", "role"]
@@ -2511,11 +2521,43 @@ const swaggerSpec = {
         }
       }
     },
+    "/api/user/save": {
+      post: {
+        tags: ["Users"],
+        summary: "Save users to disk",
+        description: "Persist the current ACL user configuration to disk using Redis ACL SAVE",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "ACL saved to disk successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "ACL saved to disk"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            description: "Bad request"
+          },
+          "500": {
+            description: "Internal server error"
+          }
+        }
+      }
+    },
     "/api/user/{user}": {
       patch: {
         tags: ["Users"],
-        summary: "Update user role",
-        description: "Update the role of a FalkorDB user",
+        summary: "Update user",
+        description: "Update the role, key permissions, and optionally the password of a FalkorDB user",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -2526,21 +2568,57 @@ const swaggerSpec = {
               type: "string"
             },
             description: "Username to update"
-          },
-          {
-            in: "query",
-            name: "role",
-            required: true,
-            schema: {
-              type: "string",
-              enum: ["Admin", "Read-Write", "Read-Only"]
-            },
-            description: "New role for the user"
           }
         ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  role: {
+                    type: "string",
+                    enum: ["Admin", "Read-Write", "Read-Only"],
+                    description: "New role for the user"
+                  },
+                  keys: {
+                    type: "string",
+                    description: "Key permissions pattern for accessible keys (defaults to * if omitted)",
+                    example: "*"
+                  },
+                  password: {
+                    type: "string",
+                    description: "New password for the user (optional, omit to keep current password). Must be at least 8 characters with uppercase, lowercase, digit, and special character."
+                  }
+                },
+                required: ["role"]
+              }
+            }
+          }
+        },
         responses: {
           "200": {
-            description: "User role updated successfully"
+            description: "User updated successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "User role updated"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            description: "Bad request - validation error or invalid role"
+          },
+          "500": {
+            description: "Internal server error"
           }
         }
       }

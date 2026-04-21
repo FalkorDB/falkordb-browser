@@ -56,10 +56,8 @@ function GraphView({
     isAddNode
 }: Props) {
 
-    const { graph, graphName, currentTab, setCurrentTab, isLoading, setIsLoading } = useContext(GraphContext);
+    const { graph, graphName, currentTab, setCurrentTab, isLoading, setIsLoading, expand, setExpand } = useContext(GraphContext);
     const { setData, data, graphData, setGraphData, setViewport, viewport } = useContext(ForceGraphContext);
-
-    const [expand, setExpand] = useState(true);
 
     const elementsLength = graph.getElements().length;
 
@@ -80,7 +78,7 @@ function GraphView({
         if (elementsLength === 0 && graph.Data.length !== 0) defaultChecked = "Table";
 
         setCurrentTab(defaultChecked);
-    }, [graph, elementsLength, graph.Data.length, setCurrentTab, isTabEnabled]);
+    }, [graph, graph.getElements().length, graph.Data.length, setCurrentTab]);
 
     useEffect(() => {
         setSelectedElements([]);

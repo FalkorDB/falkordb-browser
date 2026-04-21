@@ -31,7 +31,7 @@ function formatVersion(version: string | undefined): string {
 export default function Header() {
     const { indicator, setIndicator } = useContext(IndicatorContext);
     const { connectionType, connectionInfo, dbVersion } = useContext(ConnectionContext);
-    const { data: session } = useSession();
+    const { status, data: session } = useSession();
     const { toast } = useToast();
 
     const [usedMemory, setUsedMemory] = useState<string | null>(null);
@@ -39,6 +39,8 @@ export default function Header() {
     useEffect(() => {
         setUsedMemory(null);
         (async () => {
+            if (status !== "authenticated") return;
+            
             const result = await securedFetch("/api/info?section=memory", {
                 method: "GET"
             }, toast, setIndicator);
@@ -99,7 +101,7 @@ export default function Header() {
                         <div
                             tabIndex={0}
                             role="status"
-                            aria-label={`Connection type: ${connectionType}, Status: ${indicator}`}
+                            aria-label={`Deployment type: ${connectionType}, Status: ${indicator}`}
                             className={cn(
                                 indicator === "offline" ? "text-destructive border-destructive bg-destructive/10" : "text-green border-green bg-green/10",
                                 "h-6 px-2 rounded-full flex items-center gap-1.5 text-xs font-medium border",
@@ -115,7 +117,7 @@ export default function Header() {
                     </TooltipTrigger>
                     <TooltipContent>
                         <div className="flex flex-col gap-1">
-                            <p>Connection type: {connectionType}</p>
+                            <p>Deployment type: {connectionType}</p>
                             <p className={cn(
                                 indicator === "offline" ? "text-destructive" : "text-green",
                             )}>Status: {indicator}</p>
@@ -127,7 +129,7 @@ export default function Header() {
                 session?.user &&
                 <div className="flex gap-1 items-center">
                     <Button
-                        title="Copy connection info"
+                        title="Copy deployment info"
                         className="p-0.5 shrink-0"
                         onClick={() => {
                             let text = `${session.user.host}:${session.user.port}`;

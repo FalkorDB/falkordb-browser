@@ -1,11 +1,15 @@
 import { Dispatch, SetStateAction, useContext, useEffect, useState } from "react";
-import { Loader2, X, Palette, Network, Search } from "lucide-react";
+import { Loader2, X, Palette, Play, Plus, Network, Search } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn, InfoLabel } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger, PopoverClose } from "@/components/ui/popover";
+import { cn, formatName, InfoLabel } from "@/lib/utils";
 import Button from "../components/ui/Button";
-import { BrowserSettingsContext, GraphContext, QueryLoadingContext } from "../components/provider";
+import { BrowserSettingsContext, ConnectionContext, GraphContext, QueryLoadingContext } from "../components/provider";
 import CustomizeStylePanel from "./CustomizeStylePanel";
 import Input from "../components/ui/Input";
+import SelectGraph from "./selectGraph";
+import { Graph } from "../api/graph/model";
+import CreateGraph from "../components/CreateGraph";
 
 /** Escape a Cypher identifier by wrapping it in backticks (doubles any internal backticks). */
 function escapeIdentifier(id: string): string {
@@ -19,9 +23,10 @@ function escapeIdentifier(id: string): string {
  * @returns The Graph Info panel React element containing graph name, memory usage, node/edge counts, property keys, and query buttons
  */
 export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizingLabel }: { onClose: () => void, customizingLabel: InfoLabel | null, setCustomizingLabel: Dispatch<SetStateAction<InfoLabel | null>> }) {
-    const { graphInfo: { Labels, Relationships, PropertyKeys, MemoryUsage }, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
+    const { graphInfo: { Labels, Relationships, PropertyKeys, MemoryUsage }, nodesCount, edgesCount, runQuery, graphName, setGraphName, graphNames, setGraphNames, setGraph } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
     const { settings: { graphInfo: { showMemoryUsage, maxItemsForSearch } } } = useContext(BrowserSettingsContext);
+    const { isReadOnly } = useContext(ConnectionContext);
 
     const [nodesSearch, setNodesSearch] = useState("");
     const [edgesSearch, setEdgesSearch] = useState("");
@@ -32,7 +37,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     useEffect(() => { setPropertyKeysSearch(""); }, [PropertyKeys, maxItemsForSearch]);
 
     return (
-        <div aria-disabled={nodesCount === undefined || edgesCount === undefined} data-testid="graphInfoPanel" className={cn(`relative h-full w-full p-3 grid grid-rows-[max-content_max-content_max-content_1fr_1fr_1fr] gap-3`)}>
+        <div data-testid="graphInfoPanel" className={cn("relative h-full w-full p-3 grid gap-3", showMemoryUsage ? "grid-rows-[max-content_max-content_max-content_1fr_1fr_1fr]" : "grid-rows-[max-content_max-content_1fr_1fr_1fr]")}>
             {
                 !customizingLabel ? (
                     <>
@@ -47,56 +52,74 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             <h1 className="text-lg font-semibold">Graph Info</h1>
                             <Network size={20} className="text-foreground/50" />
                         </div>
-                        <div className="flex gap-2 items-center overflow-hidden">
-                            <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Name</h2>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <p tabIndex={0} role="text" aria-label={graphName} className="truncate pointer-events-auto text-sm font-semibold">{graphName}</p>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    {graphName}
-                                </TooltipContent>
-                            </Tooltip>
+                        <div className="w-full flex gap-2 items-center overflow-hidden">
+                            <SelectGraph
+                                options={graphNames}
+                                setOptions={(opts) => setGraphNames(opts as unknown as string[])}
+                                selectedValue={graphName}
+                                setSelectedValue={(name) => setGraphName(formatName(name))}
+                                type="Graph"
+                                setGraph={(g) => setGraph(g as Graph)}
+                            />
+                            {
+                                !isReadOnly &&
+                                <CreateGraph
+                                    type="Graph"
+                                    graphNames={graphNames}
+                                    onSetGraphName={(newGraphName) => {
+                                        setGraphName(formatName(newGraphName));
+                                        setGraphNames(prev => [...prev, formatName(newGraphName)]);
+                                    }}
+                                    trigger={
+                                        <Button
+                                            data-testid="createGraph"
+                                            variant="Primary"
+                                            className="hover:!bg-primary/70 p-1"
+                                            title="Create New Graph"
+                                        >
+                                            <Plus size={20} />
+                                        </Button>
+                                    }
+                                />
+                            }
                         </div>
                         {
                             showMemoryUsage &&
-                            <div className="flex flex-col gap-2">
-                                <div className="flex gap-2 items-center">
+                            <div className="w-full flex items-center gap-2">
                                     <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Memory</h2>
                                     {
-                                        MemoryUsage.get("total_graph_sz_mb") !== undefined
+                                        MemoryUsage.get("total_graph_sz_mb") !== undefined || graphName === ""
                                             ? <Tooltip>
                                                 <TooltipTrigger asChild>
-                                                    <p tabIndex={0} role="text" aria-label={`${MemoryUsage.get("total_graph_sz_mb") || "<1"} MB`} className="truncate pointer-events-auto text-sm font-semibold">{MemoryUsage.get("total_graph_sz_mb") || "<1"} MB</p>
+                                                    <p tabIndex={0} role="text" aria-label={graphName === "" ? "0" : `${ MemoryUsage.get("total_graph_sz_mb") || "<1"} MB`} className="truncate pointer-events-auto text-sm font-semibold">{graphName === "" ? "0" : `${MemoryUsage.get("total_graph_sz_mb") || "<1"} MB`}</p>
                                                 </TooltipTrigger>
                                                 <TooltipContent>
-                                                    {MemoryUsage.get("total_graph_sz_mb")} MB
+                                                    {graphName === "" ? "0" : `${MemoryUsage.get("total_graph_sz_mb") || "<1"} MB`}
                                                 </TooltipContent>
                                             </Tooltip>
                                             : <Loader2 className="animate-spin" />
                                     }
-                                </div>
                             </div>
                         }
-                        <div className="flex flex-col gap-3 overflow-hidden">
+                        <div className="flex flex-col gap-3 overflow-hidden min-h-0">
                             <div className="flex gap-2 items-center">
                                 <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Nodes</h2>
                                 {
-                                    nodesCount !== undefined ?
-                                        <Tooltip>
+                                    nodesCount !== undefined || graphName === "" ?
+                                     <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <p
                                                     data-testid="nodesCount"
                                                     tabIndex={0}
                                                     role="text"
-                                                    aria-label={`${nodesCount.toLocaleString()} nodes`}
+                                                    aria-label={`${nodesCount?.toLocaleString() || 0} nodes`}
                                                     className="truncate pointer-events-auto text-sm font-semibold"
                                                 >
-                                                    {nodesCount.toLocaleString()}
+                                                    {nodesCount?.toLocaleString() || 0}
                                                 </p>
                                             </TooltipTrigger>
                                             <TooltipContent>
-                                                {nodesCount.toLocaleString()}
+                                                {nodesCount?.toLocaleString() || 0}
                                             </TooltipContent>
                                         </Tooltip>
                                         : <Loader2 data-testid="nodesCountLoader" className="animate-spin" />
@@ -125,57 +148,66 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                     const labelColor = label.style.color;
 
                                     return (
-                                        <li key={`${name}-${labelColor}`} className="max-w-full flex gap-1 items-center overflow-x-hidden">
-                                            <Button
-                                                className="w-fit max-w-[calc(100%-16px)] h-6 px-2 rounded-md flex items-center gap-1.5 bg-secondary text-foreground text-xs hover:bg-secondary/80 transition-colors"
-                                                data-testid={`graphInfo${name}Node`}
-                                                title={`MATCH (n:${escapeIdentifier(name)}) RETURN n
-                                                    #: ${label.count.toLocaleString()}`}
-                                                onClick={() => runQuery(`MATCH (n:${escapeIdentifier(name)}) RETURN n`)}
-                                                disabled={isQueryLoading}
-                                            >
-                                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: labelColor }} />
-                                                <span className="truncate">{name}</span>
-                                            </Button>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
+                                        <li key={`${name}-${labelColor}`} className="max-w-full">
+                                            <Popover>
+                                                <PopoverTrigger asChild>
                                                     <Button
-                                                        className="h-4 w-4 p-1 rounded-full flex justify-center items-center bg-muted hover:bg-muted/80"
-                                                        data-testid={`customizeStyle${name}`}
-                                                        title="Customize Style"
-                                                        onClick={() => setCustomizingLabel(label)}
+                                                        data-testid={`graphInfo${name}Node`}
+                                                        title={`${name} #: ${label.count.toLocaleString()}`}
+                                                        className="w-fit max-w-full h-6 px-2 rounded-md flex items-center gap-1.5 bg-secondary text-foreground text-xs hover:bg-secondary/80 transition-colors cursor-pointer"
                                                     >
-                                                        <Palette className="h-3 w-3" />
+                                                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: labelColor }} />
+                                                        <span className="truncate">{name}</span>
                                                     </Button>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    Customize Style
-                                                </TooltipContent>
-                                            </Tooltip>
+                                                </PopoverTrigger>
+                                                <PopoverContent className="w-fit p-1 flex flex-col gap-1" align="start">
+                                                    <PopoverClose asChild>
+                                                        <Button
+                                                            className="w-full justify-start gap-2 px-2 py-1 text-xs hover:bg-secondary rounded-md"
+                                                            data-testid={`runLabel${name}`}
+                                                            onClick={() => runQuery(`MATCH (n:${escapeIdentifier(name)}) RETURN n`)}
+                                                            disabled={isQueryLoading}
+                                                        >
+                                                            <Play size={12} />
+                                                            Run
+                                                        </Button>
+                                                    </PopoverClose>
+                                                    <PopoverClose asChild>
+                                                        <Button
+                                                            className="w-full justify-start gap-2 px-2 py-1 text-xs hover:bg-secondary rounded-md"
+                                                            data-testid={`customizeStyle${name}`}
+                                                            onClick={() => setCustomizingLabel(label)}
+                                                        >
+                                                            <Palette size={12} />
+                                                            Customize
+                                                        </Button>
+                                                    </PopoverClose>
+                                                </PopoverContent>
+                                            </Popover>
                                         </li>
                                     );
                                 })}
                             </ul>
                         </div>
-                        <div className="flex flex-col gap-3 overflow-hidden">
+                        <div className="flex flex-col gap-3 overflow-hidden min-h-0">
                             <div className="flex gap-2 items-center">
                                 <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Edges</h2>
                                 {
-                                    edgesCount !== undefined ?
+                                    edgesCount !== undefined || graphName === "" ?
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <p
                                                     data-testid="edgesCount"
                                                     tabIndex={0}
                                                     role="text"
-                                                    aria-label={`${edgesCount.toLocaleString()} edges`}
+                                                    aria-label={`${edgesCount?.toLocaleString() || 0} edges`}
                                                     className="truncate pointer-events-auto text-sm font-semibold"
                                                 >
-                                                    {edgesCount.toLocaleString()}
+                                                    {edgesCount?.toLocaleString() || 0}
                                                 </p>
                                             </TooltipTrigger>
                                             <TooltipContent>
-                                                {edgesCount.toLocaleString()}
+                                                {edgesCount?.toLocaleString() || 0}
                                             </TooltipContent>
                                         </Tooltip>
                                         :
@@ -221,7 +253,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                 })}
                             </ul>
                         </div>
-                        <div className="flex flex-col gap-3 overflow-hidden">
+                        <div className="flex flex-col gap-3 overflow-hidden min-h-0">
                             <div className="flex gap-2 items-center">
                                 <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Property Keys</h2>
                                 {

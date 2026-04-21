@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  allowedDevOrigins: ['127.0.0.1', '0.0.0.0'],
   output: 'standalone',
   reactStrictMode: true,
   // Keep falkordb server-only to avoid bundling BigInt in client/runtime
