@@ -16,14 +16,14 @@ export default function AddUser({ onAddUser }: {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
-    const [role, setRole] = useState("Admin");
+    const [role, setRole] = useState("");
     const [keys, setKeys] = useState<string[]>([]);
 
     const handleClose = () => {
         setPassword("");
         setConfirmPassword("");
         setUsername("");
-        setRole("Admin");
+        setRole("");
         setKeys([]);
     };
 
