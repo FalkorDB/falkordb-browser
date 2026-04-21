@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { getRoleWithKeys, extractKeysFromACL, ROLE } from "./model.ts";
+import { getRoleWithKeys, extractKeysFromACL, ROLE } from "./model";
 
 // ---------------------------------------------------------------------------
 // getRoleWithKeys
@@ -16,14 +16,14 @@ describe("getRoleWithKeys", () => {
 
   it("inserts resetkeys and the supplied key pattern", () => {
     const role = ROLE.get("Read-Write")!;
-    const result = getRoleWithKeys(role, "myprefix:*");
+    const result = getRoleWithKeys(role, ["myprefix:*"]);
     assert.equal(result[1], "resetkeys");
     assert.equal(result[2], "~myprefix:*");
   });
 
   it("inserts resetkeys and key pattern for Read-Only role", () => {
     const role = ROLE.get("Read-Only")!;
-    const result = getRoleWithKeys(role, "test:*");
+    const result = getRoleWithKeys(role, ["test:*"]);
     assert.equal(result[1], "resetkeys");
     assert.equal(result[2], "~test:*");
   });
@@ -37,7 +37,7 @@ describe("getRoleWithKeys", () => {
 
   it("preserves all remaining role entries after the key pattern", () => {
     const role = ROLE.get("Read-Only")!;
-    const result = getRoleWithKeys(role, "ns:*");
+    const result = getRoleWithKeys(role, ["ns:*"]);
     // role[0] = "on", then "resetkeys", then "~ns:*", then role.slice(1)
     const expected = ["on", "resetkeys", "~ns:*", ...role.slice(1)];
     assert.deepEqual(result, expected);
@@ -47,7 +47,7 @@ describe("getRoleWithKeys", () => {
   // update to a narrower pattern because aclSetUser merges key patterns.
   it("includes resetkeys so stale wildcard ~* cannot shadow a narrower update", () => {
     const role = ROLE.get("Read-Write")!;
-    const result = getRoleWithKeys(role, "app:*");
+    const result = getRoleWithKeys(role, ["app:*"]);
     // resetkeys must appear before the new ~pattern so Redis/FalkorDB clears
     // existing key patterns first.
     const resetkeysIdx = result.indexOf("resetkeys");
@@ -63,28 +63,28 @@ describe("getRoleWithKeys", () => {
 describe("extractKeysFromACL", () => {
   it("returns the key pattern from a typical ACL line", () => {
     const parts = ["user", "alice", "on", "~myprefix:*", "resetchannels", "-@all"];
-    assert.equal(extractKeysFromACL(parts), "myprefix:*");
+    assert.deepEqual(extractKeysFromACL(parts), ["myprefix:*"]);
   });
 
-  it("returns * when no ~ pattern is present", () => {
+  it("returns [*] when no ~ pattern is present", () => {
     const parts = ["user", "alice", "on", "resetchannels", "-@all"];
-    assert.equal(extractKeysFromACL(parts), "*");
+    assert.deepEqual(extractKeysFromACL(parts), ["*"]);
   });
 
-  it("returns * when the only pattern is ~*", () => {
+  it("returns [*] when the only pattern is ~*", () => {
     const parts = ["user", "alice", "on", "~*", "resetchannels", "-@all"];
-    assert.equal(extractKeysFromACL(parts), "*");
+    assert.deepEqual(extractKeysFromACL(parts), ["*"]);
   });
 
-  it("joins multiple key patterns with a space", () => {
+  it("returns multiple key patterns as an array", () => {
     const parts = ["user", "alice", "on", "~ns1:*", "~ns2:*", "-@all"];
-    assert.equal(extractKeysFromACL(parts), "ns1:* ns2:*");
+    assert.deepEqual(extractKeysFromACL(parts), ["ns1:*", "ns2:*"]);
   });
 
   it("strips the ~ prefix correctly", () => {
     const parts = ["user", "bob", "on", "~test:*", "-@all"];
     const result = extractKeysFromACL(parts);
-    assert.ok(!result.startsWith("~"), "result must not start with ~");
-    assert.equal(result, "test:*");
+    assert.ok(!result[0].startsWith("~"), "result must not start with ~");
+    assert.deepEqual(result, ["test:*"]);
   });
 });

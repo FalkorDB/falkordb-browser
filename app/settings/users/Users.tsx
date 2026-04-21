@@ -84,7 +84,7 @@ export default function Users() {
                 title: "Success",
                 description: "User added successfully",
             });
-            setUsers(prev => [...prev, { username, role, selected: false }]);
+            setUsers(prev => [...prev, { username, role, keys, selected: false }]);
             setRows(prev => [...prev, {
                 name: username,
                 cells: [{
@@ -123,10 +123,11 @@ export default function Users() {
     };
 
     const checkedRows = rows.filter(row => row.checked);
-    const selectedUserData = checkedRows.length === 1 ? {
-        username: checkedRows[0].cells[0].value as string,
-        role: checkedRows[0].cells[1].value as string,
-        keys: (checkedRows[0].cells[2].value as string).split(", ").map(key => key.trim()),
+    const selectedUser = checkedRows.length === 1 ? users.find(u => u.username === checkedRows[0].cells[0].value) : null;
+    const selectedUserData = selectedUser ? {
+        username: selectedUser.username,
+        role: selectedUser.role,
+        keys: selectedUser.keys || ["*"],
     } : null;
 
     return (

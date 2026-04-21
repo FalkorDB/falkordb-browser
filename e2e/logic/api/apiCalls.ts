@@ -425,7 +425,7 @@ export default class ApiCalls {
     }
   }
 
-  async updateUser(username: string, data: { role: string; keys?: string; password?: string }): Promise<UpdateUserResponse> {
+  async updateUser(username: string, data: { role: string; keys?: string[]; password?: string }): Promise<UpdateUserResponse> {
     try {
       const result = await patchRequest(
         `${urls.api.settingsUser}${encodeURIComponent(username)}`,

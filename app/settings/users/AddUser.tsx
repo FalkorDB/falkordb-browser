@@ -23,7 +23,7 @@ export default function AddUser({ onAddUser }: {
         setPassword("");
         setConfirmPassword("");
         setUsername("");
-        setRole("");
+        setRole("Admin");
         setKeys([]);
     };
 

@@ -208,7 +208,7 @@ test.describe('@Config Settings users tests', () => {
     test("@admin API Test: Update user with password and keys via PATCH", async () => {
         const username = getRandomString('user');
         await apiCall.createUsers({ username, password: user.password, role: user.ReadWrite });
-        await apiCall.updateUser(username, { role: user.ReadWrite, keys: "test:*", password: "NewPass1@" });
+        await apiCall.updateUser(username, { role: user.ReadWrite, keys: ["test:*"], password: "NewPass1@" });
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
         await settingsUsersPage.navigateToUserTab();
         const newKeys = await settingsUsersPage.getUserKeys(username);
