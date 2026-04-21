@@ -4,9 +4,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { EyeIcon, EyeOffIcon, ExternalLink, InfoIcon } from "lucide-react";
+import { EyeIcon, EyeOffIcon, ExternalLink, InfoIcon, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 import Button from "./ui/Button";
 import Combobox from "./ui/combobox";
 import Input from "./ui/Input";
@@ -49,7 +50,14 @@ export type TextField = DefaultField & {
     type: "text"
 };
 
-export type Field = SelectField | PasswordField | TextField;
+export type TagField = DefaultField & {
+    type: "tag"
+    tags: string[]
+    onAddTag: (tag: string) => void
+    onRemoveTag: (index: number) => void
+};
+
+export type Field = SelectField | PasswordField | TextField | TagField;
 
 interface Props {
     handleSubmit: (e: React.FormEvent<HTMLFormElement>) => Promise<void>
@@ -63,28 +71,99 @@ interface Props {
     className?: string
 }
 
+function TagInput({ field }: { field: TagField }) {
+    const [inputValue, setInputValue] = useState("");
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const addTags = (value: string) => {
+        const parts = value.split(",").map(p => p.trim().replace(/^~/, "")).filter(Boolean);
+        parts.forEach(part => {
+            if (!field.tags.includes(part)) {
+                field.onAddTag(part);
+            }
+        });
+        setInputValue("");
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter" || e.key === ",") {
+            e.preventDefault();
+            addTags(inputValue);
+        } else if (e.key === "Backspace" && inputValue === "" && field.tags.length > 0) {
+            field.onRemoveTag(field.tags.length - 1);
+        }
+    };
+
+    return (
+        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
+        <div
+            className="flex flex-wrap items-center gap-1 border border-border p-1 rounded-lg bg-input text-foreground min-h-[34px] cursor-text"
+            onClick={() => inputRef.current?.focus()}
+        >
+            {field.tags.map((tag, index) => (
+                <Badge key={tag} variant="secondary" className="flex items-center gap-1 px-2 py-0.5 max-w-full overflow-hidden">
+                    <span className="truncate" title={tag}>{tag}</span>
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            field.onRemoveTag(index);
+                        }}
+                        className="hover:text-destructive shrink-0"
+                        aria-label={`Remove ${tag}`}
+                    >
+                        <X size={12} />
+                    </button>
+                </Badge>
+            ))}
+            <input
+                ref={inputRef}
+                id={field.label}
+                className="flex-1 min-w-[80px] bg-transparent outline-none text-sm p-0.5"
+                value={inputValue}
+                placeholder={field.tags.length === 0 ? (field.placeholder || "Type and press Enter") : ""}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onBlur={() => addTags(inputValue)}
+                disabled={field.disabled}
+            />
+        </div>
+    );
+}
+
 export default function FormComponent({ handleSubmit, fields, error = undefined, children = undefined, submitButtonLabel = "Submit", className = "" }: Props) {
     const [show, setShow] = useState<{ [key: string]: boolean }>({});
     const [errors, setErrors] = useState<{ [key: string]: boolean }>({});
     const [isLoading, setIsLoading] = useState(false);
     const isMountedRef = useRef(false);
 
+    // Stable identifier for the current set of fields — triggers re-validation when the form layout changes
+    const fieldsKey = fields.map(f => f.label).join(",");
     const fieldValues = fields.map(f => f.value).join("\0");
 
     useEffect(() => {
+        const clearMountedFlag = () => {
+            isMountedRef.current = false;
+        };
+        
         if (!isMountedRef.current) {
             isMountedRef.current = true;
-            return;
+
+            return clearMountedFlag;
         }
 
         const newErrors: { [key: string]: boolean } = {};
+
         fields.forEach(field => {
             if (field.errors) {
                 newErrors[field.label] = field.errors.some(err => err.condition(field.value));
             }
         });
+
         setErrors(prev => ({ ...prev, ...newErrors }));
-    }, [fieldValues]);
+
+        return clearMountedFlag;
+    }, [fieldsKey, fieldValues]);
 
     const onHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -160,6 +239,8 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                             selectedValue={field.value}
                                             setSelectedValue={field.onChange}
                                         />
+                                        : field.type === "tag" ?
+                                            <TagInput field={field} />
                                         : <Input
                                             className={cn("w-full", field.type === "password" && "pr-10")}
                                             id={field.label}

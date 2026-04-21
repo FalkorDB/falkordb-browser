@@ -43,17 +43,7 @@ export async function PATCH(
 
       const connection = await client.connection;
 
-      // Preserve existing key permissions when keys not provided (true PATCH semantics)
-      let effectiveKeys = keys;
-      if (effectiveKeys === undefined) {
-        const aclList = await connection.aclList();
-        const userLine = aclList.find((line: string) => line.split(" ")[1] === username);
-        if (userLine) {
-          effectiveKeys = extractKeysFromACL(userLine.split(" "));
-        }
-      }
-
-      const finalRole = getRoleWithKeys(role, effectiveKeys);
+      const finalRole = getRoleWithKeys(role, keys);
       if (password) {
         finalRole.push(`>${password}`);
       }

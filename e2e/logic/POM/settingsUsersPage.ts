@@ -311,9 +311,19 @@ export default class SettingsUsersPage extends BasePage {
   }
 
   async fillEditKeysField(keys: string): Promise<void> {
+    // Remove all existing tags by clicking their remove buttons (scoped to tag input container)
+    const keysContainer = this.editKeysField.locator('..');
+    const removeButtons = keysContainer.locator("button[aria-label^='Remove ']");
+    while (await removeButtons.count() > 0) {
+      await removeButtons.first().click();
+    }
+    // Type the new key and press Enter to commit the tag
     await interactWhenVisible(
       this.editKeysField,
-      (el) => el.fill(keys),
+      async (el) => {
+        await el.fill(keys);
+        await el.press("Enter");
+      },
       "edit keys input"
     );
   }

@@ -10,21 +10,21 @@ import FormComponent, { Field } from "@/app/components/FormComponent";
 import { Drawer, DrawerDescription, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 
 export default function AddUser({ onAddUser }: {
-    onAddUser: (user: CreateUser, keys: string) => Promise<void>
+    onAddUser: (user: CreateUser, keys: string[]) => Promise<void>
 }) {
     const [open, setOpen] = useState(false);
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
-    const [role, setRole] = useState("Admin");
-    const [keys, setKeys] = useState("");
+    const [role, setRole] = useState("");
+    const [keys, setKeys] = useState<string[]>([]);
 
     const handleClose = () => {
         setPassword("");
         setConfirmPassword("");
         setUsername("");
         setRole("");
-        setKeys("");
+        setKeys([]);
     };
 
     useEffect(() => {
@@ -113,18 +113,16 @@ export default function AddUser({ onAddUser }: {
             ]
         },
         {
-            value: keys,
-            onChange: (e) => setKeys(e.target.value),
+            value: keys.join(" "),
             label: "Key / Graph Permissions",
-            type: "text",
+            type: "tag",
+            tags: keys,
+            onAddTag: (tag) => setKeys(prev => [...prev, tag]),
+            onRemoveTag: (index) => setKeys(prev => prev.filter((_, i) => i !== index)),
             required: false,
             placeholder: "*",
-            description: "Pattern for accessible keys / graphs (e.g. *, user:*, ~myprefix:*)",
-            info: "Defines which keys / graphs this user can access. See Redis ACL documentation for pattern syntax.",
-            link: {
-                label: "Learn more",
-                url: "https://redis.io/docs/latest/operate/oss_and_stack/management/security/acl/#key-permissions"
-            },
+            description: "Pattern for accessible keys / graphs (e.g. mygraph, myprefix:*, *)",
+            info: "Defines which keys / graphs this user can access",
             errors: []
         }
     ];
@@ -132,7 +130,7 @@ export default function AddUser({ onAddUser }: {
     const handleAddUser = async (e: FormEvent) => {
         e.preventDefault();
 
-        await onAddUser({ username, password, role }, keys);
+        await onAddUser({ username, password, role, }, keys);
 
         setOpen(false);
 

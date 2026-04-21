@@ -17,9 +17,9 @@ export const createUser = z.object({
     })
     .min(1, "Role cannot be empty"),
   keys: z
-    .string()
+    .array(z.string().min(1, "Key cannot be empty"))
     .optional()
-    .default("*"),
+    .default(["*"]),
 });
 
 export const deleteUsers = z.object({
@@ -39,7 +39,7 @@ export const updateUser = z.object({
     })
     .min(1, "Role cannot be empty"),
   keys: z
-    .string()
+    .array(z.string().min(1, "Key cannot be empty"))
     .optional(),
   password: z
     .string()

@@ -9,8 +9,8 @@ import { Drawer, DrawerDescription, DrawerContent, DrawerHeader, DrawerTitle, Dr
 interface EditUserProps {
     username: string
     role: string
-    keys: string
-    onEditUser: (username: string, role: string, keys: string, password?: string) => Promise<boolean>
+    keys: string[]
+    onEditUser: (username: string, role: string, keys: string[], password?: string) => Promise<boolean>
     disabled?: boolean
 }
 
@@ -19,12 +19,12 @@ export default function EditUser({ username, role: initialRole, keys: initialKey
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [role, setRole] = useState(initialRole);
-    const [keys, setKeys] = useState(initialKeys);
+    const [keys, setKeys] = useState<string[]>(initialKeys ? initialKeys : []);
 
     useEffect(() => {
         if (open) {
             setRole(initialRole);
-            setKeys(initialKeys);
+            setKeys(initialKeys ? initialKeys : []);
             setPassword("");
             setConfirmPassword("");
         }
@@ -100,10 +100,12 @@ export default function EditUser({ username, role: initialRole, keys: initialKey
             ]
         },
         {
-            value: keys,
-            onChange: (e) => setKeys(e.target.value),
+            value: keys.join(" "),
             label: "Key / Graph Permissions",
-            type: "text",
+            type: "tag",
+            tags: keys,
+            onAddTag: (tag) => setKeys(prev => [...prev, tag]),
+            onRemoveTag: (index) => setKeys(prev => prev.filter((_, i) => i !== index)),
             required: false,
             placeholder: "*",
             description: "Pattern for accessible keys / graphs (e.g. *, user:*, ~myprefix:*)",

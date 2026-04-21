@@ -2,13 +2,11 @@
 
 "use client";
 
-import React, { useEffect, useState, useContext } from "react";
-import { Save } from "lucide-react";
+import { useEffect, useState, useContext, useCallback } from "react";
 import { CreateUser, User } from "@/app/api/user/model";
 import { prepareArg, securedFetch, Row } from "@/lib/utils";
 import TableComponent from "@/app/components/TableComponent";
 import { useToast } from "@/components/ui/use-toast";
-import ActionButton from "@/app/components/ui/Button";
 import { IndicatorContext } from "@/app/components/provider";
 import DeleteUser from "./DeleteUser";
 import AddUser from "./AddUser";
@@ -40,7 +38,7 @@ export default function Users() {
             if (result.ok) {
                 const data = await result.json();
                 setUsers(data.result.map((user: User) => ({ ...user, selected: false })));
-                setRows(data.result.map(({ username, role, keys }: { username: string, role: string, keys: string }): Row => ({
+                setRows(data.result.map(({ username, role, keys }: { username: string, role: string, keys: string[] }): Row => ({
                     name: username,
                     cells: [{
                         value: username,
@@ -49,7 +47,7 @@ export default function Users() {
                         value: role,
                         type: "readonly",
                     }, {
-                        value: keys || "*",
+                        value: keys.join(", ") || "*",
                         type: "readonly"
                     }],
                     checked: false,
@@ -58,20 +56,21 @@ export default function Users() {
         })();
     }, [toast, setIndicator]);
 
-    const handleSaveUsers = async () => {
+    const handleSaveUsers = useCallback(async () => {
         const response = await securedFetch('/api/user/save', {
             method: 'POST',
         }, toast, setIndicator);
 
-        if (response.ok) {
+        if (!response.ok) {
             toast({
-                title: "Success",
-                description: "Users saved to disk",
+                title: "Error",
+                description: <p>Failed to save users to disk <a href="https://docs.falkordb.com/operations/durability/acl-persistence.html" target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-1">Learn More</a></p>,
+                variant: "warning",
             });
         }
-    };
+    }, [toast, setIndicator]);
 
-    const handleAddUser = async ({ username, password, role }: CreateUser, keys: string) => {
+    const handleAddUser = async ({ username, password, role }: CreateUser, keys: string[]) => {
         const response = await securedFetch('/api/user/', {
             method: 'POST',
             headers: {
@@ -85,7 +84,7 @@ export default function Users() {
                 title: "Success",
                 description: "User added successfully",
             });
-            setUsers(prev => [...prev, { username, role, selected: false }]);
+            setUsers(prev => [...prev, { username, role, keys, selected: false }]);
             setRows(prev => [...prev, {
                 name: username,
                 cells: [{
@@ -95,37 +94,40 @@ export default function Users() {
                     value: role,
                     type: "readonly",
                 }, {
-                    value: keys || "*",
+                    value: keys.join(", ") || "*",
                     type: "readonly"
                 }],
                 checked: false,
             }] as Row[]);
+            await handleSaveUsers();
         }
     };
 
-    const handleEditUser = async (username: string, role: string, keys: string, password?: string) => {
+    const handleEditUser = async (username: string, role: string, keys: string[], password?: string) => {
         const result = await securedFetch(`api/user/${prepareArg(username)}`, {
             method: 'PATCH',
             body: JSON.stringify({ role, keys, password })
         }, toast, setIndicator);
 
         if (result.ok) {
-            setUsers(prev => prev.map(u => u.username === username ? { ...u, role, keys: keys || "*" } : u));
-            setRows(prev => prev.map((row): Row => row.cells[0].value === username ? { ...row, cells: [row.cells[0], { ...row.cells[1], value: role }, { ...row.cells[2], value: keys || "*" }] } : row));
+            setUsers(prev => prev.map(u => u.username === username ? { ...u, role, keys: keys || ["*"] } : u));
+            setRows(prev => prev.map((row): Row => row.cells[0].value === username ? { ...row, cells: [row.cells[0], { ...row.cells[1], value: role }, { ...row.cells[2], value: keys.join(", ") || "*" }] } : row));
             toast({
                 title: "Success",
                 description: `${username} updated successfully`,
             });
+            await handleSaveUsers();
         }
 
         return result.ok;
     };
 
     const checkedRows = rows.filter(row => row.checked);
-    const selectedUserData = checkedRows.length === 1 ? {
-        username: checkedRows[0].cells[0].value as string,
-        role: checkedRows[0].cells[1].value as string,
-        keys: checkedRows[0].cells[2].value as string,
+    const selectedUser = checkedRows.length === 1 ? users.find(u => u.username === checkedRows[0].cells[0].value) : null;
+    const selectedUserData = selectedUser ? {
+        username: selectedUser.username,
+        role: selectedUser.role,
+        keys: selectedUser.keys || ["*"],
     } : null;
 
     return (
@@ -133,7 +135,7 @@ export default function Users() {
             <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-3">
                     <h2 className="text-xl font-semibold text-foreground">Users</h2>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
                         {users.length} {users.length === 1 ? "user" : "users"}
                     </span>
                 </div>
@@ -155,20 +157,11 @@ export default function Users() {
                         <EditUser
                             username={selectedUserData?.username || ""}
                             role={selectedUserData?.role || ""}
-                            keys={selectedUserData?.keys || "*"}
+                            keys={selectedUserData?.keys || ["*"]}
                             onEditUser={handleEditUser}
                             disabled={!selectedUserData || selectedUserData.username === "default"}
                         />
-                        <DeleteUser users={rows.filter(row => row.checked && row.cells[0].value !== "default").map(row => users.find(user => user.username === row.cells[0].value)!)} setUsers={setUsers} setRows={setRows} />
-                        <ActionButton
-                            variant="Secondary"
-                            label="Save Users"
-                            title="Save users to disk"
-                            className="px-4 py-[10px]"
-                            onClick={handleSaveUsers}
-                        >
-                            <Save size={20} />
-                        </ActionButton>
+                        <DeleteUser users={rows.filter(row => row.checked && row.cells[0].value !== "default").map(row => users.find(user => user.username === row.cells[0].value)!)} setUsers={setUsers} setRows={setRows} onSave={handleSaveUsers} />
                     </div>
                 </TableComponent>
             </div>
