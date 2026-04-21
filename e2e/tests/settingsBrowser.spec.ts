@@ -17,6 +17,9 @@ test.describe('@browser Browser Settings tests', () => {
     let anthropicModel: string;
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     let geminiModel: string;
+    let xaiModel: string;
+    // Whether model listing actually returned results from the AI providers
+    let modelsAvailable = false;
 
     test.beforeAll(async () => {
         // Fetch available models from each provider before running tests
@@ -27,19 +30,23 @@ test.describe('@browser Browser Settings tests', () => {
             const openaiModels = await tempApiCall.getModelsByProvider('openai');
             const anthropicModels = await tempApiCall.getModelsByProvider('anthropic');
             const geminiModels = await tempApiCall.getModelsByProvider('gemini');
+            const xaiModels = await tempApiCall.getModelsByProvider('xai');
 
             // Store first model from each provider
-            openaiModel = openaiModels.models[0] || 'gpt-4o-mini';
-            anthropicModel = anthropicModels.models[0] || 'claude-3-5-sonnet';
-            geminiModel = geminiModels.models[0] || 'gemini-2.0-flash-exp';
+            openaiModel = openaiModels.models?.[0] || 'gpt-4o-mini';
+            anthropicModel = anthropicModels.models?.[0] || 'claude-3-5-sonnet';
+            geminiModel = geminiModels.models?.[0] || 'gemini-2.0-flash-exp';
+            xaiModel = xaiModels.models?.[0] || 'grok-3-mini';
 
-            // console.log('Test models:', { openaiModel, anthropicModel, geminiModel });
+            // Models are available if at least one provider returned results
+            modelsAvailable = !!(openaiModels.models?.length || anthropicModels.models?.length || geminiModels.models?.length || xaiModels.models?.length);
         } catch (error) {
             // Fallback to default models if API call fails
             console.warn('Failed to fetch models, using defaults:', error);
             openaiModel = 'gpt-4o-mini';
             anthropicModel = 'claude-3-5-sonnet';
             geminiModel = 'gemini-2.0-flash-exp';
+            xaiModel = 'grok-3-mini';
         }
     });
 
@@ -60,6 +67,15 @@ test.describe('@browser Browser Settings tests', () => {
 
         // Wait for models to load
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+
+        // Skip if models are not available (e.g., no AI provider API keys in CI)
+        if (!modelsAvailable) {
+            const isVisible = await settingsBrowserPage.isModelVisible(openaiModel);
+            if (!isVisible) {
+                test.skip();
+                return;
+            }
+        }
 
         // Select a model - use the first available OpenAI model
         await settingsBrowserPage.selectModel(openaiModel);
@@ -90,6 +106,15 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
+        // Skip if models are not available
+        if (!modelsAvailable) {
+            const isVisible = await settingsBrowserPage.isModelVisible(openaiModel);
+            if (!isVisible) {
+                test.skip();
+                return;
+            }
+        }
+
         // Select model and fill API key - use first available OpenAI model
         const testApiKey = "sk-persist-test-key";
         await settingsBrowserPage.selectModel(openaiModel);
@@ -119,6 +144,12 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
+        // Skip if models are not available
+        if (!modelsAvailable && !(await settingsBrowserPage.isModelVisible(openaiModel))) {
+            test.skip();
+            return;
+        }
+
         // Search for "gpt" - should only show OpenAI models
         await settingsBrowserPage.searchModels("gpt");
         await settingsBrowserPage.waitForTimeout(300); // Wait for debounce
@@ -137,6 +168,12 @@ test.describe('@browser Browser Settings tests', () => {
 
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+
+        // Skip if models are not available
+        if (!modelsAvailable && !(await settingsBrowserPage.isModelVisible(anthropicModel))) {
+            test.skip();
+            return;
+        }
 
         // Search for "claude" - should only show Anthropic category
         await settingsBrowserPage.searchModels("claude");
@@ -172,6 +209,12 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
+        // Skip if models are not available
+        if (!modelsAvailable && !(await settingsBrowserPage.isCategoryVisible("OpenAI"))) {
+            test.skip();
+            return;
+        }
+
         // Verify all main categories are visible
         const isOpenAICategoryVisible = await settingsBrowserPage.isCategoryVisible("OpenAI");
         const isAnthropicCategoryVisible = await settingsBrowserPage.isCategoryVisible("Anthropic");
@@ -189,6 +232,13 @@ test.describe('@browser Browser Settings tests', () => {
             const isOllamaCategoryVisible = await settingsBrowserPage.isCategoryVisible("Ollama");
             expect(isOllamaCategoryVisible).toBe(true);
         }
+
+        // xAI category only appears if xAI/Grok models are available
+        const isXaiModelVisible = await settingsBrowserPage.isModelVisible(xaiModel);
+        if (isXaiModelVisible) {
+            const isXaiCategoryVisible = await settingsBrowserPage.isCategoryVisible("xAI");
+            expect(isXaiCategoryVisible).toBe(true);
+        }
     });
 
     test('@readwrite Verify clearing search shows all models again', async () => {
@@ -196,6 +246,12 @@ test.describe('@browser Browser Settings tests', () => {
 
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+
+        // Skip if models are not available
+        if (!modelsAvailable && !(await settingsBrowserPage.isModelVisible(openaiModel))) {
+            test.skip();
+            return;
+        }
 
         // Search for specific model
         await settingsBrowserPage.searchModels("gpt");
@@ -221,6 +277,12 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
+        // Skip if models are not available
+        if (!modelsAvailable && !(await settingsBrowserPage.isModelVisible(openaiModel))) {
+            test.skip();
+            return;
+        }
+
         // Select OpenAI model
         await settingsBrowserPage.selectModel(openaiModel);
         let isSelected = await settingsBrowserPage.isModelSelected(openaiModel);
@@ -243,53 +305,121 @@ test.describe('@browser Browser Settings tests', () => {
         await apiCall.addGraph(graphName);
         await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
 
-        // Navigate to settings and configure with mismatched model and API key
-        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
-        await browser.setPageToFullScreen();
+        try {
+            // Navigate to settings and configure with mismatched model and API key
+            const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+            await browser.setPageToFullScreen();
 
-        await settingsBrowserPage.expandChatSection();
-        await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+            await settingsBrowserPage.expandChatSection();
+            await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
-        // Select Anthropic model
-        await settingsBrowserPage.selectModel(anthropicModel);
+            // Skip if models are not available
+            if (!modelsAvailable && !(await settingsBrowserPage.isModelVisible(anthropicModel))) {
+                test.skip();
+                return;
+            }
 
-        // Use OpenAI API key (mismatch - starts with sk- but not sk-ant-)
-        const testApiKey = process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY || "sk-test-openai-key-placeholder";
-        await settingsBrowserPage.fillChatApiKey(testApiKey);
+            // Select Anthropic model
+            await settingsBrowserPage.selectModel(anthropicModel);
 
-        // Save the settings
-        await settingsBrowserPage.clickSaveSettingsButton();
-        await settingsBrowserPage.waitForTimeout(1000);
+            // Use OpenAI API key (mismatch - starts with sk- but not sk-ant-)
+            const testApiKey = process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY || "sk-test-openai-key-placeholder";
+            await settingsBrowserPage.fillChatApiKey(testApiKey);
 
-        // Navigate to graph page using header component
-        const headerComponent = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
-        await headerComponent.clickOnGraphsButton();
+            // Save the settings
+            await settingsBrowserPage.clickSaveSettingsButton();
+            await settingsBrowserPage.waitForTimeout(1000);
 
-        // Create chat component and select the graph
-        const chatComponent = await browser.createNewPage(ChatComponent, urls.graphUrl);
-        await chatComponent.selectGraphByName(graphName);
+            // Navigate to graph page using header component
+            const headerComponent = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
+            await headerComponent.clickOnGraphsButton();
 
-        // Open chat panel
-        await chatComponent.openChat();
-        await chatComponent.waitForChatPanel();
+            // Create chat component and select the graph
+            const chatComponent = await browser.createNewPage(ChatComponent, urls.graphUrl);
+            await chatComponent.selectGraphByName(graphName);
 
-        // Verify chat input is visible
-        expect(await chatComponent.isChatInputVisible()).toBe(true);
+            // Open chat panel
+            await chatComponent.openChat();
+            await chatComponent.waitForChatPanel();
 
-        // Send a question to trigger the model/API key mismatch error
-        await chatComponent.fillChatInput("Who is Alice?");
-        await chatComponent.clickChatSendButton();
+            // Verify chat input is visible
+            expect(await chatComponent.isChatInputVisible()).toBe(true);
 
-        // Verify user message was sent (appears in chat)
-        await chatComponent.waitForChatUserMessage();
+            // Send a question to trigger the model/API key mismatch error
+            await chatComponent.fillChatInput("Who is Alice?");
+            await chatComponent.clickChatSendButton();
 
-        // Verify error toast is displayed due to model/API key mismatch
-        // The error message should be: "Model/API key mismatch: You selected a Anthropic model but provided a OpenAI API key..."
-        const isErrorToastVisible = await chatComponent.getNotificationErrorToast();
-        expect(isErrorToastVisible).toBe(true);
+            // Verify user message was sent (appears in chat)
+            await chatComponent.waitForChatUserMessage();
 
-        // Clean up
-        await apiCall.removeGraph(graphName);
+            // Verify error toast is displayed due to model/API key mismatch
+            // The error message should be: "Model/API key mismatch: You selected a Anthropic model but provided a OpenAI API key..."
+            const isErrorToastVisible = await chatComponent.getNotificationErrorToast();
+            expect(isErrorToastVisible).toBe(true);
+        } finally {
+            // Clean up - always remove graph even if test fails
+            await apiCall.removeGraph(graphName);
+        }
+    });
+
+    test('@readwrite Verify xAI API key mismatch shows error toast in chat', async () => {
+        // Create a graph first
+        const graphName = getRandomString("chat");
+        await apiCall.addGraph(graphName);
+        await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
+
+        try {
+            // Navigate to settings and configure with mismatched model and API key
+            const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+            await browser.setPageToFullScreen();
+
+            await settingsBrowserPage.expandChatSection();
+            await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+
+            // Skip if xAI model is not available
+            const isXaiModelVisible = await settingsBrowserPage.isModelVisible(xaiModel);
+            if (!isXaiModelVisible) {
+                test.skip();
+                return;
+            }
+
+            // Select xAI model
+            await settingsBrowserPage.selectModel(xaiModel);
+
+            // Use OpenAI API key (mismatch with xAI model)
+            const testApiKey = process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY || "sk-test-openai-key-placeholder";
+            await settingsBrowserPage.fillChatApiKey(testApiKey);
+
+            // Save the settings
+            await settingsBrowserPage.clickSaveSettingsButton();
+            await settingsBrowserPage.waitForTimeout(1000);
+
+            // Navigate to graph page using header component
+            const headerComponent = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
+            await headerComponent.clickOnGraphsButton();
+
+            // Create chat component and select the graph
+            const chatComponent = await browser.createNewPage(ChatComponent, urls.graphUrl);
+            await chatComponent.selectGraphByName(graphName);
+
+            // Open chat panel
+            await chatComponent.openChat();
+            await chatComponent.waitForChatPanel();
+
+            // Send a question to trigger the model/API key mismatch error
+            await chatComponent.fillChatInput("Who is Alice?");
+            await chatComponent.clickChatSendButton();
+
+            // Verify user message was sent
+            await chatComponent.waitForChatUserMessage();
+
+            // Verify error toast is displayed due to model/API key mismatch
+            const isErrorToastVisible = await chatComponent.getNotificationErrorToast();
+            expect(isErrorToastVisible).toBe(true);
+        } finally {
+            // Clean up - always remove graph even if test fails
+            await apiCall.removeGraph(graphName);
+        }
     });
 
 });
