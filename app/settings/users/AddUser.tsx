@@ -121,7 +121,7 @@ export default function AddUser({ onAddUser }: {
             onRemoveTag: (index) => setKeys(prev => prev.filter((_, i) => i !== index)),
             required: false,
             placeholder: "*",
-            description: "Pattern for accessible keys / graphs (e.g. mygraph, myprefix:*, *)",
+            description: "Pattern for accessible keys / graphs (e.g. mygraph, myprefix*, *)",
             info: "Defines which keys / graphs this user can access",
             errors: []
         }
