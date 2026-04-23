@@ -39,37 +39,54 @@ class FileTokenStorage implements ITokenStorage {
   }
 
   /**
-   * Read all tokens from file
+   * Read all tokens from file.
+   * Retries up to 3 times on JSON parse failure to handle the brief window
+   * where a concurrent atomic write (rename) is in progress.
    */
   private async readTokens(): Promise<TokenData[]> {
     await this.ensureFileExists();
 
-    try {
-      const content = await fs.readFile(this.filePath, 'utf8');
-      const data = JSON.parse(content);
-      return data.tokens || [];
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to read tokens from file:', error);
-      return [];
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const content = await fs.readFile(this.filePath, 'utf8');
+        const data = JSON.parse(content);
+        return data.tokens || [];
+      } catch (error) {
+        if (attempt < 2) {
+          // Brief wait before retry — allows an in-progress atomic rename to
+          // complete so the next read sees a consistent file.
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise<void>((resolve) => { setTimeout(resolve, 50); });
+        } else {
+          // eslint-disable-next-line no-console
+          console.error('Failed to read tokens from file after retries:', error);
+        }
+      }
     }
+    return [];
   }
 
   /**
-   * Write tokens to file
+   * Write tokens to file atomically: write to a temp file first, then rename.
+   * fs.rename is atomic on POSIX systems (same filesystem), so readers
+   * always see either the old or the new complete file — never a partial write.
    */
   private async writeTokens(tokens: TokenData[]): Promise<void> {
     await this.ensureFileExists();
 
+    const tmpPath = `${this.filePath}.tmp`;
     try {
       await fs.writeFile(
-        this.filePath,
+        tmpPath,
         JSON.stringify({ tokens }, null, 2),
         'utf8'
       );
+      await fs.rename(tmpPath, this.filePath);
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to write tokens to file:', error);
+      // Clean up temp file if rename failed
+      try { await fs.unlink(tmpPath); } catch { /* ignore */ }
       throw new Error('Failed to save tokens');
     }
   }
