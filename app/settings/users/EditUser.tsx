@@ -108,12 +108,8 @@ export default function EditUser({ username, role: initialRole, keys: initialKey
             onRemoveTag: (index) => setKeys(prev => prev.filter((_, i) => i !== index)),
             required: false,
             placeholder: "*",
-            description: "Pattern for accessible keys / graphs (e.g. *, user:*, ~myprefix:*)",
-            info: "Defines which keys / graphs this user can access. See Redis ACL documentation for pattern syntax.",
-            link: {
-                label: "Learn more",
-                url: "https://redis.io/docs/latest/operate/oss_and_stack/management/security/acl/#key-permissions"
-            },
+            description: "Pattern for accessible keys / graphs (e.g. *, mygraph, myprefix*)",
+            info: "Defines which keys / graphs this user can access",
             errors: []
         }
     ];
