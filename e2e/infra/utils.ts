@@ -209,9 +209,11 @@ export function getRandomString(prefix = "", delimiter = "_"): string {
 export async function interactWhenVisible<T>(
   element: Locator,
   action: (el: Locator) => Promise<T>,
-  name: string
+  name: string,
+  time?: number,
+  retry?: number
 ): Promise<T> {
-  const isVisible = await waitForElementToBeVisible(element);
+  const isVisible = await waitForElementToBeVisible(element, time, retry);
   if (!isVisible) throw new Error(`${name} is not visible!`);
   return action(element);
 }
