@@ -136,34 +136,34 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
     const [errors, setErrors] = useState<{ [key: string]: boolean }>({});
     const [isLoading, setIsLoading] = useState(false);
     const isMountedRef = useRef(false);
+    const prevFieldsKeyRef = useRef<string | null>(null);
 
     // Stable identifier for the current set of fields — triggers re-validation when the form layout changes
     const fieldsKey = fields.map(f => f.label).join(",");
-    const fieldValues = fields.map(f => f.value).join("\0");
 
     useEffect(() => {
-        const clearMountedFlag = () => {
-            isMountedRef.current = false;
-        };
-        
         if (!isMountedRef.current) {
             isMountedRef.current = true;
-
-            return clearMountedFlag;
+            prevFieldsKeyRef.current = fieldsKey;
+            return;
         }
 
-        const newErrors: { [key: string]: boolean } = {};
+        // Only re-validate when the form layout changes (e.g. switching login mode),
+        // not on mount or on every value change
+        if (prevFieldsKeyRef.current !== fieldsKey) {
+            prevFieldsKeyRef.current = fieldsKey;
 
-        fields.forEach(field => {
-            if (field.errors) {
-                newErrors[field.label] = field.errors.some(err => err.condition(field.value));
-            }
-        });
+            const newErrors: { [key: string]: boolean } = {};
 
-        setErrors(prev => ({ ...prev, ...newErrors }));
+            fields.forEach(field => {
+                if (field.errors) {
+                    newErrors[field.label] = field.errors.some(err => err.condition(field.value));
+                }
+            });
 
-        return clearMountedFlag;
-    }, [fieldsKey, fieldValues]);
+            setErrors(prev => ({ ...prev, ...newErrors }));
+        }
+    }, [fieldsKey, fields]);
 
     const onHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
