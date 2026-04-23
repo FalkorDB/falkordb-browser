@@ -5,7 +5,7 @@
     :root {
         --background: 0 0% 100%;
         --foreground: 0 0% 10%;
-        --secondary: 0 0% 90%;
+        --secondary: 0 0% 95%;
         --primary: 247 100% 70%;
         --destructive: 0 100% 66%;
         --accent: var(--background);
@@ -14,8 +14,8 @@
         --radius: 0.5rem;
         --input: var(--background);
         --text-muted-foreground: var(--foreground);
-        --muted: 0 0% 80%;
-        --border: 0 0% 40%;
+        --muted: 0 0% 85%;
+        --border: 0 0% 50%;
         --green: 142 71% 45%;
         --fav: 45 93% 47%;
     }
@@ -25,7 +25,7 @@
         --foreground: 0 0% 100%;
         --secondary: 0 0% 14.1%;
         --border: 0 0% 26%;
-        --green: 144 61% 20%;
+        --green: 144 61% 40%;
         --fav: 48 96% 53%;
     }
   .theme {
@@ -100,7 +100,7 @@
     }
 
     .DataPanel {
-        @apply h-full w-full flex flex-col bg-background border border-border rounded-lg;
+        @apply h-full w-full flex flex-col bg-background border border-border/50 rounded-lg;
     }
 
     .Dropzone {
@@ -166,7 +166,7 @@
 }
 
 .light ::-webkit-scrollbar-thumb {
-    background: #666666;
+    background: #888888;
 }
 
 .dark ::-webkit-scrollbar-thumb {

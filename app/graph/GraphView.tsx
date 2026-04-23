@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useEffect, Dispatch, SetStateAction, useContext, useCallback } from "react";
+import { useEffect, Dispatch, SetStateAction, useContext, useCallback, useState } from "react";
 import { GitGraph, ScrollText, Table } from "lucide-react";
 import { cn, GraphRef, Tab, Label, Link, Node, Relationship, HistoryQuery } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -56,7 +56,7 @@ function GraphView({
     isAddNode
 }: Props) {
 
-    const { graph, graphName, currentTab, setCurrentTab, isLoading, setIsLoading } = useContext(GraphContext);
+    const { graph, graphName, currentTab, setCurrentTab, isLoading, setIsLoading, expand, setExpand } = useContext(GraphContext);
     const { setData, data, graphData, setGraphData, setViewport, viewport } = useContext(ForceGraphContext);
 
     const elementsLength = graph.getElements().length;
@@ -78,7 +78,7 @@ function GraphView({
         if (elementsLength === 0 && graph.Data.length !== 0) defaultChecked = "Table";
 
         setCurrentTab(defaultChecked);
-    }, [graph, elementsLength, graph.Data.length, setCurrentTab, isTabEnabled]);
+    }, [graph, graph.getElements().length, graph.Data.length, setCurrentTab]);
 
     useEffect(() => {
         setSelectedElements([]);
@@ -179,14 +179,16 @@ function GraphView({
                                 canvasRef={canvasRef}
                                 setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => "labels" in e) ? setIsAddEdge : undefined}
                                 setIsAddNode={setIsAddNode}
+                                expand={expand}
+                                setExpand={setExpand}
                                 isAddEdge={isAddEdge}
                                 isAddNode={isAddNode}
                             />
                             {
-                                (labels.length !== 0 || relationships.length !== 0) &&
-                                <div className={cn("w-fit max-w-[200px] h-1 grow grid gap-2", labels.length !== 0 && relationships.length !== 0 ? "grid-rows-[minmax(0,max-content)_max-content_minmax(0,max-content)]" : "grid-rows-[minmax(0,max-content)]")}>
+                                expand && (labels.length !== 0 || relationships.length !== 0) &&
+                                <div className={cn("w-fit max-w-[180px] h-1 grow grid gap-1.5", labels.length !== 0 && relationships.length !== 0 ? "grid-rows-[minmax(0,max-content)_max-content_minmax(0,max-content)]" : "grid-rows-[minmax(0,max-content)]")}>
                                     {labels.length !== 0 && <Labels labels={labels} onClick={onLabelClick} label="Labels" type="Graph" />}
-                                    {labels.length !== 0 && relationships.length > 0 && <div className="h-px bg-border rounded-full" />}
+                                    {labels.length !== 0 && relationships.length > 0 && <div className="h-px bg-border/40 rounded-full" />}
                                     {relationships.length !== 0 && <Labels labels={relationships} onClick={onRelationshipClick} label="Relationships" type="Graph" />}
                                 </div>
                             }

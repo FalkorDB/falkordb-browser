@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { renameGraph, validateBody } from "../../validate-body";
-import { getCorsHeaders } from "../../utils";
+import { getCorsHeaders, writeGetClientErrorAsSSE } from "../../utils";
 
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
@@ -60,14 +60,15 @@ export async function POST(
       return session;
     }
 
-    const { client, user } = session;
+    const { client } = session;
 
     const { graph: graphId } = await params;
+    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
 
     try {
       const graph = client.selectGraph(graphId);
 
-      if (user.role === "Read-Only") await graph.roQuery("RETURN 1");
+      if (isReadOnly) await graph.roQuery("RETURN 1");
       else await graph.query("RETURN 1");
 
       return NextResponse.json(
@@ -156,13 +157,22 @@ export async function GET(
     const session = await getClient(request);
 
     if (session instanceof NextResponse) {
-      throw new Error(await session.text());
+      await writeGetClientErrorAsSSE(session, writer, encoder);
+      return new Response(readable, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+          ...getCorsHeaders(request),
+        },
+      });
     }
 
-    const { client, user } = session;
+    const { client } = session;
     const { graph: graphId } = await params;
     const query = request.nextUrl.searchParams.get("query");
     const timeout = Number(request.nextUrl.searchParams.get("timeout")) * 1000;
+    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
 
     try {
       if (!query) throw new Error("Missing parameter query");
@@ -170,8 +180,7 @@ export async function GET(
 
       const graph = client.selectGraph(graphId);
 
-      const result =
-        user.role === "Read-Only"
+      const result = isReadOnly
           ? await graph.roQuery(query, { TIMEOUT: timeout })
           : await graph.query(query, { TIMEOUT: timeout });
 

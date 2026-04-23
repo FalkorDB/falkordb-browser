@@ -12,6 +12,7 @@ class FalkorDBTokenStorage implements ITokenStorage {
   }
 
   async createToken(tokenData: TokenData): Promise<void> {
+    const kind = tokenData.kind ?? 'pat';
     const query = `
       MERGE (u:User {username: '${this.escapeString(tokenData.username)}', user_id: '${this.escapeString(tokenData.user_id)}'})
       CREATE (t:Token {
@@ -27,7 +28,8 @@ class FalkorDBTokenStorage implements ITokenStorage {
         expires_at: ${tokenData.expires_at},
         last_used: ${tokenData.last_used},
         is_active: ${tokenData.is_active},
-        encrypted_password: '${this.escapeString(tokenData.encrypted_password)}'
+        encrypted_password: '${this.escapeString(tokenData.encrypted_password)}',
+        kind: '${this.escapeString(kind)}'
       })
       CREATE (t)-[:BELONGS_TO]->(u)
       RETURN t.token_id as token_id
@@ -42,9 +44,14 @@ class FalkorDBTokenStorage implements ITokenStorage {
       ? ""
       : `AND t.username = '${this.escapeString(options.username || '')}' AND t.host = '${this.escapeString(options.host || 'localhost')}' AND t.port = ${options.port || 6379}`;
 
+    // Only PAT rows are surfaced in the tokens listing. Session rows are
+    // internal (rows missing a kind property are treated as 'pat' for
+    // backward compatibility with pre-existing data).
     const query = `
       MATCH (t:Token)-[:BELONGS_TO]->(u:User)
-      WHERE t.is_active = true ${userFilter}
+      WHERE t.is_active = true
+        AND (t.kind IS NULL OR t.kind = 'pat')
+        ${userFilter}
       RETURN t.token_hash as token_hash,
              t.token_id as token_id,
              t.user_id as user_id,
@@ -57,7 +64,8 @@ class FalkorDBTokenStorage implements ITokenStorage {
              t.expires_at as expires_at,
              t.last_used as last_used,
              t.is_active as is_active,
-             t.encrypted_password as encrypted_password
+             t.encrypted_password as encrypted_password,
+             t.kind as kind
       ORDER BY t.created_at DESC
     `;
 
@@ -78,6 +86,7 @@ class FalkorDBTokenStorage implements ITokenStorage {
       last_used: row.last_used,
       is_active: row.is_active,
       encrypted_password: row.encrypted_password,
+      kind: row.kind ?? 'pat',
     }));
   }
 
@@ -138,6 +147,20 @@ class FalkorDBTokenStorage implements ITokenStorage {
 
     const result = await executePATQuery(query);
     return !!(result.data && result.data.length > 0);
+  }
+
+  async deleteToken(tokenId: string): Promise<boolean> {
+    const query = `
+      MATCH (t:Token {token_id: '${this.escapeString(tokenId)}'})
+      DETACH DELETE t
+      RETURN count(t) as deleted
+    `;
+
+    const result = await executePATQuery(query);
+    if (!result.data || result.data.length === 0) return false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const deleted = (result.data[0] as any).deleted || 0;
+    return deleted > 0;
   }
 
   async updateLastUsed(tokenId: string): Promise<void> {

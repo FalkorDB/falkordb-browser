@@ -61,10 +61,24 @@ export default class CustomizeStylePage extends GraphInfoPage {
   }
 
   async isCustomizeStyleButtonVisible(label: string): Promise<boolean> {
-    return waitForElementToBeVisible(this.customizeStyleButton(label));
+    await interactWhenVisible(
+      this.labelButton(label),
+      (el) => el.click(),
+      `Label Button ${label}`
+    );
+    const visible = await waitForElementToBeVisible(this.customizeStyleButton(label));
+    // Close the popover by pressing Escape
+    await this.page.keyboard.press("Escape");
+    await waitForElementToNotBeVisible(this.customizeStyleButton(label));
+    return visible;
   }
 
   async clickCustomizeStyleButton(label: string): Promise<void> {
+    await interactWhenVisible(
+      this.labelButton(label),
+      (el) => el.click(),
+      `Label Button ${label}`
+    );
     await interactWhenVisible(
       this.customizeStyleButton(label),
       (el) => el.click(),
@@ -136,10 +150,20 @@ export default class CustomizeStylePage extends GraphInfoPage {
     // Wait for the button to be visible first
     await waitForElementToBeVisible(this.labelButton(label));
 
-    // Get the color from the inline style attribute which is the source of truth
-    const color = await this.labelButton(label).evaluate((el: HTMLElement) =>
-      el.style.backgroundColor || window.getComputedStyle(el).backgroundColor
-    );
+    // Get the color from the inner color dot span or background
+    const color = await this.labelButton(label).evaluate((el: HTMLElement) => {
+      // Check inner color dot element
+      const dotSpan = el.querySelector('[class*="rounded-full"]');
+      if (dotSpan) {
+        const dotBg = window.getComputedStyle(dotSpan).backgroundColor;
+        if (dotBg && dotBg !== 'rgba(0, 0, 0, 0)' && dotBg !== 'transparent') {
+          return dotBg;
+        }
+      }
+      // Fall back to inline or computed background color
+      const computedStyle = window.getComputedStyle(el);
+      return el.style.backgroundColor || computedStyle.backgroundColor;
+    });
     return color;
   }
 

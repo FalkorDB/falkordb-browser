@@ -7,16 +7,15 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { fetchOptions, getMemoryUsage, getSSEGraphResult, prepareArg, Row, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
-import { ChevronDown, ChevronUp, PlusCircle, Settings } from "lucide-react";
+import { ChevronDown, ChevronUp, Settings } from "lucide-react";
 import Button from "../components/ui/Button";
-import { IndicatorContext, BrowserSettingsContext } from "../components/provider";
+import { IndicatorContext, BrowserSettingsContext, ConnectionContext } from "../components/provider";
 import PaginationList from "../components/PaginationList";
 import TableComponent from "../components/TableComponent";
 import ExportGraph from "../components/ExportGraph";
 import DeleteGraph from "../components/graph/DeleteGraph";
 import CloseDialog from "../components/CloseDialog";
 import DuplicateGraph from "../components/graph/DuplicateGraph";
-import CreateGraph from "../components/CreateGraph";
 import { Graph } from "../api/graph/model";
 
 interface Props {
@@ -44,6 +43,7 @@ interface Props {
 export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, type, setGraph }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext);
+    const { isReadOnly } = useContext(ConnectionContext);
     const {
         settings: {
             contentPersistenceSettings: {
@@ -85,7 +85,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const loadNodesCount = useCallback((opt: string) =>
         async () => {
             try {
-                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes`, toast, setIndicator) as { nodes?: number };
+                const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
+                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes${readOnlyParam}`, toast, setIndicator) as { nodes?: number };
 
                 if (result.nodes == null || !Number.isFinite(Number(result.nodes))) return "";
 
@@ -93,12 +94,13 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             } catch {
                 return "";
             }
-        }, [toast, setIndicator]);
+        }, [toast, setIndicator, isReadOnly]);
 
     const loadEdgesCount = useCallback((opt: string) =>
         async () => {
             try {
-                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges`, toast, setIndicator) as { edges?: number };
+                const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
+                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges${readOnlyParam}`, toast, setIndicator) as { edges?: number };
 
                 if (result.edges == null || !Number.isFinite(Number(result.edges))) return "";
 
@@ -106,7 +108,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             } catch {
                 return "";
             }
-        }, [toast, setIndicator]);
+        }, [toast, setIndicator, isReadOnly]);
 
     const handleSetOption = useCallback(async (option: string, optionName: string) => {
         const result = await securedFetch(
@@ -213,7 +215,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             <DropdownMenu open={open} onOpenChange={handleOpenChange}>
                 <DropdownMenuTrigger disabled={options.length === 0 || indicator === "offline"} asChild>
                     <Button
-                        className="h-full w-[230px] bg-background rounded-lg border border-border p-2 justify-left disabled:text-gray-400 disabled:opacity-100 SofiaSans"
+                        className="min-w-0 basis-0 grow bg-background rounded-lg border border-border p-2 justify-left disabled:text-gray-400 disabled:opacity-100 p-1 text-sm"
                         label={selectedValue || `Select ${type}`}
                         title={options.length === 0 ? `There are no ${type}` : undefined}
                         indicator={indicator}
@@ -243,23 +245,6 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         searchRef={inputRef}
                     />
                     <div className="flex gap-2">
-                        <CreateGraph
-                            type={type}
-                            graphNames={options}
-                            onSetGraphName={(newGraphName) => {
-                                setSelectedValue(newGraphName);
-                                setOptions([...options, newGraphName]);
-                            }}
-                            trigger={
-                                <Button
-                                    className="w-fit"
-                                    variant="Primary"
-                                    label="Create"
-                                >
-                                    <PlusCircle size={20} />
-                                </Button>
-                            }
-                        />
                         <DialogTrigger asChild>
                             <Button
                                 className="w-fit"
@@ -282,7 +267,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 }}
                 hideClose
                 preventOutsideClose={tutorialOpen}
-                className="flex flex-col border-none rounded-lg max-w-none h-[90dvh] w-[80dvw] p-2"
+                className="flex flex-col border-none rounded-lg max-w-none h-[90dvh] w-[41dvw] p-2"
             >
                 <DialogHeader className="flex-row justify-between items-center border-b border-border pb-4">
                     <DialogTitle className="text-2xl font-medium">Manage Graphs</DialogTitle>
@@ -297,17 +282,17 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     entityName={type}
                     headers={[
                         "Name",
-                        ...(showMemoryUsage ? ["Memory Usage"] : []),
-                        "Nodes #",
-                        "Edges #"
+                        ...(showMemoryUsage ? [{name : "Memory Usage", width: "15%"}] : []),
+                        { name: "Nodes #", width: "15%" },
+                        { name: "Edges #", width: "15%" }
                     ]}
                     rows={rows}
                     setRows={setRows}
                     inputRef={inputRef}
-                    itemHeight={36}
+                    itemHeight={24}
                 >
                     {
-                        session?.user.role !== "Read-Only" &&
+                        !isReadOnly &&
                         <>
                             <DeleteGraph
                                 type={type}

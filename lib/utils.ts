@@ -8,6 +8,7 @@ import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { MutableRefObject } from "react";
 import type { FalkorDBCanvas } from "@falkordb/canvas";
+import { signOut } from "next-auth/react";
 
 export type ToastArguments = {
   title: string;
@@ -147,7 +148,7 @@ export interface Relationship extends Omit<InfoRelationship, "count"> {
 
 export type GraphRef = MutableRefObject<FalkorDBCanvas | null>;
 
-export type Panel = "chat" | "data" | "add" | undefined;
+export type Panel = "data" | "add" | undefined;
 
 export type SelectCell = {
   value: string;
@@ -247,9 +248,17 @@ export async function getSSEGraphResult(
 
     evtSource.addEventListener("error", (event: MessageEvent) => {
       handled = true;
-      const { message, status } = JSON.parse(event.data);
+      const { message, status, code } = JSON.parse(event.data);
 
       evtSource.close();
+
+      if (status === 401 && code === "SESSION_INVALID") {
+        triggerSessionInvalidationSignOut();
+        setIndicator("offline");
+        reject(new Error(message));
+        return;
+      }
+
       toast({ title: "Error", description: message, variant: "destructive" });
 
       if (status === 401 || status >= 500) setIndicator("offline");
@@ -272,6 +281,18 @@ export async function getSSEGraphResult(
   });
 }
 
+// Guards against triggering multiple concurrent signOut calls when many
+// in-flight requests hit a newly-invalidated session at the same time.
+let sessionInvalidationInFlight = false;
+
+function triggerSessionInvalidationSignOut(): void {
+  if (sessionInvalidationInFlight) return;
+  sessionInvalidationInFlight = true;
+  signOut({ callbackUrl: "/login" }).catch(() => {
+    sessionInvalidationInFlight = false;
+  });
+}
+
 export async function securedFetch(
   input: string,
   init: RequestInit,
@@ -280,6 +301,16 @@ export async function securedFetch(
 ): Promise<Response> {
   const response = await fetch(input, init);
   const { status } = response;
+
+  // The server signals "your session is orphaned, sign out now" via this
+  // header. We only sign out on this explicit signal so that ordinary 401s
+  // (e.g. login form with wrong password) don't log out unrelated users.
+  if (status === 401 && response.headers.get("X-Session-Invalid") === "1") {
+    triggerSessionInvalidationSignOut();
+    setIndicator("offline");
+    return response;
+  }
+
   if (status >= 300) {
     let message = await response.text();
 
@@ -316,11 +347,12 @@ export const between = (hash: number, from: number, to: number) => {
 export const getDefaultQuery = (q?: string) =>
   q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN * LIMIT 100";
 
-export const getMetaStats = async (name: string, toast: ToastFn, setIndicator: (indicator: "online" | "offline") => void) => {
+export const getMetaStats = async (name: string, toast: ToastFn, setIndicator: (indicator: "online" | "offline") => void, isReadOnly?: boolean) => {
   const q = "CALL db.meta.stats() YIELD labels, relTypes RETURN labels, relTypes as relationships";
+  const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
 
   try {
-    const result = await getSSEGraphResult(`/api/graph/${prepareArg(name)}?query=${encodeURIComponent(q)}`, toast, setIndicator) as { data: { labels: { [key: string]: number }, relationships: { [key: string]: number } }[] };
+    const result = await getSSEGraphResult(`/api/graph/${prepareArg(name)}?query=${encodeURIComponent(q)}${readOnlyParam}`, toast, setIndicator) as { data: { labels: { [key: string]: number }, relationships: { [key: string]: number } }[] };
 
     if (!result) return undefined;
 

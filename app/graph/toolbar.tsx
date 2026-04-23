@@ -1,13 +1,13 @@
-import { ArrowRight, Circle, Info } from "lucide-react";
-import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { ArrowRight, Circle, Search, X } from "lucide-react";
+import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { cn, GraphRef, Link, Node } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useSession } from "next-auth/react";
 import { Graph } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import DeleteElement from "./DeleteElement";
-import { BrowserSettingsContext, GraphContext } from "../components/provider";
+import { BrowserSettingsContext, ConnectionContext, GraphContext } from "../components/provider";
+import { getNodeDisplayText } from "@falkordb/canvas";
 
 interface Props {
     graph: Graph
@@ -19,6 +19,8 @@ interface Props {
     label: "Graph" | "Schema"
     setIsAddNode: (isAddNode: boolean) => void
     setIsAddEdge?: (isAddEdge: boolean) => void
+    setExpand: Dispatch<SetStateAction<boolean>>
+    expand: boolean
     isAddNode: boolean
     isAddEdge: boolean
     isLoadingSchema?: boolean
@@ -40,20 +42,17 @@ export default function Toolbar({
     setIsAddEdge,
     isAddEdge,
     isAddNode,
+    setExpand,
+    expand,
     isLoadingSchema
 }: Props) {
 
     const { isLoading: isLoadingGraph } = useContext(GraphContext);
-    const { settings: { showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
-    const {
-        settings: {
-            limitSettings: { limit, lastLimit },
-        }
-    } = useContext(BrowserSettingsContext);
+    const { settings: { captionsKeysSettings: { captionsKeys }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix} } } = useContext(BrowserSettingsContext);
+    const { isReadOnly } = useContext(ConnectionContext);
 
 
     const suggestionRef = useRef<HTMLDivElement>(null);
-    const { data: session } = useSession();
 
     const [suggestions, setSuggestions] = useState<(Node | Link)[]>([]);
     const [suggestionIndex, setSuggestionIndex] = useState(0);
@@ -64,9 +63,6 @@ export default function Toolbar({
     const [topFakeItemHeight, setTopFakeItemHeight] = useState(0);
     const [bottomFakeItemHeight, setBottomFakeItemHeight] = useState(0);
     const [visibleSuggestions, setVisibleSuggestions] = useState<(Node | Link)[]>([]);
-
-    const hasLimitWarning = graph.CurrentLimit && graph.Data.length >= graph.CurrentLimit;
-    const hasLimitChangeWarning = graph.CurrentLimit && lastLimit !== limit;
 
     const isLoading = isLoadingSchema || isLoadingGraph;
 
@@ -136,58 +132,29 @@ export default function Toolbar({
 
     return (
         <div className={cn("w-full flex flex-wrap gap-4 justify-between items-center", label === "Schema" && "h-full")}>
-            <div className={cn("w-full relative pointer-events-auto min-w-[10dvw] max-w-[30dvw]", label === "Schema" && "h-full")}>
+            <div className="flex gap-2 items-center">
+
                 {
-                    graph.getElements().length > 0 && !isLoading &&
-                    <Input
-                        data-testid={`elementCanvasSearch${label}`}
-                        className={cn("w-full text-foreground border border-primary", label === "Schema" && "h-full")}
-                        placeholder="Search for element in the graph"
-                        value={searchElement}
-                        onChange={(e) => setSearchElement(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Escape') {
-                                e.preventDefault();
-                                setSearchElement("");
-                            }
-
-                            if (e.key === 'Enter' && suggestions[suggestionIndex]) {
-                                e.preventDefault();
-                                handleSearchElement(suggestions[suggestionIndex]);
-                                setSearchElement("");
-                            }
-
-                            if (e.key === 'ArrowDown') {
-                                e.preventDefault();
-                                const index = suggestionIndex === suggestions.length - 1 ? 0 : suggestionIndex + 1;
-                                setSuggestionIndex(index);
-                                scrollToSuggestion(index);
-                            }
-
-                            if (e.key === 'ArrowUp') {
-                                e.preventDefault();
-                                const index = suggestionIndex === 0 ? suggestions.length - 1 : suggestionIndex - 1;
-                                setSuggestionIndex(index);
-                                scrollToSuggestion(index);
-                            }
-                        }}
-                        onBlur={(e) => {
-                            if (suggestionRef.current?.contains(e.relatedTarget) || e.relatedTarget === suggestionRef.current) return;
-
-                            setSuggestions([]);
+                    graph.getElements().length > 0 &&
+                    <Button
+                        title={expand ? "Close Search & Filter" : "Open Search & Filter"}
+                        className="pointer-events-auto"
+                        onClick={() => setExpand(prev => !prev)}
+                    >
+                        {
+                            expand ? <X size={25} /> : <Search size={25} />
                         }
-                        }
-                        onFocus={() => handleOnChange()}
-                    />
+                    </Button>
                 }
-                {
-                    suggestions.length > 0 &&
-                    <div tabIndex={-1} onScroll={handleScroll} ref={suggestionRef} className="max-h-[30dvh] overflow-auto absolute left-0 top-14 w-full border border-border p-2 rounded-lg bg-background">
-                        <ul
-                            data-testid={`elementCanvasSuggestionsList${label}`}
-                            className="flex flex-col gap-2"
-                            role="listbox"
-                            tabIndex={-1}
+                <div className={cn("basis-0 grow relative pointer-events-auto min-w-[10dvw] max-w-[30dvw]", label === "Schema" && "h-full")}>
+                    {
+                        expand && graph.getElements().length > 0 && !isLoading &&
+                        <Input
+                            data-testid={`elementCanvasSearch${label}`}
+                            className={cn("w-full text-foreground border border-primary", label === "Schema" && "h-full")}
+                            placeholder="Search for element"
+                            value={searchElement}
+                            onChange={(e) => setSearchElement(e.target.value)}
                             onKeyDown={(e) => {
                                 if (e.key === 'Escape') {
                                     e.preventDefault();
@@ -205,7 +172,6 @@ export default function Toolbar({
                                     const index = suggestionIndex === suggestions.length - 1 ? 0 : suggestionIndex + 1;
                                     setSuggestionIndex(index);
                                     scrollToSuggestion(index);
-
                                 }
 
                                 if (e.key === 'ArrowUp') {
@@ -215,110 +181,126 @@ export default function Toolbar({
                                     scrollToSuggestion(index);
                                 }
                             }}
-                        >
-                            {
-                                topFakeItemHeight > 0
-                                && <li
-                                    className="animate-pulse"
-                                    style={{
-                                        height: `${topFakeItemHeight}px`,
-                                        backgroundImage: stripBackground,
-                                        backgroundRepeat: 'repeat-y',
-                                        backgroundSize: `100% ${ITEM_HEIGHT + GAP}px`,
-                                        overflow: 'hidden'
-                                    }}
-                                />
-                            }
-                            {
-                                visibleSuggestions.map((suggestion, index) => {
-                                    const actualIndex = index + startIndex;
-                                    const type = "source" in suggestion;
+                            onBlur={(e) => {
+                                if (suggestionRef.current?.contains(e.relatedTarget) || e.relatedTarget === suggestionRef.current) return;
 
-                                    return (
-                                        <li key={actualIndex}>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Button
-                                                        role="option"
-                                                        aria-selected={actualIndex === suggestionIndex}
-                                                        data-testid={`elementCanvasSuggestion${label}${suggestion.data.name || suggestion.id}`}
-                                                        className={cn("w-full h-full p-2 rounded-lg flex gap-2", actualIndex === suggestionIndex ? "bg-gray-300" : "bg-gray-500")}
-                                                        onClick={() => handleSearchElement(suggestion)}
-                                                        onMouseEnter={() => setSuggestionIndex(actualIndex)}
-                                                    >
-                                                        <div
-                                                            className="rounded-full h-8 w-8 p-2 flex items-center justify-center"
-                                                            style={{ backgroundColor: suggestion.color }}
-                                                        >
-                                                            <p className="text-foreground text-sm font-bold truncate">{type ? (suggestion as Link).relationship : (suggestion as Node).labels[0]}</p>
-                                                        </div>
-                                                        <div
-                                                            className={cn("w-1 grow text-center truncate", actualIndex === suggestionIndex ? "text-black" : "text-foreground")}
-                                                        >
-                                                            {suggestion.data.name || suggestion.id}
-                                                        </div>
-                                                    </Button>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    {type ? (suggestion as Link).relationship : (suggestion as Node).labels[0]}
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </li>
-                                    );
-                                })
+                                setSuggestions([]);
                             }
-                            {
-                                bottomFakeItemHeight > 0
-                                && <li
-                                    className="animate-pulse"
-                                    style={{
-                                        height: `${bottomFakeItemHeight}px`,
-                                        backgroundImage: stripBackground,
-                                        backgroundRepeat: 'repeat-y',
-                                        backgroundSize: `100% ${ITEM_HEIGHT + GAP}px`,
-                                        overflow: 'hidden'
-                                    }}
-                                />
                             }
-                        </ul>
-                    </div>
-                }
+                            onFocus={() => handleOnChange()}
+                        />
+                    }
+                    {
+                        expand && suggestions.length > 0 &&
+                        <div tabIndex={-1} onScroll={handleScroll} ref={suggestionRef} className="z-10 max-h-[30dvh] overflow-auto absolute left-0 top-14 w-full border border-border p-2 rounded-lg bg-background">
+                            <ul
+                                data-testid={`elementCanvasSuggestionsList${label}`}
+                                className="flex flex-col gap-2"
+                                role="listbox"
+                                tabIndex={-1}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Escape') {
+                                        e.preventDefault();
+                                        setSearchElement("");
+                                    }
+
+                                    if (e.key === 'Enter' && suggestions[suggestionIndex]) {
+                                        e.preventDefault();
+                                        handleSearchElement(suggestions[suggestionIndex]);
+                                        setSearchElement("");
+                                    }
+
+                                    if (e.key === 'ArrowDown') {
+                                        e.preventDefault();
+                                        const index = suggestionIndex === suggestions.length - 1 ? 0 : suggestionIndex + 1;
+                                        setSuggestionIndex(index);
+                                        scrollToSuggestion(index);
+
+                                    }
+
+                                    if (e.key === 'ArrowUp') {
+                                        e.preventDefault();
+                                        const index = suggestionIndex === 0 ? suggestions.length - 1 : suggestionIndex - 1;
+                                        setSuggestionIndex(index);
+                                        scrollToSuggestion(index);
+                                    }
+                                }}
+                            >
+                                {
+                                    topFakeItemHeight > 0
+                                    && <li
+                                        className="animate-pulse"
+                                        style={{
+                                            height: `${topFakeItemHeight}px`,
+                                            backgroundImage: stripBackground,
+                                            backgroundRepeat: 'repeat-y',
+                                            backgroundSize: `100% ${ITEM_HEIGHT + GAP}px`,
+                                            overflow: 'hidden'
+                                        }}
+                                    />
+                                }
+                                {
+                                    visibleSuggestions.map((suggestion, index) => {
+                                        const actualIndex = index + startIndex;
+                                        const type = "source" in suggestion;
+
+                                        return (
+                                            <li key={actualIndex}>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <Button
+                                                            role="option"
+                                                            aria-selected={actualIndex === suggestionIndex}
+                                                            data-testid={`elementCanvasSuggestion${label}${suggestion.data.name || suggestion.id}`}
+                                                            className={cn("w-full h-full p-1 rounded-lg flex gap-2", actualIndex === suggestionIndex ? "bg-border" : "bg-secondary")}
+                                                            onClick={() => handleSearchElement(suggestion)}
+                                                            onMouseEnter={() => setSuggestionIndex(actualIndex)}
+                                                        >
+                                                            <div
+                                                                className="rounded-full h-4 w-4 p-1"
+                                                                style={{ backgroundColor: suggestion.color }}
+                                                            />
+                                                            <p>{type ? (suggestion as Link).relationship : (suggestion as Node).labels[0]}</p>
+                                                            <div
+                                                                className={cn("w-1 grow text-center truncate", actualIndex === suggestionIndex ? "text-accent-foreground" : "text-foreground")}
+                                                            >
+                                                                {type ? suggestion.relationship : getNodeDisplayText(suggestion as Node, captionsKeys, showPropertyKeyPrefix)}
+                                                            </div>
+                                                        </Button>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        {type ? (suggestion as Link).relationship : (suggestion as Node).labels[0]}
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </li>
+                                        );
+                                    })
+                                }
+                                {
+                                    bottomFakeItemHeight > 0
+                                    && <li
+                                        className="animate-pulse"
+                                        style={{
+                                            height: `${bottomFakeItemHeight}px`,
+                                            backgroundImage: stripBackground,
+                                            backgroundRepeat: 'repeat-y',
+                                            backgroundSize: `100% ${ITEM_HEIGHT + GAP}px`,
+                                            overflow: 'hidden'
+                                        }}
+                                    />
+                                }
+                            </ul>
+                        </div>
+                    }
+                </div>
             </div>
             <div data-testid={`elementCanvasToolbarAction${label}`} className={cn("flex flex-row-reverse gap-2 pointer-events-auto", label === "Schema" && "h-full")}>
                 {
-                    graphName && session?.user.role !== "Read-Only" &&
+                    graphName && !isReadOnly &&
                     <>
                         <Button
-                            data-testid={`elementCanvasInfo${label}`}
-                            className="p-1 bg-background cursor-default border-primary"
-                            variant="Secondary"
-                            tooltipVariant="Primary"
-                            tooltipSide="bottom"
-                            title={`Select And Show Properties (Right Click)
-                                Select Multiple Entities (Right Click + Left Ctrl)
-                                Select 2 Nodes to Create Edge`}
-                        >
-                            <Info size={20} />
-                        </Button>
-                        {
-                            (hasLimitWarning || hasLimitChangeWarning) ?
-                                <Button
-                                    data-testid={`elementCanvasLimitWarning${label}`}
-                                    className="p-1 bg-background cursor-default border-orange-300"
-                                    variant="Secondary"
-                                    tooltipVariant="Primary"
-                                    tooltipSide="bottom"
-                                    title={`${hasLimitWarning ? `Data currently limited to ${graph.Data.length} rows` : ""}
-                        ${hasLimitChangeWarning ? "Rerun the query to apply the new limit." : ""}
-                        ${graph.ShowPropertyKeyPrefix !== showPropertyKeyPrefix ? "Rerun the query to apply the new property key prefix settings." : ""}`}
-                                >
-                                    <Info className="text-orange-300" size={20} />
-                                </Button>
-                                : null
-                        }
-                        <Button
                             data-testid={`elementCanvasAddNode${label}`}
-                            className="p-1 bg-background border-brandGreen text-brandGreen"
+                            className="p-1 bg-background border-green text-green"
                             variant="Secondary"
                             tooltipVariant="Primary"
                             tooltipSide="bottom"
@@ -331,7 +313,7 @@ export default function Toolbar({
                             setIsAddEdge &&
                             <Button
                                 data-testid={`elementCanvasAddEdge${label}`}
-                                className="p-1 bg-background border-brandGreen text-brandGreen"
+                                className="p-1 bg-background border-green text-green"
                                 variant="Secondary"
                                 tooltipVariant="Primary"
                                 tooltipSide="bottom"

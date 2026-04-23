@@ -1,13 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { getCorsHeaders } from "@/app/api/utils";
+import { NextResponse } from "next/server";
+import { getClient } from "../../auth/[...nextauth]/options";
+import { getCorsHeaders } from "../../utils";
 
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
 
-// eslint-disable-next-line import/prefer-default-export, @typescript-eslint/no-unused-vars
-export async function GET(request: NextRequest) {
+// eslint-disable-next-line import/prefer-default-export
+export async function POST(request: Request) {
   try {
     const session = await getClient(request);
 
@@ -16,12 +16,13 @@ export async function GET(request: NextRequest) {
     }
 
     const { client } = session;
-    const section = request.nextUrl.searchParams.get("section") || "";
 
     try {
-      const result = await (await client.connection).info(section);
-
-      return NextResponse.json({ result }, { status: 200, headers: getCorsHeaders(request) });
+      await (await client.connection).aclSave();
+      return NextResponse.json(
+        { message: "ACL saved to disk" },
+        { status: 200, headers: getCorsHeaders(request) }
+      );
     } catch (error) {
       console.error(error);
       return NextResponse.json(

@@ -1,6 +1,7 @@
 export interface User {
   username: string;
   role: string;
+  keys?: string[];
 }
 
 export interface CreateUser {
@@ -11,7 +12,6 @@ export interface CreateUser {
 
 const READ_ONLY_ROLE = [
   "on",
-  "~*",
   "resetchannels",
   "-@all",
   "+graph.explain",
@@ -29,8 +29,12 @@ const READ_ONLY_ROLE = [
   "+expiretime",
 ];
 
+export function getRoleWithKeys(role: string[], keys?: string[]): string[] {
+  return [role[0], "resetkeys", ...(keys?.length ? keys.map((key) => `~${key}`) : ["~*"]), ...role.slice(1)];
+}
+
 export const ROLE = new Map<string, string[]>([
-  ["Admin", ["on", "~*", "&*", "+@all"]],
+  ["Admin", ["on", "&*", "+@all"]],
   [
     "Read-Write",
     [
@@ -50,3 +54,10 @@ export const ROLE = new Map<string, string[]>([
   ],
   ["Read-Only", READ_ONLY_ROLE],
 ]);
+
+export function extractKeysFromACL(userDetails: string[]): string[] {
+  const keyPatterns = userDetails
+    .filter((part) => part.startsWith("~"))
+    .map((part) => part.slice(1));
+  return keyPatterns.length > 0 ? keyPatterns : ["*"];
+}

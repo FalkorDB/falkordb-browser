@@ -27,6 +27,7 @@ import {
   GetUsersResponse,
   CreateUsersResponse,
   DeleteUsersResponse,
+  UpdateUserResponse,
 } from "./responses/userResponses";
 import {
   AddSchemaResponse,
@@ -420,6 +421,20 @@ export default class ApiCalls {
     } catch (error) {
       throw new Error(
         `Failed to delete users. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
+  async updateUser(username: string, data: { role: string; keys?: string[]; password?: string }): Promise<UpdateUserResponse> {
+    try {
+      const result = await patchRequest(
+        `${urls.api.settingsUser}${encodeURIComponent(username)}`,
+        data
+      );
+      return await result.json();
+    } catch (error) {
+      throw new Error(
+        `Failed to update user. \n Error: ${(error as Error).message}`
       );
     }
   }

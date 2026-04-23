@@ -18,7 +18,7 @@ export async function DELETE(
       return session;
     }
 
-    const { client, user } = session;
+    const { client } = session;
     const { schema, element } = await params;
     const elementId = Number(element);
     const schemaName = `${schema}_schema`;
@@ -36,8 +36,9 @@ export async function DELETE(
       const { label } = validation.data;
       const query = `MATCH (n) WHERE ID(n) = $id REMOVE n:${label}`;
       const graph = client.selectGraph(schemaName);
+      const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
 
-      if (user.role === "Read-Only")
+      if (isReadOnly)
         await graph.roQuery(query, { params: { id: elementId } });
       else await graph.query(query, { params: { id: elementId } });
 
@@ -71,7 +72,7 @@ export async function POST(
       return session;
     }
 
-    const { client, user } = session;
+    const { client } = session;
     const { schema, element } = await params;
     const elementId = Number(element);
     const schemaName = `${schema}_schema`;
@@ -89,8 +90,9 @@ export async function POST(
       const { label } = validation.data;
       const query = `MATCH (n) WHERE ID(n) = $id SET n:${label}`;
       const graph = client.selectGraph(schemaName);
+      const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
 
-      if (user.role === "Read-Only")
+      if (isReadOnly)
         await graph.roQuery(query, { params: { id: elementId } });
       else
         await graph.query(query, { params: { id: elementId } });

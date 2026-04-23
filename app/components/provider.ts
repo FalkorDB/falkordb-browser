@@ -148,6 +148,8 @@ type GraphContextType = {
   cooldownTicks: number | undefined;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
+  expand: boolean;
+  setExpand: Dispatch<SetStateAction<boolean>>;
 };
 
 type SchemaContextType = {
@@ -172,6 +174,8 @@ type IndicatorContextType = {
 type PanelContextType = {
   panel: Panel;
   setPanel: Dispatch<SetStateAction<Panel>>;
+  panelOpen: boolean;
+  onTogglePanel: () => void;
 };
 
 type QueryLoadingContextType = {
@@ -206,6 +210,7 @@ type ConnectionContextType = {
   setConnectionInfo: Dispatch<SetStateAction<ConnectionInfo>>;
   dbVersion: string;
   setDbVersion: Dispatch<SetStateAction<string>>;
+  isReadOnly: boolean;
 };
 
 type UDFContextType = {
@@ -350,6 +355,8 @@ export const GraphContext = createContext<GraphContextType>({
   cooldownTicks: undefined,
   isLoading: false,
   setIsLoading: () => { },
+  expand: true,
+  setExpand: () => { },
 });
 
 export const SchemaContext = createContext<SchemaContextType>({
@@ -389,6 +396,8 @@ export const IndicatorContext = createContext<IndicatorContextType>({
 export const PanelContext = createContext<PanelContextType>({
   panel: undefined,
   setPanel: () => { },
+  panelOpen: false,
+  onTogglePanel: () => { },
 });
 
 export const QueryLoadingContext = createContext<QueryLoadingContextType>({
@@ -423,6 +432,7 @@ export const ConnectionContext = createContext<ConnectionContextType>({
   setConnectionInfo: () => { },
   dbVersion: "",
   setDbVersion: () => { },
+  isReadOnly: false,
 });
 
 export const UDFContext = createContext<UDFContextType>({

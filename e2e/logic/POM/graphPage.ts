@@ -83,12 +83,44 @@ export default class GraphPage extends Page {
     return this.page.getByTestId("duplicateGraph");
   }
 
+  /**
+   * Ensures the graph info side panel is expanded.
+   * react-resizable-panels v4 renders content inside collapsed panels
+   * (overflow: visible on outer div), so Playwright's isVisible() returns
+   * true even when the panel is at 0% width. We check the panel's actual
+   * bounding box width instead.
+   */
+  private async ensureGraphInfoPanelOpen(): Promise<void> {
+    // Use .first() to avoid strict-mode violations: two elements share
+    // data-testid="graphInfoPanel" (the ResizablePanel wrapper in providers.tsx
+    // and the inner div in graphInfo.tsx).
+    const box = await this.graphInfoPanel.first().boundingBox().catch(() => null);
+    if (!box || box.width < 50) {
+      await interactWhenVisible(
+        this.graphInfoToggle,
+        (el) => el.click(),
+        "Graph Info Toggle"
+      );
+      // Wait for the panel expansion animation to complete
+      await this.graphInfoPanel.first().waitFor({ state: "visible" });
+      await this.page.waitForTimeout(300);
+    }
+  }
+
   private get duplicateGraphInput(): Locator {
     return this.page.getByTestId("duplicateGraphInput");
   }
 
   private get duplicateGraphConfirm(): Locator {
     return this.page.getByTestId("duplicateGraphConfirm");
+  }
+
+  private get graphInfoToggle(): Locator {
+    return this.page.getByTestId("graphInfoToggle");
+  }
+
+  private get graphInfoPanel(): Locator {
+    return this.page.getByTestId("graphInfoPanel");
   }
 
   private get closeHelpMessage(): Locator {
@@ -169,6 +201,8 @@ export default class GraphPage extends Page {
   }
 
   async clickEditorInput(): Promise<void> {
+    // Dismiss any open Radix tooltips that may overlay the editor
+    await this.page.keyboard.press("Escape");
     await interactWhenVisible(
       this.editorContainer,
       (el) => el.click(),
@@ -193,6 +227,7 @@ export default class GraphPage extends Page {
   }
 
   async clickCreateGraph(): Promise<void> {
+    await this.ensureGraphInfoPanelOpen();
     await interactWhenVisible(
       this.create("Graph"),
       (el) => el.click(),
@@ -277,6 +312,9 @@ export default class GraphPage extends Page {
   }
 
   async clickSelect(type: Type = "Graph"): Promise<void> {
+    if (type === "Graph") {
+      await this.ensureGraphInfoPanelOpen();
+    }
     await interactWhenVisible(
       this.select(type),
       (el) => el.click(),

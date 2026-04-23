@@ -11,16 +11,20 @@ export default class SettingsUsersPage extends BasePage {
     return this.page.locator("button#add-user");
   }
 
+  private get editUserButton(): Locator {
+    return this.page.locator("button#edit-user");
+  }
+
   private get submitUserAddition(): Locator {
     return this.page.getByRole("button", { name: "Submit" });
   }
 
-  private get selectRoleBtn(): Locator {
-    return this.page.getByTestId("selectRole");
+  private get submitEditUser(): Locator {
+    return this.page.getByRole("button", { name: "Save", exact: true });
   }
 
-  private get userSelectRoleEditBtn(): Locator {
-    return this.page.getByTestId("editButtonUsers");
+  private get selectRoleBtn(): Locator {
+    return this.page.getByTestId("selectRole");
   }
 
   private get userRow(): (selectedUser: string) => Locator {
@@ -35,10 +39,6 @@ export default class SettingsUsersPage extends BasePage {
       );
   }
 
-  private get confirmModifyingUserRole(): Locator {
-    return this.page.locator("//button[text()='Set User']");
-  }
-
   private get userNameField(): Locator {
     return this.page.locator("//input[@id='Username']");
   }
@@ -51,6 +51,22 @@ export default class SettingsUsersPage extends BasePage {
     return this.page.locator("//input[@id='Confirm Password']");
   }
 
+  private get editNewPasswordField(): Locator {
+    return this.page.locator("//input[@id='New Password']");
+  }
+
+  private get editConfirmPasswordField(): Locator {
+    return this.page.locator("//input[@id='Confirm Password']");
+  }
+
+  private get editSelectRoleBtn(): Locator {
+    return this.page.getByTestId("selectRole");
+  }
+
+  private get editKeysField(): Locator {
+    return this.page.locator("//input[@id='Key / Graph Permissions']");
+  }
+
   private get confirmUserDeleteMsg(): Locator {
     return this.page.getByRole("button", { name: "Continue" });
   }
@@ -58,6 +74,11 @@ export default class SettingsUsersPage extends BasePage {
   private get userRoleContent(): (selectedUser: string) => Locator {
     return (selectedUser: string) =>
       this.page.getByTestId(`contentUsers${selectedUser}Role`);
+  }
+
+  private get userKeysContent(): (selectedUser: string) => Locator {
+    return (selectedUser: string) =>
+      this.page.getByTestId(`contentUsers${selectedUser}Key / Graph Permissions`);
   }
 
   private get userCheckboxBtn(): (selectedUser: string) => Locator {
@@ -166,22 +187,6 @@ export default class SettingsUsersPage extends BasePage {
     );
   }
 
-  async clickUserSelectRoleEditBtn(): Promise<void> {
-    await interactWhenVisible(
-      this.userSelectRoleEditBtn,
-      (el) => el.click(),
-      `select role edit button`
-    );
-  }
-
-  async clickUserSelectRoleBtn(): Promise<void> {
-    await interactWhenVisible(
-      this.selectRoleBtn,
-      (el) => el.click(),
-      "select role button"
-    );
-  }
-
   async clickDeleteUsersBtn(): Promise<void> {
     await interactWhenVisible(
       this.deleteUsersBtn,
@@ -203,14 +208,6 @@ export default class SettingsUsersPage extends BasePage {
       this.userCheckboxBtn(selectedUser),
       (el) => el.click(),
       `checkbox button for ${selectedUser}`
-    );
-  }
-
-  async clickConfirmModifyingUserRole(): Promise<void> {
-    await interactWhenVisible(
-      this.confirmModifyingUserRole,
-      (el) => el.click(),
-      "set user button"
     );
   }
 
@@ -244,12 +241,110 @@ export default class SettingsUsersPage extends BasePage {
 
   async modifyUserRole(selectedUser: string, role: string): Promise<void> {
     await this.waitForPageIdle();
-    await this.clickUserRow(selectedUser);
-    await this.clickUserSelectRoleEditBtn();
-    await this.clickUserSelectRoleBtn();
+    await this.searchForElement(selectedUser);
+    await this.clickUserCheckboxBtn(selectedUser);
+    await this.clickOnEditUserBtn();
+    await this.clickEditSelectRoleBtn();
     await this.clickOnSelectUserRole(role);
-    await this.clickOnConfirmModifyingUserRole();
+    await this.clickOnSubmitEditUser();
     await waitForTimeOut(this.page, 1500);
+  }
+
+  async editUser(selectedUser: string, options: { role?: string, keys?: string, password?: string, confirmPassword?: string }): Promise<void> {
+    await this.waitForPageIdle();
+    await this.searchForElement(selectedUser);
+    await this.clickUserCheckboxBtn(selectedUser);
+    await this.clickOnEditUserBtn();
+    if (options.password) {
+      await this.fillEditNewPasswordField(options.password);
+      await this.fillEditConfirmPasswordField(options.confirmPassword || options.password);
+    }
+    if (options.role) {
+      await this.clickEditSelectRoleBtn();
+      await this.clickOnSelectUserRole(options.role);
+    }
+    if (options.keys !== undefined) {
+      await this.fillEditKeysField(options.keys);
+    }
+    await this.clickOnSubmitEditUser();
+    await waitForTimeOut(this.page, 1500);
+  }
+
+  async clickOnEditUserBtn(): Promise<void> {
+    await interactWhenVisible(
+      this.editUserButton,
+      (el) => el.click(),
+      "edit user button"
+    );
+  }
+
+  async clickOnSubmitEditUser(): Promise<void> {
+    await interactWhenVisible(
+      this.submitEditUser,
+      (el) => el.click(),
+      "submit edit user button"
+    );
+  }
+
+  async clickEditSelectRoleBtn(): Promise<void> {
+    await interactWhenVisible(
+      this.editSelectRoleBtn,
+      (el) => el.click(),
+      "edit select role button"
+    );
+  }
+
+  async fillEditNewPasswordField(password: string): Promise<void> {
+    await interactWhenVisible(
+      this.editNewPasswordField,
+      (el) => el.fill(password),
+      "edit new password input"
+    );
+  }
+
+  async fillEditConfirmPasswordField(confirmPassword: string): Promise<void> {
+    await interactWhenVisible(
+      this.editConfirmPasswordField,
+      (el) => el.fill(confirmPassword),
+      "edit confirm password input"
+    );
+  }
+
+  async fillEditKeysField(keys: string): Promise<void> {
+    // Remove all existing tags by clicking their remove buttons (scoped to tag input container)
+    const keysContainer = this.editKeysField.locator('..');
+    const removeButtons = keysContainer.locator("button[aria-label^='Remove ']");
+    while (await removeButtons.count() > 0) {
+      await removeButtons.first().click();
+    }
+    // Type the new key and press Enter to commit the tag
+    await interactWhenVisible(
+      this.editKeysField,
+      async (el) => {
+        await el.fill(keys);
+        await el.press("Enter");
+      },
+      "edit keys input"
+    );
+  }
+
+  async isEditUserButtonDisabled(): Promise<boolean> {
+    await this.waitForPageIdle();
+    const disabled = await this.editUserButton.isDisabled();
+    return disabled;
+  }
+
+  async isDeleteUserButtonDisabled(): Promise<boolean> {
+    await this.waitForPageIdle();
+    const disabled = await this.deleteUsersBtn.isDisabled();
+    return disabled;
+  }
+
+  async getUserKeys(selectedUser: string): Promise<string | null> {
+    await this.waitForPageIdle();
+    await this.searchForElement(selectedUser);
+    const keys = await this.userKeysContent(selectedUser).textContent();
+    return keys;
   }
 
   async deleteTwoUsers(
@@ -284,9 +379,5 @@ export default class SettingsUsersPage extends BasePage {
       .filter({ hasNot: this.fakeRow })
       .count();
     return count;
-  }
-
-  async clickOnConfirmModifyingUserRole(): Promise<void> {
-    await this.clickConfirmModifyingUserRole();
   }
 }

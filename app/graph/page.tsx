@@ -7,7 +7,7 @@ import dynamicImport from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import { Graph, GraphInfo } from "../api/graph/model";
-import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ForceGraphContext } from "../components/provider";
+import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ForceGraphContext, ConnectionContext } from "../components/provider";
 import { getConnectionItem } from "@/lib/connection-storage";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
@@ -22,8 +22,8 @@ const CreateElementPanel = dynamicImport(() => import("./CreateElementPanel"), {
 
 const Selector = dynamicImport(() => import("./Selector"), {
     ssr: false,
-    loading: () => <div className="h-[50px] flex flex-row gap-2 items-center">
-        <div className="w-[230px] h-full animate-pulse rounded-md border border-border bg-background" />
+    loading: () => <div className="h-[50px] flex flex-row gap-3 items-center">
+        <div className="w-[44px] h-full animate-pulse rounded-lg border border-border bg-background" />
         <div className="w-1 grow h-full animate-pulse rounded-md border border-border bg-background" />
         <div className="w-[120px] h-full animate-pulse rounded-md border border-border bg-background" />
     </div>
@@ -51,6 +51,7 @@ export default function Page() {
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext);
     const { setData, canvasRef } = useContext(ForceGraphContext);
+    const { isReadOnly } = useContext(ConnectionContext);
     const {
         graph,
         setGraph,
@@ -82,6 +83,7 @@ export default function Page() {
     const panelRef = useRef<PanelImperativeHandle>(null);
 
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
+    const [chatOpen, setChatOpen] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(true);
     const [isAddNode, setIsAddNode] = useState(false);
     const [isAddEdge, setIsAddEdge] = useState(false);
@@ -90,30 +92,19 @@ export default function Page() {
         setIsCollapsed(size.asPercentage === 0);
     }, []);
 
+    const panelSizes: Record<string, { size: string; min: string }> = {
+        data: { size: "200px", min: "200px" },
+        add: { size: "30%", min: "25%" },
+    };
+
     const getPanelSize = useCallback(() => {
-        switch (panel) {
-            case "data":
-                return "200px";
-            case "add":
-                return "30%";
-            case "chat":
-                return "40%";
-            default:
-                return "0%";
-        }
+        if (!panel) return "0%";
+        return panelSizes[panel]?.size ?? "0%";
     }, [panel]);
 
     const panelMinSize = useMemo(() => {
-        switch (panel) {
-            case "data":
-                return "200px";
-            case "add":
-                return "25%";
-            case "chat":
-                return "45%";
-            default:
-                return "0%";
-        }
+        if (!panel) return "0%";
+        return panelSizes[panel]?.min ?? "0%";
     }, [panel]);
 
     useEffect(() => {
@@ -131,12 +122,6 @@ export default function Page() {
             return () => cancelAnimationFrame(frameId);
         }
         currentPanel.collapse();
-
-        if (panel !== "chat") return;
-
-        setSelectedElements([]);
-        setIsAddNode(false);
-        setIsAddEdge(false);
 
     }, [getPanelSize, panel]);
 
@@ -158,7 +143,8 @@ export default function Page() {
     const fetchInfo = useCallback(async (type: string) => {
         if (!graphName) return [];
 
-        const result = await securedFetch(`/api/graph/${graphName}/info?type=${type}`, {
+        const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
+        const result = await securedFetch(`/api/graph/${graphName}/info?type=${type}${readOnlyParam}`, {
             method: "GET",
         }, toast, setIndicator);
 
@@ -169,7 +155,7 @@ export default function Page() {
         return json.result.data.map(({ info }: { info: string }) => info);
     }, [graphName, setIndicator, toast]);
 
-    const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator), [setIndicator, toast]);
+    const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator, isReadOnly), [setIndicator, toast, isReadOnly]);
 
     useEffect(() => {
         if (!graphName) return undefined;
@@ -246,18 +232,15 @@ export default function Page() {
                 return "data";
             }
 
-            if (prev !== "chat") {
-                return undefined;
-            }
-
-            return prev;
+            return undefined;
         });
 
         if (el.length !== 0) {
+            setChatOpen(false);
             setIsAddEdge(false);
             setIsAddNode(false);
         }
-    }, [setPanel]);
+    }, [setPanel, setChatOpen]);
 
     useEffect(() => {
         handleSetSelectedElements();
@@ -276,7 +259,8 @@ export default function Page() {
 
     const handleCreateElement = useCallback(async (attributes: [string, Value][], label: string[]) => {
         const fakeId = "-1";
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/${fakeId}`, {
+        const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/${fakeId}${readOnlyParam}`, {
             method: "POST",
             body: JSON.stringify({
                 attributes,
@@ -317,8 +301,9 @@ export default function Page() {
 
     const handleDeleteElement = useCallback(async () => {
         const deletedElements = (await Promise.all(selectedElements.map(async (element) => {
-            const type = !("source" in element);
-            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${prepareArg(element.id.toString())}`, {
+            const type = !('source' in element);
+            const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
+            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${prepareArg(element.id.toString())}${readOnlyParam}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type })
             }, toast, setIndicator);
@@ -377,13 +362,6 @@ export default function Page() {
         if (!graphName) return undefined;
 
         switch (panel) {
-            case "chat":
-                return (
-                    <Chat
-                        onClose={() => setPanel(undefined)}
-                    />
-                );
-
             case "data":
 
                 if (selectedElements.length === 0) return undefined;
@@ -428,7 +406,7 @@ export default function Page() {
     }, [graphName, panel, handleSetSelectedElements, setPanel, isAddNode, selectedElements, handleCreateElement, setLabels, canvasRef]);
 
     return (
-        <div className="Page p-2 gap-2">
+        <div className="Page p-3 gap-3">
             <Selector
                 type="Graph"
                 graph={graph}
@@ -442,8 +420,10 @@ export default function Page() {
                 setHistoryQuery={setHistoryQuery}
                 fetchCount={fetchCount}
                 isQueryLoading={isQueryLoading}
+                chatOpen={chatOpen}
+                setChatOpen={setChatOpen}
             />
-            <ResizablePanelGroup orientation="horizontal" className="h-1 grow">
+            <ResizablePanelGroup orientation="horizontal" className="h-1 grow relative">
                 <ResizablePanel
                     defaultSize="100%"
                     collapsible
@@ -472,7 +452,7 @@ export default function Page() {
                 <ResizableHandle
                     withHandle
                     onMouseUp={() => isCollapsed && handleSetSelectedElements()}
-                    className={cn("ml-2", isCollapsed && "hidden")}
+                    className={cn("bg-transparent", isCollapsed && "hidden")}
                     disabled={isCollapsed}
                 />
                 <ResizablePanel
@@ -484,6 +464,12 @@ export default function Page() {
                 >
                     {getCurrentPanel()}
                 </ResizablePanel>
+                {
+                    chatOpen && graphName &&
+                    <div className="absolute bottom-3 right-3 w-[400px] h-[500px] max-h-[80%] max-w-[95%] z-30">
+                        <Chat onClose={() => setChatOpen(false)} />
+                    </div>
+                }
             </ResizablePanelGroup>
         </div >
     );

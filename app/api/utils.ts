@@ -1,8 +1,7 @@
-import { Role } from "next-auth";
 import type { Graph } from "falkordb";
 
-export const runQuery = async (graph: Graph, query: string, role: Role) => {
-    const result = role === "Read-Only" ? await graph.roQuery(query) : await graph.query(query);
+export const runQuery = async (graph: Graph, query: string, isReadOnly: boolean) => {
+    const result = isReadOnly ? await graph.roQuery(query) : await graph.query(query);
     return result;
 };
 
@@ -87,4 +86,33 @@ export function corsHeaders(requestOrigin?: string | null): Record<string, strin
 export function getCorsHeaders(request?: Request): Record<string, string> {
     const origin = request?.headers.get('origin');
     return corsHeaders(origin);
+}
+
+/**
+ * Forwards a NextResponse returned by getClient() into an SSE error event
+ * so the streaming client can surface the same status/code that the
+ * non-streaming path would. Preserves status (e.g. 401) and the
+ * SESSION_INVALID code needed to trigger auto-signOut on the client.
+ */
+export async function writeGetClientErrorAsSSE(
+    response: Response,
+    writer: WritableStreamDefaultWriter<Uint8Array>,
+    encoder: TextEncoder,
+): Promise<void> {
+    const { status } = response;
+    let message = "Unauthorized";
+    let code: string | undefined;
+    try {
+        const body = await response.clone().json() as { message?: string; code?: string };
+        if (body.message) message = body.message;
+        if (body.code) code = body.code;
+    } catch {
+        try { message = await response.text(); } catch { /* ignore */ }
+    }
+    const payload: Record<string, unknown> = { message, status };
+    if (code) payload.code = code;
+    writer.write(
+        encoder.encode(`event: error\ndata: ${JSON.stringify(payload)}\n\n`)
+    );
+    writer.close();
 }

@@ -3,10 +3,11 @@
 
 "use client";
 
-import { useState } from "react";
-import { EyeIcon, EyeOffIcon, InfoIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { EyeIcon, EyeOffIcon, ExternalLink, InfoIcon, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 import Button from "./ui/Button";
 import Combobox from "./ui/combobox";
 import Input from "./ui/Input";
@@ -25,6 +26,11 @@ export type DefaultField = {
     description?: string
     errors?: Error[]
     info?: string
+    disabled?: boolean
+    link?: {
+        label: string
+        url: string
+    }
 };
 
 export type SelectField = DefaultField & {
@@ -44,7 +50,14 @@ export type TextField = DefaultField & {
     type: "text"
 };
 
-export type Field = SelectField | PasswordField | TextField;
+export type TagField = DefaultField & {
+    type: "tag"
+    tags: string[]
+    onAddTag: (tag: string) => void
+    onRemoveTag: (index: number) => void
+};
+
+export type Field = SelectField | PasswordField | TextField | TagField;
 
 interface Props {
     handleSubmit: (e: React.FormEvent<HTMLFormElement>) => Promise<void>
@@ -58,10 +71,103 @@ interface Props {
     className?: string
 }
 
+function TagInput({ field }: { field: TagField }) {
+    const [inputValue, setInputValue] = useState("");
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const addTags = (value: string) => {
+        const parts = value.split(",").map(p => p.trim().replace(/^~/, "")).filter(Boolean);
+        const seen = new Set(field.tags.map(t => t.replace(/^~/, "")));
+        parts.forEach(part => {
+            if (!seen.has(part)) {
+                seen.add(part);
+                field.onAddTag(part);
+            }
+        });
+        setInputValue("");
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter" || e.key === ",") {
+            e.preventDefault();
+            addTags(inputValue);
+        } else if (e.key === "Backspace" && inputValue === "" && field.tags.length > 0) {
+            field.onRemoveTag(field.tags.length - 1);
+        }
+    };
+
+    return (
+        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
+        <div
+            className="flex flex-wrap items-center gap-1 border border-border p-1 rounded-lg bg-input text-foreground min-h-[34px] cursor-text"
+            onClick={() => inputRef.current?.focus()}
+        >
+            {field.tags.map((tag, index) => (
+                <Badge key={tag} variant="secondary" className="flex items-center gap-1 px-2 py-0.5 max-w-full overflow-hidden">
+                    <span className="truncate" title={tag}>{tag}</span>
+                    {!field.disabled && (
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                field.onRemoveTag(index);
+                            }}
+                            className="hover:text-destructive shrink-0"
+                            aria-label={`Remove ${tag}`}
+                        >
+                            <X size={12} />
+                        </button>
+                    )}
+                </Badge>
+            ))}
+            <input
+                ref={inputRef}
+                id={field.label}
+                className="flex-1 min-w-[80px] bg-transparent outline-none text-sm p-0.5"
+                value={inputValue}
+                placeholder={field.tags.length === 0 ? (field.placeholder || "Type and press Enter") : ""}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onBlur={() => addTags(inputValue)}
+                disabled={field.disabled}
+            />
+        </div>
+    );
+}
+
 export default function FormComponent({ handleSubmit, fields, error = undefined, children = undefined, submitButtonLabel = "Submit", className = "" }: Props) {
     const [show, setShow] = useState<{ [key: string]: boolean }>({});
     const [errors, setErrors] = useState<{ [key: string]: boolean }>({});
     const [isLoading, setIsLoading] = useState(false);
+    const isMountedRef = useRef(false);
+    const prevFieldsKeyRef = useRef<string | null>(null);
+
+    // Stable identifier for the current set of fields — triggers re-validation when the form layout changes
+    const fieldsKey = fields.map(f => f.label).join(",");
+
+    useEffect(() => {
+        if (!isMountedRef.current) {
+            isMountedRef.current = true;
+            prevFieldsKeyRef.current = fieldsKey;
+            return;
+        }
+
+        // Only re-validate when the form layout changes (e.g. switching login mode),
+        // not on mount or on every value change
+        if (prevFieldsKeyRef.current !== fieldsKey) {
+            prevFieldsKeyRef.current = fieldsKey;
+
+            const newErrors: { [key: string]: boolean } = {};
+
+            fields.forEach(field => {
+                if (field.errors) {
+                    newErrors[field.label] = field.errors.some(err => err.condition(field.value));
+                }
+            });
+
+            setErrors(prev => ({ ...prev, ...newErrors }));
+        }
+    }, [fieldsKey, fields]);
 
     const onHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -93,7 +199,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                 fields.map((field) => {
                     const passwordType = show[field.label] ? "text" : "password";
                     return (
-                        <div className="flex flex-col gap-2" key={field.label}>
+                        <div className="flex flex-col gap-1" key={field.label}>
                             <div className={cn(field.info && "flex gap-2 items-center")}>
                                 <label className={cn(errors[field.label] && "text-destructive")} htmlFor={field.label}>{field.required && <span>*</span>} {field.label}</label>
                                 {
@@ -108,7 +214,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                     </Tooltip>
                                 }
                             </div>
-                            <div className="relative flex flex-col gap-2">
+                            <div className="relative flex flex-col gap-1">
                                 {
                                     field.type === "password" &&
                                     <Button
@@ -137,11 +243,15 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                             selectedValue={field.value}
                                             setSelectedValue={field.onChange}
                                         />
+                                        : field.type === "tag" ?
+                                            <TagInput field={field} />
                                         : <Input
+                                            className={cn("w-full", field.type === "password" && "pr-10")}
                                             id={field.label}
                                             type={field.type === "password" ? passwordType : field.type}
                                             placeholder={field.placeholder}
                                             value={field.value}
+                                            disabled={field.disabled}
                                             onChange={(e) => {
                                                 field.onChange(e);
                                                 if (field.type === "password") {
@@ -162,19 +272,34 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                             }} />
                                 }
                                 <p className="text-sm text-gray-500">{field.description}</p>
-                                <div className="h-5">
-                                    {
-                                        field.errors && errors[field.label] &&
-                                        <p className="text-sm text-destructive">{field.errors.find((err) => err.condition(field.value))?.message}</p>
-                                    }
-                                </div>
+                                {
+                                    field.link &&
+                                    <a
+                                        href={field.link.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-sm text-primary flex items-center gap-1 hover:underline w-fit"
+                                    >
+                                        {field.link.label}
+                                        <ExternalLink size={14} />
+                                    </a>
+                                }
+                                {
+                                    field.errors &&
+                                    <div className="h-5">
+                                        {
+                                            errors[field.label] &&
+                                            <p className="text-sm text-destructive">{field.errors.find((err) => err.condition(field.value))?.message}</p>
+                                        }
+                                    </div>
+                                }
                             </div>
                         </div>
                     );
                 })
             }
             {children}
-            <div className="min-h-5">
+            <div className="min-h-8">
                 {error?.show && (typeof error.message === "string" ? <p className="text-sm text-destructive">{error.message}</p> : error?.message)}
             </div>
             <div className="flex justify-end gap-2">
