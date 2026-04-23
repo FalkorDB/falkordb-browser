@@ -10,7 +10,7 @@ import FormComponent, { Field } from "@/app/components/FormComponent";
 import { Drawer, DrawerDescription, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 
 export default function AddUser({ onAddUser }: {
-    onAddUser: (user: CreateUser, keys: string[]) => Promise<void>
+    onAddUser: (user: CreateUser, keys: string[]) => Promise<boolean>
 }) {
     const [open, setOpen] = useState(false);
     const [username, setUsername] = useState("");
@@ -130,11 +130,10 @@ export default function AddUser({ onAddUser }: {
     const handleAddUser = async (e: FormEvent) => {
         e.preventDefault();
 
-        await onAddUser({ username, password, role, }, keys);
-
-        setOpen(false);
-
-        handleClose();
+        const ok = await onAddUser({ username, password, role, }, keys);
+        if (ok) {
+            setOpen(false);
+        }
     };
 
     return (

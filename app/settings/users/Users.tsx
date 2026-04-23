@@ -101,6 +101,8 @@ export default function Users() {
             }] as Row[]);
             await handleSaveUsers();
         }
+
+        return response.ok;
     };
 
     const handleEditUser = async (username: string, role: string, keys: string[], password?: string) => {
