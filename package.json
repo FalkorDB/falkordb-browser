@@ -5,7 +5,7 @@
   "version": "2.0.1",
   "private": true,
   "engines": {
-    "node": ">=20.9.0"
+    "node": ">=20.19.0"
   },
   "scripts": {
     "dev": "next dev",
@@ -71,13 +71,13 @@
     "react-dom": "^19.2.5",
     "react-dropzone": "^15.0.0",
     "react-gtm-module": "^2.0.11",
-    "react-hook-form": "^7.72.1",
+    "react-hook-form": "^7.73.1",
     "react-json-tree": "^0.20.0",
     "react-resizable-panels": "^4.9.0",
     "swagger-ui-react": "^5.32.4",
     "swr": "^2.4.1",
     "tailwind-merge": "^3.5.0",
-    "tailwindcss": "^4.2.2",
+    "tailwindcss": "^4.2.3",
     "uuid": "^14.0.0",
     "vaul": "^1.1.2",
     "yaml": "^2.8.3",
@@ -85,7 +85,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
-    "@tailwindcss/postcss": "^4.2.2",
+    "@tailwindcss/postcss": "^4.2.3",
     "@types/cytoscape-fcose": "^2.2.4",
     "@types/lodash": "^4.17.24",
     "@types/node": "^25.5.2",
@@ -94,8 +94,8 @@
     "@types/react-dom": "^19.2.3",
     "@types/react-gtm-module": "^2.0.4",
     "@types/swagger-ui-react": "^5.18.0",
-    "@typescript-eslint/eslint-plugin": "^8.58.2",
-    "@typescript-eslint/parser": "^8.58.1",
+    "@typescript-eslint/eslint-plugin": "^8.59.0",
+    "@typescript-eslint/parser": "^8.59.0",
     "eslint": "^10.2.1",
     "eslint-config-airbnb": "^19.0.4",
     "eslint-config-airbnb-typescript": "^18.0.0",
