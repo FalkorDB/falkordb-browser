@@ -77,8 +77,10 @@ function TagInput({ field }: { field: TagField }) {
 
     const addTags = (value: string) => {
         const parts = value.split(",").map(p => p.trim().replace(/^~/, "")).filter(Boolean);
+        const seen = new Set(field.tags.map(t => t.replace(/^~/, "")));
         parts.forEach(part => {
-            if (!field.tags.includes(part)) {
+            if (!seen.has(part)) {
+                seen.add(part);
                 field.onAddTag(part);
             }
         });
@@ -103,17 +105,19 @@ function TagInput({ field }: { field: TagField }) {
             {field.tags.map((tag, index) => (
                 <Badge key={tag} variant="secondary" className="flex items-center gap-1 px-2 py-0.5 max-w-full overflow-hidden">
                     <span className="truncate" title={tag}>{tag}</span>
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            field.onRemoveTag(index);
-                        }}
-                        className="hover:text-destructive shrink-0"
-                        aria-label={`Remove ${tag}`}
-                    >
-                        <X size={12} />
-                    </button>
+                    {!field.disabled && (
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                field.onRemoveTag(index);
+                            }}
+                            className="hover:text-destructive shrink-0"
+                            aria-label={`Remove ${tag}`}
+                        >
+                            <X size={12} />
+                        </button>
+                    )}
                 </Badge>
             ))}
             <input

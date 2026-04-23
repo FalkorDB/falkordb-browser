@@ -21,14 +21,17 @@ export default function EditUser({ username, role: initialRole, keys: initialKey
     const [role, setRole] = useState(initialRole);
     const [keys, setKeys] = useState<string[]>(initialKeys ? initialKeys : []);
 
+    const [prevOpen, setPrevOpen] = useState(false);
+
     useEffect(() => {
-        if (open) {
+        if (open && !prevOpen) {
             setRole(initialRole);
             setKeys(initialKeys ? initialKeys : []);
             setPassword("");
             setConfirmPassword("");
         }
-    }, [open, initialRole, initialKeys]);
+        setPrevOpen(open);
+    }, [open, prevOpen, initialRole, initialKeys]);
 
     const fields: Field[] = [
         {
@@ -117,7 +120,8 @@ export default function EditUser({ username, role: initialRole, keys: initialKey
     const handleEditUser = async (e: FormEvent) => {
         e.preventDefault();
 
-        const ok = await onEditUser(username, role, keys, password || undefined);
+        const normalizedKeys = keys.length === 0 ? ["*"] : keys;
+        const ok = await onEditUser(username, role, normalizedKeys, password || undefined);
         if (ok) {
             setOpen(false);
         }
