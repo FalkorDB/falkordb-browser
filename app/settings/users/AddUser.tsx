@@ -130,7 +130,8 @@ export default function AddUser({ onAddUser }: {
     const handleAddUser = async (e: FormEvent) => {
         e.preventDefault();
 
-        const ok = await onAddUser({ username, password, role, }, keys);
+        const normalizedKeys = keys.length === 0 ? ["*"] : keys;
+        const ok = await onAddUser({ username, password, role, }, normalizedKeys);
         if (ok) {
             setOpen(false);
         }

@@ -77,7 +77,7 @@ function TagInput({ field }: { field: TagField }) {
 
     const addTags = (value: string) => {
         const parts = value.split(",").map(p => p.trim().replace(/^~/, "")).filter(Boolean);
-        const seen = new Set(field.tags);
+        const seen = new Set(field.tags.map(t => t.replace(/^~/, "")));
         parts.forEach(part => {
             if (!seen.has(part)) {
                 seen.add(part);
