@@ -92,7 +92,9 @@ export default class SettingsTokensPage extends HeaderComponent {
     await interactWhenVisible(
       this.tokensTab,
       (el) => el.click(),
-      "tokens tab"
+      "tokens tab",
+      1000,
+      15
     );
   }
 
@@ -222,6 +224,7 @@ export default class SettingsTokensPage extends HeaderComponent {
 
   // Actions
   async navigateToTokensTab(): Promise<void> {
+    await this.waitForPageIdle();
     await this.clickTokensTab();
     await this.waitFor(500);
   }
