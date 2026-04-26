@@ -1,4 +1,5 @@
 /** @type {import('next').NextConfig} */
+const path = require('path');
 const nextConfig = {
   allowedDevOrigins: ['127.0.0.1', '0.0.0.0'],
   output: 'standalone',
@@ -34,7 +35,20 @@ const nextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: "frame-ancestors 'none';"
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://www.googletagmanager.com",
+              "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+              "img-src 'self' data: blob:",
+              "font-src 'self' data: https://cdn.jsdelivr.net",
+              "connect-src 'self' https://cdn.jsdelivr.net https://www.google-analytics.com https://www.googletagmanager.com",
+              "worker-src 'self' blob: https://cdn.jsdelivr.net",
+              "child-src 'self' blob:",
+              "object-src 'none'",
+              "base-uri 'self'",
+              "frame-ancestors 'none'",
+              "form-action 'self'",
+            ].join('; ')
           },
           {
             key: 'Strict-Transport-Security',
@@ -60,9 +74,12 @@ const nextConfig = {
       }
     ];
   },
-  // Webpack config (only used when NOT using Turbopack, i.e., webpack build mode)
-  // The SVG handling has been migrated to turbopack.rules above for Turbopack mode
+  // Webpack config for production builds (next build --webpack)
+  // SVG handling + local @falkordb/canvas alias
   webpack(config) {
+    // Alias local @falkordb/canvas to its built dist when using webpack
+    config.resolve.alias['@falkordb/canvas'] = path.resolve(__dirname, '../falkordb-canvas/dist/index.js');
+
     // Grab the existing rule that handles SVG imports
     const fileLoaderRule = config.module.rules.find((rule) =>
       rule.test?.test?.('.svg'),

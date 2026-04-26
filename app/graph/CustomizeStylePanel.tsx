@@ -17,7 +17,7 @@ interface Props {
 }
 
 export default function CustomizeStylePanel({ label, onClose }: Props) {
-    const { graph, setLabels } = useContext(GraphContext);
+    const { graph, setLabels, handleCooldown, cooldownTicks } = useContext(GraphContext);
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { canvasRef } = useContext(ForceGraphContext);
 
@@ -93,7 +93,9 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
 
             canvas.setGraphData(currentData);
         }
-    }, [canvasRef, graph.Labels, graph.LabelsMap, label, setLabels]);
+
+        handleCooldown(cooldownTicks === undefined ? undefined : -1);
+    }, [canvasRef, graph.Labels, graph.LabelsMap, label, setLabels, handleCooldown, cooldownTicks]);
 
     const handleColorSelect = (color: string) => {
         setSelectedColor(color);
@@ -169,7 +171,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
             >
                 <X className="h-4 w-4" />
             </Button>
-            <div className="flex justify-between items-center pr-8">
+            <div className="flex justify-between items-center pr-5">
                 <h1 className="text-2xl">Customize Style</h1>
                 <Palette size={25} />
             </div>

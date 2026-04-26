@@ -6,7 +6,7 @@
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import type { Data, GraphLink, GraphNode, GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
-import { dataToGraphData } from "@falkordb/canvas";
+import { dataToGraphData, NODE_SIZE } from "@falkordb/canvas";
 import { securedFetch, getTheme, GraphRef, GraphData, Node, Relationship, Link } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Graph } from "../api/graph/model";
@@ -37,7 +37,7 @@ const convertToCanvasData = (graphData: GraphData): Data => ({
         labels,
         color,
         visible,
-        size,
+        size: size,
         data
     })),
     links: graphData.links.map(({ id, relationship, color, visible, source, target, data }) => ({

@@ -5,7 +5,7 @@ import { ThemeProvider } from 'next-themes';
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue } from "@/lib/utils";
-import { encryptValue, decryptValue, isCryptoAvailable, isEncrypted } from "@/lib/encryption";
+
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
@@ -212,25 +212,21 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       // Only encrypt and save secret key if it has changed
       if (newSecretKey !== secretKey) {
         if (newSecretKey) {
-          // Key has a value - encrypt it
-          if (!isCryptoAvailable()) {
-            toast({
-              title: "Error",
-              description: "Encryption not available in this browser. Cannot save secret key.",
-              variant: "destructive",
-            });
-            return; // Stop saving if crypto not available
-          }
-
           try {
-            const encryptedKey = await encryptValue(newSecretKey);
+            const res = await fetch("/api/encryption/encrypt", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ value: newSecretKey }),
+            });
+            if (!res.ok) throw new Error("Encryption request failed");
+            const { result: encryptedKey } = await res.json();
             if (!encryptedKey) {
               toast({
                 title: "Error",
                 description: "Could not encrypt secret key. Please try again.",
                 variant: "destructive",
               });
-              return; // Stop saving if encryption returns empty string
+              return;
             }
             localStorage.setItem("secretKey", encryptedKey);
           } catch (error) {
@@ -240,7 +236,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
               description: "Could not encrypt secret key. Please try again.",
               variant: "destructive",
             });
-            return; // Stop saving if encryption fails
+            return;
           }
         } else {
           // Key is empty - remove it from storage
@@ -684,37 +680,45 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setRowHeightExpandMultiple(parseInt(localStorage.getItem("rowHeightExpandMultiple") || "3", 10));
       const parsedMaxItems = parseInt(localStorage.getItem("maxItemsForSearch") || "20", 10);
       setMaxItemsForSearch(Number.isFinite(parsedMaxItems) ? Math.min(Math.max(parsedMaxItems, 10), 50) : 20);
-      // Decrypt secret key if encrypted, or migrate plain text keys to encrypted format
+      // Decrypt secret key via server-side API
       const storedSecretKey = localStorage.getItem("secretKey") || "";
       if (storedSecretKey) {
-        if (!isCryptoAvailable()) {
-          console.error('Encryption not available - cannot decrypt secret key');
-          setSecretKey('');
-        } else if (isEncrypted(storedSecretKey)) {
-          // Already encrypted - decrypt it
-          const decryptedKey = await decryptValue(storedSecretKey);
-          if (decryptedKey) {
-            setSecretKey(decryptedKey);
-          } else {
-            // Decryption failed (corrupted or key mismatch) - clear it
-            // eslint-disable-next-line no-console
-            console.warn('Clearing corrupted encrypted secret key');
-            setSecretKey('');
-            localStorage.removeItem("secretKey");
-          }
-        } else {
-          // Plain text key from existing users - migrate to encrypted
-          try {
-            setSecretKey(storedSecretKey);
-            const encryptedKey = await encryptValue(storedSecretKey);
-            if (encryptedKey) {
-              localStorage.setItem("secretKey", encryptedKey);
+        try {
+          const res = await fetch("/api/encryption/decrypt", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ value: storedSecretKey }),
+          });
+          if (res.ok) {
+            const { result: decryptedKey } = await res.json();
+            if (decryptedKey) {
+              setSecretKey(decryptedKey);
+              // Re-encrypt with server key if it was stored in old format
+              if (!storedSecretKey.startsWith("senc:")) {
+                const encRes = await fetch("/api/encryption/encrypt", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ value: decryptedKey }),
+                });
+                if (encRes.ok) {
+                  const { result: reEncrypted } = await encRes.json();
+                  if (reEncrypted) {
+                    localStorage.setItem("secretKey", reEncrypted);
+                  }
+                }
+              }
             } else {
-              console.error('Failed to encrypt plain text key');
+              console.warn('Clearing corrupted encrypted secret key');
+              setSecretKey('');
+              localStorage.removeItem("secretKey");
             }
-          } catch (error) {
-            console.error('Failed to encrypt plain text key:', error);
+          } else {
+            console.error('Failed to decrypt secret key');
+            setSecretKey('');
           }
+        } catch (error) {
+          console.error('Failed to decrypt secret key:', error);
+          setSecretKey('');
         }
       }
 
@@ -771,7 +775,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     return () => {
       if (rafId !== undefined) cancelAnimationFrame(rafId);
     };
-  }, [pathname]);
+  }, [pathname, panelRef.current]);
 
   const checkStatus = useCallback(() => {
     securedFetch("/api/status", {
