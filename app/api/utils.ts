@@ -64,15 +64,12 @@ export function corsHeaders(requestOrigin?: string | null): Record<string, strin
         'Vary': 'Origin',
     };
 
-    // Check if the request origin is in the allowlist
+    // Only set CORS headers when the request origin is in the allowlist
     if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
         headers['Access-Control-Allow-Origin'] = requestOrigin;
         headers['Access-Control-Allow-Credentials'] = 'true';
-    } else if (process.env.NODE_ENV === 'development' && !process.env.ALLOWED_ORIGINS) {
-        // In development, allow all origins if ALLOWED_ORIGINS is not explicitly set
-        headers['Access-Control-Allow-Origin'] = '*';
     }
-    // If origin is not allowed and not in development, no CORS headers are added
+    // If origin is not allowed, no CORS headers are added
     // This will cause the browser to block the request
 
     return headers;
