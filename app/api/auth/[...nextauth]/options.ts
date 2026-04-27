@@ -2,6 +2,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { AuthOptions, Role, User, getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { FalkorDB, type FalkorDBOptions } from "falkordb";
+import { LRUCache } from "lru-cache";
 import { v4 as uuidv4 } from "uuid";
 import crypto from "crypto";
 import { getToken } from "next-auth/jwt";
@@ -41,7 +42,26 @@ interface AuthenticatedUserWithPassword extends AuthenticatedUser {
   password?: string;
 }
 
-const connections = new Map<string, FalkorDB>();
+// Single TTL constant controlling session JWT, stored credentials, and connection idle eviction.
+const SESSION_TTL_SECONDS = 60 * 1; // 1 hour
+
+const CONNECTION_TTL_MS = SESSION_TTL_SECONDS * 1000;
+
+/**
+ * LRU cache with a sliding TTL per connection.
+ * - Every `get()` extends the TTL (sliding window).
+ * - `dispose` auto-closes evicted / deleted FalkorDB connections.
+ * - `ttlAutopurge` periodically sweeps expired entries.
+ */
+const connections = new LRUCache<string, FalkorDB>({
+  max: 100,
+  ttl: CONNECTION_TTL_MS,
+  updateAgeOnGet: true,
+  ttlAutopurge: true,
+  dispose: (client: FalkorDB) => {
+    client.close().catch(() => {});
+  },
+});
 
 export async function newClient(
   credentials: {
@@ -96,17 +116,9 @@ export async function newClient(
   connections.set(id, client);
 
   client.on("error", (err) => {
-    // Close coonection on error and remove from connections map
     // eslint-disable-next-line no-console
     console.error("FalkorDB Client Error", err);
-    const connection = connections.get(id);
-    if (connection) {
-      connections.delete(id);
-      connection.close().catch((e) => {
-        // eslint-disable-next-line no-console
-        console.warn("FalkorDB Client Disconnect Error", e);
-      });
-    }
+    connections.delete(id); // dispose auto-closes
   });
 
   // Verify connection and Role
@@ -241,16 +253,7 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
         console.warn("JWT authentication failed: token is not active (revoked or expired)");
 
         // Clean up stale connection to prevent connection leak
-        const staleClient = connections.get(payload.sub);
-        if (staleClient) {
-          connections.delete(payload.sub);
-          try {
-            await staleClient.close();
-          } catch (closeError) {
-            // eslint-disable-next-line no-console
-            console.warn("Failed to close revoked JWT connection", closeError);
-          }
-        }
+        connections.delete(payload.sub); // dispose auto-closes
         return null;
       }
 
@@ -290,13 +293,7 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
           // Connection is dead, remove from pool and recreate
           // eslint-disable-next-line no-console
           console.warn("Connection health check failed, recreating:", pingError);
-          connections.delete(payload.sub);
-
-          try {
-            await client.close();
-          } catch (closeError) {
-            // Ignore close errors on dead connections
-          }
+          connections.delete(payload.sub); // dispose auto-closes
 
           client = undefined; // Will be recreated below
         }
@@ -350,12 +347,11 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
   return null;
 }
 
-const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60; // 30 days; keep in sync with session.maxAge below
-
 const authOptions: AuthOptions = {
   session: {
     strategy: "jwt",
-    maxAge: SESSION_MAX_AGE_SECONDS,
+    maxAge: SESSION_TTL_SECONDS,
+    updateAge: 5 * 60, // 5 minutes - how often the session is updated/extended in the database (not the JWT lifetime, which is fixed at maxAge);
   },
   providers: [
     CredentialsProvider({
@@ -406,7 +402,7 @@ const authOptions: AuthOptions = {
                 // Align with NextAuth session lifetime so abandoned rows
                 // (e.g. browser closed before signOut fires) are eligible
                 // for cleanup instead of living forever.
-                expiresAtUnix: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS,
+                expiresAtUnix: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
               });
             } catch (storageError) {
               // eslint-disable-next-line no-console
@@ -414,11 +410,7 @@ const authOptions: AuthOptions = {
                 "Failed to persist session credential; aborting login:",
                 storageError
               );
-              const conn = connections.get(id);
-              if (conn) {
-                connections.delete(id);
-                try { await conn.close(); } catch { /* ignore */ }
-              }
+              connections.delete(id); // dispose auto-closes
               return null;
             }
           }
@@ -505,11 +497,7 @@ const authOptions: AuthOptions = {
       }
 
       if (id) {
-        const conn = connections.get(id);
-        if (conn) {
-          connections.delete(id);
-          try { await conn.close(); } catch { /* ignore */ }
-        }
+        connections.delete(id); // dispose auto-closes
       }
     },
   },
@@ -609,13 +597,7 @@ export async function getClient(
       // Connection is dead, remove from pool and recreate
       // eslint-disable-next-line no-console
       console.warn("Session connection health check failed, recreating:", pingError);
-      connections.delete(id);
-
-      try {
-        await connection.close();
-      } catch (closeError) {
-        // Ignore close errors on dead connections
-      }
+      connections.delete(id); // dispose auto-closes
 
       connection = undefined; // Will be recreated below
     }

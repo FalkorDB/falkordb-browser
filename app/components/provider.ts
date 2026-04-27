@@ -143,7 +143,7 @@ type GraphContextType = {
   currentTab: Tab;
   setCurrentTab: Dispatch<SetStateAction<Tab>>;
   runQuery: (query: string, name?: string) => Promise<void>;
-  fetchCount: () => Promise<void>;
+  fetchCount: (name?: string) => Promise<void>;
   handleCooldown: (ticks?: number, isSetLoading?: boolean) => void;
   cooldownTicks: number | undefined;
   isLoading: boolean;

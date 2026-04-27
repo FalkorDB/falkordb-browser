@@ -233,52 +233,81 @@ export function cn(...inputs: ClassValue[]) {
 export async function getSSEGraphResult(
   url: string,
   toast: ToastFn,
-  setIndicator: (indicator: "online" | "offline") => void
+  setIndicator: (indicator: "online" | "offline") => void,
 ): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    let handled = false;
 
-    const evtSource = new EventSource(url);
-    evtSource.addEventListener("result", (event: MessageEvent) => {
-      const result = JSON.parse(event.data);
-      evtSource.close();
-      setIndicator("online");
-      resolve(result);
-    });
+  let response: Response;
+  try {
+    response = await fetch(url);
+  } catch {
+    toast({ title: "Error", description: "Network or server error", variant: "destructive" });
+    setIndicator("offline");
+    throw new Error("Network or server error");
+  }
 
-    evtSource.addEventListener("error", (event: MessageEvent) => {
-      handled = true;
-      const { message, status, code } = JSON.parse(event.data);
+  const body = response.body;
+  if (!body) {
+    toast({ title: "Error", description: "Empty response", variant: "destructive" });
+    setIndicator("offline");
+    throw new Error("Empty response");
+  }
 
-      evtSource.close();
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
 
-      if (status === 401 && code === "SESSION_INVALID") {
-        triggerSessionInvalidationSignOut();
-        setIndicator("offline");
-        reject(new Error(message));
-        return;
+  // Read the SSE stream until we get a "result" or "error" event
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    // eslint-disable-next-line no-await-in-loop
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    // Parse complete SSE messages (separated by double newline)
+    const parts = buffer.split("\n\n");
+    // Keep the last (possibly incomplete) chunk in the buffer
+    buffer = parts.pop() || "";
+
+    for (const part of parts) {
+      const eventMatch = part.match(/^event:\s*(.+)$/m);
+      if (!eventMatch) continue;
+
+      // SSE allows multiple "data:" lines per message — concatenate them all
+      const dataLines = part.split("\n")
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trim());
+      if (dataLines.length === 0) continue;
+
+      const eventName = eventMatch[1].trim();
+      const data = JSON.parse(dataLines.join(""));
+
+      if (eventName === "result") {
+        reader.cancel();
+        setIndicator("online");
+        return data;
       }
 
-      toast({ title: "Error", description: message, variant: "destructive" });
+      if (eventName === "error") {
+        reader.cancel();
+        const { message, status, code } = data;
 
-      if (status === 401 || status >= 500) setIndicator("offline");
+        if (status === 401 && code === "SESSION_INVALID") {
+          triggerSessionInvalidationSignOut();
+          setIndicator("offline");
+          throw new Error(message);
+        }
 
-      reject(new Error(message));
-    });
+        toast({ title: "Error", description: message, variant: "destructive" });
+        if (status === 401 || status >= 500) setIndicator("offline");
+        throw new Error(message);
+      }
+    }
+  }
 
-    evtSource.onerror = () => {
-      if (handled) return;
-
-      evtSource.close();
-      toast({
-        title: "Error",
-        description: "Network or server error",
-        variant: "destructive",
-      });
-      setIndicator("offline");
-      reject(new Error("Network or server error"));
-    };
-  });
+  toast({ title: "Error", description: "Network or server error", variant: "destructive" });
+  setIndicator("offline");
+  throw new Error("Network or server error");
 }
 
 // Guards against triggering multiple concurrent signOut calls when many
@@ -297,7 +326,7 @@ export async function securedFetch(
   input: string,
   init: RequestInit,
   toast: ToastFn,
-  setIndicator: (indicator: "online" | "offline") => void
+  setIndicator: (indicator: "online" | "offline") => void,
 ): Promise<Response> {
   const response = await fetch(input, init);
   const { status } = response;
@@ -437,7 +466,7 @@ const processEntries = (arr: MemoryValueType): Map<string, MemoryValue> => {
 export const getMemoryUsage = async (
   name: string,
   toast: ToastFn,
-  setIndicator: (indicator: "online" | "offline") => void
+  setIndicator: (indicator: "online" | "offline") => void,
 ): Promise<Map<string, MemoryValue>> => {
   const result = await securedFetch(
     `api/graph/${prepareArg(name)}/memory`,
@@ -445,7 +474,7 @@ export const getMemoryUsage = async (
       method: "GET",
     },
     toast,
-    setIndicator
+    setIndicator,
   );
 
   if (!result.ok) return new Map();

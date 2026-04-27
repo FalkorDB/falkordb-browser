@@ -32,7 +32,7 @@ const handleIsPortFormat = (value: string) => {
 const handleIsPortValid = (value: string) => value.startsWith("0");
 
 const getPortErrors = (func?: (value: string) => string) => {
-  const getValue = (v: string) => func ? func(v) : v;  
+  const getValue = (v: string) => func ? func(v) : v;
 
   return [
     {
@@ -127,7 +127,7 @@ export default function LoginForm() {
       setUsername(e.target.value);
       setRawUrl(buildUrl({ host, port, username: e.target.value, password, TLS }));
       clearError();
-      
+
       return true;
     },
     label: "Username",
@@ -142,7 +142,7 @@ export default function LoginForm() {
       setPassword(e.target.value);
       setRawUrl(buildUrl({ host, port, username, password: e.target.value, TLS }));
       clearError();
-      
+
       return true;
     },
     label: "Password",
@@ -157,16 +157,16 @@ export default function LoginForm() {
     onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value;
       const parsed = parseUrl(val);
-      
+
       setHost(parsed.host);
       setPort(parsed.port);
       setUsername(parsed.username);
       setPassword(parsed.password);
       setTLS(parsed.tls);
       setRawUrl(val);
-      
+
       clearError();
-      
+
       return true;
     },
     errors: [
@@ -177,17 +177,17 @@ export default function LoginForm() {
     placeholder: `falkor://Default:Default@${DEFAULT_HOST}:${DEFAULT_PORT}`,
     required: true
   }] : userInputFields;
-  
+
   const fields: Field[] = loginMode === "url" ?
-  urlFields
-  : [
+    urlFields
+    : [
       {
         value: host,
         onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
           setHost(e.target.value);
           setRawUrl(buildUrl({ host: e.target.value, port, username, password, TLS }));
           clearError();
-          
+
           return true;
         },
         label: "Host",
@@ -201,7 +201,7 @@ export default function LoginForm() {
           setRawUrl(buildUrl({ host, port: e.target.value, username, password, TLS }));
           setPort(e.target.value);
           clearError();
-          
+
           return true;
         },
         errors: [...getPortErrors()],
@@ -355,6 +355,8 @@ export default function LoginForm() {
 
     reader.readAsDataURL(acceptedFiles[0]);
   };
+
+  console.log(mounted, currentTheme);
 
   return (
     <div className="relative h-full w-full flex flex-col">

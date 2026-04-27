@@ -795,20 +795,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [checkStatus, status]);
 
-  const handleOnSetGraphName = (newGraphName: string) => {
-    if (pathname.includes("/schema")) {
-      setSchemaName(formatName(newGraphName));
-      setSchemaNames(prev => [...prev, formatName(newGraphName)]);
-    } else {
-      setGraphName(formatName(newGraphName));
-      setGraphNames(prev => [...prev, formatName(newGraphName)]);
-    }
-  };
-
   const handleFetchOptions = useCallback(async () => {
     if (indicator === "offline") return;
 
-    await Promise.all(([["Graph", setGraphNames, setGraphName],/* ["Schema", setSchemaNames, setSchemaName] */] as ["Graph" | "Schema", Dispatch<SetStateAction<string[]>>, Dispatch<SetStateAction<string>>][]).map(async ([type, setOptions, setName]) => {
+    await Promise.all(([["Graph", setGraphNames, setGraphName]] as ["Graph" | "Schema", Dispatch<SetStateAction<string[]>>, Dispatch<SetStateAction<string>>][]).map(async ([type, setOptions, setName]) => {
       await fetchOptions(type, toast, setIndicator, indicator, setName, setOptions, contentPersistence);
     }));
   }, [indicator, toast, contentPersistence]);
