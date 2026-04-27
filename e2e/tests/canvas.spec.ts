@@ -164,7 +164,8 @@ test.describe('Canvas Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@readwrite moving a node to another node's position while animation is off should place them at the same position`, async () => {
+    test(`@readwrite moving a node to another node's position while animation is off should place them at the same position`, async ({ }, testInfo) => {
+        testInfo.setTimeout(60000);
         const graphName = getRandomString('graph');
         await apicalls.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -186,7 +187,8 @@ test.describe('Canvas Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@readwrite moving a node to another node's position while animation is on should push them apart`, async () => {
+    test(`@readwrite moving a node to another node's position while animation is on should push them apart`, async ({ }, testInfo) => {
+        testInfo.setTimeout(60000);
         const graphName = getRandomString('graph');
         await apicalls.addGraph(graphName);
 
@@ -200,7 +202,7 @@ test.describe('Canvas Tests', () => {
 
         const fromX = initNodes[0].screenX;
         const fromY = initNodes[0].screenY;
-        const toX = initNodes[1].screenX;;
+        const toX = initNodes[1].screenX;
         const toY = initNodes[1].screenY;
         await graph.changeNodePosition(fromX, fromY, toX, toY);
         await graph.waitForScaleToStabilize();

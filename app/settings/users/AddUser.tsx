@@ -10,7 +10,7 @@ import FormComponent, { Field } from "@/app/components/FormComponent";
 import { Drawer, DrawerDescription, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 
 export default function AddUser({ onAddUser }: {
-    onAddUser: (user: CreateUser, keys: string[]) => Promise<void>
+    onAddUser: (user: CreateUser, keys: string[]) => Promise<boolean>
 }) {
     const [open, setOpen] = useState(false);
     const [username, setUsername] = useState("");
@@ -121,7 +121,7 @@ export default function AddUser({ onAddUser }: {
             onRemoveTag: (index) => setKeys(prev => prev.filter((_, i) => i !== index)),
             required: false,
             placeholder: "*",
-            description: "Pattern for accessible keys / graphs (e.g. mygraph, myprefix:*, *)",
+            description: "Pattern for accessible keys / graphs (e.g. mygraph, myprefix*, *)",
             info: "Defines which keys / graphs this user can access",
             errors: []
         }
@@ -130,11 +130,11 @@ export default function AddUser({ onAddUser }: {
     const handleAddUser = async (e: FormEvent) => {
         e.preventDefault();
 
-        await onAddUser({ username, password, role, }, keys);
-
-        setOpen(false);
-
-        handleClose();
+        const normalizedKeys = keys.length === 0 ? ["*"] : keys;
+        const ok = await onAddUser({ username, password, role, }, normalizedKeys);
+        if (ok) {
+            setOpen(false);
+        }
     };
 
     return (

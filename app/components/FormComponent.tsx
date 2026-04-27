@@ -77,8 +77,10 @@ function TagInput({ field }: { field: TagField }) {
 
     const addTags = (value: string) => {
         const parts = value.split(",").map(p => p.trim().replace(/^~/, "")).filter(Boolean);
+        const seen = new Set(field.tags.map(t => t.replace(/^~/, "")));
         parts.forEach(part => {
-            if (!field.tags.includes(part)) {
+            if (!seen.has(part)) {
+                seen.add(part);
                 field.onAddTag(part);
             }
         });
@@ -103,17 +105,19 @@ function TagInput({ field }: { field: TagField }) {
             {field.tags.map((tag, index) => (
                 <Badge key={tag} variant="secondary" className="flex items-center gap-1 px-2 py-0.5 max-w-full overflow-hidden">
                     <span className="truncate" title={tag}>{tag}</span>
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            field.onRemoveTag(index);
-                        }}
-                        className="hover:text-destructive shrink-0"
-                        aria-label={`Remove ${tag}`}
-                    >
-                        <X size={12} />
-                    </button>
+                    {!field.disabled && (
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                field.onRemoveTag(index);
+                            }}
+                            className="hover:text-destructive shrink-0"
+                            aria-label={`Remove ${tag}`}
+                        >
+                            <X size={12} />
+                        </button>
+                    )}
                 </Badge>
             ))}
             <input
@@ -136,34 +140,34 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
     const [errors, setErrors] = useState<{ [key: string]: boolean }>({});
     const [isLoading, setIsLoading] = useState(false);
     const isMountedRef = useRef(false);
+    const prevFieldsKeyRef = useRef<string | null>(null);
 
     // Stable identifier for the current set of fields — triggers re-validation when the form layout changes
     const fieldsKey = fields.map(f => f.label).join(",");
-    const fieldValues = fields.map(f => f.value).join("\0");
 
     useEffect(() => {
-        const clearMountedFlag = () => {
-            isMountedRef.current = false;
-        };
-        
         if (!isMountedRef.current) {
             isMountedRef.current = true;
-
-            return clearMountedFlag;
+            prevFieldsKeyRef.current = fieldsKey;
+            return;
         }
 
-        const newErrors: { [key: string]: boolean } = {};
+        // Only re-validate when the form layout changes (e.g. switching login mode),
+        // not on mount or on every value change
+        if (prevFieldsKeyRef.current !== fieldsKey) {
+            prevFieldsKeyRef.current = fieldsKey;
 
-        fields.forEach(field => {
-            if (field.errors) {
-                newErrors[field.label] = field.errors.some(err => err.condition(field.value));
-            }
-        });
+            const newErrors: { [key: string]: boolean } = {};
 
-        setErrors(prev => ({ ...prev, ...newErrors }));
+            fields.forEach(field => {
+                if (field.errors) {
+                    newErrors[field.label] = field.errors.some(err => err.condition(field.value));
+                }
+            });
 
-        return clearMountedFlag;
-    }, [fieldsKey, fieldValues]);
+            setErrors(prev => ({ ...prev, ...newErrors }));
+        }
+    }, [fieldsKey, fields]);
 
     const onHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
