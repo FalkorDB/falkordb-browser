@@ -1,6 +1,6 @@
 "use client";
 
-import { SignInOptions, SignInResponse, signIn } from "next-auth/react";
+import { SignInResponse, signIn } from "next-auth/react";
 import { FormEvent, useContext, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
@@ -316,7 +316,7 @@ export default function LoginForm() {
       }
     }
 
-    const params: SignInOptions = {
+    const params: Record<string, unknown> & { redirect: false } = {
       redirect: false,
     };
 

@@ -63,14 +63,16 @@ export async function GET(
 
       return NextResponse.json({ result }, { status: 200, headers: getCorsHeaders(request) });
     } catch (err) {
+      console.error(err);
       return NextResponse.json(
-        { message: (err as Error).message },
+        { message: "An error occurred while processing the request" },
         { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500, headers: getCorsHeaders(request) }
     );
   }

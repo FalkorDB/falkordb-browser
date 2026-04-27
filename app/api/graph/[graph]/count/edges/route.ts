@@ -56,7 +56,7 @@ export async function GET(
       writer.write(
         encoder.encode(
           `event: error\ndata: ${JSON.stringify({
-            message: (error as Error).message,
+            message: "An error occurred while processing the request",
             status: 400,
           })}\n\n`
         )
@@ -68,7 +68,7 @@ export async function GET(
     writer.write(
       encoder.encode(
         `event: error\ndata: ${JSON.stringify({
-          message: (error as Error).message,
+          message: "Internal server error",
           status: 500,
         })}\n\n`
       )

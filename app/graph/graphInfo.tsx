@@ -240,12 +240,12 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                             <Button
                                                 title={`MATCH p=()-[:${escapeIdentifier(relationship.name)}]-() RETURN p
                                                     #: ${relationship.count.toLocaleString()}`}
-                                                className="h-6 max-w-full px-2 rounded-md flex items-center gap-1.5 bg-secondary text-foreground text-xs hover:bg-secondary/80 transition-colors overflow-hidden"
+                                                className="h-6 max-w-full px-2 rounded-md flex items-center gap-1.5 bg-secondary text-foreground text-xs hover:bg-secondary/80 transition-colors overflow-hidden border-l-4"
+                                                style={{ borderColor: relationshipColor }}
                                                 data-testid={`graphInfo${relationship.name}Edge`}
                                                 onClick={() => runQuery(`MATCH p=()-[:${escapeIdentifier(relationship.name)}]-() RETURN p`)}
                                                 disabled={isQueryLoading}
                                             >
-                                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: relationshipColor }} />
                                                 <span className="truncate">{relationship.name}</span>
                                             </Button>
                                         </li>

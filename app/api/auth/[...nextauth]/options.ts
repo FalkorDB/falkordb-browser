@@ -1,17 +1,14 @@
-import CredentialsProvider from "next-auth/providers/credentials";
-import { AuthOptions, Role, User, getServerSession } from "next-auth";
-import { NextResponse } from "next/server";
+import type { Role } from "next-auth";
+import { NextRequest, NextResponse } from "next/server";
 import { FalkorDB, type FalkorDBOptions } from "falkordb";
 import { LRUCache } from "lru-cache";
 import { v4 as uuidv4 } from "uuid";
 import crypto from "crypto";
 import { getToken } from "next-auth/jwt";
-import StorageFactory from "@/lib/token-storage/StorageFactory";
 import { getCorsHeaders } from "../../utils";
 import {
   isTokenActive,
   getPasswordFromTokenDB,
-  storeEncryptedCredential,
 } from "../tokenUtils";
 
 interface CustomJWTPayload {
@@ -43,7 +40,7 @@ interface AuthenticatedUserWithPassword extends AuthenticatedUser {
 }
 
 // Single TTL constant controlling session JWT, stored credentials, and connection idle eviction.
-const SESSION_TTL_SECONDS = 60 * 60; // 1 hour
+export const SESSION_TTL_SECONDS = 60 * 60; // 1 hour
 
 const CONNECTION_TTL_MS = SESSION_TTL_SECONDS * 1000;
 
@@ -53,7 +50,7 @@ const CONNECTION_TTL_MS = SESSION_TTL_SECONDS * 1000;
  * - `dispose` auto-closes evicted / deleted FalkorDB connections.
  * - `ttlAutopurge` periodically sweeps expired entries.
  */
-const connections = new LRUCache<string, FalkorDB>({
+export const connections = new LRUCache<string, FalkorDB>({
   max: 100,
   ttl: CONNECTION_TTL_MS,
   updateAgeOnGet: true,
@@ -199,7 +196,7 @@ async function isJWTOnlyRequest(): Promise<boolean> {
  */
 async function verifyJWTToken(token: string): Promise<CustomJWTPayload> {
   const { jwtVerify } = await import('jose');
-  const secret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
+  const secret = new TextEncoder().encode(process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET);
   const { payload } = await jwtVerify(token, secret);
   return payload as unknown as CustomJWTPayload;
 }
@@ -347,161 +344,7 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
   return null;
 }
 
-const authOptions: AuthOptions = {
-  session: {
-    strategy: "jwt",
-    maxAge: SESSION_TTL_SECONDS,
-    updateAge: 5 * 60, // 5 minutes - how often the session is updated/extended in the database (not the JWT lifetime, which is fixed at maxAge);
-  },
-  providers: [
-    CredentialsProvider({
-      name: "Credentials",
-      credentials: {
-        host: { label: "Host", type: "text", placeholder: "localhost" },
-        port: { label: "Port", type: "number", placeholder: "6379" },
-        username: { label: "Username", type: "text" },
-        password: { label: "Password", type: "password" },
-        tls: { label: "tls", type: "boolean" },
-        ca: { label: "ca", type: "string" },
-        url: { label: "url", type: "string" },
-      },
-      async authorize(credentials) {
-        if (!credentials) {
-          return null;
-        }
 
-        try {
-          // Generate random UUID for this session
-          const id = uuidv4();
-
-          const { role } = await newClient(credentials, id);
-
-          // Persist the password encrypted in the Token DB and keep only an
-          // opaque credentialRef in the JWT. The password itself never enters
-          // the JWT, the NextAuth session, or any client-visible payload.
-          let credentialRef: string | undefined;
-          if (credentials.password) {
-            try {
-              credentialRef = generateTimeUUID();
-              const tokenHash = crypto
-                .createHash("sha256")
-                .update(`session:${credentialRef}`)
-                .digest("hex");
-
-              await storeEncryptedCredential({
-                tokenHash,
-                tokenId: credentialRef,
-                userId: id,
-                username: credentials.username || "default",
-                name: `session:${id}`,
-                role,
-                host: credentials.host || "localhost",
-                port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-                password: credentials.password,
-                kind: 'session',
-                // Align with NextAuth session lifetime so abandoned rows
-                // (e.g. browser closed before signOut fires) are eligible
-                // for cleanup instead of living forever.
-                expiresAtUnix: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
-              });
-            } catch (storageError) {
-              // eslint-disable-next-line no-console
-              console.error(
-                "Failed to persist session credential; aborting login:",
-                storageError
-              );
-              connections.delete(id); // dispose auto-closes
-              return null;
-            }
-          }
-
-          const res: User = {
-            id,
-            url: credentials.url,
-            host: credentials.host || "localhost",
-            port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-            credentialRef,
-            username: credentials.username,
-            tls: credentials.tls === "true",
-            ca: credentials.url ? undefined : credentials.ca,
-            role,
-          };
-          return res;
-        } catch (err) {
-          // eslint-disable-next-line no-console
-          console.error("FalkorDB Client Connect Error", err);
-          return null;
-        }
-      },
-    }),
-  ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        return {
-          ...token,
-          id: user.id,
-          host: user.host,
-          port: user.port,
-          credentialRef: user.credentialRef,
-          username: user.username,
-          tls: user.tls,
-          ca: user.ca,
-          role: user.role,
-          url: user.url,
-        };
-      }
-
-      return token;
-    },
-    async redirect({ url, baseUrl }) {
-      return url.startsWith(baseUrl) ? url : baseUrl;
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        return {
-          ...session,
-          user: {
-            ...session.user,
-            id: token.id as string,
-            host: token.host as string,
-            port: parseInt(token.port as string, 10),
-            username: token.username as string,
-            tls: token.tls as boolean,
-            ca: token.ca,
-            role: token.role as Role,
-            url: token.url as string | undefined,
-          },
-        };
-      }
-      return session;
-    },
-  },
-  events: {
-    async signOut({ token }) {
-      const t = token as Record<string, unknown> | null;
-      const credentialRef = t?.credentialRef as string | undefined;
-      const id = t?.id as string | undefined;
-
-      // Session credentials are ephemeral and have no audit value beyond
-      // the session itself, so we hard-delete the Token DB row on sign-out
-      // rather than soft-revoking it (which is the PAT behavior).
-      if (credentialRef) {
-        try {
-          const storage = StorageFactory.getStorage();
-          await storage.deleteToken(credentialRef);
-        } catch (e) {
-          // eslint-disable-next-line no-console
-          console.warn("Failed to delete session credential on signOut:", e);
-        }
-      }
-
-      if (id) {
-        connections.delete(id); // dispose auto-closes
-      }
-    },
-  },
-};
 
 export async function getClient(
   request: Request
@@ -526,8 +369,9 @@ export async function getClient(
   }
 
   // Fall back to session authentication for regular app requests
-  const session = await getServerSession(authOptions);
-  const id = session?.user.id;
+  const { auth } = await import("@/auth");
+  const session = await auth();
+  const id = session?.user?.id;
 
   if (!id) {
     return NextResponse.json({ message: "Not authenticated" }, { status: 401, headers: getCorsHeaders(request) });
@@ -544,9 +388,8 @@ export async function getClient(
   let password: string | undefined;
   try {
     const jwt = await getToken({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      req: request as any,
-      secret: process.env.NEXTAUTH_SECRET,
+      req: request as unknown as NextRequest,
+      secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
     });
     const credentialRef = jwt?.credentialRef as string | undefined;
     if (credentialRef) {
@@ -581,7 +424,17 @@ export async function getClient(
     console.warn("Failed to read JWT for session credential lookup:", err);
   }
 
-  const userWithPassword: AuthenticatedUserWithPassword = { ...user, password };
+  const userWithPassword: AuthenticatedUserWithPassword = {
+    id,
+    username: user.username,
+    role: user.role,
+    host: user.host,
+    port: user.port,
+    tls: user.tls,
+    ca: user.ca,
+    url: user.url,
+    password,
+  };
 
   let connection = connections.get(id);
 
@@ -614,10 +467,8 @@ export async function getClient(
       ca: user.ca,
       url: user.url,
     },
-    user.id
+    id
   );
 
   return { client, user: userWithPassword };
 }
-
-export default authOptions;

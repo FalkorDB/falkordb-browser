@@ -116,13 +116,14 @@ export async function GET(request: Request) {
 export async function POST(request: NextRequest) {
   try {
     // 1. Validate JWT secret
-    if (!process.env.NEXTAUTH_SECRET) {
+    const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+    if (!authSecret) {
       return NextResponse.json(
         { message: "Server configuration error" },
         { status: 500, headers: getCorsHeaders(request) }
       );
     }
-    const jwtSecret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
+    const jwtSecret = new TextEncoder().encode(authSecret);
 
     // 2. Get authenticated user from session
     const session = await getClient(request);

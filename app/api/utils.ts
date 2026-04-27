@@ -43,9 +43,10 @@ function getAllowedOrigins(): string[] {
     // Default allowed origins for development
     const defaults = ['http://localhost:3000'];
 
-    // Add NEXTAUTH_URL if configured
-    if (process.env.NEXTAUTH_URL) {
-        defaults.push(process.env.NEXTAUTH_URL.replace(/\/$/, '')); // Remove trailing slash
+    // Add AUTH_URL / NEXTAUTH_URL if configured
+    const authUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL;
+    if (authUrl) {
+        defaults.push(authUrl.replace(/\/$/, '')); // Remove trailing slash
     }
 
     return defaults;

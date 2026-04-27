@@ -163,7 +163,7 @@ const swaggerSpec = {
             }
           },
           "500": {
-            description: "Server configuration error - Missing NEXTAUTH_SECRET",
+            description: "Server configuration error - Missing AUTH_SECRET",
             content: {
               "application/json": {
                 schema: {
@@ -171,7 +171,7 @@ const swaggerSpec = {
                   properties: {
                     message: {
                       type: "string",
-                      example: "Server configuration error: NEXTAUTH_SECRET not set"
+                      example: "Server configuration error: AUTH_SECRET not set"
                     }
                   }
                 }

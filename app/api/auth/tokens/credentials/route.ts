@@ -32,13 +32,14 @@ type LoginInput = {
 export async function POST(request: NextRequest) {
   try {
     // 1. Validate JWT secret
-    if (!process.env.NEXTAUTH_SECRET) {
+    const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+    if (!authSecret) {
       return NextResponse.json(
-        { message: "Server configuration error: NEXTAUTH_SECRET not set" },
+        { message: "Server configuration error: AUTH_SECRET not set" },
         { status: 500 }
       );
     }
-    const jwtSecret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
+    const jwtSecret = new TextEncoder().encode(authSecret);
 
     // 2. Parse and validate request body
     let body;
@@ -186,7 +187,7 @@ export async function POST(request: NextRequest) {
       // eslint-disable-next-line no-console
       console.error('Failed to store token for user:', authenticatedUser.username, storageError);
       return NextResponse.json(
-        { message: storageError instanceof Error ? storageError.message : "Failed to store token" },
+        { message: "Failed to store token" },
         { status: 500 }
       );
     }

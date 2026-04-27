@@ -60,14 +60,14 @@ export async function POST(
     } catch (error) {
       console.error(error);
       return NextResponse.json(
-        { message: (error as Error).message },
+        { message: "An error occurred while processing the request" },
         { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500, headers: getCorsHeaders(request) }
     );
   }
@@ -123,14 +123,14 @@ export async function DELETE(
     } catch (error) {
       console.error(error);
       return NextResponse.json(
-        { message: (error as Error).message },
+        { message: "An error occurred while processing the request" },
         { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500, headers: getCorsHeaders(request) }
     );
   }

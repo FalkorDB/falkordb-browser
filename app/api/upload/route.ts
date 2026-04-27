@@ -47,18 +47,18 @@ export async function POST(request: NextRequest) {
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore
       await pump(file.stream(), fs.createWriteStream(filePath));
-      return NextResponse.json({ path: filePath, status: 200 }, { headers: getCorsHeaders(request) });
+      return NextResponse.json({ path: `/assets/${filename}`, status: 200 }, { headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
-        { message: (error as Error).message },
+        { message: "An error occurred while processing the request" },
         { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500, headers: getCorsHeaders(request) }
     );
   }
