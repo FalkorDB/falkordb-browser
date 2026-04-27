@@ -356,8 +356,6 @@ export default function LoginForm() {
     reader.readAsDataURL(acceptedFiles[0]);
   };
 
-  console.log(mounted, currentTheme);
-
   return (
     <div className="relative h-full w-full flex flex-col">
       <div className="grow basis-0 flex items-center justify-center overflow-auto">

@@ -43,7 +43,7 @@ interface AuthenticatedUserWithPassword extends AuthenticatedUser {
 }
 
 // Single TTL constant controlling session JWT, stored credentials, and connection idle eviction.
-const SESSION_TTL_SECONDS = 60 * 1; // 1 hour
+const SESSION_TTL_SECONDS = 60 * 60; // 1 hour
 
 const CONNECTION_TTL_MS = SESSION_TTL_SECONDS * 1000;
 
