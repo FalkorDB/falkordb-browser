@@ -6,8 +6,8 @@ updates:
       interval: "weekly"
     target-branch: "staging"
 
-  - package-ecosystem: "npm" # See documentation for possible values
-    directory: "/" # Location of package manifests
+  - package-ecosystem: "npm"
+    directory: "/"
     schedule:
       interval: "daily"
     target-branch: "staging"
@@ -15,4 +15,3 @@ updates:
       npm-minor-patch:
         update-types:
           - "patch"
-    
