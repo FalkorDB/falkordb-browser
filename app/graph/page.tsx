@@ -171,10 +171,10 @@ export default function Page() {
             const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
             setGraphInfo(gi);
             fetchCount();
-        }).catch((error) => {
+        }).catch(() => {
             toast({
                 title: "Error",
-                description: error.message || "Failed to fetch graph info",
+                description: "Failed to fetch graph info. Please check your connection and try again.",
                 variant: "destructive",
             });
         });

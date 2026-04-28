@@ -317,7 +317,11 @@ export default function Chat({ onClose }: Props) {
 
                             toast({
                                 title: "Error",
-                                description: eventData,
+                                description: statusCode === 401
+                                    ? "Your session has expired. Please sign in again."
+                                    : statusCode >= 500
+                                        ? "Something went wrong on the server. Please try again later."
+                                        : "An error occurred while processing your request. Please try again.",
                                 variant: "destructive",
                             });
 
@@ -340,10 +344,10 @@ export default function Chat({ onClose }: Props) {
             };
 
             processStream();
-        } catch (error) {
+        } catch (_error) {
             toast({
                 title: "Error",
-                description: (error as Error).message,
+                description: "Something went wrong while processing the chat response. Please try again.",
                 variant: "destructive",
             });
         } finally {

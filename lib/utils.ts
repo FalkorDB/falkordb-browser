@@ -6,13 +6,13 @@
 
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { MutableRefObject } from "react";
+import React, { RefObject } from "react";
 import type { FalkorDBCanvas } from "@falkordb/canvas";
 import { signOut } from "next-auth/react";
 
 export type ToastArguments = {
   title: string;
-  description: string;
+  description: React.ReactNode;
   variant: "destructive" | "default";
 };
 
@@ -146,7 +146,7 @@ export interface Relationship extends Omit<InfoRelationship, "count"> {
   textDescent?: number;
 }
 
-export type GraphRef = MutableRefObject<FalkorDBCanvas | null>;
+export type GraphRef = RefObject<FalkorDBCanvas | null>;
 
 export type Panel = "data" | "add" | undefined;
 
@@ -259,7 +259,8 @@ export async function getSSEGraphResult(
         return;
       }
 
-      toast({ title: "Error", description: message, variant: "destructive" });
+      const friendly = toUserFriendlyMessage(message, status);
+      toast({ title: "Error", description: friendly, variant: "destructive" });
 
       if (status === 401 || status >= 500) setIndicator("offline");
 
@@ -279,6 +280,106 @@ export async function getSSEGraphResult(
       reject(new Error("Network or server error"));
     };
   });
+}
+
+// Parses FalkorDB parser error format:
+// "errMsg: <message> line: <N>, column: <N>, offset: <N> errCtx: <snippet> errCtxOffset: <N>"
+export function parseSyntaxError(raw: string): {
+  message: string;
+  context: string;
+  contextOffset: number;
+} | null {
+  const match = raw.match(
+    /errMsg:\s*(.+?)\s+line:\s*\d+,\s*column:\s*\d+,\s*offset:\s*\d+\s+errCtx:\s*(.+?)\s+errCtxOffset:\s*(\d+)$/
+  );
+  if (!match) return null;
+  return {
+    message: match[1],
+    context: match[2],
+    contextOffset: Number(match[3]),
+  };
+}
+
+// Builds a React element that highlights the error position in the query snippet.
+export function formatSyntaxError(
+  message: string,
+  context: string,
+  contextOffset: number
+): React.ReactNode {
+  const before = context.slice(0, contextOffset);
+  const errorChar = context[contextOffset] || "";
+  const after = context.slice(contextOffset + 1);
+
+  // Extract the word containing the error character and enrich the message.
+  // e.g. "Invalid input 's': expected RETURN" → "Invalid input 's' in RETsURN: expected RETURN"
+  const wordStart = context.lastIndexOf(" ", contextOffset - 1) + 1;
+  const wordEndIdx = context.indexOf(" ", contextOffset);
+  const errorWord = context.slice(wordStart, wordEndIdx === -1 ? undefined : wordEndIdx);
+
+  // Insert "in <word>" after the quoted character, before the colon
+  const enriched = errorWord.length > 1
+    ? message.replace(/^(Invalid input '[^']*')(:)/, `$1 in ${errorWord}$2`)
+    : message;
+
+  return React.createElement("div", { className: "flex flex-col gap-1" },
+    React.createElement("span", null, enriched),
+    React.createElement("code", {
+      className: "mt-1 block rounded px-2 py-1 text-xs font-mono whitespace-pre-wrap break-words"
+    },
+      before,
+      React.createElement("span", {
+        className: "font-bold text-xl underline mx-1"
+      }, errorChar || " "),
+      after
+    )
+  );
+}
+
+// Maps raw server/Redis/FalkorDB error messages to user-friendly descriptions.
+// Syntax errors are parsed and displayed with the error position highlighted.
+export function toUserFriendlyMessage(raw: string, status: number): React.ReactNode {
+  if (status >= 500) {
+    return "Something went wrong on the server. Please try again later.";
+  }
+
+  if (status === 401) {
+    return "Your session has expired. Please sign in again.";
+  }
+
+  const lower = raw.toLowerCase();
+
+  if (lower.includes("connection refused") || lower.includes("econnrefused")) {
+    return "Unable to connect to the database. Please check your connection settings.";
+  }
+
+  if (lower.includes("noauth") || lower.includes("wrongpass")) {
+    return "Database authentication failed. Please check your credentials.";
+  }
+
+  if (lower.includes("loading") && lower.includes("dataset")) {
+    return "The database is still loading. Please wait a moment and try again.";
+  }
+
+  if (lower.includes("oom") || lower.includes("out of memory")) {
+    return "The server is running low on memory. Please try again later.";
+  }
+
+  if (lower.includes("timeout") || lower.includes("timed out")) {
+    return "The request timed out. Please try a simpler query or try again later.";
+  }
+
+  if (lower.includes("readonly") && lower.includes("replica")) {
+    return "This operation cannot be performed on a read-only replica.";
+  }
+
+  // FalkorDB parser/syntax errors — highlight the error position
+  const parsed = parseSyntaxError(raw);
+  if (parsed) {
+    return formatSyntaxError(parsed.message, parsed.context, parsed.contextOffset);
+  }
+
+  // Default: return the raw message
+  return raw;
 }
 
 // Guards against triggering multiple concurrent signOut calls when many
@@ -322,7 +423,7 @@ export async function securedFetch(
 
     toast({
       title: "Error",
-      description: message,
+      description: toUserFriendlyMessage(message, status),
       variant: "destructive",
     });
 
