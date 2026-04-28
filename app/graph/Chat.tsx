@@ -1,6 +1,6 @@
 /* eslint-disable no-case-declarations */
 /* eslint-disable react/no-array-index-key */
-import { cn, getTheme, Message } from "@/lib/utils";
+import { cn, getTheme, Message, toUserFriendlyMessage } from "@/lib/utils";
 import { useContext, useEffect, useRef, useState, useCallback } from "react";
 import { useTheme } from "next-themes";
 import Image from "next/image";
@@ -317,11 +317,7 @@ export default function Chat({ onClose }: Props) {
 
                             toast({
                                 title: "Error",
-                                description: statusCode === 401
-                                    ? "Your session has expired. Please sign in again."
-                                    : statusCode >= 500
-                                        ? "Something went wrong on the server. Please try again later."
-                                        : "An error occurred while processing your request. Please try again.",
+                                description: toUserFriendlyMessage(eventData?.trim() || "", statusCode || 0),
                                 variant: "destructive",
                             });
 
@@ -344,10 +340,10 @@ export default function Chat({ onClose }: Props) {
             };
 
             processStream();
-        } catch (_error) {
+        } catch (error) {
             toast({
                 title: "Error",
-                description: "Something went wrong while processing the chat response. Please try again.",
+                description: toUserFriendlyMessage((error as Error).message || "", 0),
                 variant: "destructive",
             });
         } finally {

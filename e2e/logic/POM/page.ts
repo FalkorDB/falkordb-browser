@@ -432,16 +432,28 @@ export default class Page extends BasePage {
   }
 
   async getNotificationErrorToast(): Promise<boolean> {
-    await this.page.waitForTimeout(1000);
     const isVisible = await this.isVisibleErrorToast();
     return isVisible;
   }
 
   async getErrorToastText(): Promise<string> {
-    await this.page.waitForTimeout(1000);
     const isVisible = await this.isVisibleErrorToast();
     if (!isVisible) return "";
     return (await this.errorToast.textContent()) || "";
+  }
+
+  async mockRoute(pattern: string, status: number, body: object): Promise<void> {
+    await this.page.route(pattern, (route) => {
+      route.fulfill({
+        status,
+        contentType: "application/json",
+        body: JSON.stringify(body),
+      });
+    });
+  }
+
+  async unmockRoute(pattern: string): Promise<void> {
+    await this.page.unroute(pattern);
   }
 
   async getLinksScreenPositions(windowKey: "graph" | "schema"): Promise<any[]> {

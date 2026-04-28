@@ -284,36 +284,41 @@ export async function getSSEGraphResult(
 
 // Parses FalkorDB parser error format:
 // "errMsg: <message> line: <N>, column: <N>, offset: <N> errCtx: <snippet> errCtxOffset: <N>"
+// Uses [\s\S] for multiline tolerance and avoids strict end-of-string anchoring.
 export function parseSyntaxError(raw: string): {
   message: string;
   context: string;
   contextOffset: number;
 } | null {
   const match = raw.match(
-    /errMsg:\s*(.+?)\s+line:\s*\d+,\s*column:\s*\d+,\s*offset:\s*\d+\s+errCtx:\s*(.+?)\s+errCtxOffset:\s*(\d+)$/
+    /errMsg:\s*([\s\S]+?)\s+line:\s*\d+,\s*column:\s*\d+,\s*offset:\s*\d+\s+errCtx:\s*([\s\S]+?)\s+errCtxOffset:\s*(\d+)/
   );
   if (!match) return null;
   return {
-    message: match[1],
-    context: match[2],
+    message: match[1].trim(),
+    context: match[2].trim(),
     contextOffset: Number(match[3]),
   };
 }
 
 // Builds a React element that highlights the error position in the query snippet.
+// Clamps contextOffset to valid range to prevent blank/incorrect highlights.
 export function formatSyntaxError(
   message: string,
   context: string,
   contextOffset: number
 ): React.ReactNode {
-  const before = context.slice(0, contextOffset);
-  const errorChar = context[contextOffset] || "";
-  const after = context.slice(contextOffset + 1);
+  const safeOffset = context.length > 0
+    ? Math.max(0, Math.min(contextOffset, context.length - 1))
+    : 0;
+  const before = context.slice(0, safeOffset);
+  const errorChar = context[safeOffset] || "";
+  const after = context.slice(safeOffset + 1);
 
   // Extract the word containing the error character and enrich the message.
   // e.g. "Invalid input 's': expected RETURN" → "Invalid input 's' in RETsURN: expected RETURN"
-  const wordStart = context.lastIndexOf(" ", contextOffset - 1) + 1;
-  const wordEndIdx = context.indexOf(" ", contextOffset);
+  const wordStart = context.lastIndexOf(" ", safeOffset - 1) + 1;
+  const wordEndIdx = context.indexOf(" ", safeOffset);
   const errorWord = context.slice(wordStart, wordEndIdx === -1 ? undefined : wordEndIdx);
 
   // Insert "in <word>" after the quoted character, before the colon
@@ -378,8 +383,13 @@ export function toUserFriendlyMessage(raw: string, status: number): React.ReactN
     return formatSyntaxError(parsed.message, parsed.context, parsed.contextOffset);
   }
 
-  // Default: return the raw message
-  return raw;
+  // Pass through known user-readable query errors as-is
+  if (/unknown function|not defined|already exists|missing parameter|empty query|type mismatch|division by zero|invalid (entity|input) type/i.test(raw)) {
+    return raw;
+  }
+
+  // Safe generic fallback for unrecognized messages
+  return "An unexpected error occurred. Please try again.";
 }
 
 // Guards against triggering multiple concurrent signOut calls when many

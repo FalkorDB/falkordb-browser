@@ -475,10 +475,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
         setGraphInfo(gi);
         return gi;
-      }).catch(() => {
+      }).catch((error) => {
         toast({
           title: "Error",
-          description: "Failed to fetch graph info. Please check your connection and try again.",
+          description: (error as Error).message || "Failed to fetch graph info",
           variant: "destructive",
         });
         return undefined;
