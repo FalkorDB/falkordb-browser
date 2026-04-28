@@ -442,20 +442,6 @@ export default class Page extends BasePage {
     return (await this.errorToast.textContent()) || "";
   }
 
-  async mockRoute(pattern: string, status: number, body: object): Promise<void> {
-    await this.page.route(pattern, (route) => {
-      route.fulfill({
-        status,
-        contentType: "application/json",
-        body: JSON.stringify(body),
-      });
-    });
-  }
-
-  async unmockRoute(pattern: string): Promise<void> {
-    await this.page.unroute(pattern);
-  }
-
   async isOfflineIndicatorVisible(): Promise<boolean> {
     const indicator = this.page.locator('[role="status"][aria-label*="offline"]');
     return waitForElementToBeVisible(indicator);
