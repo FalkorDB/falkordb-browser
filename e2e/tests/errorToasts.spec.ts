@@ -18,9 +18,13 @@ test.describe("Error Toast Messages", () => {
   });
 
   test.afterEach(async () => {
-    if (graphName) {
-      await apiCall.removeGraph(graphName).catch(() => {});
+    const graphToRemove = graphName;
+    graphName = undefined;
+
+    if (graphToRemove) {
+      await apiCall.removeGraph(graphToRemove).catch(() => {});
     }
+
     await browser.closeBrowser();
   });
 

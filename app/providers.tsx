@@ -483,9 +483,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         setGraphInfo(gi);
         return gi;
       }).catch((error) => {
+        console.error("Failed to fetch graph info:", error);
         toast({
           title: "Error",
-          description: (error as Error).message || "Failed to fetch graph info",
+          description: "Failed to fetch graph info",
           variant: "destructive",
         });
         return undefined;
@@ -780,7 +781,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     return () => {
       if (rafId !== undefined) cancelAnimationFrame(rafId);
     };
-  }, [pathname, panelRef.current]);
+  }, [pathname]);
 
   const checkStatus = useCallback(() => {
     securedFetch("/api/status", {

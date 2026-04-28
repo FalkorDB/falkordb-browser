@@ -239,6 +239,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
     const [lineNumber, setLineNumber] = useState(1);
     const [blur, setBlur] = useState(false);
+    const [editorMountVersion, setEditorMountVersion] = useState(0);
 
     const editorHeight = useMemo(() => blur
         ? LINE_HEIGHT
@@ -302,17 +303,13 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
     // Apply or clear syntax error decorations in the editor
     useEffect(() => {
-        const editor = editorRef.current;
-        if (!editor) return;
-
-        if (!syntaxError) {
-            // Clear decorations
-            if (decorationsRef.current) {
-                decorationsRef.current.clear();
-                decorationsRef.current = null;
-            }
-            return;
+        if (decorationsRef.current) {
+            decorationsRef.current.clear();
+            decorationsRef.current = null;
         }
+
+        const editor = maximize ? dialogEditorRef.current : editorRef.current;
+        if (!editor || !syntaxError) return;
 
         const { line, column } = syntaxError;
         const model = editor.getModel();
@@ -328,7 +325,12 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             },
         ]);
         decorationsRef.current = decorations;
-    }, [syntaxError]);
+
+        return () => {
+            decorations.clear();
+            if (decorationsRef.current === decorations) decorationsRef.current = null;
+        };
+    }, [syntaxError, maximize, editorMountVersion]);
 
     // Clear syntax error when the user modifies the query
     useEffect(() => {
@@ -664,6 +666,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                         onMount={(e) => {
                             handleEditorDidMount(e);
                             editorRef.current = e;
+                            setEditorMountVersion(version => version + 1);
                         }}
                     />
                     <span ref={placeholderRef} className="w-full top-0 left-0 absolute pointer-events-none truncate SofiaSans">
@@ -796,6 +799,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                             onMount={(e) => {
                                 handleEditorDidMount(e);
                                 dialogEditorRef.current = e;
+                                setEditorMountVersion(version => version + 1);
                             }}
                         />
                     </div>

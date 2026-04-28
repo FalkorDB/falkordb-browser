@@ -39,6 +39,19 @@ interface Props {
     onClose: () => void
 }
 
+type ErrorWithStatus = Error & { status?: number };
+
+const createResponseError = async (response: Response): Promise<ErrorWithStatus> => {
+    const error = new Error(await response.text()) as ErrorWithStatus;
+    error.status = response.status;
+    return error;
+};
+
+const getErrorStatus = (error: unknown) => {
+    if (error instanceof Error && "status" in error && typeof error.status === "number") return error.status;
+    return 0;
+};
+
 const getStreamStatusCode = (line: string) => {
     const match = line.match(/\bstatus:\s*(\d+)/);
     return match ? Number(match[1]) : 0;
@@ -248,7 +261,7 @@ export default function Chat({ onClose }: Props) {
             });
 
             if (!response.ok) {
-                throw new Error(await response.text());
+                throw await createResponseError(response);
             }
 
             const reader = response.body?.getReader();
@@ -328,23 +341,22 @@ export default function Chat({ onClose }: Props) {
                             isResult = true;
                             break;
 
-                        case "error":
+                        case "error": {
                             const statusCode = getStreamStatusCode(line);
                             const errorMessage = getStreamData(line);
 
                             if (statusCode === 401 || statusCode >= 500) setIndicator("offline");
 
-                            {
-                                const friendly = toUserFriendlyMessage(errorMessage, statusCode);
-                                toast({
-                                    title: friendly.title,
-                                    description: friendly.description,
-                                    variant: "destructive",
-                                });
-                            }
+                            const friendly = toUserFriendlyMessage(errorMessage, statusCode);
+                            toast({
+                                title: friendly.title,
+                                description: friendly.description,
+                                variant: "destructive",
+                            });
 
                             isResult = true;
                             break;
+                        }
 
                         case "Schema":
                         case "CypherResult":
@@ -363,7 +375,7 @@ export default function Chat({ onClose }: Props) {
 
             processStream();
         } catch (error) {
-            const friendly = toUserFriendlyMessage((error as Error).message || "", 0);
+            const friendly = toUserFriendlyMessage(error instanceof Error ? error.message : error, getErrorStatus(error));
             toast({
                 title: friendly.title,
                 description: friendly.description,

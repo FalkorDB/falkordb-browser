@@ -262,13 +262,26 @@ export async function getSSEGraphResult(
 
     evtSource.addEventListener("error", (event: MessageEvent) => {
       handled = true;
-      const { message: rawMessage, status: rawStatus, code } = JSON.parse(event.data) as {
-        message?: unknown;
-        status?: unknown;
-        code?: string;
-      };
+      let rawMessage: unknown = "Request failed";
+      let rawStatus: unknown = 0;
+      let code: string | undefined;
+
+      try {
+        const payload = JSON.parse(event.data) as {
+          message?: unknown;
+          status?: unknown;
+          code?: string;
+        };
+        rawMessage = payload.message;
+        rawStatus = payload.status;
+        code = payload.code;
+      } catch (error) {
+        console.error("Failed to parse SSE error event:", error);
+      }
+
       const message = normalizeErrorMessage(rawMessage) || "Request failed";
-      const status = typeof rawStatus === "number" ? rawStatus : 0;
+      const parsedStatus = Number(rawStatus);
+      const status = Number.isFinite(parsedStatus) ? parsedStatus : 0;
 
       evtSource.close();
 
@@ -395,6 +408,39 @@ function extractResponseErrorMessage(bodyText: string): string {
   return bodyText;
 }
 
+const USER_READABLE_ERROR_PATTERNS = [
+  /\bunknown function\b/i,
+  /\bnot defined\b/i,
+  /\balready exists\b/i,
+  /\bmissing parameter\b/i,
+  /\bempty query\b/i,
+  /\btype mismatch\b/i,
+  /\bdivision by zero\b/i,
+  /\binvalid (?:cypher only|entity|graph name|host|input|json|messages|model|password|port|replace|role|type|url|username|value)\b/i,
+  /\b(?:api key|attribute name|attribute value|code|graph name|key|label|messages|model|name|password|role|source name|type|username|value) (?:is required|cannot be empty)\b/i,
+  /\bselected nodes are required\b/i,
+  /^validation failed$/i,
+  /^database is offline\.$/i,
+  /^graph not found\b/i,
+  /^your graph is empty\b/i,
+  /^model\/api key mismatch\b/i,
+  /^model ".+" not found\b/i,
+  /^ollama model ".+" not found\b/i,
+  /^invalid .*api key\b/i,
+  /^api key error\b/i,
+  /^cannot connect to ollama\b/i,
+  /^network error\b/i,
+  /^request timed out\b/i,
+  /^could not generate\b/i,
+  /^unable to generate\b/i,
+  /^no messages provided$/i,
+  /^no user messages found$/i,
+];
+
+function isAllowlistedUserError(message: string): boolean {
+  return USER_READABLE_ERROR_PATTERNS.some(pattern => pattern.test(message));
+}
+
 // Maps raw server/Redis/FalkorDB error messages to user-friendly descriptions.
 // Syntax errors are parsed and displayed with the error position highlighted.
 export function toUserFriendlyMessage(raw: unknown, status: number): UserFriendlyMessage {
@@ -444,11 +490,11 @@ export function toUserFriendlyMessage(raw: unknown, status: number): UserFriendl
     return { title: "Error", description: "Something went wrong on the server. Please try again later." };
   }
 
-  if (status > 0 && status < 500) {
+  if (isAllowlistedUserError(rawMessage)) {
     return { title: "Error", description: rawMessage };
   }
 
-  return { title: "Error", description: rawMessage || "An unexpected error occurred. Please try again." };
+  return { title: "Error", description: "An unexpected error occurred. Please try again." };
 }
 
 // Guards against triggering multiple concurrent signOut calls when many
