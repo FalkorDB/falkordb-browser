@@ -315,11 +315,14 @@ export default function Chat({ onClose }: Props) {
 
                             if (statusCode === 401 || statusCode >= 500) setIndicator("offline");
 
-                            toast({
-                                title: "Error",
-                                description: toUserFriendlyMessage(eventData?.trim() || "", statusCode || 0),
-                                variant: "destructive",
-                            });
+                            {
+                                const friendly = toUserFriendlyMessage(eventData?.trim() || "", statusCode || 0);
+                                toast({
+                                    title: friendly.title,
+                                    description: friendly.description,
+                                    variant: "destructive",
+                                });
+                            }
 
                             isResult = true;
                             break;
@@ -341,9 +344,10 @@ export default function Chat({ onClose }: Props) {
 
             processStream();
         } catch (error) {
+            const friendly = toUserFriendlyMessage((error as Error).message || "", 0);
             toast({
-                title: "Error",
-                description: toUserFriendlyMessage((error as Error).message || "", 0),
+                title: friendly.title,
+                description: friendly.description,
                 variant: "destructive",
             });
         } finally {

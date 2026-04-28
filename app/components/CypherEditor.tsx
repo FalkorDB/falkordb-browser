@@ -15,7 +15,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
 import EditorComponent, { LINE_HEIGHT, LanguageConfig } from "./EditorComponent";
-import { BrowserSettingsContext, IndicatorContext, UDFContext, ConnectionContext } from "./provider";
+import { BrowserSettingsContext, IndicatorContext, UDFContext, ConnectionContext, SyntaxErrorContext } from "./provider";
 import { Graph } from "../api/graph/model";
 
 interface Props {
@@ -220,6 +220,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { udfList } = useContext(UDFContext);
     const { isReadOnly } = useContext(ConnectionContext);
+    const { syntaxError, setSyntaxError } = useContext(SyntaxErrorContext);
 
     const { toast } = useToast();
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -234,6 +235,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const tutorialOpenRef = useRef(tutorialOpen);
     const isReadOnlyRef = useRef(isReadOnly);
     const monacoRef = useRef<Monaco | null>(null);
+    const decorationsRef = useRef<monaco.editor.IEditorDecorationsCollection | null>(null);
 
     const [lineNumber, setLineNumber] = useState(1);
     const [blur, setBlur] = useState(false);
@@ -296,6 +298,43 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
     useEffect(() => {
         setLineNumber(historyQuery.query.split("\n").length);
+    }, [historyQuery.query]);
+
+    // Apply or clear syntax error decorations in the editor
+    useEffect(() => {
+        const editor = editorRef.current;
+        if (!editor) return;
+
+        if (!syntaxError) {
+            // Clear decorations
+            if (decorationsRef.current) {
+                decorationsRef.current.clear();
+                decorationsRef.current = null;
+            }
+            return;
+        }
+
+        const { line, column } = syntaxError;
+        const model = editor.getModel();
+        if (!model) return;
+
+        const decorations = editor.createDecorationsCollection([
+            {
+                range: new monaco.Range(line, column, line, column + 1),
+                options: {
+                    inlineClassName: 'syntax-error-highlight',
+                    hoverMessage: { value: syntaxError.message },
+                },
+            },
+        ]);
+        decorationsRef.current = decorations;
+    }, [syntaxError]);
+
+    // Clear syntax error when the user modifies the query
+    useEffect(() => {
+        if (syntaxError) {
+            setSyntaxError(null);
+        }
     }, [historyQuery.query]);
 
     const fetchSuggestions = async (detail: string): Promise<monaco.languages.CompletionItem[]> => {

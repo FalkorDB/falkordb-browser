@@ -442,6 +442,13 @@ export default class Page extends BasePage {
     return (await this.errorToast.textContent()) || "";
   }
 
+  async getErrorToastTitle(): Promise<string> {
+    const isVisible = await this.isVisibleErrorToast();
+    if (!isVisible) return "";
+    const title = this.errorToast.getByTestId("toast-title");
+    return (await title.textContent()) || "";
+  }
+
   async isOfflineIndicatorVisible(): Promise<boolean> {
     const indicator = this.page.locator('[role="status"][aria-label*="offline"]');
     return waitForElementToBeVisible(indicator);

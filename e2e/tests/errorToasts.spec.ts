@@ -40,8 +40,11 @@ test.describe("Error Toast Messages", () => {
     await graph.clickRunQuery(false);
 
     expect(await graph.getNotificationErrorToast()).toBe(true);
+    const toastTitle = await graph.getErrorToastTitle();
     const toastText = await graph.getErrorToastText();
 
+    // Toast title should say "Syntax Error"
+    expect(toastTitle).toBe("Syntax Error");
     // Should contain the human-readable message, not "errMsg:"
     expect(toastText).not.toContain("errMsg:");
     expect(toastText).not.toContain("errCtx:");
@@ -64,8 +67,10 @@ test.describe("Error Toast Messages", () => {
     await graph.clickRunQuery(false);
 
     expect(await graph.getNotificationErrorToast()).toBe(true);
+    const toastTitle = await graph.getErrorToastTitle();
     const toastText = await graph.getErrorToastText();
 
+    expect(toastTitle).toBe("Syntax Error");
     expect(toastText).not.toContain("errMsg:");
     expect(toastText).toContain("Invalid input");
   });
@@ -82,10 +87,12 @@ test.describe("Error Toast Messages", () => {
     await graph.clickRunQuery(false);
 
     expect(await graph.getNotificationErrorToast()).toBe(true);
-    const toastText = await graph.getErrorToastText();
+    const toastTitle3 = await graph.getErrorToastTitle();
+    const toastText3 = await graph.getErrorToastText();
 
-    expect(toastText).not.toContain("errMsg:");
-    expect(toastText).toContain("Invalid input");
+    expect(toastTitle3).toBe("Syntax Error");
+    expect(toastText3).not.toContain("errMsg:");
+    expect(toastText3).toContain("Invalid input");
   });
 
   test(`@admin Syntax error at offset 0 shows friendly message`, async () => {
@@ -100,11 +107,13 @@ test.describe("Error Toast Messages", () => {
     await graph.clickRunQuery(false);
 
     expect(await graph.getNotificationErrorToast()).toBe(true);
-    const toastText = await graph.getErrorToastText();
+    const toastTitle4 = await graph.getErrorToastTitle();
+    const toastText4 = await graph.getErrorToastText();
 
-    expect(toastText).not.toContain("errMsg:");
-    expect(toastText).not.toContain("errCtxOffset:");
-    expect(toastText).toContain("Invalid input");
+    expect(toastTitle4).toBe("Syntax Error");
+    expect(toastText4).not.toContain("errMsg:");
+    expect(toastText4).not.toContain("errCtxOffset:");
+    expect(toastText4).toContain("Invalid input");
   });
 
   test(`@admin Syntax error with multiple expected tokens shows friendly message`, async () => {
@@ -119,10 +128,12 @@ test.describe("Error Toast Messages", () => {
     await graph.clickRunQuery(false);
 
     expect(await graph.getNotificationErrorToast()).toBe(true);
-    const toastText = await graph.getErrorToastText();
+    const toastTitle5 = await graph.getErrorToastTitle();
+    const toastText5 = await graph.getErrorToastText();
 
-    expect(toastText).not.toContain("errMsg:");
-    expect(toastText).toContain("Invalid input");
+    expect(toastTitle5).toBe("Syntax Error");
+    expect(toastText5).not.toContain("errMsg:");
+    expect(toastText5).toContain("Invalid input");
   });
 
   // ---------------------------------------------------------------------------
@@ -141,8 +152,10 @@ test.describe("Error Toast Messages", () => {
     await graph.clickRunQuery(false);
 
     expect(await graph.getNotificationErrorToast()).toBe(true);
+    const toastTitleUndef = await graph.getErrorToastTitle();
     const toastText = await graph.getErrorToastText();
 
+    expect(toastTitleUndef).toBe("Error");
     expect(toastText).toContain("not defined");
   });
 
@@ -158,8 +171,10 @@ test.describe("Error Toast Messages", () => {
     await graph.clickRunQuery(false);
 
     expect(await graph.getNotificationErrorToast()).toBe(true);
+    const toastTitleFn = await graph.getErrorToastTitle();
     const toastText = await graph.getErrorToastText();
 
+    expect(toastTitleFn).toBe("Error");
     expect(toastText).toContain("Unknown function");
   });
 
@@ -177,7 +192,9 @@ test.describe("Error Toast Messages", () => {
     await graph.addGraph(graphName, false);
 
     expect(await graph.getNotificationErrorToast()).toBe(true);
+    const toastTitleDup = await graph.getErrorToastTitle();
     const toastText = await graph.getErrorToastText();
+    expect(toastTitleDup).toBe("Error");
     expect(toastText).toContain("already exists");
   });
 });

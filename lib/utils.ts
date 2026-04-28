@@ -201,6 +201,14 @@ export type UDFEntry = [string, string, string, string[]];
 // [...UDFEntry, library_code, code]
 export type UDFEntryWithCode = [...UDFEntry, string, string];
 
+export type SyntaxErrorInfo = {
+  message: string;
+  context: string;
+  contextOffset: number;
+  line: number;
+  column: number;
+};
+
 export type ConnectionType = "Standalone" | "Cluster" | "Sentinel";
 
 export interface ClusterNodeInfo {
@@ -260,7 +268,7 @@ export async function getSSEGraphResult(
       }
 
       const friendly = toUserFriendlyMessage(message, status);
-      toast({ title: "Error", description: friendly, variant: "destructive" });
+      toast({ title: friendly.title, description: friendly.description, variant: "destructive" });
 
       if (status === 401 || status >= 500) setIndicator("offline");
 
@@ -285,19 +293,17 @@ export async function getSSEGraphResult(
 // Parses FalkorDB parser error format:
 // "errMsg: <message> line: <N>, column: <N>, offset: <N> errCtx: <snippet> errCtxOffset: <N>"
 // Uses [\s\S] for multiline tolerance and avoids strict end-of-string anchoring.
-export function parseSyntaxError(raw: string): {
-  message: string;
-  context: string;
-  contextOffset: number;
-} | null {
+export function parseSyntaxError(raw: string): SyntaxErrorInfo | null {
   const match = raw.match(
-    /errMsg:\s*([\s\S]+?)\s+line:\s*\d+,\s*column:\s*\d+,\s*offset:\s*\d+\s+errCtx:\s*([\s\S]+?)\s+errCtxOffset:\s*(\d+)/
+    /errMsg:\s*([\s\S]+?)\s+line:\s*(\d+),\s*column:\s*(\d+),\s*offset:\s*\d+\s+errCtx:\s*([\s\S]+?)\s+errCtxOffset:\s*(\d+)/
   );
   if (!match) return null;
   return {
     message: match[1].trim(),
-    context: match[2].trim(),
-    contextOffset: Number(match[3]),
+    line: Number(match[2]),
+    column: Number(match[3]),
+    context: match[4].trim(),
+    contextOffset: Number(match[5]),
   };
 }
 
@@ -342,54 +348,54 @@ export function formatSyntaxError(
 
 // Maps raw server/Redis/FalkorDB error messages to user-friendly descriptions.
 // Syntax errors are parsed and displayed with the error position highlighted.
-export function toUserFriendlyMessage(raw: string, status: number): React.ReactNode {
+export function toUserFriendlyMessage(raw: string, status: number): { title: string; description: React.ReactNode; syntaxError?: SyntaxErrorInfo } {
   if (status >= 500) {
-    return "Something went wrong on the server. Please try again later.";
+    return { title: "Error", description: "Something went wrong on the server. Please try again later." };
   }
 
   if (status === 401) {
-    return "Your session has expired. Please sign in again.";
+    return { title: "Error", description: "Your session has expired. Please sign in again." };
   }
 
   const lower = raw.toLowerCase();
 
   if (lower.includes("connection refused") || lower.includes("econnrefused")) {
-    return "Unable to connect to the database. Please check your connection settings.";
+    return { title: "Error", description: "Unable to connect to the database. Please check your connection settings." };
   }
 
   if (lower.includes("noauth") || lower.includes("wrongpass")) {
-    return "Database authentication failed. Please check your credentials.";
+    return { title: "Error", description: "Database authentication failed. Please check your credentials." };
   }
 
   if (lower.includes("loading") && lower.includes("dataset")) {
-    return "The database is still loading. Please wait a moment and try again.";
+    return { title: "Error", description: "The database is still loading. Please wait a moment and try again." };
   }
 
   if (lower.includes("oom") || lower.includes("out of memory")) {
-    return "The server is running low on memory. Please try again later.";
+    return { title: "Error", description: "The server is running low on memory. Please try again later." };
   }
 
   if (lower.includes("timeout") || lower.includes("timed out")) {
-    return "The request timed out. Please try a simpler query or try again later.";
+    return { title: "Error", description: "The request timed out. Please try a simpler query or try again later." };
   }
 
   if (lower.includes("readonly") && lower.includes("replica")) {
-    return "This operation cannot be performed on a read-only replica.";
+    return { title: "Error", description: "This operation cannot be performed on a read-only replica." };
   }
 
   // FalkorDB parser/syntax errors — highlight the error position
   const parsed = parseSyntaxError(raw);
   if (parsed) {
-    return formatSyntaxError(parsed.message, parsed.context, parsed.contextOffset);
+    return { title: "Syntax Error", description: formatSyntaxError(parsed.message, parsed.context, parsed.contextOffset), syntaxError: parsed };
   }
 
   // Pass through known user-readable query errors as-is
   if (/unknown function|not defined|already exists|missing parameter|empty query|type mismatch|division by zero|invalid (entity|input) type/i.test(raw)) {
-    return raw;
+    return { title: "Error", description: raw };
   }
 
   // Safe generic fallback for unrecognized messages
-  return "An unexpected error occurred. Please try again.";
+  return { title: "Error", description: "An unexpected error occurred. Please try again." };
 }
 
 // Guards against triggering multiple concurrent signOut calls when many
@@ -431,9 +437,10 @@ export async function securedFetch(
       // message is already text
     }
 
+    const friendly = toUserFriendlyMessage(message, status);
     toast({
-      title: "Error",
-      description: toUserFriendlyMessage(message, status),
+      title: friendly.title,
+      description: friendly.description,
       variant: "destructive",
     });
 

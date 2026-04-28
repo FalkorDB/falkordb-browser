@@ -4,7 +4,7 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue } from "@/lib/utils";
+import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue, SyntaxErrorInfo, parseSyntaxError } from "@/lib/utils";
 import { encryptValue, decryptValue, isCryptoAvailable, isEncrypted } from "@/lib/encryption";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import { usePathname, useRouter } from "next/navigation";
@@ -15,7 +15,7 @@ import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphInfo } from "./api/graph/model";
 import Navbar from "./components/Navbar";
-import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext } from "./components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, SyntaxErrorContext } from "./components/provider";
 import Tutorial from "./components/Tutorial";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import Header from "./components/Header";
@@ -118,6 +118,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0);
   const [panel, setPanel] = useState<Panel>();
   const [isQueryLoading, setIsQueryLoading] = useState(false);
+  const [syntaxError, setSyntaxError] = useState<SyntaxErrorInfo | null>(null);
   const [model, setModel] = useState("");
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
@@ -331,6 +332,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setIsQueryLoading,
   }), [isQueryLoading]);
 
+  const syntaxErrorContext = useMemo(() => ({
+    syntaxError,
+    setSyntaxError,
+  }), [syntaxError]);
+
   const forceGraphContext = useMemo(() => ({
     canvasRef,
     viewport,
@@ -450,6 +456,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     };
 
     setIsQueryLoading(true);
+    setSyntaxError(null);
 
     setHistoryQuery(prev => ({
       ...prev,
@@ -528,8 +535,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setSearch("");
       setScrollPosition(0);
       handleCooldown(-1);
-    } catch {
+    } catch (err) {
       // Errors from getSSEGraphResult are already surfaced via toast
+      const parsed = parseSyntaxError((err as Error).message || "");
+      if (parsed) setSyntaxError(parsed);
     } finally {
       setIsQueryLoading(false);
     }
@@ -771,7 +780,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     return () => {
       if (rafId !== undefined) cancelAnimationFrame(rafId);
     };
-  }, [pathname]);
+  }, [pathname, panelRef.current]);
 
   const checkStatus = useCallback(() => {
     securedFetch("/api/status", {
@@ -933,6 +942,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                 <IndicatorContext.Provider value={indicatorContext}>
                   <PanelContext.Provider value={panelContext}>
                     <QueryLoadingContext.Provider value={queryLoadingContext}>
+                      <SyntaxErrorContext.Provider value={syntaxErrorContext}>
                       <ForceGraphContext.Provider value={forceGraphContext}>
                         <TableViewContext.Provider value={tableViewContext}>
                           <ConnectionContext.Provider value={connectionContext}>
@@ -1005,6 +1015,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                           </ConnectionContext.Provider>
                         </TableViewContext.Provider>
                       </ForceGraphContext.Provider>
+                      </SyntaxErrorContext.Provider>
                     </QueryLoadingContext.Provider>
                   </PanelContext.Provider>
                 </IndicatorContext.Provider>

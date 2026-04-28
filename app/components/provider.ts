@@ -1,5 +1,5 @@
 import { createContext, Dispatch, SetStateAction } from "react";
-import { ConnectionInfo, ConnectionType, GraphData, GraphRef, HistoryQuery, Label, Panel, Relationship, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
+import { ConnectionInfo, ConnectionType, GraphData, GraphRef, HistoryQuery, Label, Panel, Relationship, SyntaxErrorInfo, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
 import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
 import { Graph, GraphInfo } from "../api/graph/model";
 
@@ -441,3 +441,13 @@ export const UDFContext = createContext<UDFContextType>({
   selectedUdf: undefined,
   setSelectedUdf: () => { },
 }); 
+
+type SyntaxErrorContextType = {
+  syntaxError: SyntaxErrorInfo | null;
+  setSyntaxError: Dispatch<SetStateAction<SyntaxErrorInfo | null>>;
+};
+
+export const SyntaxErrorContext = createContext<SyntaxErrorContextType>({
+  syntaxError: null,
+  setSyntaxError: () => { },
+});
