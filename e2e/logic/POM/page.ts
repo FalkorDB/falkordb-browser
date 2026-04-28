@@ -456,6 +456,11 @@ export default class Page extends BasePage {
     await this.page.unroute(pattern);
   }
 
+  async isOfflineIndicatorVisible(): Promise<boolean> {
+    const indicator = this.page.locator('[role="status"][aria-label*="offline"]');
+    return waitForElementToBeVisible(indicator);
+  }
+
   async getLinksScreenPositions(windowKey: "graph" | "schema"): Promise<any[]> {
     // Wait for canvas to be ready and animations to settle
     await this.waitForCanvasAnimationToEnd();
