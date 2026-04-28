@@ -209,6 +209,12 @@ export type SyntaxErrorInfo = {
   column: number;
 };
 
+export type UserFriendlyMessage = {
+  title: string;
+  description: React.ReactNode;
+  syntaxError?: SyntaxErrorInfo;
+};
+
 export type ConnectionType = "Standalone" | "Cluster" | "Sentinel";
 
 export interface ClusterNodeInfo {
@@ -256,7 +262,13 @@ export async function getSSEGraphResult(
 
     evtSource.addEventListener("error", (event: MessageEvent) => {
       handled = true;
-      const { message, status, code } = JSON.parse(event.data);
+      const { message: rawMessage, status: rawStatus, code } = JSON.parse(event.data) as {
+        message?: unknown;
+        status?: unknown;
+        code?: string;
+      };
+      const message = normalizeErrorMessage(rawMessage) || "Request failed";
+      const status = typeof rawStatus === "number" ? rawStatus : 0;
 
       evtSource.close();
 
@@ -295,14 +307,14 @@ export async function getSSEGraphResult(
 // Uses [\s\S] for multiline tolerance and avoids strict end-of-string anchoring.
 export function parseSyntaxError(raw: string): SyntaxErrorInfo | null {
   const match = raw.match(
-    /errMsg:\s*([\s\S]+?)\s+line:\s*(\d+),\s*column:\s*(\d+),\s*offset:\s*\d+\s+errCtx:\s*([\s\S]+?)\s+errCtxOffset:\s*(\d+)/
+    /errMsg:\s*([\s\S]+?)\s+line:\s*(\d+),\s*column:\s*(\d+),\s*offset:\s*\d+\s+errCtx:\s?([\s\S]+?)\s+errCtxOffset:\s*(\d+)/
   );
   if (!match) return null;
   return {
     message: match[1].trim(),
-    line: Number(match[2]),
-    column: Number(match[3]),
-    context: match[4].trim(),
+    line: Math.max(1, Number(match[2])),
+    column: Math.max(1, Number(match[3])),
+    context: match[4],
     contextOffset: Number(match[5]),
   };
 }
@@ -321,11 +333,13 @@ export function formatSyntaxError(
   const errorChar = context[safeOffset] || "";
   const after = context.slice(safeOffset + 1);
 
-  // Extract the word containing the error character and enrich the message.
+  // Extract the token containing the error character and enrich the message.
   // e.g. "Invalid input 's': expected RETURN" → "Invalid input 's' in RETsURN: expected RETURN"
-  const wordStart = context.lastIndexOf(" ", safeOffset - 1) + 1;
-  const wordEndIdx = context.indexOf(" ", safeOffset);
-  const errorWord = context.slice(wordStart, wordEndIdx === -1 ? undefined : wordEndIdx);
+  let wordStart = safeOffset;
+  while (wordStart > 0 && !/\s/.test(context[wordStart - 1])) wordStart -= 1;
+  let wordEnd = safeOffset;
+  while (wordEnd < context.length && !/\s/.test(context[wordEnd])) wordEnd += 1;
+  const errorWord = context.slice(wordStart, wordEnd);
 
   // Insert "in <word>" after the quoted character, before the colon
   const enriched = errorWord.length > 1
@@ -346,18 +360,57 @@ export function formatSyntaxError(
   );
 }
 
+export function normalizeErrorMessage(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  if (raw instanceof Error) return raw.message;
+  if (raw == null) return "";
+
+  try {
+    return JSON.stringify(raw);
+  } catch {
+    return String(raw);
+  }
+}
+
+function extractResponseErrorMessage(bodyText: string): string {
+  if (!bodyText) return "";
+
+  try {
+    const parsed = JSON.parse(bodyText) as unknown;
+
+    if (typeof parsed === "string") return parsed;
+
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const body = parsed as Record<string, unknown>;
+      const message = normalizeErrorMessage(body.message || body.error || body.detail);
+
+      if (message) return message;
+
+      if (body.status === "offline") return "Database is offline.";
+    }
+  } catch {
+    // bodyText is already plain text
+  }
+
+  return bodyText;
+}
+
 // Maps raw server/Redis/FalkorDB error messages to user-friendly descriptions.
 // Syntax errors are parsed and displayed with the error position highlighted.
-export function toUserFriendlyMessage(raw: string, status: number): { title: string; description: React.ReactNode; syntaxError?: SyntaxErrorInfo } {
-  if (status >= 500) {
-    return { title: "Error", description: "Something went wrong on the server. Please try again later." };
+export function toUserFriendlyMessage(raw: unknown, status: number): UserFriendlyMessage {
+  const rawMessage = normalizeErrorMessage(raw).trim();
+  if (!rawMessage) {
+    if (status === 401) return { title: "Error", description: "Your session has expired. Please sign in again." };
+    if (status >= 500) return { title: "Error", description: "Something went wrong on the server. Please try again later." };
+    return { title: "Error", description: "An unexpected error occurred. Please try again." };
   }
 
-  if (status === 401) {
-    return { title: "Error", description: "Your session has expired. Please sign in again." };
+  const parsed = parseSyntaxError(rawMessage);
+  if (parsed) {
+    return { title: "Syntax Error", description: formatSyntaxError(parsed.message, parsed.context, parsed.contextOffset), syntaxError: parsed };
   }
 
-  const lower = raw.toLowerCase();
+  const lower = rawMessage.toLowerCase();
 
   if (lower.includes("connection refused") || lower.includes("econnrefused")) {
     return { title: "Error", description: "Unable to connect to the database. Please check your connection settings." };
@@ -383,19 +436,19 @@ export function toUserFriendlyMessage(raw: string, status: number): { title: str
     return { title: "Error", description: "This operation cannot be performed on a read-only replica." };
   }
 
-  // FalkorDB parser/syntax errors — highlight the error position
-  const parsed = parseSyntaxError(raw);
-  if (parsed) {
-    return { title: "Syntax Error", description: formatSyntaxError(parsed.message, parsed.context, parsed.contextOffset), syntaxError: parsed };
+  if (status === 401) {
+    return { title: "Error", description: "Your session has expired. Please sign in again." };
   }
 
-  // Pass through known user-readable query errors as-is
-  if (/unknown function|not defined|already exists|missing parameter|empty query|type mismatch|division by zero|invalid (entity|input) type/i.test(raw)) {
-    return { title: "Error", description: raw };
+  if (status >= 500) {
+    return { title: "Error", description: "Something went wrong on the server. Please try again later." };
   }
 
-  // Safe generic fallback for unrecognized messages
-  return { title: "Error", description: "An unexpected error occurred. Please try again." };
+  if (status > 0 && status < 500) {
+    return { title: "Error", description: rawMessage };
+  }
+
+  return { title: "Error", description: rawMessage || "An unexpected error occurred. Please try again." };
 }
 
 // Guards against triggering multiple concurrent signOut calls when many
@@ -429,13 +482,7 @@ export async function securedFetch(
   }
 
   if (status >= 300) {
-    let message = await response.text();
-
-    try {
-      message = JSON.parse(message).message;
-    } catch {
-      // message is already text
-    }
+    const message = extractResponseErrorMessage(await response.text());
 
     const friendly = toUserFriendlyMessage(message, status);
     toast({
