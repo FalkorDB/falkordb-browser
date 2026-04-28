@@ -25,7 +25,7 @@ export async function GET(
     }
 
     const { filename } = await params;
-    const upload = getStoredUpload(filename);
+    const upload = getStoredUpload(filename, session.user.id);
 
     if (!upload?.filePath) {
       return NextResponse.json({ message: "File not found." }, { status: 404, headers: corsHeaders });
@@ -64,7 +64,7 @@ export async function GET(
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Failed to download uploaded file." },
       { status: 500, headers: getCorsHeaders(request) }
     );
   }

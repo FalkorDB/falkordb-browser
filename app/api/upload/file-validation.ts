@@ -1,4 +1,5 @@
 import path from "path";
+import crypto from "crypto";
 
 export const MAX_FILE_SIZE = 5 * 1024 * 1024;
 export const MAX_MULTIPART_SIZE = MAX_FILE_SIZE + 1024 * 1024;
@@ -13,6 +14,11 @@ const UUID_FILE_NAME_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9
 
 function getUploadsDir() {
   return path.join(process.cwd(), "uploads");
+}
+
+function getUserUploadsDir(userId: string) {
+  const userDirectory = crypto.createHash("sha256").update(userId).digest("hex");
+  return path.join(getUploadsDir(), userDirectory);
 }
 
 async function readFilePrefix(file: File, length: number) {
@@ -123,8 +129,8 @@ export function getAllowedFileType(extension: string) {
   return ALLOWED_FILE_TYPES[extension];
 }
 
-export function getUploadFilePath(filename: string) {
-  const uploadsDir = getUploadsDir();
+export function getUploadFilePath(filename: string, userId: string) {
+  const uploadsDir = getUserUploadsDir(userId);
   const filePath = path.join(uploadsDir, filename);
   const relativePath = path.relative(uploadsDir, filePath);
 
@@ -135,7 +141,7 @@ export function getUploadFilePath(filename: string) {
   return filePath;
 }
 
-export function getStoredUpload(filename: string) {
+export function getStoredUpload(filename: string, userId: string) {
   if (!UUID_FILE_NAME_PATTERN.test(filename)) {
     return null;
   }
@@ -149,11 +155,11 @@ export function getStoredUpload(filename: string) {
 
   return {
     extension,
-    filePath: getUploadFilePath(filename),
+    filePath: getUploadFilePath(filename, userId),
     fileType,
   };
 }
 
-export function getUploadsDirectory() {
-  return getUploadsDir();
+export function getUploadsDirectory(userId: string) {
+  return getUserUploadsDir(userId);
 }

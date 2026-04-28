@@ -122,25 +122,31 @@ export async function POST(request: NextRequest) {
     }
 
     const filename = `${randomUUID()}${extension}`;
-    const uploadsDir = getUploadsDirectory();
-    const filePath = getUploadFilePath(filename);
+    const uploadsDir = getUploadsDirectory(session.user.id);
+    const filePath = getUploadFilePath(filename, session.user.id);
 
     if (!filePath) {
       return NextResponse.json({ error: "Invalid file name." }, { status: 400, headers: corsHeaders });
     }
 
     try {
+      const tempFilePath = `${filePath}.tmp`;
+
       await fs.promises.mkdir(uploadsDir, { recursive: true });
       await pipeline(
         Readable.fromWeb(file.stream() as NodeReadableStream<Uint8Array>),
-        fs.createWriteStream(filePath)
+        fs.createWriteStream(tempFilePath)
       );
+      await fs.promises.rename(tempFilePath, filePath);
       return NextResponse.json({ id: filename, path: `/api/upload/${filename}`, status: 200 }, { headers: corsHeaders });
     } catch (error) {
       console.error(error);
+      await fs.promises.unlink(`${filePath}.tmp`).catch((cleanupError) => {
+        console.warn("Failed to clean up partial upload:", cleanupError);
+      });
       return NextResponse.json(
-        { message: (error as Error).message },
-        { status: 400, headers: corsHeaders }
+        { message: "Failed to store uploaded file." },
+        { status: 500, headers: corsHeaders }
       );
     }
   } catch (err) {
