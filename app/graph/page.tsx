@@ -174,7 +174,7 @@ export default function Page() {
         }).catch((error) => {
             toast({
                 title: "Error",
-                description: error.message || "Failed to fetch graph info",
+                description: (error as Error).message || "Failed to fetch graph info",
                 variant: "destructive",
             });
         });

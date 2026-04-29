@@ -6,13 +6,13 @@
 
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { MutableRefObject } from "react";
+import React, { RefObject } from "react";
 import type { FalkorDBCanvas } from "@falkordb/canvas";
 import { signOut } from "next-auth/react";
 
 export type ToastArguments = {
   title: string;
-  description: string;
+  description: React.ReactNode;
   variant: "destructive" | "default";
 };
 
@@ -146,7 +146,7 @@ export interface Relationship extends Omit<InfoRelationship, "count"> {
   textDescent?: number;
 }
 
-export type GraphRef = MutableRefObject<FalkorDBCanvas | null>;
+export type GraphRef = RefObject<FalkorDBCanvas | null>;
 
 export type Panel = "data" | "add" | undefined;
 
@@ -201,6 +201,20 @@ export type UDFEntry = [string, string, string, string[]];
 // [...UDFEntry, library_code, code]
 export type UDFEntryWithCode = [...UDFEntry, string, string];
 
+export type SyntaxErrorInfo = {
+  message: string;
+  context: string;
+  contextOffset: number;
+  line: number;
+  column: number;
+};
+
+export type UserFriendlyMessage = {
+  title: string;
+  description: React.ReactNode;
+  syntaxError?: SyntaxErrorInfo;
+};
+
 export type ConnectionType = "Standalone" | "Cluster" | "Sentinel";
 
 export interface ClusterNodeInfo {
@@ -248,7 +262,26 @@ export async function getSSEGraphResult(
 
     evtSource.addEventListener("error", (event: MessageEvent) => {
       handled = true;
-      const { message, status, code } = JSON.parse(event.data);
+      let rawMessage: unknown = "Request failed";
+      let rawStatus: unknown = 0;
+      let code: string | undefined;
+
+      try {
+        const payload = JSON.parse(event.data) as {
+          message?: unknown;
+          status?: unknown;
+          code?: string;
+        };
+        rawMessage = payload.message;
+        rawStatus = payload.status;
+        code = payload.code;
+      } catch (error) {
+        console.error("Failed to parse SSE error event:", error);
+      }
+
+      const message = normalizeErrorMessage(rawMessage) || "Request failed";
+      const parsedStatus = Number(rawStatus);
+      const status = Number.isFinite(parsedStatus) ? parsedStatus : 0;
 
       evtSource.close();
 
@@ -259,7 +292,8 @@ export async function getSSEGraphResult(
         return;
       }
 
-      toast({ title: "Error", description: message, variant: "destructive" });
+      const friendly = toUserFriendlyMessage(message, status);
+      toast({ title: friendly.title, description: friendly.description, variant: "destructive" });
 
       if (status === 401 || status >= 500) setIndicator("offline");
 
@@ -279,6 +313,188 @@ export async function getSSEGraphResult(
       reject(new Error("Network or server error"));
     };
   });
+}
+
+// Parses FalkorDB parser error format:
+// "errMsg: <message> line: <N>, column: <N>, offset: <N> errCtx: <snippet> errCtxOffset: <N>"
+// Uses [\s\S] for multiline tolerance and avoids strict end-of-string anchoring.
+export function parseSyntaxError(raw: string): SyntaxErrorInfo | null {
+  const match = raw.match(
+    /errMsg:\s*([\s\S]+?)\s+line:\s*(\d+),\s*column:\s*(\d+),\s*offset:\s*\d+\s+errCtx:\s?([\s\S]+?)\s+errCtxOffset:\s*(\d+)/
+  );
+  if (!match) return null;
+  return {
+    message: match[1].trim(),
+    line: Math.max(1, Number(match[2])),
+    column: Math.max(1, Number(match[3])),
+    context: match[4],
+    contextOffset: Number(match[5]),
+  };
+}
+
+// Builds a React element that highlights the error position in the query snippet.
+// Clamps contextOffset to valid range to prevent blank/incorrect highlights.
+export function formatSyntaxError(
+  message: string,
+  context: string,
+  contextOffset: number
+): React.ReactNode {
+  const safeOffset = context.length > 0
+    ? Math.max(0, Math.min(contextOffset, context.length - 1))
+    : 0;
+  const before = context.slice(0, safeOffset);
+  const errorChar = context[safeOffset] || "";
+  const after = context.slice(safeOffset + 1);
+
+  // Extract the token containing the error character and enrich the message.
+  // e.g. "Invalid input 's': expected RETURN" → "Invalid input 's' in RETsURN: expected RETURN"
+  let wordStart = safeOffset;
+  while (wordStart > 0 && !/\s/.test(context[wordStart - 1])) wordStart -= 1;
+  let wordEnd = safeOffset;
+  while (wordEnd < context.length && !/\s/.test(context[wordEnd])) wordEnd += 1;
+  const errorWord = context.slice(wordStart, wordEnd);
+
+  // Insert "in <word>" after the quoted character, before the colon
+  const enriched = errorWord.length > 1
+    ? message.replace(/^(Invalid input '[^']*')(:)/, `$1 in ${errorWord}$2`)
+    : message;
+
+  return React.createElement("div", { className: "flex flex-col gap-1" },
+    React.createElement("span", null, enriched),
+    React.createElement("code", {
+      className: "mt-1 block rounded px-2 py-1 text-xs font-mono whitespace-pre-wrap break-words"
+    },
+      before,
+      React.createElement("span", {
+        className: "font-bold text-xl underline mx-1"
+      }, errorChar || " "),
+      after
+    )
+  );
+}
+
+export function normalizeErrorMessage(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  if (raw instanceof Error) return raw.message;
+  if (raw == null) return "";
+
+  try {
+    return JSON.stringify(raw);
+  } catch {
+    return String(raw);
+  }
+}
+
+function extractResponseErrorMessage(bodyText: string): string {
+  if (!bodyText) return "";
+
+  try {
+    const parsed = JSON.parse(bodyText) as unknown;
+
+    if (typeof parsed === "string") return parsed;
+
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const body = parsed as Record<string, unknown>;
+      const message = normalizeErrorMessage(body.message || body.error || body.detail);
+
+      if (message) return message;
+
+      if (body.status === "offline") return "Database is offline.";
+    }
+  } catch {
+    // bodyText is already plain text
+  }
+
+  return bodyText;
+}
+
+const USER_READABLE_ERROR_PATTERNS = [
+  /\bunknown function\b/i,
+  /\bnot defined\b/i,
+  /\balready exists\b/i,
+  /\bmissing parameter\b/i,
+  /\bempty query\b/i,
+  /\btype mismatch\b/i,
+  /\bdivision by zero\b/i,
+  /\binvalid (?:cypher only|entity|graph name|host|input|json|messages|model|password|port|replace|role|type|url|username|value)\b/i,
+  /\b(?:api key|attribute name|attribute value|code|graph name|key|label|messages|model|name|password|role|source name|type|username|value) (?:is required|cannot be empty)\b/i,
+  /\bselected nodes are required\b/i,
+  /^validation failed$/i,
+  /^database is offline\.$/i,
+  /^graph not found\b/i,
+  /^your graph is empty\b/i,
+  /^model\/api key mismatch\b/i,
+  /^model ".+" not found\b/i,
+  /^ollama model ".+" not found\b/i,
+  /^invalid .*api key\b/i,
+  /^api key error\b/i,
+  /^cannot connect to ollama\b/i,
+  /^network error\b/i,
+  /^request timed out\b/i,
+  /^could not generate\b/i,
+  /^unable to generate\b/i,
+  /^no messages provided$/i,
+  /^no user messages found$/i,
+];
+
+function isAllowlistedUserError(message: string): boolean {
+  return USER_READABLE_ERROR_PATTERNS.some(pattern => pattern.test(message));
+}
+
+// Maps raw server/Redis/FalkorDB error messages to user-friendly descriptions.
+// Syntax errors are parsed and displayed with the error position highlighted.
+export function toUserFriendlyMessage(raw: unknown, status: number): UserFriendlyMessage {
+  const rawMessage = normalizeErrorMessage(raw).trim();
+  if (!rawMessage) {
+    if (status === 401) return { title: "Error", description: "Your session has expired. Please sign in again." };
+    if (status >= 500) return { title: "Error", description: "Something went wrong on the server. Please try again later." };
+    return { title: "Error", description: "An unexpected error occurred. Please try again." };
+  }
+
+  const parsed = parseSyntaxError(rawMessage);
+  if (parsed) {
+    return { title: "Syntax Error", description: formatSyntaxError(parsed.message, parsed.context, parsed.contextOffset), syntaxError: parsed };
+  }
+
+  const lower = rawMessage.toLowerCase();
+
+  if (lower.includes("connection refused") || lower.includes("econnrefused")) {
+    return { title: "Error", description: "Unable to connect to the database. Please check your connection settings." };
+  }
+
+  if (lower.includes("noauth") || lower.includes("wrongpass")) {
+    return { title: "Error", description: "Database authentication failed. Please check your credentials." };
+  }
+
+  if (lower.includes("loading") && lower.includes("dataset")) {
+    return { title: "Error", description: "The database is still loading. Please wait a moment and try again." };
+  }
+
+  if (lower.includes("oom") || lower.includes("out of memory")) {
+    return { title: "Error", description: "The server is running low on memory. Please try again later." };
+  }
+
+  if (lower.includes("timeout") || lower.includes("timed out")) {
+    return { title: "Error", description: "The request timed out. Please try a simpler query or try again later." };
+  }
+
+  if (lower.includes("readonly") && lower.includes("replica")) {
+    return { title: "Error", description: "This operation cannot be performed on a read-only replica." };
+  }
+
+  if (status === 401) {
+    return { title: "Error", description: "Your session has expired. Please sign in again." };
+  }
+
+  if (status >= 500) {
+    return { title: "Error", description: "Something went wrong on the server. Please try again later." };
+  }
+
+  if (isAllowlistedUserError(rawMessage)) {
+    return { title: "Error", description: rawMessage };
+  }
+
+  return { title: "Error", description: "An unexpected error occurred. Please try again." };
 }
 
 // Guards against triggering multiple concurrent signOut calls when many
@@ -312,17 +528,12 @@ export async function securedFetch(
   }
 
   if (status >= 300) {
-    let message = await response.text();
+    const message = extractResponseErrorMessage(await response.text());
 
-    try {
-      message = JSON.parse(message).message;
-    } catch {
-      // message is already text
-    }
-
+    const friendly = toUserFriendlyMessage(message, status);
     toast({
-      title: "Error",
-      description: message,
+      title: friendly.title,
+      description: friendly.description,
       variant: "destructive",
     });
 

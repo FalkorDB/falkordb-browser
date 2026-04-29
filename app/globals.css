@@ -189,3 +189,8 @@ input[type="color"]::-webkit-color-swatch {
     z-index: 40 !important;
 }
 
+.syntax-error-highlight {
+    background-color: rgba(255, 0, 0, 0.25);
+    border-bottom: 2px wavy red;
+}
+

@@ -432,9 +432,26 @@ export default class Page extends BasePage {
   }
 
   async getNotificationErrorToast(): Promise<boolean> {
-    await this.page.waitForTimeout(1000);
     const isVisible = await this.isVisibleErrorToast();
     return isVisible;
+  }
+
+  async getErrorToastText(): Promise<string> {
+    const isVisible = await this.isVisibleErrorToast();
+    if (!isVisible) return "";
+    return (await this.errorToast.textContent()) || "";
+  }
+
+  async getErrorToastTitle(): Promise<string> {
+    const isVisible = await this.isVisibleErrorToast();
+    if (!isVisible) return "";
+    const title = this.errorToast.getByTestId("toast-title");
+    return (await title.textContent()) || "";
+  }
+
+  async isOfflineIndicatorVisible(): Promise<boolean> {
+    const indicator = this.page.locator('[role="status"][aria-label*="offline"]');
+    return waitForElementToBeVisible(indicator);
   }
 
   async getLinksScreenPositions(windowKey: "graph" | "schema"): Promise<any[]> {
