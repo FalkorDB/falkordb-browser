@@ -446,15 +446,18 @@ test.describe("Customize Style Tests", () => {
     // Close the data panel to refresh the canvas view
     await dataGraph.closeDataPanel();
 
-    // Get updated canvas nodes and verify the color changed
-    nodes = await dataGraph.getNodesScreenPositions("graph");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const updatedNode = nodes.find((n: any) => n.labels?.includes(newLabel));
-    expect(updatedNode).toBeTruthy();
+    // Wait for the graph data model to reflect the label change.
+    // We cannot use getNodesScreenPositions() here because canvas v0.0.49
+    // does not update data-engine-status to "stopped" after re-renders
+    // triggered by label edits when autoStopOnSettle is false.
+    const result = await dataGraph.waitForGraphNodeUpdate("graph", {
+      label: newLabel,
+      notColor: initialNodeColor,
+      nodeId: String(targetNode.id),
+    });
 
-    // CRITICAL: Verify that the node color on canvas changed from person1 to the new label
-    const updatedNodeColor = updatedNode.color;
-    expect(updatedNodeColor).not.toBe(initialNodeColor);
+    expect(result).toBeTruthy();
+    expect(result!.color).not.toBe(initialNodeColor);
 
     await apiCall.removeGraph(graphName);
   });
