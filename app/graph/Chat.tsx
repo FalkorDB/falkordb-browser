@@ -1,7 +1,8 @@
 /* eslint-disable no-case-declarations */
 /* eslint-disable react/no-array-index-key */
 import { cn, getTheme, Message, toUserFriendlyMessage } from "@/lib/utils";
-import { useContext, useEffect, useRef, useState, useCallback } from "react";
+import { useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
+import MarkdownIt from "markdown-it";
 import { useTheme } from "next-themes";
 import Image from "next/image";
 import { ChevronDown, ChevronRight, Share2, Copy, Loader2, Play, Search, X, Send, Sparkles } from "lucide-react";
@@ -386,6 +387,12 @@ export default function Chat({ onClose }: Props) {
         }
     };
 
+    const md = useMemo(() => new MarkdownIt({
+        html: false,
+        linkify: true,
+        breaks: true,
+    }), []);
+
     const getMessage = (message: Message, index?: number) => {
         switch (message.type) {
             case "Status":
@@ -467,7 +474,12 @@ export default function Chat({ onClose }: Props) {
                 );
             default:
                 return (
-                    <p className="text-sm text-wrap whitespace-pre-wrap">{message.content}</p>
+                    <div
+                        data-testid="chatMessageMarkdown"
+                        className="text-sm markdown-body"
+                        // eslint-disable-next-line react/no-danger
+                        dangerouslySetInnerHTML={{ __html: md.render(typeof message.content === "string" ? message.content : String(message.content ?? "")) }}
+                    />
                 );
         }
     };
