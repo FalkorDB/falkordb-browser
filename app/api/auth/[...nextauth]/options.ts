@@ -713,11 +713,14 @@ const authOptions: AuthOptions = {
           user: {
             ...session.user,
             id: token.id as string,
-            host: activeConn?.host ?? "localhost",
-            port: activeConn?.port ?? 6379,
-            username: activeConn?.username ?? "default",
-            tls: activeConn?.tls ?? false,
-            role: (activeConn?.role ?? "Read-Only") as Role,
+            // Prefer activeConn (new format), fall back to flat token fields
+            // (old format — getServerSession does NOT run the jwt callback so
+            // the migration to `connections` array may not have happened yet).
+            host: activeConn?.host ?? (token.host as string | undefined) ?? "localhost",
+            port: activeConn?.port ?? (typeof token.port === "string" ? parseInt(token.port, 10) : (token.port as number | undefined)) ?? 6379,
+            username: activeConn?.username ?? (token.username as string | undefined) ?? "default",
+            tls: activeConn?.tls ?? (token.tls as boolean | undefined) ?? false,
+            role: (activeConn?.role ?? (token.role as string | undefined) ?? "Read-Only") as Role,
           },
         };
       }
