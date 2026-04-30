@@ -805,6 +805,75 @@ export async function getClient(
   }
 
   if (!connId) {
+    // ── Legacy session fallback ──
+    // Old sessions (before multi-connection) stored the FalkorDB client
+    // keyed by session ID and credentials via `credentialRef` in the JWT.
+    // Try to reuse the old-style connection so users don't get kicked out.
+    try {
+      const jwt = await getToken({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        req: request as any,
+        secret: process.env.NEXTAUTH_SECRET,
+      });
+      const credentialRef = jwt?.credentialRef as string | undefined;
+      if (credentialRef) {
+        let password: string;
+        try {
+          password = await getPasswordFromTokenDB(credentialRef);
+        } catch {
+          return NextResponse.json(
+            { message: "Session credential could not be resolved; please sign in again.", code: "SESSION_INVALID" },
+            { status: 401, headers: { ...getCorsHeaders(request), "X-Session-Invalid": "1" } }
+          );
+        }
+
+        // Check for a live connection stored under the old key (session ID)
+        let client = connections.get(id);
+        if (client) {
+          try {
+            const conn = await client.connection;
+            await conn.ping();
+          } catch {
+            connections.delete(id);
+            try { await client.close(); } catch { /* ignore */ }
+            client = undefined;
+          }
+        }
+
+        if (!client) {
+          // Reconnect using session user credentials
+          const { user } = session;
+          const { client: reconnected } = await newClient(
+            {
+              host: user.host,
+              port: user.port.toString(),
+              username: user.username,
+              password,
+              tls: user.tls.toString(),
+            },
+            id
+          );
+          client = reconnected;
+        }
+
+        return {
+          client,
+          user: {
+            id,
+            username: session.user.username,
+            role: session.user.role,
+            host: session.user.host,
+            port: session.user.port,
+            tls: session.user.tls,
+            password,
+          },
+        };
+      }
+    } catch (legacyErr) {
+      // eslint-disable-next-line no-console
+      console.warn("Legacy session fallback failed:", legacyErr);
+    }
+
     return NextResponse.json(
       { message: "No active connection. Please sign in again.", code: "SESSION_INVALID" },
       {
