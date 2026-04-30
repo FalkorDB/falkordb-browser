@@ -238,7 +238,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const decorationsRef = useRef<monaco.editor.IEditorDecorationsCollection | null>(null);
 
     const [lineNumber, setLineNumber] = useState(1);
-    const [blur, setBlur] = useState(true);
+    const [blur, setBlur] = useState(false);
     const [editorMountVersion, setEditorMountVersion] = useState(0);
 
     const editorHeight = useMemo(() => blur

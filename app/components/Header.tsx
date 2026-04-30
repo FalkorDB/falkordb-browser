@@ -125,7 +125,7 @@ export default function Header() {
             </div>
             <div className="flex gap-1 items-center">
                 <span className="font-bold">User:</span>
-                <h2>{session?.user?.name || "default"}</h2>
+                <h2>{session?.user?.username || session?.user?.name || "default"}</h2>
             </div>
             {
                 session?.user &&
