@@ -92,6 +92,13 @@ export interface ITokenStorage {
   getEncryptedPassword(tokenId: string): Promise<string | null>;
 
   /**
+   * Fetch all tokens belonging to a specific user/session, optionally
+   * filtered by kind. Used to list additional connections stored against
+   * a session.
+   */
+  fetchTokensByUserId(userId: string, kind?: TokenKind): Promise<TokenData[]>;
+
+  /**
    * Clean up expired tokens (optional, for maintenance)
    */
   cleanupExpiredTokens?(): Promise<number>;

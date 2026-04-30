@@ -5,7 +5,7 @@ import {
   deleteSchemaElement,
   validateBody,
 } from "@/app/api/validate-body";
-import { getCorsHeaders } from "@/app/api/utils";
+import { getCorsHeaders, resolveReadOnly } from "@/app/api/utils";
 import { formatAttributes } from "./utils";
 
 export async function OPTIONS(request: NextRequest) {
@@ -23,11 +23,11 @@ export async function GET(
       return session;
     }
 
-    const { client } = session;
+    const { client, user } = session;
     const { schema: schemaName, element } = await params;
     const schemaId = `${schemaName}_schema`;
     const elementId = Number(element);
-    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       const schema = client.selectGraph(schemaId);
@@ -70,7 +70,7 @@ export async function POST(
       return session;
     }
 
-    const { client } = session;
+    const { client, user } = session;
     const { schema } = await params;
     const schemaName = `${schema}_schema`;
     const body = await request.json();
@@ -82,7 +82,7 @@ export async function POST(
     }
 
     const { type, label, attributes, selectedNodes } = validation.data;
-    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       if (!type) {
@@ -155,7 +155,7 @@ export async function DELETE(
       return session;
     }
 
-    const { client } = session;
+    const { client, user } = session;
     const { schema, element } = await params;
     const schemaName = `${schema}_schema`;
     const elementId = Number(element);
@@ -168,7 +168,7 @@ export async function DELETE(
     }
 
     const { type } = validation.data;
-    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       const graph = client.selectGraph(schemaName);

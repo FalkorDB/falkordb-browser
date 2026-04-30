@@ -182,6 +182,15 @@ class FileTokenStorage implements ITokenStorage {
     return token.encrypted_password || null;
   }
 
+  async fetchTokensByUserId(userId: string, kind?: import('./ITokenStorage').TokenKind): Promise<TokenData[]> {
+    const tokens = await this.readTokens();
+    const now = Math.floor(Date.now() / 1000);
+    return tokens
+      .filter(t => t.user_id === userId && t.is_active && (t.expires_at === -1 || t.expires_at > now))
+      .filter(t => !kind || (t.kind ?? 'pat') === kind)
+      .sort((a, b) => b.created_at - a.created_at);
+  }
+
   async cleanupExpiredTokens(): Promise<number> {
     const tokens = await this.readTokens();
     const now = Math.floor(Date.now() / 1000);

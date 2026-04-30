@@ -252,7 +252,14 @@ export async function getSSEGraphResult(
   return new Promise((resolve, reject) => {
     let handled = false;
 
-    const evtSource = new EventSource(url);
+    // Inject connectionId as a query param for SSE (EventSource doesn't support headers)
+    let effectiveUrl = url;
+    if (_activeConnectionId) {
+      const sep = effectiveUrl.includes("?") ? "&" : "?";
+      effectiveUrl += `${sep}connectionId=${encodeURIComponent(_activeConnectionId)}`;
+    }
+
+    const evtSource = new EventSource(effectiveUrl);
     evtSource.addEventListener("result", (event: MessageEvent) => {
       const result = JSON.parse(event.data);
       evtSource.close();
@@ -509,13 +516,37 @@ function triggerSessionInvalidationSignOut(): void {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Active connection ID for multi-connection support.
+// When set, securedFetch automatically injects an X-Connection-Id header so
+// the backend routes requests to the correct FalkorDB client.
+// ---------------------------------------------------------------------------
+let _activeConnectionId: string | null = null;
+
+export function setActiveConnectionIdGlobal(id: string | null) {
+  _activeConnectionId = id;
+}
+
+export function getActiveConnectionIdGlobal(): string | null {
+  return _activeConnectionId;
+}
+
 export async function securedFetch(
   input: string,
   init: RequestInit,
   toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void
 ): Promise<Response> {
-  const response = await fetch(input, init);
+  // Inject X-Connection-Id header when an additional connection is active
+  const effectiveInit = { ...init };
+  if (_activeConnectionId) {
+    effectiveInit.headers = {
+      ...effectiveInit.headers,
+      "X-Connection-Id": _activeConnectionId,
+    };
+  }
+
+  const response = await fetch(input, effectiveInit);
   const { status } = response;
 
   // The server signals "your session is orphaned, sign out now" via this

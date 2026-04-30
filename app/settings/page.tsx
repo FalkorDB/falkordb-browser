@@ -12,20 +12,20 @@ import Configurations from "./Configurations";
 import Button from "../components/ui/Button";
 import BrowserSettings from "./browserSettings";
 import PersonalAccessTokens from "./tokens/PersonalAccessTokens";
-import { IndicatorContext, BrowserSettingsContext } from "../components/provider";
+import { IndicatorContext, BrowserSettingsContext, ConnectionContext } from "../components/provider";
 
 type Tab = 'Browser' | 'Configurations' | 'Users' | 'Tokens';
 
 export default function Settings() {
 
     const { hasChanges, saveSettings, resetSettings } = useContext(BrowserSettingsContext);
+    const { activeConnectionId } = useContext(ConnectionContext);
     const { indicator } = useContext(IndicatorContext);
     const { data: session } = useSession();
     const { toast } = useToast();
     const router = useRouter();
 
     const [current, setCurrent] = useState<Tab>('Browser');
-
 
     const navigateBack = useCallback((e: KeyboardEvent) => {
         if (e.key === "Escape" && current !== "Browser") {
@@ -43,6 +43,11 @@ export default function Settings() {
         };
     }, [navigateBack]);
 
+    useEffect(() => {
+        if (current === "Users" ) {
+            setCurrent("Browser");
+        }
+    }, [activeConnectionId]);
     const handleSetCurrent = useCallback((tab: Tab) => {
         if (current === "Browser" && hasChanges) {
             getQuerySettingsNavigationToast(toast, () => {

@@ -1,6 +1,6 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
-import { getCorsHeaders } from "../../../utils";
+import { getCorsHeaders, resolveReadOnly } from "../../../utils";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
@@ -14,7 +14,7 @@ export async function GET(
       return session;
     }
 
-    const { client } = session;
+    const { client, user } = session;
     const { graph: graphId } = await params;
     const type = request.nextUrl.searchParams.get("type") as
       | "(function)"
@@ -22,7 +22,7 @@ export async function GET(
       | "(label)"
       | "(relationship type)"
       | undefined;
-    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       const getQuery = () => {

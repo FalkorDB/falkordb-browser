@@ -52,6 +52,8 @@ export default function Page() {
     const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext);
     const { setData, canvasRef } = useContext(ForceGraphContext);
     const { isReadOnly } = useContext(ConnectionContext);
+    const isReadOnlyRef = useRef(isReadOnly);
+    isReadOnlyRef.current = isReadOnly;
     const {
         graph,
         setGraph,
@@ -143,7 +145,7 @@ export default function Page() {
     const fetchInfo = useCallback(async (type: string) => {
         if (!graphName) return [];
 
-        const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
+        const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
         const result = await securedFetch(`/api/graph/${graphName}/info?type=${type}${readOnlyParam}`, {
             method: "GET",
         }, toast, setIndicator);
@@ -155,7 +157,7 @@ export default function Page() {
         return json.result.data.map(({ info }: { info: string }) => info);
     }, [graphName, setIndicator, toast]);
 
-    const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator, isReadOnly), [setIndicator, toast, isReadOnly]);
+    const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator, isReadOnlyRef.current), [setIndicator, toast]);
 
     useEffect(() => {
         if (!graphName) return undefined;
@@ -164,7 +166,7 @@ export default function Page() {
             fetchMetaStats(graphName),
             fetchInfo("(property key)"),
         ]).then(async ([newDataStats, newPropertyKeys]) => {
-            const memoryUsage = showMemoryUsage ? await getMemoryUsage(graphName, toast, setIndicator) : new Map<string, MemoryValue>();
+            const memoryUsage = showMemoryUsage && !isReadOnlyRef.current ? await getMemoryUsage(graphName, toast, setIndicator) : new Map<string, MemoryValue>();
             const newLabels = newDataStats?.[0] || [];
             const newRelationships = newDataStats?.[1] || [];
 
@@ -179,14 +181,19 @@ export default function Page() {
             });
         });
 
-        handleSetInfo();
+        // When runDefaultQuery is enabled, the graph setup effect will call
+        // runQuery which already fetches info/stats internally — skip the
+        // immediate call here to avoid duplicates.
+        if (!runDefaultQuery) {
+            handleSetInfo();
+        }
 
         const interval = setInterval(handleSetInfo, refreshInterval * 1000);
 
         return () => {
             clearInterval(interval);
         };
-    }, [fetchCount, fetchInfo, fetchMetaStats, graphName, refreshInterval, setGraphInfo, setIndicator, showMemoryUsage, toast]);
+    }, [fetchCount, fetchInfo, fetchMetaStats, graphName, refreshInterval, runDefaultQuery, setGraphInfo, setIndicator, showMemoryUsage, toast]);
 
     useEffect(() => {
         if (graphName) return;
@@ -259,7 +266,7 @@ export default function Page() {
 
     const handleCreateElement = useCallback(async (attributes: [string, Value][], label: string[]) => {
         const fakeId = "-1";
-        const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
+        const readOnlyParam = isReadOnlyRef.current ? '?readOnly=true' : '';
         const result = await securedFetch(`api/graph/${prepareArg(graphName)}/${fakeId}${readOnlyParam}`, {
             method: "POST",
             body: JSON.stringify({
@@ -302,7 +309,7 @@ export default function Page() {
     const handleDeleteElement = useCallback(async () => {
         const deletedElements = (await Promise.all(selectedElements.map(async (element) => {
             const type = !('source' in element);
-            const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
+            const readOnlyParam = isReadOnlyRef.current ? '?readOnly=true' : '';
             const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${prepareArg(element.id.toString())}${readOnlyParam}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type })

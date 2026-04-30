@@ -7,6 +7,7 @@ import { useSession } from "next-auth/react";
 import { Copy, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { cn, securedFetch } from "@/lib/utils";
+import ConnectionManager from "./ConnectionManager";
 
 /**
  * Format version number to include dots (e.g., "11111" -> "1.11.11")
@@ -40,7 +41,7 @@ export default function Header() {
         setUsedMemory(null);
         (async () => {
             if (status !== "authenticated") return;
-            
+
             const result = await securedFetch("/api/info?section=memory", {
                 method: "GET"
             }, toast, setIndicator);
@@ -69,21 +70,18 @@ export default function Header() {
 
     return (
         <header className="flex gap-4 w-full border-b border-border/50 px-3 py-1.5 items-center text-sm">
-            <div className="flex gap-1 items-center">
-                <label className="font-bold">User:</label>
-                <h2>{session?.user.username || "Default"}</h2>
-            </div>
+            <ConnectionManager />
             {
                 formatVersion(dbVersion) &&
                 <div className="flex gap-1 items-center">
-                    <label className="font-bold">FalkorDB:</label>
+                    <span className="font-bold">FalkorDB:</span>
                     <h2>v{formatVersion(dbVersion)}</h2>
                 </div>
             }
             <div className="flex gap-1 items-center">
                 <Tooltip>
                     <TooltipTrigger>
-                        <label className="font-bold">Memory:</label>
+                        <span className="font-bold">Memory:</span>
                     </TooltipTrigger>
                     <TooltipContent>
                         <p>Used Memory</p>
@@ -124,6 +122,10 @@ export default function Header() {
                         </div>
                     </TooltipContent>
                 </Tooltip>
+            </div>
+            <div className="flex gap-1 items-center">
+                <span className="font-bold">User:</span>
+                <h2>{session?.user?.name || "default"}</h2>
             </div>
             {
                 session?.user &&

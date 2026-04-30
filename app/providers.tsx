@@ -4,7 +4,7 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue, SyntaxErrorInfo, parseSyntaxError } from "@/lib/utils";
+import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, setActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue, SyntaxErrorInfo, parseSyntaxError } from "@/lib/utils";
 import { encryptValue, decryptValue, isCryptoAvailable, isEncrypted } from "@/lib/encryption";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import { usePathname, useRouter } from "next/navigation";
@@ -15,7 +15,7 @@ import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphInfo } from "./api/graph/model";
 import Navbar from "./components/Navbar";
-import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, SyntaxErrorContext } from "./components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, SyntaxErrorContext, SessionConnection } from "./components/provider";
 import Tutorial from "./components/Tutorial";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import Header from "./components/Header";
@@ -58,7 +58,7 @@ const defaultQueryHistory: HistoryQuery = {
 function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { toast } = useToast();
-  const { status, data: sessionData } = useSession();
+  const { status, data: sessionData, update: updateSession } = useSession();
   const router = useRouter();
 
   // Set connection prefix for scoped localStorage
@@ -66,7 +66,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (status === "authenticated" && sessionData?.user) {
-      setConnectionPrefix(sessionData.user.host, sessionData.user.port);
+      setConnectionPrefix(sessionData.user.host, sessionData.user.port, sessionData.user.username);
       migrateToScopedStorage();
       setPrefixReady(true);
     } else {
@@ -131,6 +131,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [dbVersion, setDbVersion] = useState<string>("");
   const [connectionType, setConnectionType] = useState<ConnectionType>("Standalone");
   const [connectionInfo, setConnectionInfo] = useState<ConnectionInfo>({});
+  const [additionalConnections, setAdditionalConnections] = useState<SessionConnection[]>([]);
+  const [activeConnectionId, setActiveConnectionId] = useState<string | null>(null);
   const [captionsKeys, setCaptionsKeys] = useState<[string, boolean][]>([]);
   const [newCaptionsKeys, setNewCaptionsKeys] = useState<[string, boolean][]>([]);
   const [newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix] = useState<boolean>(false);
@@ -149,6 +151,9 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [maxItemsForSearch, setMaxItemsForSearch] = useState<number>(20);
   const [newMaxItemsForSearch, setNewMaxItemsForSearch] = useState<number>(20);
   const [expandFilter, setExpandFilter] = useState(true);
+  const sessionSyncedRef = useRef(false);
+  const prevActiveConnectionIdRef = useRef<string | null>(null);
+  const connectionSwitchFetchedRef = useRef(false);
   const showNavbarAndHeader = pathname !== "/" && pathname !== "/login";
 
   const replayTutorial = useCallback(() => {
@@ -361,6 +366,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     sessionData?.user?.role === "Read-Only" || connectionInfo.sentinelRole === "slave",
     [sessionData?.user?.role, connectionInfo.sentinelRole]
   );
+  // Ref that always holds the latest isReadOnly value.
+  // Callbacks read from the ref so they don't need isReadOnly in their
+  // dependency arrays, which avoids cascading effect re-fires.
+  const isReadOnlyRef = useRef(isReadOnly);
+  isReadOnlyRef.current = isReadOnly;
 
   const connectionContext = useMemo(() => ({
     connectionType,
@@ -369,8 +379,13 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setConnectionInfo,
     dbVersion,
     setDbVersion,
-    isReadOnly
-  }), [connectionType, connectionInfo, dbVersion, isReadOnly]);
+    isReadOnly,
+    additionalConnections,
+    setAdditionalConnections,
+    activeConnectionId,
+    setActiveConnectionId,
+    updateSession,
+  }), [connectionType, connectionInfo, dbVersion, isReadOnly, additionalConnections, activeConnectionId, updateSession]);
 
   const udfContext = useMemo(() => ({
     udfList,
@@ -397,7 +412,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setNodesCount(undefined);
 
     try {
-      const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
+      const readOnlyParam = isReadOnlyRef.current ? '?readOnly=true' : '';
       const result = await getSSEGraphResult(`api/graph/${prepareArg(n)}/count${readOnlyParam}`, toast, setIndicator) as { nodes?: number; edges?: number };
 
       if (!result) return;
@@ -420,7 +435,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const fetchInfo = useCallback(async (type: string, name: string) => {
     if (!graphName) return [];
 
-    const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
+    const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
     const result = await securedFetch(`/api/graph/${name}/info?type=${type}${readOnlyParam}`, {
       method: "GET",
     }, toast, setIndicator);
@@ -430,10 +445,9 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     const json = await result.json();
 
     return json.result.data.map(({ info }: { info: string }) => info);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graphName]);
+  }, [graphName, toast, setIndicator]);
 
-  const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator, isReadOnly), [toast, setIndicator, isReadOnly]);
+  const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator, isReadOnlyRef.current), [toast, setIndicator]);
 
   const handelGetNewQueries = useCallback((newQuery: Query) => {
     const existing = historyQuery.queries.find(qu => qu.text === newQuery.text);
@@ -465,7 +479,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     }));
 
     const [query, existingLimit] = getQueryWithLimit(q, limit);
-    const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
+    const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
     const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}${readOnlyParam}`;
     try {
       const result = await getSSEGraphResult(url, toast, setIndicator) as { data: Data; metadata: string[] };
@@ -476,7 +490,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         fetchMetaStats(n),
         fetchInfo("(property key)", n),
       ]).then(async ([metaStats, newPropertyKeys]) => {
-        const memoryUsage = showMemoryUsage ? await getMemoryUsage(n, toast, setIndicator) : new Map<string, MemoryValue>();
+        const memoryUsage = showMemoryUsage && !isReadOnlyRef.current ? await getMemoryUsage(n, toast, setIndicator) : new Map<string, MemoryValue>();
         const newLabels = metaStats?.[0] || [];
         const newRelationships = metaStats?.[1] || [];
         const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
@@ -651,6 +665,50 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     })();
   }, [status, toast]);
 
+  // Fetch connections for this session and auto-select the active one
+  useEffect(() => {
+    if (status !== "authenticated") {
+      setAdditionalConnections([]);
+      setActiveConnectionId(null);
+      setActiveConnectionIdGlobal(null);
+      sessionSyncedRef.current = false;
+      return;
+    }
+
+    // Only fetch connections once per authentication cycle
+    if (sessionSyncedRef.current) return;
+    sessionSyncedRef.current = true;
+
+    (async () => {
+      try {
+        const result = await securedFetch("/api/connections", {
+          method: "GET",
+        }, toast, setIndicator);
+
+        if (!result.ok) return;
+
+        const json = await result.json();
+        if (json?.connections) {
+          const conns: SessionConnection[] = json.connections;
+          setAdditionalConnections(conns);
+
+          // Auto-select: restore the last active connection from localStorage,
+          // falling back to the most recently added connection (last in list).
+          if (conns.length > 0) {
+            const lastId = localStorage.getItem("lastActiveConnectionId");
+            const target = lastId && conns.find(c => c.id === lastId)
+              ? lastId
+              : conns[conns.length - 1].id;
+            setActiveConnectionId(target);
+            setActiveConnectionIdGlobal(target);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch connections:", err);
+      }
+    })();
+  }, [status, toast]);
+
   useEffect(() => {
     if (status !== "authenticated" || !prefixReady) return;
 
@@ -781,7 +839,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     return () => {
       if (rafId !== undefined) cancelAnimationFrame(rafId);
     };
-  }, [pathname]);
+  }, [pathname, panelRef.current]);
 
   const checkStatus = useCallback(() => {
     securedFetch("/api/status", {
@@ -817,13 +875,46 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     await Promise.all(([["Graph", setGraphNames, setGraphName],/* ["Schema", setSchemaNames, setSchemaName] */] as ["Graph" | "Schema", Dispatch<SetStateAction<string[]>>, Dispatch<SetStateAction<string>>][]).map(async ([type, setOptions, setName]) => {
       await fetchOptions(type, toast, setIndicator, indicator, setName, setOptions, contentPersistence);
     }));
-  }, [indicator, toast, contentPersistence]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toast, contentPersistence]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
-
+    // Skip if the reset effect already triggered a fetch for this switch
+    if (connectionSwitchFetchedRef.current) {
+      connectionSwitchFetchedRef.current = false;
+      return;
+    }
     handleFetchOptions();
   }, [handleFetchOptions, status]);
+
+  // Reset all graph state when the active connection changes (user switch)
+  useEffect(() => {
+    const prev = prevActiveConnectionIdRef.current;
+    prevActiveConnectionIdRef.current = activeConnectionId;
+
+    // Skip the very first selection (initial mount / login)
+    if (prev === null || activeConnectionId === null) return;
+    // Skip if unchanged
+    if (prev === activeConnectionId) return;
+
+    // Clear graph / schema data so stale results from the old connection are gone
+    setGraph(Graph.empty());
+    setGraphName("");
+    setGraphNames([]);
+    setSchema(Graph.empty());
+    setSchemaName("");
+    setSchemaNames([]);
+    setNodesCount(undefined);
+    setEdgesCount(undefined);
+    setHistoryQuery(h => ({ ...h, query: "", currentQuery: defaultQueryHistory.currentQuery }));
+    setLabels([]);
+    setRelationships([]);
+
+    // Re-fetch graph list for the new connection
+    connectionSwitchFetchedRef.current = true;
+    handleFetchOptions();
+  }, [activeConnectionId, handleFetchOptions]);
 
   const handleCloseTutorial = () => {
     setTutorialOpen(false);

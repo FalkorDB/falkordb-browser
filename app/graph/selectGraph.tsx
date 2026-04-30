@@ -76,11 +76,12 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const loadMemory = useCallback((opt: string) =>
         async () => {
+            if (isReadOnly) return '<1 MB';
             const memoryMap = await getMemoryUsage(opt, toast, setIndicator);
             const memoryValue = memoryMap.get("total_graph_sz_mb") || '<1';
 
             return `${memoryValue} MB`;
-        }, [toast, setIndicator]);
+        }, [toast, setIndicator, isReadOnly]);
 
     const loadNodesCount = useCallback((opt: string) =>
         async () => {
@@ -136,7 +137,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
                 const cells: Row["cells"] = [baseCell];
 
-                if (showMemoryUsage) {
+                if (showMemoryUsage && !isReadOnly) {
                     cells.push({ loadCell: loadMemory(opt), type: "readonly" });
                 }
 
@@ -164,7 +165,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
             const cells: Row["cells"] = [baseCell];
 
-            if (showMemoryUsage) {
+            if (showMemoryUsage && !isReadOnly) {
                 cells.push({ loadCell: loadMemory(opt), type: "readonly" });
             }
 
@@ -179,7 +180,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 cells
             };
         }));
-    }, [sessionRole, handleSetOption, loadMemory, loadNodesCount, loadEdgesCount, showMemoryUsage]);
+    }, [sessionRole, handleSetOption, loadMemory, loadNodesCount, loadEdgesCount, showMemoryUsage, isReadOnly]);
 
     useEffect(() => {
         if (!openMenage) {
@@ -282,7 +283,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     entityName={type}
                     headers={[
                         "Name",
-                        ...(showMemoryUsage ? [{name : "Memory Usage", width: "15%"}] : []),
+                        ...(showMemoryUsage && !isReadOnly ? [{name : "Memory Usage", width: "15%"}] : []),
                         { name: "Nodes #", width: "15%" },
                         { name: "Edges #", width: "15%" }
                     ]}

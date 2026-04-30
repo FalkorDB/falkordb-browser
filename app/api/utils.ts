@@ -1,9 +1,21 @@
 import type { Graph } from "falkordb";
+import type { NextRequest } from "next/server";
 
 export const runQuery = async (graph: Graph, query: string, isReadOnly: boolean) => {
     const result = isReadOnly ? await graph.roQuery(query) : await graph.query(query);
     return result;
 };
+
+/**
+ * Determine whether a request must use read-only queries.
+ * Returns true when the frontend sends `readOnly=true` OR
+ * when the authenticated user's role is "Read-Only".
+ * This prevents NOPERM errors caused by stale frontend state.
+ */
+export function resolveReadOnly(request: NextRequest, userRole?: string): boolean {
+    return request.nextUrl.searchParams.get("readOnly") === "true"
+        || userRole === "Read-Only";
+}
 
 /**
  * Build FalkorDB connection URL from user session

@@ -203,6 +203,15 @@ type TableViewContextType = {
   dataHash: string;
 };
 
+export interface SessionConnection {
+  id: string;
+  username?: string;
+  role: string;
+  host: string;
+  port: number;
+  tls: boolean;
+}
+
 type ConnectionContextType = {
   connectionType: ConnectionType;
   setConnectionType: Dispatch<SetStateAction<ConnectionType>>;
@@ -211,6 +220,11 @@ type ConnectionContextType = {
   dbVersion: string;
   setDbVersion: Dispatch<SetStateAction<string>>;
   isReadOnly: boolean;
+  additionalConnections: SessionConnection[];
+  setAdditionalConnections: Dispatch<SetStateAction<SessionConnection[]>>;
+  activeConnectionId: string | null;
+  setActiveConnectionId: Dispatch<SetStateAction<string | null>>;
+  updateSession: (data: { connections?: SessionConnection[]; activeConnectionId?: string | null }) => Promise<unknown>;
 };
 
 type UDFContextType = {
@@ -433,6 +447,11 @@ export const ConnectionContext = createContext<ConnectionContextType>({
   dbVersion: "",
   setDbVersion: () => { },
   isReadOnly: false,
+  additionalConnections: [],
+  setAdditionalConnections: () => { },
+  activeConnectionId: null,
+  setActiveConnectionId: () => { },
+  updateSession: async () => { },
 });
 
 export const UDFContext = createContext<UDFContextType>({
