@@ -215,6 +215,8 @@ export async function addSessionConnection(
     port: credentials.port ? parseInt(credentials.port, 10) : 6379,
     password: credentials.password || "",
     kind: "session",
+    tls: credentials.tls === "true",
+    ca: credentials.ca,
     expiresAtUnix: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS,
   });
 
@@ -244,7 +246,8 @@ export async function listSessionConnections(sessionId: string): Promise<Connect
       role: t.role as Role,
       host: t.host,
       port: t.port,
-      tls: false,
+      tls: t.tls ?? false,
+      ca: t.ca || undefined,
     }));
 }
 
@@ -312,6 +315,8 @@ async function getConnectionClient(
         port: tokenData.port.toString(),
         username: tokenData.username,
         password,
+        tls: (tokenData.tls ?? false).toString(),
+        ca: tokenData.ca || undefined,
       },
       key
     );
@@ -324,7 +329,8 @@ async function getConnectionClient(
         role: role as Role,
         host: tokenData.host,
         port: tokenData.port,
-        tls: false,
+        tls: tokenData.tls ?? false,
+        ca: tokenData.ca || undefined,
       },
     };
   }
@@ -342,7 +348,8 @@ async function getConnectionClient(
       role: tokenData.role as Role,
       host: tokenData.host,
       port: tokenData.port,
-      tls: false,
+      tls: tokenData.tls ?? false,
+      ca: tokenData.ca || undefined,
     },
   };
 }
@@ -618,6 +625,8 @@ const authOptions: AuthOptions = {
               port: credentials.port ? parseInt(credentials.port, 10) : 6379,
               password: credentials.password || "",
               kind: 'session',
+              tls: credentials.tls === "true",
+              ca: credentials.url ? undefined : credentials.ca,
               expiresAtUnix: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS,
             });
           } catch (storageError) {
@@ -727,6 +736,7 @@ const authOptions: AuthOptions = {
             port: connPort,
             password,
             kind: "session",
+            tls: connTls,
             expiresAtUnix: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS,
           });
 
@@ -954,6 +964,7 @@ export async function getClient(
           port: session.user.port || 6379,
           password: password || "",
           kind: "session",
+          tls: session.user.tls ?? false,
           expiresAtUnix: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS,
         });
       } catch (persistErr) {

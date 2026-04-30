@@ -28,6 +28,10 @@ export interface TokenData {
    * (treated as 'pat' by readers).
    */
   kind?: TokenKind;
+  /** Whether the connection uses TLS. Defaults to false for old rows. */
+  tls?: boolean;
+  /** Base64-encoded CA certificate for TLS connections. */
+  ca?: string;
 }
 
 /**
