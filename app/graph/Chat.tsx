@@ -3,6 +3,7 @@
 import { cn, getTheme, Message, toUserFriendlyMessage } from "@/lib/utils";
 import { useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import MarkdownIt from "markdown-it";
+import DOMPurify from "dompurify";
 import { useTheme } from "next-themes";
 import Image from "next/image";
 import { ChevronDown, ChevronRight, Share2, Copy, Loader2, Play, Search, X, Send, Sparkles } from "lucide-react";
@@ -473,12 +474,14 @@ export default function Chat({ onClose }: Props) {
                     </div>
                 );
             default:
+                const rawContent = typeof message.content === "string" ? message.content : String(message.content ?? "");
+                const sanitizedHtml = DOMPurify.sanitize(md.render(rawContent), { USE_PROFILES: { html: true } });
                 return (
                     <div
                         data-testid="chatMessageMarkdown"
                         className="text-sm markdown-body"
                         // eslint-disable-next-line react/no-danger
-                        dangerouslySetInnerHTML={{ __html: md.render(typeof message.content === "string" ? message.content : String(message.content ?? "")) }}
+                        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
                     />
                 );
         }
