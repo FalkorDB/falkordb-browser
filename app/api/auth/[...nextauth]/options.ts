@@ -317,13 +317,16 @@ async function getConnectionClient(
     }
 
     const { decrypt } = await import("../encryption");
-    const password = decrypt(tokenData.encrypted_password);
+    // Use `|| undefined` so an empty stored password (no-auth connections)
+    // connects anonymously instead of sending AUTH with an empty string,
+    // matching the behaviour of the original passwordless login.
+    const password = decrypt(tokenData.encrypted_password) || undefined;
 
     const { role, client: newConn } = await newClient(
       {
         host: tokenData.host,
         port: tokenData.port.toString(),
-        username: tokenData.username,
+        username: tokenData.username || undefined,
         password,
         tls: (tokenData.tls ?? false).toString(),
         ca: tokenData.ca || undefined,

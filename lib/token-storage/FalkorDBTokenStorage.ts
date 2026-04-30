@@ -98,7 +98,7 @@ class FalkorDBTokenStorage implements ITokenStorage {
 
   async fetchTokenById(tokenId: string): Promise<TokenData | null> {
     const query = `
-      MATCH (t:Token {token_id: '${this.escapeString(tokenId)}'})-[:BELONGS_TO]->(u:User)
+      MATCH (t:Token {token_id: '${this.escapeString(tokenId)}'})
       RETURN t.token_hash as token_hash,
              t.token_id as token_id,
              t.user_id as user_id,
