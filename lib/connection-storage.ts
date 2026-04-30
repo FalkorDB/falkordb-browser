@@ -12,15 +12,16 @@
 let _prefix = "";
 let _host = "";
 let _port = 0;
+let _migrated = new Set<string>();
 
 /**
  * Build and cache the prefix.
- * Call once when the session becomes available (host & port known).
+ * Call once when the session becomes available (host, port & username known).
  */
-export function setConnectionPrefix(host: string, port: number, username?: string): void {
+export function setConnectionPrefix(host: string, port: number, username: string): void {
   _host = host;
   _port = port;
-  _prefix = `${host}:${port}:${username || ""}:`;
+  _prefix = `${host}:${port}:${username}:`;
 }
 
 /**
@@ -28,6 +29,7 @@ export function setConnectionPrefix(host: string, port: number, username?: strin
  */
 export function clearConnectionPrefix(): void {
   _prefix = "";
+  _migrated.clear();
 }
 
 export function getConnectionPrefix(): string {
@@ -76,22 +78,24 @@ const SCOPED_KEY_PREFIXES = ["chat-", "cypherOnly-", "labelStyle_"];
 
 export function migrateToScopedStorage(): void {
   if (!isBrowser() || !_prefix) return;
+  // Only run migration once per prefix to avoid repeating work on every
+  // session update (e.g. switching active connection).
+  if (_migrated.has(_prefix)) return;
+  _migrated.add(_prefix);
 
-  // ── Phase 1: migrate old host:port: prefix → new host:port:username: prefix ──
-  // Users who upgraded before the username was added have keys like
-  // "localhost:6379:query history". These need to move to
-  // "localhost:6379:alice:query history" (or "localhost:6379::query history"
-  // when no username is set).
-  const oldPrefix = `${_host}:${_port}:`;
-  if (_prefix !== oldPrefix) {
-    // Collect keys to migrate first to avoid mutating localStorage during iteration
+  // ── Phase 1: migrate old host:port: prefix → current host:port:username: prefix ──
+  // Legacy format: "host:port:key"             (before username was added)
+  // Current format: "host:port:username:key"   (username is always "default" or a real name)
+  const legacyPrefix = `${_host}:${_port}:`;
+
+  if (legacyPrefix !== _prefix) {
     const toMigrate: [string, string][] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (!key || !key.startsWith(oldPrefix)) continue;
-      // Skip keys that already use the new prefix (it starts with oldPrefix too)
+      if (!key || !key.startsWith(legacyPrefix)) continue;
+      // Skip keys that already use the current prefix
       if (key.startsWith(_prefix)) continue;
-      const suffix = key.slice(oldPrefix.length);
+      const suffix = key.slice(legacyPrefix.length);
       // Only migrate keys we recognize (exact scoped keys or graph-prefixed keys)
       const isExactScopedKey = SCOPED_KEYS.includes(suffix);
       const isPrefixedKey = SCOPED_KEY_PREFIXES.some(p => suffix.startsWith(p));

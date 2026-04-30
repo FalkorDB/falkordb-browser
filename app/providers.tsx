@@ -66,7 +66,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (status === "authenticated" && sessionData?.user) {
-      setConnectionPrefix(sessionData.user.host, sessionData.user.port, sessionData.user.username);
+      setConnectionPrefix(sessionData.user.host, sessionData.user.port, sessionData.user.username || "default");
       migrateToScopedStorage();
       setPrefixReady(true);
     } else {

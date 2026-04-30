@@ -219,7 +219,7 @@ export async function addSessionConnection(
 
   return {
     id: connId,
-    username: credentials.username,
+    username: credentials.username || "default",
     role,
     host: credentials.host || "localhost",
     port: credentials.port ? parseInt(credentials.port, 10) : 6379,
@@ -633,7 +633,7 @@ const authOptions: AuthOptions = {
             url: credentials.url,
             host: credentials.host || "localhost",
             port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-            username: credentials.username,
+            username: credentials.username || "default",
             tls: credentials.tls === "true",
             ca: credentials.url ? undefined : credentials.ca,
             role,
@@ -653,7 +653,7 @@ const authOptions: AuthOptions = {
         // Build the initial connections array with the first connection
         const firstConnection = {
           id: user.connId!,
-          username: user.username,
+          username: user.username || "default",
           role: user.role,
           host: user.host,
           port: user.port,
@@ -666,6 +666,23 @@ const authOptions: AuthOptions = {
           connections: [firstConnection],
           activeConnectionId: user.connId!,
         };
+      }
+
+      // ── Migrate old flat-format JWT tokens to the new connections array ──
+      // Old tokens have host/port/username/role/tls directly on the token
+      // but no `connections` array. Convert them so the session callback
+      // and frontend always see the new format.
+      if (!token.connections && token.host) {
+        const legacyConnId = (token.credentialRef as string) || (token.id as string);
+        token.connections = [{
+          id: legacyConnId,
+          username: (token.username as string) || "default",
+          role: token.role as string,
+          host: token.host as string,
+          port: typeof token.port === "string" ? parseInt(token.port, 10) : token.port as number,
+          tls: token.tls as boolean,
+        }];
+        token.activeConnectionId = legacyConnId;
       }
 
       // Handle session.update() calls from the frontend
