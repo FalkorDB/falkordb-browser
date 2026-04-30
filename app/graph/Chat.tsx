@@ -475,7 +475,7 @@ export default function Chat({ onClose }: Props) {
                 );
             default:
                 const rawContent = typeof message.content === "string" ? message.content : String(message.content ?? "");
-                const sanitizedHtml = DOMPurify.sanitize(md.render(rawContent), { USE_PROFILES: { html: true } });
+                const sanitizedHtml = DOMPurify.sanitize(md.render(rawContent));
                 return (
                     <div
                         data-testid="chatMessageMarkdown"
