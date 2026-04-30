@@ -172,13 +172,18 @@ export async function DELETE(
 
       const { type } = validation.data;
       const graph = client.selectGraph(graphId);
+      if (isReadOnly) {
+        return NextResponse.json(
+          { message: "Forbidden: read-only connection" },
+          { status: 403, headers: getCorsHeaders(request) }
+        );
+      }
+
       const query = type
         ? `MATCH (n) WHERE ID(n) = $id DELETE n`
         : `MATCH ()-[e]->() WHERE ID(e) = $id DELETE e`;
 
-      if (isReadOnly)
-        await graph.roQuery(query, { params: { id: elementId } });
-      else await graph.query(query, { params: { id: elementId } });
+      await graph.query(query, { params: { id: elementId } });
 
       return NextResponse.json(
         { message: "Element deleted successfully" },

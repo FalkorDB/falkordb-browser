@@ -540,10 +540,9 @@ export async function securedFetch(
   // Inject X-Connection-Id header when an additional connection is active
   const effectiveInit = { ...init };
   if (_activeConnectionId) {
-    effectiveInit.headers = {
-      ...effectiveInit.headers,
-      "X-Connection-Id": _activeConnectionId,
-    };
+    const headers = new Headers(effectiveInit.headers);
+    headers.set("X-Connection-Id", _activeConnectionId);
+    effectiveInit.headers = headers;
   }
 
   const response = await fetch(input, effectiveInit);

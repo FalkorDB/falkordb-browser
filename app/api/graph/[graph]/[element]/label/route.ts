@@ -37,13 +37,18 @@ export async function DELETE(
         return NextResponse.json({ message: validation.error }, { status: 400, headers: getCorsHeaders(request) });
       }
 
+      if (isReadOnly) {
+        return NextResponse.json(
+          { message: "Forbidden: read-only connection" },
+          { status: 403, headers: getCorsHeaders(request) }
+        );
+      }
+
       const { label } = validation.data;
       const query = `MATCH (n) WHERE ID(n) = $id REMOVE n:${label}`;
       const graph = client.selectGraph(graphId);
 
-      if (isReadOnly)
-        await graph.roQuery(query, { params: { id: elementId } });
-      else await graph.query(query, { params: { id: elementId } });
+      await graph.query(query, { params: { id: elementId } });
 
       return NextResponse.json(
         { message: "Label removed successfully" },
@@ -91,14 +96,18 @@ export async function POST(
         return NextResponse.json({ message: validation.error }, { status: 400, headers: getCorsHeaders(request) });
       }
 
+      if (isReadOnly) {
+        return NextResponse.json(
+          { message: "Forbidden: read-only connection" },
+          { status: 403, headers: getCorsHeaders(request) }
+        );
+      }
+
       const { label } = validation.data;
       const query = `MATCH (n) WHERE ID(n) = $id SET n:${label}`;
       const graph = client.selectGraph(graphId);
 
-      if (isReadOnly)
-        await graph.roQuery(query, { params: { id: elementId } });
-      else
-        await graph.query(query, { params: { id: elementId } });
+      await graph.query(query, { params: { id: elementId } });
       
 
       return NextResponse.json(

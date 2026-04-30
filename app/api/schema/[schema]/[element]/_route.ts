@@ -84,6 +84,13 @@ export async function POST(
     const { type, label, attributes, selectedNodes } = validation.data;
     const isReadOnly = resolveReadOnly(request, user.role);
 
+    if (isReadOnly) {
+      return NextResponse.json(
+        { message: "Forbidden: read-only connection" },
+        { status: 403, headers: getCorsHeaders(request) }
+      );
+    }
+
     try {
       if (!type) {
         if (!selectedNodes || selectedNodes.length !== 2)
@@ -123,10 +130,7 @@ export async function POST(
         });
       }
 
-      const result =
-        isReadOnly
-          ? await graph.roQuery(query, { params: queryParams })
-          : await graph.query(query, { params: queryParams });
+      const result = await graph.query(query, { params: queryParams });
 
       return NextResponse.json({ result }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
@@ -170,15 +174,20 @@ export async function DELETE(
     const { type } = validation.data;
     const isReadOnly = resolveReadOnly(request, user.role);
 
+    if (isReadOnly) {
+      return NextResponse.json(
+        { message: "Forbidden: read-only connection" },
+        { status: 403, headers: getCorsHeaders(request) }
+      );
+    }
+
     try {
       const graph = client.selectGraph(schemaName);
       const query = type
         ? `MATCH (n) WHERE ID(n) = $id DELETE n`
         : `MATCH ()-[e]->() WHERE ID(e) = $id DELETE e`;
 
-      if (isReadOnly)
-        await graph.roQuery(query, { params: { id: elementId } });
-      else await graph.query(query, { params: { id: elementId } });
+      await graph.query(query, { params: { id: elementId } });
 
       return NextResponse.json(
         { message: "Element deleted successfully" },

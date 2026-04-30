@@ -38,9 +38,14 @@ export async function DELETE(
       const graph = client.selectGraph(schemaName);
       const isReadOnly = resolveReadOnly(request, user.role);
 
-      if (isReadOnly)
-        await graph.roQuery(query, { params: { id: elementId } });
-      else await graph.query(query, { params: { id: elementId } });
+      if (isReadOnly) {
+        return NextResponse.json(
+          { message: "Forbidden: read-only connection" },
+          { status: 403, headers: getCorsHeaders(request) }
+        );
+      }
+
+      await graph.query(query, { params: { id: elementId } });
 
       return NextResponse.json(
         { message: "Label removed successfully" },
@@ -92,10 +97,14 @@ export async function POST(
       const graph = client.selectGraph(schemaName);
       const isReadOnly = resolveReadOnly(request, user.role);
 
-      if (isReadOnly)
-        await graph.roQuery(query, { params: { id: elementId } });
-      else
-        await graph.query(query, { params: { id: elementId } });
+      if (isReadOnly) {
+        return NextResponse.json(
+          { message: "Forbidden: read-only connection" },
+          { status: 403, headers: getCorsHeaders(request) }
+        );
+      }
+
+      await graph.query(query, { params: { id: elementId } });
       
 
       return NextResponse.json(

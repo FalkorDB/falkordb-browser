@@ -173,13 +173,18 @@ export default class CustomizeStylePage extends GraphInfoPage {
   } | null> {
     const style = await this.page.evaluate((labelName) => {
       // labelStyle_ is now connection-scoped, so find the key that ends with `labelStyle_{label}`
+      const suffix = `labelStyle_${labelName}`;
+      const matches: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && key.endsWith(`labelStyle_${labelName}`)) {
-          return JSON.parse(localStorage.getItem(key)!);
-        }
+        if (!key || !key.endsWith(suffix)) continue;
+        const value = localStorage.getItem(key);
+        if (value !== null) matches.push(value);
       }
-      return null;
+      if (matches.length > 1) {
+        throw new Error(`Ambiguous scoped label style for ${suffix}`);
+      }
+      return matches.length === 1 ? JSON.parse(matches[0]) : null;
     }, label);
     return style;
   }

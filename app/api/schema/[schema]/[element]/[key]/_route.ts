@@ -45,11 +45,14 @@ export async function POST(
 
       const isReadOnly = resolveReadOnly(request, user.role);
 
-      if (isReadOnly)
-        await graph.roQuery(query, {
-          params: { id: elementId, value: formattedValue },
-        });
-      else await graph.query(query, {
+      if (isReadOnly) {
+        return NextResponse.json(
+          { message: "Forbidden: read-only connection" },
+          { status: 403 }
+        );
+      }
+
+      await graph.query(query, {
         params: { id: elementId, value: formattedValue },
       });
 
@@ -108,9 +111,14 @@ export async function DELETE(
 
       const isReadOnly = resolveReadOnly(request, user.role);
 
-      if (isReadOnly)
-        await graph.roQuery(query, { params: { id: elementId } });
-      else await graph.query(query, { params: { id: elementId } });
+      if (isReadOnly) {
+        return NextResponse.json(
+          { message: "Forbidden: read-only connection" },
+          { status: 403 }
+        );
+      }
+
+      await graph.query(query, { params: { id: elementId } });
 
       return NextResponse.json(
         { message: "Attribute deleted successfully" },

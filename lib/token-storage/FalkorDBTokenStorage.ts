@@ -223,7 +223,9 @@ class FalkorDBTokenStorage implements ITokenStorage {
   async fetchTokensByUserId(userId: string, kind?: import('./ITokenStorage').TokenKind): Promise<TokenData[]> {
     const nowUnix = Math.floor(Date.now() / 1000);
     const kindFilter = kind
-      ? `AND t.kind = '${this.escapeString(kind)}'`
+      ? kind === 'pat'
+        ? "AND (t.kind IS NULL OR t.kind = 'pat')"
+        : `AND t.kind = '${this.escapeString(kind)}'`
       : '';
     const query = `
       MATCH (t:Token {user_id: '${this.escapeString(userId)}'})
