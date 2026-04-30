@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     // eslint-disable-next-line no-console
     console.error("Failed to list connections:", err);
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500, headers: getCorsHeaders(request) }
     );
   }
@@ -59,7 +59,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = await request.json();
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { message: "Invalid JSON payload" },
+        { status: 400, headers: getCorsHeaders(request) }
+      );
+    }
+
     const { host, port, username, password, tls, ca } = body;
 
     if (!password) {
@@ -86,7 +95,7 @@ export async function POST(request: Request) {
     // eslint-disable-next-line no-console
     console.error("Failed to add connection:", err);
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500, headers: getCorsHeaders(request) }
     );
   }

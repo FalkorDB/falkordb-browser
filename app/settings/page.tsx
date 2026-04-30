@@ -47,7 +47,7 @@ export default function Settings() {
         if (current === "Users" ) {
             setCurrent("Browser");
         }
-    }, [activeConnectionId]);
+    }, [activeConnectionId, current]);
     const handleSetCurrent = useCallback((tab: Tab) => {
         if (current === "Browser" && hasChanges) {
             getQuerySettingsNavigationToast(toast, () => {

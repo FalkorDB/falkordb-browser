@@ -677,7 +677,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
     // Only fetch connections once per authentication cycle
     if (sessionSyncedRef.current) return;
-    sessionSyncedRef.current = true;
 
     (async () => {
       try {
@@ -705,6 +704,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
             await updateSession({ activeConnectionId: target });
           }
         }
+        sessionSyncedRef.current = true;
       } catch (err) {
         console.error("Failed to fetch connections:", err);
       }

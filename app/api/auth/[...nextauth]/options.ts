@@ -204,21 +204,31 @@ export async function addSessionConnection(
     .update(`connection:${connId}`)
     .digest("hex");
 
-  await storeEncryptedCredential({
-    tokenHash,
-    tokenId: connId,                 // use connId as the Token DB row key
-    userId: sessionId,               // links this credential to the session
-    username: credentials.username || "default",
-    name: `connection:${connId}`,
-    role,
-    host: credentials.host || "localhost",
-    port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-    password: credentials.password || "",
-    kind: "session",
-    tls: credentials.tls === "true",
-    ca: credentials.ca,
-    expiresAtUnix: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS,
-  });
+  try {
+    await storeEncryptedCredential({
+      tokenHash,
+      tokenId: connId,                 // use connId as the Token DB row key
+      userId: sessionId,               // links this credential to the session
+      username: credentials.username || "default",
+      name: `connection:${connId}`,
+      role,
+      host: credentials.host || "localhost",
+      port: credentials.port ? parseInt(credentials.port, 10) : 6379,
+      password: credentials.password || "",
+      kind: "session",
+      tls: credentials.tls === "true",
+      ca: credentials.ca,
+      expiresAtUnix: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS,
+    });
+  } catch (storageError) {
+    // Clean up the in-memory client that newClient() cached
+    const conn = connections.get(key);
+    if (conn) {
+      connections.delete(key);
+      try { await conn.close(); } catch { /* ignore */ }
+    }
+    throw storageError;
+  }
 
   return {
     id: connId,
@@ -302,7 +312,7 @@ async function getConnectionClient(
     // Recreate from Token DB
     const storage = StorageFactory.getStorage();
     const tokenData = await storage.fetchTokenById(connId);
-    if (!tokenData || !tokenData.is_active || !tokenData.name.startsWith("connection:")) {
+    if (!tokenData || !tokenData.is_active || !tokenData.name.startsWith("connection:") || tokenData.user_id !== sessionId) {
       return null;
     }
 

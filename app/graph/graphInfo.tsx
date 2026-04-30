@@ -37,7 +37,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     useEffect(() => { setPropertyKeysSearch(""); }, [PropertyKeys, maxItemsForSearch]);
 
     return (
-        <div data-testid="graphInfoPanel" className={cn("relative h-full w-full p-3 grid gap-3", showMemoryUsage ? "grid-rows-[max-content_max-content_max-content_1fr_1fr_1fr]" : "grid-rows-[max-content_max-content_1fr_1fr_1fr]")}>
+        <div data-testid="graphInfoPanel" className={cn("relative h-full w-full p-3 grid gap-3", showMemoryUsage && !isReadOnly ? "grid-rows-[max-content_max-content_max-content_1fr_1fr_1fr]" : "grid-rows-[max-content_max-content_1fr_1fr_1fr]")}>
             {
                 !customizingLabel ? (
                     <>

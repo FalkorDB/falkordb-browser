@@ -148,7 +148,7 @@ export default function ConnectionManager() {
           port: port || undefined,
           username,
           password,
-          tls: TLS || undefined,
+          tls: TLS,
           ca: CA || undefined,
         }),
       }, toast, setIndicator);
