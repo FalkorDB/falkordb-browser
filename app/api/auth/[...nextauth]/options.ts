@@ -106,13 +106,16 @@ export async function newClient(
   connections.set(id, client);
 
   client.on("error", (err) => {
-    // Close coonection on error and remove from connections map
+    // Close connection on error and remove from connections map.
+    // Guard with identity check: if concurrent requests recreated the
+    // connection under the same key, only close OUR client — not the
+    // replacement that another request already stored.
     // eslint-disable-next-line no-console
     console.error("FalkorDB Client Error", err);
-    const connection = connections.get(id);
-    if (connection) {
+    const current = connections.get(id);
+    if (current === client) {
       connections.delete(id);
-      connection.close().catch((e) => {
+      client.close().catch((e) => {
         // eslint-disable-next-line no-console
         console.warn("FalkorDB Client Disconnect Error", e);
       });
