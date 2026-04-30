@@ -44,10 +44,12 @@ interface AuthenticatedUserWithPassword extends AuthenticatedUser {
 const connections = new Map<string, FalkorDB>();
 
 /**
- * Returns the map key for a connection.
- * All connections use the format: sessionId:connectionId
+ * Returns the map key for a session-scoped multi-connection entry.
+ * Only used for connections stored via addSessionConnection / the
+ * initial login flow — NOT for JWT/PAT clients (which are keyed by
+ * payload.sub directly).
  */
-function connectionKey(sessionId: string, connectionId: string): string {
+function sessionConnectionKey(sessionId: string, connectionId: string): string {
   return `${sessionId}:${connectionId}`;
 }
 
@@ -192,15 +194,14 @@ export async function addSessionConnection(
   }
 ): Promise<ConnectionInfo> {
   const connId = uuidv4();
-  const key = connectionKey(sessionId, connId);
+  const key = sessionConnectionKey(sessionId, connId);
 
   const { role } = await newClient(credentials, key);
 
-  // Persist encrypted password in Token DB with kind='connection'
-  const credentialRef = generateTimeUUID();
+  // Persist encrypted password in Token DB
   const tokenHash = crypto
     .createHash("sha256")
-    .update(`connection:${credentialRef}`)
+    .update(`connection:${connId}`)
     .digest("hex");
 
   await storeEncryptedCredential({
@@ -213,7 +214,7 @@ export async function addSessionConnection(
     host: credentials.host || "localhost",
     port: credentials.port ? parseInt(credentials.port, 10) : 6379,
     password: credentials.password || "",
-    kind: "connection" as "session",  // piggy-back on TokenKind; we filter by name prefix
+    kind: "session",
     expiresAtUnix: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS,
   });
 
@@ -243,7 +244,7 @@ export async function listSessionConnections(sessionId: string): Promise<Connect
       role: t.role as Role,
       host: t.host,
       port: t.port,
-      tls: false,   // tls is not stored in TokenData; the client will reconnect with correct params
+      tls: false,
     }));
 }
 
@@ -255,13 +256,19 @@ export async function removeSessionConnection(
   sessionId: string,
   connId: string
 ): Promise<boolean> {
-  const key = connectionKey(sessionId, connId);
+  // Verify the token belongs to this session before deleting
+  const storage = StorageFactory.getStorage();
+  const tokenData = await storage.fetchTokenById(connId);
+  if (!tokenData || tokenData.user_id !== sessionId || !tokenData.name.startsWith("connection:")) {
+    return false;
+  }
+
+  const key = sessionConnectionKey(sessionId, connId);
   const client = connections.get(key);
   if (client) {
     connections.delete(key);
     try { await client.close(); } catch { /* ignore */ }
   }
-  const storage = StorageFactory.getStorage();
   return storage.deleteToken(connId);
 }
 
@@ -273,7 +280,7 @@ async function getConnectionClient(
   sessionId: string,
   connId: string
 ): Promise<{ client: FalkorDB; connInfo: ConnectionInfo } | null> {
-  const key = connectionKey(sessionId, connId);
+  const key = sessionConnectionKey(sessionId, connId);
   let client = connections.get(key);
 
   // Health check
@@ -586,7 +593,7 @@ const authOptions: AuthOptions = {
           // Generate random UUID for this session and its first connection
           const id = uuidv4();
           const connId = uuidv4();
-          const key = connectionKey(id, connId);
+          const key = sessionConnectionKey(id, connId);
 
           const { role } = await newClient(credentials, key);
 
@@ -727,7 +734,7 @@ const authOptions: AuthOptions = {
           // to the new connection-key format so getClient() finds it.
           const oldClient = connections.get(sessionId);
           if (oldClient) {
-            const newKey = connectionKey(sessionId, legacyConnId);
+            const newKey = sessionConnectionKey(sessionId, legacyConnId);
             connections.delete(sessionId);
             connections.set(newKey, oldClient);
           }
@@ -793,7 +800,7 @@ const authOptions: AuthOptions = {
           const allTokens = await storage.fetchTokensByUserId(id);
           const connTokens = allTokens.filter(tk => tk.name.startsWith("connection:"));
           await Promise.all(connTokens.map(async (tk) => {
-            const key = connectionKey(id, tk.token_id);
+            const key = sessionConnectionKey(id, tk.token_id);
             const c = connections.get(key);
             if (c) {
               connections.delete(key);
@@ -852,7 +859,7 @@ export async function getClient(
       const allTokens = await storage.fetchTokensByUserId(id);
       const connTokens = allTokens.filter(t => t.name.startsWith("connection:"));
       if (connTokens.length > 0) {
-        connId = connTokens[connTokens.length - 1].token_id;
+        connId = connTokens[0].token_id;
       }
     } catch (e) {
       // eslint-disable-next-line no-console
@@ -893,7 +900,7 @@ export async function getClient(
       // scheme so it appears in listSessionConnections() and all
       // subsequent requests go through the normal path.
       const legacyConnId = uuidv4();
-      const legacyKey = connectionKey(id, legacyConnId);
+      const legacyKey = sessionConnectionKey(id, legacyConnId);
 
       // Check for a live connection stored under the old key (session ID)
       let client = connections.get(id);

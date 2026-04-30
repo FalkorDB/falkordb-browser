@@ -1,6 +1,7 @@
 import { createContext, Dispatch, SetStateAction } from "react";
 import { ConnectionInfo, ConnectionType, GraphData, GraphRef, HistoryQuery, Label, Panel, Relationship, SyntaxErrorInfo, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
 import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
+import type { SessionConnection } from "next-auth";
 import { Graph, GraphInfo } from "../api/graph/model";
 
 type BrowserSettingsContextType = {
@@ -203,14 +204,9 @@ type TableViewContextType = {
   dataHash: string;
 };
 
-export interface SessionConnection {
-  id: string;
-  username?: string;
-  role: string;
-  host: string;
-  port: number;
-  tls: boolean;
-}
+// Re-export the canonical SessionConnection type from the NextAuth module
+// augmentation so frontend code has a single source of truth.
+export type { SessionConnection } from "next-auth";
 
 type ConnectionContextType = {
   connectionType: ConnectionType;

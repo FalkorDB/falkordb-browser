@@ -693,21 +693,23 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
           setAdditionalConnections(conns);
 
           // Auto-select: restore the last active connection from localStorage,
-          // falling back to the most recently added connection (last in list).
+          // falling back to the most recently added connection (first in list,
+          // since /api/connections returns newest-first order).
           if (conns.length > 0) {
             const lastId = localStorage.getItem("lastActiveConnectionId");
             const target = lastId && conns.find(c => c.id === lastId)
               ? lastId
-              : conns[conns.length - 1].id;
+              : conns[0].id;
             setActiveConnectionId(target);
             setActiveConnectionIdGlobal(target);
+            await updateSession({ activeConnectionId: target });
           }
         }
       } catch (err) {
         console.error("Failed to fetch connections:", err);
       }
     })();
-  }, [status, toast]);
+  }, [status, toast, updateSession]);
 
   useEffect(() => {
     if (status !== "authenticated" || !prefixReady) return;
@@ -839,7 +841,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     return () => {
       if (rafId !== undefined) cancelAnimationFrame(rafId);
     };
-  }, [pathname, panelRef.current]);
+  }, [pathname]);
 
   const checkStatus = useCallback(() => {
     securedFetch("/api/status", {
