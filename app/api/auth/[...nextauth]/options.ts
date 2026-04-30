@@ -672,17 +672,70 @@ const authOptions: AuthOptions = {
       // Old tokens have host/port/username/role/tls directly on the token
       // but no `connections` array. Convert them so the session callback
       // and frontend always see the new format.
+      // We also persist the connection to Token DB here so that
+      // GET /api/connections returns it immediately (before getClient runs).
       if (!token.connections && token.host) {
-        const legacyConnId = (token.credentialRef as string) || (token.id as string);
+        const legacyConnId = uuidv4();
+        const sessionId = token.id as string;
+        const connHost = (token.host as string) || "localhost";
+        const connPort = typeof token.port === "string" ? parseInt(token.port, 10) : (token.port as number) || 6379;
+        const connUsername = (token.username as string) || "default";
+        const connRole = (token.role as string) || "Read-Only";
+        const connTls = token.tls as boolean;
+
         token.connections = [{
           id: legacyConnId,
-          username: (token.username as string) || "default",
-          role: token.role as string,
-          host: token.host as string,
-          port: typeof token.port === "string" ? parseInt(token.port, 10) : token.port as number,
-          tls: token.tls as boolean,
+          username: connUsername,
+          role: connRole,
+          host: connHost,
+          port: connPort,
+          tls: connTls,
         }];
         token.activeConnectionId = legacyConnId;
+
+        // Persist to Token DB so the connection appears in the connections
+        // list before any API call triggers the getClient() legacy fallback.
+        try {
+          const credentialRef = token.credentialRef as string | undefined;
+          let password = "";
+          if (credentialRef) {
+            try {
+              password = await getPasswordFromTokenDB(credentialRef);
+            } catch { /* passwordless fallback — leave password empty */ }
+          }
+
+          const tokenHash = crypto
+            .createHash("sha256")
+            .update(`connection:${legacyConnId}`)
+            .digest("hex");
+
+          await storeEncryptedCredential({
+            tokenHash,
+            tokenId: legacyConnId,
+            userId: sessionId,
+            username: connUsername,
+            name: `connection:${legacyConnId}`,
+            role: connRole,
+            host: connHost,
+            port: connPort,
+            password,
+            kind: "session",
+            expiresAtUnix: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS,
+          });
+
+          // Move old in-memory client (stored under bare session ID)
+          // to the new connection-key format so getClient() finds it.
+          const oldClient = connections.get(sessionId);
+          if (oldClient) {
+            const newKey = connectionKey(sessionId, legacyConnId);
+            connections.delete(sessionId);
+            connections.set(newKey, oldClient);
+          }
+        } catch (migrateErr) {
+          // Non-fatal: getClient() legacy fallback will retry persistence.
+          // eslint-disable-next-line no-console
+          console.warn("JWT migration: failed to persist connection to Token DB:", migrateErr);
+        }
       }
 
       // Handle session.update() calls from the frontend
@@ -836,12 +889,21 @@ export async function getClient(
         }
       }
 
+      // Migrate the legacy connection into the new connection-key
+      // scheme so it appears in listSessionConnections() and all
+      // subsequent requests go through the normal path.
+      const legacyConnId = uuidv4();
+      const legacyKey = connectionKey(id, legacyConnId);
+
       // Check for a live connection stored under the old key (session ID)
       let client = connections.get(id);
       if (client) {
         try {
           const conn = await client.connection;
           await conn.ping();
+          // Move from old key to new connection-keyed entry
+          connections.delete(id);
+          connections.set(legacyKey, client);
         } catch {
           connections.delete(id);
           try { await client.close(); } catch { /* ignore */ }
@@ -860,9 +922,38 @@ export async function getClient(
             password,
             tls: user.tls.toString(),
           },
-          id
+          legacyKey
         );
         client = reconnected;
+      }
+
+      // Persist the migrated connection in Token DB so it shows up
+      // in listSessionConnections and future getClient calls use the
+      // normal connection-token path instead of this legacy fallback.
+      try {
+        const tokenHash = crypto
+          .createHash("sha256")
+          .update(`connection:${legacyConnId}`)
+          .digest("hex");
+
+        await storeEncryptedCredential({
+          tokenHash,
+          tokenId: legacyConnId,
+          userId: id,
+          username: session.user.username || "default",
+          name: `connection:${legacyConnId}`,
+          role: session.user.role,
+          host: session.user.host || "localhost",
+          port: session.user.port || 6379,
+          password: password || "",
+          kind: "session",
+          expiresAtUnix: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS,
+        });
+      } catch (persistErr) {
+        // Non-fatal: the connection works in-memory; it just won't
+        // appear in listSessionConnections until next login.
+        // eslint-disable-next-line no-console
+        console.warn("Failed to persist legacy connection to Token DB:", persistErr);
       }
 
       return {
