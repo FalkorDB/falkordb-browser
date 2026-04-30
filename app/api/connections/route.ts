@@ -79,12 +79,12 @@ export async function POST(request: Request) {
     }
 
     const connInfo = await addSessionConnection(id, {
-      host: host || session.user.host,
+      host: (host as string) || session.user.host,
       port: port?.toString() || session.user.port.toString(),
-      username,
-      password,
+      username: username as string,
+      password: password as string,
       tls: tls?.toString() || String(session.user.tls),
-      ca,
+      ca: ca as string | undefined,
     });
 
     return NextResponse.json(
