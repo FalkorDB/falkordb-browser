@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useCallback, useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,7 @@ export default function Settings() {
     const router = useRouter();
 
     const [current, setCurrent] = useState<Tab>('Browser');
+    const prevActiveConnectionIdRef = useRef<string | null | undefined>(undefined);
 
     const navigateBack = useCallback((e: KeyboardEvent) => {
         if (e.key === "Escape" && current !== "Browser") {
@@ -44,7 +45,11 @@ export default function Settings() {
     }, [navigateBack]);
 
     useEffect(() => {
-        if (current === "Users" ) {
+        const prev = prevActiveConnectionIdRef.current;
+        prevActiveConnectionIdRef.current = activeConnectionId;
+        // Only reset when the user explicitly switches connections (non-null → different non-null).
+        // Skip the initial null → value transition that happens on first connection load.
+        if (prev != null && activeConnectionId != null && prev !== activeConnectionId && current === "Users") {
             setCurrent("Browser");
         }
     }, [activeConnectionId, current]);
