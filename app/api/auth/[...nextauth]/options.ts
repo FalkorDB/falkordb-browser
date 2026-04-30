@@ -946,10 +946,16 @@ export async function getClient(
         }
       }
 
+      // actualRole tracks the role determined by newClient() (via aclGetUser)
+      // so we always store and return the REAL FalkorDB role, not the
+      // potentially-stale session.user.role which defaults to "Read-Only"
+      // before the JWT migration has run.
+      let actualRole: Role = session.user.role;
+
       if (!client) {
         // Reconnect using session user credentials
         const { user } = session;
-        const { client: reconnected } = await newClient(
+        const { client: reconnected, role: reconnectedRole } = await newClient(
           {
             host: user.host,
             port: user.port.toString(),
@@ -960,6 +966,7 @@ export async function getClient(
           legacyKey
         );
         client = reconnected;
+        actualRole = reconnectedRole;
       }
 
       // Persist the migrated connection in Token DB so it shows up
@@ -977,7 +984,7 @@ export async function getClient(
           userId: id,
           username: session.user.username || "default",
           name: `connection:${legacyConnId}`,
-          role: session.user.role,
+          role: actualRole,
           host: session.user.host || "localhost",
           port: session.user.port || 6379,
           password: password || "",
@@ -997,7 +1004,7 @@ export async function getClient(
         user: {
           id,
           username: session.user.username,
-          role: session.user.role,
+          role: actualRole,
           host: session.user.host,
           port: session.user.port,
           tls: session.user.tls,
