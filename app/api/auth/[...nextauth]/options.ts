@@ -819,64 +819,68 @@ export async function getClient(
         secret: process.env.NEXTAUTH_SECRET,
       });
       const credentialRef = jwt?.credentialRef as string | undefined;
+
+      // Resolve the password: either from Token DB (if credentialRef exists)
+      // or undefined (passwordless connection, e.g. default local FalkorDB).
+      let password: string | undefined;
       if (credentialRef) {
-        let password: string;
         try {
           password = await getPasswordFromTokenDB(credentialRef);
-        } catch {
+        } catch (pwErr) {
+          // eslint-disable-next-line no-console
+          console.warn("Legacy password resolution failed:", pwErr);
           return NextResponse.json(
             { message: "Session credential could not be resolved; please sign in again.", code: "SESSION_INVALID" },
             { status: 401, headers: { ...getCorsHeaders(request), "X-Session-Invalid": "1" } }
           );
         }
-
-        // Check for a live connection stored under the old key (session ID)
-        let client = connections.get(id);
-        if (client) {
-          try {
-            const conn = await client.connection;
-            await conn.ping();
-          } catch {
-            connections.delete(id);
-            try { await client.close(); } catch { /* ignore */ }
-            client = undefined;
-          }
-        }
-
-        if (!client) {
-          // Reconnect using session user credentials
-          const { user } = session;
-          const { client: reconnected } = await newClient(
-            {
-              host: user.host,
-              port: user.port.toString(),
-              username: user.username,
-              password,
-              tls: user.tls.toString(),
-            },
-            id
-          );
-          client = reconnected;
-        }
-
-        return {
-          client,
-          user: {
-            id,
-            username: session.user.username,
-            role: session.user.role,
-            host: session.user.host,
-            port: session.user.port,
-            tls: session.user.tls,
-            password,
-          },
-        };
       }
+
+      // Check for a live connection stored under the old key (session ID)
+      let client = connections.get(id);
+      if (client) {
+        try {
+          const conn = await client.connection;
+          await conn.ping();
+        } catch {
+          connections.delete(id);
+          try { await client.close(); } catch { /* ignore */ }
+          client = undefined;
+        }
+      }
+
+      if (!client) {
+        // Reconnect using session user credentials
+        const { user } = session;
+        const { client: reconnected } = await newClient(
+          {
+            host: user.host,
+            port: user.port.toString(),
+            username: user.username,
+            password,
+            tls: user.tls.toString(),
+          },
+          id
+        );
+        client = reconnected;
+      }
+
+      return {
+        client,
+        user: {
+          id,
+          username: session.user.username,
+          role: session.user.role,
+          host: session.user.host,
+          port: session.user.port,
+          tls: session.user.tls,
+          password,
+        },
+      };
     } catch (legacyErr) {
       // eslint-disable-next-line no-console
       console.warn("Legacy session fallback failed:", legacyErr);
     }
-
     return NextResponse.json(
       { message: "No active connection. Please sign in again.", code: "SESSION_INVALID" },
       {
