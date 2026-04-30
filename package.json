@@ -81,7 +81,7 @@
     "uuid": "^14.0.0",
     "vaul": "^1.1.2",
     "yaml": "^2.8.3",
-    "zod": "^4.3.6"
+    "zod": "^4.4.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
