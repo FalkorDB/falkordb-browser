@@ -172,8 +172,14 @@ export default class CustomizeStylePage extends GraphInfoPage {
     size?: number;
   } | null> {
     const style = await this.page.evaluate((labelName) => {
-      const stored = localStorage.getItem(`labelStyle_${labelName}`);
-      return stored ? JSON.parse(stored) : null;
+      // labelStyle_ is now connection-scoped, so find the key that ends with `labelStyle_{label}`
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.endsWith(`labelStyle_${labelName}`)) {
+          return JSON.parse(localStorage.getItem(key)!);
+        }
+      }
+      return null;
     }, label);
     return style;
   }

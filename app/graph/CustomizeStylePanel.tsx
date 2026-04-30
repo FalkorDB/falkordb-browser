@@ -7,6 +7,7 @@ import { X, Palette } from "lucide-react";
 import { LabelStyle, InfoLabel, Label, cn } from "@/lib/utils";
 import { GraphContext, ForceGraphContext, BrowserSettingsContext } from "@/app/components/provider";
 import { STYLE_COLORS, getLabelWithFewestElements } from "@/app/api/graph/model";
+import { setConnectionItem } from "@/lib/connection-storage";
 import Button from "@/app/components/ui/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { NODE_SIZE } from "@falkordb/canvas";
@@ -44,7 +45,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
 
     const saveStyleToStorage = useCallback((labelName: string, style: LabelStyle) => {
         const storageKey = `labelStyle_${labelName}`;
-        localStorage.setItem(storageKey, JSON.stringify(style));
+        setConnectionItem(storageKey, JSON.stringify(style));
     }, []);
 
     const applyStylesToGraph = useCallback((color: string, size: number) => {

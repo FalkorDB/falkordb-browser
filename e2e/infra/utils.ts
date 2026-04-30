@@ -31,8 +31,8 @@ export function normalizeUrl(url: string | null | undefined): string {
  * Global user preferences use plain keys. Per-connection data (e.g. query history)
  * is prefixed with host:port: to match the runtime connection-scoped storage.
  */
-export const initializeLocalStorage = (host = "localhost", port = 6379) => {
-    const prefix = `${host}:${port}:`;
+export const initializeLocalStorage = (host = "localhost", port = 6379, username = "default") => {
+    const prefix = `${host}:${port}:${username}:`;
     return `
         if (!localStorage.getItem("timeout")) localStorage.setItem("timeout", "0");
         if (!localStorage.getItem("limit")) localStorage.setItem("limit", "300");

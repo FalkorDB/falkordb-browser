@@ -238,7 +238,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const decorationsRef = useRef<monaco.editor.IEditorDecorationsCollection | null>(null);
 
     const [lineNumber, setLineNumber] = useState(1);
-    const [blur, setBlur] = useState(false);
+    const [blur, setBlur] = useState(true);
     const [editorMountVersion, setEditorMountVersion] = useState(0);
 
     const editorHeight = useMemo(() => blur
@@ -268,7 +268,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         } else if (!historyQuery.query && placeholderRef.current && blur) {
             placeholderRef.current.style.display = "block";
         }
-    }, [historyQuery.query]);
+    }, [historyQuery.query, blur]);
 
     useEffect(() => {
         graphIdRef.current = graph.Id;

@@ -84,7 +84,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             }
                         </div>
                         {
-                            showMemoryUsage &&
+                            showMemoryUsage && !isReadOnly &&
                             <div className="w-full flex items-center gap-2">
                                     <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Memory</h2>
                                     {

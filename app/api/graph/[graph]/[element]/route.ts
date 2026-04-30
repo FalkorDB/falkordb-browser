@@ -5,7 +5,7 @@ import {
   deleteGraphElement,
   validateBody,
 } from "../../../validate-body";
-import { getCorsHeaders } from "../../../utils";
+import { getCorsHeaders, resolveReadOnly } from "../../../utils";
 
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
@@ -23,10 +23,10 @@ export async function GET(
       return session;
     }
 
-    const { client } = session;
+    const { client, user } = session;
     const { graph: graphId, element } = await params;
     const elementId = Number(element);
-    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       const graph = client.selectGraph(graphId);
@@ -68,9 +68,9 @@ export async function POST(
       return session;
     }
 
-    const { client } = session;
+    const { client, user } = session;
     const { graph: graphId } = await params;
-    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       const body = await request.json();
@@ -152,10 +152,10 @@ export async function DELETE(
       return session;
     }
 
-    const { client } = session;
+    const { client, user } = session;
     const { graph: graphId, element } = await params;
     const elementId = Number(element);
-    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       const body = await request.json();

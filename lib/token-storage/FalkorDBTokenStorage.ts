@@ -210,6 +210,53 @@ class FalkorDBTokenStorage implements ITokenStorage {
   }
 
   // eslint-disable-next-line class-methods-use-this
+  async fetchTokensByUserId(userId: string, kind?: import('./ITokenStorage').TokenKind): Promise<TokenData[]> {
+    const nowUnix = Math.floor(Date.now() / 1000);
+    const kindFilter = kind
+      ? `AND t.kind = '${this.escapeString(kind)}'`
+      : '';
+    const query = `
+      MATCH (t:Token {user_id: '${this.escapeString(userId)}'})
+      WHERE t.is_active = true
+        AND (t.expires_at = -1 OR t.expires_at > ${nowUnix})
+        ${kindFilter}
+      RETURN t.token_hash as token_hash,
+             t.token_id as token_id,
+             t.user_id as user_id,
+             t.username as username,
+             t.name as name,
+             t.role as role,
+             t.host as host,
+             t.port as port,
+             t.created_at as created_at,
+             t.expires_at as expires_at,
+             t.last_used as last_used,
+             t.is_active as is_active,
+             t.encrypted_password as encrypted_password,
+             t.kind as kind
+      ORDER BY t.created_at DESC
+    `;
+    const result = await executePATQuery(query);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (result.data || []).map((row: any) => ({
+      token_hash: row.token_hash,
+      token_id: row.token_id,
+      user_id: row.user_id,
+      username: row.username,
+      name: row.name,
+      role: row.role,
+      host: row.host,
+      port: row.port,
+      created_at: row.created_at,
+      expires_at: row.expires_at,
+      last_used: row.last_used,
+      is_active: row.is_active,
+      encrypted_password: row.encrypted_password,
+      kind: row.kind ?? 'pat',
+    }));
+  }
+
+  // eslint-disable-next-line class-methods-use-this
   async cleanupExpiredTokens(): Promise<number> {
     const nowUnix = Math.floor(Date.now() / 1000);
 
