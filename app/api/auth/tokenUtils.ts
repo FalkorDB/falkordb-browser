@@ -122,6 +122,8 @@ export async function storeEncryptedCredential(params: {
   password: string;
   expiresAtUnix?: number;
   kind?: 'session' | 'pat';
+  tls?: boolean;
+  ca?: string;
 }): Promise<void> {
   const storage = StorageFactory.getStorage();
   const nowUnix = Math.floor(Date.now() / 1000);
@@ -141,5 +143,7 @@ export async function storeEncryptedCredential(params: {
     is_active: true,
     encrypted_password: encrypt(params.password),
     kind: params.kind ?? 'pat',
+    tls: params.tls ?? false,
+    ca: params.ca,
   });
 }

@@ -268,7 +268,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         } else if (!historyQuery.query && placeholderRef.current && blur) {
             placeholderRef.current.style.display = "block";
         }
-    }, [historyQuery.query]);
+    }, [historyQuery.query, blur]);
 
     useEffect(() => {
         graphIdRef.current = graph.Id;

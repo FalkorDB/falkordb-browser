@@ -28,6 +28,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY || 'a3f5d8c2b7e4f1a0c9d6e8b2f5a7c3d1e9f2a4b8c6d3e7f1a5b9c2d8e4f0a6b3' }}
+
 jobs:
   setup-and-build:
     name: Setup, cache dependencies, and build
@@ -145,7 +148,7 @@ jobs:
           export CHAT_URL="http://localhost:8080/"
           export NEXTAUTH_URL="http://localhost:3000/"
           export NEXTAUTH_SECRET=SECRET
-          export ENCRYPTION_KEY="a3f5d8c2b7e4f1a0c9d6e8b2f5a7c3d1e9f2a4b8c6d3e7f1a5b9c2d8e4f0a6b3"
+          export ENCRYPTION_KEY="$ENCRYPTION_KEY"
           export PAT_FALKORDB_HOST=localhost
           export PAT_FALKORDB_PORT=6380
           export PAT_FALKORDB_USERNAME=default
@@ -290,7 +293,7 @@ jobs:
         env:
           SKIP_SERVER_IDENTITY_CHECK: "true"
         run: |
-          NEXTAUTH_SECRET=SECRET SKIP_SERVER_IDENTITY_CHECK=true npm start > nextjs.log 2>&1 & 
+          NEXTAUTH_SECRET=SECRET SKIP_SERVER_IDENTITY_CHECK=true ENCRYPTION_KEY="$ENCRYPTION_KEY" npm start > nextjs.log 2>&1 & 
           timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
           npx playwright test --workers=1 --reporter=dot,list --project="[TLS - Chromium]" --project="[TLS - Firefox]"
       - name: Cleanup TLS certificates
@@ -427,7 +430,7 @@ jobs:
           done
       - name: Run cluster tests
         run: |
-          NEXTAUTH_SECRET=SECRET npm start > nextjs.log 2>&1 & 
+          NEXTAUTH_SECRET=SECRET ENCRYPTION_KEY="$ENCRYPTION_KEY" npm start > nextjs.log 2>&1 & 
           timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
           npx playwright test --grep "@cluster" --workers=4 --reporter=dot,list
       - name: Cleanup cluster

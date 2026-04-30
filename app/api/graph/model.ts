@@ -3,6 +3,7 @@
 /* eslint-disable no-param-reassign */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Data, getMetaStats, GraphData, InfoLabel, InfoRelationship, Label, Link, LinkCell, MemoryValue, Node, NodeCell, Relationship, ToastFn, Value } from "@/lib/utils";
+import { getConnectionItem } from "@/lib/connection-storage";
 
 // Color palette for node customization
 export const STYLE_COLORS = [
@@ -73,7 +74,7 @@ export function loadLabelStyle(label: Label | InfoLabel): void {
   if (typeof window === "undefined") return;
 
   const storageKey = `labelStyle_${label.name}`;
-  const savedStyle = localStorage.getItem(storageKey);
+  const savedStyle = getConnectionItem(storageKey);
 
   if (savedStyle) {
     try {
