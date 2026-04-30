@@ -701,7 +701,16 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
               : conns[0].id;
             setActiveConnectionId(target);
             setActiveConnectionIdGlobal(target);
-            await updateSession({ activeConnectionId: target });
+            // Always sync the full connections list into the JWT together with
+            // activeConnectionId so the session callback always finds activeConn.
+            // Without this, a legacy-fallback connection (legacyConnId) ends up
+            // as activeConnectionId but is absent from token.connections, causing
+            // session.user.role to default to "Read-Only" and all write queries
+            // to be silently rejected by FalkorDB (roQuery on empty key).
+            await updateSession({
+              activeConnectionId: target,
+              connections: conns,
+            });
           } else {
             // No connections in Token DB — this happens for sessions created
             // before the multi-connection feature was deployed (old flat-format JWT).
@@ -723,6 +732,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                   : retryConns[0].id;
                 setActiveConnectionId(target);
                 setActiveConnectionIdGlobal(target);
+                await updateSession({ activeConnectionId: target, connections: retryConns });
               }
             }
           }
