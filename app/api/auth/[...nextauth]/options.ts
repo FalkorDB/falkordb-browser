@@ -1026,13 +1026,11 @@ export async function getClient(
   try {
     const connResult = await getConnectionClient(id, connId);
     if (connResult) {
-      const { decrypt } = await import("../encryption");
-      const storage = StorageFactory.getStorage();
-      const tokenData = await storage.fetchTokenById(connId);
-      let connPassword: string | undefined;
-      if (tokenData?.encrypted_password) {
-        connPassword = decrypt(tokenData.encrypted_password);
-      }
+      // Build the user object from connection info; the password is a
+      // nice-to-have (used for PAT issuance and chat URL building) but
+      // the connection itself already works. Resolve it in a separate
+      // try/catch so a transient Token DB error here doesn't kill the
+      // whole request with SESSION_INVALID.
       const connUser: AuthenticatedUserWithPassword = {
         id,
         username: connResult.connInfo.username,
@@ -1040,8 +1038,19 @@ export async function getClient(
         host: connResult.connInfo.host,
         port: connResult.connInfo.port,
         tls: connResult.connInfo.tls,
-        password: connPassword,
+        password: undefined,
       };
+      try {
+        const { decrypt } = await import("../encryption");
+        const storage = StorageFactory.getStorage();
+        const tokenData = await storage.fetchTokenById(connId);
+        if (tokenData?.encrypted_password) {
+          connUser.password = decrypt(tokenData.encrypted_password) || undefined;
+        }
+      } catch (pwErr) {
+        // eslint-disable-next-line no-console
+        console.warn("Failed to resolve connection password (non-fatal):", pwErr);
+      }
       return { client: connResult.client, user: connUser };
     }
   } catch (connErr) {
