@@ -702,6 +702,29 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
             setActiveConnectionId(target);
             setActiveConnectionIdGlobal(target);
             await updateSession({ activeConnectionId: target });
+          } else {
+            // No connections in Token DB — this happens for sessions created
+            // before the multi-connection feature was deployed (old flat-format JWT).
+            // Calling updateSession() with no payload still triggers the jwt callback
+            // which migrates the old token to the new connections array format and
+            // persists it in Token DB so subsequent fetches will find it.
+            await updateSession({});
+            // Retry: the jwt migration just ran, fetch connections again so the
+            // ConnectionManager dropdown can populate.
+            const retryResult = await securedFetch("/api/connections", { method: "GET" }, toast, setIndicator);
+            if (retryResult.ok) {
+              const retryJson = await retryResult.json();
+              if (retryJson?.connections?.length > 0) {
+                const retryConns: SessionConnection[] = retryJson.connections;
+                setAdditionalConnections(retryConns);
+                const lastId = localStorage.getItem("lastActiveConnectionId");
+                const target = lastId && retryConns.find(c => c.id === lastId)
+                  ? lastId
+                  : retryConns[0].id;
+                setActiveConnectionId(target);
+                setActiveConnectionIdGlobal(target);
+              }
+            }
           }
         }
         sessionSyncedRef.current = true;
