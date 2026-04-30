@@ -35,7 +35,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 24
           cache: 'npm'
@@ -117,7 +117,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 24
           cache: 'npm'
@@ -195,7 +195,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 24
           cache: 'npm'
@@ -290,7 +290,7 @@ jobs:
         env:
           SKIP_SERVER_IDENTITY_CHECK: "true"
         run: |
-          NEXTAUTH_SECRET=SECRET SKIP_SERVER_IDENTITY_CHECK=true npm start > nextjs.log 2>&1 & 
+          NEXTAUTH_SECRET=SECRET SKIP_SERVER_IDENTITY_CHECK=true ENCRYPTION_KEY="a3f5d8c2b7e4f1a0c9d6e8b2f5a7c3d1e9f2a4b8c6d3e7f1a5b9c2d8e4f0a6b3" npm start > nextjs.log 2>&1 & 
           timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
           npx playwright test --workers=1 --reporter=dot,list --project="[TLS - Chromium]" --project="[TLS - Firefox]"
       - name: Cleanup TLS certificates
@@ -334,7 +334,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 24
           cache: 'npm'
@@ -427,7 +427,7 @@ jobs:
           done
       - name: Run cluster tests
         run: |
-          NEXTAUTH_SECRET=SECRET npm start > nextjs.log 2>&1 & 
+          NEXTAUTH_SECRET=SECRET ENCRYPTION_KEY="a3f5d8c2b7e4f1a0c9d6e8b2f5a7c3d1e9f2a4b8c6d3e7f1a5b9c2d8e4f0a6b3" npm start > nextjs.log 2>&1 & 
           timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
           npx playwright test --grep "@cluster" --workers=4 --reporter=dot,list
       - name: Cleanup cluster
