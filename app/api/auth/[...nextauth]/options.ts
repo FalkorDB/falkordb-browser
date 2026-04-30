@@ -318,15 +318,17 @@ async function getConnectionClient(
 
     const { decrypt } = await import("../encryption");
     // Use `|| undefined` so an empty stored password (no-auth connections)
-    // connects anonymously instead of sending AUTH with an empty string,
-    // matching the behaviour of the original passwordless login.
+    // connects anonymously — exactly as the original passwordless login did.
+    // Only pass username when a real password is present; otherwise both
+    // credentials are omitted so no AUTH command is sent to FalkorDB.
     const password = decrypt(tokenData.encrypted_password) || undefined;
+    const username = password ? (tokenData.username || undefined) : undefined;
 
     const { role, client: newConn } = await newClient(
       {
         host: tokenData.host,
         port: tokenData.port.toString(),
-        username: tokenData.username || undefined,
+        username,
         password,
         tls: (tokenData.tls ?? false).toString(),
         ca: tokenData.ca || undefined,
