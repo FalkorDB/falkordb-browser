@@ -197,8 +197,13 @@ export default function Configurations() {
     };
 
     const fetchConfigs = async () => {
+        // Pass X-Connection-Id explicitly so the correct client is used
+        // regardless of the module-level global state (e.g. after HMR).
+        const connHeaders: Record<string, string> = {};
+        if (activeConnectionId) connHeaders['X-Connection-Id'] = activeConnectionId;
         const result = await securedFetch("/api/graph/config", {
-            method: "GET"
+            method: "GET",
+            headers: connHeaders,
         }, toast, setIndicator);
 
         if (!result.ok) return;

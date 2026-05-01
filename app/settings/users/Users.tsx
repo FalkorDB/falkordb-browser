@@ -28,19 +28,17 @@ export default function Users() {
     const { activeConnectionId } = useContext(ConnectionContext);
 
     useEffect(() => {
-        // Wait for a real connection ID so the request is routed to the
-        // correct FalkorDB client (admin), not a Token DB fallback that
-        // might lack ACL LIST permission.
         if (!activeConnectionId) return;
-        // Explicitly sync the module-level global so securedFetch sends
-        // X-Connection-Id correctly even after Next.js HMR module resets.
         setActiveConnectionIdGlobal(activeConnectionId);
 
         (async () => {
+            // Pass X-Connection-Id explicitly so the correct client is used
+            // regardless of the module-level global state (e.g. after HMR).
             const result = await securedFetch("api/user", {
                 method: 'GET',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'X-Connection-Id': activeConnectionId,
                 }
             }, toast, setIndicator);
 
@@ -63,7 +61,8 @@ export default function Users() {
                 })));
             }
         })();
-    }, [toast, setIndicator, activeConnectionId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeConnectionId]);
 
     const handleSaveUsers = useCallback(async () => {
         // Use a no-op toast so securedFetch does NOT show a generic red error
