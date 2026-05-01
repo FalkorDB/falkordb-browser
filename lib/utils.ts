@@ -680,20 +680,21 @@ export const getMemoryUsage = async (
   toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void
 ): Promise<Map<string, MemoryValue>> => {
-  const result = await securedFetch(
-    `api/graph/${prepareArg(name)}/memory`,
-    {
-      method: "GET",
-    },
-    toast,
-    setIndicator
-  );
-
-  if (!result.ok) return new Map();
-
-  const json = await result.json();
-
-  return processEntries(json.result);
+  // Use plain fetch (not securedFetch) so NOPERM / version-too-low 400 errors
+  // from restricted users don't produce error toasts — memory usage is an
+  // optional admin-only feature and missing it is not an error worth surfacing.
+  try {
+    const headers = new Headers();
+    if (_activeConnectionId) {
+      headers.set("X-Connection-Id", _activeConnectionId);
+    }
+    const result = await fetch(`api/graph/${prepareArg(name)}/memory`, { headers });
+    if (!result.ok) return new Map();
+    const json = await result.json();
+    return processEntries(json.result);
+  } catch {
+    return new Map();
+  }
 };
 
 /**

@@ -86,14 +86,17 @@ export default function ConnectionManager() {
       additionalConnections.length > 0
         ? additionalConnections
         : (session as { connections?: SessionConnection[] }).connections ?? [];
-    // Update the JWT FIRST so session.user.role is correct before any
-    // downstream API calls (graph list reload, query execution) fire.
-    await updateSession({ connections: connsForSession, activeConnectionId: connId });
-    // Set local state AFTER the JWT is updated to prevent a window where
-    // activeConnectionId is set but sessionData.user.role is still stale.
-    setActiveConnectionId(connId);
+    // Set the global ID immediately so periodic timers (memory, count, etc.)
+    // that fire DURING the updateSession await use the correct connection and
+    // don't fall back to Token DB which might pick the wrong entry.
     setActiveConnectionIdGlobal(connId);
     localStorage.setItem("lastActiveConnectionId", connId);
+    // Update the JWT so session.user.role is correct before React effects
+    // (graph-list reload, query execution) fire.
+    await updateSession({ connections: connsForSession, activeConnectionId: connId });
+    // Update React state AFTER the JWT is updated so the prevActiveConnectionId
+    // effect fires with the correct role already in sessionData.
+    setActiveConnectionId(connId);
   }, [setActiveConnectionId, updateSession, additionalConnections, session]);
 
   const handleRemove = useCallback(async (e: React.MouseEvent, connId: string) => {
