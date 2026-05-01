@@ -10,7 +10,7 @@ import { prepareArg, securedFetch, Row, DataCell } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import TableComponent from "../components/TableComponent";
 import ToastButton from "../components/ToastButton";
-import { IndicatorContext } from "../components/provider";
+import { IndicatorContext, ConnectionContext } from "../components/provider";
 
 type Config = {
     name: string,
@@ -129,6 +129,7 @@ export default function Configurations() {
     const [configs, setConfigs] = useState<Row[]>([]);
     const { toast } = useToast();
     const { setIndicator } = useContext(IndicatorContext);
+    const { activeConnectionId } = useContext(ConnectionContext);
 
     const handleSetConfig = async (name: string, value: string, isUndo: boolean) => {
         if (!value) {
@@ -235,8 +236,11 @@ export default function Configurations() {
     };
 
     useEffect(() => {
+        // Wait for a real connection ID so the request uses the correct
+        // FalkorDB client and doesn't fall back to a restricted Token DB entry.
+        if (!activeConnectionId) return;
         fetchConfigs();
-    }, []);
+    }, [activeConnectionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
         <div className="grow basis-0 overflow-hidden">
