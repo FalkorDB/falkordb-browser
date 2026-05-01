@@ -521,16 +521,14 @@ function triggerSessionInvalidationSignOut(): void {
 // When set, securedFetch automatically injects an X-Connection-Id header so
 // the backend routes requests to the correct FalkorDB client.
 //
-// Initialise from localStorage so the value survives Next.js HMR module
-// resets. `lastActiveConnectionId` is written by handleSelect whenever the
-// user switches connections, so after a hot-reload the global is immediately
-// restored to the correct connection rather than falling back to the Token DB
-// (which might pick a restricted user).
+// NOTE: do NOT initialise from localStorage here. If the user's last
+// explicit connection was a restricted user (e.g. shahar), initialising
+// _activeConnectionId to that ID would cause securedFetch to overwrite
+// any explicitly-passed X-Connection-Id headers (set by settings components)
+// with the restricted ID. The dep-free effect in providers.tsx keeps this
+// global in sync with the React activeConnectionId state after every render.
 // ---------------------------------------------------------------------------
-let _activeConnectionId: string | null =
-  typeof window !== "undefined"
-    ? window.localStorage.getItem("lastActiveConnectionId")
-    : null;
+let _activeConnectionId: string | null = null;
 
 export function setActiveConnectionIdGlobal(id: string | null) {
   _activeConnectionId = id;
