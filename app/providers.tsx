@@ -712,27 +712,38 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
               connections: conns,
             });
           } else {
-            // No connections in Token DB — this happens for sessions created
-            // before the multi-connection feature was deployed (old flat-format JWT).
-            // Calling updateSession() with no payload still triggers the jwt callback
-            // which migrates the old token to the new connections array format and
-            // persists it in Token DB so subsequent fetches will find it.
-            await updateSession({});
-            // Retry: the jwt migration just ran, fetch connections again so the
-            // ConnectionManager dropdown can populate.
-            const retryResult = await securedFetch("/api/connections", { method: "GET" }, toast, setIndicator);
-            if (retryResult.ok) {
-              const retryJson = await retryResult.json();
-              if (retryJson?.connections?.length > 0) {
-                const retryConns: SessionConnection[] = retryJson.connections;
-                setAdditionalConnections(retryConns);
-                const lastId = localStorage.getItem("lastActiveConnectionId");
-                const target = lastId && retryConns.find(c => c.id === lastId)
-                  ? lastId
-                  : retryConns[0].id;
-                setActiveConnectionId(target);
-                setActiveConnectionIdGlobal(target);
-                await updateSession({ activeConnectionId: target, connections: retryConns });
+            // Token DB returned no connections — the session is out of sync.
+            // This happens after a server restart (FileTokenStorage wiped),
+            // a deploy that changed the storage backend, or any time the
+            // connection entry was never written (old pre-feature sessions).
+            //
+            // Fix: call the migration endpoint which:
+            //   1. Deletes stale Token DB entries for this user
+            //   2. Reconnects to FalkorDB using session.user credentials
+            //   3. Creates a fresh entry in Token DB
+            //   4. Returns the new connection
+            // Then sync the JWT and local state with the result.
+            //
+            // Also clean up stale localStorage keys so we don't restore
+            // a lastActiveConnectionId that no longer exists.
+            localStorage.removeItem("lastActiveConnectionId");
+
+            const migrateResult = await securedFetch("/api/auth/migrate-session", {
+              method: "POST",
+            }, toast, setIndicator);
+
+            if (migrateResult.ok) {
+              const migrateJson = await migrateResult.json();
+              if (migrateJson?.connection) {
+                const migratedConn: SessionConnection = migrateJson.connection;
+                const migratedConns = [migratedConn];
+                setAdditionalConnections(migratedConns);
+                setActiveConnectionId(migratedConn.id);
+                setActiveConnectionIdGlobal(migratedConn.id);
+                await updateSession({
+                  activeConnectionId: migratedConn.id,
+                  connections: migratedConns,
+                });
               }
             }
           }
