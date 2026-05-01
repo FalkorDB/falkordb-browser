@@ -4,7 +4,7 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, setActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue, SyntaxErrorInfo, parseSyntaxError } from "@/lib/utils";
+import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue, SyntaxErrorInfo, parseSyntaxError } from "@/lib/utils";
 import { encryptValue, decryptValue, isCryptoAvailable, isEncrypted } from "@/lib/encryption";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import { usePathname, useRouter } from "next/navigation";
@@ -598,18 +598,22 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     if (status !== "authenticated") return;
 
     (async () => {
-      const result = await securedFetch("/api/DBVersion", {
-        method: "GET",
-      }, toast, setIndicator);
-
-      if (!result.ok) return;
-
-      const [name, version] = (await result.json()).result || ["", 0];
-
-      setDbVersion(String(version));
-      setShowMemoryUsage(name === "graph" && version >= MEMORY_USAGE_VERSION_THRESHOLD);
+      // Use plain fetch (not securedFetch) so NOPERM from restricted users
+      // (who lack module|list permission) doesn't produce an error toast.
+      // DB version / memory-usage availability is optional admin metadata.
+      try {
+        const connId = getActiveConnectionIdGlobal();
+        const headers = new Headers();
+        if (connId) headers.set("X-Connection-Id", connId);
+        const result = await fetch("/api/DBVersion", { method: "GET", headers });
+        if (!result.ok) return;
+        const [name, version] = (await result.json()).result || ["", 0];
+        setDbVersion(String(version));
+        setShowMemoryUsage(name === "graph" && version >= MEMORY_USAGE_VERSION_THRESHOLD);
+      } catch { /* ignore */ }
     })();
-  }, [status, toast]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
 
   useEffect(() => {
     if (status !== "authenticated") {
