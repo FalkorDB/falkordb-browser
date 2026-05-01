@@ -601,19 +601,25 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       // Use plain fetch (not securedFetch) so NOPERM from restricted users
       // (who lack module|list permission) doesn't produce an error toast.
       // DB version / memory-usage availability is optional admin metadata.
+      // Re-runs on connection switch so switching back to admin restores the
+      // memory-usage widget.
       try {
-        const connId = getActiveConnectionIdGlobal();
+        const connId = activeConnectionId ?? getActiveConnectionIdGlobal();
         const headers = new Headers();
         if (connId) headers.set("X-Connection-Id", connId);
         const result = await fetch("/api/DBVersion", { method: "GET", headers });
-        if (!result.ok) return;
+        if (!result.ok) {
+          // Restricted user or version not available — hide memory widget
+          setShowMemoryUsage(false);
+          return;
+        }
         const [name, version] = (await result.json()).result || ["", 0];
         setDbVersion(String(version));
         setShowMemoryUsage(name === "graph" && version >= MEMORY_USAGE_VERSION_THRESHOLD);
       } catch { /* ignore */ }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
+  }, [status, activeConnectionId]);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -837,33 +843,33 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       }
 
       setModel(localStorage.getItem("model") || "");
-      (async () => {
-        const res = await fetch("/api/udf", {
-          method: "GET",
-        });
-
-        if (!res.ok) {
-          setShowUDF(false);
-          return;
-        };
-
-        const json = await res.json();
-        setUdfList(json.result);
-
-        if (json.result.length > 0) {
-          const result = await securedFetch(`/api/udf/${encodeURIComponent(json.result[0][1])}`, {
-            method: "GET",
-          }, toast, setIndicator);
-
-          if (!result.ok) return;
-
-          const udfData = await result.json();
-
-          setSelectedUdf(prev => prev ?? udfData.result[0]);
-        }
-      })();
     })();
   }, [status, prefixReady, toast]);
+
+  // Re-check UDF availability whenever the active connection changes so
+  // switching back to an admin connection restores the UDF menu.
+  useEffect(() => {
+    if (status !== "authenticated") { setShowUDF(false); return; }
+
+    (async () => {
+      const res = await fetch("/api/udf", { method: "GET" });
+      if (!res.ok) { setShowUDF(false); return; }
+
+      const json = await res.json();
+      setShowUDF(true);
+      setUdfList(json.result);
+
+      if (json.result.length > 0) {
+        const result = await securedFetch(`/api/udf/${encodeURIComponent(json.result[0][1])}`, {
+          method: "GET",
+        }, toast, setIndicator);
+        if (!result.ok) return;
+        const udfData = await result.json();
+        setSelectedUdf(prev => prev ?? udfData.result[0]);
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, activeConnectionId]);
 
   const onPanelResize = useCallback((size: PanelSize) => {
     setIsCollapsed(size.asPercentage === 0);
