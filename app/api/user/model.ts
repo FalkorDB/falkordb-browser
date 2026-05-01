@@ -18,7 +18,8 @@ const READ_ONLY_ROLE = [
   "+graph.list",
   "+graph.ro_query",
   "+graph.info",
-  "+graph.memory",
+  "+graph.memory",  // graph memory usage stats
+  "+module|list",   // MODULE LIST — needed for the DBVersion check (showMemoryUsage)
   "+ping",
   "+hello",
   "+info",
@@ -45,6 +46,7 @@ export const ROLE = new Map<string, string[]>([
       "+graph.constraint",
       "+graph.bulk",
       "+graph.copy",
+      "+graph.udf",     // GRAPH.UDF (list/load/flush/delete) — UDF panel access
       "+expire",
       "+pexpire",
       "+restore",
