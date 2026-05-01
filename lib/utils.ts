@@ -688,11 +688,22 @@ export const getMemoryUsage = async (
     if (_activeConnectionId) {
       headers.set("X-Connection-Id", _activeConnectionId);
     }
-    const result = await fetch(`api/graph/${prepareArg(name)}/memory`, { headers });
-    if (!result.ok) return new Map();
+    // eslint-disable-next-line no-console
+    console.debug(`[memory] fetching for graph="${name}" connId=${_activeConnectionId ?? "(none)"}`);
+    const result = await fetch(`/api/graph/${prepareArg(name)}/memory`, { headers });
+    if (!result.ok) {
+      // eslint-disable-next-line no-console
+      console.debug(`[memory] endpoint returned ${result.status} for graph="${name}"`);
+      return new Map();
+    }
     const json = await result.json();
-    return processEntries(json.result);
-  } catch {
+    const map = processEntries(json.result);
+    // eslint-disable-next-line no-console
+    console.debug(`[memory] result for graph="${name}": total_graph_sz_mb=${map.get("total_graph_sz_mb")}`);
+    return map;
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.debug(`[memory] fetch threw for graph="${name}":`, err);
     return new Map();
   }
 };
