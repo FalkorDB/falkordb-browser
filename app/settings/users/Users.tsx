@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useContext, useCallback } from "react";
 import { CreateUser, User } from "@/app/api/user/model";
-import { prepareArg, securedFetch, Row, ToastFn } from "@/lib/utils";
+import { prepareArg, securedFetch, setActiveConnectionIdGlobal, Row, ToastFn } from "@/lib/utils";
 import TableComponent from "@/app/components/TableComponent";
 import { useToast } from "@/components/ui/use-toast";
 import { IndicatorContext, ConnectionContext } from "@/app/components/provider";
@@ -32,6 +32,9 @@ export default function Users() {
         // correct FalkorDB client (admin), not a Token DB fallback that
         // might lack ACL LIST permission.
         if (!activeConnectionId) return;
+        // Explicitly sync the module-level global so securedFetch sends
+        // X-Connection-Id correctly even after Next.js HMR module resets.
+        setActiveConnectionIdGlobal(activeConnectionId);
 
         (async () => {
             const result = await securedFetch("api/user", {

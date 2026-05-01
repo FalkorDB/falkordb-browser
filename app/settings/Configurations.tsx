@@ -6,7 +6,7 @@
 "use client";
 
 import { useEffect, useState, useContext } from "react";
-import { prepareArg, securedFetch, Row, DataCell } from "@/lib/utils";
+import { prepareArg, securedFetch, setActiveConnectionIdGlobal, Row, DataCell } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import TableComponent from "../components/TableComponent";
 import ToastButton from "../components/ToastButton";
@@ -239,6 +239,9 @@ export default function Configurations() {
         // Wait for a real connection ID so the request uses the correct
         // FalkorDB client and doesn't fall back to a restricted Token DB entry.
         if (!activeConnectionId) return;
+        // Explicitly sync the module-level global so securedFetch sends
+        // X-Connection-Id correctly even after Next.js HMR module resets.
+        setActiveConnectionIdGlobal(activeConnectionId);
         fetchConfigs();
     }, [activeConnectionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
