@@ -964,6 +964,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
     // Clear graph / schema data so stale results from the old connection are gone
     setGraph(Graph.empty());
+    setGraphInfo(GraphInfo.empty(toast, setIndicator));
     setGraphName("");
     setGraphNames([]);
     setSchema(Graph.empty());
