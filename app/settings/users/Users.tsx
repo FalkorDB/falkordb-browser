@@ -4,10 +4,10 @@
 
 import { useEffect, useState, useContext, useCallback } from "react";
 import { CreateUser, User } from "@/app/api/user/model";
-import { prepareArg, securedFetch, Row } from "@/lib/utils";
+import { prepareArg, securedFetch, Row, ToastFn } from "@/lib/utils";
 import TableComponent from "@/app/components/TableComponent";
 import { useToast } from "@/components/ui/use-toast";
-import { IndicatorContext } from "@/app/components/provider";
+import { IndicatorContext, ConnectionContext } from "@/app/components/provider";
 import DeleteUser from "./DeleteUser";
 import AddUser from "./AddUser";
 import EditUser from "./EditUser";
@@ -25,8 +25,14 @@ export default function Users() {
     const [rows, setRows] = useState<Row[]>([]);
     const { toast } = useToast();
     const { setIndicator } = useContext(IndicatorContext);
+    const { activeConnectionId } = useContext(ConnectionContext);
 
     useEffect(() => {
+        // Wait for a real connection ID so the request is routed to the
+        // correct FalkorDB client (admin), not a Token DB fallback that
+        // might lack ACL LIST permission.
+        if (!activeConnectionId) return;
+
         (async () => {
             const result = await securedFetch("api/user", {
                 method: 'GET',
@@ -54,17 +60,21 @@ export default function Users() {
                 })));
             }
         })();
-    }, [toast, setIndicator]);
+    }, [toast, setIndicator, activeConnectionId]);
 
     const handleSaveUsers = useCallback(async () => {
+        // Use a no-op toast so securedFetch does NOT show a generic red error
+        // when aclSave() fails (e.g. FalkorDB not configured with an ACL file).
+        // We show a single, informative warning toast below instead.
+        const silent: ToastFn = () => {};
         const response = await securedFetch('/api/user/save', {
             method: 'POST',
-        }, toast, setIndicator);
+        }, silent, setIndicator);
 
         if (!response.ok) {
             toast({
-                title: "Error",
-                description: <p>Failed to save users to disk <a href="https://docs.falkordb.com/operations/durability/acl-persistence.html" target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-1">Learn More</a></p>,
+                title: "Users not persisted",
+                description: <p>Users are active in memory but could not be saved to disk. <a href="https://docs.falkordb.com/operations/durability/acl-persistence.html" target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-1">Learn More</a></p>,
                 variant: "warning",
             });
         }
