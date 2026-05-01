@@ -51,7 +51,7 @@ export default function Page() {
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext);
     const { setData, canvasRef } = useContext(ForceGraphContext);
-    const { isReadOnly } = useContext(ConnectionContext);
+    const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
     const isReadOnlyRef = useRef(isReadOnly);
     isReadOnlyRef.current = isReadOnly;
     const {
@@ -176,7 +176,7 @@ export default function Page() {
             fetchMetaStats(graphName),
             fetchInfo("(property key)"),
         ]).then(async ([newDataStats, newPropertyKeys]) => {
-            const memoryUsage = showMemoryUsage && !isReadOnlyRef.current ? await getMemoryUsage(graphName, toast, setIndicator) : new Map<string, MemoryValue>();
+            const memoryUsage = showMemoryUsage && !isReadOnlyRef.current ? await getMemoryUsage(graphName, toast, setIndicator, activeConnectionId) : new Map<string, MemoryValue>();
             const newLabels = newDataStats?.[0] || [];
             const newRelationships = newDataStats?.[1] || [];
 
@@ -207,7 +207,8 @@ export default function Page() {
         return () => {
             clearInterval(interval);
         };
-    }, [fetchCount, fetchInfo, fetchMetaStats, graphName, refreshInterval, runDefaultQuery, setGraphInfo, setIndicator, showMemoryUsage, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fetchCount, fetchInfo, fetchMetaStats, graphName, refreshInterval, runDefaultQuery, setGraphInfo, setIndicator, showMemoryUsage, toast, activeConnectionId]);
 
     useEffect(() => {
         if (graphName) return;

@@ -678,32 +678,26 @@ const processEntries = (arr: MemoryValueType): Map<string, MemoryValue> => {
 export const getMemoryUsage = async (
   name: string,
   toast: ToastFn,
-  setIndicator: (indicator: "online" | "offline") => void
+  setIndicator: (indicator: "online" | "offline") => void,
+  // Pass activeConnectionId explicitly from React context/closure.
+  // This avoids relying on the module-level global _activeConnectionId
+  // which can be reset to null by Next.js HMR between renders.
+  connectionId?: string | null
 ): Promise<Map<string, MemoryValue>> => {
   // Use plain fetch (not securedFetch) so NOPERM / version-too-low 400 errors
   // from restricted users don't produce error toasts — memory usage is an
   // optional admin-only feature and missing it is not an error worth surfacing.
   try {
+    const effectiveConnId = connectionId !== undefined ? connectionId : _activeConnectionId;
     const headers = new Headers();
-    if (_activeConnectionId) {
-      headers.set("X-Connection-Id", _activeConnectionId);
+    if (effectiveConnId) {
+      headers.set("X-Connection-Id", effectiveConnId);
     }
-    // eslint-disable-next-line no-console
-    console.debug(`[memory] fetching for graph="${name}" connId=${_activeConnectionId ?? "(none)"}`);
     const result = await fetch(`/api/graph/${prepareArg(name)}/memory`, { headers });
-    if (!result.ok) {
-      // eslint-disable-next-line no-console
-      console.debug(`[memory] endpoint returned ${result.status} for graph="${name}"`);
-      return new Map();
-    }
+    if (!result.ok) return new Map();
     const json = await result.json();
-    const map = processEntries(json.result);
-    // eslint-disable-next-line no-console
-    console.debug(`[memory] result for graph="${name}": total_graph_sz_mb=${map.get("total_graph_sz_mb")}`);
-    return map;
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.debug(`[memory] fetch threw for graph="${name}":`, err);
+    return processEntries(json.result);
+  } catch {
     return new Map();
   }
 };

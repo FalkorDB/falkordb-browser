@@ -490,7 +490,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         fetchMetaStats(n),
         fetchInfo("(property key)", n),
       ]).then(async ([metaStats, newPropertyKeys]) => {
-        const memoryUsage = showMemoryUsage && !isReadOnlyRef.current ? await getMemoryUsage(n, toast, setIndicator) : new Map<string, MemoryValue>();
+        const memoryUsage = showMemoryUsage && !isReadOnlyRef.current ? await getMemoryUsage(n, toast, setIndicator, getActiveConnectionIdGlobal()) : new Map<string, MemoryValue>();
         const newLabels = metaStats?.[0] || [];
         const newRelationships = metaStats?.[1] || [];
         const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
@@ -593,6 +593,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setRelationships([...graph.Relationships]);
     setLabels([...graph.Labels]);
   }, [graph, graph.Labels.length, graph.Relationships.length, graph.Labels, graph.Relationships]);
+
+  // Keep the module-level global in sync with React state on every render.
+  // This is intentionally dependency-free so it runs after every render,
+  // restoring _activeConnectionId even when Next.js HMR resets the module.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setActiveConnectionIdGlobal(activeConnectionId); });
 
   useEffect(() => {
     // Wait until we have a real connection ID so the server always routes
