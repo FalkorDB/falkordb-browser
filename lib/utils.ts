@@ -520,8 +520,17 @@ function triggerSessionInvalidationSignOut(): void {
 // Active connection ID for multi-connection support.
 // When set, securedFetch automatically injects an X-Connection-Id header so
 // the backend routes requests to the correct FalkorDB client.
+//
+// Initialise from localStorage so the value survives Next.js HMR module
+// resets. `lastActiveConnectionId` is written by handleSelect whenever the
+// user switches connections, so after a hot-reload the global is immediately
+// restored to the correct connection rather than falling back to the Token DB
+// (which might pick a restricted user).
 // ---------------------------------------------------------------------------
-let _activeConnectionId: string | null = null;
+let _activeConnectionId: string | null =
+  typeof window !== "undefined"
+    ? window.localStorage.getItem("lastActiveConnectionId")
+    : null;
 
 export function setActiveConnectionIdGlobal(id: string | null) {
   _activeConnectionId = id;
