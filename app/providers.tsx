@@ -601,8 +601,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   useEffect(() => { setActiveConnectionIdGlobal(activeConnectionId); });
 
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.debug(`[DBVersion] fired: status=${status} activeConnectionId=${activeConnectionId}`);
     if (status !== "authenticated" || !activeConnectionId) return;
 
     (async () => {
@@ -611,17 +609,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         headers.set("X-Connection-Id", activeConnectionId);
         const result = await fetch("/api/DBVersion", { method: "GET", headers });
         if (!result.ok) {
-          // eslint-disable-next-line no-console
-          console.debug(`[DBVersion] returned ${result.status} -> showMemoryUsage=false`);
           setShowMemoryUsage(false);
           return;
         }
         const [name, version] = (await result.json()).result || ["", 0];
-        const show = name === "graph" && version >= MEMORY_USAGE_VERSION_THRESHOLD;
-        // eslint-disable-next-line no-console
-        console.debug(`[DBVersion] name=${name} version=${version} -> showMemoryUsage=${show}`);
         setDbVersion(String(version));
-        setShowMemoryUsage(show);
+        setShowMemoryUsage(name === "graph" && version >= MEMORY_USAGE_VERSION_THRESHOLD);
       } catch { /* ignore */ }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
