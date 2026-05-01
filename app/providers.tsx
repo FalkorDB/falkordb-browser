@@ -595,18 +595,19 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   }, [graph, graph.Labels.length, graph.Relationships.length, graph.Labels, graph.Relationships]);
 
   useEffect(() => {
-    if (status !== "authenticated") return;
+    // Wait until we have a real connection ID so the server always routes
+    // the request to the correct FalkorDB client rather than falling back
+    // to the most-recently-added Token DB entry (which may be a restricted user).
+    if (status !== "authenticated" || !activeConnectionId) return;
 
     (async () => {
       // Use plain fetch (not securedFetch) so NOPERM from restricted users
       // (who lack module|list permission) doesn't produce an error toast.
-      // DB version / memory-usage availability is optional admin metadata.
       // Re-runs on connection switch so switching back to admin restores the
       // memory-usage widget.
       try {
-        const connId = activeConnectionId ?? getActiveConnectionIdGlobal();
         const headers = new Headers();
-        if (connId) headers.set("X-Connection-Id", connId);
+        headers.set("X-Connection-Id", activeConnectionId);
         const result = await fetch("/api/DBVersion", { method: "GET", headers });
         if (!result.ok) {
           // Restricted user or version not available — hide memory widget
@@ -849,10 +850,17 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   // Re-check UDF availability whenever the active connection changes so
   // switching back to an admin connection restores the UDF menu.
   useEffect(() => {
-    if (status !== "authenticated") { setShowUDF(false); return; }
+    if (status === "unauthenticated") { setShowUDF(false); return; }
+    // Wait until we have a real connection ID so the server always routes
+    // the request to the correct FalkorDB client rather than falling back
+    // to the most-recently-added Token DB entry (which may be a restricted user).
+    if (status !== "authenticated" || !activeConnectionId) return;
 
     (async () => {
-      const res = await fetch("/api/udf", { method: "GET" });
+      // Pass the connection ID explicitly so the server uses the right client.
+      const headers = new Headers();
+      headers.set("X-Connection-Id", activeConnectionId);
+      const res = await fetch("/api/udf", { method: "GET", headers });
       if (!res.ok) { setShowUDF(false); return; }
 
       const json = await res.json();
@@ -949,7 +957,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     const prev = prevActiveConnectionIdRef.current;
     prevActiveConnectionIdRef.current = activeConnectionId;
 
-    // Skip the very first selection (initial mount / login)
+    // Skip the very first selection (initial mount / login) and null resets
     if (prev === null || activeConnectionId === null) return;
     // Skip if unchanged
     if (prev === activeConnectionId) return;
