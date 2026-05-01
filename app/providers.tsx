@@ -601,28 +601,27 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   useEffect(() => { setActiveConnectionIdGlobal(activeConnectionId); });
 
   useEffect(() => {
-    // Wait until we have a real connection ID so the server always routes
-    // the request to the correct FalkorDB client rather than falling back
-    // to the most-recently-added Token DB entry (which may be a restricted user).
+    // eslint-disable-next-line no-console
+    console.debug(`[DBVersion] fired: status=${status} activeConnectionId=${activeConnectionId}`);
     if (status !== "authenticated" || !activeConnectionId) return;
 
     (async () => {
-      // Use plain fetch (not securedFetch) so NOPERM from restricted users
-      // (who lack module|list permission) doesn't produce an error toast.
-      // Re-runs on connection switch so switching back to admin restores the
-      // memory-usage widget.
       try {
         const headers = new Headers();
         headers.set("X-Connection-Id", activeConnectionId);
         const result = await fetch("/api/DBVersion", { method: "GET", headers });
         if (!result.ok) {
-          // Restricted user or version not available — hide memory widget
+          // eslint-disable-next-line no-console
+          console.debug(`[DBVersion] returned ${result.status} -> showMemoryUsage=false`);
           setShowMemoryUsage(false);
           return;
         }
         const [name, version] = (await result.json()).result || ["", 0];
+        const show = name === "graph" && version >= MEMORY_USAGE_VERSION_THRESHOLD;
+        // eslint-disable-next-line no-console
+        console.debug(`[DBVersion] name=${name} version=${version} -> showMemoryUsage=${show}`);
         setDbVersion(String(version));
-        setShowMemoryUsage(name === "graph" && version >= MEMORY_USAGE_VERSION_THRESHOLD);
+        setShowMemoryUsage(show);
       } catch { /* ignore */ }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
