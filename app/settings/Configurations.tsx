@@ -24,7 +24,8 @@ const disableRunTimeConfigs = new Set([
     "OMP_THREAD_COUNT",
     "NODE_CREATION_BUFFER",
     "BOLT_PORT",
-    "IMPORT_FOLDER"
+    "IMPORT_FOLDER",
+    "TEMP_FOLDER"
 ]);
 
 const Configs: Map<string, Config> = new Map([
@@ -121,6 +122,21 @@ const Configs: Map<string, Config> = new Map([
     ["ASYNC_DELETE", {
         name: "ASYNC_DELETE",
         description: "Controls how graphs are discarded, when set to `yes` graphs are freed on a dedicated thread leaving the server's main thread free, otherwise graphs are freed on the server's main thread.",
+        value: ""
+    }],
+    ["TEMP_FOLDER", {
+        name: "TEMP_FOLDER",
+        description: "Path to the folder FalkorDB uses for temporary files during operations such as graph imports and bulk loading. This is a load-time-only parameter and cannot be changed at runtime.",
+        value: ""
+    }],
+    ["JS_HEAP_SIZE", {
+        name: "JS_HEAP_SIZE",
+        description: "Maximum heap memory (in bytes) available to the JavaScript engine (V8) used for executing User-Defined Functions (UDFs). Increasing this value allows UDFs to process larger data sets, but reduces overall memory available to other processes.",
+        value: ""
+    }],
+    ["JS_STACK_SIZE", {
+        name: "JS_STACK_SIZE",
+        description: "Maximum stack size (in bytes) for the JavaScript engine used for executing User-Defined Functions (UDFs). This controls the maximum call stack depth available to JavaScript-based UDFs.",
         value: ""
     }]
 ]);
