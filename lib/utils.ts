@@ -442,6 +442,11 @@ const USER_READABLE_ERROR_PATTERNS = [
   /^unable to generate\b/i,
   /^no messages provided$/i,
   /^no user messages found$/i,
+  // Connection errors from /api/connections
+  /^cannot connect to falkordb\b/i,
+  /^authentication failed\b/i,
+  /^connection timed out\b/i,
+  /^only admin users can add connections\b/i,
 ];
 
 function isAllowlistedUserError(message: string): boolean {
