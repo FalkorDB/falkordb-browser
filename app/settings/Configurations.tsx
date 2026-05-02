@@ -202,13 +202,13 @@ export default function Configurations() {
         const connHeaders: Record<string, string> = {};
         if (activeConnectionId) connHeaders['X-Connection-Id'] = activeConnectionId;
         // eslint-disable-next-line no-console
-        console.debug('[configs] fetching connId=', activeConnectionId);
+        console.log('[configs] fetching connId=', activeConnectionId);
         const result = await securedFetch("/api/graph/config", {
             method: "GET",
             headers: connHeaders,
         }, toast, setIndicator);
         // eslint-disable-next-line no-console
-        console.debug('[configs] response ok=', result.ok, 'status=', result.status);
+        console.log('[configs] response ok=', result.ok, 'status=', result.status);
         if (!result.ok) return;
 
         const { configs: configurations } = await result.json();
@@ -241,16 +241,14 @@ export default function Configurations() {
         });
 
         // eslint-disable-next-line no-console
-        console.debug('[configs] setting', newConfigs.length, 'rows');
+        console.log('[configs] setting', newConfigs.length, 'rows');
         setConfigs(newConfigs);
     };
 
     useEffect(() => {
-        // Wait for a real connection ID so the request uses the correct
-        // FalkorDB client and doesn't fall back to a restricted Token DB entry.
+        // eslint-disable-next-line no-console
+        console.log('[configs effect] activeConnectionId=', activeConnectionId);
         if (!activeConnectionId) return;
-        // Explicitly sync the module-level global so securedFetch sends
-        // X-Connection-Id correctly even after Next.js HMR module resets.
         setActiveConnectionIdGlobal(activeConnectionId);
         fetchConfigs();
     }, [activeConnectionId]); // eslint-disable-line react-hooks/exhaustive-deps
