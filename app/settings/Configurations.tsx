@@ -129,7 +129,7 @@ export default function Configurations() {
     const [configs, setConfigs] = useState<Row[]>([]);
     const { toast } = useToast();
     const { setIndicator } = useContext(IndicatorContext);
-    const { activeConnectionId } = useContext(ConnectionContext);
+    const { activeConnectionId, additionalConnections } = useContext(ConnectionContext);
 
     const handleSetConfig = async (name: string, value: string, isUndo: boolean) => {
         if (!value) {
@@ -247,11 +247,11 @@ export default function Configurations() {
 
     useEffect(() => {
         // eslint-disable-next-line no-console
-        console.log('[configs effect] activeConnectionId=', activeConnectionId);
+        console.log('[configs effect] activeConnectionId=', activeConnectionId, 'conns=', additionalConnections.length);
         if (!activeConnectionId) return;
         setActiveConnectionIdGlobal(activeConnectionId);
         fetchConfigs();
-    }, [activeConnectionId]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [activeConnectionId, additionalConnections]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
         <div className="grow basis-0 overflow-hidden">
