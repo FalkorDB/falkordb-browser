@@ -201,14 +201,10 @@ export default function Configurations() {
         // regardless of the module-level global state (e.g. after HMR).
         const connHeaders: Record<string, string> = {};
         if (activeConnectionId) connHeaders['X-Connection-Id'] = activeConnectionId;
-        // eslint-disable-next-line no-console
-        console.log('[configs] fetching connId=', activeConnectionId);
         const result = await securedFetch("/api/graph/config", {
             method: "GET",
             headers: connHeaders,
         }, toast, setIndicator);
-        // eslint-disable-next-line no-console
-        console.log('[configs] response ok=', result.ok, 'status=', result.status);
         if (!result.ok) return;
 
         const { configs: configurations } = await result.json();
@@ -240,14 +236,10 @@ export default function Configurations() {
             };
         });
 
-        // eslint-disable-next-line no-console
-        console.log('[configs] setting', newConfigs.length, 'rows');
         setConfigs(newConfigs);
     };
 
     useEffect(() => {
-        // eslint-disable-next-line no-console
-        console.log('[configs effect] activeConnectionId=', activeConnectionId, 'conns=', additionalConnections.length);
         if (!activeConnectionId) return;
         setActiveConnectionIdGlobal(activeConnectionId);
         fetchConfigs();

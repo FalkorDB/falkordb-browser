@@ -876,12 +876,28 @@ export async function getClient(
   }
 
   // The frontend sends the active connection ID via X-Connection-Id
-  // header (or connectionId query param for SSE). If not provided
-  // (e.g. first requests before the frontend has fetched the connection
-  // list), fall back to the most recent connection stored in Token DB.
+  // header (or connectionId query param for SSE).
+  //
+  // Fallback priority when the header is absent:
+  //   1. session.activeConnectionId — the JWT's canonical active connection,
+  //      set by updateSession() whenever the user switches connections.
+  //      This is always correct and avoids Token DB sort-order surprises.
+  //   2. Token DB lookup — last resort for sessions that pre-date the
+  //      activeConnectionId JWT field.
   let connId = getConnectionIdFromRequest(request);
 
   if (!connId) {
+    // Use the session's authoritative active connection ID first.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sessionActiveId = (session as any).activeConnectionId as string | undefined;
+    if (sessionActiveId) {
+      connId = sessionActiveId;
+    }
+  }
+
+  if (!connId) {
+    // Last resort: Token DB lookup (order is newest-first, may not match
+    // the user's actual active connection — avoid when possible).
     try {
       const storage = StorageFactory.getStorage();
       const allTokens = await storage.fetchTokensByUserId(id);
