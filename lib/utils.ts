@@ -544,13 +544,16 @@ export async function securedFetch(
   toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void
 ): Promise<Response> {
-  // Inject X-Connection-Id header when an additional connection is active
+  // Inject X-Connection-Id header when an additional connection is active.
+  // Callers that already set the header explicitly take priority — the global
+  // is only used as a fallback so stale module state can't override a
+  // deliberately-chosen connection ID.
   const effectiveInit = { ...init };
-  if (_activeConnectionId) {
-    const headers = new Headers(effectiveInit.headers);
-    headers.set("X-Connection-Id", _activeConnectionId);
-    effectiveInit.headers = headers;
+  const existingHeaders = new Headers(effectiveInit.headers);
+  if (_activeConnectionId && !existingHeaders.has("X-Connection-Id")) {
+    existingHeaders.set("X-Connection-Id", _activeConnectionId);
   }
+  effectiveInit.headers = existingHeaders;
 
   const response = await fetch(input, effectiveInit);
   const { status } = response;
