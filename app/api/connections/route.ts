@@ -52,13 +52,6 @@ export async function POST(request: Request) {
       );
     }
 
-    if (session.user.role !== "Admin") {
-      return NextResponse.json(
-        { message: "Only admin users can add connections" },
-        { status: 403, headers: getCorsHeaders(request) }
-      );
-    }
-
     let body: Record<string, unknown>;
     try {
       body = await request.json();
