@@ -6,7 +6,7 @@
 "use client";
 
 import { useEffect, useState, useContext } from "react";
-import { prepareArg, securedFetch, setActiveConnectionIdGlobal, Row, DataCell } from "@/lib/utils";
+import { prepareArg, securedFetch, Row, DataCell } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import TableComponent from "../components/TableComponent";
 import ToastButton from "../components/ToastButton";
@@ -129,7 +129,7 @@ export default function Configurations() {
     const [configs, setConfigs] = useState<Row[]>([]);
     const { toast } = useToast();
     const { setIndicator } = useContext(IndicatorContext);
-    const { activeConnectionId, additionalConnections } = useContext(ConnectionContext);
+    const { activeConnectionId } = useContext(ConnectionContext);
 
     const handleSetConfig = async (name: string, value: string, isUndo: boolean) => {
         if (!value) {
@@ -197,15 +197,18 @@ export default function Configurations() {
     };
 
     const fetchConfigs = async () => {
-        // Pass X-Connection-Id explicitly so the correct client is used
-        // regardless of the module-level global state (e.g. after HMR).
-        const connHeaders: Record<string, string> = {};
-        if (activeConnectionId) connHeaders['X-Connection-Id'] = activeConnectionId;
-        const result = await securedFetch("/api/graph/config", {
-            method: "GET",
-            headers: connHeaders,
-        }, toast, setIndicator);
-        if (!result.ok) return;
+        // Use plain fetch with no X-Connection-Id header.
+        // The server uses session.activeConnectionId from the JWT as the
+        // authoritative connection (set by every handleSelect call), so
+        // this is always correct regardless of client-side global state.
+        const result = await fetch("/api/graph/config", { method: "GET" });
+        if (!result.ok) {
+            const body = await result.text().catch(() => "");
+            let message = "Failed to load DB configurations";
+            try { message = JSON.parse(body).message || message; } catch { /* ignore */ }
+            toast({ title: "Error", description: message, variant: "destructive" });
+            return;
+        }
 
         const { configs: configurations } = await result.json();
 
@@ -240,10 +243,12 @@ export default function Configurations() {
     };
 
     useEffect(() => {
-        if (!activeConnectionId) return;
-        setActiveConnectionIdGlobal(activeConnectionId);
+        // Fire on mount and whenever the active connection changes.
+        // No guard needed: the server always resolves the correct connection
+        // via session.activeConnectionId from the JWT.
         fetchConfigs();
-    }, [activeConnectionId, additionalConnections]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeConnectionId]);
 
     return (
         <div className="grow basis-0 overflow-hidden">

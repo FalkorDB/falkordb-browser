@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useContext, useCallback } from "react";
 import { CreateUser, User } from "@/app/api/user/model";
-import { prepareArg, securedFetch, setActiveConnectionIdGlobal, Row, ToastFn } from "@/lib/utils";
+import { prepareArg, securedFetch, Row, ToastFn } from "@/lib/utils";
 import TableComponent from "@/app/components/TableComponent";
 import { useToast } from "@/components/ui/use-toast";
 import { IndicatorContext, ConnectionContext } from "@/app/components/provider";
@@ -28,38 +28,28 @@ export default function Users() {
     const { activeConnectionId } = useContext(ConnectionContext);
 
     useEffect(() => {
-        if (!activeConnectionId) return;
-        setActiveConnectionIdGlobal(activeConnectionId);
-
         (async () => {
-            // Pass X-Connection-Id explicitly so the correct client is used
-            // regardless of the module-level global state (e.g. after HMR).
-            const result = await securedFetch("api/user", {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Connection-Id': activeConnectionId,
-                }
-            }, toast, setIndicator);
-
-            if (result.ok) {
-                const data = await result.json();
-                setUsers(data.result.map((user: User) => ({ ...user, selected: false })));
-                setRows(data.result.map(({ username, role, keys }: { username: string, role: string, keys: string[] }): Row => ({
-                    name: username,
-                    cells: [{
-                        value: username,
-                        type: "readonly"
-                    }, {
-                        value: role,
-                        type: "readonly",
-                    }, {
-                        value: keys.join(", ") || "*",
-                        type: "readonly"
-                    }],
-                    checked: false,
-                })));
-            }
+            // Use plain fetch with no X-Connection-Id header.
+            // The server resolves the correct connection via session.activeConnectionId
+            // from the JWT (updated by every handleSelect call).
+            const result = await fetch("/api/user", { method: 'GET' });
+            if (!result.ok) return;
+            const data = await result.json();
+            setUsers(data.result.map((user: User) => ({ ...user, selected: false })));
+            setRows(data.result.map(({ username, role, keys }: { username: string, role: string, keys: string[] }): Row => ({
+                name: username,
+                cells: [{
+                    value: username,
+                    type: "readonly"
+                }, {
+                    value: role,
+                    type: "readonly",
+                }, {
+                    value: keys.join(", ") || "*",
+                    type: "readonly"
+                }],
+                checked: false,
+            })));
         })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeConnectionId]);
