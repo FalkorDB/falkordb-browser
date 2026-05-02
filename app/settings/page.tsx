@@ -44,14 +44,26 @@ export default function Settings() {
         };
     }, [navigateBack]);
 
+    // Reset to Browser whenever the current tab requires admin access but the
+    // active connection is not admin (e.g. user switches to a read/write connection).
+    const isAdmin = session?.user.role === "Admin" && indicator === "online";
+    const adminOnlyTabs: Tab[] = ["Users", "Configurations"];
+    useEffect(() => {
+        if (!isAdmin && adminOnlyTabs.includes(current)) {
+            setCurrent("Browser");
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAdmin, current]);
+
     useEffect(() => {
         const prev = prevActiveConnectionIdRef.current;
         prevActiveConnectionIdRef.current = activeConnectionId;
         // Only reset when the user explicitly switches connections (non-null → different non-null).
         // Skip the initial null → value transition that happens on first connection load.
-        if (prev != null && activeConnectionId != null && prev !== activeConnectionId && current === "Users") {
+        if (prev != null && activeConnectionId != null && prev !== activeConnectionId && adminOnlyTabs.includes(current as Tab)) {
             setCurrent("Browser");
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeConnectionId, current]);
     const handleSetCurrent = useCallback((tab: Tab) => {
         if (current === "Browser" && hasChanges) {
@@ -68,6 +80,11 @@ export default function Settings() {
     }, [current, hasChanges, resetSettings, saveSettings, toast]);
 
     const getCurrentTab = () => {
+        // Guard: render admin-only tabs only when user has admin access.
+        // This prevents stale renders if the tab state hasn't been reset yet.
+        if (!isAdmin && adminOnlyTabs.includes(current as Tab)) {
+            return <BrowserSettings />;
+        }
         switch (current) {
             case 'Users':
                 return <Users />;
