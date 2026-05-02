@@ -601,13 +601,14 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   useEffect(() => { setActiveConnectionIdGlobal(activeConnectionId); });
 
   useEffect(() => {
-    if (status !== "authenticated" || !activeConnectionId) return;
-
+    if (status !== "authenticated") return;
+    // Use plain fetch with no X-Connection-Id — the server resolves the
+    // connection via session.activeConnectionId from the JWT, which is always
+    // correct (set by every connection switch). This avoids the timing race
+    // where activeConnectionId is null on page load and the check never fires.
     (async () => {
       try {
-        const headers = new Headers();
-        headers.set("X-Connection-Id", activeConnectionId);
-        const result = await fetch("/api/DBVersion", { method: "GET", headers });
+        const result = await fetch("/api/DBVersion", { method: "GET" });
         if (!result.ok) {
           setShowMemoryUsage(false);
           return;
@@ -619,7 +620,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, activeConnectionId]);
-
   useEffect(() => {
     if (status !== "authenticated") {
       setConnectionType("Standalone");
@@ -849,16 +849,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   // switching back to an admin connection restores the UDF menu.
   useEffect(() => {
     if (status === "unauthenticated") { setShowUDF(false); return; }
-    // Wait until we have a real connection ID so the server always routes
-    // the request to the correct FalkorDB client rather than falling back
-    // to the most-recently-added Token DB entry (which may be a restricted user).
-    if (status !== "authenticated" || !activeConnectionId) return;
-
+    if (status !== "authenticated") return;
+    // Use plain fetch with no X-Connection-Id — server resolves via JWT.
     (async () => {
-      // Pass the connection ID explicitly so the server uses the right client.
-      const headers = new Headers();
-      headers.set("X-Connection-Id", activeConnectionId);
-      const res = await fetch("/api/udf", { method: "GET", headers });
+      const res = await fetch("/api/udf", { method: "GET" });
       if (!res.ok) { setShowUDF(false); return; }
 
       const json = await res.json();
