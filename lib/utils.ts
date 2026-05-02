@@ -468,6 +468,13 @@ export function toUserFriendlyMessage(raw: unknown, status: number): UserFriendl
     return { title: "Syntax Error", description: formatSyntaxError(parsed.message, parsed.context, parsed.contextOffset), syntaxError: parsed };
   }
 
+  // Check the allowlist FIRST so that server-provided specific messages
+  // (e.g. "Connection timed out. Please check the host…") are shown as-is
+  // and are not overridden by the generic pattern handlers below.
+  if (isAllowlistedUserError(rawMessage)) {
+    return { title: "Error", description: rawMessage };
+  }
+
   const lower = rawMessage.toLowerCase();
 
   if (lower.includes("connection refused") || lower.includes("econnrefused")) {
@@ -500,10 +507,6 @@ export function toUserFriendlyMessage(raw: unknown, status: number): UserFriendl
 
   if (status >= 500) {
     return { title: "Error", description: "Something went wrong on the server. Please try again later." };
-  }
-
-  if (isAllowlistedUserError(rawMessage)) {
-    return { title: "Error", description: rawMessage };
   }
 
   return { title: "Error", description: "An unexpected error occurred. Please try again." };
