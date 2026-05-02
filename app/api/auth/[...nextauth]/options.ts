@@ -878,32 +878,30 @@ export async function getClient(
   // The frontend sends the active connection ID via X-Connection-Id
   // header (or connectionId query param for SSE).
   //
-  // Fallback priority when the header is absent:
-  //   1. session.activeConnectionId — the JWT's canonical active connection,
-  //      set by updateSession() whenever the user switches connections.
-  //      This is always correct and avoids Token DB sort-order surprises.
-  //   2. Token DB lookup — last resort for sessions that pre-date the
-  //      activeConnectionId JWT field.
+  // When no header is present, fall back to the Token DB connection list.
+  // If session.activeConnectionId (from the JWT) matches one of the Token DB
+  // entries, prefer it over the default (newest-first) order — but ONLY if it
+  // actually exists in the Token DB. This prevents a stale session.activeConnectionId
+  // (e.g. after another test signs out and deletes connections) from bypassing
+  // the legacy reconnect fallback and triggering an unexpected SESSION_INVALID.
   let connId = getConnectionIdFromRequest(request);
 
   if (!connId) {
-    // Use the session's authoritative active connection ID first.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sessionActiveId = (session as any).activeConnectionId as string | undefined;
-    if (sessionActiveId) {
-      connId = sessionActiveId;
-    }
-  }
-
-  if (!connId) {
-    // Last resort: Token DB lookup (order is newest-first, may not match
-    // the user's actual active connection — avoid when possible).
     try {
       const storage = StorageFactory.getStorage();
       const allTokens = await storage.fetchTokensByUserId(id);
       const connTokens = allTokens.filter(t => t.name.startsWith("connection:"));
       if (connTokens.length > 0) {
+        // Default: first entry from Token DB
         connId = connTokens[0].token_id;
+        // Prefer session.activeConnectionId if it exists in the Token DB list
+        // (ensures the correct connection is used after a switch, even when
+        // the Token DB sort order would pick a different entry).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sessionActiveId = (session as any).activeConnectionId as string | undefined;
+        if (sessionActiveId && connTokens.some(t => t.token_id === sessionActiveId)) {
+          connId = sessionActiveId;
+        }
       }
     } catch (e) {
       // eslint-disable-next-line no-console
