@@ -64,6 +64,7 @@ export default function DuplicateGraph({ open, onOpenChange, selectedValue, onDu
             open={open}
             onOpenChange={onOpenChange}
             trigger={<Button
+                className="p-1"
                 variant="Primary"
                 label="Duplicate"
                 title={`Create a copy of the selected ${type} (single graph only)`}

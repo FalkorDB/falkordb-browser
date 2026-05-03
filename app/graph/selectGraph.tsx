@@ -276,9 +276,9 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         data-testid="manageContent"
                         role="dialog"
                         aria-label={`Manage ${type}s`}
-                        className="fixed top-16 left-3 z-30 flex flex-col gap-4 border border-border rounded-lg shadow-lg h-[calc(70dvh-5rem)] w-[41dvw] p-2 bg-background"
+                        className="fixed top-16 left-3 z-30 flex flex-col gap-2 border border-border rounded-lg shadow-lg h-[493px] w-[750px] p-2 bg-background"
                     >
-                        <div className="flex flex-row justify-between items-center border-b border-border pb-4">
+                        <div className="flex flex-row justify-between items-center border-b border-border pb-1">
                             <h2 className="text-2xl font-medium flex items-center gap-2">
                                 Manage {type}s
                                 <Settings size={22} className="text-foreground/60" />
@@ -292,14 +292,14 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                             </Button>
                         </div>
                         <TableComponent
-                            className="grow overflow-hidden"
+                            className="grow overflow-hidden gap-2"
                             label={`${type}s`}
                             entityName={type}
                             headers={[
                                 "Name",
-                                ...(showMemoryUsage ? [{ name: "Memory Usage", width: "15%" }] : []),
-                                { name: "Nodes #", width: "15%" },
-                                { name: "Edges #", width: "15%" }
+                                ...(showMemoryUsage ? [{ name: "Memory Usage", width: "20%" }] : []),
+                                { name: "Nodes #", width: "10%" },
+                                { name: "Edges #", width: "10%" }
                             ]}
                             rows={rows}
                             setRows={setRows}
