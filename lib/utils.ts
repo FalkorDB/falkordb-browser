@@ -252,7 +252,14 @@ export async function getSSEGraphResult(
   return new Promise((resolve, reject) => {
     let handled = false;
 
-    const evtSource = new EventSource(url);
+    // Inject connectionId as a query param for SSE (EventSource doesn't support headers)
+    let effectiveUrl = url;
+    if (_activeConnectionId) {
+      const sep = effectiveUrl.includes("?") ? "&" : "?";
+      effectiveUrl += `${sep}connectionId=${encodeURIComponent(_activeConnectionId)}`;
+    }
+
+    const evtSource = new EventSource(effectiveUrl);
     evtSource.addEventListener("result", (event: MessageEvent) => {
       const result = JSON.parse(event.data);
       evtSource.close();
@@ -435,6 +442,10 @@ const USER_READABLE_ERROR_PATTERNS = [
   /^unable to generate\b/i,
   /^no messages provided$/i,
   /^no user messages found$/i,
+  // Connection errors from /api/connections
+  /^cannot connect to falkordb\b/i,
+  /^authentication failed\b/i,
+  /^connection timed out\b/i,
 ];
 
 function isAllowlistedUserError(message: string): boolean {
@@ -454,6 +465,13 @@ export function toUserFriendlyMessage(raw: unknown, status: number): UserFriendl
   const parsed = parseSyntaxError(rawMessage);
   if (parsed) {
     return { title: "Syntax Error", description: formatSyntaxError(parsed.message, parsed.context, parsed.contextOffset), syntaxError: parsed };
+  }
+
+  // Check the allowlist FIRST so that server-provided specific messages
+  // (e.g. "Connection timed out. Please check the host…") are shown as-is
+  // and are not overridden by the generic pattern handlers below.
+  if (isAllowlistedUserError(rawMessage)) {
+    return { title: "Error", description: rawMessage };
   }
 
   const lower = rawMessage.toLowerCase();
@@ -490,10 +508,6 @@ export function toUserFriendlyMessage(raw: unknown, status: number): UserFriendl
     return { title: "Error", description: "Something went wrong on the server. Please try again later." };
   }
 
-  if (isAllowlistedUserError(rawMessage)) {
-    return { title: "Error", description: rawMessage };
-  }
-
   return { title: "Error", description: "An unexpected error occurred. Please try again." };
 }
 
@@ -509,13 +523,46 @@ function triggerSessionInvalidationSignOut(): void {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Active connection ID for multi-connection support.
+// When set, securedFetch automatically injects an X-Connection-Id header so
+// the backend routes requests to the correct FalkorDB client.
+//
+// NOTE: do NOT initialise from localStorage here. If the user's last
+// explicit connection was a restricted user (e.g. shahar), initialising
+// _activeConnectionId to that ID would cause securedFetch to overwrite
+// any explicitly-passed X-Connection-Id headers (set by settings components)
+// with the restricted ID. The dep-free effect in providers.tsx keeps this
+// global in sync with the React activeConnectionId state after every render.
+// ---------------------------------------------------------------------------
+let _activeConnectionId: string | null = null;
+
+export function setActiveConnectionIdGlobal(id: string | null) {
+  _activeConnectionId = id;
+}
+
+export function getActiveConnectionIdGlobal(): string | null {
+  return _activeConnectionId;
+}
+
 export async function securedFetch(
   input: string,
   init: RequestInit,
   toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void
 ): Promise<Response> {
-  const response = await fetch(input, init);
+  // Inject X-Connection-Id header when an additional connection is active.
+  // Callers that already set the header explicitly take priority — the global
+  // is only used as a fallback so stale module state can't override a
+  // deliberately-chosen connection ID.
+  const effectiveInit = { ...init };
+  const existingHeaders = new Headers(effectiveInit.headers);
+  if (_activeConnectionId && !existingHeaders.has("X-Connection-Id")) {
+    existingHeaders.set("X-Connection-Id", _activeConnectionId);
+  }
+  effectiveInit.headers = existingHeaders;
+
+  const response = await fetch(input, effectiveInit);
   const { status } = response;
 
   // The server signals "your session is orphaned, sign out now" via this
@@ -648,22 +695,28 @@ const processEntries = (arr: MemoryValueType): Map<string, MemoryValue> => {
 export const getMemoryUsage = async (
   name: string,
   toast: ToastFn,
-  setIndicator: (indicator: "online" | "offline") => void
+  setIndicator: (indicator: "online" | "offline") => void,
+  // Pass activeConnectionId explicitly from React context/closure.
+  // This avoids relying on the module-level global _activeConnectionId
+  // which can be reset to null by Next.js HMR between renders.
+  connectionId?: string | null
 ): Promise<Map<string, MemoryValue>> => {
-  const result = await securedFetch(
-    `api/graph/${prepareArg(name)}/memory`,
-    {
-      method: "GET",
-    },
-    toast,
-    setIndicator
-  );
-
-  if (!result.ok) return new Map();
-
-  const json = await result.json();
-
-  return processEntries(json.result);
+  // Use plain fetch (not securedFetch) so NOPERM / version-too-low 400 errors
+  // from restricted users don't produce error toasts — memory usage is an
+  // optional admin-only feature and missing it is not an error worth surfacing.
+  try {
+    const effectiveConnId = connectionId !== undefined ? connectionId : _activeConnectionId;
+    const headers = new Headers();
+    if (effectiveConnId) {
+      headers.set("X-Connection-Id", effectiveConnId);
+    }
+    const result = await fetch(`/api/graph/${prepareArg(name)}/memory`, { headers });
+    if (!result.ok) return new Map();
+    const json = await result.json();
+    return processEntries(json.result);
+  } catch {
+    return new Map();
+  }
 };
 
 /**

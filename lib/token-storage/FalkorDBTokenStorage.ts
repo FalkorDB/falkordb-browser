@@ -29,7 +29,9 @@ class FalkorDBTokenStorage implements ITokenStorage {
         last_used: ${tokenData.last_used},
         is_active: ${tokenData.is_active},
         encrypted_password: '${this.escapeString(tokenData.encrypted_password)}',
-        kind: '${this.escapeString(kind)}'
+        kind: '${this.escapeString(kind)}',
+        tls: ${tokenData.tls ?? false},
+        ca: '${this.escapeString(tokenData.ca ?? '')}'
       })
       CREATE (t)-[:BELONGS_TO]->(u)
       RETURN t.token_id as token_id
@@ -65,7 +67,9 @@ class FalkorDBTokenStorage implements ITokenStorage {
              t.last_used as last_used,
              t.is_active as is_active,
              t.encrypted_password as encrypted_password,
-             t.kind as kind
+             t.kind as kind,
+             t.tls as tls,
+             t.ca as ca
       ORDER BY t.created_at DESC
     `;
 
@@ -87,12 +91,14 @@ class FalkorDBTokenStorage implements ITokenStorage {
       is_active: row.is_active,
       encrypted_password: row.encrypted_password,
       kind: row.kind ?? 'pat',
+      tls: row.tls ?? false,
+      ca: row.ca || undefined,
     }));
   }
 
   async fetchTokenById(tokenId: string): Promise<TokenData | null> {
     const query = `
-      MATCH (t:Token {token_id: '${this.escapeString(tokenId)}'})-[:BELONGS_TO]->(u:User)
+      MATCH (t:Token {token_id: '${this.escapeString(tokenId)}'})
       RETURN t.token_hash as token_hash,
              t.token_id as token_id,
              t.user_id as user_id,
@@ -105,7 +111,9 @@ class FalkorDBTokenStorage implements ITokenStorage {
              t.expires_at as expires_at,
              t.last_used as last_used,
              t.is_active as is_active,
-             t.encrypted_password as encrypted_password
+             t.encrypted_password as encrypted_password,
+             t.tls as tls,
+             t.ca as ca
     `;
 
     const result = await executePATQuery(query);
@@ -131,6 +139,8 @@ class FalkorDBTokenStorage implements ITokenStorage {
       last_used: row.last_used,
       is_active: row.is_active,
       encrypted_password: row.encrypted_password,
+      tls: row.tls ?? false,
+      ca: row.ca || undefined,
     };
   }
 
@@ -207,6 +217,59 @@ class FalkorDBTokenStorage implements ITokenStorage {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const row = result.data[0] as any;
     return row.encrypted_password || null;
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  async fetchTokensByUserId(userId: string, kind?: import('./ITokenStorage').TokenKind): Promise<TokenData[]> {
+    const nowUnix = Math.floor(Date.now() / 1000);
+    const kindFilter = kind
+      ? kind === 'pat'
+        ? "AND (t.kind IS NULL OR t.kind = 'pat')"
+        : `AND t.kind = '${this.escapeString(kind)}'`
+      : '';
+    const query = `
+      MATCH (t:Token {user_id: '${this.escapeString(userId)}'})
+      WHERE t.is_active = true
+        AND (t.expires_at = -1 OR t.expires_at > ${nowUnix})
+        ${kindFilter}
+      RETURN t.token_hash as token_hash,
+             t.token_id as token_id,
+             t.user_id as user_id,
+             t.username as username,
+             t.name as name,
+             t.role as role,
+             t.host as host,
+             t.port as port,
+             t.created_at as created_at,
+             t.expires_at as expires_at,
+             t.last_used as last_used,
+             t.is_active as is_active,
+             t.encrypted_password as encrypted_password,
+             t.kind as kind,
+             t.tls as tls,
+             t.ca as ca
+      ORDER BY t.created_at DESC
+    `;
+    const result = await executePATQuery(query);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (result.data || []).map((row: any) => ({
+      token_hash: row.token_hash,
+      token_id: row.token_id,
+      user_id: row.user_id,
+      username: row.username,
+      name: row.name,
+      role: row.role,
+      host: row.host,
+      port: row.port,
+      created_at: row.created_at,
+      expires_at: row.expires_at,
+      last_used: row.last_used,
+      is_active: row.is_active,
+      encrypted_password: row.encrypted_password,
+      kind: row.kind ?? 'pat',
+      tls: row.tls ?? false,
+      ca: row.ca || undefined,
+    }));
   }
 
   // eslint-disable-next-line class-methods-use-this

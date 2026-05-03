@@ -43,7 +43,7 @@ interface Props {
 export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, type, setGraph }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext);
-    const { isReadOnly } = useContext(ConnectionContext);
+    const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
     const {
         settings: {
             contentPersistenceSettings: {
@@ -76,11 +76,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const loadMemory = useCallback((opt: string) =>
         async () => {
-            const memoryMap = await getMemoryUsage(opt, toast, setIndicator);
+            const memoryMap = await getMemoryUsage(opt, toast, setIndicator, activeConnectionId);
             const memoryValue = memoryMap.get("total_graph_sz_mb") || '<1';
 
             return `${memoryValue} MB`;
-        }, [toast, setIndicator]);
+        }, [toast, setIndicator, activeConnectionId]);
 
     const loadNodesCount = useCallback((opt: string) =>
         async () => {
@@ -179,7 +179,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 cells
             };
         }));
-    }, [sessionRole, handleSetOption, loadMemory, loadNodesCount, loadEdgesCount, showMemoryUsage]);
+    }, [sessionRole, handleSetOption, loadMemory, loadNodesCount, loadEdgesCount, showMemoryUsage, isReadOnly]);
 
     useEffect(() => {
         if (!openMenage) {
