@@ -1,7 +1,7 @@
 /* eslint-disable no-case-declarations */
 /* eslint-disable react/no-array-index-key */
 import { cn, getTheme, Message, toUserFriendlyMessage } from "@/lib/utils";
-import { useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { memo, useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
 import { useTheme } from "next-themes";
@@ -17,6 +17,28 @@ import { EventType } from "../api/chat/route";
 import ToastButton from "../components/ToastButton";
 import { ShineBorder } from "@/components/ui/shine-border";
 import { getConnectionItem, setConnectionItem, getConnectionPrefix } from "@/lib/connection-storage";
+
+const mdInstance = new MarkdownIt({
+    html: false,
+    linkify: true,
+    breaks: true,
+});
+
+const MarkdownMessage = memo(function MarkdownMessage({ content }: { content: string }) {
+    const sanitizedHtml = useMemo(() => {
+        const raw = typeof content === "string" ? content : String(content ?? "");
+        return DOMPurify.sanitize(mdInstance.render(raw));
+    }, [content]);
+
+    return (
+        <div
+            data-testid="chatMessageMarkdown"
+            className="text-sm markdown-body"
+            // eslint-disable-next-line react/no-danger
+            dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+        />
+    );
+});
 
 // Function to get the last maxSavedMessages user messages and all messages in between
 const getLastUserMessagesWithContext = (allMessages: Message[], maxUserMessages: number) => {
@@ -388,12 +410,6 @@ export default function Chat({ onClose }: Props) {
         }
     };
 
-    const md = useMemo(() => new MarkdownIt({
-        html: false,
-        linkify: true,
-        breaks: true,
-    }), []);
-
     const getMessage = (message: Message, index?: number) => {
         switch (message.type) {
             case "Status":
@@ -474,16 +490,7 @@ export default function Chat({ onClose }: Props) {
                     </div>
                 );
             default:
-                const rawContent = typeof message.content === "string" ? message.content : String(message.content ?? "");
-                const sanitizedHtml = DOMPurify.sanitize(md.render(rawContent));
-                return (
-                    <div
-                        data-testid="chatMessageMarkdown"
-                        className="text-sm markdown-body"
-                        // eslint-disable-next-line react/no-danger
-                        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-                    />
-                );
+                return <MarkdownMessage content={message.content} />;
         }
     };
 

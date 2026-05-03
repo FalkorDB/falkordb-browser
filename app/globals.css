@@ -282,6 +282,9 @@ input[type="color"]::-webkit-color-swatch {
 .markdown-body table {
     border-collapse: collapse;
     margin: 0.5em 0;
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
 }
 
 .markdown-body th,
