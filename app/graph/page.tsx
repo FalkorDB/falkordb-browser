@@ -90,6 +90,7 @@ export default function Page() {
 
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
     const [chatOpen, setChatOpen] = useState(false);
+    const [queriesOpen, setQueriesOpen] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(true);
     const [isAddNode, setIsAddNode] = useState(false);
     const [isAddEdge, setIsAddEdge] = useState(false);
@@ -444,6 +445,8 @@ export default function Page() {
                 isQueryLoading={isQueryLoading}
                 chatOpen={chatOpen}
                 setChatOpen={setChatOpen}
+                queriesOpen={queriesOpen}
+                setQueriesOpen={setQueriesOpen}
             />
             <ResizablePanelGroup orientation="horizontal" className="h-1 grow relative">
                 <ResizablePanel
