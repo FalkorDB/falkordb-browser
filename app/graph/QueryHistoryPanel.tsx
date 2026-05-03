@@ -286,7 +286,7 @@ export default function QueryHistoryPanel({ onClose }: Props) {
 
     return (
         <div data-testid="queryHistoryPanel" className="h-full w-full border border-border rounded-lg bg-background">
-            <div className="relative h-full w-full flex flex-col gap-2 rounded-lg p-3">
+            <div className="relative h-full w-full flex flex-col gap-2 rounded-lg p-3 overflow-y-auto">
                 <Button
                     data-testid="queryHistoryCloseButton"
                     className="absolute top-2 right-2"
@@ -299,254 +299,252 @@ export default function QueryHistoryPanel({ onClose }: Props) {
                     <h1 className="text-lg font-semibold">Query History</h1>
                     <History size={20} className="text-foreground/50" />
                 </div>
-                <div className="flex flex-col gap-2 overflow-hidden min-h-0 flex-1">
-                    <PaginationList
-                        label="Query"
-                        className="bg-secondary rounded-lg overflow-hidden shrink-0 max-h-[55%]"
-                        isSelected={(item) => historyQuery.queries.findIndex(q => q.text === item.text) + 1 === historyQuery.counter}
-                        isDeleteSelected={(item) => deleteElements.some(idx => historyQuery.queries[idx]?.text === item.text)}
-                        afterSearchCallback={afterSearchCallback}
-                        onToggleFav={handleToggleFav}
-                        dataTestId="queryHistory"
-                        list={filteredQueries}
-                        onClick={(counter, evt) => {
-                            const index = historyQuery.queries.findIndex(q => q.text === counter);
+                <PaginationList
+                    label="Query"
+                    className="bg-secondary rounded-lg overflow-hidden grow basis-0"
+                    isSelected={(item) => historyQuery.queries.findIndex(q => q.text === item.text) + 1 === historyQuery.counter}
+                    isDeleteSelected={(item) => deleteElements.some(idx => historyQuery.queries[idx]?.text === item.text)}
+                    afterSearchCallback={afterSearchCallback}
+                    onToggleFav={handleToggleFav}
+                    dataTestId="queryHistory"
+                    list={filteredQueries}
+                    onClick={(counter, evt) => {
+                        const index = historyQuery.queries.findIndex(q => q.text === counter);
 
-                            if (evt.type === "rightclick") {
-                                if (evt.ctrlKey) {
-                                    setDeleteElements(prev => prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]);
-                                } else {
-                                    setDeleteElements(prev => prev.includes(index) ? [] : [index]);
-                                }
-                            } else if (evt.type === "click") {
-                                setHistoryQuery(prev => ({
-                                    ...prev,
-                                    counter: index + 1 === historyQuery.counter ? 0 : index + 1
-                                }));
-                                setTab("text");
+                        if (evt.type === "rightclick") {
+                            if (evt.ctrlKey) {
+                                setDeleteElements(prev => prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]);
+                            } else {
+                                setDeleteElements(prev => prev.includes(index) ? [] : [index]);
                             }
-                        }}
-                        onDoubleClick={async (counter) => {
-                            const index = historyQuery.queries.findIndex(q => q.text === counter);
+                        } else if (evt.type === "click") {
                             setHistoryQuery(prev => ({
                                 ...prev,
-                                counter: index + 1
+                                counter: index + 1 === historyQuery.counter ? 0 : index + 1
                             }));
                             setTab("text");
-                            try {
-                                setIsLoading(true);
-                                if (counter.trim()) {
-                                    await runQuery(counter.trim());
-                                }
-                                onClose();
-                            } finally {
-                                setIsLoading(false);
+                        }
+                    }}
+                    onDoubleClick={async (counter) => {
+                        const index = historyQuery.queries.findIndex(q => q.text === counter);
+                        setHistoryQuery(prev => ({
+                            ...prev,
+                            counter: index + 1
+                        }));
+                        setTab("text");
+                        try {
+                            setIsLoading(true);
+                            if (counter.trim()) {
+                                await runQuery(counter.trim());
                             }
-                        }}
-                        searchRef={searchQueryRef}
-                    >
-                        <ul className="w-full flex flex-wrap gap-2 overflow-y-auto max-h-[80px] p-1">
-                            <li key="info">
-                                <Tooltip>
-                                    <TooltipTrigger className="h-[28px] flex items-center text-foreground/60">
-                                        <Info size={16} />
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        Press graph name to see history of that graph
-                                    </TooltipContent>
-                                </Tooltip>
-                            </li>
-                            <li key="fav-filter" className="max-w-full h-[28px]">
-                                <Button
-                                    data-testid="queryHistoryFavFilter"
-                                    className={cn("bg-background py-0.5 px-2 rounded-full w-full flex items-center gap-1 text-xs", favFilter && "text-background bg-foreground")}
-                                    title="Filter by favorites"
-                                    onClick={() => handelSetFilteredQueries(undefined, !favFilter)}
-                                >
-                                    <Star size={12} className={cn(favFilter ? "fill-fav text-fav" : "")} />
-                                    Favorites
-                                </Button>
-                            </li>
-                            {
-                                filters.map(name => (
-                                    <li key={name} className="max-w-full h-[28px]">
-                                        <Button
-                                            className={cn("bg-background py-0.5 px-2 rounded-full w-full text-xs", activeFilters.some(f => f === name) && "text-background bg-foreground")}
-                                            label={name}
-                                            onClick={() => handelSetFilteredQueries(name)}
-                                        />
-                                    </li>
-                                ))
-                            }
-                        </ul>
-                        <div className="flex gap-2">
+                            onClose();
+                        } finally {
+                            setIsLoading(false);
+                        }
+                    }}
+                    searchRef={searchQueryRef}
+                >
+                    <ul className="w-full flex flex-wrap  items-center gap-2 overflow-y-auto max-h-[80px] p-1">
+                        <li key="info" className="flex flex-col items-center">
+                            <Tooltip>
+                                <TooltipTrigger className="flex items-center text-foreground/60">
+                                    <Info size={16} />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    Press graph name to see history of that graph
+                                </TooltipContent>
+                            </Tooltip>
+                        </li>
+                        <li key="fav-filter" className="max-w-full">
                             <Button
-                                className="p-1"
-                                variant="Delete"
-                                data-testid="queryHistoryDelete"
-                                title={`Remove selected query from history
+                                data-testid="queryHistoryFavFilter"
+                                className={cn("bg-background py-0.5 px-2 rounded-full w-full flex items-center gap-1 text-xs", favFilter && "text-background bg-foreground")}
+                                title="Filter by favorites"
+                                onClick={() => handelSetFilteredQueries(undefined, !favFilter)}
+                            >
+                                <Star size={12} className={cn(favFilter ? "fill-fav text-fav" : "")} />
+                                Favorites
+                            </Button>
+                        </li>
+                        {
+                            filters.map(name => (
+                                <li key={name} className="max-w-full">
+                                    <Button
+                                        className={cn("bg-background py-0.5 px-2 rounded-full w-full text-xs", activeFilters.some(f => f === name) && "text-background bg-foreground")}
+                                        label={name}
+                                        onClick={() => handelSetFilteredQueries(name)}
+                                    />
+                                </li>
+                            ))
+                        }
+                    </ul>
+                    <div className="flex gap-2">
+                        <Button
+                            className="p-1"
+                            variant="Delete"
+                            data-testid="queryHistoryDelete"
+                            title={`Remove selected query from history
                                     press (Right Click) to select
                                     press (Ctrl + Right Click) for multi select`}
-                                onClick={handleDeleteQuery}
-                                disabled={deleteElements.length === 0}
-                            >
-                                <Trash2 size={16} />
-                            </Button>
-                            <Button
-                                className="p-1 text-xs"
-                                variant="Delete"
-                                data-testid="queryHistoryDelete"
-                                title="Remove all queries from history"
-                                onClick={() => {
-                                    removeConnectionItem("query history");
-                                    setHistoryQuery(prev => ({
-                                        ...prev,
-                                        queries: [],
-                                        counter: 0
-                                    }));
-                                    setFilteredQueries([]);
-                                    setActiveFilters([]);
-                                    setDeleteElements([]);
-                                }}
-                                disabled={historyQuery.queries.length === 0}
-                            >
-                                <Trash2 size={16} /> All
-                            </Button>
-                            <Button
-                                variant="Delete"
-                                className="p-1 text-xs"
-                                data-testid="queryHistoryClearFav"
-                                title="Clear all favorites"
-                                onClick={() => {
-                                    const newQueries = historyQuery.queries.map(q => ({ ...q, fav: false, name: undefined }));
-                                    setConnectionItem("query history", JSON.stringify(newQueries));
-                                    setHistoryQuery(prev => ({
-                                        ...prev,
-                                        queries: newQueries,
-                                        currentQuery: prev.currentQuery.fav
-                                            ? { ...prev.currentQuery, fav: false, name: undefined }
-                                            : prev.currentQuery,
-                                    }));
-                                    setFilteredQueries(prev => prev.map(q => ({ ...q, fav: false, name: undefined })));
-                                }}
-                                disabled={!historyQuery.queries.some(q => q.fav)}
-                            >
-                                <Star size={14} /> Clear
-                            </Button>
-                        </div>
-                    </PaginationList>
-                    <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="w-full flex flex-col gap-2 items-center min-h-0 flex-1">
-                        <TabsList className="h-fit bg-background gap-1">
-                            <TabsTrigger className={cn("text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
-                            <TabsTrigger className={cn("text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>
-                            <TabsTrigger className={cn("text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("metadata")} value="metadata">Metadata</TabsTrigger>
-                            <TabsTrigger className={cn("text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("explain")} value="explain">Explain</TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="text" className="mt-0 w-full flex-1 min-h-0 bg-secondary rounded-lg relative p-2 overflow-hidden">
+                            onClick={handleDeleteQuery}
+                            disabled={deleteElements.length === 0}
+                        >
+                            <Trash2 size={16} />
+                        </Button>
+                        <Button
+                            className="p-1 text-xs"
+                            variant="Delete"
+                            data-testid="queryHistoryDelete"
+                            title="Remove all queries from history"
+                            onClick={() => {
+                                removeConnectionItem("query history");
+                                setHistoryQuery(prev => ({
+                                    ...prev,
+                                    queries: [],
+                                    counter: 0
+                                }));
+                                setFilteredQueries([]);
+                                setActiveFilters([]);
+                                setDeleteElements([]);
+                            }}
+                            disabled={historyQuery.queries.length === 0}
+                        >
+                            <Trash2 size={16} /> All
+                        </Button>
+                        <Button
+                            variant="Delete"
+                            className="p-1 text-xs"
+                            data-testid="queryHistoryClearFav"
+                            title="Clear all favorites"
+                            onClick={() => {
+                                const newQueries = historyQuery.queries.map(q => ({ ...q, fav: false, name: undefined }));
+                                setConnectionItem("query history", JSON.stringify(newQueries));
+                                setHistoryQuery(prev => ({
+                                    ...prev,
+                                    queries: newQueries,
+                                    currentQuery: prev.currentQuery.fav
+                                        ? { ...prev.currentQuery, fav: false, name: undefined }
+                                        : prev.currentQuery,
+                                }));
+                                setFilteredQueries(prev => prev.map(q => ({ ...q, fav: false, name: undefined })));
+                            }}
+                            disabled={!historyQuery.queries.some(q => q.fav)}
+                        >
+                            <Star size={14} /> Clear
+                        </Button>
+                    </div>
+                </PaginationList>
+                <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="w-full flex flex-col gap-2 items-center h-[200px]">
+                    <TabsList className="h-fit bg-background gap-1">
+                        <TabsTrigger className={cn("text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
+                        <TabsTrigger className={cn("text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>
+                        <TabsTrigger className={cn("text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("metadata")} value="metadata">Metadata</TabsTrigger>
+                        <TabsTrigger className={cn("text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("explain")} value="explain">Explain</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="text" className="mt-0 h-full w-full bg-secondary rounded-lg relative p-2 overflow-hidden">
+                        {
+                            currentQuery &&
+                            <>
+                                <Button
+                                    ref={submitQuery}
+                                    data-testid="queryHistoryEditorRun"
+                                    className="z-10 absolute bottom-3 right-4 py-1.5 px-6 text-sm"
+                                    indicator={indicator}
+                                    variant="Primary"
+                                    label="Run"
+                                    title="Press Enter to run the query"
+                                    onClick={handleSubmit}
+                                    isLoading={isLoading}
+                                    disabled={isQueryLoading}
+                                />
+                                <EditorComponent
+                                    className="SofiaSans"
+                                    height="100%"
+                                    language={CYPHER_LANGUAGE_NAME}
+                                    themeName="selector-theme"
+                                    themeBackground={secondary}
+                                    options={{
+                                        lineHeight: 22,
+                                        fontSize: 14,
+                                        lineNumbersMinChars: 3,
+                                        scrollbar: {
+                                            horizontal: "auto"
+                                        },
+                                        scrollBeyondLastLine: false,
+                                        wordWrap: "off",
+                                        renderWhitespace: "none"
+                                    }}
+                                    value={historyQuery.query}
+                                    onChange={(value) => {
+                                        setHistoryQuery(prev => {
+                                            const newHistoryQuery = {
+                                                ...prev,
+                                                query: value || "",
+                                                currentQuery: {
+                                                    ...prev.currentQuery,
+                                                    text: prev.counter ? prev.currentQuery.text : value || ""
+                                                }
+                                            };
+
+                                            return newHistoryQuery;
+                                        });
+                                    }}
+                                    onMount={handleEditorDidMount}
+                                />
+                            </>
+                        }
+                    </TabsContent>
+                    <TabsContent className="h-full w-full bg-secondary rounded-lg p-4 overflow-auto" value="profile">
+                        <div className="h-full w-full overflow-auto flex flex-col gap-4">
                             {
                                 currentQuery &&
-                                <>
-                                    <Button
-                                        ref={submitQuery}
-                                        data-testid="queryHistoryEditorRun"
-                                        className="z-10 absolute bottom-3 right-4 py-1.5 px-6 text-sm"
-                                        indicator={indicator}
-                                        variant="Primary"
-                                        label="Run"
-                                        title="Press Enter to run the query"
-                                        onClick={handleSubmit}
-                                        isLoading={isLoading}
-                                        disabled={isQueryLoading}
-                                    />
-                                    <EditorComponent
-                                        className="SofiaSans"
-                                        height="100%"
-                                        language={CYPHER_LANGUAGE_NAME}
-                                        themeName="selector-theme"
-                                        themeBackground={secondary}
-                                        options={{
-                                            lineHeight: 22,
-                                            fontSize: 14,
-                                            lineNumbersMinChars: 3,
-                                            scrollbar: {
-                                                horizontal: "auto"
-                                            },
-                                            scrollBeyondLastLine: false,
-                                            wordWrap: "off",
-                                            renderWhitespace: "none"
-                                        }}
-                                        value={historyQuery.query}
-                                        onChange={(value) => {
-                                            setHistoryQuery(prev => {
-                                                const newHistoryQuery = {
-                                                    ...prev,
-                                                    query: value || "",
-                                                    currentQuery: {
-                                                        ...prev.currentQuery,
-                                                        text: prev.counter ? prev.currentQuery.text : value || ""
-                                                    }
-                                                };
+                                <Profile
+                                    background={secondary}
+                                    graphName={graphName}
+                                    query={currentQuery}
+                                    setQuery={({ profile }) => {
+                                        setHistoryQuery(prev => {
+                                            const newQuery = {
+                                                ...prev.currentQuery,
+                                                profile: profile || []
+                                            };
 
-                                                return newHistoryQuery;
-                                            });
-                                        }}
-                                        onMount={handleEditorDidMount}
-                                    />
-                                </>
+                                            const newQueries = prev.queries.map(q => q.text === newQuery.text ? newQuery : q);
+
+                                            return {
+                                                ...prev,
+                                                currentQuery: newQuery,
+                                                queries: newQueries
+                                            };
+                                        });
+                                    }}
+                                    fetchCount={fetchCount}
+                                />
                             }
-                        </TabsContent>
-                        <TabsContent className="w-full flex-1 min-h-0 bg-secondary rounded-lg p-4 overflow-auto" value="profile">
-                            <div className="h-full w-full overflow-auto flex flex-col gap-4">
-                                {
-                                    currentQuery &&
-                                    <Profile
-                                        background={secondary}
-                                        graphName={graphName}
-                                        query={currentQuery}
-                                        setQuery={({ profile }) => {
-                                            setHistoryQuery(prev => {
-                                                const newQuery = {
-                                                    ...prev.currentQuery,
-                                                    profile: profile || []
-                                                };
-
-                                                const newQueries = prev.queries.map(q => q.text === newQuery.text ? newQuery : q);
-
-                                                return {
-                                                    ...prev,
-                                                    currentQuery: newQuery,
-                                                    queries: newQueries
-                                                };
-                                            });
-                                        }}
-                                        fetchCount={fetchCount}
-                                    />
-                                }
-                            </div>
-                        </TabsContent>
-                        <TabsContent className="w-full flex-1 min-h-0 bg-secondary rounded-lg p-4 overflow-auto" value="metadata">
-                            <div className="h-full w-full overflow-auto flex flex-col gap-4">
-                                {
-                                    currentQuery &&
-                                    <Metadata
-                                        query={currentQuery}
-                                    />
-                                }
-                            </div>
-                        </TabsContent>
-                        <TabsContent className="w-full flex-1 min-h-0 bg-secondary rounded-lg p-4 overflow-auto" value="explain">
-                            <div className="h-full w-full overflow-auto flex flex-col gap-4">
-                                {
-                                    currentQuery &&
-                                    <Explain
-                                        background={secondary}
-                                        query={currentQuery}
-                                    />
-                                }
-                            </div>
-                        </TabsContent>
-                    </Tabs>
-                </div>
+                        </div>
+                    </TabsContent>
+                    <TabsContent className="h-full w-full bg-secondary rounded-lg p-4 overflow-auto" value="metadata">
+                        <div className="h-full w-full overflow-auto flex flex-col gap-4">
+                            {
+                                currentQuery &&
+                                <Metadata
+                                    query={currentQuery}
+                                />
+                            }
+                        </div>
+                    </TabsContent>
+                    <TabsContent className="h-full w-full bg-secondary rounded-lg p-4 overflow-auto" value="explain">
+                        <div className="h-full w-full overflow-auto flex flex-col gap-4">
+                            {
+                                currentQuery &&
+                                <Explain
+                                    background={secondary}
+                                    query={currentQuery}
+                                />
+                            }
+                        </div>
+                    </TabsContent>
+                </Tabs>
             </div>
         </div>
     );

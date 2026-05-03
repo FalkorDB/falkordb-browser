@@ -175,7 +175,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                 </PopoverTrigger>
                                 <PopoverContent
                                     align="start"
-                                    sideOffset={8}
+                                    sideOffset={20}
                                     className="w-[560px] max-w-[95vw] h-[60dvh] max-h-[95vh] p-0 border-none bg-transparent shadow-none"
                                     onOpenAutoFocus={(e) => e.preventDefault()}
                                 >
