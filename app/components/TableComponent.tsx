@@ -790,13 +790,13 @@ export default function TableComponent({
                                                                     : <div className="flex items-center gap-2 justify-center">
                                                                         <Tooltip>
                                                                             <TooltipTrigger asChild>
-                                                                                <p data-testid={`content${cellTestId}${headerNames[j]}`} >{cell.value}</p>
+                                                                                <p data-testid={`content${cellTestId}${headerNames[j]}`} className="text-center" >{cell.value}</p>
                                                                             </TooltipTrigger>
                                                                             <TooltipContent>
                                                                                 {cell.value}
                                                                             </TooltipContent>
                                                                         </Tooltip>
-                                                                        <div className="w-4">
+                                                                        <div className="min-w-4">
                                                                             {
                                                                                 cell.type !== "readonly" && hover === row.name &&
                                                                                 <Button

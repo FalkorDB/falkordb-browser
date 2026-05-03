@@ -176,7 +176,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                 <PopoverContent
                                     align="start"
                                     sideOffset={20}
-                                    className="w-[560px] max-w-[95vw] h-[60dvh] max-h-[95vh] p-0 border-none bg-transparent shadow-none"
+                                    className="w-[560px] h-[600px] p-0 border-none bg-transparent shadow-none"
                                     onOpenAutoFocus={(e) => e.preventDefault()}
                                 >
                                     <QueryHistoryPanel onClose={() => setQueriesOpen?.(false)} />
