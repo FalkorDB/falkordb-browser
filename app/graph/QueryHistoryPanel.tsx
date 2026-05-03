@@ -28,7 +28,7 @@ export default function QueryHistoryPanel({ onClose }: Props) {
     const { indicator } = useContext(IndicatorContext);
 
     const { theme } = useTheme();
-    const { secondary } = getTheme(theme);
+    const { background } = getTheme(theme);
 
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
     const submitQuery = useRef<HTMLButtonElement>(null);
@@ -286,7 +286,7 @@ export default function QueryHistoryPanel({ onClose }: Props) {
 
     return (
         <div data-testid="queryHistoryPanel" className="h-full w-full border border-border rounded-lg bg-background">
-            <div className="relative h-full w-full flex flex-col gap-2 rounded-lg p-3 overflow-y-auto">
+            <div className="relative h-full w-full flex flex-col rounded-lg p-3 overflow-y-auto">
                 <Button
                     data-testid="queryHistoryCloseButton"
                     className="absolute top-2 right-2"
@@ -301,13 +301,70 @@ export default function QueryHistoryPanel({ onClose }: Props) {
                 </div>
                 <PaginationList
                     label="Query"
-                    className="bg-secondary rounded-lg overflow-hidden grow basis-0 h-[200px]"
+                    className="overflow-hidden h-[319px] p-1 border-b border-border"
                     isSelected={(item) => historyQuery.queries.findIndex(q => q.text === item.text) + 1 === historyQuery.counter}
                     isDeleteSelected={(item) => deleteElements.some(idx => historyQuery.queries[idx]?.text === item.text)}
                     afterSearchCallback={afterSearchCallback}
                     onToggleFav={handleToggleFav}
                     dataTestId="queryHistory"
                     list={filteredQueries}
+                    actionButtons={
+                        <div className="flex gap-2">
+                            <Button
+                                className="p-1"
+                                variant="Delete"
+                                data-testid="queryHistoryDelete"
+                                title={`Remove selected query from history
+                                    press (Right Click) to select
+                                    press (Ctrl + Right Click) for multi select`}
+                                onClick={handleDeleteQuery}
+                                disabled={deleteElements.length === 0}
+                            >
+                                <Trash2 size={16} />
+                            </Button>
+                            <Button
+                                className="p-1 text-xs"
+                                variant="Delete"
+                                data-testid="queryHistoryDelete"
+                                title="Remove all queries from history"
+                                onClick={() => {
+                                    removeConnectionItem("query history");
+                                    setHistoryQuery(prev => ({
+                                        ...prev,
+                                        queries: [],
+                                        counter: 0
+                                    }));
+                                    setFilteredQueries([]);
+                                    setActiveFilters([]);
+                                    setDeleteElements([]);
+                                }}
+                                disabled={historyQuery.queries.length === 0}
+                            >
+                                <Trash2 size={16} /> All
+                            </Button>
+                            <Button
+                                variant="Delete"
+                                className="p-1 text-xs"
+                                data-testid="queryHistoryClearFav"
+                                title="Clear all favorites"
+                                onClick={() => {
+                                    const newQueries = historyQuery.queries.map(q => ({ ...q, fav: false, name: undefined }));
+                                    setConnectionItem("query history", JSON.stringify(newQueries));
+                                    setHistoryQuery(prev => ({
+                                        ...prev,
+                                        queries: newQueries,
+                                        currentQuery: prev.currentQuery.fav
+                                            ? { ...prev.currentQuery, fav: false, name: undefined }
+                                            : prev.currentQuery,
+                                    }));
+                                    setFilteredQueries(prev => prev.map(q => ({ ...q, fav: false, name: undefined })));
+                                }}
+                                disabled={!historyQuery.queries.some(q => q.fav)}
+                            >
+                                <Star size={14} /> Clear
+                            </Button>
+                        </div>
+                    }
                     onClick={(counter, evt) => {
                         const index = historyQuery.queries.findIndex(q => q.text === counter);
 
@@ -378,70 +435,15 @@ export default function QueryHistoryPanel({ onClose }: Props) {
                             ))
                         }
                     </ul>
-                    <div className="flex gap-2">
-                        <Button
-                            className="p-1"
-                            variant="Delete"
-                            data-testid="queryHistoryDelete"
-                            title={`Remove selected query from history
-                                    press (Right Click) to select
-                                    press (Ctrl + Right Click) for multi select`}
-                            onClick={handleDeleteQuery}
-                            disabled={deleteElements.length === 0}
-                        >
-                            <Trash2 size={16} />
-                        </Button>
-                        <Button
-                            className="p-1 text-xs"
-                            variant="Delete"
-                            data-testid="queryHistoryDelete"
-                            title="Remove all queries from history"
-                            onClick={() => {
-                                removeConnectionItem("query history");
-                                setHistoryQuery(prev => ({
-                                    ...prev,
-                                    queries: [],
-                                    counter: 0
-                                }));
-                                setFilteredQueries([]);
-                                setActiveFilters([]);
-                                setDeleteElements([]);
-                            }}
-                            disabled={historyQuery.queries.length === 0}
-                        >
-                            <Trash2 size={16} /> All
-                        </Button>
-                        <Button
-                            variant="Delete"
-                            className="p-1 text-xs"
-                            data-testid="queryHistoryClearFav"
-                            title="Clear all favorites"
-                            onClick={() => {
-                                const newQueries = historyQuery.queries.map(q => ({ ...q, fav: false, name: undefined }));
-                                setConnectionItem("query history", JSON.stringify(newQueries));
-                                setHistoryQuery(prev => ({
-                                    ...prev,
-                                    queries: newQueries,
-                                    currentQuery: prev.currentQuery.fav
-                                        ? { ...prev.currentQuery, fav: false, name: undefined }
-                                        : prev.currentQuery,
-                                }));
-                                setFilteredQueries(prev => prev.map(q => ({ ...q, fav: false, name: undefined })));
-                            }}
-                            disabled={!historyQuery.queries.some(q => q.fav)}
-                        >
-                            <Star size={14} /> Clear
-                        </Button>
-                    </div>
                 </PaginationList>
-                <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="w-full flex flex-col gap-2 items-center h-[200px]">
+                <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="w-full flex flex-col items-center basis-0 grow">
                     <TabsList className="h-fit bg-background gap-1">
-                        <TabsTrigger className={cn("text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
-                        <TabsTrigger className={cn("text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>
-                        <TabsTrigger className={cn("text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("metadata")} value="metadata">Metadata</TabsTrigger>
-                        <TabsTrigger className={cn("text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("explain")} value="explain">Explain</TabsTrigger>
+                        <TabsTrigger className={cn("px-2 py-0.5 text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
+                        <TabsTrigger className={cn("px-2 py-0.5 text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>
+                        <TabsTrigger className={cn("px-2 py-0.5 text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("metadata")} value="metadata">Metadata</TabsTrigger>
+                        <TabsTrigger className={cn("px-2 py-0.5 text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("explain")} value="explain">Explain</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="text" className="mt-0 h-full w-full bg-secondary rounded-lg relative p-2 overflow-hidden">
+                    <TabsContent value="text" className="mt-0 h-full w-full rounded-lg relative p-1 overflow-hidden">
                         {
                             currentQuery &&
                             <>
@@ -462,7 +464,6 @@ export default function QueryHistoryPanel({ onClose }: Props) {
                                     height="100%"
                                     language={CYPHER_LANGUAGE_NAME}
                                     themeName="selector-theme"
-                                    themeBackground={secondary}
                                     options={{
                                         lineHeight: 22,
                                         fontSize: 14,
@@ -494,12 +495,12 @@ export default function QueryHistoryPanel({ onClose }: Props) {
                             </>
                         }
                     </TabsContent>
-                    <TabsContent className="h-full w-full bg-secondary rounded-lg p-4 overflow-auto" value="profile">
+                    <TabsContent className="h-full w-full rounded-lg overflow-auto" value="profile">
                         <div className="h-full w-full overflow-auto flex flex-col gap-4">
                             {
                                 currentQuery &&
                                 <Profile
-                                    background={secondary}
+                                    background={background}
                                     graphName={graphName}
                                     query={currentQuery}
                                     setQuery={({ profile }) => {
@@ -523,7 +524,7 @@ export default function QueryHistoryPanel({ onClose }: Props) {
                             }
                         </div>
                     </TabsContent>
-                    <TabsContent className="h-full w-full bg-secondary rounded-lg p-4 overflow-auto" value="metadata">
+                    <TabsContent className="h-full w-full rounded-lg overflow-auto" value="metadata">
                         <div className="h-full w-full overflow-auto flex flex-col gap-4">
                             {
                                 currentQuery &&
@@ -533,12 +534,12 @@ export default function QueryHistoryPanel({ onClose }: Props) {
                             }
                         </div>
                     </TabsContent>
-                    <TabsContent className="h-full w-full bg-secondary rounded-lg p-4 overflow-auto" value="explain">
+                    <TabsContent className="h-full w-full rounded-lg overflow-auto" value="explain">
                         <div className="h-full w-full overflow-auto flex flex-col gap-4">
                             {
                                 currentQuery &&
                                 <Explain
-                                    background={secondary}
+                                    background={background}
                                     query={currentQuery}
                                 />
                             }
