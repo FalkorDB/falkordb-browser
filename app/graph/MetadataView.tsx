@@ -16,11 +16,12 @@ const renderLabel = (l: any) => (
     <span className="SofiaSans">{l[0]}:</span>
 );
 
-export function Profile({ query, setQuery, fetchCount, background }: {
+export function Profile({ query, setQuery, fetchCount, background, hideTitle }: {
     query: Query,
     setQuery: (q: Query) => void,
     fetchCount: () => Promise<void>
     background: string
+    hideTitle?: boolean
 }) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext);
@@ -58,7 +59,7 @@ export function Profile({ query, setQuery, fetchCount, background }: {
 
     return (
         <>
-            <h1 className="text-2xl font-bold">Profile</h1>
+            {!hideTitle && <h1 className="text-2xl font-bold">Profile</h1>}
             <div className="flex gap-4">
                 <Button
                     indicator={indicator}
@@ -108,12 +109,13 @@ export function Profile({ query, setQuery, fetchCount, background }: {
     );
 }
 
-export function Metadata({ query }: {
+export function Metadata({ query, hideTitle }: {
     query: Query,
+    hideTitle?: boolean
 }) {
     return (
         <>
-            <h1 className="text-2xl font-bold">Metadata</h1>
+            {!hideTitle && <h1 className="text-2xl font-bold">Metadata</h1>}
             <ul className="flex flex-col gap-2 p-2 h-1 grow overflow-auto SofiaSans">
                 {query.metadata.map((m, i) => (
                     // eslint-disable-next-line react/no-array-index-key
@@ -124,9 +126,10 @@ export function Metadata({ query }: {
     );
 }
 
-export function Explain({ query, background }: {
+export function Explain({ query, background, hideTitle }: {
     query: Query,
-    background: string
+    background: string,
+    hideTitle?: boolean
 }) {
 
     const { theme } = useTheme();
@@ -134,7 +137,7 @@ export function Explain({ query, background }: {
 
     return (
         <>
-            <h1 className="text-2xl font-bold">Explain</h1>
+            {!hideTitle && <h1 className="text-2xl font-bold">Explain</h1>}
             <div className="h-1 grow w-full overflow-auto">
                 <JSONTree
                     data={createNestedObject(query.explain)}
