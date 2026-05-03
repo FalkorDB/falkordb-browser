@@ -43,7 +43,7 @@ interface Props {
 export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, type, setGraph }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext);
-    const { isReadOnly } = useContext(ConnectionContext);
+    const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
     const {
         settings: {
             contentPersistenceSettings: {
@@ -76,12 +76,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const loadMemory = useCallback((opt: string) =>
         async () => {
-            if (isReadOnly) return '<1 MB';
-            const memoryMap = await getMemoryUsage(opt, toast, setIndicator);
+            const memoryMap = await getMemoryUsage(opt, toast, setIndicator, activeConnectionId);
             const memoryValue = memoryMap.get("total_graph_sz_mb") || '<1';
 
             return `${memoryValue} MB`;
-        }, [toast, setIndicator, isReadOnly]);
+        }, [toast, setIndicator, activeConnectionId]);
 
     const loadNodesCount = useCallback((opt: string) =>
         async () => {
@@ -137,7 +136,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
                 const cells: Row["cells"] = [baseCell];
 
-                if (showMemoryUsage && !isReadOnly) {
+                if (showMemoryUsage) {
                     cells.push({ loadCell: loadMemory(opt), type: "readonly" });
                 }
 
@@ -165,7 +164,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
             const cells: Row["cells"] = [baseCell];
 
-            if (showMemoryUsage && !isReadOnly) {
+            if (showMemoryUsage) {
                 cells.push({ loadCell: loadMemory(opt), type: "readonly" });
             }
 
@@ -283,7 +282,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     entityName={type}
                     headers={[
                         "Name",
-                        ...(showMemoryUsage && !isReadOnly ? [{name : "Memory Usage", width: "15%"}] : []),
+                        ...(showMemoryUsage ? [{name : "Memory Usage", width: "15%"}] : []),
                         { name: "Nodes #", width: "15%" },
                         { name: "Edges #", width: "15%" }
                     ]}

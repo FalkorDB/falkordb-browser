@@ -4,10 +4,10 @@
 
 import { useEffect, useState, useContext, useCallback } from "react";
 import { CreateUser, User } from "@/app/api/user/model";
-import { prepareArg, securedFetch, Row } from "@/lib/utils";
+import { prepareArg, securedFetch, Row, ToastFn } from "@/lib/utils";
 import TableComponent from "@/app/components/TableComponent";
 import { useToast } from "@/components/ui/use-toast";
-import { IndicatorContext } from "@/app/components/provider";
+import { IndicatorContext, ConnectionContext } from "@/app/components/provider";
 import DeleteUser from "./DeleteUser";
 import AddUser from "./AddUser";
 import EditUser from "./EditUser";
@@ -25,46 +25,48 @@ export default function Users() {
     const [rows, setRows] = useState<Row[]>([]);
     const { toast } = useToast();
     const { setIndicator } = useContext(IndicatorContext);
+    const { activeConnectionId } = useContext(ConnectionContext);
 
     useEffect(() => {
         (async () => {
-            const result = await securedFetch("api/user", {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            }, toast, setIndicator);
-
-            if (result.ok) {
-                const data = await result.json();
-                setUsers(data.result.map((user: User) => ({ ...user, selected: false })));
-                setRows(data.result.map(({ username, role, keys }: { username: string, role: string, keys: string[] }): Row => ({
-                    name: username,
-                    cells: [{
-                        value: username,
-                        type: "readonly"
-                    }, {
-                        value: role,
-                        type: "readonly",
-                    }, {
-                        value: keys.join(", ") || "*",
-                        type: "readonly"
-                    }],
-                    checked: false,
-                })));
-            }
+            // Use plain fetch with no X-Connection-Id header.
+            // The server resolves the correct connection via session.activeConnectionId
+            // from the JWT (updated by every handleSelect call).
+            const result = await fetch("/api/user", { method: 'GET' });
+            if (!result.ok) return;
+            const data = await result.json();
+            setUsers(data.result.map((user: User) => ({ ...user, selected: false })));
+            setRows(data.result.map(({ username, role, keys }: { username: string, role: string, keys: string[] }): Row => ({
+                name: username,
+                cells: [{
+                    value: username,
+                    type: "readonly"
+                }, {
+                    value: role,
+                    type: "readonly",
+                }, {
+                    value: keys.join(", ") || "*",
+                    type: "readonly"
+                }],
+                checked: false,
+            })));
         })();
-    }, [toast, setIndicator]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeConnectionId]);
 
     const handleSaveUsers = useCallback(async () => {
+        // Use a no-op toast so securedFetch does NOT show a generic red error
+        // when aclSave() fails (e.g. FalkorDB not configured with an ACL file).
+        // We show a single, informative warning toast below instead.
+        const silent: ToastFn = () => {};
         const response = await securedFetch('/api/user/save', {
             method: 'POST',
-        }, toast, setIndicator);
+        }, silent, setIndicator);
 
         if (!response.ok) {
             toast({
-                title: "Error",
-                description: <p>Failed to save users to disk <a href="https://docs.falkordb.com/operations/durability/acl-persistence.html" target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-1">Learn More</a></p>,
+                title: "Users not persisted",
+                description: <p>Users are active in memory but could not be saved to disk. <a href="https://docs.falkordb.com/operations/durability/acl-persistence.html" target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-1">Learn More</a></p>,
                 variant: "warning",
             });
         }

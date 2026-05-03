@@ -81,19 +81,36 @@ export default function ConnectionManager() {
     clearError();
   };
 
-  const handleSelect = useCallback((connId: string) => {
-    setActiveConnectionId(connId);
+  const handleSelect = useCallback(async (connId: string) => {
+    const connsForSession =
+      additionalConnections.length > 0
+        ? additionalConnections
+        : (session as { connections?: SessionConnection[] }).connections ?? [];
+    // Set the global ID immediately so periodic timers (memory, count, etc.)
+    // that fire DURING the updateSession await use the correct connection and
+    // don't fall back to Token DB which might pick the wrong entry.
     setActiveConnectionIdGlobal(connId);
     localStorage.setItem("lastActiveConnectionId", connId);
-    updateSession({ connections: additionalConnections, activeConnectionId: connId });
-  }, [setActiveConnectionId, updateSession, additionalConnections]);
+    // Update the JWT so session.user.role is correct before React effects
+    // (graph-list reload, query execution) fire.
+    await updateSession({ connections: connsForSession, activeConnectionId: connId });
+    // Update React state AFTER the JWT is updated so the prevActiveConnectionId
+    // effect fires with the correct role already in sessionData.
+    setActiveConnectionId(connId);
+  }, [setActiveConnectionId, updateSession, additionalConnections, session]);
 
   const handleRemove = useCallback(async (e: React.MouseEvent, connId: string) => {
     e.stopPropagation();
     e.preventDefault();
 
-    // If this is the last connection, sign out instead
-    if (additionalConnections.length <= 1) {
+    // If this is the last connection, sign out instead.
+    // Use additionalConnections.length when populated; otherwise fall back to
+    // the JWT connections count so we don't sign out prematurely.
+    const totalConns =
+      additionalConnections.length > 0
+        ? additionalConnections.length
+        : ((session as { connections?: SessionConnection[] }).connections ?? []).length;
+    if (totalConns <= 1) {
       await signOut({ callbackUrl: "/login" });
       return;
     }
@@ -156,7 +173,13 @@ export default function ConnectionManager() {
       if (result.ok) {
         const json = await result.json();
         const newConn = json.connection;
-        const updated = [...additionalConnections, newConn];
+        // Base on current displayConns (not just additionalConnections) so
+        // existing JWT connections are not lost when in fallback mode.
+        const baseConns =
+          additionalConnections.length > 0
+            ? additionalConnections
+            : (session as { connections?: SessionConnection[] }).connections ?? [];
+        const updated = [...baseConns, newConn];
         setAdditionalConnections(updated);
         // Auto-switch to the newly added connection
         setActiveConnectionId(newConn.id);
@@ -172,7 +195,7 @@ export default function ConnectionManager() {
     } finally {
       setAdding(false);
     }
-  }, [host, port, username, password, TLS, CA, toast, setAdditionalConnections, setIndicator, additionalConnections, setActiveConnectionId, updateSession]);
+  }, [host, port, username, password, TLS, CA, toast, setAdditionalConnections, setIndicator, additionalConnections, session, setActiveConnectionId, updateSession]);
 
   const onFileDrop = (acceptedFiles: File[]) => {
     const reader = new FileReader();
@@ -186,9 +209,25 @@ export default function ConnectionManager() {
 
   if (!session?.user) return null;
 
-  const activeConn = additionalConnections.find(c => c.id === activeConnectionId);
+  // additionalConnections is populated asynchronously by providers.tsx after
+  // GET /api/connections resolves. Fall back to session.connections (from the
+  // JWT, available synchronously) so the dropdown appears immediately.
+  const displayConns: SessionConnection[] =
+    additionalConnections.length > 0
+      ? additionalConnections
+      : (session as { connections?: SessionConnection[] }).connections ?? [];
 
-  if (!activeConn) return null;
+  if (displayConns.length === 0) return null;
+
+  // Use the explicitly active connection, or fall back to the first one while
+  // activeConnectionId is still being resolved (e.g. on initial page load).
+  const effectiveActiveId =
+    activeConnectionId ??
+    (session as { activeConnectionId?: string }).activeConnectionId;
+
+  const activeConn =
+    displayConns.find(c => c.id === effectiveActiveId) ??
+    displayConns[0];
 
   const getConnectionLabel = (conn: SessionConnection) => `${conn.username}@${conn.host}:${conn.port}`;
 
@@ -242,12 +281,12 @@ export default function ConnectionManager() {
             <ChevronDown size={14} />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-64">
+        <DropdownMenuContent align="start" className="w-[300px]">
           <DropdownMenuLabel>Connections</DropdownMenuLabel>
           <DropdownMenuSeparator />
 
           {/* All connections shown equally */}
-          {additionalConnections.map((conn) => (
+          {displayConns.map((conn) => (
             <DropdownMenuItem
               key={conn.id}
               className="flex items-center justify-between gap-2 px-2 py-2 cursor-pointer"
@@ -255,8 +294,8 @@ export default function ConnectionManager() {
             >
               <Tooltip>
                 <TooltipTrigger className="flex items-center gap-2 min-w-0">
-                  {activeConnectionId === conn.id && <Check size={14} className="shrink-0 text-primary" />}
-                  {activeConnectionId !== conn.id && <span className="w-[14px]" />}
+                  {activeConn.id === conn.id && <Check size={14} className="shrink-0 text-primary" />}
+                  {activeConn.id !== conn.id && <span className="w-[14px]" />}
                   <span className="truncate font-medium">{getConnectionLabel(conn)}</span>
                   <span className="text-xs text-muted-foreground shrink-0">{conn.role}</span>
                 </TooltipTrigger>

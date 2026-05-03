@@ -52,13 +52,6 @@ export async function POST(request: Request) {
       );
     }
 
-    if (session.user.role !== "Admin") {
-      return NextResponse.json(
-        { message: "Only admin users can add connections" },
-        { status: 403, headers: getCorsHeaders(request) }
-      );
-    }
-
     let body: Record<string, unknown>;
     try {
       body = await request.json();
@@ -92,11 +85,41 @@ export async function POST(request: Request) {
       { status: 201, headers: getCorsHeaders(request) }
     );
   } catch (err) {
+    const raw = (err as Error).message || "";
     // eslint-disable-next-line no-console
-    console.error("Failed to add connection:", err);
+    console.error("Failed to add connection:", raw);
+
+    // Surface specific, actionable error messages so the client can show
+    // a helpful toast instead of a generic "unexpected error" message.
+    const lower = raw.toLowerCase();
+    let message: string;
+    let status: number;
+
+    if (lower.includes("econnrefused") || lower.includes("connection refused") || lower.includes("connect etimedout")) {
+      status = 503;
+      message = `Cannot connect to FalkorDB at the specified address. Please verify the host and port are correct and the server is reachable.`;
+    } else if (lower.includes("wrongpass") || lower.includes("noauth") || lower.includes("invalid password")) {
+      status = 400;
+      message = `Authentication failed: wrong password. Please check your credentials.`;
+    } else if (lower.includes("noperm")) {
+      status = 400;
+      message = `Authentication failed: user does not have sufficient permissions.`;
+    } else if (lower.includes("timeout") || lower.includes("timed out")) {
+      status = 400;
+      message = `Connection timed out. Please check the host, port, and network connectivity.`;
+    } else if (raw) {
+      // Return the raw FalkorDB message (likely already user-readable) but
+      // cap at 200 chars to avoid flooding the toast.
+      status = 400;
+      message = raw.length > 200 ? `${raw.slice(0, 200)}…` : raw;
+    } else {
+      status = 500;
+      message = "Failed to add connection. Please check your settings and try again.";
+    }
+
     return NextResponse.json(
-      { message: "Internal server error" },
-      { status: 500, headers: getCorsHeaders(request) }
+      { message },
+      { status, headers: getCorsHeaders(request) }
     );
   }
 }

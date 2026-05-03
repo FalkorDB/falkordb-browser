@@ -4,7 +4,7 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, setActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue, SyntaxErrorInfo, parseSyntaxError } from "@/lib/utils";
+import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue, SyntaxErrorInfo, parseSyntaxError } from "@/lib/utils";
 import { encryptValue, decryptValue, isCryptoAvailable, isEncrypted } from "@/lib/encryption";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import { usePathname, useRouter } from "next/navigation";
@@ -490,7 +490,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         fetchMetaStats(n),
         fetchInfo("(property key)", n),
       ]).then(async ([metaStats, newPropertyKeys]) => {
-        const memoryUsage = showMemoryUsage && !isReadOnlyRef.current ? await getMemoryUsage(n, toast, setIndicator) : new Map<string, MemoryValue>();
+        const memoryUsage = showMemoryUsage ? await getMemoryUsage(n, toast, setIndicator, getActiveConnectionIdGlobal()) : new Map<string, MemoryValue>();
         const newLabels = metaStats?.[0] || [];
         const newRelationships = metaStats?.[1] || [];
         const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
@@ -594,23 +594,32 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setLabels([...graph.Labels]);
   }, [graph, graph.Labels.length, graph.Relationships.length, graph.Labels, graph.Relationships]);
 
+  // Keep the module-level global in sync with React state on every render.
+  // This is intentionally dependency-free so it runs after every render,
+  // restoring _activeConnectionId even when Next.js HMR resets the module.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setActiveConnectionIdGlobal(activeConnectionId); });
+
   useEffect(() => {
     if (status !== "authenticated") return;
-
+    // Use plain fetch with no X-Connection-Id — the server resolves the
+    // connection via session.activeConnectionId from the JWT, which is always
+    // correct (set by every connection switch). This avoids the timing race
+    // where activeConnectionId is null on page load and the check never fires.
     (async () => {
-      const result = await securedFetch("/api/DBVersion", {
-        method: "GET",
-      }, toast, setIndicator);
-
-      if (!result.ok) return;
-
-      const [name, version] = (await result.json()).result || ["", 0];
-
-      setDbVersion(String(version));
-      setShowMemoryUsage(name === "graph" && version >= MEMORY_USAGE_VERSION_THRESHOLD);
+      try {
+        const result = await fetch("/api/DBVersion", { method: "GET" });
+        if (!result.ok) {
+          setShowMemoryUsage(false);
+          return;
+        }
+        const [name, version] = (await result.json()).result || ["", 0];
+        setDbVersion(String(version));
+        setShowMemoryUsage(name === "graph" && version >= MEMORY_USAGE_VERSION_THRESHOLD);
+      } catch { /* ignore */ }
     })();
-  }, [status, toast]);
-
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, activeConnectionId]);
   useEffect(() => {
     if (status !== "authenticated") {
       setConnectionType("Standalone");
@@ -701,7 +710,51 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
               : conns[0].id;
             setActiveConnectionId(target);
             setActiveConnectionIdGlobal(target);
-            await updateSession({ activeConnectionId: target });
+            // Always sync the full connections list into the JWT together with
+            // activeConnectionId so the session callback always finds activeConn.
+            // Without this, a legacy-fallback connection (legacyConnId) ends up
+            // as activeConnectionId but is absent from token.connections, causing
+            // session.user.role to default to "Read-Only" and all write queries
+            // to be silently rejected by FalkorDB (roQuery on empty key).
+            await updateSession({
+              activeConnectionId: target,
+              connections: conns,
+            });
+          } else {
+            // Token DB returned no connections — the session is out of sync.
+            // This happens after a server restart (FileTokenStorage wiped),
+            // a deploy that changed the storage backend, or any time the
+            // connection entry was never written (old pre-feature sessions).
+            //
+            // Fix: call the migration endpoint which:
+            //   1. Deletes stale Token DB entries for this user
+            //   2. Reconnects to FalkorDB using session.user credentials
+            //   3. Creates a fresh entry in Token DB
+            //   4. Returns the new connection
+            // Then sync the JWT and local state with the result.
+            //
+            // Also clean up stale localStorage keys so we don't restore
+            // a lastActiveConnectionId that no longer exists.
+            localStorage.removeItem("lastActiveConnectionId");
+
+            const migrateResult = await securedFetch("/api/auth/migrate-session", {
+              method: "POST",
+            }, toast, setIndicator);
+
+            if (migrateResult.ok) {
+              const migrateJson = await migrateResult.json();
+              if (migrateJson?.connection) {
+                const migratedConn: SessionConnection = migrateJson.connection;
+                const migratedConns = [migratedConn];
+                setAdditionalConnections(migratedConns);
+                setActiveConnectionId(migratedConn.id);
+                setActiveConnectionIdGlobal(migratedConn.id);
+                await updateSession({
+                  activeConnectionId: migratedConn.id,
+                  connections: migratedConns,
+                });
+              }
+            }
           }
         }
         sessionSyncedRef.current = true;
@@ -789,33 +842,34 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       }
 
       setModel(localStorage.getItem("model") || "");
-      (async () => {
-        const res = await fetch("/api/udf", {
-          method: "GET",
-        });
-
-        if (!res.ok) {
-          setShowUDF(false);
-          return;
-        };
-
-        const json = await res.json();
-        setUdfList(json.result);
-
-        if (json.result.length > 0) {
-          const result = await securedFetch(`/api/udf/${encodeURIComponent(json.result[0][1])}`, {
-            method: "GET",
-          }, toast, setIndicator);
-
-          if (!result.ok) return;
-
-          const udfData = await result.json();
-
-          setSelectedUdf(prev => prev ?? udfData.result[0]);
-        }
-      })();
     })();
   }, [status, prefixReady, toast]);
+
+  // Re-check UDF availability whenever the active connection changes so
+  // switching back to an admin connection restores the UDF menu.
+  useEffect(() => {
+    if (status === "unauthenticated") { setShowUDF(false); return; }
+    if (status !== "authenticated") return;
+    // Use plain fetch with no X-Connection-Id — server resolves via JWT.
+    (async () => {
+      const res = await fetch("/api/udf", { method: "GET" });
+      if (!res.ok) { setShowUDF(false); return; }
+
+      const json = await res.json();
+      setShowUDF(true);
+      setUdfList(json.result);
+
+      if (json.result.length > 0) {
+        const result = await securedFetch(`/api/udf/${encodeURIComponent(json.result[0][1])}`, {
+          method: "GET",
+        }, toast, setIndicator);
+        if (!result.ok) return;
+        const udfData = await result.json();
+        setSelectedUdf(prev => prev ?? udfData.result[0]);
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, activeConnectionId]);
 
   const onPanelResize = useCallback((size: PanelSize) => {
     setIsCollapsed(size.asPercentage === 0);
@@ -841,7 +895,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     return () => {
       if (rafId !== undefined) cancelAnimationFrame(rafId);
     };
-  }, [pathname]);
+  }, [pathname, panelRef.current]);
 
   const checkStatus = useCallback(() => {
     securedFetch("/api/status", {
@@ -895,13 +949,14 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     const prev = prevActiveConnectionIdRef.current;
     prevActiveConnectionIdRef.current = activeConnectionId;
 
-    // Skip the very first selection (initial mount / login)
+    // Skip the very first selection (initial mount / login) and null resets
     if (prev === null || activeConnectionId === null) return;
     // Skip if unchanged
     if (prev === activeConnectionId) return;
 
     // Clear graph / schema data so stale results from the old connection are gone
     setGraph(Graph.empty());
+    setGraphInfo(GraphInfo.empty(toast, setIndicator));
     setGraphName("");
     setGraphNames([]);
     setSchema(Graph.empty());

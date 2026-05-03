@@ -106,13 +106,16 @@ export async function newClient(
   connections.set(id, client);
 
   client.on("error", (err) => {
-    // Close coonection on error and remove from connections map
+    // Close connection on error and remove from connections map.
+    // Guard with identity check: if concurrent requests recreated the
+    // connection under the same key, only close OUR client — not the
+    // replacement that another request already stored.
     // eslint-disable-next-line no-console
     console.error("FalkorDB Client Error", err);
-    const connection = connections.get(id);
-    if (connection) {
+    const current = connections.get(id);
+    if (current === client) {
       connections.delete(id);
-      connection.close().catch((e) => {
+      client.close().catch((e) => {
         // eslint-disable-next-line no-console
         console.warn("FalkorDB Client Disconnect Error", e);
       });
@@ -317,13 +320,18 @@ async function getConnectionClient(
     }
 
     const { decrypt } = await import("../encryption");
-    const password = decrypt(tokenData.encrypted_password);
+    // Use `|| undefined` so an empty stored password (no-auth connections)
+    // connects anonymously — exactly as the original passwordless login did.
+    // Only pass username when a real password is present; otherwise both
+    // credentials are omitted so no AUTH command is sent to FalkorDB.
+    const password = decrypt(tokenData.encrypted_password) || undefined;
+    const username = password ? (tokenData.username || undefined) : undefined;
 
     const { role, client: newConn } = await newClient(
       {
         host: tokenData.host,
         port: tokenData.port.toString(),
-        username: tokenData.username,
+        username,
         password,
         tls: (tokenData.tls ?? false).toString(),
         ca: tokenData.ca || undefined,
@@ -868,9 +876,14 @@ export async function getClient(
   }
 
   // The frontend sends the active connection ID via X-Connection-Id
-  // header (or connectionId query param for SSE). If not provided
-  // (e.g. first requests before the frontend has fetched the connection
-  // list), fall back to the most recent connection stored in Token DB.
+  // header (or connectionId query param for SSE).
+  //
+  // When no header is present, fall back to the Token DB connection list.
+  // If session.activeConnectionId (from the JWT) matches one of the Token DB
+  // entries, prefer it over the default (newest-first) order — but ONLY if it
+  // actually exists in the Token DB. This prevents a stale session.activeConnectionId
+  // (e.g. after another test signs out and deletes connections) from bypassing
+  // the legacy reconnect fallback and triggering an unexpected SESSION_INVALID.
   let connId = getConnectionIdFromRequest(request);
 
   if (!connId) {
@@ -879,7 +892,16 @@ export async function getClient(
       const allTokens = await storage.fetchTokensByUserId(id);
       const connTokens = allTokens.filter(t => t.name.startsWith("connection:"));
       if (connTokens.length > 0) {
+        // Default: first entry from Token DB
         connId = connTokens[0].token_id;
+        // Prefer session.activeConnectionId if it exists in the Token DB list
+        // (ensures the correct connection is used after a switch, even when
+        // the Token DB sort order would pick a different entry).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sessionActiveId = (session as any).activeConnectionId as string | undefined;
+        if (sessionActiveId && connTokens.some(t => t.token_id === sessionActiveId)) {
+          connId = sessionActiveId;
+        }
       }
     } catch (e) {
       // eslint-disable-next-line no-console
@@ -938,10 +960,16 @@ export async function getClient(
         }
       }
 
+      // actualRole tracks the role determined by newClient() (via aclGetUser)
+      // so we always store and return the REAL FalkorDB role, not the
+      // potentially-stale session.user.role which defaults to "Read-Only"
+      // before the JWT migration has run.
+      let actualRole: Role = session.user.role;
+
       if (!client) {
         // Reconnect using session user credentials
         const { user } = session;
-        const { client: reconnected } = await newClient(
+        const { client: reconnected, role: reconnectedRole } = await newClient(
           {
             host: user.host,
             port: user.port.toString(),
@@ -952,6 +980,7 @@ export async function getClient(
           legacyKey
         );
         client = reconnected;
+        actualRole = reconnectedRole;
       }
 
       // Persist the migrated connection in Token DB so it shows up
@@ -969,7 +998,7 @@ export async function getClient(
           userId: id,
           username: session.user.username || "default",
           name: `connection:${legacyConnId}`,
-          role: session.user.role,
+          role: actualRole,
           host: session.user.host || "localhost",
           port: session.user.port || 6379,
           password: password || "",
@@ -989,7 +1018,7 @@ export async function getClient(
         user: {
           id,
           username: session.user.username,
-          role: session.user.role,
+          role: actualRole,
           host: session.user.host,
           port: session.user.port,
           tls: session.user.tls,
@@ -1018,13 +1047,11 @@ export async function getClient(
   try {
     const connResult = await getConnectionClient(id, connId);
     if (connResult) {
-      const { decrypt } = await import("../encryption");
-      const storage = StorageFactory.getStorage();
-      const tokenData = await storage.fetchTokenById(connId);
-      let connPassword: string | undefined;
-      if (tokenData?.encrypted_password) {
-        connPassword = decrypt(tokenData.encrypted_password);
-      }
+      // Build the user object from connection info; the password is a
+      // nice-to-have (used for PAT issuance and chat URL building) but
+      // the connection itself already works. Resolve it in a separate
+      // try/catch so a transient Token DB error here doesn't kill the
+      // whole request with SESSION_INVALID.
       const connUser: AuthenticatedUserWithPassword = {
         id,
         username: connResult.connInfo.username,
@@ -1032,8 +1059,19 @@ export async function getClient(
         host: connResult.connInfo.host,
         port: connResult.connInfo.port,
         tls: connResult.connInfo.tls,
-        password: connPassword,
+        password: undefined,
       };
+      try {
+        const { decrypt } = await import("../encryption");
+        const storage = StorageFactory.getStorage();
+        const tokenData = await storage.fetchTokenById(connId);
+        if (tokenData?.encrypted_password) {
+          connUser.password = decrypt(tokenData.encrypted_password) || undefined;
+        }
+      } catch (pwErr) {
+        // eslint-disable-next-line no-console
+        console.warn("Failed to resolve connection password (non-fatal):", pwErr);
+      }
       return { client: connResult.client, user: connUser };
     }
   } catch (connErr) {

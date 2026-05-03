@@ -51,7 +51,7 @@ export default function Page() {
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext);
     const { setData, canvasRef } = useContext(ForceGraphContext);
-    const { isReadOnly } = useContext(ConnectionContext);
+    const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
     const isReadOnlyRef = useRef(isReadOnly);
     isReadOnlyRef.current = isReadOnly;
     const {
@@ -83,6 +83,10 @@ export default function Page() {
     const { toast } = useToast();
 
     const panelRef = useRef<PanelImperativeHandle>(null);
+    // Track the previous graphName to distinguish "graph just changed" re-fires
+    // (where runQuery handles the initial fetch) from other dep changes like
+    // showMemoryUsage becoming true (where we must fetch immediately).
+    const prevGraphNameRef = useRef<string | undefined>(undefined);
 
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
     const [chatOpen, setChatOpen] = useState(false);
@@ -160,13 +164,19 @@ export default function Page() {
     const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator, isReadOnlyRef.current), [setIndicator, toast]);
 
     useEffect(() => {
-        if (!graphName) return undefined;
+        if (!graphName) {
+            prevGraphNameRef.current = graphName;
+            return undefined;
+        }
+
+        const graphNameJustChanged = prevGraphNameRef.current !== graphName;
+        prevGraphNameRef.current = graphName;
 
         const handleSetInfo = () => Promise.all([
             fetchMetaStats(graphName),
             fetchInfo("(property key)"),
         ]).then(async ([newDataStats, newPropertyKeys]) => {
-            const memoryUsage = showMemoryUsage && !isReadOnlyRef.current ? await getMemoryUsage(graphName, toast, setIndicator) : new Map<string, MemoryValue>();
+            const memoryUsage = showMemoryUsage ? await getMemoryUsage(graphName, toast, setIndicator, activeConnectionId) : new Map<string, MemoryValue>();
             const newLabels = newDataStats?.[0] || [];
             const newRelationships = newDataStats?.[1] || [];
 
@@ -181,10 +191,14 @@ export default function Page() {
             });
         });
 
-        // When runDefaultQuery is enabled, the graph setup effect will call
-        // runQuery which already fetches info/stats internally — skip the
-        // immediate call here to avoid duplicates.
-        if (!runDefaultQuery) {
+        // When runDefaultQuery is enabled and the graph name just changed, the
+        // graph-setup effect below will call runQuery which already fetches
+        // info/stats (including memory) internally — skip here to avoid
+        // duplicating that initial fetch.
+        // For any other dep change (e.g. showMemoryUsage becoming true after a
+        // connection switch to admin, or refreshInterval changing), always call
+        // immediately so memory appears without waiting for the next interval.
+        if (!runDefaultQuery || !graphNameJustChanged) {
             handleSetInfo();
         }
 
@@ -193,6 +207,7 @@ export default function Page() {
         return () => {
             clearInterval(interval);
         };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [fetchCount, fetchInfo, fetchMetaStats, graphName, refreshInterval, runDefaultQuery, setGraphInfo, setIndicator, showMemoryUsage, toast]);
 
     useEffect(() => {
