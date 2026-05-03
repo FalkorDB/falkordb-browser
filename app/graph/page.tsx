@@ -176,7 +176,7 @@ export default function Page() {
             fetchMetaStats(graphName),
             fetchInfo("(property key)"),
         ]).then(async ([newDataStats, newPropertyKeys]) => {
-            const memoryUsage = showMemoryUsage && !isReadOnlyRef.current ? await getMemoryUsage(graphName, toast, setIndicator, activeConnectionId) : new Map<string, MemoryValue>();
+            const memoryUsage = showMemoryUsage ? await getMemoryUsage(graphName, toast, setIndicator, activeConnectionId) : new Map<string, MemoryValue>();
             const newLabels = newDataStats?.[0] || [];
             const newRelationships = newDataStats?.[1] || [];
 

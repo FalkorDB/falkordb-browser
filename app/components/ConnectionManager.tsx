@@ -229,11 +229,6 @@ export default function ConnectionManager() {
     displayConns.find(c => c.id === effectiveActiveId) ??
     displayConns[0];
 
-  // Handlers that mutate the connections list must use displayConns as the
-  // source of truth, not additionalConnections, because additionalConnections
-  // may be empty while displayConns is populated from the JWT fallback.
-  const effectiveConns = displayConns;
-
   const getConnectionLabel = (conn: SessionConnection) => `${conn.username}@${conn.host}:${conn.port}`;
 
   const fields: Field[] = [
@@ -286,7 +281,7 @@ export default function ConnectionManager() {
             <ChevronDown size={14} />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-64">
+        <DropdownMenuContent align="start" className="w-[300px]">
           <DropdownMenuLabel>Connections</DropdownMenuLabel>
           <DropdownMenuSeparator />
 

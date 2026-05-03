@@ -490,7 +490,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         fetchMetaStats(n),
         fetchInfo("(property key)", n),
       ]).then(async ([metaStats, newPropertyKeys]) => {
-        const memoryUsage = showMemoryUsage && !isReadOnlyRef.current ? await getMemoryUsage(n, toast, setIndicator, getActiveConnectionIdGlobal()) : new Map<string, MemoryValue>();
+        const memoryUsage = showMemoryUsage ? await getMemoryUsage(n, toast, setIndicator, getActiveConnectionIdGlobal()) : new Map<string, MemoryValue>();
         const newLabels = metaStats?.[0] || [];
         const newRelationships = metaStats?.[1] || [];
         const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
@@ -895,7 +895,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     return () => {
       if (rafId !== undefined) cancelAnimationFrame(rafId);
     };
-  }, [pathname]);
+  }, [pathname, panelRef.current]);
 
   const checkStatus = useCallback(() => {
     securedFetch("/api/status", {
