@@ -11,6 +11,7 @@ import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorCon
 import { getConnectionItem } from "@/lib/connection-storage";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
+import QueryHistoryPanel from "./QueryHistoryPanel";
 
 const DataPanel = dynamicImport(() => import("./DataPanel"), {
     ssr: false,
@@ -90,6 +91,7 @@ export default function Page() {
 
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
     const [chatOpen, setChatOpen] = useState(false);
+    const [queriesOpen, setQueriesOpen] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(true);
     const [isAddNode, setIsAddNode] = useState(false);
     const [isAddEdge, setIsAddEdge] = useState(false);
@@ -444,6 +446,8 @@ export default function Page() {
                 isQueryLoading={isQueryLoading}
                 chatOpen={chatOpen}
                 setChatOpen={setChatOpen}
+                queriesOpen={queriesOpen}
+                setQueriesOpen={setQueriesOpen}
             />
             <ResizablePanelGroup orientation="horizontal" className="h-1 grow relative">
                 <ResizablePanel
@@ -490,6 +494,12 @@ export default function Page() {
                     chatOpen && graphName &&
                     <div className="absolute bottom-3 right-3 w-[400px] h-[500px] max-h-[80%] max-w-[95%] z-30">
                         <Chat onClose={() => setChatOpen(false)} />
+                    </div>
+                }
+                {
+                    queriesOpen &&
+                    <div className="absolute top-3 left-3 w-[560px] h-[60%] max-w-[95%] max-h-[95%] z-30">
+                        <QueryHistoryPanel onClose={() => setQueriesOpen(false)} />
                     </div>
                 }
             </ResizablePanelGroup>
