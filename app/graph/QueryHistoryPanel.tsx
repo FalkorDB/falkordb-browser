@@ -500,6 +500,7 @@ export default function QueryHistoryPanel({ onClose }: Props) {
                             {
                                 currentQuery &&
                                 <Profile
+                                    hideTitle
                                     background={background}
                                     query={currentQuery}
                                     setQuery={({ profile }) => {
@@ -528,6 +529,7 @@ export default function QueryHistoryPanel({ onClose }: Props) {
                             {
                                 currentQuery &&
                                 <Metadata
+                                    hideTitle
                                     query={currentQuery}
                                 />
                             }
@@ -538,6 +540,7 @@ export default function QueryHistoryPanel({ onClose }: Props) {
                             {
                                 currentQuery &&
                                 <Explain
+                                    hideTitle
                                     background={background}
                                     query={currentQuery}
                                 />
