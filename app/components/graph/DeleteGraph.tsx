@@ -97,6 +97,7 @@ export default function DeleteGraph({
       title="Delete Graph"
       trigger={
         <Button
+          className="p-1"
           data-testid="deleteGraph"
           variant="Delete"
           disabled={rows.filter(opt => opt.checked).length === 0}
