@@ -64,8 +64,8 @@ const tutorialSteps: TutorialStep[] = [
         description: "This dropdown lets you select which graph to work with. We've loaded demo graphs for this tour. Click the highlighted dropdown to see them.",
         placementAxis: "x",
         targetSelector: '[data-testid="selectGraph"]',
-        advanceOn: "pointerdown",
-        forward: ["mouseenter", "mouseleave"],
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave", "pointerdown"],
     },
     {
         title: "Manage Graphs",
@@ -108,12 +108,22 @@ const tutorialSteps: TutorialStep[] = [
         hidePrev: true
     },
     {
+        title: "Open Label Options",
+        description: "Click on the 'Person' label to see the available options for this node type.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="graphInfoPersonNode"]',
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave", "pointerdown"],
+        hidePrev: true
+    },
+    {
         title: "Customize Label Styles",
-        description: "You can customize how nodes with specific labels appear in the graph. Click the palette icon next to the 'Person' label to open the style customization panel.",
+        description: "Click 'Customize' to open the style customization panel where you can change how nodes with this label appear in the graph.",
         placementAxis: "x",
         targetSelector: '[data-testid="customizeStylePerson"]',
         advanceOn: "click",
-        forward: ["mouseenter", "mouseleave"],
+        forward: ["mouseenter", "mouseleave", "pointerdown"],
+        hidePrev: true
     },
     {
         title: "Choose Node Color",
@@ -230,14 +240,14 @@ const tutorialSteps: TutorialStep[] = [
         title: "Query History Window",
         description: "Access your previous queries here. You can also remove queries from your history or clear the entire history.",
         placementAxis: "y",
-        targetSelector: '[data-testid="queryHistoryContent"]',
+        targetSelector: '[data-testid="queryHistoryPanel"]',
         hidePrev: true
     },
     {
         title: "Close Query History Window",
         description: "",
         placementAxis: "y",
-        targetSelector: '[data-testid="closeQueryHistory"]',
+        targetSelector: '[data-testid="queryHistoryCloseButton"]',
         advanceOn: "click",
         forward: ["mouseenter", "mouseleave"],
     },

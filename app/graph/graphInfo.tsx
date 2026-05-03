@@ -160,7 +160,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                         <span className="truncate">{name}</span>
                                                     </Button>
                                                 </PopoverTrigger>
-                                                <PopoverContent className="w-fit p-1 flex flex-col gap-1" align="start">
+                                                <PopoverContent className="z-30 w-fit p-1 flex flex-col gap-1" align="start">
                                                     <PopoverClose asChild>
                                                         <Button
                                                             className="w-full justify-start gap-2 px-2 py-1 text-xs hover:bg-secondary rounded-md"
