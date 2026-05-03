@@ -488,7 +488,7 @@ test.describe("Chat Feature Tests", () => {
     await chat.waitForChatPanel();
 
     // Build a mock SSE response containing markdown-formatted text
-    const markdownAnswer = "Here are Alice's friends:\\n\\n**Bob** is her friend.\\n\\n- Item one\\n- Item two\\n\\n```cypher\\nMATCH (n) RETURN n\\n```";
+    const markdownAnswer = "Here are Alice's friends:\n\n**Bob** is her friend.\n\n- Item one\n- Item two\n\n```cypher\nMATCH (n) RETURN n\n```";
     const ssePayload = [
       `event: CypherQuery data: MATCH (a:Person {name: "Alice"})-[:KNOWS]->(b) RETURN b.name\n\n`,
       `event: Result data: ${JSON.stringify(markdownAnswer)}\n\n`,
