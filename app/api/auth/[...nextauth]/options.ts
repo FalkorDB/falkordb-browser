@@ -6,7 +6,12 @@ import { v4 as uuidv4 } from "uuid";
 import crypto from "crypto";
 import { getToken } from "next-auth/jwt";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
-import { getCorsHeaders } from "../../utils";
+import {
+  enableAutoNextAuthUrl,
+  getCorsHeaders,
+  isRequestOriginTrusted,
+  shouldUseSecureCookies,
+} from "../../utils";
 import {
   isTokenActive,
   getPasswordFromTokenDB,
@@ -42,6 +47,8 @@ interface AuthenticatedUserWithPassword extends AuthenticatedUser {
 }
 
 const connections = new Map<string, FalkorDB>();
+
+enableAutoNextAuthUrl();
 
 /**
  * Returns the map key for a session-scoped multi-connection entry.
@@ -851,6 +858,10 @@ export async function getClient(
   | NextResponse
   | { client: FalkorDB; user: AuthenticatedUserWithPassword }
 > {
+  if (!isRequestOriginTrusted(request)) {
+    return NextResponse.json({ message: "Untrusted request origin" }, { status: 400, headers: getCorsHeaders(request) });
+  }
+
   // Check if this is a JWT-only request (from /docs)
   const jwtOnlyRequired = await isJWTOnlyRequest();
 
@@ -919,6 +930,7 @@ export async function getClient(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         req: request as any,
         secret: process.env.NEXTAUTH_SECRET,
+        secureCookie: shouldUseSecureCookies(request),
       });
       const credentialRef = jwt?.credentialRef as string | undefined;
 
