@@ -6,12 +6,14 @@ import { useState, useContext, Dispatch, SetStateAction } from "react";
 import { cn, GraphRef, formatName, Node, Link, HistoryQuery } from "@/lib/utils";
 import { History, Info, Network, Sparkles } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Button from "../components/ui/Button";
 import { BrowserSettingsContext, ConnectionContext, IndicatorContext, PanelContext } from "../components/provider";
 import CypherEditor from "../components/CypherEditor";
 import Toolbar from "./toolbar";
 import { Graph } from "../api/graph/model";
 import SelectGraph from "./selectGraph";
+import QueryHistoryPanel from "./QueryHistoryPanel";
 
 interface BaseProps<T = "Schema" | "Graph"> {
     type: T
@@ -158,17 +160,28 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                             />
                         </div>
                         <div className="h-full w-fit flex gap-3 items-center p-2 border border-border rounded-lg bg-background">
-                            <Button
-                                aria-label="Query history panel"
-                                aria-pressed={queriesOpen}
-                                data-testid="queryHistory"
-                                className={cn(queriesOpen && "!text-primary")}
-                                disabled={historyQuery.queries.length === 0}
-                                title={historyQuery.queries.length === 0 ? "No queries" : "View past queries"}
-                                onClick={() => setQueriesOpen?.(prev => !prev)}
-                            >
-                                <History />
-                            </Button>
+                            <Popover open={queriesOpen} onOpenChange={setQueriesOpen}>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        aria-label="Query history panel"
+                                        aria-pressed={queriesOpen}
+                                        data-testid="queryHistory"
+                                        className={cn(queriesOpen && "!text-primary")}
+                                        disabled={historyQuery.queries.length === 0}
+                                        title={historyQuery.queries.length === 0 ? "No queries" : "View past queries"}
+                                    >
+                                        <History />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                    align="start"
+                                    sideOffset={8}
+                                    className="w-[560px] max-w-[95vw] h-[60dvh] max-h-[95vh] p-0 border-none bg-transparent shadow-none"
+                                    onOpenAutoFocus={(e) => e.preventDefault()}
+                                >
+                                    <QueryHistoryPanel onClose={() => setQueriesOpen?.(false)} />
+                                </PopoverContent>
+                            </Popover>
                             {
                                 (() => {
                                     const hasLimitWarning = graph.CurrentLimit && graph.Data.length >= graph.CurrentLimit;

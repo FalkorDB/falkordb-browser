@@ -285,8 +285,8 @@ export default function QueryHistoryPanel({ onClose }: Props) {
     if (!historyQuery || !setHistoryQuery) return null;
 
     return (
-        <div data-testid="queryHistoryPanel" className="border-Gradient-rounded h-full w-full">
-            <div className="bg-background relative h-full w-full flex flex-col gap-2 rounded-lg p-3">
+        <div data-testid="queryHistoryPanel" className="h-full w-full border border-border rounded-lg bg-background">
+            <div className="relative h-full w-full flex flex-col gap-2 rounded-lg p-3">
                 <Button
                     data-testid="queryHistoryCloseButton"
                     className="absolute top-2 right-2"
