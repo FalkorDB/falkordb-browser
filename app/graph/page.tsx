@@ -491,7 +491,7 @@ export default function Page() {
                 </ResizablePanel>
                 {
                     chatOpen && graphName &&
-                    <div className="absolute bottom-3 right-3 w-[400px] h-[500px] max-h-[80%] max-w-[95%] z-30">
+                    <div className="absolute bottom-3 right-3 w-[400px] h-[500px] z-30">
                         <Chat onClose={() => setChatOpen(false)} />
                     </div>
                 }
