@@ -276,12 +276,12 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         data-testid="manageContent"
                         role="dialog"
                         aria-label={`Manage ${type}s`}
-                        className="fixed top-16 left-3 z-30 flex flex-col border border-border rounded-lg shadow-lg h-[calc(100dvh-5rem)] w-[41dvw] p-2 bg-background"
+                        className="fixed top-16 left-3 z-30 flex flex-col gap-4 border border-border rounded-lg shadow-lg h-[calc(100dvh-5rem)] w-[41dvw] p-2 bg-background"
                     >
                         <div className="flex flex-row justify-between items-center border-b border-border pb-4">
                             <h2 className="text-2xl font-medium flex items-center gap-2">
-                                <Settings size={22} className="text-foreground/60" />
                                 Manage {type}s
+                                <Settings size={22} className="text-foreground/60" />
                             </h2>
                             <Button
                                 aria-label="Close"
