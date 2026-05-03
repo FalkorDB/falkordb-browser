@@ -699,7 +699,6 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                         currentQuery &&
                                                         <Profile
                                                             background={secondary}
-                                                            graphName={graphName}
                                                             query={currentQuery}
                                                             setQuery={({ profile }) => {
                                                                 setHistoryQuery(prev => {
