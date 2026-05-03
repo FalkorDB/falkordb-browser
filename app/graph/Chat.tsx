@@ -1,7 +1,9 @@
 /* eslint-disable no-case-declarations */
 /* eslint-disable react/no-array-index-key */
 import { cn, getTheme, Message, toUserFriendlyMessage } from "@/lib/utils";
-import { useContext, useEffect, useRef, useState, useCallback } from "react";
+import { memo, useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
+import MarkdownIt from "markdown-it";
+import DOMPurify from "dompurify";
 import { useTheme } from "next-themes";
 import Image from "next/image";
 import { ChevronDown, ChevronRight, Share2, Copy, Loader2, Play, Search, X, Send, Sparkles } from "lucide-react";
@@ -15,6 +17,28 @@ import { EventType } from "../api/chat/route";
 import ToastButton from "../components/ToastButton";
 import { ShineBorder } from "@/components/ui/shine-border";
 import { getConnectionItem, setConnectionItem, getConnectionPrefix } from "@/lib/connection-storage";
+
+const mdInstance = new MarkdownIt({
+    html: false,
+    linkify: true,
+    breaks: true,
+});
+
+const MarkdownMessage = memo(function MarkdownMessage({ content }: { content: string }) {
+    const sanitizedHtml = useMemo(() => {
+        const raw = typeof content === "string" ? content : String(content ?? "");
+        return DOMPurify.sanitize(mdInstance.render(raw));
+    }, [content]);
+
+    return (
+        <div
+            data-testid="chatMessageMarkdown"
+            className="text-sm markdown-body"
+            // eslint-disable-next-line react/no-danger
+            dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+        />
+    );
+});
 
 // Function to get the last maxSavedMessages user messages and all messages in between
 const getLastUserMessagesWithContext = (allMessages: Message[], maxUserMessages: number) => {
@@ -466,9 +490,7 @@ export default function Chat({ onClose }: Props) {
                     </div>
                 );
             default:
-                return (
-                    <p className="text-sm text-wrap whitespace-pre-wrap">{message.content}</p>
-                );
+                return <MarkdownMessage content={message.content} />;
         }
     };
 

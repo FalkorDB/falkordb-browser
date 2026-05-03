@@ -16,8 +16,7 @@ const renderLabel = (l: any) => (
     <span className="SofiaSans">{l[0]}:</span>
 );
 
-export function Profile({ graphName, query, setQuery, fetchCount, background }: {
-    graphName: string,
+export function Profile({ query, setQuery, fetchCount, background }: {
     query: Query,
     setQuery: (q: Query) => void,
     fetchCount: () => Promise<void>
@@ -39,7 +38,7 @@ export function Profile({ graphName, query, setQuery, fetchCount, background }: 
         setIsLoading(true);
         try {
             const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
-            const result = await securedFetch(`/api/graph/${graphName}/profile?query=${prepareArg(query.text)}${readOnlyParam}`, {
+            const result = await securedFetch(`/api/graph/${query.graphName}/profile?query=${prepareArg(query.text)}${readOnlyParam}`, {
                 method: "GET",
             }, toast, setIndicator);
 
@@ -168,8 +167,7 @@ export function Explain({ query, background }: {
 }
 
 
-export default function MetadataView({ graphName, query, setQuery, fetchCount }: {
-    graphName: string,
+export default function MetadataView({ query, setQuery, fetchCount }: {
     query: Query,
     setQuery: (q: Query) => void,
     fetchCount: () => Promise<void>
@@ -181,7 +179,7 @@ export default function MetadataView({ graphName, query, setQuery, fetchCount }:
     return (
         <div className="h-full grid grid-cols-2 grid-rows-3 overflow-hidden">
             <div className="flex flex-col gap-2 p-2 overflow-auto border-border row-span-3 border-r">
-                <Profile background={background} graphName={graphName} query={query} setQuery={setQuery} fetchCount={fetchCount} />
+                <Profile background={background} query={query} setQuery={setQuery} fetchCount={fetchCount} />
             </div>
             <div className="flex flex-col gap-2 p-2 overflow-auto border-border row-span-1 border-b">
                 <Metadata query={query} />

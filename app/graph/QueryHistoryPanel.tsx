@@ -501,7 +501,6 @@ export default function QueryHistoryPanel({ onClose }: Props) {
                                 currentQuery &&
                                 <Profile
                                     background={background}
-                                    graphName={graphName}
                                     query={currentQuery}
                                     setQuery={({ profile }) => {
                                         setHistoryQuery(prev => {
