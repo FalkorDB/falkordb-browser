@@ -34,15 +34,16 @@ interface ContentProps
   hideClose?: boolean
   closeSize?: number
   preventOutsideClose?: boolean
+  noOverlay?: boolean
 }
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   ContentProps
->(({ className, hideClose, closeSize = 16, preventOutsideClose = false, onInteractOutside, onEscapeKeyDown, children, ...props }, ref) => (
+>(({ className, hideClose, closeSize = 16, preventOutsideClose = false, noOverlay = false, onInteractOutside, onEscapeKeyDown, children, ...props }, ref) => (
   <DialogPortal>
     {
-      <DialogOverlay />
+      !noOverlay && <DialogOverlay />
     }
     <DialogPrimitive.Content
       ref={ref}

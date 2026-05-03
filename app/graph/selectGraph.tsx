@@ -211,7 +211,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     };
 
     return (
-        <Dialog open={openMenage} onOpenChange={setOpenMenage}>
+        <Dialog open={openMenage} onOpenChange={setOpenMenage} modal={false}>
             <DropdownMenu open={open} onOpenChange={handleOpenChange}>
                 <DropdownMenuTrigger disabled={options.length === 0 || indicator === "offline"} asChild>
                     <Button
@@ -265,12 +265,18 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         e.preventDefault();
                     }
                 }}
+                onOpenAutoFocus={(e) => e.preventDefault()}
                 hideClose
-                preventOutsideClose={tutorialOpen}
-                className="flex flex-col border-none rounded-lg max-w-none h-[90dvh] w-[41dvw] p-2"
+                noOverlay
+                preventOutsideClose
+                style={{ transform: "none" }}
+                className="flex flex-col border border-border rounded-lg shadow-lg max-w-none top-16 left-3 h-[calc(100dvh-5rem)] w-[41dvw] p-2 bg-background"
             >
                 <DialogHeader className="flex-row justify-between items-center border-b border-border pb-4">
-                    <DialogTitle className="text-2xl font-medium">Manage Graphs</DialogTitle>
+                    <DialogTitle className="text-2xl font-medium flex items-center gap-2">
+                        <Settings size={22} className="text-foreground/60" />
+                        Manage {type}s
+                    </DialogTitle>
                     <CloseDialog data-testid="closeManage" />
                 </DialogHeader>
                 <VisuallyHidden>
