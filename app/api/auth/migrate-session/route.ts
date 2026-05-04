@@ -5,7 +5,7 @@ import crypto from "crypto";
 import authOptions, { newClient } from "@/app/api/auth/[...nextauth]/options";
 import { storeEncryptedCredential } from "@/app/api/auth/tokenUtils";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
-import { getCorsHeaders } from "@/app/api/utils";
+import { getCorsHeaders, isRequestOriginTrusted } from "@/app/api/utils";
 
 const SESSION_MAX_AGE_SECONDS = 24 * 60 * 60;
 
@@ -27,6 +27,13 @@ const SESSION_MAX_AGE_SECONDS = 24 * 60 * 60;
  */
 export async function POST(request: Request) {
   try {
+    if (!isRequestOriginTrusted(request)) {
+      return NextResponse.json(
+        { message: "Untrusted request origin" },
+        { status: 400, headers: getCorsHeaders(request) }
+      );
+    }
+
     const session = await getServerSession(authOptions);
     const user = session?.user;
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import authOptions, { removeSessionConnection } from "@/app/api/auth/[...nextauth]/options";
-import { getCorsHeaders } from "@/app/api/utils";
+import { getCorsHeaders, isRequestOriginTrusted } from "@/app/api/utils";
 
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
@@ -16,6 +16,13 @@ export async function DELETE(
   { params }: { params: Promise<{ connectionId: string }> }
 ) {
   try {
+    if (!isRequestOriginTrusted(request)) {
+      return NextResponse.json(
+        { message: "Untrusted request origin" },
+        { status: 400, headers: getCorsHeaders(request) }
+      );
+    }
+
     const session = await getServerSession(authOptions);
     const id = session?.user?.id;
 
