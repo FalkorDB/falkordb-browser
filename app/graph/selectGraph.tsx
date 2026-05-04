@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
 
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { fetchOptions, getMemoryUsage, getSSEGraphResult, prepareArg, Row, securedFetch } from "@/lib/utils";
@@ -67,6 +67,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     useEffect(() => {
         setOpen(false);
     }, [selectedValue]);
+
+
 
     const getOptions = useCallback(async () =>
         fetchOptions(type, toast, setIndicator, indicator, setSelectedValue, setOptions, contentPersistence)
@@ -225,8 +227,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     return (
         <>
-            <DropdownMenu open={open} onOpenChange={handleOpenChange}>
-                <DropdownMenuTrigger disabled={options.length === 0 || indicator === "offline"} asChild>
+            <Popover open={open} onOpenChange={handleOpenChange}>
+                <PopoverTrigger disabled={options.length === 0 || indicator === "offline"} asChild>
                     <Button
                         className="min-w-0 basis-0 grow bg-background rounded-lg border border-border p-2 justify-left disabled:text-gray-400 disabled:opacity-100 p-1 text-sm"
                         label={selectedValue || `Select ${type}`}
@@ -241,10 +243,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                 <ChevronDown className="min-w-4 min-h-4" />
                         }
                     </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                    className="h-[40dvh] min-h-fit w-[350px] mt-2 overflow-hidden border border-border rounded-lg flex flex-col items-center p-2"
-                    preventOutsideClose={tutorialOpen}
+                </PopoverTrigger>
+                <PopoverContent
+                    className="z-20 h-[40dvh] min-h-fit w-[350px] mt-2 overflow-hidden border border-border rounded-lg flex flex-col items-center p-2"
+                    onInteractOutside={(e) => { if (openMenage || tutorialOpen) e.preventDefault(); }}
+                    onEscapeKeyDown={(e) => { if (openMenage || tutorialOpen) e.preventDefault(); }}
                 >
                     <PaginationList
                         className="basis-0 grow min-h-fit p-0"
@@ -259,17 +262,17 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     />
                     <div className="flex gap-2">
                         <Button
-                            className="w-fit"
+                            className="w-fit px-2 py-1 text-xs"
                             variant="Primary"
                             label="Manage"
                             data-testid={`manage${type}s`}
-                            onClick={() => { setOpen(false); setOpenMenage(true); }}
+                            onClick={() => { setOpenMenage(true); }}
                         >
-                            <Settings size={20} />
+                            <Settings size={16} />
                         </Button>
                     </div>
-                </DropdownMenuContent>
-            </DropdownMenu>
+                </PopoverContent>
+            </Popover>
             {
                 mounted && openMenage && createPortal(
                     <div

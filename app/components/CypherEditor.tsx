@@ -710,6 +710,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                         </Tooltip>
                     </TooltipProvider>
                     <Button
+                        className="py-1"
                         data-testid="editorRun"
                         ref={submitQuery}
                         indicator={indicator}

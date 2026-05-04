@@ -927,12 +927,13 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
   const handleFetchOptions = useCallback(async () => {
     if (indicator === "offline") return;
+    if (tutorialOpen) return;
 
     await Promise.all(([["Graph", setGraphNames, setGraphName],/* ["Schema", setSchemaNames, setSchemaName] */] as ["Graph" | "Schema", Dispatch<SetStateAction<string[]>>, Dispatch<SetStateAction<string>>][]).map(async ([type, setOptions, setName]) => {
       await fetchOptions(type, toast, setIndicator, indicator, setName, setOptions, contentPersistence);
     }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toast, contentPersistence]);
+  }, [toast, contentPersistence, tutorialOpen]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
