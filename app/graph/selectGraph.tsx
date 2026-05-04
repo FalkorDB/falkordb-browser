@@ -262,13 +262,13 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     />
                     <div className="flex gap-2">
                         <Button
-                            className="w-fit"
+                            className="w-fit px-2 py-1 text-xs"
                             variant="Primary"
                             label="Manage"
                             data-testid={`manage${type}s`}
                             onClick={() => { setOpenMenage(true); }}
                         >
-                            <Settings size={20} />
+                            <Settings size={16} />
                         </Button>
                     </div>
                 </PopoverContent>

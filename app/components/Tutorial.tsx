@@ -200,7 +200,7 @@ const tutorialSteps: TutorialStep[] = [
     },
     {
         title: "Graph Action Toolbar",
-        description: "Use these action buttons to edit your graph. Add new nodes (circle icon), create edges between nodes (arrow icon) (you can see the add edge button only when there are two nodes selected, see the info), or delete selected elements. The info button provides helpful tips for selecting and managing multiple graph elements.",
+        description: "Use these action buttons to edit your graph. Add new nodes (circle icon), create edges between nodes (arrow icon) (you can see the add edge button only when there are two nodes selected, see the info), or delete selected elements.",
         placementAxis: "x",
         targetSelector: '[data-testid="elementCanvasToolbarActionGraph"]',
     },
@@ -373,6 +373,7 @@ function TutorialPortal({
                 const overlay = document.createElement('div');
                 overlay.style.position = 'fixed';
                 overlay.style.zIndex = '40';
+                overlay.setAttribute('data-tutorial-overlay', 'true');
 
                 const applyDisabledStyle = () => {
                     // Check if the element is disabled
@@ -726,6 +727,7 @@ function TutorialPortal({
     const content = (
         <div
             ref={tooltipRef}
+            data-tutorial-overlay="true"
             className="fixed bg-background border border-border rounded-lg p-6 shadow-2xl max-w-[500px] z-50 pointer-events-auto"
             style={fixedPositionStyle}
         >
