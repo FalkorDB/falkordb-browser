@@ -31,8 +31,10 @@ export async function GET(
       return NextResponse.json({ message: "File not found." }, { status: 404, headers: corsHeaders });
     }
 
+    let fh: fs.promises.FileHandle | undefined;
     try {
-      const stats = await fs.promises.stat(upload.filePath);
+      fh = await fs.promises.open(upload.filePath, "r");
+      const stats = await fh.stat();
 
       if (!stats.isFile()) {
         return NextResponse.json({ message: "File not found." }, { status: 404, headers: corsHeaders });
@@ -42,7 +44,7 @@ export async function GET(
         return NextResponse.json({ message: "File is too large." }, { status: 413, headers: corsHeaders });
       }
 
-      const fileBuffer = await fs.promises.readFile(upload.filePath);
+      const fileBuffer = await fh.readFile();
 
       return new NextResponse(new Blob([new Uint8Array(fileBuffer)], { type: upload.fileType.contentType }), {
         status: 200,
@@ -60,6 +62,8 @@ export async function GET(
       }
 
       throw error;
+    } finally {
+      await fh?.close();
     }
   } catch (err) {
     console.error(err);
