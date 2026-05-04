@@ -393,11 +393,11 @@ export default function TableComponent({
     const columnCount = (setRows ? headerNames.length + 1 : headerNames.length) + 1;
 
     const renderValue = (v: any) => (
-        <span className={cn("pointer-events-auto", valueClassName)}>{v}</span>
+        <span className={cn("pointer-events-auto text-xs", valueClassName)}>{v}</span>
     );
 
     const renderLabel = (l: any) => (
-        <span className={cn(valueClassName)}>{l[0]}:</span>
+        <span className={cn("text-xs", valueClassName)}>{l[0]}:</span>
     );
 
     const getClassName = (index?: number, level?: number) => {
@@ -604,7 +604,7 @@ export default function TableComponent({
                             const rowTestID = `${label}${row.name}`;
                             return (
                                 <TableRow
-                                    className="border-border"
+                                    className="border-border text-xs"
                                     data-testid={`tableRow${rowTestID}`}
                                     onMouseEnter={() => setHover(row.name)}
                                     onMouseLeave={() => setHover("")}

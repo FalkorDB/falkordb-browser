@@ -114,27 +114,13 @@ export default class TutorialPanel extends GraphPage {
    * Returns true if the DataPanel appeared (i.e. a node/edge was right-clicked).
    */
   async rightClickCanvasUntilDataPanel(): Promise<boolean> {
-    const canvas = this.page.locator("falkordb-canvas");
-    const box = await canvas.boundingBox();
-    if (!box) return false;
+    // Use actual node screen positions from the graph so we always hit a node.
+    const nodes = await this.getNodesScreenPositions("graph");
+    const visibleNodes = nodes.filter((n) => n.isVisible);
+    const targets = visibleNodes.length > 0 ? visibleNodes : nodes;
 
-    const offsets = [
-      { x: 0.5, y: 0.5 },
-      { x: 0.4, y: 0.4 },
-      { x: 0.6, y: 0.4 },
-      { x: 0.3, y: 0.6 },
-      { x: 0.5, y: 0.3 },
-      { x: 0.7, y: 0.5 },
-      { x: 0.3, y: 0.3 },
-    ];
-
-    for (const offset of offsets) {
-      await this.page.mouse.click(
-        box.x + box.width * offset.x,
-        box.y + box.height * offset.y,
-        { button: "right" }
-      );
-      // Check if DataPanel appeared
+    for (const node of targets) {
+      await this.page.mouse.click(node.screenX, node.screenY, { button: "right" });
       const dataPanel = this.page.getByTestId("DataPanel");
       const appeared = await waitForElementToBeVisible(dataPanel, 500, 4);
       if (appeared) return true;

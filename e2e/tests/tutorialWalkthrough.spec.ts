@@ -125,15 +125,9 @@ test.describe("Tutorial Walkthrough", () => {
         await tutorial.clickNextButton();
 
         // Step 17: "View Node / Edge Details" — advanceOn: "contextmenu", with advanceCondition
-        // Right-click on the canvas to open the DataPanel on a node/edge.
+        // Right-click on an actual node so the DataPanel opens reliably.
         await tutorial.waitForStep("View Node / Edge Details");
-        await tutorial.rightClickTutorialTarget("falkordb-canvas");
-        // The advanceCondition polls for DataPanel; if we missed a node, try more positions
-        try {
-            await tutorial.waitForStep("Data Panel", 5000);
-        } catch {
-            await tutorial.rightClickCanvasUntilDataPanel();
-        }
+        await tutorial.rightClickCanvasUntilDataPanel();
 
         // Step 18: "Data Panel" — no advanceOn, has Next button
         await tutorial.waitForStep("Data Panel");
