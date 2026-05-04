@@ -1,7 +1,8 @@
 import type { Graph } from "falkordb";
-import type { NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
 const AUTO_NEXTAUTH_URL = "auto";
+const UNTRUSTED_REQUEST_ORIGIN_MESSAGE = "Untrusted request origin";
 const LOCALHOST_ORIGINS = new Set([
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -248,6 +249,13 @@ export function getCorsHeaders(request?: Request): Record<string, string> {
     }
 
     return headers;
+}
+
+export function rejectUntrustedOrigin(request: Request): NextResponse<{ message: string }> {
+    return NextResponse.json(
+        { message: UNTRUSTED_REQUEST_ORIGIN_MESSAGE },
+        { status: 400, headers: getCorsHeaders(request) }
+    );
 }
 
 /**

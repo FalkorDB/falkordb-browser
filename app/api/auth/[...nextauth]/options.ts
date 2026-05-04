@@ -10,6 +10,7 @@ import {
   enableAutoNextAuthUrl,
   getCorsHeaders,
   isRequestOriginTrusted,
+  rejectUntrustedOrigin,
   shouldUseSecureCookies,
 } from "../../utils";
 import {
@@ -859,7 +860,7 @@ export async function getClient(
   | { client: FalkorDB; user: AuthenticatedUserWithPassword }
 > {
   if (!isRequestOriginTrusted(request)) {
-    return NextResponse.json({ message: "Untrusted request origin" }, { status: 400, headers: getCorsHeaders(request) });
+    return rejectUntrustedOrigin(request);
   }
 
   // Check if this is a JWT-only request (from /docs)

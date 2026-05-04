@@ -1,6 +1,6 @@
 import NextAuth from "next-auth";
-import { NextResponse, type NextRequest } from "next/server";
-import { enableAutoNextAuthUrl, getCorsHeaders, isRequestOriginTrusted } from "../../utils";
+import type { NextRequest } from "next/server";
+import { enableAutoNextAuthUrl, isRequestOriginTrusted, rejectUntrustedOrigin } from "../../utils";
 import authOptions from "./options";
 
 enableAutoNextAuthUrl();
@@ -13,10 +13,7 @@ type AuthRouteContext = {
 
 async function authHandler(request: NextRequest, context: AuthRouteContext) {
   if (!isRequestOriginTrusted(request)) {
-    return NextResponse.json(
-      { message: "Untrusted request origin" },
-      { status: 400, headers: getCorsHeaders(request) }
-    );
+    return rejectUntrustedOrigin(request);
   }
 
   return handler(request, context);
