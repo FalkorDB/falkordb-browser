@@ -64,8 +64,8 @@ const tutorialSteps: TutorialStep[] = [
         description: "This dropdown lets you select which graph to work with. We've loaded demo graphs for this tour. Click the highlighted dropdown to see them.",
         placementAxis: "x",
         targetSelector: '[data-testid="selectGraph"]',
-        advanceOn: "pointerdown",
-        forward: ["mouseenter", "mouseleave"],
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave", "pointerdown"],
     },
     {
         title: "Manage Graphs",
@@ -108,12 +108,22 @@ const tutorialSteps: TutorialStep[] = [
         hidePrev: true
     },
     {
+        title: "Open Label Options",
+        description: "Click on the 'Person' label to see the available options for this node type.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="graphInfoPersonNode"]',
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave", "pointerdown"],
+        hidePrev: true
+    },
+    {
         title: "Customize Label Styles",
-        description: "You can customize how nodes with specific labels appear in the graph. Click the palette icon next to the 'Person' label to open the style customization panel.",
+        description: "Click 'Customize' to open the style customization panel where you can change how nodes with this label appear in the graph.",
         placementAxis: "x",
         targetSelector: '[data-testid="customizeStylePerson"]',
         advanceOn: "click",
-        forward: ["mouseenter", "mouseleave"],
+        forward: ["mouseenter", "mouseleave", "pointerdown"],
+        hidePrev: true
     },
     {
         title: "Choose Node Color",
@@ -190,7 +200,7 @@ const tutorialSteps: TutorialStep[] = [
     },
     {
         title: "Graph Action Toolbar",
-        description: "Use these action buttons to edit your graph. Add new nodes (circle icon), create edges between nodes (arrow icon) (you can see the add edge button only when there are two nodes selected, see the info), or delete selected elements. The info button provides helpful tips for selecting and managing multiple graph elements.",
+        description: "Use these action buttons to edit your graph. Add new nodes (circle icon), create edges between nodes (arrow icon) (you can see the add edge button only when there are two nodes selected, see the info), or delete selected elements.",
         placementAxis: "x",
         targetSelector: '[data-testid="elementCanvasToolbarActionGraph"]',
     },
@@ -230,14 +240,14 @@ const tutorialSteps: TutorialStep[] = [
         title: "Query History Window",
         description: "Access your previous queries here. You can also remove queries from your history or clear the entire history.",
         placementAxis: "y",
-        targetSelector: '[data-testid="queryHistoryContent"]',
+        targetSelector: '[data-testid="queryHistoryPanel"]',
         hidePrev: true
     },
     {
         title: "Close Query History Window",
         description: "",
         placementAxis: "y",
-        targetSelector: '[data-testid="closeQueryHistory"]',
+        targetSelector: '[data-testid="queryHistoryCloseButton"]',
         advanceOn: "click",
         forward: ["mouseenter", "mouseleave"],
     },
@@ -363,6 +373,7 @@ function TutorialPortal({
                 const overlay = document.createElement('div');
                 overlay.style.position = 'fixed';
                 overlay.style.zIndex = '40';
+                overlay.setAttribute('data-tutorial-overlay', 'true');
 
                 const applyDisabledStyle = () => {
                     // Check if the element is disabled
@@ -716,6 +727,7 @@ function TutorialPortal({
     const content = (
         <div
             ref={tooltipRef}
+            data-tutorial-overlay="true"
             className="fixed bg-background border border-border rounded-lg p-6 shadow-2xl max-w-[500px] z-50 pointer-events-auto"
             style={fixedPositionStyle}
         >
@@ -880,6 +892,7 @@ function TutorialSpotlight({ targetSelector, spotlightSelector }: { targetSelect
     return (
         <div
             data-testid="tutorialSpotlight"
+            data-tutorial-overlay="true"
             className="fixed inset-0 z-40 bg-black opacity-50 transition-all duration-300 pointer-events-auto"
             style={spotlightStyle}
         />

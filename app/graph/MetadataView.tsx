@@ -9,11 +9,11 @@ import Button from "../components/ui/Button";
 import { IndicatorContext, ConnectionContext } from "../components/provider";
 
 const renderValue = (v: any) => (
-    <span className="SofiaSans">{v}</span>
+    <span className="SofiaSans text-xs">{v}</span>
 );
 
 const renderLabel = (l: any) => (
-    <span className="SofiaSans">{l[0]}:</span>
+    <span className="SofiaSans text-xs">{l[0]}:</span>
 );
 
 export function Profile({ query, setQuery, fetchCount, background, hideTitle }: {
@@ -64,6 +64,7 @@ export function Profile({ query, setQuery, fetchCount, background, hideTitle }: 
                 <Button
                     indicator={indicator}
                     variant="Primary"
+                    className="px-2 py-1 text-xs"
                     label="Profile"
                     onClick={handleProfile}
                     isLoading={isLoading}
@@ -116,7 +117,7 @@ export function Metadata({ query, hideTitle }: {
     return (
         <>
             {!hideTitle && <h1 className="text-2xl font-bold">Metadata</h1>}
-            <ul className="flex flex-col gap-2 p-2 h-1 grow overflow-auto SofiaSans">
+            <ul className="flex flex-col gap-2 p-2 h-1 grow overflow-auto SofiaSans text-xs">
                 {query.metadata.map((m, i) => (
                     // eslint-disable-next-line react/no-array-index-key
                     <li key={i}>{m}</li>
