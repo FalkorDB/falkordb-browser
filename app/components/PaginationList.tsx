@@ -222,7 +222,7 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                 <Input
                     ref={searchRef as React.RefObject<HTMLInputElement>}
                     data-testid={`${label}Search`}
-                    className="w-full bg-background text-foreground"
+                    className="w-full bg-background text-foreground text-xs"
                     value={search}
                     placeholder={`Search for a ${label}`}
                     onChange={(e) => setSearch(e.target.value)}
