@@ -168,6 +168,11 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                             e.preventDefault();
                                         }
                                     }}
+                                    onEscapeKeyDown={(e) => {
+                                        if ((e.target as Element)?.closest?.('[data-tutorial-overlay]')) {
+                                            e.preventDefault();
+                                        }
+                                    }}
                                 >
                                                     <PopoverClose asChild>
                                                         <Button
