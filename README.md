@@ -58,6 +58,8 @@ Open [http://localhost:3000](http://localhost:3000) with your browser.
 docker run -p 3000:3000 -e "NEXTAUTH_URL=https://www.yoururl.com" -p 6379:6379 -it --rm falkordb/falkordb:latest
 ```
 
+For reverse-proxy deployments using `NEXTAUTH_URL=auto`, set `TRUST_PROXY_HEADERS=true` only when the proxy strips or overwrites incoming `X-Forwarded-Host` and `X-Forwarded-Proto` headers.
+
 > Note: Alternativly, you can run the browser from source and database using Docker
 
 ### Run the graph database from Docker container
@@ -106,7 +108,6 @@ For detailed configuration options and examples, see the [Helm chart documentati
 * run the server `npm run dev`
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
-
 
 
 

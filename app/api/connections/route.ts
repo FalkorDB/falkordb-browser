@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import authOptions, { addSessionConnection, listSessionConnections } from "@/app/api/auth/[...nextauth]/options";
-import { getCorsHeaders } from "@/app/api/utils";
+import { getCorsHeaders, isRequestOriginTrusted, rejectUntrustedOrigin } from "@/app/api/utils";
 
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
@@ -13,6 +13,10 @@ export async function OPTIONS(request: Request) {
  */
 export async function GET(request: Request) {
   try {
+    if (!isRequestOriginTrusted(request)) {
+      return rejectUntrustedOrigin(request);
+    }
+
     const session = await getServerSession(authOptions);
     const id = session?.user?.id;
 
@@ -42,6 +46,10 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   try {
+    if (!isRequestOriginTrusted(request)) {
+      return rejectUntrustedOrigin(request);
+    }
+
     const session = await getServerSession(authOptions);
     const id = session?.user?.id;
 
