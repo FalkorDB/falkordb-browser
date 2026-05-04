@@ -183,6 +183,11 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                             e.preventDefault();
                                         }
                                     }}
+                                    onEscapeKeyDown={(e) => {
+                                        if ((e.target as Element)?.closest?.('[data-tutorial-overlay]')) {
+                                            e.preventDefault();
+                                        }
+                                    }}
                                 >
                                     <QueryHistoryPanel onClose={() => setQueriesOpen?.(false)} />
                                 </PopoverContent>

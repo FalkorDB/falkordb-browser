@@ -127,7 +127,8 @@ test.describe("Tutorial Walkthrough", () => {
         // Step 17: "View Node / Edge Details" — advanceOn: "contextmenu", with advanceCondition
         // Right-click on an actual node so the DataPanel opens reliably.
         await tutorial.waitForStep("View Node / Edge Details");
-        await tutorial.rightClickCanvasUntilDataPanel();
+        const hit = await tutorial.rightClickCanvasUntilDataPanel();
+        expect(hit, "Right-click fallback: DataPanel never appeared after exhausting all canvas node positions").toBeTruthy();
 
         // Step 18: "Data Panel" — no advanceOn, has Next button
         await tutorial.waitForStep("Data Panel");
