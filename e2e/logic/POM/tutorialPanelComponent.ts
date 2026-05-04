@@ -73,8 +73,10 @@ export default class TutorialPanel extends GraphPage {
    * We locate that overlay and click it, which the tutorial system forwards.
    */
   async clickTutorialTarget(selector: string): Promise<void> {
-    // Wait for the target element to exist first
-    const target = this.page.locator(selector);
+    // Wait for the target element to exist first.
+    // Use .first() to mirror document.querySelector behaviour when the selector
+    // matches multiple elements (e.g. all 15 preset color buttons).
+    const target = this.page.locator(selector).first();
     await waitForElementToBeVisible(target);
     // The tutorial overlay sits on z-index:40 over the target element.
     // Click the actual center of the target element's bounding box.
@@ -87,7 +89,7 @@ export default class TutorialPanel extends GraphPage {
    * Perform a mousedown on the tutorial target element.
    */
   async mousedownTutorialTarget(selector: string): Promise<void> {
-    const target = this.page.locator(selector);
+    const target = this.page.locator(selector).first();
     await waitForElementToBeVisible(target);
     const box = await target.boundingBox();
     if (!box) throw new Error(`Target ${selector} has no bounding box`);
@@ -100,7 +102,7 @@ export default class TutorialPanel extends GraphPage {
    * Right-click on the tutorial canvas target.
    */
   async rightClickTutorialTarget(selector: string): Promise<void> {
-    const target = this.page.locator(selector);
+    const target = this.page.locator(selector).first();
     await waitForElementToBeVisible(target);
     const box = await target.boundingBox();
     if (!box) throw new Error(`Target ${selector} has no bounding box`);
