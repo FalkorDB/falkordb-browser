@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const AUTO_NEXTAUTH_URL = "auto";
 const UNTRUSTED_REQUEST_ORIGIN_MESSAGE = "Untrusted request origin";
+const TRUST_PROXY_HEADERS = "true";
 const LOCALHOST_ORIGINS = new Set([
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -81,6 +82,10 @@ function isSafeHost(host: string): boolean {
         && !/\s/.test(host);
 }
 
+function shouldTrustProxyHeaders(): boolean {
+    return process.env.TRUST_PROXY_HEADERS === TRUST_PROXY_HEADERS;
+}
+
 export function isAutoNextAuthUrl(): boolean {
     return process.env.NEXTAUTH_URL === AUTO_NEXTAUTH_URL;
 }
@@ -96,14 +101,23 @@ export function getRequestOrigin(request?: Request): string | null {
         return null;
     }
 
-    const forwardedHost = firstHeaderValue(request.headers.get("x-forwarded-host"));
+    const trustProxyHeaders = shouldTrustProxyHeaders();
+    const forwardedHost = trustProxyHeaders
+        ? firstHeaderValue(request.headers.get("x-forwarded-host"))
+        : null;
     const host = forwardedHost ?? request.headers.get("host");
 
     if (!host || !isSafeHost(host)) {
         return null;
     }
 
-    const forwardedProto = firstHeaderValue(request.headers.get("x-forwarded-proto"));
+    const forwardedProto = trustProxyHeaders
+        ? firstHeaderValue(request.headers.get("x-forwarded-proto"))
+        : null;
+    if (forwardedProto && forwardedProto !== "https" && forwardedProto !== "http") {
+        return null;
+    }
+
     const requestProtocol = (() => {
         try {
             return new URL(request.url).protocol.replace(":", "");
@@ -111,9 +125,7 @@ export function getRequestOrigin(request?: Request): string | null {
             return null;
         }
     })();
-    const protocol = forwardedProto === "https" || forwardedProto === "http"
-        ? forwardedProto
-        : requestProtocol;
+    const protocol = forwardedProto ?? requestProtocol;
 
     if (protocol !== "https" && protocol !== "http") {
         return null;
