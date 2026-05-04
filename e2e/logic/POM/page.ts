@@ -236,9 +236,8 @@ export default class Page extends BasePage {
     return this.page.locator("#skeleton").first();
   }
 
-  // 2000 is the timeout for the animation to end
-  // 1000 is the timeout for the fit to size animation
-  // 1500 is extra timeout to ensure the animation is over
+  // Wait for the canvas engine to report "stopped" status.
+  // The timeout is a maximum bound — returns immediately when the engine stops.
   async waitForCanvasAnimationToEnd(timeout = 4500): Promise<void> {
     await waitForElementToBeVisible(this.skeleton);
 
@@ -305,6 +304,35 @@ export default class Page extends BasePage {
       lastScale = currentScale;
     }
     throw new Error("Scale did not stabilize within timeout");
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async waitForGraphNodeUpdate(
+    windowKey: "graph" | "schema",
+    predicate: { label: string; notColor: string; nodeId?: string },
+    timeout = 15000
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ): Promise<any> {
+    const result = await this.page.waitForFunction(
+      ({ key, label, notColor, nodeId }) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = (window as any)[key]?.();
+        if (!data) return null;
+        const allNodes = data.nodes || data.elements?.nodes || [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const node = allNodes.find((n: any) => {
+          if (nodeId && String(n.id) !== String(nodeId)) return false;
+          return n.labels?.includes(label);
+        });
+        if (node && typeof node.color === "string" && node.color && node.color !== notColor) {
+          return { color: node.color, labels: node.labels };
+        }
+        return null;
+      },
+      { key: windowKey, ...predicate },
+      { timeout }
+    );
+    return result.jsonValue();
   }
 
   async getNodesScreenPositions(windowKey: "graph" | "schema"): Promise<any[]> {
@@ -432,9 +460,26 @@ export default class Page extends BasePage {
   }
 
   async getNotificationErrorToast(): Promise<boolean> {
-    await this.page.waitForTimeout(1000);
     const isVisible = await this.isVisibleErrorToast();
     return isVisible;
+  }
+
+  async getErrorToastText(): Promise<string> {
+    const isVisible = await this.isVisibleErrorToast();
+    if (!isVisible) return "";
+    return (await this.errorToast.textContent()) || "";
+  }
+
+  async getErrorToastTitle(): Promise<string> {
+    const isVisible = await this.isVisibleErrorToast();
+    if (!isVisible) return "";
+    const title = this.errorToast.getByTestId("toast-title");
+    return (await title.textContent()) || "";
+  }
+
+  async isOfflineIndicatorVisible(): Promise<boolean> {
+    const indicator = this.page.locator('[role="status"][aria-label*="offline"]');
+    return waitForElementToBeVisible(indicator);
   }
 
   async getLinksScreenPositions(windowKey: "graph" | "schema"): Promise<any[]> {

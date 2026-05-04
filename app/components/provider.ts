@@ -1,6 +1,7 @@
 import { createContext, Dispatch, SetStateAction } from "react";
-import { ConnectionInfo, ConnectionType, GraphData, GraphRef, HistoryQuery, Label, Panel, Relationship, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
+import { ConnectionInfo, ConnectionType, GraphData, GraphRef, HistoryQuery, Label, Panel, Relationship, SyntaxErrorInfo, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
 import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
+import type { SessionConnection } from "next-auth";
 import { Graph, GraphInfo } from "../api/graph/model";
 
 type BrowserSettingsContextType = {
@@ -203,6 +204,10 @@ type TableViewContextType = {
   dataHash: string;
 };
 
+// Re-export the canonical SessionConnection type from the NextAuth module
+// augmentation so frontend code has a single source of truth.
+export type { SessionConnection } from "next-auth";
+
 type ConnectionContextType = {
   connectionType: ConnectionType;
   setConnectionType: Dispatch<SetStateAction<ConnectionType>>;
@@ -211,6 +216,11 @@ type ConnectionContextType = {
   dbVersion: string;
   setDbVersion: Dispatch<SetStateAction<string>>;
   isReadOnly: boolean;
+  additionalConnections: SessionConnection[];
+  setAdditionalConnections: Dispatch<SetStateAction<SessionConnection[]>>;
+  activeConnectionId: string | null;
+  setActiveConnectionId: Dispatch<SetStateAction<string | null>>;
+  updateSession: (data: { connections?: SessionConnection[]; activeConnectionId?: string | null }) => Promise<unknown>;
 };
 
 type UDFContextType = {
@@ -433,6 +443,11 @@ export const ConnectionContext = createContext<ConnectionContextType>({
   dbVersion: "",
   setDbVersion: () => { },
   isReadOnly: false,
+  additionalConnections: [],
+  setAdditionalConnections: () => { },
+  activeConnectionId: null,
+  setActiveConnectionId: () => { },
+  updateSession: async () => { },
 });
 
 export const UDFContext = createContext<UDFContextType>({
@@ -441,3 +456,13 @@ export const UDFContext = createContext<UDFContextType>({
   selectedUdf: undefined,
   setSelectedUdf: () => { },
 }); 
+
+type SyntaxErrorContextType = {
+  syntaxError: SyntaxErrorInfo | null;
+  setSyntaxError: Dispatch<SetStateAction<SyntaxErrorInfo | null>>;
+};
+
+export const SyntaxErrorContext = createContext<SyntaxErrorContextType>({
+  syntaxError: null,
+  setSyntaxError: () => { },
+});

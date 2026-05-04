@@ -465,6 +465,74 @@ test.describe("Chat Feature Tests", () => {
     await apiCall.removeGraph(graphName);
   });
 
+  test(`@readwrite Verify chat renders markdown content as HTML`, async () => {
+    const graphName = getRandomString("chat");
+    await apiCall.addGraph(graphName);
+    await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
+
+    const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
+    await browser.setPageToFullScreen();
+
+    // Inject fake model + plain-text API key into localStorage so
+    // handleSubmit does not bail out before sending the request.
+    const page = await browser.getPage();
+    await page.evaluate(() => {
+      localStorage.setItem("model", "gpt-4o-mini");
+      localStorage.setItem("secretKey", "fake-test-key-for-markdown");
+    });
+    // Reload so the React context picks up the new values
+    await page.reload({ waitUntil: "networkidle" });
+
+    await chat.selectGraphByName(graphName);
+    await chat.openChat();
+    await chat.waitForChatPanel();
+
+    // Build a mock SSE response containing markdown-formatted text
+    const markdownAnswer = "Here are Alice's friends:\n\n**Bob** is her friend.\n\n- Item one\n- Item two\n\n```cypher\nMATCH (n) RETURN n\n```";
+    const ssePayload = [
+      `event: CypherQuery data: MATCH (a:Person {name: "Alice"})-[:KNOWS]->(b) RETURN b.name\n\n`,
+      `event: Result data: ${JSON.stringify(markdownAnswer)}\n\n`,
+    ].join("");
+
+    // Intercept the /api/chat POST and return the mock SSE stream
+    await page.route("**/api/chat", (route) => {
+      route.fulfill({
+        status: 200,
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+        },
+        body: ssePayload,
+      });
+    });
+
+    // Send a question (the mock will answer)
+    await chat.fillChatInput("Who are Alice's friends?");
+    await chat.clickChatSendButton();
+
+    // Wait for the markdown result to appear
+    await chat.waitForAssistantResponse("Result");
+
+    // Locate the rendered markdown container
+    const markdownDiv = page.getByTestId("chatMessageMarkdown").last();
+    await markdownDiv.waitFor({ state: "visible", timeout: 5000 });
+
+    // Verify markdown was converted to real HTML elements
+    const hasStrong = await markdownDiv.locator("strong").count();
+    expect(hasStrong).toBeGreaterThanOrEqual(1);
+
+    const hasListItems = await markdownDiv.locator("li").count();
+    expect(hasListItems).toBeGreaterThanOrEqual(2);
+
+    const hasCodeBlock = await markdownDiv.locator("pre code").count();
+    expect(hasCodeBlock).toBeGreaterThanOrEqual(1);
+
+    // Cleanup mock
+    await page.unroute("**/api/chat");
+    await apiCall.removeGraph(graphName);
+  });
+
   test(`@readwrite Verify messages are graph-specific and respect maxSavedMessages limit`, async () => {
     test.setTimeout(90000);
     const graph1Name = getRandomString("chat");

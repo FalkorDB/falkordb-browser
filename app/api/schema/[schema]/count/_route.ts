@@ -1,5 +1,5 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { runQuery } from "@/app/api/utils";
+import { runQuery, resolveReadOnly } from "@/app/api/utils";
 import { NextResponse, NextRequest } from "next/server";
 
 // eslint-disable-next-line import/prefer-default-export
@@ -18,10 +18,10 @@ export async function GET(
       throw new Error(await session.text());
     }
 
-    const { client } = session;
+    const { client, user } = session;
     const { schema } = await params;
     const schemaName = `${schema}_schema`;
-    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       const graph = client.selectGraph(schemaName);

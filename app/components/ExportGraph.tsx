@@ -66,6 +66,7 @@ export default function ExportGraph({ selectedValues, type }: Props) {
             onOpenChange={setOpen}
             trigger={
                 <Button
+                    className="p-1 text-xs"
                     data-testid="exportGraph"
                     variant="Primary"
                     label="Export Data"

@@ -16,13 +16,13 @@ function LibrarySection({ libraryName, libraryType, functions, isSelected, onSel
     onDelete: () => void
 }) {
     const [open, setOpen] = useState(false);
-    const iconSize = 25;
+    const iconSize = 16;
 
     return (
         <div className="flex flex-col gap-2">
             <div
                 className={cn(
-                    "flex items-center gap-2 w-full text-left text-sm font-medium py-1 px-1 rounded hover:bg-secondary",
+                    "flex items-center gap-2 w-full text-left text-xs font-medium py-1 px-1 rounded hover:bg-secondary",
                     isSelected && "bg-secondary text-primary"
                 )}
             >
@@ -52,7 +52,7 @@ function LibrarySection({ libraryName, libraryType, functions, isSelected, onSel
                     {functions.map((fn) => (
                         <p
                             key={fn}
-                            className="text-sm py-0.5 px-1 text-muted-foreground truncate"
+                            className="text-xs py-0.5 px-1 text-muted-foreground truncate"
                             title={fn}
                         >
                             {fn}

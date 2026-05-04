@@ -7,9 +7,8 @@ import { Suspense, useEffect } from "react";
 function LoginVerificationInner({ children }: { children: React.ReactNode }) {
 
     const router = useRouter();
-    const { status } = useSession();
+    const { status, data } = useSession();
     const url = usePathname();
-    const { data } = useSession();
     const searchParams = useSearchParams();
 
     useEffect(() => {

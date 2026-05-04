@@ -295,7 +295,6 @@ function GraphView({
                             };
                         });
                     }}
-                    graphName={graph.Id}
                     query={historyQuery.currentQuery}
                     fetchCount={fetchCount}
                 />

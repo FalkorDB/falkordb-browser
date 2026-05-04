@@ -1,9 +1,29 @@
 import type { Graph } from "falkordb";
+import { NextResponse, type NextRequest } from "next/server";
+
+const AUTO_NEXTAUTH_URL = "auto";
+const UNTRUSTED_REQUEST_ORIGIN_MESSAGE = "Untrusted request origin";
+const TRUST_PROXY_HEADERS = "true";
+const LOCALHOST_ORIGINS = new Set([
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]);
 
 export const runQuery = async (graph: Graph, query: string, isReadOnly: boolean) => {
     const result = isReadOnly ? await graph.roQuery(query) : await graph.query(query);
     return result;
 };
+
+/**
+ * Determine whether a request must use read-only queries.
+ * Returns true when the frontend sends `readOnly=true` OR
+ * when the authenticated user's role is "Read-Only".
+ * This prevents NOPERM errors caused by stale frontend state.
+ */
+export function resolveReadOnly(request: NextRequest, userRole?: string): boolean {
+    return request.nextUrl.searchParams.get("readOnly") === "true"
+        || userRole === "Read-Only";
+}
 
 /**
  * Build FalkorDB connection URL from user session
@@ -31,24 +51,164 @@ export function buildFalkorDBConnection(user: {
     return `${protocol}${auth}${user.host}:${user.port}`;
 }
 
+function normalizeOrigin(origin: string): string | null {
+    try {
+        const parsed = new URL(origin);
+
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+            return null;
+        }
+
+        return parsed.origin;
+    } catch {
+        return null;
+    }
+}
+
+function firstHeaderValue(value: string | null): string | null {
+    return value?.split(",")[0]?.trim() || null;
+}
+
+function getHeaderOrigin(request: Request): string | null {
+    const origin = request.headers.get("origin");
+    return origin ? normalizeOrigin(origin) : null;
+}
+
+function isSafeHost(host: string): boolean {
+    return Boolean(host)
+        && !host.includes("/")
+        && !host.includes("\\")
+        && !host.includes("@")
+        && !/\s/.test(host);
+}
+
+function shouldTrustProxyHeaders(): boolean {
+    return process.env.TRUST_PROXY_HEADERS === TRUST_PROXY_HEADERS;
+}
+
+export function isAutoNextAuthUrl(): boolean {
+    return process.env.NEXTAUTH_URL === AUTO_NEXTAUTH_URL;
+}
+
+export function enableAutoNextAuthUrl(): void {
+    if (isAutoNextAuthUrl()) {
+        process.env.AUTH_TRUST_HOST ??= "true";
+    }
+}
+
+export function getRequestOrigin(request?: Request): string | null {
+    if (!request) {
+        return null;
+    }
+
+    const trustProxyHeaders = shouldTrustProxyHeaders();
+    const forwardedHost = trustProxyHeaders
+        ? firstHeaderValue(request.headers.get("x-forwarded-host"))
+        : null;
+    const host = forwardedHost ?? request.headers.get("host");
+
+    if (!host || !isSafeHost(host)) {
+        return null;
+    }
+
+    const forwardedProto = trustProxyHeaders
+        ? firstHeaderValue(request.headers.get("x-forwarded-proto"))
+        : null;
+    if (forwardedProto && forwardedProto !== "https" && forwardedProto !== "http") {
+        return null;
+    }
+
+    const requestProtocol = (() => {
+        try {
+            return new URL(request.url).protocol.replace(":", "");
+        } catch {
+            return null;
+        }
+    })();
+    const protocol = forwardedProto ?? requestProtocol;
+
+    if (protocol !== "https" && protocol !== "http") {
+        return null;
+    }
+
+    return normalizeOrigin(`${protocol}://${host}`);
+}
+
 /**
  * Get allowed origins from environment variable or use defaults
  */
 function getAllowedOrigins(): string[] {
     const envOrigins = process.env.ALLOWED_ORIGINS;
     if (envOrigins) {
-        return envOrigins.split(',').map(origin => origin.trim());
+        return envOrigins
+            .split(',')
+            .map(origin => normalizeOrigin(origin.trim()))
+            .filter((origin): origin is string => Boolean(origin));
     }
 
-    // Default allowed origins for development
-    const defaults = ['http://localhost:3000'];
+    const defaults = [...LOCALHOST_ORIGINS];
 
     // Add NEXTAUTH_URL if configured
-    if (process.env.NEXTAUTH_URL) {
-        defaults.push(process.env.NEXTAUTH_URL.replace(/\/$/, '')); // Remove trailing slash
+    if (process.env.NEXTAUTH_URL && !isAutoNextAuthUrl()) {
+        const nextAuthOrigin = normalizeOrigin(process.env.NEXTAUTH_URL);
+        if (nextAuthOrigin) {
+            defaults.push(nextAuthOrigin);
+        }
     }
 
-    return defaults;
+    return [...new Set(defaults)];
+}
+
+export function isOriginAllowed(requestOrigin?: string | null, request?: Request): boolean {
+    if (!requestOrigin) {
+        return false;
+    }
+
+    const origin = normalizeOrigin(requestOrigin);
+    if (!origin) {
+        return false;
+    }
+
+    const allowedOrigins = getAllowedOrigins();
+
+    if (allowedOrigins.includes(origin)) {
+        return true;
+    }
+
+    if (!process.env.ALLOWED_ORIGINS && isAutoNextAuthUrl()) {
+        return origin === getRequestOrigin(request);
+    }
+
+    return false;
+}
+
+export function isRequestOriginTrusted(request: Request): boolean {
+    if (!isAutoNextAuthUrl()) {
+        return true;
+    }
+
+    const requestOrigin = getRequestOrigin(request);
+    if (!requestOrigin) {
+        return false;
+    }
+
+    const callerOrigin = getHeaderOrigin(request);
+
+    if (process.env.ALLOWED_ORIGINS) {
+        return isOriginAllowed(requestOrigin, request)
+            && (!callerOrigin || isOriginAllowed(callerOrigin, request));
+    }
+
+    return !callerOrigin || callerOrigin === requestOrigin;
+}
+
+export function shouldUseSecureCookies(request: Request): boolean {
+    const nextAuthUrl = process.env.NEXTAUTH_URL;
+    if (nextAuthUrl && !isAutoNextAuthUrl()) {
+        return nextAuthUrl.startsWith("https://");
+    }
+
+    return getRequestOrigin(request)?.startsWith("https://") ?? false;
 }
 
 /**
@@ -57,16 +217,17 @@ function getAllowedOrigins(): string[] {
  * @returns CORS headers object
  */
 export function corsHeaders(requestOrigin?: string | null): Record<string, string> {
-    const allowedOrigins = getAllowedOrigins();
     const headers: Record<string, string> = {
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         'Vary': 'Origin',
     };
 
-    // Check if the request origin is in the allowlist
-    if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
-        headers['Access-Control-Allow-Origin'] = requestOrigin;
+    const origin = requestOrigin ? normalizeOrigin(requestOrigin) : null;
+    const allowedOrigins = getAllowedOrigins();
+
+    if (origin && allowedOrigins.includes(origin)) {
+        headers['Access-Control-Allow-Origin'] = origin;
         headers['Access-Control-Allow-Credentials'] = 'true';
     } else if (process.env.NODE_ENV === 'development' && !process.env.ALLOWED_ORIGINS) {
         // In development, allow all origins if ALLOWED_ORIGINS is not explicitly set
@@ -85,7 +246,28 @@ export function corsHeaders(requestOrigin?: string | null): Record<string, strin
  */
 export function getCorsHeaders(request?: Request): Record<string, string> {
     const origin = request?.headers.get('origin');
-    return corsHeaders(origin);
+    const headers = corsHeaders(origin);
+    const normalizedOrigin = origin ? normalizeOrigin(origin) : null;
+
+    if (
+        normalizedOrigin
+        && !headers['Access-Control-Allow-Origin']
+        && !process.env.ALLOWED_ORIGINS
+        && isAutoNextAuthUrl()
+        && normalizedOrigin === getRequestOrigin(request)
+    ) {
+        headers['Access-Control-Allow-Origin'] = normalizedOrigin;
+        headers['Access-Control-Allow-Credentials'] = 'true';
+    }
+
+    return headers;
+}
+
+export function rejectUntrustedOrigin(request: Request): NextResponse<{ message: string }> {
+    return NextResponse.json(
+        { message: UNTRUSTED_REQUEST_ORIGIN_MESSAGE },
+        { status: 400, headers: getCorsHeaders(request) }
+    );
 }
 
 /**

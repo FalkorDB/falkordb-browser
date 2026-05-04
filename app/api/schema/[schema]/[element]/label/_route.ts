@@ -1,5 +1,5 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { getCorsHeaders } from "@/app/api/utils";
+import { getCorsHeaders, resolveReadOnly } from "@/app/api/utils";
 import { addSchemaElementLabel, removeSchemaElementLabel, validateBody } from "@/app/api/validate-body";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -18,7 +18,7 @@ export async function DELETE(
       return session;
     }
 
-    const { client } = session;
+    const { client, user } = session;
     const { schema, element } = await params;
     const elementId = Number(element);
     const schemaName = `${schema}_schema`;
@@ -36,11 +36,16 @@ export async function DELETE(
       const { label } = validation.data;
       const query = `MATCH (n) WHERE ID(n) = $id REMOVE n:${label}`;
       const graph = client.selectGraph(schemaName);
-      const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
+      const isReadOnly = resolveReadOnly(request, user.role);
 
-      if (isReadOnly)
-        await graph.roQuery(query, { params: { id: elementId } });
-      else await graph.query(query, { params: { id: elementId } });
+      if (isReadOnly) {
+        return NextResponse.json(
+          { message: "Forbidden: read-only connection" },
+          { status: 403, headers: getCorsHeaders(request) }
+        );
+      }
+
+      await graph.query(query, { params: { id: elementId } });
 
       return NextResponse.json(
         { message: "Label removed successfully" },
@@ -72,7 +77,7 @@ export async function POST(
       return session;
     }
 
-    const { client } = session;
+    const { client, user } = session;
     const { schema, element } = await params;
     const elementId = Number(element);
     const schemaName = `${schema}_schema`;
@@ -90,12 +95,16 @@ export async function POST(
       const { label } = validation.data;
       const query = `MATCH (n) WHERE ID(n) = $id SET n:${label}`;
       const graph = client.selectGraph(schemaName);
-      const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
+      const isReadOnly = resolveReadOnly(request, user.role);
 
-      if (isReadOnly)
-        await graph.roQuery(query, { params: { id: elementId } });
-      else
-        await graph.query(query, { params: { id: elementId } });
+      if (isReadOnly) {
+        return NextResponse.json(
+          { message: "Forbidden: read-only connection" },
+          { status: 403, headers: getCorsHeaders(request) }
+        );
+      }
+
+      await graph.query(query, { params: { id: elementId } });
       
 
       return NextResponse.json(

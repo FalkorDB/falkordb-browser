@@ -1,20 +1,18 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
 
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
-import { DialogHeader, DialogDescription, DialogTrigger, DialogTitle, DialogContent, Dialog } from "@/components/ui/dialog";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { createPortal } from "react-dom";
 import { fetchOptions, getMemoryUsage, getSSEGraphResult, prepareArg, Row, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
-import { ChevronDown, ChevronUp, Settings } from "lucide-react";
+import { ChevronDown, ChevronUp, Settings, X } from "lucide-react";
 import Button from "../components/ui/Button";
 import { IndicatorContext, BrowserSettingsContext, ConnectionContext } from "../components/provider";
 import PaginationList from "../components/PaginationList";
 import TableComponent from "../components/TableComponent";
 import ExportGraph from "../components/ExportGraph";
 import DeleteGraph from "../components/graph/DeleteGraph";
-import CloseDialog from "../components/CloseDialog";
 import DuplicateGraph from "../components/graph/DuplicateGraph";
 import { Graph } from "../api/graph/model";
 
@@ -43,7 +41,7 @@ interface Props {
 export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, type, setGraph }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext);
-    const { isReadOnly } = useContext(ConnectionContext);
+    const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
     const {
         settings: {
             contentPersistenceSettings: {
@@ -70,17 +68,19 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         setOpen(false);
     }, [selectedValue]);
 
+
+
     const getOptions = useCallback(async () =>
         fetchOptions(type, toast, setIndicator, indicator, setSelectedValue, setOptions, contentPersistence)
         , [type, toast, setIndicator, indicator, setSelectedValue, setOptions, contentPersistence]);
 
     const loadMemory = useCallback((opt: string) =>
         async () => {
-            const memoryMap = await getMemoryUsage(opt, toast, setIndicator);
+            const memoryMap = await getMemoryUsage(opt, toast, setIndicator, activeConnectionId);
             const memoryValue = memoryMap.get("total_graph_sz_mb") || '<1';
 
             return `${memoryValue} MB`;
-        }, [toast, setIndicator]);
+        }, [toast, setIndicator, activeConnectionId]);
 
     const loadNodesCount = useCallback((opt: string) =>
         async () => {
@@ -179,7 +179,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 cells
             };
         }));
-    }, [sessionRole, handleSetOption, loadMemory, loadNodesCount, loadEdgesCount, showMemoryUsage]);
+    }, [sessionRole, handleSetOption, loadMemory, loadNodesCount, loadEdgesCount, showMemoryUsage, isReadOnly]);
 
     useEffect(() => {
         if (!openMenage) {
@@ -210,10 +210,25 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         setOpen(false);
     };
 
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => { setMounted(true); }, []);
+
+    useEffect(() => {
+        if (!openMenage) return undefined;
+        const handler = (e: KeyboardEvent) => {
+            if (e.key !== "Escape") return;
+            if (inputRef.current === document.activeElement) return;
+            setOpenMenage(false);
+        };
+        window.addEventListener("keydown", handler);
+        return () => window.removeEventListener("keydown", handler);
+    }, [openMenage]);
+
     return (
-        <Dialog open={openMenage} onOpenChange={setOpenMenage}>
-            <DropdownMenu open={open} onOpenChange={handleOpenChange}>
-                <DropdownMenuTrigger disabled={options.length === 0 || indicator === "offline"} asChild>
+        <>
+            <Popover open={open} onOpenChange={handleOpenChange}>
+                <PopoverTrigger disabled={options.length === 0 || indicator === "offline"} asChild>
                     <Button
                         className="min-w-0 basis-0 grow bg-background rounded-lg border border-border p-2 justify-left disabled:text-gray-400 disabled:opacity-100 p-1 text-sm"
                         label={selectedValue || `Select ${type}`}
@@ -228,10 +243,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                 <ChevronDown className="min-w-4 min-h-4" />
                         }
                     </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                    className="h-[40dvh] min-h-fit w-[350px] mt-2 overflow-hidden border border-border rounded-lg flex flex-col items-center p-2"
-                    preventOutsideClose={tutorialOpen}
+                </PopoverTrigger>
+                <PopoverContent
+                    className="z-20 h-[40dvh] min-h-fit w-[350px] mt-2 overflow-hidden border border-border rounded-lg flex flex-col items-center p-2"
+                    onInteractOutside={(e) => { if (openMenage || tutorialOpen) e.preventDefault(); }}
+                    onEscapeKeyDown={(e) => { if (openMenage || tutorialOpen) e.preventDefault(); }}
                 >
                     <PaginationList
                         className="basis-0 grow min-h-fit p-0"
@@ -245,85 +261,90 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         searchRef={inputRef}
                     />
                     <div className="flex gap-2">
-                        <DialogTrigger asChild>
-                            <Button
-                                className="w-fit"
-                                variant="Primary"
-                                label="Manage"
-                                data-testid={`manage${type}s`}
-                            >
-                                <Settings size={20} />
-                            </Button>
-                        </DialogTrigger>
+                        <Button
+                            className="w-fit px-2 py-1 text-xs"
+                            variant="Primary"
+                            label="Manage"
+                            data-testid={`manage${type}s`}
+                            onClick={() => { setOpenMenage(true); }}
+                        >
+                            <Settings size={16} />
+                        </Button>
                     </div>
-                </DropdownMenuContent>
-            </DropdownMenu>
-            <DialogContent
-                data-testid="manageContent"
-                onEscapeKeyDown={(e) => {
-                    if (inputRef.current === document.activeElement) {
-                        e.preventDefault();
-                    }
-                }}
-                hideClose
-                preventOutsideClose={tutorialOpen}
-                className="flex flex-col border-none rounded-lg max-w-none h-[90dvh] w-[41dvw] p-2"
-            >
-                <DialogHeader className="flex-row justify-between items-center border-b border-border pb-4">
-                    <DialogTitle className="text-2xl font-medium">Manage Graphs</DialogTitle>
-                    <CloseDialog data-testid="closeManage" />
-                </DialogHeader>
-                <VisuallyHidden>
-                    <DialogDescription />
-                </VisuallyHidden>
-                <TableComponent
-                    className="grow overflow-hidden"
-                    label={`${type}s`}
-                    entityName={type}
-                    headers={[
-                        "Name",
-                        ...(showMemoryUsage ? [{name : "Memory Usage", width: "15%"}] : []),
-                        { name: "Nodes #", width: "15%" },
-                        { name: "Edges #", width: "15%" }
-                    ]}
-                    rows={rows}
-                    setRows={setRows}
-                    inputRef={inputRef}
-                    itemHeight={24}
-                >
-                    {
-                        !isReadOnly &&
-                        <>
-                            <DeleteGraph
-                                type={type}
-                                rows={rows.filter(opt => opt.checked)}
-                                handleSetRows={handleSetRows}
-                                selectedValue={selectedValue}
-                                setGraphName={setSelectedValue}
-                                setGraph={setGraph}
-                                setOpenMenage={setOpenMenage}
-                                graphNames={options}
-                                setGraphNames={setOptions}
-                            />
-                            <ExportGraph
-                                selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
-                                type={type}
-                            />
-                            <DuplicateGraph
-                                selectedValue={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)[0]}
-                                type={type}
-                                open={openDuplicate}
-                                onOpenChange={setOpenDuplicate}
-                                onDuplicate={(duplicateName) => {
-                                    setSelectedValue(duplicateName);
-                                    setOptions!([...options, duplicateName]);
-                                }}
-                                disabled={rows.filter(opt => opt.checked).length !== 1}
-                            />
-                        </>
-                    }
-                </TableComponent>
-            </DialogContent>
-        </Dialog>
+                </PopoverContent>
+            </Popover>
+            {
+                mounted && openMenage && createPortal(
+                    <div
+                        data-testid="manageContent"
+                        role="dialog"
+                        aria-label={`Manage ${type}s`}
+                        className="fixed top-16 left-3 z-30 flex flex-col gap-2 border border-border rounded-lg shadow-lg h-[493px] w-[750px] p-2 bg-background"
+                    >
+                        <div className="flex flex-row justify-between items-center border-b border-border pb-1">
+                            <h2 className="text-2xl font-medium flex items-center gap-2">
+                                Manage {type}s
+                                <Settings size={22} className="text-foreground/60" />
+                            </h2>
+                            <Button
+                                aria-label="Close"
+                                data-testid="closeManage"
+                                onClick={() => setOpenMenage(false)}
+                            >
+                                <X />
+                            </Button>
+                        </div>
+                        <TableComponent
+                            className="grow overflow-hidden gap-2"
+                            label={`${type}s`}
+                            entityName={type}
+                            headers={[
+                                "Name",
+                                ...(showMemoryUsage ? [{ name: "Memory Usage", width: "20%" }] : []),
+                                { name: "Nodes #", width: "10%" },
+                                { name: "Edges #", width: "10%" }
+                            ]}
+                            rows={rows}
+                            setRows={setRows}
+                            inputRef={inputRef}
+                            itemHeight={24}
+                        >
+                            {
+                                !isReadOnly &&
+                                <>
+                                    <DeleteGraph
+                                        type={type}
+                                        rows={rows.filter(opt => opt.checked)}
+                                        handleSetRows={handleSetRows}
+                                        selectedValue={selectedValue}
+                                        setGraphName={setSelectedValue}
+                                        setGraph={setGraph}
+                                        setOpenMenage={setOpenMenage}
+                                        graphNames={options}
+                                        setGraphNames={setOptions}
+                                    />
+                                    <ExportGraph
+                                        selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
+                                        type={type}
+                                    />
+                                    <DuplicateGraph
+                                        selectedValue={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)[0]}
+                                        type={type}
+                                        open={openDuplicate}
+                                        onOpenChange={setOpenDuplicate}
+                                        onDuplicate={(duplicateName) => {
+                                            setSelectedValue(duplicateName);
+                                            setOptions!([...options, duplicateName]);
+                                        }}
+                                        disabled={rows.filter(opt => opt.checked).length !== 1}
+                                    />
+                                </>
+                            }
+                        </TableComponent>
+                    </div>,
+                    document.body
+                )
+            }
+        </>
     );
 }

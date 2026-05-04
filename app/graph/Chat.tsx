@@ -1,7 +1,9 @@
 /* eslint-disable no-case-declarations */
 /* eslint-disable react/no-array-index-key */
-import { cn, getTheme, Message } from "@/lib/utils";
-import { useContext, useEffect, useRef, useState, useCallback } from "react";
+import { cn, getTheme, Message, toUserFriendlyMessage } from "@/lib/utils";
+import { memo, useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
+import MarkdownIt from "markdown-it";
+import DOMPurify from "dompurify";
 import { useTheme } from "next-themes";
 import Image from "next/image";
 import { ChevronDown, ChevronRight, Share2, Copy, Loader2, Play, Search, X, Send, Sparkles } from "lucide-react";
@@ -15,6 +17,28 @@ import { EventType } from "../api/chat/route";
 import ToastButton from "../components/ToastButton";
 import { ShineBorder } from "@/components/ui/shine-border";
 import { getConnectionItem, setConnectionItem, getConnectionPrefix } from "@/lib/connection-storage";
+
+const mdInstance = new MarkdownIt({
+    html: false,
+    linkify: true,
+    breaks: true,
+});
+
+const MarkdownMessage = memo(function MarkdownMessage({ content }: { content: string }) {
+    const sanitizedHtml = useMemo(() => {
+        const raw = typeof content === "string" ? content : String(content ?? "");
+        return DOMPurify.sanitize(mdInstance.render(raw));
+    }, [content]);
+
+    return (
+        <div
+            data-testid="chatMessageMarkdown"
+            className="text-sm markdown-body"
+            // eslint-disable-next-line react/no-danger
+            dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+        />
+    );
+});
 
 // Function to get the last maxSavedMessages user messages and all messages in between
 const getLastUserMessagesWithContext = (allMessages: Message[], maxUserMessages: number) => {
@@ -38,6 +62,37 @@ const getLastUserMessagesWithContext = (allMessages: Message[], maxUserMessages:
 interface Props {
     onClose: () => void
 }
+
+type ErrorWithStatus = Error & { status?: number };
+
+const createResponseError = async (response: Response): Promise<ErrorWithStatus> => {
+    const error = new Error(await response.text()) as ErrorWithStatus;
+    error.status = response.status;
+    return error;
+};
+
+const getErrorStatus = (error: unknown) => {
+    if (error instanceof Error && "status" in error && typeof error.status === "number") return error.status;
+    return 0;
+};
+
+const getStreamStatusCode = (line: string) => {
+    const match = line.match(/\bstatus:\s*(\d+)/);
+    return match ? Number(match[1]) : 0;
+};
+
+const getStreamData = (line: string) => {
+    const data = line.match(/\bdata:\s*([\s\S]*)/)?.[1]?.trim() || "";
+
+    if (!data) return "";
+
+    try {
+        const parsed = JSON.parse(data);
+        return typeof parsed === "string" ? parsed : JSON.stringify(parsed);
+    } catch {
+        return data;
+    }
+};
 
 export default function Chat({ onClose }: Props) {
     const { resolvedTheme } = useTheme();
@@ -230,7 +285,7 @@ export default function Chat({ onClose }: Props) {
             });
 
             if (!response.ok) {
-                throw new Error(await response.text());
+                throw await createResponseError(response);
             }
 
             const reader = response.body?.getReader();
@@ -310,19 +365,22 @@ export default function Chat({ onClose }: Props) {
                             isResult = true;
                             break;
 
-                        case "error":
-                            const statusCode = Number(line.split("status:")[1].split(" ")[0]);
+                        case "error": {
+                            const statusCode = getStreamStatusCode(line);
+                            const errorMessage = getStreamData(line);
 
                             if (statusCode === 401 || statusCode >= 500) setIndicator("offline");
 
+                            const friendly = toUserFriendlyMessage(errorMessage, statusCode);
                             toast({
-                                title: "Error",
-                                description: eventData,
+                                title: friendly.title,
+                                description: friendly.description,
                                 variant: "destructive",
                             });
 
                             isResult = true;
                             break;
+                        }
 
                         case "Schema":
                         case "CypherResult":
@@ -341,9 +399,10 @@ export default function Chat({ onClose }: Props) {
 
             processStream();
         } catch (error) {
+            const friendly = toUserFriendlyMessage(error instanceof Error ? error.message : error, getErrorStatus(error));
             toast({
-                title: "Error",
-                description: (error as Error).message,
+                title: friendly.title,
+                description: friendly.description,
                 variant: "destructive",
             });
         } finally {
@@ -431,9 +490,7 @@ export default function Chat({ onClose }: Props) {
                     </div>
                 );
             default:
-                return (
-                    <p className="text-sm text-wrap whitespace-pre-wrap">{message.content}</p>
-                );
+                return <MarkdownMessage content={message.content} />;
         }
     };
 

@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getClient } from "../../auth/[...nextauth]/options";
 import { renameSchema, validateBody } from "../../validate-body";
+import { resolveReadOnly } from "../../utils";
 
 export async function GET(
   request: NextRequest,
@@ -13,11 +14,11 @@ export async function GET(
       return session;
     }
 
-    const { client } = session;
+    const { client, user } = session;
     const { schema } = await params;
     const schemaName = `${schema}_schema`;
     const create = request.nextUrl.searchParams.get("create");
-    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       const schemas = await client.list();
