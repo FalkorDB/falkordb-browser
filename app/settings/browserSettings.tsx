@@ -482,7 +482,7 @@ export default function BrowserSettings() {
                                                         <Info size={16} />
                                                     </TooltipTrigger>
                                                     <TooltipContent>
-                                                        <p>Be aware that "RESULTSET_SIZE" caps the maximum number of rows returned by a query. (you can modify this configuration in the "DB Configurations" tab)</p>
+                                                        <p>Be aware that &quot;RESULTSET_SIZE&quot; caps the maximum number of rows returned by a query. (you can modify this configuration in the &quot;DB Configurations&quot; tab)</p>
                                                     </TooltipContent>
                                                 </Tooltip>
                                             </div>
