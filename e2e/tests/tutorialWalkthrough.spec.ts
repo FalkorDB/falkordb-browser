@@ -180,7 +180,7 @@ test.describe("Tutorial Walkthrough", () => {
         await tutorial.clickNextButton(); // This is the "Finish" button
 
         // 3. After tutorial closes, verify state restoration
-        await tutorial.isTutorialNotVisible();
+        expect(await tutorial.isTutorialNotVisible()).toBeTruthy();
 
         // Wait for cleanup to complete (demo graphs deleted, user graphs restored)
         await tutorial.waitForTimeout(3000);

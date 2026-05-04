@@ -796,7 +796,7 @@ export default function TableComponent({
                                                                                 {cell.value}
                                                                             </TooltipContent>
                                                                         </Tooltip>
-                                                                        <div className="min-w-4">
+                                                                        <div className="w-4 flex-none">
                                                                             {
                                                                                 cell.type !== "readonly" && hover === row.name &&
                                                                                 <Button

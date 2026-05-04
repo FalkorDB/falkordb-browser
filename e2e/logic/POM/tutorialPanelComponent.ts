@@ -91,6 +91,7 @@ export default class TutorialPanel extends GraphPage {
     await waitForElementToBeVisible(target);
     const box = await target.boundingBox();
     if (!box) throw new Error(`Target ${selector} has no bounding box`);
+    await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await this.page.mouse.down();
     await this.page.mouse.up();
   }
