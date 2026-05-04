@@ -153,6 +153,7 @@ export default function Page() {
                     height="100%"
                     readOnly
                     options={{
+                        fontSize: 14,
                         minimap: { enabled: true },
                         scrollbar: { vertical: 'auto', horizontal: 'auto' },
                         overviewRulerLanes: 3,
