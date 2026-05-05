@@ -220,7 +220,7 @@ type ConnectionContextType = {
   setAdditionalConnections: Dispatch<SetStateAction<SessionConnection[]>>;
   activeConnectionId: string | null;
   setActiveConnectionId: Dispatch<SetStateAction<string | null>>;
-  updateSession: (data: { connections?: SessionConnection[]; activeConnectionId?: string | null }) => Promise<unknown>;
+  updateSession: (data: { activeConnectionId?: string | null }) => Promise<unknown>;
 };
 
 type UDFContextType = {

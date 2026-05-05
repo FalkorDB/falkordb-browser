@@ -630,6 +630,10 @@ const authOptions: AuthOptions = {
 
           const { role } = await newClient(credentials, key);
 
+          // Opportunistically clean up expired tokens from storage.
+          // Non-blocking: fire-and-forget so login isn't delayed.
+          StorageFactory.getStorage().cleanupExpiredTokens?.().catch(() => {});
+
           // Store the connection entry in Token DB. Every connection
           // (including the initial login) is stored as a "connection:"
           // entry so they all appear in listSessionConnections and are
@@ -692,31 +696,64 @@ const authOptions: AuthOptions = {
   callbacks: {
     async jwt({ token, user, trigger, session: updateData }) {
       if (user) {
-        // Build the initial connections array with the first connection
-        const firstConnection = {
-          id: user.connId!,
-          username: user.username || "default",
-          role: user.role,
+        // Store only the active connection's flat fields + its ID.
+        // The full list of connections lives in the Token DB and is
+        // fetched via GET /api/connections — never stored in the JWT.
+        // IMPORTANT: Only keep the minimal set of fields to prevent
+        // cookie bloat (Vercel 494 error). Do NOT spread ...token here.
+        return {
+          // NextAuth required fields (iat/exp/jti are added automatically)
+          sub: user.id,
+          // Our custom fields
+          id: user.id,
+          activeConnectionId: user.connId!,
           host: user.host,
           port: user.port,
+          username: user.username || "default",
+          role: user.role,
           tls: user.tls,
-        };
-
-        return {
-          ...token,
-          id: user.id,
-          connections: [firstConnection],
-          activeConnectionId: user.connId!,
         };
       }
 
-      // ── Migrate old flat-format JWT tokens to the new connections array ──
+      // ── Strip any accumulated bloat from old tokens ──
+      // Remove fields that are no longer needed and inflate the cookie.
+      // These may have been set by old code or NextAuth defaults.
+      // Save credentialRef before deletion — needed for legacy migration below.
+      const legacyCredentialRef = token.credentialRef as string | undefined;
+
+      // If the token still carries a connections[] array (from old code that
+      // stored all connections in the JWT), extract the active connection's
+      // flat fields BEFORE deleting the array so we don't lose them.
+      if (token.connections) {
+        const conns = token.connections as Array<{ id: string; username?: string; role: string; host: string; port: number; tls: boolean }>;
+        const activeId = token.activeConnectionId as string | undefined;
+        const activeConn = activeId ? conns.find(c => c.id === activeId) : conns[0];
+        if (activeConn) {
+          token.host = activeConn.host;
+          token.port = activeConn.port;
+          token.username = activeConn.username || "default";
+          token.role = activeConn.role;
+          token.tls = activeConn.tls;
+          if (!token.activeConnectionId) {
+            token.activeConnectionId = activeConn.id;
+          }
+        }
+      }
+
+      delete token.connections;
+      delete token.name;
+      delete token.email;
+      delete token.picture;
+      delete token.image;
+      delete token.ca;          // CA certs are large; stored in Token DB
+      delete token.url;         // Connection URL; stored in Token DB
+      delete token.credentialRef; // Legacy field replaced by Token DB
+
+      // ── Migrate old flat-format JWT tokens that have no activeConnectionId ──
       // Old tokens have host/port/username/role/tls directly on the token
-      // but no `connections` array. Convert them so the session callback
-      // and frontend always see the new format.
-      // We also persist the connection to Token DB here so that
-      // GET /api/connections returns it immediately (before getClient runs).
-      if (!token.connections && token.host) {
+      // but no activeConnectionId. Persist the connection to Token DB so
+      // GET /api/connections returns it immediately.
+      if (!token.activeConnectionId && token.host) {
         const legacyConnId = uuidv4();
         const sessionId = token.id as string;
         const connHost = (token.host as string) || "localhost";
@@ -725,24 +762,15 @@ const authOptions: AuthOptions = {
         const connRole = (token.role as string) || "Read-Only";
         const connTls = token.tls as boolean;
 
-        token.connections = [{
-          id: legacyConnId,
-          username: connUsername,
-          role: connRole,
-          host: connHost,
-          port: connPort,
-          tls: connTls,
-        }];
         token.activeConnectionId = legacyConnId;
 
         // Persist to Token DB so the connection appears in the connections
         // list before any API call triggers the getClient() legacy fallback.
         try {
-          const credentialRef = token.credentialRef as string | undefined;
           let password = "";
-          if (credentialRef) {
+          if (legacyCredentialRef) {
             try {
-              password = await getPasswordFromTokenDB(credentialRef);
+              password = await getPasswordFromTokenDB(legacyCredentialRef);
             } catch { /* passwordless fallback — leave password empty */ }
           }
 
@@ -781,13 +809,30 @@ const authOptions: AuthOptions = {
         }
       }
 
-      // Handle session.update() calls from the frontend
+      // Handle session.update() calls from the frontend.
+      // Only activeConnectionId is sent; we look up the connection details
+      // from Token DB to keep the token small.
       if (trigger === "update" && updateData) {
-        if (updateData.connections !== undefined) {
-          token.connections = updateData.connections;
-        }
         if (updateData.activeConnectionId !== undefined) {
-          token.activeConnectionId = updateData.activeConnectionId;
+          const newConnId = updateData.activeConnectionId as string;
+          token.activeConnectionId = newConnId;
+
+          // Look up the connection details from Token DB
+          try {
+            const storage = StorageFactory.getStorage();
+            const tokenData = await storage.fetchTokenById(newConnId);
+            if (tokenData && tokenData.name.startsWith("connection:")) {
+              token.host = tokenData.host;
+              token.port = tokenData.port;
+              token.username = tokenData.username || "default";
+              token.role = tokenData.role;
+              token.tls = tokenData.tls ?? false;
+            }
+          } catch (lookupErr) {
+            // Non-fatal: session.user will use stale values until next refresh
+            // eslint-disable-next-line no-console
+            console.warn("JWT update: failed to look up connection from Token DB:", lookupErr);
+          }
         }
       }
 
@@ -798,25 +843,19 @@ const authOptions: AuthOptions = {
     },
     async session({ session, token }) {
       if (session.user) {
-        const conns = token.connections as Array<{ id: string; username?: string; role: string; host: string; port: number; tls: boolean }> | undefined;
         const activeId = token.activeConnectionId as string | undefined;
-        const activeConn = activeId ? conns?.find(c => c.id === activeId) : conns?.[0];
 
         return {
           ...session,
-          connections: conns,
           activeConnectionId: activeId,
           user: {
             ...session.user,
             id: token.id as string,
-            // Prefer activeConn (new format), fall back to flat token fields
-            // (old format — getServerSession does NOT run the jwt callback so
-            // the migration to `connections` array may not have happened yet).
-            host: activeConn?.host ?? (token.host as string | undefined) ?? "localhost",
-            port: activeConn?.port ?? (typeof token.port === "string" ? parseInt(token.port, 10) : (token.port as number | undefined)) ?? 6379,
-            username: activeConn?.username ?? (token.username as string | undefined) ?? "default",
-            tls: activeConn?.tls ?? (token.tls as boolean | undefined) ?? false,
-            role: (activeConn?.role ?? (token.role as string | undefined) ?? "Read-Only") as Role,
+            host: (token.host as string | undefined) ?? "localhost",
+            port: (typeof token.port === "string" ? parseInt(token.port, 10) : (token.port as number | undefined)) ?? 6379,
+            username: (token.username as string | undefined) ?? "default",
+            tls: (token.tls as boolean | undefined) ?? false,
+            role: ((token.role as string | undefined) ?? "Read-Only") as Role,
           },
         };
       }

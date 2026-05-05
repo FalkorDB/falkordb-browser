@@ -82,22 +82,19 @@ export default function ConnectionManager() {
   };
 
   const handleSelect = useCallback(async (connId: string) => {
-    const connsForSession =
-      additionalConnections.length > 0
-        ? additionalConnections
-        : (session as { connections?: SessionConnection[] }).connections ?? [];
     // Set the global ID immediately so periodic timers (memory, count, etc.)
     // that fire DURING the updateSession await use the correct connection and
     // don't fall back to Token DB which might pick the wrong entry.
     setActiveConnectionIdGlobal(connId);
     localStorage.setItem("lastActiveConnectionId", connId);
     // Update the JWT so session.user.role is correct before React effects
-    // (graph-list reload, query execution) fire.
-    await updateSession({ connections: connsForSession, activeConnectionId: connId });
+    // (graph-list reload, query execution) fire. The JWT callback looks up
+    // the connection details from Token DB.
+    await updateSession({ activeConnectionId: connId });
     // Update React state AFTER the JWT is updated so the prevActiveConnectionId
     // effect fires with the correct role already in sessionData.
     setActiveConnectionId(connId);
-  }, [setActiveConnectionId, updateSession, additionalConnections, session]);
+  }, [setActiveConnectionId, updateSession]);
 
   const handleRemove = useCallback(async (e: React.MouseEvent, connId: string) => {
     e.stopPropagation();
@@ -105,11 +102,10 @@ export default function ConnectionManager() {
 
     // If this is the last connection, sign out instead.
     // Use additionalConnections.length when populated; otherwise fall back to
-    // the JWT connections count so we don't sign out prematurely.
-    const totalConns =
-      additionalConnections.length > 0
-        ? additionalConnections.length
-        : ((session as { connections?: SessionConnection[] }).connections ?? []).length;
+    // a count of 1 (the session always has at least one connection).
+    const totalConns = additionalConnections.length > 0
+      ? additionalConnections.length
+      : 1;
     if (totalConns <= 1) {
       await signOut({ callbackUrl: "/login" });
       return;
@@ -129,9 +125,7 @@ export default function ConnectionManager() {
             setActiveConnectionId(newActive);
             setActiveConnectionIdGlobal(newActive);
             localStorage.setItem("lastActiveConnectionId", newActive);
-            updateSession({ connections: remaining, activeConnectionId: newActive });
-          } else {
-            updateSession({ connections: remaining });
+            updateSession({ activeConnectionId: newActive });
           }
           return remaining;
         });
@@ -173,19 +167,12 @@ export default function ConnectionManager() {
       if (result.ok) {
         const json = await result.json();
         const newConn = json.connection;
-        // Base on current displayConns (not just additionalConnections) so
-        // existing JWT connections are not lost when in fallback mode.
-        const baseConns =
-          additionalConnections.length > 0
-            ? additionalConnections
-            : (session as { connections?: SessionConnection[] }).connections ?? [];
-        const updated = [...baseConns, newConn];
-        setAdditionalConnections(updated);
+        setAdditionalConnections((prev) => [...prev, newConn]);
         // Auto-switch to the newly added connection
         setActiveConnectionId(newConn.id);
         setActiveConnectionIdGlobal(newConn.id);
         localStorage.setItem("lastActiveConnectionId", newConn.id);
-        updateSession({ connections: updated, activeConnectionId: newConn.id });
+        updateSession({ activeConnectionId: newConn.id });
         toast({ title: `Connection added for ${username}` });
         resetForm();
         setDialogOpen(false);
@@ -195,7 +182,7 @@ export default function ConnectionManager() {
     } finally {
       setAdding(false);
     }
-  }, [host, port, username, password, TLS, CA, toast, setAdditionalConnections, setIndicator, additionalConnections, session, setActiveConnectionId, updateSession]);
+  }, [host, port, username, password, TLS, CA, toast, setAdditionalConnections, setIndicator, setActiveConnectionId, updateSession]);
 
   const onFileDrop = (acceptedFiles: File[]) => {
     const reader = new FileReader();
@@ -210,12 +197,9 @@ export default function ConnectionManager() {
   if (!session?.user) return null;
 
   // additionalConnections is populated asynchronously by providers.tsx after
-  // GET /api/connections resolves. Fall back to session.connections (from the
-  // JWT, available synchronously) so the dropdown appears immediately.
-  const displayConns: SessionConnection[] =
-    additionalConnections.length > 0
-      ? additionalConnections
-      : (session as { connections?: SessionConnection[] }).connections ?? [];
+  // GET /api/connections resolves. Until then the list may be empty; the
+  // dropdown simply won't render until data arrives.
+  const displayConns: SessionConnection[] = additionalConnections;
 
   if (displayConns.length === 0) return null;
 
