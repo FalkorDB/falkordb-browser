@@ -441,7 +441,6 @@ export default function Page() {
                 runQuery={runQuery}
                 historyQuery={historyQuery}
                 setHistoryQuery={setHistoryQuery}
-                fetchCount={fetchCount}
                 isQueryLoading={isQueryLoading}
                 chatOpen={chatOpen}
                 setChatOpen={setChatOpen}
