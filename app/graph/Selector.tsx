@@ -42,7 +42,6 @@ interface SchemaProps {
     runQuery?: never;
     historyQuery?: never;
     setHistoryQuery?: never;
-    fetchCount?: never;
     isQueryLoading?: never;
 }
 
@@ -50,7 +49,6 @@ interface GraphProps {
     runQuery: (query: string) => Promise<void>;
     historyQuery: HistoryQuery;
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>;
-    fetchCount: () => Promise<void>;
     isQueryLoading: boolean;
     selectedElements?: never;
     setSelectedElements?: never;
@@ -79,7 +77,6 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     runQuery,
     historyQuery,
     setHistoryQuery,
-    fetchCount,
     selectedElements,
     setSelectedElements,
     handleDeleteElement,
