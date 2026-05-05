@@ -301,7 +301,7 @@ export default function QueryHistoryPanel({ onClose }: Props) {
                 </div>
                 <PaginationList
                     label="Query"
-                    className="overflow-hidden h-[319px] p-1 border-b border-border"
+                    className="overflow-hidden h-[313px] max-h-[393px] p-1 border-b border-border"
                     isSelected={(item) => historyQuery.queries.findIndex(q => q.text === item.text) + 1 === historyQuery.counter}
                     isDeleteSelected={(item) => deleteElements.some(idx => historyQuery.queries[idx]?.text === item.text)}
                     afterSearchCallback={afterSearchCallback}

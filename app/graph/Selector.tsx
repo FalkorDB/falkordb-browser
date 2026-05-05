@@ -176,7 +176,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                 <PopoverContent
                                     align="start"
                                     sideOffset={20}
-                                    className="z-30 w-[560px] max-w-[95dvw] h-[600px] max-h-[95dvh] p-0 border-none bg-transparent shadow-none"
+                                    className="z-30 w-[560px] h-[600px] p-0 border-none bg-transparent shadow-none"
                                     onOpenAutoFocus={(e) => e.preventDefault()}
                                     onInteractOutside={(e) => {
                                         if ((e.target as Element)?.closest?.('[data-tutorial-overlay]')) {

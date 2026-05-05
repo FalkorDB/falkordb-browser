@@ -100,12 +100,12 @@ const getQueryElement = (item: Query) => {
     }
 
     return (
-        <div className="flex gap-2 items-center text-foreground/60">
+        <div className="flex gap-2 items-center text-foreground/60 overflow-hidden whitespace-nowrap">
             {elements.map((element, index) => (
                 <Fragment key={element.tooltip}>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <div className={element.className}>{element.content}</div>
+                            <div className={cn("truncate", element.className)}>{element.content}</div>
                         </TooltipTrigger>
                         <TooltipContent>
                             {element.tooltip}
@@ -278,9 +278,19 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                                         {getQueryElement(item)}
                                         {!isString && onToggleFav && (
                                             <div
-                                                className="grow basis-0 flex items-center gap-1 justify-end"
+                                                className="flex items-center gap-1 justify-end overflow-hidden whitespace-nowrap"
                                             >
-                                                {item.name && <p className="text-fav font-medium truncate max-w-[120px]">{item.name}</p>}
+                                                {
+                                                    item.name &&
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <p className="text-fav font-medium truncate">{item.name}</p>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            Favorite name: {item.name}
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                }
                                                 <Button
                                                     data-testid={`${dataTestId}${text}Fav`}
                                                     title={isFav ? "Remove from favorites" : "Add to favorites"}
@@ -352,7 +362,7 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                         );
                     })
                 }
-            </ul>
+            </ul >
             <ul className="flex gap-6 p-0 items-center justify-center">
                 <li className="flex gap-4">
                     <Button disabled={stepCounter < 4} label="<<" title="Previous 5 pages" onClick={() => setStepCounter(prev => prev > 4 ? prev - 5 : prev)} />
@@ -428,7 +438,7 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                     </form>
                 </DialogContent>
             </Dialog>
-        </div>
+        </div >
     );
 }
 
