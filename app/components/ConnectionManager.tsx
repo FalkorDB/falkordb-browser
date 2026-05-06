@@ -252,13 +252,14 @@ export default function ConnectionManager() {
         <DropdownMenuTrigger asChild>
           <button
             type="button"
+            data-testid="connections-dropdown-trigger"
             className="flex items-center gap-1 text-sm hover:text-primary transition-colors"
           >
             <span>Connections</span>
             <ChevronDown size={14} />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-[300px]">
+        <DropdownMenuContent align="start" className="w-[300px]" data-testid="connections-dropdown-content">
           <DropdownMenuLabel>Connections</DropdownMenuLabel>
           <DropdownMenuSeparator />
 
@@ -266,6 +267,7 @@ export default function ConnectionManager() {
           {additionalConnections.map((conn) => (
             <DropdownMenuItem
               key={conn.id}
+              data-testid={`connection-item-${conn.id}`}
               className="flex items-center justify-between gap-2 px-2 py-2 cursor-pointer"
               onClick={() => handleSelect(conn.id)}
             >
