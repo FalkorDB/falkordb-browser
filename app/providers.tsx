@@ -61,6 +61,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const { status, data: sessionData, update: updateSession } = useSession();
   const router = useRouter();
 
+  // Keep a stable ref for updateSession so effects that call it don't
+  // re-trigger when the function identity changes on session refresh.
+  const updateSessionRef = useRef(updateSession);
+  useEffect(() => { updateSessionRef.current = updateSession; }, [updateSession]);
+
   // Set connection prefix for scoped localStorage
   const [prefixReady, setPrefixReady] = useState(false);
 
@@ -677,15 +682,21 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   // Fetch connections for this session and auto-select the active one
   useEffect(() => {
     if (status !== "authenticated") {
-      setAdditionalConnections([]);
-      setActiveConnectionId(null);
-      setActiveConnectionIdGlobal(null);
-      sessionSyncedRef.current = false;
+      // Only clear state on a real sign-out (unauthenticated), not during
+      // transient "loading" status caused by updateSession() refreshing the JWT.
+      if (status === "unauthenticated") {
+        setAdditionalConnections([]);
+        setActiveConnectionId(null);
+        setActiveConnectionIdGlobal(null);
+        sessionSyncedRef.current = false;
+      }
       return;
     }
 
     // Only fetch connections once per authentication cycle
     if (sessionSyncedRef.current) return;
+
+    let cancelled = false;
 
     (async () => {
       try {
@@ -693,9 +704,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
           method: "GET",
         }, toast, setIndicator);
 
-        if (!result.ok) return;
+        if (cancelled || !result.ok) return;
 
         const json = await result.json();
+        
+        if (cancelled) return;
+
         if (json?.connections) {
           const conns: SessionConnection[] = json.connections;
           setAdditionalConnections(conns);
@@ -713,9 +727,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
             // Sync activeConnectionId into the JWT so session.user reflects
             // the correct connection's role/host/port. The JWT callback looks
             // up the full connection details from Token DB.
-            await updateSession({
-              activeConnectionId: target,
-            });
+            if (!cancelled) {
+              await updateSessionRef.current({
+                activeConnectionId: target,
+              });
+            }
           } else {
             // Token DB returned no connections — the session is out of sync.
             // This happens after a server restart (FileTokenStorage wiped),
@@ -737,6 +753,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
               method: "POST",
             }, toast, setIndicator);
 
+            if (cancelled) return;
+
             if (migrateResult.ok) {
               const migrateJson = await migrateResult.json();
               if (migrateJson?.connection) {
@@ -745,9 +763,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                 setAdditionalConnections(migratedConns);
                 setActiveConnectionId(migratedConn.id);
                 setActiveConnectionIdGlobal(migratedConn.id);
-                await updateSession({
-                  activeConnectionId: migratedConn.id,
-                });
+                if (!cancelled) {
+                  await updateSessionRef.current({
+                    activeConnectionId: migratedConn.id,
+                  });
+                }
               }
             }
           }
@@ -757,7 +777,9 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         console.error("Failed to fetch connections:", err);
       }
     })();
-  }, [status, toast, updateSession]);
+
+    return () => { cancelled = true; };
+  }, [status, toast]);
 
   useEffect(() => {
     if (status !== "authenticated" || !prefixReady) return;

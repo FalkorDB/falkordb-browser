@@ -196,13 +196,6 @@ export default function ConnectionManager() {
 
   if (!session?.user) return null;
 
-  // additionalConnections is populated asynchronously by providers.tsx after
-  // GET /api/connections resolves. Until then the list may be empty; the
-  // dropdown simply won't render until data arrives.
-  const displayConns: SessionConnection[] = additionalConnections;
-
-  if (displayConns.length === 0) return null;
-
   // Use the explicitly active connection, or fall back to the first one while
   // activeConnectionId is still being resolved (e.g. on initial page load).
   const effectiveActiveId =
@@ -210,8 +203,9 @@ export default function ConnectionManager() {
     (session as { activeConnectionId?: string }).activeConnectionId;
 
   const activeConn =
-    displayConns.find(c => c.id === effectiveActiveId) ??
-    displayConns[0];
+    additionalConnections.find(c => c.id === effectiveActiveId) ??
+    additionalConnections[0] ??
+    null;
 
   const getConnectionLabel = (conn: SessionConnection) => `${conn.username}@${conn.host}:${conn.port}`;
 
@@ -259,27 +253,29 @@ export default function ConnectionManager() {
         <DropdownMenuTrigger asChild>
           <button
             type="button"
+            data-testid="connections-dropdown-trigger"
             className="flex items-center gap-1 text-sm hover:text-primary transition-colors"
           >
             <span>Connections</span>
             <ChevronDown size={14} />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-[300px]">
+        <DropdownMenuContent align="start" className="w-[300px]" data-testid="connections-dropdown-content">
           <DropdownMenuLabel>Connections</DropdownMenuLabel>
           <DropdownMenuSeparator />
 
           {/* All connections shown equally */}
-          {displayConns.map((conn) => (
+          {additionalConnections.map((conn) => (
             <DropdownMenuItem
               key={conn.id}
+              data-testid={`connection-item-${conn.id}`}
               className="flex items-center justify-between gap-2 px-2 py-2 cursor-pointer"
               onClick={() => handleSelect(conn.id)}
             >
               <Tooltip>
                 <TooltipTrigger className="flex items-center gap-2 min-w-0">
-                  {activeConn.id === conn.id && <Check size={14} className="shrink-0 text-primary" />}
-                  {activeConn.id !== conn.id && <span className="w-[14px]" />}
+                  {activeConn?.id === conn.id && <Check size={14} className="shrink-0 text-primary" />}
+                  {activeConn?.id !== conn.id && <span className="w-[14px]" />}
                   <span className="truncate font-medium">{getConnectionLabel(conn)}</span>
                   <span className="text-xs text-muted-foreground shrink-0">{conn.role}</span>
                 </TooltipTrigger>
