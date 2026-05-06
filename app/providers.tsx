@@ -61,6 +61,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const { status, data: sessionData, update: updateSession } = useSession();
   const router = useRouter();
 
+  // Keep a stable ref for updateSession so effects that call it don't
+  // re-trigger when the function identity changes on session refresh.
+  const updateSessionRef = useRef(updateSession);
+  useEffect(() => { updateSessionRef.current = updateSession; }, [updateSession]);
+
   // Set connection prefix for scoped localStorage
   const [prefixReady, setPrefixReady] = useState(false);
 
@@ -677,10 +682,14 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   // Fetch connections for this session and auto-select the active one
   useEffect(() => {
     if (status !== "authenticated") {
-      setAdditionalConnections([]);
-      setActiveConnectionId(null);
-      setActiveConnectionIdGlobal(null);
-      sessionSyncedRef.current = false;
+      // Only clear state on a real sign-out (unauthenticated), not during
+      // transient "loading" status caused by updateSession() refreshing the JWT.
+      if (status === "unauthenticated") {
+        setAdditionalConnections([]);
+        setActiveConnectionId(null);
+        setActiveConnectionIdGlobal(null);
+        sessionSyncedRef.current = false;
+      }
       return;
     }
 
@@ -696,6 +705,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         if (!result.ok) return;
 
         const json = await result.json();
+        
         if (json?.connections) {
           const conns: SessionConnection[] = json.connections;
           setAdditionalConnections(conns);
@@ -713,7 +723,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
             // Sync activeConnectionId into the JWT so session.user reflects
             // the correct connection's role/host/port. The JWT callback looks
             // up the full connection details from Token DB.
-            await updateSession({
+            await updateSessionRef.current({
               activeConnectionId: target,
             });
           } else {
@@ -745,7 +755,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                 setAdditionalConnections(migratedConns);
                 setActiveConnectionId(migratedConn.id);
                 setActiveConnectionIdGlobal(migratedConn.id);
-                await updateSession({
+                await updateSessionRef.current({
                   activeConnectionId: migratedConn.id,
                 });
               }
@@ -757,7 +767,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         console.error("Failed to fetch connections:", err);
       }
     })();
-  }, [status, toast, updateSession]);
+  }, [status, toast]);
 
   useEffect(() => {
     if (status !== "authenticated" || !prefixReady) return;

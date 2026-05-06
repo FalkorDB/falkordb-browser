@@ -196,13 +196,6 @@ export default function ConnectionManager() {
 
   if (!session?.user) return null;
 
-  // additionalConnections is populated asynchronously by providers.tsx after
-  // GET /api/connections resolves. Until then the list may be empty; the
-  // dropdown simply won't render until data arrives.
-  const displayConns: SessionConnection[] = additionalConnections;
-
-  if (displayConns.length === 0) return null;
-
   // Use the explicitly active connection, or fall back to the first one while
   // activeConnectionId is still being resolved (e.g. on initial page load).
   const effectiveActiveId =
@@ -210,8 +203,8 @@ export default function ConnectionManager() {
     (session as { activeConnectionId?: string }).activeConnectionId;
 
   const activeConn =
-    displayConns.find(c => c.id === effectiveActiveId) ??
-    displayConns[0];
+    additionalConnections.find(c => c.id === effectiveActiveId) ??
+    additionalConnections[0];
 
   const getConnectionLabel = (conn: SessionConnection) => `${conn.username}@${conn.host}:${conn.port}`;
 
@@ -270,7 +263,7 @@ export default function ConnectionManager() {
           <DropdownMenuSeparator />
 
           {/* All connections shown equally */}
-          {displayConns.map((conn) => (
+          {additionalConnections.map((conn) => (
             <DropdownMenuItem
               key={conn.id}
               className="flex items-center justify-between gap-2 px-2 py-2 cursor-pointer"
