@@ -710,15 +710,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
               : conns[0].id;
             setActiveConnectionId(target);
             setActiveConnectionIdGlobal(target);
-            // Always sync the full connections list into the JWT together with
-            // activeConnectionId so the session callback always finds activeConn.
-            // Without this, a legacy-fallback connection (legacyConnId) ends up
-            // as activeConnectionId but is absent from token.connections, causing
-            // session.user.role to default to "Read-Only" and all write queries
-            // to be silently rejected by FalkorDB (roQuery on empty key).
+            // Sync activeConnectionId into the JWT so session.user reflects
+            // the correct connection's role/host/port. The JWT callback looks
+            // up the full connection details from Token DB.
             await updateSession({
               activeConnectionId: target,
-              connections: conns,
             });
           } else {
             // Token DB returned no connections — the session is out of sync.
@@ -751,7 +747,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                 setActiveConnectionIdGlobal(migratedConn.id);
                 await updateSession({
                   activeConnectionId: migratedConn.id,
-                  connections: migratedConns,
                 });
               }
             }

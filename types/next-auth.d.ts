@@ -26,7 +26,6 @@ declare module "next-auth" {
 
   interface Session {
     user: User;
-    connections?: SessionConnection[];
     activeConnectionId?: string;
   }
 }
