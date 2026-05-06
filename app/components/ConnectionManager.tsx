@@ -204,7 +204,8 @@ export default function ConnectionManager() {
 
   const activeConn =
     additionalConnections.find(c => c.id === effectiveActiveId) ??
-    additionalConnections[0];
+    additionalConnections[0] ??
+    null;
 
   const getConnectionLabel = (conn: SessionConnection) => `${conn.username}@${conn.host}:${conn.port}`;
 
@@ -273,8 +274,8 @@ export default function ConnectionManager() {
             >
               <Tooltip>
                 <TooltipTrigger className="flex items-center gap-2 min-w-0">
-                  {activeConn.id === conn.id && <Check size={14} className="shrink-0 text-primary" />}
-                  {activeConn.id !== conn.id && <span className="w-[14px]" />}
+                  {activeConn?.id === conn.id && <Check size={14} className="shrink-0 text-primary" />}
+                  {activeConn?.id !== conn.id && <span className="w-[14px]" />}
                   <span className="truncate font-medium">{getConnectionLabel(conn)}</span>
                   <span className="text-xs text-muted-foreground shrink-0">{conn.role}</span>
                 </TooltipTrigger>

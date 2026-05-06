@@ -696,16 +696,20 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     // Only fetch connections once per authentication cycle
     if (sessionSyncedRef.current) return;
 
+    let cancelled = false;
+
     (async () => {
       try {
         const result = await securedFetch("/api/connections", {
           method: "GET",
         }, toast, setIndicator);
 
-        if (!result.ok) return;
+        if (cancelled || !result.ok) return;
 
         const json = await result.json();
         
+        if (cancelled) return;
+
         if (json?.connections) {
           const conns: SessionConnection[] = json.connections;
           setAdditionalConnections(conns);
@@ -723,9 +727,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
             // Sync activeConnectionId into the JWT so session.user reflects
             // the correct connection's role/host/port. The JWT callback looks
             // up the full connection details from Token DB.
-            await updateSessionRef.current({
-              activeConnectionId: target,
-            });
+            if (!cancelled) {
+              await updateSessionRef.current({
+                activeConnectionId: target,
+              });
+            }
           } else {
             // Token DB returned no connections — the session is out of sync.
             // This happens after a server restart (FileTokenStorage wiped),
@@ -747,6 +753,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
               method: "POST",
             }, toast, setIndicator);
 
+            if (cancelled) return;
+
             if (migrateResult.ok) {
               const migrateJson = await migrateResult.json();
               if (migrateJson?.connection) {
@@ -755,9 +763,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                 setAdditionalConnections(migratedConns);
                 setActiveConnectionId(migratedConn.id);
                 setActiveConnectionIdGlobal(migratedConn.id);
-                await updateSessionRef.current({
-                  activeConnectionId: migratedConn.id,
-                });
+                if (!cancelled) {
+                  await updateSessionRef.current({
+                    activeConnectionId: migratedConn.id,
+                  });
+                }
               }
             }
           }
@@ -767,6 +777,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         console.error("Failed to fetch connections:", err);
       }
     })();
+
+    return () => { cancelled = true; };
   }, [status, toast]);
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { Locator, Page } from "playwright";
+import { Locator } from "playwright";
 import BasePage from "@/e2e/infra/ui/basePage";
 import { interactWhenVisible } from "@/e2e/infra/utils";
 
