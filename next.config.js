@@ -41,7 +41,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
               "img-src 'self' data: blob:",
               "font-src 'self' data: https://cdn.jsdelivr.net",
-              "connect-src 'self' https://cdn.jsdelivr.net https://www.google-analytics.com https://www.googletagmanager.com",
+              "connect-src 'self' https: wss: https://cdn.jsdelivr.net https://www.google-analytics.com https://www.googletagmanager.com",
               "worker-src 'self' blob: https://cdn.jsdelivr.net",
               "child-src 'self' blob:",
               "object-src 'none'",

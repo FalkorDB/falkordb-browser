@@ -111,14 +111,14 @@ export const { handlers, auth, signIn: serverSignIn, signOut: serverSignOut } = 
         return {
           ...token,
           id: user.id ?? token.id,
-          host: user.host,
-          port: user.port,
-          credentialRef: user.credentialRef,
+          host: user.host ?? token.host,
+          port: user.port ?? token.port,
+          credentialRef: user.credentialRef ?? token.credentialRef,
           username: user.username ?? token.username,
-          tls: user.tls,
-          ca: user.ca,
-          role: user.role,
-          url: user.url,
+          tls: user.tls ?? token.tls,
+          ca: user.ca ?? token.ca,
+          role: user.role ?? token.role,
+          url: user.url ?? token.url,
         };
       }
       return token;

@@ -4,7 +4,7 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, SyntaxErrorInfo, parseSyntaxError } from "@/lib/utils";
+import { cn, fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, SyntaxErrorInfo, parseSyntaxError } from "@/lib/utils";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
@@ -854,10 +854,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
           } else {
             console.error('Failed to decrypt secret key');
             setSecretKey('');
+            localStorage.removeItem("secretKey");
           }
         } catch (error) {
           console.error('Failed to decrypt secret key:', error);
           setSecretKey('');
+          localStorage.removeItem("secretKey");
         }
       }
 
