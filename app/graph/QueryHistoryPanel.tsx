@@ -7,6 +7,7 @@ import { History, Info, Star, Trash2, X } from "lucide-react";
 import { cn, getTheme, Query } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Checkbox } from "@/components/ui/checkbox";
 import { setConnectionItem, removeConnectionItem } from "@/lib/connection-storage";
 import Button from "../components/ui/Button";
 import EditorComponent from "../components/EditorComponent";
@@ -40,6 +41,7 @@ export default function QueryHistoryPanel({ onClose }: Props) {
     const [isLoading, setIsLoading] = useState(false);
     const [tab, setTab] = useState<Tab>("text");
     const [deleteElements, setDeleteElements] = useState<number[]>([]);
+    const [wrapLines, setWrapLines] = useState(false);
 
     const filters = useMemo(() => {
         const queries = historyQuery?.queries ?? [];
@@ -459,6 +461,18 @@ export default function QueryHistoryPanel({ onClose }: Props) {
                                     isLoading={isLoading}
                                     disabled={isQueryLoading}
                                 />
+                                <label
+                                    htmlFor="queryHistoryEditorWrapLines"
+                                    className="z-10 absolute bottom-3 right-28 py-1.5 px-2 text-sm flex items-center gap-2 cursor-pointer select-none bg-background/80 rounded"
+                                >
+                                    <Checkbox
+                                        id="queryHistoryEditorWrapLines"
+                                        data-testid="queryHistoryEditorWrapLines"
+                                        checked={wrapLines}
+                                        onCheckedChange={(checked) => setWrapLines(checked as boolean)}
+                                    />
+                                    Wrap lines
+                                </label>
                                 <EditorComponent
                                     className="SofiaSans"
                                     height="100%"
@@ -469,10 +483,10 @@ export default function QueryHistoryPanel({ onClose }: Props) {
                                         fontSize: 14,
                                         lineNumbersMinChars: 3,
                                         scrollbar: {
-                                            horizontal: "auto"
+                                            horizontal: wrapLines ? "hidden" : "auto"
                                         },
                                         scrollBeyondLastLine: false,
-                                        wordWrap: "off",
+                                        wordWrap: wrapLines ? "on" : "off",
                                         renderWhitespace: "none"
                                     }}
                                     value={historyQuery.query}
