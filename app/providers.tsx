@@ -1193,7 +1193,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 export default function NextAuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
-      <Suspense>
+      <Suspense fallback={null}>
         <ProvidersWithSession>{children}</ProvidersWithSession>
       </Suspense>
     </SessionProvider>

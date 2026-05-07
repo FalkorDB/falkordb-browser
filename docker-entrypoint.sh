@@ -2,9 +2,24 @@
 
 # Generate ENCRYPTION_KEY if not provided by the user
 if [ -z "$ENCRYPTION_KEY" ]; then
-  export ENCRYPTION_KEY=$(head -c 32 /dev/urandom | od -A n -t x1 | tr -d ' \n')
+  ENCRYPTION_KEY=$(head -c 32 /dev/urandom | od -A n -t x1 | tr -d ' \n')
+  if [ -z "$ENCRYPTION_KEY" ] || [ ${#ENCRYPTION_KEY} -lt 64 ]; then
+    echo "ERROR: Failed to generate a valid ENCRYPTION_KEY. Aborting."
+    exit 1
+  fi
+  export ENCRYPTION_KEY
   echo "INFO: No ENCRYPTION_KEY provided, generated a random one for this container session."
   echo "WARNING: Encrypted credentials will be lost if the container is recreated without persisting the key."
+fi
+
+# Ensure .data directory exists and is writable (handles volume mounts)
+DATA_DIR="/app/.data"
+if [ ! -d "$DATA_DIR" ]; then
+  mkdir -p "$DATA_DIR" 2>/dev/null || true
+fi
+if [ ! -w "$DATA_DIR" ]; then
+  echo "ERROR: Data directory $DATA_DIR is not writable. Check volume permissions (uid=1001)."
+  exit 1
 fi
 
 exec "$@"

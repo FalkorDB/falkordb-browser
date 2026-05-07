@@ -1,5 +1,5 @@
 node_modules
 .next
 .git
-.env.local
+.env*
 .data
