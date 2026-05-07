@@ -92,6 +92,7 @@ export default function TableView() {
             onExpandChange={setExpand}
         >
             <Export
+                className="p-1 text-sm"
                 data-testid="exportTableViewButton"
                 content={csvContent}
                 filename={`${graph.Id}_table_export.csv`}

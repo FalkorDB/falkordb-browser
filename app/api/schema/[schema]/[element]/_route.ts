@@ -5,7 +5,7 @@ import {
   deleteSchemaElement,
   validateBody,
 } from "@/app/api/validate-body";
-import { getCorsHeaders } from "@/app/api/utils";
+import { getCorsHeaders, resolveReadOnly } from "@/app/api/utils";
 import { formatAttributes } from "./utils";
 
 export async function OPTIONS(request: NextRequest) {
@@ -23,11 +23,11 @@ export async function GET(
       return session;
     }
 
-    const { client } = session;
+    const { client, user } = session;
     const { schema: schemaName, element } = await params;
     const schemaId = `${schemaName}_schema`;
     const elementId = Number(element);
-    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       const schema = client.selectGraph(schemaId);
@@ -70,7 +70,7 @@ export async function POST(
       return session;
     }
 
-    const { client } = session;
+    const { client, user } = session;
     const { schema } = await params;
     const schemaName = `${schema}_schema`;
     const body = await request.json();
@@ -82,7 +82,14 @@ export async function POST(
     }
 
     const { type, label, attributes, selectedNodes } = validation.data;
-    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
+    const isReadOnly = resolveReadOnly(request, user.role);
+
+    if (isReadOnly) {
+      return NextResponse.json(
+        { message: "Forbidden: read-only connection" },
+        { status: 403, headers: getCorsHeaders(request) }
+      );
+    }
 
     try {
       if (!type) {
@@ -123,10 +130,7 @@ export async function POST(
         });
       }
 
-      const result =
-        isReadOnly
-          ? await graph.roQuery(query, { params: queryParams })
-          : await graph.query(query, { params: queryParams });
+      const result = await graph.query(query, { params: queryParams });
 
       return NextResponse.json({ result }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
@@ -155,7 +159,7 @@ export async function DELETE(
       return session;
     }
 
-    const { client } = session;
+    const { client, user } = session;
     const { schema, element } = await params;
     const schemaName = `${schema}_schema`;
     const elementId = Number(element);
@@ -168,7 +172,14 @@ export async function DELETE(
     }
 
     const { type } = validation.data;
-    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
+    const isReadOnly = resolveReadOnly(request, user.role);
+
+    if (isReadOnly) {
+      return NextResponse.json(
+        { message: "Forbidden: read-only connection" },
+        { status: 403, headers: getCorsHeaders(request) }
+      );
+    }
 
     try {
       const graph = client.selectGraph(schemaName);
@@ -176,9 +187,7 @@ export async function DELETE(
         ? `MATCH (n) WHERE ID(n) = $id DELETE n`
         : `MATCH ()-[e]->() WHERE ID(e) = $id DELETE e`;
 
-      if (isReadOnly)
-        await graph.roQuery(query, { params: { id: elementId } });
-      else await graph.query(query, { params: { id: elementId } });
+      await graph.query(query, { params: { id: elementId } });
 
       return NextResponse.json(
         { message: "Element deleted successfully" },

@@ -63,15 +63,15 @@ export default function Navbar({ showUDF }: Props) {
                 }
                 <div data-testid="NavigationButtons" className="p-1 flex flex-col items-center gap-2 bg-foreground/5 rounded-lg">
                     <Button
-                        data-testid="settings"
+                        title="View and manage your graphs"
                         className={cn(
-                            "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/15",
-                            type === "Settings" && "!text-primary"
+                            "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
+                            type === "Graph" && "!text-primary"
                         )}
-                        title="Adjust application settings"
-                        onClick={() => router.push("/settings")}
+                        onClick={() => router.push("/graph")}
+                        data-testid="GraphsButton"
                     >
-                        <Settings size={iconSize} />
+                        <GitGraph size={iconSize} />
                     </Button>
                     {
                         showUDF ?
@@ -87,20 +87,21 @@ export default function Navbar({ showUDF }: Props) {
                                 <FunctionSquare size={iconSize} />
                             </Button> : null
                     }
-                    <Button
-                        title="View and manage your graphs"
-                        className={cn(
-                            "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10",
-                            type === "Graph" && "!text-primary"
-                        )}
-                        onClick={() => router.push("/graph")}
-                        data-testid="GraphsButton"
-                    >
-                        <GitGraph size={iconSize} />
-                    </Button>
                 </div>
             </div>
             <div className="w-full flex flex-col gap-2 items-center">
+                <Button
+                    data-testid="settings"
+                    className={cn(
+                        "text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/15",
+                        type === "Settings" && "!text-primary"
+                    )}
+                    title="Adjust application settings"
+                    onClick={() => router.push("/settings")}
+                >
+                    <Settings size={iconSize} />
+                </Button>
+                {separator}
                 <Drawer direction="right">
                     <DropdownMenu>
                         <DropdownMenuTrigger onClick={(e) => e.preventDefault()} asChild>

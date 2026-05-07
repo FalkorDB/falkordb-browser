@@ -28,6 +28,10 @@ export interface TokenData {
    * (treated as 'pat' by readers).
    */
   kind?: TokenKind;
+  /** Whether the connection uses TLS. Defaults to false for old rows. */
+  tls?: boolean;
+  /** Base64-encoded CA certificate for TLS connections. */
+  ca?: string;
 }
 
 /**
@@ -90,6 +94,13 @@ export interface ITokenStorage {
    * @returns Encrypted password or null if not found
    */
   getEncryptedPassword(tokenId: string): Promise<string | null>;
+
+  /**
+   * Fetch all tokens belonging to a specific user/session, optionally
+   * filtered by kind. Used to list additional connections stored against
+   * a session.
+   */
+  fetchTokensByUserId(userId: string, kind?: TokenKind): Promise<TokenData[]>;
 
   /**
    * Clean up expired tokens (optional, for maintenance)

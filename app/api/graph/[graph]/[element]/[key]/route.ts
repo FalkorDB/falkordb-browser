@@ -5,7 +5,7 @@ import {
   deleteGraphElementAttribute,
   validateBody,
 } from "../../../../validate-body";
-import { getCorsHeaders } from "../../../../utils";
+import { getCorsHeaders, resolveReadOnly } from "../../../../utils";
 
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
@@ -24,10 +24,10 @@ export async function POST(
       return session;
     }
 
-    const { client } = session;
+    const { client, user } = session;
     const { graph: graphId, element, key } = await params;
     const elementId = Number(element);
-    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       const body = await request.json();
@@ -45,13 +45,18 @@ export async function POST(
       const { value, type } = validation.data;
       const graph = client.selectGraph(graphId);
 
+      if (isReadOnly) {
+        return NextResponse.json(
+          { message: "Forbidden: read-only connection" },
+          { status: 403, headers: getCorsHeaders(request) }
+        );
+      }
+
       const query = type
         ? `MATCH (n) WHERE ID(n) = $id SET n.${key} = $value`
         : `MATCH ()-[e]->() WHERE ID(e) = $id SET e.${key} = $value`;
 
-      if (isReadOnly)
-        await graph.roQuery(query, { params: { id: elementId, value } });
-      else await graph.query(query, { params: { id: elementId, value } });
+      await graph.query(query, { params: { id: elementId, value } });
 
       return NextResponse.json(
         { message: "Attribute updated successfully" },
@@ -86,11 +91,11 @@ export async function DELETE(
       return session;
     }
 
-    const { client } = session;
+    const { client, user } = session;
 
     const { graph: graphId, element, key } = await params;
     const elementId = Number(element);
-    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       const body = await request.json();
@@ -108,13 +113,18 @@ export async function DELETE(
       const { type } = validation.data;
       const graph = client.selectGraph(graphId);
 
+      if (isReadOnly) {
+        return NextResponse.json(
+          { message: "Forbidden: read-only connection" },
+          { status: 403, headers: getCorsHeaders(request) }
+        );
+      }
+
       const query = type
         ? `MATCH (n) WHERE ID(n) = $id SET n.${key} = NULL`
         : `MATCH ()-[e]->() WHERE ID(e) = $id SET e.${key} = NULL`;
 
-      if (isReadOnly)
-        await graph.roQuery(query, { params: { id: elementId } });
-      else await graph.query(query, { params: { id: elementId } });
+      await graph.query(query, { params: { id: elementId } });
 
       return NextResponse.json(
         { message: "Attribute deleted successfully" },

@@ -393,11 +393,11 @@ export default function TableComponent({
     const columnCount = (setRows ? headerNames.length + 1 : headerNames.length) + 1;
 
     const renderValue = (v: any) => (
-        <span className={cn("pointer-events-auto", valueClassName)}>{v}</span>
+        <span className={cn("pointer-events-auto text-xs", valueClassName)}>{v}</span>
     );
 
     const renderLabel = (l: any) => (
-        <span className={cn(valueClassName)}>{l[0]}:</span>
+        <span className={cn("text-xs", valueClassName)}>{l[0]}:</span>
     );
 
     const getClassName = (index?: number, level?: number) => {
@@ -604,7 +604,7 @@ export default function TableComponent({
                             const rowTestID = `${label}${row.name}`;
                             return (
                                 <TableRow
-                                    className="border-border"
+                                    className="border-border text-xs"
                                     data-testid={`tableRow${rowTestID}`}
                                     onMouseEnter={() => setHover(row.name)}
                                     onMouseLeave={() => setHover("")}
@@ -790,13 +790,13 @@ export default function TableComponent({
                                                                     : <div className="flex items-center gap-2 justify-center">
                                                                         <Tooltip>
                                                                             <TooltipTrigger asChild>
-                                                                                <p data-testid={`content${cellTestId}${headerNames[j]}`} >{cell.value}</p>
+                                                                                <p data-testid={`content${cellTestId}${headerNames[j]}`} className="text-center" >{cell.value}</p>
                                                                             </TooltipTrigger>
                                                                             <TooltipContent>
                                                                                 {cell.value}
                                                                             </TooltipContent>
                                                                         </Tooltip>
-                                                                        <div className="w-4">
+                                                                        <div className="w-4 flex-none">
                                                                             {
                                                                                 cell.type !== "readonly" && hover === row.name &&
                                                                                 <Button

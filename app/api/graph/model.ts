@@ -3,6 +3,7 @@
 /* eslint-disable no-param-reassign */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Data, getMetaStats, GraphData, InfoLabel, InfoRelationship, Label, Link, LinkCell, MemoryValue, Node, NodeCell, Relationship, ToastFn, Value } from "@/lib/utils";
+import { getConnectionItem } from "@/lib/connection-storage";
 
 // Color palette for node customization
 export const STYLE_COLORS = [
@@ -73,7 +74,7 @@ export function loadLabelStyle(label: Label | InfoLabel): void {
   if (typeof window === "undefined") return;
 
   const storageKey = `labelStyle_${label.name}`;
-  const savedStyle = localStorage.getItem(storageKey);
+  const savedStyle = getConnectionItem(storageKey);
 
   if (savedStyle) {
     try {
@@ -814,13 +815,17 @@ export class Graph {
         if (!l) {
           const [infoLabel] = await this.graphInfo.createLabel([[label, undefined]], this.id);
 
-          l = {
-            ...infoLabel,
-            elements: [],
-          };
+          // Re-check after await: a concurrent call may have already inserted this label
+          l = this.labelsMap.get(label);
+          if (!l) {
+            l = {
+              ...infoLabel,
+              elements: [],
+            };
 
-          this.labelsMap.set(l.name, l);
-          this.labels.push(l);
+            this.labelsMap.set(l.name, l);
+            this.labels.push(l);
+          }
         }
 
         if (node) {
@@ -839,12 +844,17 @@ export class Graph {
 
     if (!r) {
       const infoRelationship = await this.graphInfo.createRelationship([relationship, undefined], this.id);
-      r = {
-        ...infoRelationship,
-        elements: [],
-      };
-      this.relationshipsMap.set(r.name, r);
-      this.relationships.push(r);
+
+      // Re-check after await: a concurrent call may have already inserted this relationship
+      r = this.relationshipsMap.get(relationship);
+      if (!r) {
+        r = {
+          ...infoRelationship,
+          elements: [],
+        };
+        this.relationshipsMap.set(r.name, r);
+        this.relationships.push(r);
+      }
     }
 
     return r;

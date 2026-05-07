@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { renameGraph, validateBody } from "../../validate-body";
-import { getCorsHeaders, writeGetClientErrorAsSSE } from "../../utils";
+import { getCorsHeaders, writeGetClientErrorAsSSE, resolveReadOnly } from "../../utils";
 
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
@@ -60,10 +60,10 @@ export async function POST(
       return session;
     }
 
-    const { client } = session;
+    const { client, user } = session;
 
     const { graph: graphId } = await params;
-    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       const graph = client.selectGraph(graphId);
@@ -168,11 +168,11 @@ export async function GET(
       });
     }
 
-    const { client } = session;
+    const { client, user } = session;
     const { graph: graphId } = await params;
     const query = request.nextUrl.searchParams.get("query");
     const timeout = Number(request.nextUrl.searchParams.get("timeout")) * 1000;
-    const isReadOnly = request.nextUrl.searchParams.get("readOnly") === "true";
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       if (!query) throw new Error("Missing parameter query");

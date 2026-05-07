@@ -1,9 +1,18 @@
-import type { DefaultSession } from "next-auth"
+import type { DefaultSession, DefaultUser } from "next-auth"
 
 declare module "next-auth" {
   type Role = "Admin" | "Read-Write" | "Read-Only";
 
-  interface User {
+  interface SessionConnection {
+    id: string;
+    username?: string;
+    role: Role;
+    host: string;
+    port: number;
+    tls: boolean;
+  }
+
+  interface User extends DefaultUser {
     role: Role;
     host: string;
     port: number;
@@ -12,23 +21,11 @@ declare module "next-auth" {
     ca?: string;
     username?: string;
     credentialRef?: string;
+    connId?: string;
   }
 
   interface Session {
-    user: User & DefaultSession["user"];
-  }
-}
-
-declare module "@auth/core/jwt" {
-  interface JWT {
-    id: string;
-    host: string;
-    port: number;
-    credentialRef?: string;
-    username: string;
-    tls: boolean;
-    ca?: string;
-    role: "Admin" | "Read-Write" | "Read-Only";
-    url?: string;
+    user: User;
+    activeConnectionId?: string;
   }
 }
