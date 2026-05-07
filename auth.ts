@@ -2,7 +2,7 @@ import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import { v4 as uuidv4 } from "uuid"
 import crypto from "crypto"
-import type { User } from "next-auth"
+import type { Role, User } from "next-auth"
 import StorageFactory from "@/lib/token-storage/StorageFactory"
 import {
   newClient,
@@ -137,8 +137,8 @@ export const { handlers, auth, signIn: serverSignIn, signOut: serverSignOut } = 
             port: token.port as number,
             username: token.username as string,
             tls: token.tls as boolean,
-            ca: token.ca,
-            role: token.role,
+            ca: token.ca as string | undefined,
+            role: token.role as Role,
             url: token.url as string | undefined,
           },
         };

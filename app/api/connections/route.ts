@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import authOptions, { addSessionConnection, listSessionConnections } from "@/app/api/auth/[...nextauth]/options";
+import { addSessionConnection, listSessionConnections } from "@/app/api/auth/[...nextauth]/options";
 import { getCorsHeaders, isRequestOriginTrusted, rejectUntrustedOrigin } from "@/app/api/utils";
+import { auth } from "@/auth";
 
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
@@ -17,7 +17,7 @@ export async function GET(request: Request) {
       return rejectUntrustedOrigin(request);
     }
 
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     const id = session?.user?.id;
 
     if (!id) {
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       return rejectUntrustedOrigin(request);
     }
 
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     const id = session?.user?.id;
 
     if (!id) {

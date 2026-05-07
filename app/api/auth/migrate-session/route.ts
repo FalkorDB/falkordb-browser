@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { v4 as uuidv4 } from "uuid";
 import crypto from "crypto";
-import authOptions, { newClient } from "@/app/api/auth/[...nextauth]/options";
+import { newClient } from "@/app/api/auth/[...nextauth]/options";
+import { auth } from "@/auth";
 import { storeEncryptedCredential } from "@/app/api/auth/tokenUtils";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
 import { getCorsHeaders, isRequestOriginTrusted, rejectUntrustedOrigin } from "@/app/api/utils";
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       return rejectUntrustedOrigin(request);
     }
 
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     const user = session?.user;
 
     if (!user?.id) {

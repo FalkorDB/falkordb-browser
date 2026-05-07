@@ -1,5 +1,5 @@
 import CredentialsProvider from "next-auth/providers/credentials";
-import type { AuthOptions, Role, User } from "next-auth";
+import type { Role, User } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { FalkorDB, type FalkorDBOptions } from "falkordb";
 import { LRUCache } from "lru-cache";
@@ -605,9 +605,9 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
 
 const SESSION_MAX_AGE_SECONDS = 24 * 60 * 60; // 24 hours; keep in sync with session.maxAge below
 
-const authOptions: AuthOptions = {
+export const authOptions = {
   session: {
-    strategy: "jwt",
+    strategy: "jwt" as const,
     maxAge: SESSION_MAX_AGE_SECONDS,
   },
   providers: [
@@ -633,7 +633,8 @@ const authOptions: AuthOptions = {
           const connId = uuidv4();
           const key = sessionConnectionKey(id, connId);
 
-          const { role } = await newClient(credentials, key);
+          const creds = credentials as Record<string, string | undefined>;
+          const { role } = await newClient(creds, key);
 
           // Opportunistically clean up expired tokens from storage.
           // Non-blocking: fire-and-forget so login isn't delayed.
@@ -653,15 +654,15 @@ const authOptions: AuthOptions = {
               tokenHash,
               tokenId: connId,
               userId: id,
-              username: credentials.username || "default",
+              username: creds.username || "default",
               name: `connection:${connId}`,
               role,
-              host: credentials.host || "localhost",
-              port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-              password: credentials.password || "",
+              host: creds.host || "localhost",
+              port: creds.port ? parseInt(creds.port, 10) : 6379,
+              password: creds.password || "",
               kind: 'session',
-              tls: credentials.tls === "true",
-              ca: credentials.url ? undefined : credentials.ca,
+              tls: creds.tls === "true",
+              ca: creds.url ? undefined : creds.ca,
               expiresAtUnix: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS,
             });
           } catch (storageError) {
@@ -681,12 +682,12 @@ const authOptions: AuthOptions = {
           const res: User = {
             id,
             connId,
-            url: credentials.url,
-            host: credentials.host || "localhost",
-            port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-            username: credentials.username || "default",
-            tls: credentials.tls === "true",
-            ca: credentials.url ? undefined : credentials.ca,
+            url: creds.url,
+            host: creds.host || "localhost",
+            port: creds.port ? parseInt(creds.port, 10) : 6379,
+            username: creds.username || "default",
+            tls: creds.tls === "true",
+            ca: creds.url ? undefined : creds.ca,
             role,
           };
           return res;
@@ -699,7 +700,8 @@ const authOptions: AuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user, trigger, session: updateData }) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async jwt({ token, user, trigger, session: updateData }: any) {
       if (user) {
         // Store only the active connection's flat fields + its ID.
         // The full list of connections lives in the Token DB and is
@@ -843,10 +845,10 @@ const authOptions: AuthOptions = {
 
       return token;
     },
-    async redirect({ url, baseUrl }) {
+    async redirect({ url, baseUrl }: any) {
       return url.startsWith(baseUrl) ? url : baseUrl;
     },
-    async session({ session, token }) {
+    async session({ session, token }: any) {
       if (session.user) {
         const activeId = token.activeConnectionId as string | undefined;
 
@@ -868,7 +870,7 @@ const authOptions: AuthOptions = {
     },
   },
   events: {
-    async signOut({ token }) {
+    async signOut({ token }: any) {
       const t = token as Record<string, unknown> | null;
       const id = t?.id as string | undefined;
 
@@ -896,8 +898,6 @@ const authOptions: AuthOptions = {
     },
   },
 };
-
-export default authOptions;
 
 export async function getClient(
   request: Request
