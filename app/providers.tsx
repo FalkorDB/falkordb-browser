@@ -4,7 +4,8 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Dispatch, SetStateAction, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { cn, fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, SyntaxErrorInfo, parseSyntaxError } from "@/lib/utils";
+import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue, SyntaxErrorInfo, parseSyntaxError } from "@/lib/utils";
+import { serverEncrypt, serverDecrypt, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
@@ -223,13 +224,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       if (newSecretKey !== secretKey) {
         if (newSecretKey) {
           try {
-            const res = await fetch("/api/encryption/encrypt", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ value: newSecretKey }),
-            });
-            if (!res.ok) throw new Error("Encryption request failed");
-            const { result: encryptedKey } = await res.json();
+            const encryptedKey = await serverEncrypt(newSecretKey);
             if (!encryptedKey) {
               toast({
                 title: "Error",
@@ -819,47 +814,56 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setRowHeightExpandMultiple(parseInt(localStorage.getItem("rowHeightExpandMultiple") || "3", 10));
       const parsedMaxItems = parseInt(localStorage.getItem("maxItemsForSearch") || "20", 10);
       setMaxItemsForSearch(Number.isFinite(parsedMaxItems) ? Math.min(Math.max(parsedMaxItems, 10), 50) : 20);
-      // Decrypt secret key via server-side API
+      // Decrypt secret key using server-side decryption, with migration from old client-side encryption
       const storedSecretKey = localStorage.getItem("secretKey") || "";
       if (storedSecretKey) {
-        try {
-          const res = await fetch("/api/encryption/decrypt", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ value: storedSecretKey }),
-          });
-          if (res.ok) {
-            const { result: decryptedKey } = await res.json();
+        if (isLegacyEncrypted(storedSecretKey)) {
+          // Old client-side encrypted value - decrypt with legacy method, then re-encrypt server-side
+          try {
+            const plainKey = await legacyDecrypt(storedSecretKey);
+            if (plainKey) {
+              setSecretKey(plainKey);
+              const newEncrypted = await serverEncrypt(plainKey);
+              if (newEncrypted) {
+                localStorage.setItem("secretKey", newEncrypted);
+              }
+              clearLegacyEncryptionKey();
+            } else {
+              // eslint-disable-next-line no-console
+              console.warn('Could not decrypt legacy secret key, clearing');
+              setSecretKey('');
+              localStorage.removeItem("secretKey");
+              clearLegacyEncryptionKey();
+            }
+          } catch (error) {
+            console.error('Failed to migrate legacy secret key:', error);
+            setSecretKey('');
+            localStorage.removeItem("secretKey");
+          }
+        } else {
+          // Try server-side decryption (new format or plain text)
+          try {
+            const decryptedKey = await serverDecrypt(storedSecretKey);
             if (decryptedKey) {
               setSecretKey(decryptedKey);
-              // Re-encrypt with server key if it was stored in old format
-              if (!storedSecretKey.startsWith("senc:")) {
-                const encRes = await fetch("/api/encryption/encrypt", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ value: decryptedKey }),
-                });
-                if (encRes.ok) {
-                  const { result: reEncrypted } = await encRes.json();
-                  if (reEncrypted) {
-                    localStorage.setItem("secretKey", reEncrypted);
-                  }
-                }
-              }
             } else {
+              // eslint-disable-next-line no-console
               console.warn('Clearing corrupted encrypted secret key');
               setSecretKey('');
               localStorage.removeItem("secretKey");
             }
-          } else {
-            console.error('Failed to decrypt secret key');
-            setSecretKey('');
-            localStorage.removeItem("secretKey");
+          } catch {
+            // Not server-encrypted - treat as plain text, migrate to server encryption
+            try {
+              setSecretKey(storedSecretKey);
+              const encryptedKey = await serverEncrypt(storedSecretKey);
+              if (encryptedKey) {
+                localStorage.setItem("secretKey", encryptedKey);
+              }
+            } catch (migrateError) {
+              console.error('Failed to migrate plain text key:', migrateError);
+            }
           }
-        } catch (error) {
-          console.error('Failed to decrypt secret key:', error);
-          setSecretKey('');
-          localStorage.removeItem("secretKey");
         }
       }
 
