@@ -80,8 +80,11 @@ jobs:
           push: false
           tags: falkordb/falkordb-browser:test
           load: true
+          pull: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            CACHEBUST=${{ github.run_id }}
 
       - name: Run Trivy vulnerability scanner
         id: trivy-scan
