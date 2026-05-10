@@ -110,7 +110,7 @@ export function proxy(request: NextRequest) {
     }
 
     // --- CSP with nonce (all routes) ---
-    const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+    const nonce = btoa(crypto.randomUUID());
     const isDev = process.env.NODE_ENV === "development";
 
     // In development, Turbopack injects inline scripts that need nonces.

@@ -24,6 +24,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Limit payload size to prevent resource exhaustion (max 10KB)
+    if (value.length > 10240) {
+      return NextResponse.json(
+        { message: "Payload too large" },
+        { status: 400 }
+      );
+    }
+
     if (!value) {
       return NextResponse.json({ result: "" }, { status: 200 });
     }

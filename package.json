@@ -91,6 +91,7 @@
     "@tailwindcss/postcss": "^4.2.3",
     "@types/cytoscape-fcose": "^2.2.4",
     "@types/lodash": "^4.17.24",
+    "@types/lru-cache": "^7.10.9",
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^25.6.2",
     "@types/react": "^19.2.14",
