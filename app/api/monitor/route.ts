@@ -46,7 +46,7 @@ export async function GET(request: Request) {
     } catch (error) {
       console.error(error);
       return NextResponse.json(
-        { message: "An error occurred while processing the request" },
+        { message: "Internal server error" },
         { status: 400, headers: getCorsHeaders(request) }
       );
     }

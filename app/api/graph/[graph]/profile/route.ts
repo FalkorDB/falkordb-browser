@@ -28,12 +28,11 @@ export async function GET(
     } catch (error) {
       console.error(error);
       return NextResponse.json(
-        { message: "An error occurred while processing the request" },
+        { message: "Internal server error" },
         { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
-    console.error(err);
     return NextResponse.json(
       { message: "Internal server error" },
       { status: 500, headers: getCorsHeaders(request) }
