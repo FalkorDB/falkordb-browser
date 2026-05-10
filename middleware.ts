@@ -81,7 +81,7 @@ function getRateLimitConfig(pathname: string): RateLimitConfig | null {
 
     // Graph query endpoints - prevent resource exhaustion
     if (pathname.startsWith("/api/graph")) {
-        return { maxRequests: 60, windowMs: 60_000 }; // 60 req/min
+        return { maxRequests: 200, windowMs: 60_000 }; // 200 req/min
     }
 
     // General API rate limit
@@ -95,24 +95,62 @@ function getRateLimitConfig(pathname: string): RateLimitConfig | null {
 export function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
+    // --- Rate limiting (API routes only) ---
     const config = getRateLimitConfig(pathname);
-    if (!config) {
-        return NextResponse.next();
+    if (config) {
+        const ip = getClientIP(request);
+        const key = `${ip}:${pathname.split("/").slice(0, 4).join("/")}`;
+
+        if (isRateLimited(key, config.maxRequests, config.windowMs)) {
+            return NextResponse.json(
+                { error: "Too many requests. Please try again later." },
+                { status: 429, headers: { "Retry-After": "60" } }
+            );
+        }
     }
 
-    const ip = getClientIP(request);
-    const key = `${ip}:${pathname.split("/").slice(0, 4).join("/")}`;
+    // --- CSP with nonce (all routes) ---
+    const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+    const isDev = process.env.NODE_ENV === "development";
 
-    if (isRateLimited(key, config.maxRequests, config.windowMs)) {
-        return NextResponse.json(
-            { error: "Too many requests. Please try again later." },
-            { status: 429, headers: { "Retry-After": "60" } }
-        );
-    }
+    const cspHeader = [
+        "default-src 'self'",
+        // strict-dynamic trusts scripts loaded by nonced scripts;
+        // unsafe-eval is required by React in development mode only
+        `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+        "img-src 'self' data: blob:",
+        "font-src 'self' data: https://cdn.jsdelivr.net",
+        "connect-src 'self' https://cdn.jsdelivr.net",
+        "worker-src 'self' blob:",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "frame-ancestors 'none'",
+        "form-action 'self'",
+    ].join("; ");
 
-    return NextResponse.next();
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-nonce", nonce);
+
+    const response = NextResponse.next({
+        request: { headers: requestHeaders },
+    });
+    response.headers.set("Content-Security-Policy", cspHeader);
+
+    return response;
 }
 
 export const config = {
-    matcher: "/api/:path*",
+    matcher: [
+        // Match all routes except static files and images
+        {
+            source: "/((?!_next/static|_next/image|favicon.ico).*)",
+            missing: [
+                { type: "header", key: "next-router-prefetch" },
+                { type: "header", key: "purpose", value: "prefetch" },
+            ],
+        },
+        // Always match API routes for rate limiting
+        "/api/:path*",
+    ],
 };
