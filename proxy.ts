@@ -92,7 +92,7 @@ function getRateLimitConfig(pathname: string): RateLimitConfig | null {
     return null;
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
     // --- Rate limiting (API routes only) ---
@@ -113,15 +113,26 @@ export function middleware(request: NextRequest) {
     const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
     const isDev = process.env.NODE_ENV === "development";
 
+    // In development, Turbopack injects inline scripts that need nonces.
+    // 'strict-dynamic' lets nonced scripts load further scripts.
+    // 'unsafe-eval' is required by React dev mode for stack reconstruction.
+    //
+    // In production, Next.js also emits inline <script> tags (RSC data chunks)
+    // that require nonces. We use nonce-based CSP in both modes.
+    // 'strict-dynamic' makes browsers trust scripts loaded by nonced scripts,
+    // but it also causes browsers to ignore 'self', so we keep 'self' as a
+    // fallback for older browsers that don't support 'strict-dynamic'.
+    const scriptSrc = isDev
+        ? `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval'`
+        : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`;
+
     const cspHeader = [
         "default-src 'self'",
-        // strict-dynamic trusts scripts loaded by nonced scripts;
-        // unsafe-eval is required by React in development mode only
-        `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
+        scriptSrc,
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
-        "img-src 'self' data: blob:",
+        "img-src 'self' data: blob: https://*.googletagmanager.com",
         "font-src 'self' data: https://cdn.jsdelivr.net",
-        "connect-src 'self' https://cdn.jsdelivr.net",
+        "connect-src 'self' https://cdn.jsdelivr.net https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com",
         "worker-src 'self' blob:",
         "object-src 'none'",
         "base-uri 'self'",
@@ -131,6 +142,9 @@ export function middleware(request: NextRequest) {
 
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-nonce", nonce);
+    // Next.js reads the CSP header from request headers to extract the nonce
+    // and automatically apply it to inline <script> tags during rendering.
+    requestHeaders.set("Content-Security-Policy", cspHeader);
 
     const response = NextResponse.next({
         request: { headers: requestHeaders },
