@@ -36,7 +36,7 @@ export async function DELETE(
     } catch (error) {
       console.error(error);
       return NextResponse.json(
-        { message: "An error occurred while processing the request" },
+        { message: "Internal server error" },
         { status: 400, headers: getCorsHeaders(request) }
       );
     }
@@ -78,7 +78,7 @@ export async function POST(
     } catch (error) {
       console.error(error);
       return NextResponse.json(
-        { message: "An error occurred while processing the request" },
+        { message: "Internal server error" },
         { status: 400, headers: getCorsHeaders(request) }
       );
     }
@@ -130,7 +130,7 @@ export async function PATCH(
     } catch (error) {
       console.error(error);
       return NextResponse.json(
-        { message: "An error occurred while processing the request" },
+        { message: "Internal server error" },
         { status: 400, headers: getCorsHeaders(request) }
       );
     }
@@ -231,7 +231,7 @@ export async function GET(
       writer.write(
         encoder.encode(
           `event: error\ndata: ${JSON.stringify({
-            message: "An error occurred while processing the request",
+            message: "Internal server error",
             status: 400,
           })}\n\n`
         )

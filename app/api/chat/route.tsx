@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
         }
     } catch (error) {
         console.error(error);
-        writer.write(encoder.encode(`event: error status: ${500} data: ${JSON.stringify((error as Error).message)}\n\n`));
+        writer.write(encoder.encode(`event: error status: ${500} data: ${JSON.stringify("Internal server error")}\n\n`));
         writer.close();
     }
 

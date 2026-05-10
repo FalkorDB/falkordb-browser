@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import { v4 as uuidv4 } from "uuid"
@@ -170,3 +171,9 @@ export const { handlers, auth, signIn: serverSignIn, signOut: serverSignOut } = 
     },
   },
 })
+=======
+import NextAuth from "next-auth";
+import authOptions from "@/app/api/auth/[...nextauth]/options";
+
+export const { handlers, auth, signIn, signOut } = NextAuth(authOptions);
+>>>>>>> c6d104c1 (Refactor error handling in API routes to return a generic "Internal server error" message instead of specific error messages for better security. Update NextAuth to version 5.0.0-beta.31 and add support for new user and session types. Implement encryption migration tests to ensure proper handling of secret keys in localStorage. Add new auth.ts file for NextAuth integration.)
