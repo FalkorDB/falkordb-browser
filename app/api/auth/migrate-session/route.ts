@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import crypto from "crypto";
-import authOptions, { getSessionFromRequest, newClient } from "@/app/api/auth/[...nextauth]/options";
+import { getSessionFromRequest, newClient } from "@/app/api/auth/[...nextauth]/options";
 import { storeEncryptedCredential } from "@/app/api/auth/tokenUtils";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
 import { getCorsHeaders, isRequestOriginTrusted, rejectUntrustedOrigin } from "@/app/api/utils";

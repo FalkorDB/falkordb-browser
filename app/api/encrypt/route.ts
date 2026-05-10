@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     const corsHeaders = getCorsHeaders(request);
 
     // Lightweight auth check via JWT
-    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+    const token = await getToken({ req: request, secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET });
     if (!token) {
       return NextResponse.json(
         { error: "Not authenticated" },

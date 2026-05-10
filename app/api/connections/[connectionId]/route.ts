@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import authOptions, { getSessionFromRequest, removeSessionConnection } from "@/app/api/auth/[...nextauth]/options";
+import { getSessionFromRequest, removeSessionConnection } from "@/app/api/auth/[...nextauth]/options";
 import { getCorsHeaders, isRequestOriginTrusted, rejectUntrustedOrigin } from "@/app/api/utils";
 
 export async function OPTIONS(request: Request) {

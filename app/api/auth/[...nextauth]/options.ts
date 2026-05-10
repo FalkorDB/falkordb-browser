@@ -449,7 +449,7 @@ async function isJWTOnlyRequest(): Promise<boolean> {
  */
 async function verifyJWTToken(token: string): Promise<CustomJWTPayload> {
   const { jwtVerify } = await import('jose');
-  const secret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
+  const secret = new TextEncoder().encode(process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET);
   const { payload } = await jwtVerify(token, secret);
   return payload as unknown as CustomJWTPayload;
 }
@@ -927,7 +927,7 @@ export async function getSessionFromRequest(
   const token = await getToken({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     req: request as any,
-    secret: process.env.NEXTAUTH_SECRET,
+    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
     secureCookie: shouldUseSecureCookies(request),
   });
 
@@ -1024,7 +1024,7 @@ export async function getClient(
       const jwt = await getToken({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         req: request as any,
-        secret: process.env.NEXTAUTH_SECRET,
+        secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
         secureCookie: shouldUseSecureCookies(request),
       });
       const credentialRef = jwt?.credentialRef as string | undefined;

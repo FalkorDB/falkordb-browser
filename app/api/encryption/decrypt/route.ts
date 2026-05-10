@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt";
 import { decrypt } from "@/app/api/auth/encryption";
 
 const ENCRYPTED_PREFIX = "senc:";
 
 export async function POST(request: NextRequest) {
   try {
+    const token = await getToken({ req: request, secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET });
+    if (!token) {
+      return NextResponse.json(
+        { message: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const { value } = body;
 
@@ -22,8 +31,15 @@ export async function POST(request: NextRequest) {
     // Handle server-encrypted values
     if (value.startsWith(ENCRYPTED_PREFIX)) {
       const raw = value.substring(ENCRYPTED_PREFIX.length);
-      const decrypted = decrypt(raw);
-      return NextResponse.json({ result: decrypted }, { status: 200 });
+      try {
+        const decrypted = decrypt(raw);
+        return NextResponse.json({ result: decrypted }, { status: 200 });
+      } catch {
+        return NextResponse.json(
+          { message: "Invalid encrypted payload" },
+          { status: 400 }
+        );
+      }
     }
 
     // Old client-side encrypted values (enc: prefix) can't be decrypted

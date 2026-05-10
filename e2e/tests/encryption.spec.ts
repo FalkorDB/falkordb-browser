@@ -90,7 +90,7 @@ test.describe(`@admin Encryption migration tests`, () => {
 
         // Generate a real AES-GCM encrypted value using Web Crypto API
         // then store it with the enc: prefix + the key in localStorage.
-        const migrationResult = await page.evaluate(async () => {
+        await page.evaluate(async () => {
             // Create a real crypto key
             const key = await window.crypto.subtle.generateKey(
                 { name: 'AES-GCM', length: 256 },

@@ -204,7 +204,7 @@ export function isRequestOriginTrusted(request: Request): boolean {
 }
 
 export function shouldUseSecureCookies(request: Request): boolean {
-    const nextAuthUrl = process.env.NEXTAUTH_URL;
+    const nextAuthUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL;
     if (nextAuthUrl && !isAutoNextAuthUrl()) {
         return nextAuthUrl.startsWith("https://");
     }
