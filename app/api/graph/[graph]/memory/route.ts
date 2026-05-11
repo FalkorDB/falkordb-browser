@@ -36,7 +36,7 @@ export async function GET(
   } catch (err) {
     console.error(`[memory] memoryUsage failed for graph="${graph}": ${(err as Error).message}`);
     return NextResponse.json(
-      { message: (error as Error).message },
+      { message: (err as Error).message },
       { status: 400, headers: getCorsHeaders(request) }
     );
   }

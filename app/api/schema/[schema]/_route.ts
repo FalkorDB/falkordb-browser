@@ -178,7 +178,7 @@ export async function PATCH(
     } catch (err: unknown) {
       console.error(err);
       return NextResponse.json(
-        { message: (error as Error).message },
+        { message: (err as Error).message },
         { status: 400 }
       );
     }
