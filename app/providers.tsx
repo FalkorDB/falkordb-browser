@@ -2,7 +2,7 @@
 
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
-import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Dispatch, SetStateAction, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue, SyntaxErrorInfo, parseSyntaxError } from "@/lib/utils";
 import { encryptValue, decryptValue, isCryptoAvailable, isEncrypted } from "@/lib/encryption";
@@ -623,7 +623,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         setShowMemoryUsage(name === "graph" && version >= MEMORY_USAGE_VERSION_THRESHOLD);
       } catch { /* ignore */ }
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, activeConnectionId]);
   useEffect(() => {
     if (status !== "authenticated") {
@@ -707,7 +707,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         if (cancelled || !result.ok) return;
 
         const json = await result.json();
-        
+
         if (cancelled) return;
 
         if (json?.connections) {
@@ -885,7 +885,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         setSelectedUdf(prev => prev ?? udfData.result[0]);
       }
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, activeConnectionId]);
 
   const onPanelResize = useCallback((size: PanelSize) => {
@@ -949,7 +949,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     await Promise.all(([["Graph", setGraphNames, setGraphName],/* ["Schema", setSchemaNames, setSchemaName] */] as ["Graph" | "Schema", Dispatch<SetStateAction<string[]>>, Dispatch<SetStateAction<string>>][]).map(async ([type, setOptions, setName]) => {
       await fetchOptions(type, toast, setIndicator, indicator, setName, setOptions, contentPersistence);
     }));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast, contentPersistence, tutorialOpen]);
 
   useEffect(() => {
@@ -1110,78 +1110,78 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                   <PanelContext.Provider value={panelContext}>
                     <QueryLoadingContext.Provider value={queryLoadingContext}>
                       <SyntaxErrorContext.Provider value={syntaxErrorContext}>
-                      <ForceGraphContext.Provider value={forceGraphContext}>
-                        <TableViewContext.Provider value={tableViewContext}>
-                          <ConnectionContext.Provider value={connectionContext}>
-                            <UDFContext.Provider value={udfContext}>
-                              {
-                                pathname === "/graph" &&
-                                <Tutorial
-                                  open={tutorialOpen}
-                                  onClose={handleCloseTutorial}
-                                  onLoadDemoGraphs={handleLoadDemoGraphs}
-                                  onCleanupDemoGraphs={handleCleanupDemoGraphs}
-                                />
-                              }
-                              {
-                                showNavbarAndHeader &&
-                                <Header />
-                              }
-                              <div className="basis-0 grow min-h-0 flex">
+                        <ForceGraphContext.Provider value={forceGraphContext}>
+                          <TableViewContext.Provider value={tableViewContext}>
+                            <ConnectionContext.Provider value={connectionContext}>
+                              <UDFContext.Provider value={udfContext}>
                                 {
-                                  showNavbarAndHeader &&
-                                  <Navbar
-                                    showUDF={showUDF}
+                                  pathname === "/graph" &&
+                                  <Tutorial
+                                    open={tutorialOpen}
+                                    onClose={handleCloseTutorial}
+                                    onLoadDemoGraphs={handleLoadDemoGraphs}
+                                    onCleanupDemoGraphs={handleCleanupDemoGraphs}
                                   />
                                 }
-                                <ResizablePanelGroup orientation="horizontal" className="w-1 grow">
-                                  <ResizablePanel
-                                    panelRef={panelRef}
-                                    defaultSize="0%"
-                                    collapsible={pathname !== "/udf"}
-                                    minSize="15%"
-                                    maxSize="30%"
-                                    onResize={onPanelResize}
-                                    data-testid="graphInfoPanel"
-                                  >
-                                    {
-                                      pathname === "/udf" ?
-                                        <UdfPanel />
-                                        : pathname === "/graph" &&
-                                        <GraphInfoPanel
-                                          onClose={onExpand}
-                                          customizingLabel={customizingLabel}
-                                          setCustomizingLabel={setCustomizingLabel}
-                                        />
-                                    }
-                                  </ResizablePanel>
-                                  <ResizableHandle
-                                    withHandle
-                                    onMouseUp={() => isCollapsed && onExpand()}
-                                    className={cn("bg-border", isCollapsed && "hidden")}
-                                    disabled={isCollapsed}
-                                  />
-                                  <ResizablePanel
-                                    defaultSize="100%"
-                                    minSize="70%"
-                                    maxSize="100%"
-                                  >
-                                    {
-                                      (pathname === "/graph" || pathname === "/schema") ?
-                                        <div className="h-full w-full flex flex-col">
-                                          {children}
-                                          <div className="h-4 w-full Gradient" />
-                                        </div>
-                                        :
-                                        children
-                                    }
-                                  </ResizablePanel>
-                                </ResizablePanelGroup>
-                              </div>
-                            </UDFContext.Provider>
-                          </ConnectionContext.Provider>
-                        </TableViewContext.Provider>
-                      </ForceGraphContext.Provider>
+                                {
+                                  showNavbarAndHeader &&
+                                  <Header />
+                                }
+                                <div className="basis-0 grow min-h-0 flex">
+                                  {
+                                    showNavbarAndHeader &&
+                                    <Navbar
+                                      showUDF={showUDF}
+                                    />
+                                  }
+                                  <ResizablePanelGroup orientation="horizontal" className="w-1 grow">
+                                    <ResizablePanel
+                                      panelRef={panelRef}
+                                      defaultSize="0%"
+                                      collapsible={pathname !== "/udf"}
+                                      minSize="15%"
+                                      maxSize="30%"
+                                      onResize={onPanelResize}
+                                      data-testid="graphInfoPanel"
+                                    >
+                                      {
+                                        pathname === "/udf" ?
+                                          <UdfPanel />
+                                          : pathname === "/graph" &&
+                                          <GraphInfoPanel
+                                            onClose={onExpand}
+                                            customizingLabel={customizingLabel}
+                                            setCustomizingLabel={setCustomizingLabel}
+                                          />
+                                      }
+                                    </ResizablePanel>
+                                    <ResizableHandle
+                                      withHandle
+                                      onMouseUp={() => isCollapsed && onExpand()}
+                                      className={cn("bg-border", isCollapsed && "hidden")}
+                                      disabled={isCollapsed}
+                                    />
+                                    <ResizablePanel
+                                      defaultSize="100%"
+                                      minSize="70%"
+                                      maxSize="100%"
+                                    >
+                                      {
+                                        (pathname === "/graph" || pathname === "/schema") ?
+                                          <div className="h-full w-full flex flex-col">
+                                            {children}
+                                            <div className="h-4 w-full Gradient" />
+                                          </div>
+                                          :
+                                          children
+                                      }
+                                    </ResizablePanel>
+                                  </ResizablePanelGroup>
+                                </div>
+                              </UDFContext.Provider>
+                            </ConnectionContext.Provider>
+                          </TableViewContext.Provider>
+                        </ForceGraphContext.Provider>
                       </SyntaxErrorContext.Provider>
                     </QueryLoadingContext.Provider>
                   </PanelContext.Provider>
@@ -1198,7 +1198,9 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 export default function NextAuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
-      <ProvidersWithSession>{children}</ProvidersWithSession>
+      <Suspense fallback={null}>
+        <ProvidersWithSession>{children}</ProvidersWithSession>
+      </Suspense>
     </SessionProvider>
   );
 }

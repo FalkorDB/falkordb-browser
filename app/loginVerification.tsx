@@ -2,9 +2,9 @@
 
 import { useSession } from "next-auth/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect } from "react";
+import { useEffect } from "react";
 
-function LoginVerificationInner({ children }: { children: React.ReactNode }) {
+export default function LoginVerification({ children }: { children: React.ReactNode }) {
 
     const router = useRouter();
     const { status, data } = useSession();
@@ -37,12 +37,4 @@ function LoginVerificationInner({ children }: { children: React.ReactNode }) {
     }, [status, url, router, searchParams, data?.user]);
 
     return children;
-}
-
-export default function LoginVerification({ children }: { children: React.ReactNode }) {
-    return (
-        <Suspense>
-            <LoginVerificationInner>{children}</LoginVerificationInner>
-        </Suspense>
-    );
 }
