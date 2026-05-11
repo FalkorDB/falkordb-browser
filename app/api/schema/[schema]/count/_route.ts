@@ -51,7 +51,7 @@ export async function GET(
       writer.write(
         encoder.encode(
           `event: error\ndata: ${JSON.stringify({
-            message: "Internal server error",
+            message: (error as Error).message || "Internal server error",
             status: 400,
           })}\n\n`
         )

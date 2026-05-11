@@ -58,7 +58,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ lib:
         } catch (error) {
             console.error(error);
             return NextResponse.json(
-                { message: "Internal server error" },
+                { message: (error as Error).message },
                 { status: 400, headers: getCorsHeaders(request) }
             );
         }
@@ -149,7 +149,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ lib
         catch (error) {
             console.error(error);
             return NextResponse.json(
-                { message: "Internal server error" },
+                { message: (error as Error).message },
                 { status: 400, headers: getCorsHeaders(request) }
             );
         }
@@ -189,7 +189,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ l
         catch (error) {
             console.error(error);
             return NextResponse.json(
-                { message: "Internal server error" },
+                { message: (error as Error).message },
                 { status: 400, headers: getCorsHeaders(request) }
             );
         }

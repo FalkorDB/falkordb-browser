@@ -59,7 +59,10 @@ export async function POST(request: NextRequest) {
       const decrypted = decrypt(value);
       return NextResponse.json({ value: decrypted }, { status: 200, headers: corsHeaders });
     } catch {
-      return NextResponse.json({ value: "" }, { status: 200, headers: corsHeaders });
+      return NextResponse.json(
+        { error: "Decryption failed" },
+        { status: 400, headers: corsHeaders }
+      );
     }
   } catch (err) {
     console.error(err);

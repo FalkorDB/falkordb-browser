@@ -43,7 +43,7 @@ export async function GET(
     } catch (error) {
       console.error(error);
       return NextResponse.json(
-        { message: "Internal server error" },
+        { message: (error as Error).message },
         { status: 400 }
       );
     }
@@ -83,7 +83,7 @@ export async function POST(
     } catch (error) {
       console.error(error);
       return NextResponse.json(
-        { message: "Internal server error" },
+        { message: (error as Error).message },
         { status: 400 }
       );
     }
@@ -124,7 +124,7 @@ export async function DELETE(
     } catch (error) {
       console.error(error);
       return NextResponse.json(
-        { message: "Internal server error" },
+        { message: (error as Error).message },
         { status: 400 }
       );
     }
@@ -178,7 +178,7 @@ export async function PATCH(
     } catch (err: unknown) {
       console.error(err);
       return NextResponse.json(
-        { message: "Internal server error" },
+        { message: (error as Error).message },
         { status: 400 }
       );
     }

@@ -65,7 +65,7 @@ export async function POST(
     } catch (error) {
       console.error(error);
       return NextResponse.json(
-        { message: "Internal server error" },
+        { message: (error as Error).message },
         { status: 400, headers: getCorsHeaders(request) }
       );
     }
@@ -133,7 +133,7 @@ export async function DELETE(
     } catch (error) {
       console.error(error);
       return NextResponse.json(
-        { message: "Internal server error" },
+        { message: (error as Error).message },
         { status: 400, headers: getCorsHeaders(request) }
       );
     }

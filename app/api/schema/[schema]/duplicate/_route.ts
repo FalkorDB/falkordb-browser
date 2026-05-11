@@ -39,7 +39,7 @@ export async function PATCH(
     } catch (error) {
       console.error(error);
       return NextResponse.json(
-        { message: "Internal server error" },
+        { message: (error as Error).message },
         { status: 400 }
       );
     }
