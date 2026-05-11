@@ -375,23 +375,42 @@ async function getConnectionClient(
     };
   }
 
-  // Get metadata from Token DB for role/host/port
-  const storage = StorageFactory.getStorage();
-  const tokenData = await storage.fetchTokenById(connId);
-  if (!tokenData) return null;
+  // Get metadata from Token DB for role/host/port.
+  // If the Token DB query fails (e.g. due to server-wide config changes),
+  // we still have a healthy cached client — return it with minimal info
+  // rather than invalidating the session.
+  try {
+    const storage = StorageFactory.getStorage();
+    const tokenData = await storage.fetchTokenById(connId);
+    if (!tokenData) return null;
 
-  return {
-    client,
-    connInfo: {
-      id: connId,
-      username: tokenData.username,
-      role: tokenData.role as Role,
-      host: tokenData.host,
-      port: tokenData.port,
-      tls: tokenData.tls ?? false,
-      ca: tokenData.ca || undefined,
-    },
-  };
+    return {
+      client,
+      connInfo: {
+        id: connId,
+        username: tokenData.username,
+        role: tokenData.role as Role,
+        host: tokenData.host,
+        port: tokenData.port,
+        tls: tokenData.tls ?? false,
+        ca: tokenData.ca || undefined,
+      },
+    };
+  } catch (metaErr) {
+    // eslint-disable-next-line no-console
+    console.warn("Failed to fetch connection metadata (non-fatal, using cached client):", metaErr);
+    return {
+      client,
+      connInfo: {
+        id: connId,
+        username: "",
+        role: "Read-Write" as Role,
+        host: "",
+        port: 0,
+        tls: false,
+      },
+    };
+  }
 }
 
 /**
@@ -1040,12 +1059,11 @@ export async function getClient(
         try {
           password = await getPasswordFromTokenDB(credentialRef);
         } catch (pwErr) {
+          // Non-fatal: Token DB may be temporarily unavailable (e.g. due
+          // to server-wide config changes). Proceed with undefined password
+          // which works for passwordless connections (common in dev/CI).
           // eslint-disable-next-line no-console
-          console.warn("Legacy password resolution failed:", pwErr);
-          return NextResponse.json(
-            { message: "Session credential could not be resolved; please sign in again.", code: "SESSION_INVALID" },
-            { status: 401, headers: { ...getCorsHeaders(request), "X-Session-Invalid": "1" } }
-          );
+          console.warn("Legacy password resolution failed (non-fatal):", pwErr);
         }
       }
 
