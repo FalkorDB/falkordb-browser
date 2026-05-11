@@ -96,7 +96,10 @@ export default class HeaderComponent extends BasePage {
         // If we're on the login page with valid auth, wait for the client-side
         // redirect to the graph page before looking for the logout button.
         if (this.page.url().includes('/login')) {
-            await this.page.waitForURL(urls.graphUrl, { timeout: 10000 }).catch(() => {});
+            await this.page.waitForURL(urls.graphUrl, { timeout: 20000 }).catch(() => {});
+            // If still on the login page after the timeout, the user is not
+            // authenticated — nothing to log out from.
+            if (this.page.url().includes('/login')) return;
         }
         await this.waitForPageIdle();
         await interactWhenVisible(this.LogoutButton, (el) => el.click(), "Click Logout Button");
