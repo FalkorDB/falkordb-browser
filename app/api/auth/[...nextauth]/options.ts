@@ -615,6 +615,10 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
 const SESSION_MAX_AGE_SECONDS = 24 * 60 * 60; // 24 hours; keep in sync with session.maxAge below
 
 const authOptions: NextAuthConfig = {
+  // The app performs its own origin validation (isRequestOriginTrusted),
+  // so we trust the host unconditionally to avoid v5's strict host check
+  // breaking setups where only NEXTAUTH_URL is configured.
+  trustHost: true,
   session: {
     strategy: "jwt",
     maxAge: SESSION_MAX_AGE_SECONDS,
