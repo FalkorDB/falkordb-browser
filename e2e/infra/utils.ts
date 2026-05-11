@@ -172,9 +172,9 @@ export async function getAdminToken(): Promise<
     }
 
     const requiredCookies = [
-      "next-auth.callback-url",
-      "next-auth.csrf-token",
-      "next-auth.session-token",
+      "authjs.callback-url",
+      "authjs.csrf-token",
+      "authjs.session-token",
     ];
     const cookieString = authState.cookies
       .filter((cookie: { name: string }) =>
