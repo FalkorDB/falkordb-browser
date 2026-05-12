@@ -2,7 +2,7 @@
   "name": "falkordb-browser",
   "author": "FalkorDB",
   "description": "FalkorDB Browser",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "private": true,
   "engines": {
     "node": ">=20.19.0"
@@ -79,16 +79,16 @@
     "react-resizable-panels": "^4.11.0",
     "swagger-ui-react": "^5.32.5",
     "swr": "^2.4.1",
-    "tailwind-merge": "^3.5.0",
-    "tailwindcss": "^4.2.3",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^4.3.0",
     "uuid": "^14.0.0",
     "vaul": "^1.1.2",
-    "yaml": "^2.8.4",
+    "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
-    "@tailwindcss/postcss": "^4.2.3",
+    "@tailwindcss/postcss": "^4.3.0",
     "@types/cytoscape-fcose": "^2.2.4",
     "@types/lodash": "^4.17.24",
     "@types/lru-cache": "^7.10.9",

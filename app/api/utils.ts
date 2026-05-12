@@ -86,6 +86,10 @@ function shouldTrustProxyHeaders(): boolean {
     return process.env.TRUST_PROXY_HEADERS === TRUST_PROXY_HEADERS;
 }
 
+function isSameOriginBrowserRequest(request: Request): boolean {
+    return request.headers.get("sec-fetch-site") === "same-origin";
+}
+
 export function isAutoNextAuthUrl(): boolean {
     return process.env.NEXTAUTH_URL === AUTO_NEXTAUTH_URL;
 }
@@ -200,7 +204,7 @@ export function isRequestOriginTrusted(request: Request): boolean {
             && (!callerOrigin || isOriginAllowed(callerOrigin, request));
     }
 
-    return !callerOrigin || callerOrigin === requestOrigin;
+    return !callerOrigin || callerOrigin === requestOrigin || isSameOriginBrowserRequest(request);
 }
 
 export function shouldUseSecureCookies(request: Request): boolean {
@@ -252,7 +256,8 @@ export function getCorsHeaders(request?: Request): Record<string, string> {
         && !headers['Access-Control-Allow-Origin']
         && !process.env.ALLOWED_ORIGINS
         && isAutoNextAuthUrl()
-        && normalizedOrigin === getRequestOrigin(request)
+        && request
+        && (normalizedOrigin === getRequestOrigin(request) || isSameOriginBrowserRequest(request))
     ) {
         headers['Access-Control-Allow-Origin'] = normalizedOrigin;
         headers['Access-Control-Allow-Credentials'] = 'true';
