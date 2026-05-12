@@ -99,7 +99,7 @@
     "@types/swagger-ui-react": "^5.18.0",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.6",
-    "playwright": "^1.59.1",
+    "playwright": "^1.60.0",
     "typescript": "^6.0.3"
   },
   "overrides": {
