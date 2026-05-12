@@ -1098,11 +1098,14 @@ export async function getClient(
       if (!client) {
         // Reconnect using session user credentials
         const { user } = session;
+        // Only pass username when password is present; otherwise omit both
+        // so no AUTH command is sent to passwordless FalkorDB instances.
+        const legacyUsername = password ? (user.username || undefined) : undefined;
         const { client: reconnected, role: reconnectedRole } = await newClient(
           {
             host: user.host,
             port: user.port.toString(),
-            username: user.username,
+            username: legacyUsername,
             password,
             tls: user.tls.toString(),
           },
@@ -1242,11 +1245,14 @@ export async function getClient(
       // Non-fatal: proceed with undefined password (works for passwordless)
     }
 
+    // Only pass username when password is present; otherwise omit both
+    // so no AUTH command is sent to passwordless FalkorDB instances.
+    const reconnectUsername = reconnectPassword ? (session.user.username || undefined) : undefined;
     const { client: reconnected, role: reconnectedRole } = await newClient(
       {
         host: session.user.host,
         port: session.user.port.toString(),
-        username: session.user.username,
+        username: reconnectUsername,
         password: reconnectPassword,
         tls: session.user.tls.toString(),
       },
