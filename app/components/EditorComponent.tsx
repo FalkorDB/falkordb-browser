@@ -9,6 +9,8 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import { useTheme } from "next-themes";
 import { getTheme } from "@/lib/utils";
 
+loader.config({ monaco });
+
 export const LINE_HEIGHT = 22;
 
 export const DEFAULT_MONACO_OPTIONS: monaco.editor.IStandaloneEditorConstructionOptions = {
