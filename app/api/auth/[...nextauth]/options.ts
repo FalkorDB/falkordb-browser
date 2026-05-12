@@ -376,13 +376,28 @@ async function getConnectionClient(
   }
 
   // Get metadata from Token DB for role/host/port.
-  // If the Token DB query fails (e.g. due to server-wide config changes),
-  // we still have a healthy cached client — return it with minimal info
-  // rather than invalidating the session.
+  // If the Token DB query fails or the entry is missing, we still have a
+  // healthy cached client — return it with minimal info rather than
+  // invalidating the session.
   try {
     const storage = StorageFactory.getStorage();
     const tokenData = await storage.fetchTokenById(connId);
-    if (!tokenData) return null;
+    if (!tokenData) {
+      // Entry missing but client is alive — use fallback metadata.
+      // eslint-disable-next-line no-console
+      console.warn("Token DB entry not found for connId (non-fatal, using cached client):", connId);
+      return {
+        client,
+        connInfo: {
+          id: connId,
+          username: "",
+          role: "Read-Write" as Role,
+          host: "",
+          port: 0,
+          tls: false,
+        },
+      };
+    }
 
     return {
       client,
