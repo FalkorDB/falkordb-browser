@@ -360,9 +360,12 @@ export default class ApiCalls {
     roleValue: string
   ): Promise<ModifySettingsRoleResponse> {
     try {
+      const headers = await getAdminToken();
       const result = await postRequest(
         `${urls.api.settingsConfig + roleName}`,
-        { value: roleValue }
+        { value: roleValue },
+        undefined,
+        headers
       );
       return await result.json();
     } catch (error) {
@@ -374,7 +377,8 @@ export default class ApiCalls {
 
   async getSettingsRoleValue(roleName: string): Promise<GetSettingsRoleValue> {
     try {
-      const result = await getRequest(urls.api.settingsConfig + roleName);
+      const headers = await getAdminToken();
+      const result = await getRequest(urls.api.settingsConfig + roleName, headers);
       return await result.json();
     } catch (error) {
       throw new Error(
