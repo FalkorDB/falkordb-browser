@@ -970,6 +970,27 @@ export async function getSessionFromRequest(
   };
 }
 
+/**
+ * Per-key mutex for connection resolution.
+ * Ensures only one request at a time can resolve/reconnect a given connection key.
+ * Subsequent requests for the same key wait for the first to finish, then reuse the result.
+ */
+const connectionLocks = new Map<string, Promise<unknown>>();
+
+async function withConnectionLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  // Wait for any in-flight operation on this key
+  while (connectionLocks.has(key)) {
+    try { await connectionLocks.get(key); } catch { /* ignore — we'll run our own attempt */ }
+  }
+  const promise = fn();
+  connectionLocks.set(key, promise);
+  try {
+    return await promise;
+  } finally {
+    connectionLocks.delete(key);
+  }
+}
+
 export async function getClient(
   request: Request
 ): Promise<
@@ -1043,6 +1064,7 @@ export async function getClient(
     // Old sessions (before multi-connection) stored the FalkorDB client
     // keyed by session ID and credentials via `credentialRef` in the JWT.
     // Try to reuse the old-style connection so users don't get kicked out.
+    return withConnectionLock(id, async () => {
     try {
       const jwt = await getToken({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1171,11 +1193,14 @@ export async function getClient(
         },
       }
     );
+    });
   }
 
   // All connections (including the initial login one) go through the
   // same path: look up the token from the DB, health-check the cached
   // client, and reconnect if necessary.
+  const connKey = sessionConnectionKey(id, connId);
+  return withConnectionLock(connKey, async () => {
   try {
     const connResult = await getConnectionClient(id, connId);
     if (connResult) {
@@ -1310,6 +1335,7 @@ export async function getClient(
       },
     }
   );
+  });
 }
 
 export default authOptions;
