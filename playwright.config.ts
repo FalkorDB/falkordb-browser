@@ -57,7 +57,9 @@ export default defineConfig({
       testMatch: /.*cluster\.spec\.ts$/,
     },
     
-    // Regular projects for sharding (exclude TLS and settings)
+    // Regular projects for sharding (exclude TLS, settings, and tests that
+    // call Logout() — those destroy shared Token DB entries and break other
+    // parallel tests using the same admin session).
     {
       name: '[Admin] Chromium',
       use: { 

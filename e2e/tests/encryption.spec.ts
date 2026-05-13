@@ -30,7 +30,7 @@ test.describe(`@admin Encryption migration tests`, () => {
 
     test(`plain text secretKey is migrated to server-side encryption on page load`, async () => {
         const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-        await login.Logout();
+        await login.disconnectConnection();
         await browser.setPageToFullScreen();
 
         const page = await browser.getPage();
@@ -56,7 +56,7 @@ test.describe(`@admin Encryption migration tests`, () => {
 
     test(`legacy enc: prefixed secretKey is detected on page load`, async () => {
         const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-        await login.Logout();
+        await login.disconnectConnection();
         await browser.setPageToFullScreen();
 
         const page = await browser.getPage();
@@ -83,7 +83,7 @@ test.describe(`@admin Encryption migration tests`, () => {
 
     test(`legacy enc: prefixed secretKey with old key present triggers migration`, async () => {
         const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-        await login.Logout();
+        await login.disconnectConnection();
         await browser.setPageToFullScreen();
 
         const page = await browser.getPage();
@@ -145,7 +145,7 @@ test.describe(`@admin Encryption migration tests`, () => {
 
     test(`already server-encrypted secretKey survives page reload`, async () => {
         const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-        await login.Logout();
+        await login.disconnectConnection();
         await browser.setPageToFullScreen();
 
         const page = await browser.getPage();
@@ -174,7 +174,7 @@ test.describe(`@admin Encryption migration tests`, () => {
 
     test(`empty secretKey remains empty after page load`, async () => {
         const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-        await login.Logout();
+        await login.disconnectConnection();
         await browser.setPageToFullScreen();
 
         const page = await browser.getPage();
@@ -194,7 +194,7 @@ test.describe(`@admin Encryption migration tests`, () => {
 
     test(`server-encrypted value can be decrypted through the /api/encrypt endpoint`, async () => {
         const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-        await login.Logout();
+        await login.disconnectConnection();
         await browser.setPageToFullScreen();
 
         const page = await browser.getPage();
@@ -241,7 +241,7 @@ test.describe(`@admin Encryption migration tests`, () => {
 
     test(`/api/encrypt rejects unauthenticated requests`, async () => {
         const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-        await login.Logout();
+        await login.disconnectConnection();
         await browser.setPageToFullScreen();
 
         const page = await browser.getPage();

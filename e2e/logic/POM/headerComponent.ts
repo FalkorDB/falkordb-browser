@@ -106,6 +106,20 @@ export default class HeaderComponent extends BasePage {
         await waitForURL(this.page, urls.loginUrl);
     }
 
+    /**
+     * Clears the session cookie from the browser without triggering the
+     * server-side signOut event. This leaves Token DB entries intact so
+     * parallel tests sharing the same session are not affected.
+     * Use this when you need to reach the login page without destroying
+     * the server-side session state.
+     */
+    async disconnectConnection(): Promise<void> {
+        const context = this.page.context();
+        await context.clearCookies();
+        await this.page.goto(urls.loginUrl);
+        await this.page.waitForLoadState('networkidle');
+    }
+
     async getFalkorDBLogoHref(): Promise<string | null> {
         await this.waitForPageIdle();
         return await this.falkorDBLogo.getAttribute('href');
