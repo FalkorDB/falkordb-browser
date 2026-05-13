@@ -178,6 +178,25 @@ export default defineConfig({
       testMatch: /.*(settingsConfig|settingsUsers)\.spec\.ts$/,
     },
 
+    // Smoke tests (run separately against the dockers - browser + core).
+    // Self-contained: no setup dependency, no stored auth state.
+    {
+      name: '[Smoke] - Chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+      grep: /@smoke/,
+      testMatch: /.*smoke\.spec\.ts$/,
+    },
+    {
+      name: '[Smoke] - Firefox',
+      use: {
+        ...devices['Desktop Firefox'],
+      },
+      grep: /@smoke/,
+      testMatch: /.*smoke\.spec\.ts$/,
+    },
+
     // TLS tests (run separately)
     {
       name: '[TLS - Chromium]',
