@@ -21,7 +21,7 @@ interface BaseProps<T = "Schema" | "Graph"> {
     options: string[]
     setOptions: Dispatch<SetStateAction<string[]>>
     graphName: string
-    setGraphName: Dispatch<SetStateAction<string>>
+    setGraphName: (value: string) => void
     setGraph: Dispatch<SetStateAction<Graph>>
     chatOpen?: boolean
     setChatOpen?: Dispatch<SetStateAction<boolean>>
@@ -186,7 +186,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                         }
                                     }}
                                 >
-                                    <QueryHistoryPanel onClose={() => setQueriesOpen?.(false)} />
+                                    <QueryHistoryPanel graphName={graphName} onClose={() => setQueriesOpen?.(false)} />
                                 </PopoverContent>
                             </Popover>
                             {

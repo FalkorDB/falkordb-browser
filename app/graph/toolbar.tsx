@@ -13,7 +13,7 @@ interface Props {
     graph: Graph
     graphName: string
     selectedElements: (Node | Link)[]
-    setSelectedElements: (elements: (Node | Link)[]) => void
+    setSelectedElements: (elements: (Node | Link)[], fromSearch?: boolean) => void
     handleDeleteElement: () => Promise<void>
     canvasRef: GraphRef
     label: "Graph" | "Schema"
@@ -44,7 +44,7 @@ export default function Toolbar({
     isAddNode,
     setExpand,
     expand,
-    isLoadingSchema
+    isLoadingSchema,
 }: Props) {
 
     const { isLoading: isLoadingGraph } = useContext(GraphContext);
@@ -112,7 +112,7 @@ export default function Toolbar({
 
     const handleSearchElement = (element: Node | Link) => {
         canvasRef.current?.zoomToFit(4, (node) => "labels" in element ? element.id === node.id : node.id === element.source || node.id === element.target);
-        setSelectedElements([element]);
+        setSelectedElements([element], true);
         setSearchElement("");
         setSuggestions([]);
     };

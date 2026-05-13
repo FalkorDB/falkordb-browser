@@ -23,7 +23,7 @@ function escapeIdentifier(id: string): string {
  * @returns The Graph Info panel React element containing graph name, memory usage, node/edge counts, property keys, and query buttons
  */
 export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizingLabel }: { onClose: () => void, customizingLabel: InfoLabel | null, setCustomizingLabel: Dispatch<SetStateAction<InfoLabel | null>> }) {
-    const { graphInfo: { Labels, Relationships, PropertyKeys, MemoryUsage }, nodesCount, edgesCount, runQuery, graphName, setGraphName, graphNames, setGraphNames, setGraph } = useContext(GraphContext);
+    const { graphInfo: { Labels, Relationships, PropertyKeys, MemoryUsage }, nodesCount, edgesCount, runQuery, graphName, handleSetGraphName, graphNames, setGraphNames, setGraph } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
     const { settings: { graphInfo: { showMemoryUsage, maxItemsForSearch } } } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
@@ -57,7 +57,10 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                 options={graphNames}
                                 setOptions={(opts) => setGraphNames(opts as unknown as string[])}
                                 selectedValue={graphName}
-                                setSelectedValue={(name) => setGraphName(formatName(name))}
+                                setSelectedValue={(name) => {
+                                    handleSetGraphName(formatName(name));
+
+                                }}
                                 type="Graph"
                                 setGraph={(g) => setGraph(g as Graph)}
                             />
@@ -67,7 +70,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                     type="Graph"
                                     graphNames={graphNames}
                                     onSetGraphName={(newGraphName) => {
-                                        setGraphName(formatName(newGraphName));
+                                        handleSetGraphName(formatName(newGraphName));
                                         setGraphNames(prev => [...prev, formatName(newGraphName)]);
                                     }}
                                     trigger={
@@ -253,12 +256,12 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                             <Button
                                                 title={`MATCH p=()-[:${escapeIdentifier(relationship.name)}]-() RETURN p
                                                     #: ${relationship.count.toLocaleString()}`}
-                                                className="h-6 max-w-full px-2 rounded-md flex items-center gap-1.5 bg-secondary text-foreground text-xs hover:bg-secondary/80 transition-colors overflow-hidden"
+                                                className="h-6 max-w-full px-2 rounded-md flex items-center gap-1.5 bg-secondary text-foreground text-xs hover:bg-secondary/80 transition-colors overflow-hidden border-l-4"
+                                                style={{ borderColor: relationshipColor }}
                                                 data-testid={`graphInfo${relationship.name}Edge`}
                                                 onClick={() => runQuery(`MATCH p=()-[:${escapeIdentifier(relationship.name)}]-() RETURN p`)}
                                                 disabled={isQueryLoading}
                                             >
-                                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: relationshipColor }} />
                                                 <span className="truncate">{relationship.name}</span>
                                             </Button>
                                         </li>
