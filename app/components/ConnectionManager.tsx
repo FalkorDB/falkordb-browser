@@ -57,6 +57,8 @@ export default function ConnectionManager() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<SessionConnection | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   // Form state for add-connection dialog
   const [host, setHost] = useState("");
@@ -96,22 +98,34 @@ export default function ConnectionManager() {
     setActiveConnectionId(connId);
   }, [setActiveConnectionId, updateSession]);
 
-  const handleRemove = useCallback(async (e: React.MouseEvent, connId: string) => {
+  // Determine whether the user only has one connection. The session always
+  // has at least one (the primary), so we treat an empty additionalConnections
+  // list as a single connection.
+  const isLastConnection = (additionalConnections.length > 0 ? additionalConnections.length : 1) <= 1;
+
+  const handleRemove = useCallback((e: React.MouseEvent, conn: SessionConnection) => {
     e.stopPropagation();
     e.preventDefault();
+    // Open the confirmation dialog. The actual removal/sign-out happens in
+    // confirmRemove() so the user is always asked first — this avoids the
+    // surprise of accidentally killing their last connection (which performs
+    // a full browser sign-out and tears down all session state).
+    setRemoveTarget(conn);
+  }, []);
 
-    // If this is the last connection, sign out instead.
-    // Use additionalConnections.length when populated; otherwise fall back to
-    // a count of 1 (the session always has at least one connection).
-    const totalConns = additionalConnections.length > 0
-      ? additionalConnections.length
-      : 1;
-    if (totalConns <= 1) {
-      await signOut({ callbackUrl: "/login" });
-      return;
-    }
+  const confirmRemove = useCallback(async () => {
+    if (!removeTarget) return;
+    const conn = removeTarget;
+    const connId = conn.id;
 
+    setRemoving(true);
     try {
+      // If this is the last connection, sign out instead.
+      if (isLastConnection) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+
       const result = await securedFetch(`/api/connections/${encodeURIComponent(connId)}`, {
         method: "DELETE",
       }, toast, setIndicator);
@@ -130,11 +144,14 @@ export default function ConnectionManager() {
           return remaining;
         });
         toast({ title: "Connection removed" });
+        setRemoveTarget(null);
       }
     } catch {
       toast({ title: "Failed to remove connection", variant: "destructive" });
+    } finally {
+      setRemoving(false);
     }
-  }, [toast, setAdditionalConnections, activeConnectionId, setActiveConnectionId, setIndicator, additionalConnections.length, updateSession]);
+  }, [removeTarget, isLastConnection, toast, setAdditionalConnections, activeConnectionId, setActiveConnectionId, setIndicator, updateSession]);
 
   const handleAdd = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -282,8 +299,10 @@ export default function ConnectionManager() {
               <button
                 type="button"
                 className="p-1 rounded hover:bg-destructive/10 transition-colors shrink-0"
-                onClick={(e) => handleRemove(e, conn.id)}
-                aria-label={`Remove ${conn.username}`}
+                onClick={(e) => handleRemove(e, conn)}
+                aria-label={`Sign out of connection ${getConnectionLabel(conn)}`}
+                title={`Sign out of this connection (${getConnectionLabel(conn)})`}
+                data-testid={`connection-logout-${conn.id}`}
               >
                 <LogOut size={12} className="text-destructive" />
               </button>
@@ -364,6 +383,45 @@ export default function ConnectionManager() {
           </FormComponent>
         </DialogContent>
       </Dialog>
+
+      {/* Confirm per-connection sign-out dialog */}
+      {removeTarget && (() => {
+        const isLast = isLastConnection;
+        const label = getConnectionLabel(removeTarget);
+        return (
+          <Dialog
+            open
+            onOpenChange={(open) => { if (!open && !removing) setRemoveTarget(null); }}
+          >
+            <DialogContent className="max-w-md" data-testid="connectionLogoutDialog">
+              <DialogHeader>
+                <DialogTitle>{isLast ? "Sign out of FalkorDB Browser?" : "Sign out of this connection?"}</DialogTitle>
+                <DialogDescription>
+                  {isLast
+                    ? `${label} is your only connection. Signing out of it will close all session state and sign you out of FalkorDB Browser. You will need to log in again to reconnect.`
+                    : `This will close the connection to ${label} and remove it from your session. Your other connections will remain active.`}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex justify-end gap-2">
+                <Button
+                  data-testid="connectionLogoutCancel"
+                  variant="Cancel"
+                  label="Cancel"
+                  disabled={removing}
+                  onClick={() => setRemoveTarget(null)}
+                />
+                <Button
+                  data-testid="connectionLogoutConfirm"
+                  variant="Delete"
+                  label={isLast ? "Sign Out" : "Sign Out of Connection"}
+                  onClick={confirmRemove}
+                  isLoading={removing}
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </>
   );
 }

@@ -44,6 +44,10 @@ export default class HeaderComponent extends BasePage {
         return this.page.getByTestId("logoutButton")
     }
 
+    private get LogoutConfirmButton(): Locator {
+        return this.page.getByTestId("logoutConfirm")
+    }
+
     private get aboutPopUp(): Locator {
         return this.page.locator('//div[@id="about"]');
     }
@@ -95,6 +99,7 @@ export default class HeaderComponent extends BasePage {
     async Logout(): Promise<void> {
         await this.waitForPageIdle();
         await interactWhenVisible(this.LogoutButton, (el) => el.click(), "Click Logout Button");
+        await interactWhenVisible(this.LogoutConfirmButton, (el) => el.click(), "Confirm Logout");
         await waitForURL(this.page, urls.loginUrl);
     }
 
