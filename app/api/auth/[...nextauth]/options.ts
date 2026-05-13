@@ -992,10 +992,28 @@ export async function getSessionFromRequest(
  */
 const connectionLocks = new Map<string, Promise<unknown>>();
 
+/** Maximum time (ms) to wait for an in-flight lock before giving up and proceeding. */
+const LOCK_WAIT_TIMEOUT_MS = 10_000;
+
 async function withConnectionLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
-  // Wait for any in-flight operation on this key
+  // Wait for any in-flight operation on this key, but with a timeout to
+  // prevent indefinite hangs (e.g. if a previous request was aborted
+  // mid-flight and the promise never settled).
+  const deadline = Date.now() + LOCK_WAIT_TIMEOUT_MS;
   while (connectionLocks.has(key)) {
-    try { await connectionLocks.get(key); } catch { /* ignore — we'll run our own attempt */ }
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) {
+      // eslint-disable-next-line no-console
+      console.warn("Connection lock wait timed out for key:", key, "— proceeding without lock");
+      connectionLocks.delete(key);
+      break;
+    }
+    try {
+      await Promise.race([
+        connectionLocks.get(key),
+        new Promise((_, reject) => { setTimeout(() => { reject(new Error("lock timeout")); }, remaining); }),
+      ]);
+    } catch { /* ignore — we'll run our own attempt */ }
   }
   const promise = fn();
   connectionLocks.set(key, promise);
@@ -1037,6 +1055,8 @@ export async function getClient(
   const id = session?.user.id;
 
   if (!id) {
+    // eslint-disable-next-line no-console
+    console.warn("getClient: returning 401 — session has no user id");
     return NextResponse.json({ message: "Not authenticated" }, { status: 401, headers: getCorsHeaders(request) });
   }
 
@@ -1198,6 +1218,8 @@ export async function getClient(
       // eslint-disable-next-line no-console
       console.warn("Legacy session fallback failed:", legacyErr);
     }
+    // eslint-disable-next-line no-console
+    console.warn("getClient: returning SESSION_INVALID (legacy path) for session:", id);
     return NextResponse.json(
       { message: "No active connection. Please sign in again.", code: "SESSION_INVALID" },
       {
@@ -1257,6 +1279,8 @@ export async function getClient(
     console.warn("Failed to resolve connection:", connErr);
   }
 
+  // eslint-disable-next-line no-console
+  console.warn("getClient: returning SESSION_INVALID (connId path) for session:", id, "connId:", connId);
   return NextResponse.json(
     { message: "Connection could not be resolved; please sign in again.", code: "SESSION_INVALID" },
     {

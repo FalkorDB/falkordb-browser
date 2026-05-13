@@ -53,6 +53,18 @@ export default class SettingsConfigPage extends BasePage {
     }
 
     async navigateToDBConfigurationTab(): Promise<void> {
+        // Wait for the button to be visible (requires indicator=online and Admin role).
+        // If the page navigated away (e.g. signOut redirect to /login), provide a
+        // diagnostic message instead of timing out silently.
+        try {
+            await this.dbConfigurationTabBtn.waitFor({ state: 'visible', timeout: 15000 });
+        } catch {
+            const url = this.page.url();
+            throw new Error(
+                `"Configure database settings" button did not appear within 15 s. ` +
+                `Current page URL: ${url}`
+            );
+        }
         await this.dbConfigurationTabBtn.click();
     }
 
