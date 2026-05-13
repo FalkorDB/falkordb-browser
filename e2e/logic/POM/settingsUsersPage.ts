@@ -4,7 +4,7 @@ import { interactWhenVisible, waitForElementToBeVisible, waitForTimeOut } from "
 
 export default class SettingsUsersPage extends BasePage {
   private get usersTabBtn(): Locator {
-    return this.page.getByRole("button", { name: "Users" });
+    return this.page.getByTestId("settingsTabUsers");
   }
 
   private get addUserButton(): Locator {
