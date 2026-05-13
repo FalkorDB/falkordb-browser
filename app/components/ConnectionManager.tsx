@@ -395,10 +395,10 @@ export default function ConnectionManager() {
           >
             <DialogContent className="max-w-md" data-testid="connectionLogoutDialog">
               <DialogHeader>
-                <DialogTitle>{isLast ? "Sign out of FalkorDB Browser?" : "Sign out of this connection?"}</DialogTitle>
+                <DialogTitle>{isLast ? "Logout All?" : "Logout from this connection?"}</DialogTitle>
                 <DialogDescription>
                   {isLast
-                    ? `${label} is your only connection. Signing out of it will close all session state and sign you out of FalkorDB Browser. You will need to log in again to reconnect.`
+                    ? `${label} is your only connection. In addition to logging out of it, this will end your FalkorDB Browser session, remove all stored connection credentials from this session, and require you to log in again to reconnect.`
                     : `This will close the connection to ${label} and remove it from your session. Your other connections will remain active.`}
                 </DialogDescription>
               </DialogHeader>
@@ -413,7 +413,7 @@ export default function ConnectionManager() {
                 <Button
                   data-testid="connectionLogoutConfirm"
                   variant="Delete"
-                  label={isLast ? "Sign Out" : "Sign Out of Connection"}
+                  label={isLast ? "Logout All" : "Logout"}
                   onClick={confirmRemove}
                   isLoading={removing}
                 />

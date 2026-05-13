@@ -217,11 +217,11 @@ export default function Navbar({ showUDF }: Props) {
                 <DialogComponent
                     open={logoutDialogOpen}
                     onOpenChange={(open) => { if (!loggingOut) setLogoutDialogOpen(open); }}
-                    title="Sign out of FalkorDB Browser?"
-                    description="This will close all of your active database connections and sign you out of FalkorDB Browser. You will need to log in again to reconnect."
+                    title="Logout All?"
+                    description="In addition to logging out of every connection, this will end your FalkorDB Browser session, remove all stored connection credentials from this session, and require you to log in again to reconnect."
                     trigger={
                         <Button
-                            title="Sign out of FalkorDB Browser (closes all connections)"
+                            title="Logout All"
                             className="text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10"
                             data-testid="logoutButton"
                         >
@@ -233,7 +233,7 @@ export default function Navbar({ showUDF }: Props) {
                         <Button
                             data-testid="logoutConfirm"
                             variant="Delete"
-                            label="Sign Out"
+                            label="Logout All"
                             onClick={handleConfirmLogout}
                             isLoading={loggingOut}
                         />
