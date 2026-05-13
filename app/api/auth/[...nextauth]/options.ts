@@ -53,12 +53,19 @@ interface AuthenticatedUserWithPassword extends AuthenticatedUser {
 /**
  * LRU-based connection cache. Evicts the least-recently-used connection
  * when the max size is reached, and automatically expires idle entries
- * after 30 minutes. Disposed connections are closed gracefully.
+ * after 30 minutes.
+ *
+ * IMPORTANT: `dispose` only auto-closes on `evict` (max-size) and `stale`
+ * (TTL expiry). On `set` (overwrite) and `delete` we skip auto-close
+ * because another in-flight request may still hold a reference to the old
+ * client. Callers that `.delete()` are expected to close the client
+ * themselves when safe.
  */
 const connections = new LRUCache<string, FalkorDB>({
   max: 100,
   ttl: 30 * 60 * 1000, // 30 minutes idle TTL
-  dispose(client) {
+  dispose(client, _key, reason) {
+    if (reason === 'set' || reason === 'delete') return;
     try { client.close(); } catch { /* ignore */ }
   },
 });
@@ -327,8 +334,9 @@ async function getConnectionClient(
       const conn = await client.connection;
       await conn.ping();
     } catch {
+      // Remove from cache but don't close — another request may still
+      // hold a reference. The socket error handler will clean it up.
       connections.delete(key);
-      try { await client.close(); } catch { /* ignore */ }
       client = undefined;
     }
   }
@@ -1141,7 +1149,6 @@ export async function getClient(
           connections.set(legacyKey, client);
         } catch {
           connections.delete(id);
-          try { await client.close(); } catch { /* ignore */ }
           client = undefined;
         }
       }
@@ -1277,9 +1284,11 @@ export async function getClient(
       }
       return { client: cachedClient, user: connUser };
     } catch {
-      // Health check failed — fall through to locked recreation path
+      // Health check failed — fall through to locked recreation path.
+      // Only remove from cache; do NOT close the client here because
+      // another concurrent request may still hold a reference to it.
+      // The underlying socket error handler or GC will clean it up.
       connections.delete(connKey);
-      try { cachedClient.close(); } catch { /* ignore */ }
     }
   }
 
