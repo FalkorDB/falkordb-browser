@@ -44,9 +44,6 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
     const {
         settings: {
-            contentPersistenceSettings: {
-                contentPersistence
-            },
             graphInfo: { showMemoryUsage }
         },
         tutorialOpen
@@ -71,8 +68,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
 
     const getOptions = useCallback(async () =>
-        fetchOptions(type, toast, setIndicator, indicator, setSelectedValue, setOptions, contentPersistence)
-        , [type, toast, setIndicator, indicator, setSelectedValue, setOptions, contentPersistence]);
+        fetchOptions(type, toast, setIndicator, indicator, setSelectedValue, setOptions)
+        , [type, toast, setIndicator, indicator, setSelectedValue, setOptions]);
 
     const loadMemory = useCallback((opt: string) =>
         async () => {

@@ -17,7 +17,7 @@ declare module "next-auth" {
     host: string;
     port: number;
     tls: boolean;
-    url: string;
+    url?: string;
     ca?: string;
     username?: string;
     credentialRef?: string;
