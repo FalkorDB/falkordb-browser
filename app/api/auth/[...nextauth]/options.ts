@@ -1236,16 +1236,59 @@ export async function getClient(
   // All connections (including the initial login one) go through the
   // same path: look up the token from the DB, health-check the cached
   // client, and reconnect if necessary.
+  //
+  // Fast path (no lock): if the connection is already in the cache and
+  // healthy, return it immediately. This avoids serializing every
+  // concurrent request for the same user through the lock, which would
+  // add latency when multiple browser tabs / parallel tests share a
+  // session.
   const connKey = sessionConnectionKey(id, connId);
+  const cachedClient = connections.get(connKey);
+  if (cachedClient) {
+    try {
+      const conn = await cachedClient.connection;
+      await conn.ping();
+      // Cache hit + healthy → return without lock
+      const connUser: AuthenticatedUserWithPassword = {
+        id,
+        username: "",
+        role: "Read-Write" as Role,
+        host: "",
+        port: 0,
+        tls: false,
+        password: undefined,
+      };
+      try {
+        const storage = StorageFactory.getStorage();
+        const tokenData = await storage.fetchTokenById(connId);
+        if (tokenData) {
+          connUser.username = tokenData.username;
+          connUser.role = tokenData.role as Role;
+          connUser.host = tokenData.host;
+          connUser.port = tokenData.port;
+          connUser.tls = tokenData.tls ?? false;
+          if (tokenData.encrypted_password) {
+            const { decrypt } = await import("../encryption");
+            connUser.password = decrypt(tokenData.encrypted_password) || undefined;
+          }
+        }
+      } catch {
+        // Non-fatal: metadata lookup failed but connection works
+      }
+      return { client: cachedClient, user: connUser };
+    } catch {
+      // Health check failed — fall through to locked recreation path
+      connections.delete(connKey);
+      try { cachedClient.close(); } catch { /* ignore */ }
+    }
+  }
+
+  // Slow path (with lock): connection is not in the cache or unhealthy.
+  // Use the lock to prevent multiple simultaneous recreation attempts.
   return withConnectionLock(connKey, async () => {
   try {
     const connResult = await getConnectionClient(id, connId);
     if (connResult) {
-      // Build the user object from connection info; the password is a
-      // nice-to-have (used for PAT issuance and chat URL building) but
-      // the connection itself already works. Resolve it in a separate
-      // try/catch so a transient Token DB error here doesn't kill the
-      // whole request with SESSION_INVALID.
       const connUser: AuthenticatedUserWithPassword = {
         id,
         username: connResult.connInfo.username,
