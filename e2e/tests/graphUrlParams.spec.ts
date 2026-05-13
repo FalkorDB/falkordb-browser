@@ -63,7 +63,8 @@ test.describe("@admin Graph URL params", () => {
 
         const url = graph.getCurrentURL();
         expect(url).toContain("query=");
-        expect(url).toContain(encodeURIComponent(query).replace(/%20/g, "+"));
+        const urlObj = new URL(url);
+        expect(urlObj.searchParams.get("query")).toBe(query);
     });
 
     test("Navigating to ?graph=<name>&query=<cypher> loads graph with query", async () => {

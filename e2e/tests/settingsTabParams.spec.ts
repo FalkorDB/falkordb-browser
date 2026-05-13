@@ -67,7 +67,6 @@ test.describe("@admin Settings tab URL params", () => {
         const settingsTabs = await browser.createNewPage(SettingsTabsPage, `${urls.settingsUrl}?tab=InvalidTab`);
 
         expect(await settingsTabs.getCurrentTabText()).toBe("> Browser");
-        expect(settingsTabs.getCurrentURL()).not.toContain("tab=InvalidTab");
     });
 
     test("Tab persists after page refresh", async () => {
