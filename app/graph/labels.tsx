@@ -6,10 +6,9 @@ interface Props<T extends Label | Relationship> {
     labels: T[],
     onClick: (label: T) => void,
     label: "Relationships" | "Labels",
-    type: "Schema" | "Graph",
 }
 
-export default function Labels<T extends Label | Relationship>({ labels, onClick, label, type }: Props<T>) {
+export default function Labels<T extends Label | Relationship>({ labels, onClick, label }: Props<T>) {
 
     const listRef = useRef<HTMLUListElement>(null);
 
@@ -26,7 +25,7 @@ export default function Labels<T extends Label | Relationship>({ labels, onClick
                         <li key={l.name}>
                             <Button
                                 aria-pressed={l.show}
-                                data-testid={`${type}${label}Button${l.name}`}
+                                data-testid={`Graph${label}Button${l.name}`}
                                 className={cn("w-full text-xs px-1.5 py-0.5 rounded-md hover:bg-secondary/60 transition-colors", l.show ? "opacity-100" : "opacity-40")}
                                 label={l.name}
                                 onClick={() => {

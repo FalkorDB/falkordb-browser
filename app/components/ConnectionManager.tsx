@@ -194,13 +194,9 @@ export default function ConnectionManager() {
     reader.readAsDataURL(acceptedFiles[0]);
   };
 
-  if (!session?.user) return null;
-
   // Use the explicitly active connection, or fall back to the first one while
   // activeConnectionId is still being resolved (e.g. on initial page load).
-  const effectiveActiveId =
-    activeConnectionId ??
-    (session as { activeConnectionId?: string }).activeConnectionId;
+  const effectiveActiveId = activeConnectionId ?? session?.activeConnectionId;
 
   const activeConn =
     additionalConnections.find(c => c.id === effectiveActiveId) ??

@@ -127,10 +127,10 @@ type BrowserSettingsContextType = {
 type GraphContextType = {
   graph: Graph;
   setGraph: Dispatch<SetStateAction<Graph>>;
+  graphName: string;
+  handleSetGraphName: (name: string) => void;
   graphInfo: GraphInfo;
   setGraphInfo: Dispatch<SetStateAction<GraphInfo>>;
-  graphName: string;
-  setGraphName: Dispatch<SetStateAction<string>>;
   graphNames: string[];
   setGraphNames: Dispatch<SetStateAction<string[]>>;
   labels: Label[];
@@ -151,15 +151,9 @@ type GraphContextType = {
   setIsLoading: (loading: boolean) => void;
   expand: boolean;
   setExpand: Dispatch<SetStateAction<boolean>>;
-};
-
-type SchemaContextType = {
-  schema: Graph;
-  setSchema: Dispatch<SetStateAction<Graph>>;
-  schemaName: string;
-  setSchemaName: Dispatch<SetStateAction<string>>;
-  schemaNames: string[];
-  setSchemaNames: Dispatch<SetStateAction<string[]>>;
+  selectedParam: string;
+  setSelectedParam: Dispatch<SetStateAction<string>>;
+  initialQuery: string;
 };
 
 type HistoryQueryContextType = {
@@ -343,10 +337,10 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
 export const GraphContext = createContext<GraphContextType>({
   graph: Graph.empty(),
   setGraph: () => { },
+  graphName: "",
+  handleSetGraphName: () => { },
   graphInfo: GraphInfo.empty(() => { }, () => { }),
   setGraphInfo: () => { },
-  graphName: "",
-  setGraphName: () => { },
   graphNames: [],
   setGraphNames: () => { },
   labels: [],
@@ -367,15 +361,9 @@ export const GraphContext = createContext<GraphContextType>({
   setIsLoading: () => { },
   expand: true,
   setExpand: () => { },
-});
-
-export const SchemaContext = createContext<SchemaContextType>({
-  schema: Graph.empty(),
-  setSchema: () => { },
-  schemaName: "",
-  setSchemaName: () => { },
-  schemaNames: [],
-  setSchemaNames: () => { },
+  selectedParam: "",
+  setSelectedParam: () => { },
+  initialQuery: "",
 });
 
 export const HistoryQueryContext = createContext<HistoryQueryContextType>({

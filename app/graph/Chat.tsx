@@ -1,5 +1,3 @@
-/* eslint-disable no-case-declarations */
-/* eslint-disable react/no-array-index-key */
 import { cn, getTheme, Message, toUserFriendlyMessage } from "@/lib/utils";
 import { memo, useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import MarkdownIt from "markdown-it";
@@ -34,7 +32,7 @@ const MarkdownMessage = memo(function MarkdownMessage({ content }: { content: st
         <div
             data-testid="chatMessageMarkdown"
             className="text-sm markdown-body"
-            // eslint-disable-next-line react/no-danger
+             
             dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
     );
@@ -98,7 +96,7 @@ export default function Chat({ onClose }: Props) {
     const { resolvedTheme } = useTheme();
     const { currentTheme } = getTheme(resolvedTheme);
     const { setIndicator } = useContext(IndicatorContext);
-    const { graphName, runQuery } = useContext(GraphContext);
+    const { runQuery, graphName } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
     const { settings: { chatSettings: { secretKey, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
     // Cypher Only toggle state, persisted per graph
@@ -382,7 +380,6 @@ export default function Chat({ onClose }: Props) {
                             break;
                         }
 
-                        case "Schema":
                         case "CypherResult":
                             break;
 

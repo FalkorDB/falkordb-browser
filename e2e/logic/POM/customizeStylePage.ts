@@ -214,7 +214,7 @@ export default class CustomizeStylePage extends GraphInfoPage {
   }
 
   async getNodeDisplayName(nodeId: number): Promise<string> {
-    const nodes = await this.getNodesScreenPositions("graph");
+    const nodes = await this.getNodesScreenPositions();
     const node = nodes.find((n) => n.id === nodeId);
     if (!node) {
       throw new Error(`Node with id ${nodeId} not found`);

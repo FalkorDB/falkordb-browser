@@ -12,10 +12,6 @@ export default class HeaderComponent extends BasePage {
         return this.page.getByTestId("GraphsButton");
     }
 
-    private get schemaButton(): Locator {
-        return this.page.getByTestId("SchemasButton");
-    }
-
     private get helpButton(): Locator {
         return this.page.getByRole("button", { name: "Help" })
     }
@@ -55,11 +51,6 @@ export default class HeaderComponent extends BasePage {
     async clickOnGraphsButton(): Promise<void> {
         await interactWhenVisible(this.graphsButton, (el) => el.click(), "Click Graphs Button");
         await waitForURL(this.page, urls.graphUrl);
-    }
-
-    async clickOnSchemasButton(): Promise<void> {
-        await interactWhenVisible(this.schemaButton, (el) => el.click(), "Click Schemas Button");
-        await waitForURL(this.page, urls.schemaUrl);
     }
 
     async clickOnHelpBtn(): Promise<void> {

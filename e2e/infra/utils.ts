@@ -218,11 +218,6 @@ export async function interactWhenVisible<T>(
   return action(element);
 }
 
-export function inferLabelFromGraph(graph: string): string {
-  if (graph.toLowerCase().includes("schema")) return "Schema";
-  return "Graph";
-}
-
 export async function pollForElementContent(
   element: Locator,
   elementName: string,
