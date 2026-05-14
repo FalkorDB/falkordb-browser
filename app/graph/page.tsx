@@ -8,7 +8,6 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import { Graph, GraphInfo } from "../api/graph/model";
 import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ForceGraphContext, ConnectionContext } from "../components/provider";
-import { getConnectionItem } from "@/lib/connection-storage";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
 
@@ -45,22 +44,21 @@ const GraphView = dynamicImport(() => import("./GraphView"), {
  */
 export default function Page() {
     const { historyQuery, setHistoryQuery } = useContext(HistoryQueryContext);
-    const { currentTab } = useContext(GraphContext);
     const { setIndicator } = useContext(IndicatorContext);
     const { panel, setPanel } = useContext(PanelContext);
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext);
-    const { setData, canvasRef } = useContext(ForceGraphContext);
+    const { setData, canvasRef, graphData, setViewport } = useContext(ForceGraphContext);
     const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
     const isReadOnlyRef = useRef(isReadOnly);
     isReadOnlyRef.current = isReadOnly;
     const {
         graph,
         setGraph,
+        graphName,
+        handleSetGraphName,
         graphInfo,
         setGraphInfo,
-        graphName,
-        setGraphName,
         graphNames,
         setGraphNames,
         labels,
@@ -71,18 +69,23 @@ export default function Page() {
         fetchCount,
         handleCooldown,
         cooldownTicks,
+        selectedParam,
+        setSelectedParam,
+        isLoading,
+        initialQuery,
+        currentTab,
     } = useContext(GraphContext);
     const {
         settings: {
             runDefaultQuerySettings: { runDefaultQuery },
             defaultQuerySettings: { defaultQuery },
-            contentPersistenceSettings: { contentPersistence },
             graphInfo: { showMemoryUsage, refreshInterval }
         }
     } = useContext(BrowserSettingsContext);
     const { toast } = useToast();
 
     const panelRef = useRef<PanelImperativeHandle>(null);
+    const pendingZoomRef = useRef<((node: any) => boolean) | null>(null);
     // Track the previous graphName to distinguish "graph just changed" re-fires
     // (where runQuery handles the initial fetch) from other dep changes like
     // showMemoryUsage becoming true (where we must fetch immediately).
@@ -94,6 +97,7 @@ export default function Page() {
     const [isCollapsed, setIsCollapsed] = useState(true);
     const [isAddNode, setIsAddNode] = useState(false);
     const [isAddEdge, setIsAddEdge] = useState(false);
+    const initialUrlQueryRef = useRef(initialQuery);
 
     const onPanelResize = useCallback((size: PanelSize) => {
         setIsCollapsed(size.asPercentage === 0);
@@ -125,7 +129,7 @@ export default function Page() {
             const frameId = requestAnimationFrame(() => {
                 currentPanel.resize(getPanelSize());
             });
-            // eslint-disable-next-line consistent-return
+
             return () => cancelAnimationFrame(frameId);
         }
         currentPanel.collapse();
@@ -183,7 +187,7 @@ export default function Page() {
 
             const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
             setGraphInfo(gi);
-            fetchCount();
+            fetchCount(graphName);
         }).catch((error) => {
             toast({
                 title: "Error",
@@ -208,7 +212,7 @@ export default function Page() {
         return () => {
             clearInterval(interval);
         };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [fetchCount, fetchInfo, fetchMetaStats, graphName, refreshInterval, runDefaultQuery, setGraphInfo, setIndicator, showMemoryUsage, toast]);
 
     useEffect(() => {
@@ -220,54 +224,103 @@ export default function Page() {
     useEffect(() => {
         if (!graphInfo) return;
 
-        if (contentPersistence) {
-            const content = getConnectionItem("savedContent");
-
-            if (content) {
-                const { graphName: name, query } = JSON.parse(content);
-
-                if (!graph.Id && !graphName && graphNames.includes(name) && contentPersistence) {
-                    setGraphName(name);
-                    runQuery(query, name);
-                    return;
-                }
+        // Priority 1: URL params (graph + query)
+        const pendingUrlQuery = initialUrlQueryRef.current;
+        if (pendingUrlQuery && graphName) {
+            if (graphName !== graph.Id) {
+                initialUrlQueryRef.current = "";
+                runQuery(pendingUrlQuery, graphName);
             }
+            return;
         }
 
+        // Priority 2: Default query / empty graph
         if (graphName && graphName !== graph.Id) {
             if (runDefaultQuery) {
-                runQuery(defaultQuery, undefined);
+                runQuery(defaultQuery, graphName);
                 return;
             }
 
             setGraph(Graph.empty(graphName));
-            fetchCount();
+            fetchCount(graphName);
         }
 
         setIsQueryLoading(false);
-    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames, setIsQueryLoading, tutorialOpen]);
+    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, setIsQueryLoading, tutorialOpen]);
 
-    const handleSetSelectedElements = useCallback((el: (Node | Link)[] = []) => {
+    const handleSetSelectedElements = useCallback((el: (Node | Link)[] = [], fromSearch?: boolean) => {
         setSelectedElements(el);
 
-        setPanel(prev => {
-            if (el.length !== 0) {
-                return "data";
-            }
+        // Sync selected element to context state
+        if (el.length > 0) {
+            const last = el[el.length - 1];
+            const type = "labels" in last ? "n" : "e";
+            const value = `${type}:${last.id}${fromSearch ? ":s" : ""}`;
+            setSelectedParam(value);
+        } else {
+            setSelectedParam("");
+        }
 
-            return undefined;
-        });
+        setPanel(el.length !== 0 ? "data" : undefined);
 
         if (el.length !== 0) {
             setChatOpen(false);
             setIsAddEdge(false);
             setIsAddNode(false);
         }
-    }, [setPanel, setChatOpen]);
+    }, [setPanel, setChatOpen, setSelectedParam]);
 
+    // Restore selected element from context when graph data loads, otherwise clear selection
     useEffect(() => {
+        if (!graph.Id) return;
+        if (graph.NodesMap.size === 0 && graph.LinksMap.size === 0) return;
+
+        if (selectedParam) {
+            const parts = selectedParam.split(":");
+            const type = parts[0];
+            const id = Number(parts[1]);
+            const isFromSearch = parts[2] === "s";
+
+            if (!Number.isNaN(id)) {
+                let element: Node | Link | undefined;
+                if (type === "n") {
+                    element = graph.NodesMap.get(id);
+                } else if (type === "e") {
+                    element = graph.LinksMap.get(id);
+                }
+
+                if (element) {
+                    setSelectedElements([element]);
+                    setPanel("data");
+                    if (isFromSearch && !pendingZoomRef.current) {
+                        const zoomFilter = (node: any) => "labels" in element! ? element!.id === node.id : node.id === (element as Link).source || node.id === (element as Link).target;
+                        if (graphData) {
+                            // Reroute: canvas restores cached positions, no animation.
+                            // Skip viewport and apply search zoom directly.
+                            setViewport(undefined);
+                            setTimeout(() => canvasRef.current?.zoomToFit(4, zoomFilter), 100);
+                        } else {
+                            // Reload: canvas will run force simulation.
+                            // Defer zoom until animation finishes.
+                            pendingZoomRef.current = zoomFilter;
+                        }
+                    }
+                    return;
+                }
+            }
+        }
+
         handleSetSelectedElements();
-    }, [graph, handleSetSelectedElements]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [graph]);
+
+    // Apply pending zoom once canvas animation finishes (isLoading goes false)
+    useEffect(() => {
+        if (isLoading || !pendingZoomRef.current) return;
+        const filter = pendingZoomRef.current;
+        pendingZoomRef.current = null;
+        canvasRef.current?.zoomToFit(4, filter);
+    }, [isLoading, canvasRef]);
 
     const handleSetIsAdd = useCallback((mainSetter: (isAdd: boolean) => void, setter: (isAdd: boolean) => void) => (isAdd: boolean) => {
         mainSetter(isAdd);
@@ -312,7 +365,7 @@ export default function Page() {
                 }
             }
 
-            fetchCount();
+            fetchCount(graphName);
 
             setSelectedElements([]);
         }
@@ -368,7 +421,7 @@ export default function Page() {
 
         setRelationships(graph.removeLinks(deletedElements.map((element) => element.id)));
         setData({ ...graph.Elements });
-        fetchCount();
+        fetchCount(graphName);
         setSelectedElements([]);
 
         if (panel === "data") handleSetSelectedElements();
@@ -425,7 +478,7 @@ export default function Page() {
             default:
                 return undefined;
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+
     }, [graphName, panel, handleSetSelectedElements, setPanel, isAddNode, selectedElements, handleCreateElement, setLabels, canvasRef]);
 
     return (
@@ -436,7 +489,7 @@ export default function Page() {
                 options={graphNames}
                 setOptions={setGraphNames}
                 graphName={graphName}
-                setGraphName={setGraphName}
+                setGraphName={handleSetGraphName}
                 setGraph={setGraph}
                 runQuery={runQuery}
                 historyQuery={historyQuery}
@@ -495,6 +548,6 @@ export default function Page() {
                     </div>
                 }
             </ResizablePanelGroup>
-        </div >
+        </div>
     );
 }

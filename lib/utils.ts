@@ -549,7 +549,7 @@ export async function securedFetch(
   input: string,
   init: RequestInit,
   toast: ToastFn,
-  setIndicator: (indicator: "online" | "offline") => void
+  setIndicator: (indicator: "online" | "offline") => void,
 ): Promise<Response> {
   // Inject X-Connection-Id header when an additional connection is active.
   // Callers that already set the header explicitly take priority — the global
@@ -860,7 +860,6 @@ export async function fetchOptions(
   indicator: "online" | "offline",
   setSelectedValue: (value: string) => void,
   setOptions: (options: string[]) => void,
-  contentPersistence: boolean
 ) {
   if (indicator === "offline") return;
 
@@ -880,12 +879,7 @@ export async function fetchOptions(
 
   setOptions(opts);
 
-  if (
-    setSelectedValue &&
-    opts.length === 1 &&
-    (!contentPersistence || type === "Graph")
-  )
-    setSelectedValue(formatName(opts[0]));
+  if (opts.length === 1) setSelectedValue(formatName(opts[0]));
 }
 
 export const areCaptionKeysEqual = (left: [string, boolean][], right: [string, boolean][]) =>

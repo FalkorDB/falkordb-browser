@@ -509,7 +509,7 @@ jobs:
             falkordb/falkordb:latest
       - name: Start locally-built browser container
         run: |
-          docker run -d --name falkordb-browser -p 3000:3000 \
+          docker run -d --name falkordb-browser --network=host \
             -e NEXTAUTH_URL=http://localhost:3000/ \
             -e NEXTAUTH_SECRET=SECRET \
             -e ENCRYPTION_KEY="$ENCRYPTION_KEY" \

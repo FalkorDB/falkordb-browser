@@ -1,5 +1,3 @@
-/* eslint-disable no-param-reassign */
-
 'use client';
 
 import { useEffect, Dispatch, SetStateAction, useContext, useCallback, useState } from "react";
@@ -18,7 +16,7 @@ import MetadataView from "./MetadataView";
 
 interface Props {
     selectedElements: (Node | Link)[]
-    setSelectedElements: (elements?: (Node | Link)[]) => void
+    setSelectedElements: (elements?: (Node | Link)[], fromSearch?: boolean) => void
     canvasRef: GraphRef
     handleDeleteElement: () => Promise<void>
     setLabels: Dispatch<SetStateAction<Label[]>>
@@ -53,7 +51,7 @@ function GraphView({
     setIsAddEdge,
     setIsAddNode,
     isAddEdge,
-    isAddNode
+    isAddNode,
 }: Props) {
 
     const { graph, graphName, currentTab, setCurrentTab, isLoading, setIsLoading, expand, setExpand } = useContext(GraphContext);
@@ -79,10 +77,6 @@ function GraphView({
 
         setCurrentTab(defaultChecked);
     }, [graph, graph.getElements().length, graph.Data.length, setCurrentTab]);
-
-    useEffect(() => {
-        setSelectedElements([]);
-    }, [graph.Id, setSelectedElements]);
 
     const onLabelClick = (label: Label) => {
         const canvas = canvasRef.current;
