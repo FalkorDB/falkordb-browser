@@ -3,9 +3,9 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, SyntaxErrorInfo, parseSyntaxError, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal } from "@/lib/utils";
+import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, SyntaxErrorInfo, parseSyntaxError } from "@/lib/utils";
+import { serverEncrypt, serverDecrypt, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
-import { encryptValue, decryptValue, isCryptoAvailable, isEncrypted } from "@/lib/encryption";
 import { usePathname, useRouter } from "next/navigation";
 import { setUrlParam, useGraphParams } from "@/lib/useUrlParams";
 import { useToast } from "@/components/ui/use-toast";
@@ -208,25 +208,15 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       // Only encrypt and save secret key if it has changed
       if (newSecretKey !== secretKey) {
         if (newSecretKey) {
-          // Key has a value - encrypt it
-          if (!isCryptoAvailable()) {
-            toast({
-              title: "Error",
-              description: "Encryption not available in this browser. Cannot save secret key.",
-              variant: "destructive",
-            });
-            return; // Stop saving if crypto not available
-          }
-
           try {
-            const encryptedKey = await encryptValue(newSecretKey);
+            const encryptedKey = await serverEncrypt(newSecretKey);
             if (!encryptedKey) {
               toast({
                 title: "Error",
                 description: "Could not encrypt secret key. Please try again.",
                 variant: "destructive",
               });
-              return; // Stop saving if encryption returns empty string
+              return;
             }
             localStorage.setItem("secretKey", encryptedKey);
           } catch (error) {
@@ -236,7 +226,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
               description: "Could not encrypt secret key. Please try again.",
               variant: "destructive",
             });
-            return; // Stop saving if encryption fails
+            return;
           }
         } else {
           // Key is empty - remove it from storage
@@ -804,36 +794,55 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setRowHeightExpandMultiple(parseInt(localStorage.getItem("rowHeightExpandMultiple") || "3", 10));
       const parsedMaxItems = parseInt(localStorage.getItem("maxItemsForSearch") || "20", 10);
       setMaxItemsForSearch(Number.isFinite(parsedMaxItems) ? Math.min(Math.max(parsedMaxItems, 10), 50) : 20);
-      // Decrypt secret key if encrypted, or migrate plain text keys to encrypted format
+      // Decrypt secret key using server-side decryption, with migration from old client-side encryption
       const storedSecretKey = localStorage.getItem("secretKey") || "";
       if (storedSecretKey) {
-        if (!isCryptoAvailable()) {
-          console.error('Encryption not available - cannot decrypt secret key');
-          setSecretKey('');
-        } else if (isEncrypted(storedSecretKey)) {
-          // Already encrypted - decrypt it
-          const decryptedKey = await decryptValue(storedSecretKey);
-          if (decryptedKey) {
-            setSecretKey(decryptedKey);
-          } else {
-            // Decryption failed (corrupted or key mismatch) - clear it
-            // eslint-disable-next-line no-console
-            console.warn('Clearing corrupted encrypted secret key');
+        if (isLegacyEncrypted(storedSecretKey)) {
+          // Old client-side encrypted value - decrypt with legacy method, then re-encrypt server-side
+          try {
+            const plainKey = await legacyDecrypt(storedSecretKey);
+            if (plainKey) {
+              setSecretKey(plainKey);
+              const newEncrypted = await serverEncrypt(plainKey);
+              if (newEncrypted) {
+                localStorage.setItem("secretKey", newEncrypted);
+              }
+              clearLegacyEncryptionKey();
+            } else {
+              // eslint-disable-next-line no-console
+              console.warn('Could not decrypt legacy secret key, clearing');
+              setSecretKey('');
+              localStorage.removeItem("secretKey");
+              clearLegacyEncryptionKey();
+            }
+          } catch (error) {
+            console.error('Failed to migrate legacy secret key:', error);
             setSecretKey('');
             localStorage.removeItem("secretKey");
           }
         } else {
-          // Plain text key from existing users - migrate to encrypted
+          // Try server-side decryption (new format or plain text)
           try {
-            setSecretKey(storedSecretKey);
-            const encryptedKey = await encryptValue(storedSecretKey);
-            if (encryptedKey) {
-              localStorage.setItem("secretKey", encryptedKey);
+            const decryptedKey = await serverDecrypt(storedSecretKey);
+            if (decryptedKey) {
+              setSecretKey(decryptedKey);
             } else {
-              console.error('Failed to encrypt plain text key');
+              // eslint-disable-next-line no-console
+              console.warn('Clearing corrupted encrypted secret key');
+              setSecretKey('');
+              localStorage.removeItem("secretKey");
             }
-          } catch (error) {
-            console.error('Failed to encrypt plain text key:', error);
+          } catch {
+            // Not server-encrypted - treat as plain text, migrate to server encryption
+            try {
+              setSecretKey(storedSecretKey);
+              const encryptedKey = await serverEncrypt(storedSecretKey);
+              if (encryptedKey) {
+                localStorage.setItem("secretKey", encryptedKey);
+              }
+            } catch (migrateError) {
+              console.error('Failed to migrate plain text key:', migrateError);
+            }
           }
         }
       }
@@ -886,12 +895,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [checkStatus, status]);
 
-
   const handleFetchOptions = useCallback(async () => {
     if (indicator === "offline" || tutorialOpen) return;
 
-    await fetchOptions("Graph", toast, setIndicator, indicator, handleSetGraphName, setGraphNames);
-  }, [indicator, toast]);
+    await fetchOptions(toast, setIndicator, indicator, setGraphName, setGraphNames);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toast, tutorialOpen]);
 
   useEffect(() => {
     if (status !== "authenticated") return;

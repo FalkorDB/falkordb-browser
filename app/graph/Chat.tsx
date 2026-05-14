@@ -380,7 +380,6 @@ export default function Chat({ onClose }: Props) {
                             break;
                         }
 
-                        case "Schema":
                         case "CypherResult":
                             break;
 

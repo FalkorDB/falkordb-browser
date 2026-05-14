@@ -1,6 +1,6 @@
 "use client";
 
-import { SignInResponse, signIn } from "next-auth/react";
+import { SignInOptions, SignInResponse, signIn } from "next-auth/react";
 import { FormEvent, useContext, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
@@ -316,7 +316,7 @@ export default function LoginForm() {
       }
     }
 
-    const params: Record<string, unknown> & { redirect: false } = {
+    const params: SignInOptions<false> = {
       redirect: false,
     };
 
@@ -332,7 +332,7 @@ export default function LoginForm() {
       params.password = password;
     }
 
-    signIn("credentials", params).then((res?: SignInResponse) => {
+    signIn("credentials", params).then((res: SignInResponse) => {
       if (res?.error) {
         setError({
           message: <p className="text-xs text-destructive">Invalid credentials please recheck username and password or your connection settings. Check server logs for more info. {loginMode === "url" ? <span className="text-green-700">[prefix[s]://][[username][:password]@]host[:port]</span> : null}</p>,

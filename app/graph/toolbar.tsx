@@ -16,14 +16,12 @@ interface Props {
     setSelectedElements: (elements: (Node | Link)[], fromSearch?: boolean) => void
     handleDeleteElement: () => Promise<void>
     canvasRef: GraphRef
-    label: "Graph" | "Schema"
     setIsAddNode: (isAddNode: boolean) => void
     setIsAddEdge?: (isAddEdge: boolean) => void
     setExpand: Dispatch<SetStateAction<boolean>>
     expand: boolean
     isAddNode: boolean
     isAddEdge: boolean
-    isLoadingSchema?: boolean
 }
 
 const ITEM_HEIGHT = 48;
@@ -37,14 +35,12 @@ export default function Toolbar({
     setSelectedElements,
     handleDeleteElement,
     canvasRef,
-    label,
     setIsAddNode,
     setIsAddEdge,
     isAddEdge,
     isAddNode,
     setExpand,
     expand,
-    isLoadingSchema,
 }: Props) {
 
     const { isLoading: isLoadingGraph } = useContext(GraphContext);
@@ -64,7 +60,7 @@ export default function Toolbar({
     const [bottomFakeItemHeight, setBottomFakeItemHeight] = useState(0);
     const [visibleSuggestions, setVisibleSuggestions] = useState<(Node | Link)[]>([]);
 
-    const isLoading = isLoadingSchema || isLoadingGraph;
+    const isLoading = isLoadingGraph;
 
     useEffect(() => {
         const newStartIndex = Math.max(0, Math.floor((scrollTop - ((ITEM_HEIGHT + GAP) * ITEMS_PER_PAGE)) / (ITEM_HEIGHT + GAP)));
@@ -131,7 +127,7 @@ export default function Toolbar({
     const stripBackground = `url("data:image/svg+xml,${stripSVG}")`;
 
     return (
-        <div className={cn("w-full flex flex-wrap gap-4 justify-between items-center", label === "Schema" && "h-full")}>
+        <div className={cn("w-full flex flex-wrap gap-4 justify-between items-center")}>
             <div className="flex gap-2 items-center">
 
                 {
@@ -146,12 +142,12 @@ export default function Toolbar({
                         }
                     </Button>
                 }
-                <div className={cn("basis-0 grow relative pointer-events-auto min-w-[10dvw] max-w-[30dvw]", label === "Schema" && "h-full")}>
+                <div className={cn("basis-0 grow relative pointer-events-auto min-w-[10dvw] max-w-[30dvw]")}>
                     {
                         expand && graph.getElements().length > 0 && !isLoading &&
                         <Input
-                            data-testid={`elementCanvasSearch${label}`}
-                            className={cn("w-full text-foreground border border-primary", label === "Schema" && "h-full")}
+                            data-testid="elementCanvasSearchGraph"
+                            className={cn("w-full text-foreground border border-primary")}
                             placeholder="Search for element"
                             value={searchElement}
                             onChange={(e) => setSearchElement(e.target.value)}
@@ -194,7 +190,7 @@ export default function Toolbar({
                         expand && suggestions.length > 0 &&
                         <div tabIndex={-1} onScroll={handleScroll} ref={suggestionRef} className="z-10 max-h-[30dvh] overflow-auto absolute left-0 top-14 w-full border border-border p-2 rounded-lg bg-background">
                             <ul
-                                data-testid={`elementCanvasSuggestionsList${label}`}
+                                data-testid="elementCanvasSuggestionsListGraph"
                                 className="flex flex-col gap-2"
                                 role="listbox"
                                 tabIndex={-1}
@@ -251,7 +247,7 @@ export default function Toolbar({
                                                         <Button
                                                             role="option"
                                                             aria-selected={actualIndex === suggestionIndex}
-                                                            data-testid={`elementCanvasSuggestion${label}${suggestion.data.name || suggestion.id}`}
+                                                            data-testid={`elementCanvasSuggestionGraph${suggestion.data.name || suggestion.id}`}
                                                             className={cn("w-full h-full p-1 rounded-lg flex gap-2", actualIndex === suggestionIndex ? "bg-border" : "bg-secondary")}
                                                             onClick={() => handleSearchElement(suggestion)}
                                                             onMouseEnter={() => setSuggestionIndex(actualIndex)}
@@ -294,12 +290,12 @@ export default function Toolbar({
                     }
                 </div>
             </div>
-            <div data-testid={`elementCanvasToolbarAction${label}`} className={cn("flex flex-row-reverse gap-2 pointer-events-auto", label === "Schema" && "h-full")}>
+            <div data-testid="elementCanvasToolbarActionGraph" className={cn("flex flex-row-reverse gap-2 pointer-events-auto")}>
                 {
                     graphName && !isReadOnly &&
                     <>
                         <Button
-                            data-testid={`elementCanvasAddNode${label}`}
+                            data-testid="elementCanvasAddNodeGraph"
                             className="p-1 bg-background border-green text-green"
                             variant="Secondary"
                             tooltipVariant="Primary"
@@ -312,7 +308,7 @@ export default function Toolbar({
                         {
                             setIsAddEdge &&
                             <Button
-                                data-testid={`elementCanvasAddEdge${label}`}
+                                data-testid="elementCanvasAddEdgeGraph"
                                 className="p-1 bg-background border-green text-green"
                                 variant="Secondary"
                                 tooltipVariant="Primary"
@@ -326,7 +322,6 @@ export default function Toolbar({
                         {
                             selectedElements.length !== 0 &&
                             <DeleteElement
-                                label={label}
                                 description="Are you sure you want to delete this element(s)?"
                                 open={deleteOpen}
                                 setOpen={setDeleteOpen}
@@ -342,5 +337,4 @@ export default function Toolbar({
 
 Toolbar.defaultProps = {
     setIsAddEdge: undefined,
-    isLoadingSchema: false,
 };

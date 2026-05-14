@@ -53,7 +53,29 @@ export default class SettingsConfigPage extends BasePage {
     }
 
     async navigateToDBConfigurationTab(): Promise<void> {
-        await this.dbConfigurationTabBtn.click();
+        // Wait for the button to be visible (requires indicator=online and Admin role).
+        // If the page navigated away (e.g. signOut redirect to /login), retry once —
+        // parallel shards modifying server-wide FalkorDB config can transiently
+        // invalidate the session.
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                await this.dbConfigurationTabBtn.waitFor({ state: 'visible', timeout: 15000 });
+                await this.dbConfigurationTabBtn.click();
+                return;
+            } catch {
+                const url = this.page.url();
+                if (attempt === 0 && url.includes('/login')) {
+                    // Session was transiently lost; reload to re-establish from auth cookies
+                    await this.page.goto(url.replace(/\/login.*/, '/settings'));
+                    await this.page.waitForLoadState('networkidle');
+                    continue;
+                }
+                throw new Error(
+                    `"Configure database settings" button did not appear within 15 s. ` +
+                    `Current page URL: ${url}`
+                );
+            }
+        }
     }
 
     async hoverOnRoleContentValue(role: string): Promise<void> {

@@ -61,13 +61,11 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                     handleSetGraphName(formatName(name));
 
                                 }}
-                                type="Graph"
                                 setGraph={(g) => setGraph(g as Graph)}
                             />
                             {
                                 !isReadOnly &&
                                 <CreateGraph
-                                    type="Graph"
                                     graphNames={graphNames}
                                     onSetGraphName={(newGraphName) => {
                                         handleSetGraphName(formatName(newGraphName));

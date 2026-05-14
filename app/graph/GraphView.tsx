@@ -166,7 +166,6 @@ function GraphView({
                             <Toolbar
                                 graph={graph}
                                 graphName={graphName}
-                                label="Graph"
                                 selectedElements={selectedElements}
                                 setSelectedElements={setSelectedElements}
                                 handleDeleteElement={handleDeleteElement}
@@ -181,9 +180,9 @@ function GraphView({
                             {
                                 expand && (labels.length !== 0 || relationships.length !== 0) &&
                                 <div className={cn("w-fit max-w-[180px] h-1 grow grid gap-1.5", labels.length !== 0 && relationships.length !== 0 ? "grid-rows-[minmax(0,max-content)_max-content_minmax(0,max-content)]" : "grid-rows-[minmax(0,max-content)]")}>
-                                    {labels.length !== 0 && <Labels labels={labels} onClick={onLabelClick} label="Labels" type="Graph" />}
+                                    {labels.length !== 0 && <Labels labels={labels} onClick={onLabelClick} label="Labels" />}
                                     {labels.length !== 0 && relationships.length > 0 && <div className="h-px bg-border/40 rounded-full" />}
-                                    {relationships.length !== 0 && <Labels labels={relationships} onClick={onRelationshipClick} label="Relationships" type="Graph" />}
+                                    {relationships.length !== 0 && <Labels labels={relationships} onClick={onRelationshipClick} label="Relationships" />}
                                 </div>
                             }
                         </>

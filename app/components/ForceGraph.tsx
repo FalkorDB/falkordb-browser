@@ -25,7 +25,6 @@ interface Props {
     isLoading: boolean
     setIsLoading: (loading: boolean) => void
     cooldownTicks: number | undefined
-    type?: "schema" | "graph"
     handleCooldown: (ticks?: number) => void
     viewport?: ViewportState
     setViewport?: Dispatch<SetStateAction<ViewportState>>
@@ -37,7 +36,7 @@ const convertToCanvasData = (graphData: GraphData): Data => ({
         labels,
         color,
         visible,
-        size,
+        size: size,
         data
     })),
     links: graphData.links.map(({ id, relationship, color, visible, source, target, data }) => ({
@@ -64,7 +63,6 @@ export default function ForceGraph({
     setIsLoading,
     cooldownTicks,
     handleCooldown,
-    type = "graph",
     viewport = undefined,
     setViewport = undefined,
 }: Props) {
@@ -95,8 +93,8 @@ export default function ForceGraph({
         if (!canvas || !canvasLoaded) return;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any)[type] = () => canvas.getGraphData();
-    }, [canvasRef, type, canvasLoaded]);
+        (window as any)["graph"] = () => canvas.getGraphData();
+    }, [canvasRef, canvasLoaded]);
 
     // Load saved viewport on mount
     useEffect(() => {
@@ -128,7 +126,7 @@ export default function ForceGraph({
         const canvas = canvasRef.current;
         if (!canvas || !canvasLoaded) return;
 
-        const result = await securedFetch(`/api/${type}/${graph.Id}/${node.id}${isReadOnly ? '?readOnly=true' : ''}`, {
+        const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}${isReadOnly ? '?readOnly=true' : ''}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
@@ -138,7 +136,7 @@ export default function ForceGraph({
         if (result.ok) {
             const json = await result.json();
 
-            const elements = await graph.extend(json.result, false, true, true);
+            const elements = await graph.extend(json.result, true, true);
 
             if (elements.length === 0) {
                 toast({
@@ -181,7 +179,7 @@ export default function ForceGraph({
                 handleCooldown(cooldown);
             }
         }
-    }, [canvasRef, canvasLoaded, type, graph, toast, setIndicator, cooldownTicks, handleCooldown]);
+    }, [canvasRef, canvasLoaded, graph, toast, setIndicator, cooldownTicks, handleCooldown]);
 
     const deleteNeighbors = useCallback((nodes: Node[]) => {
         if (nodes.length === 0) return;

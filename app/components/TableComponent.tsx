@@ -25,8 +25,8 @@ export type HeaderDef = string | { name: string; width?: string };
 interface Props {
     headers: HeaderDef[],
     rows: Row[],
-    label: "Graphs" | "Schemas" | "Configs" | "Users" | "TableView",
-    entityName: "Graph" | "Schema" | "Config" | "User" | "Element",
+    label: "Graphs" | "Configs" | "Users" | "TableView",
+    entityName: "Graph" | "Config" | "User" | "Element",
     itemHeight: number
     itemHeightExpandMultiple?: number
     itemWidth?: number
