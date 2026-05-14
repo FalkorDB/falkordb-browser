@@ -18,6 +18,11 @@ import LoginPage from "../logic/POM/loginPage";
 const HEX_COLON_PATTERN = /^[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+$/;
 
 test.describe(`@admin Encryption migration tests`, () => {
+    // Run serially: each test disconnects + re-authenticates which is resource-heavy;
+    // parallel login attempts under CI load cause navigation timeouts.
+    test.describe.configure({ mode: 'serial' });
+    test.setTimeout(60_000);
+
     let browser: BrowserWrapper;
 
     test.beforeEach(async () => {

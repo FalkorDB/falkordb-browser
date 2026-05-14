@@ -42,7 +42,7 @@ test.describe(`Login tests`, () => {
     invalidInputs.forEach(({ description, host, port, username, password }) => {
         test(`@admin validate user login with wrong credentials: ${description}`, async () => {
             const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-            if (login.getCurrentURL() === urls.graphUrl) await login.disconnectConnection();
+            await login.disconnectConnection();
             await browser.setPageToFullScreen();
             await login.connectWithCredentials(username, password, host, port);
             await new Promise((res) => { setTimeout(res, 500); });
@@ -96,7 +96,7 @@ test.describe(`Login tests`, () => {
     formatErrors.forEach(({ description, url }) => {
         test(`@admin validate URL format error blocks submit: ${description}`, async () => {
             const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-            if (login.getCurrentURL() === urls.graphUrl) await login.disconnectConnection();
+            await login.disconnectConnection();
             await browser.setPageToFullScreen();
             await login.submitUrlWithoutWait(url);
             expect(await login.isFormatErrorVisible()).toBe(true);
@@ -107,7 +107,7 @@ test.describe(`Login tests`, () => {
 
     test(`@admin validate valid URL format does not show format error`, async () => {
         const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-        if (login.getCurrentURL() === urls.graphUrl) await login.disconnectConnection();
+        await login.disconnectConnection();
         await browser.setPageToFullScreen();
         await login.submitUrlWithoutWait('falkor://wronguser:wrongpass@localhost:6379');
         // Format is valid, so format error should NOT appear (credentials error may appear instead)
