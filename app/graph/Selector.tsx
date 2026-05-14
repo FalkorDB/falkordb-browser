@@ -3,7 +3,7 @@
 'use client';
 
 import { useState, useContext, Dispatch, SetStateAction } from "react";
-import { cn, formatName, Node, Link, HistoryQuery } from "@/lib/utils";
+import { cn, formatName, HistoryQuery } from "@/lib/utils";
 import { History, Info, Network, Sparkles } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
