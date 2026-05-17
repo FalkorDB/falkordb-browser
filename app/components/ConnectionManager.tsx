@@ -27,7 +27,7 @@ export default function ConnectionManager() {
   } = useContext(ConnectionContext);
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [removeTarget, setRemoveTarget] = useState<SessionConnection | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<{ conn: SessionConnection; isLast: boolean } | null>(null);
   const [removing, setRemoving] = useState(false);
 
   const handleSelect = useCallback(async (connId: string) => {
@@ -57,18 +57,18 @@ export default function ConnectionManager() {
     // confirmRemove() so the user is always asked first — this avoids the
     // surprise of accidentally killing their last connection (which performs
     // a full browser sign-out and tears down all session state).
-    setRemoveTarget(conn);
+    setRemoveTarget({ conn, isLast: isLastConnection });
   }, []);
 
   const confirmRemove = useCallback(async () => {
     if (!removeTarget) return;
-    const conn = removeTarget;
+    const { conn, isLast } = removeTarget;
     const connId = conn.id;
 
     setRemoving(true);
     try {
       // If this is the last connection, sign out instead.
-      if (isLastConnection) {
+      if (isLast) {
         await signOut({ callbackUrl: "/login" });
         return;
       }
@@ -91,14 +91,17 @@ export default function ConnectionManager() {
           return remaining;
         });
         toast({ title: "Connection removed" });
-        setRemoveTarget(null);
+      } else {
+        toast({ title: "Failed to remove connection", variant: "destructive" });
       }
+      setRemoveTarget(null);
     } catch {
       toast({ title: "Failed to remove connection", variant: "destructive" });
+      setRemoveTarget(null);
     } finally {
       setRemoving(false);
     }
-  }, [removeTarget, isLastConnection, toast, setAdditionalConnections, activeConnectionId, setActiveConnectionId, setIndicator, updateSession]);
+  }, [removeTarget, toast, setAdditionalConnections, activeConnectionId, setActiveConnectionId, setIndicator, updateSession]);
 
   const handleAddConnection = useCallback(async (credentials: LoginFormCredentials) => {
     const result = await securedFetch("/api/connections", {
@@ -219,8 +222,8 @@ export default function ConnectionManager() {
 
       {/* Confirm per-connection sign-out dialog */}
       {removeTarget && (() => {
-        const isLast = isLastConnection;
-        const label = getConnectionLabel(removeTarget);
+        const { conn: targetConn, isLast } = removeTarget;
+        const label = getConnectionLabel(targetConn);
         return (
           <Dialog
             open
