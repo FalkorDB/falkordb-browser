@@ -58,7 +58,7 @@ export default function ConnectionManager() {
     // surprise of accidentally killing their last connection (which performs
     // a full browser sign-out and tears down all session state).
     setRemoveTarget({ conn, isLast: isLastConnection });
-  }, []);
+  }, [isLastConnection]);
 
   const confirmRemove = useCallback(async () => {
     if (!removeTarget) return;
