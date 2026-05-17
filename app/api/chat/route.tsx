@@ -172,7 +172,7 @@ export async function POST(request: NextRequest) {
 
             // Send result events
             if (result.cypherQuery) {
-                await writer.write(encoder.encode(`event: CypherQuery\ndata: ${result.cypherQuery}\n\n`));
+                await writer.write(encoder.encode(`event: CypherQuery\ndata: ${JSON.stringify(result.cypherQuery)}\n\n`));
             }
 
             if (result.cypherResult) {

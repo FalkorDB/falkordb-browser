@@ -284,16 +284,23 @@ export default function Chat({ onClose }: Props) {
                         break;
                     }
 
-                    case "CypherQuery":
+                    case "CypherQuery": {
+                        let cypherContent = eventData;
+                        try {
+                            cypherContent = JSON.parse(eventData);
+                        } catch {
+                            // Use raw eventData if not valid JSON
+                        }
                         setQueryCollapse(prev => ({ ...prev, [messages.length]: false }));
                         setMessages(prev => [
                             ...prev,
                             {
                                 role: "assistant",
-                                content: eventData.replace(/^cypher\s+/i, ""),
+                                content: typeof cypherContent === "string" ? cypherContent.replace(/^cypher\s+/i, "") : cypherContent,
                                 type: eventType
                             }
                         ]);
+                    }
                         break;
 
                     case "Result":
