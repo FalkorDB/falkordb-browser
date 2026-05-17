@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
                 await writer.write(encoder.encode(`event: Result\ndata: ${JSON.stringify(result.answer)}\n\n`));
             }
 
-            writer.close();
+            await writer.close();
         } catch (error) {
             console.error('Text-to-Cypher error details:', error);
 
@@ -191,16 +191,16 @@ export async function POST(request: NextRequest) {
             const userFriendlyMessage = createUserFriendlyErrorMessage(error as Error, model, key);
 
             await writer.write(encoder.encode(`event: error\ndata: ${JSON.stringify({ status: 400, message: userFriendlyMessage })}\n\n`));
-            writer.close();
+            await writer.close();
         }
     } catch (error) {
         console.error(error);
         await writer.write(encoder.encode(`event: error\ndata: ${JSON.stringify({ status: 500, message: "Internal server error" })}\n\n`));
-        writer.close();
+        await writer.close();
     }
 
     request.signal.addEventListener("abort", () => {
-        writer.close();
+        writer.close().catch(() => { /* already closed */ });
     });
 
     return new Response(readable, {
