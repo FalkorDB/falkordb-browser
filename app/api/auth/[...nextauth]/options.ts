@@ -62,7 +62,7 @@ interface AuthenticatedUserWithPassword extends AuthenticatedUser {
  * themselves when safe.
  */
 const connections = new LRUCache<string, FalkorDB>({
-  max: 100,
+  max: parseInt(process.env.MAX_CONNECTION_CACHE_SIZE || '100', 10),
   ttl: 30 * 60 * 1000, // 30 minutes idle TTL
   dispose(client, _key, reason) {
     if (reason === 'set' || reason === 'delete') return;
@@ -491,7 +491,9 @@ async function isJWTOnlyRequest(): Promise<boolean> {
  */
 async function verifyJWTToken(token: string): Promise<CustomJWTPayload> {
   const { jwtVerify } = await import('jose');
-  const secret = new TextEncoder().encode(process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET);
+  const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+  if (!authSecret) throw new Error('AUTH_SECRET or NEXTAUTH_SECRET must be set');
+  const secret = new TextEncoder().encode(authSecret);
   const { payload } = await jwtVerify(token, secret);
   return payload as unknown as CustomJWTPayload;
 }
@@ -1023,10 +1025,20 @@ async function withConnectionLock<T>(key: string, fn: () => Promise<T>): Promise
       ]);
     } catch { /* ignore — we'll run our own attempt */ }
   }
-  const promise = fn();
-  connectionLocks.set(key, promise);
+  // Claim the lock before starting fn() to prevent TOCTOU races:
+  // another awaiter that passed the while-check in the same microtask
+  // will now see the lock and wait.
+  let resolve!: (v: T) => void;
+  let reject!: (e: unknown) => void;
+  const sentinel = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+  connectionLocks.set(key, sentinel);
   try {
-    return await promise;
+    const result = await fn();
+    resolve(result);
+    return result;
+  } catch (err) {
+    reject(err);
+    throw err;
   } finally {
     connectionLocks.delete(key);
   }

@@ -247,10 +247,12 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         [blur, lineNumber]);
 
     useEffect(() => {
-        setHistoryQuery(prev => ({
-            ...prev,
-            query: prev.counter ? prev.queries[prev.counter - 1].text : prev.currentQuery.text
-        }));
+        setHistoryQuery(prev => {
+            if (prev.counter && prev.counter <= prev.queries.length) {
+                return { ...prev, query: prev.queries[prev.counter - 1].text };
+            }
+            return { ...prev, query: prev.currentQuery.text };
+        });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [historyQuery.counter, setHistoryQuery]);
 

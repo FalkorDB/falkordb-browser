@@ -702,7 +702,9 @@ export default class GraphPage extends BasePage {
     await interactWhenVisible(
       this.editorContainer,
       (el) => el.click(),
-      "Editor Input"
+      "Editor Input",
+      1000,
+      15
     );
   }
 
@@ -1177,6 +1179,8 @@ export default class GraphPage extends BasePage {
     await this.clickConfirmCreateGraph();
     if (waitForVisibility) {
       await waitForElementToNotBeVisible(this.createConfirm);
+      // Wait for the editor to become visible after graph creation
+      await waitForElementToBeVisible(this.editorContainer, 1000, 10);
     }
   }
 
@@ -1233,6 +1237,8 @@ export default class GraphPage extends BasePage {
   }
 
   async modifyGraphName(oldName: string, newName: string): Promise<void> {
+    // Wait for graph selector to be enabled (graphs loaded)
+    await waitForElementToBeEnabled(this.select("Graph"));
     await this.clickSelect();
     await this.clickManage();
     await this.hoverTableRowByName(oldName);

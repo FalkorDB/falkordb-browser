@@ -74,24 +74,6 @@ const getErrorStatus = (error: unknown) => {
     return 0;
 };
 
-const getStreamStatusCode = (line: string) => {
-    const match = line.match(/\bstatus:\s*(\d+)/);
-    return match ? Number(match[1]) : 0;
-};
-
-const getStreamData = (line: string) => {
-    const data = line.match(/\bdata:\s*([\s\S]*)/)?.[1]?.trim() || "";
-
-    if (!data) return "";
-
-    try {
-        const parsed = JSON.parse(data);
-        return typeof parsed === "string" ? parsed : JSON.stringify(parsed);
-    } catch {
-        return data;
-    }
-};
-
 export default function Chat({ onClose }: Props) {
     const { resolvedTheme } = useTheme();
     const { currentTheme } = getTheme(resolvedTheme);
@@ -302,8 +284,10 @@ export default function Chat({ onClose }: Props) {
                 let isResult = false;
 
                 lines.forEach(line => {
-                    const eventType: EventType | "error" = line.split(" ")[1] as EventType | "error";
-                    const eventData = line.split("data:")[1];
+                    const parts = line.split('\n').map(p => p.trim()).filter(p => p);
+                    const eventType: EventType | "error" = parts[0] as EventType | "error";
+                    const dataLine = parts.find(p => p.startsWith('data:'));
+                    const eventData = dataLine ? dataLine.substring(5).trim() : "";
                     switch (eventType) {
                         case "Status":
                             const message = {
@@ -364,8 +348,18 @@ export default function Chat({ onClose }: Props) {
                             break;
 
                         case "error": {
-                            const statusCode = getStreamStatusCode(line);
-                            const errorMessage = getStreamData(line);
+                            let statusCode = 0;
+                            let errorMessage = eventData;
+
+                            try {
+                                const parsed = JSON.parse(eventData);
+                                if (typeof parsed === "object" && parsed !== null) {
+                                    statusCode = parsed.status || 0;
+                                    errorMessage = parsed.message || eventData;
+                                }
+                            } catch {
+                                errorMessage = eventData;
+                            }
 
                             if (statusCode === 401 || statusCode >= 500) setIndicator("offline");
 

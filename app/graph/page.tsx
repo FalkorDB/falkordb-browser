@@ -98,6 +98,10 @@ export default function Page() {
     const [isAddNode, setIsAddNode] = useState(false);
     const [isAddEdge, setIsAddEdge] = useState(false);
     const initialUrlQueryRef = useRef(initialQuery);
+    // Tracks whether a URL query has been dispatched but hasn't completed yet.
+    // Prevents the default query from firing when `runDefaultQuery` state
+    // changes (loaded from localStorage) before the async URL query finishes.
+    const urlQueryFiredRef = useRef(false);
 
     const onPanelResize = useCallback((size: PanelSize) => {
         setIsCollapsed(size.asPercentage === 0);
@@ -229,7 +233,18 @@ export default function Page() {
         if (pendingUrlQuery && graphName) {
             if (graphName !== graph.Id) {
                 initialUrlQueryRef.current = "";
+                urlQueryFiredRef.current = true;
                 runQuery(pendingUrlQuery, graphName);
+            }
+            return;
+        }
+
+        // If the URL query was dispatched but hasn't completed yet (graph.Id
+        // not yet updated by the async runQuery), skip the default-query path
+        // so it doesn't overwrite the in-flight URL query result.
+        if (urlQueryFiredRef.current) {
+            if (graphName === graph.Id) {
+                urlQueryFiredRef.current = false;
             }
             return;
         }
