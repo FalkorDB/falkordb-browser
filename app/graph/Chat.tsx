@@ -12,6 +12,7 @@ import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import { GraphContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext } from "../components/provider";
 import { EventType } from "../api/chat/route";
+import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import ToastButton from "../components/ToastButton";
 import { ShineBorder } from "@/components/ui/shine-border";
 import { getConnectionItem, setConnectionItem, getConnectionPrefix } from "@/lib/connection-storage";
@@ -245,6 +246,21 @@ export default function Chat({ onClose }: Props) {
         setMessages(newMessages);
         setTimeout(scrollToBottom, 0);
         setNewMessage("");
+
+        // Client-side fail-fast: detect model/API key provider mismatch before making any request
+        const modelProvider = detectProviderFromModel(model);
+        const keyProvider = detectProviderFromApiKey(secretKey);
+        if (modelProvider !== "unknown" && keyProvider !== "unknown" && modelProvider !== keyProvider && modelProvider !== "ollama") {
+            const modelProviderName = getProviderDisplayName(modelProvider);
+            const keyProviderName = getProviderDisplayName(keyProvider);
+            toast({
+                title: "Error",
+                description: `Model/API key mismatch: You selected a ${modelProviderName} model but provided a ${keyProviderName} API key. Please update your API key in Settings to match your selected model.`,
+                variant: "destructive",
+            });
+            setIsLoading(false);
+            return;
+        }
 
         try {
             const response = await fetch("/api/chat", {
