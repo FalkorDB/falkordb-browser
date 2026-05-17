@@ -104,7 +104,11 @@ test.describe('@config Settings config tests', () => {
         });
     });
 
-    Data.inputDataAcceptsZero.forEach(({ input, description, expected }, index) => {
+    // Filter out "0" for VKEY_MAX_ENTITY_COUNT: setting it to 0 is a
+    // server-wide FalkorDB config that also affects the token_management
+    // graph (shared instance in CI), breaking auth on subsequent requests.
+    const vkeyData = Data.inputDataAcceptsZero.filter(d => d.input !== "0");
+    vkeyData.forEach(({ input, description, expected }, index) => {
         test(`@admin Modify ${roles.vKeyMaxEntityCount} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             await apiCall.modifySettingsRole(roles.vKeyMaxEntityCount, input);
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
@@ -112,7 +116,7 @@ test.describe('@config Settings config tests', () => {
             await settingsConfigPage.fillSearchForConfigInput(roles.vKeyMaxEntityCount);
             const value = await settingsConfigPage.getRoleContentValue(roles.vKeyMaxEntityCount);
             expect(value === input).toBe(expected);
-            if (index === Data.inputDataAcceptsZero.length - 1) {
+            if (index === vkeyData.length - 1) {
                 await apiCall.modifySettingsRole(roles.vKeyMaxEntityCount, "100000");
             }
         });

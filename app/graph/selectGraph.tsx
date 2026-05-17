@@ -21,24 +21,22 @@ interface Props {
     setOptions: (options: string[]) => void
     selectedValue: string
     setSelectedValue: (value: string) => void
-    type: "Graph" | "Schema"
     setGraph: (graph: Graph) => void
 }
 
 /**
- * Renders a selectable and manageable list of Graph or Schema entities with creation, export, duplicate and delete controls.
+ * Renders a selectable and manageable list of Graph entities with creation, export, duplicate and delete controls.
  *
- * Renders a dropdown for selecting an existing graph/schema and a management dialog that lists entries with memory, node, and edge metrics (admin users see editable names). Handles loading of options and per-row metric loaders, selection state, and CRUD interactions.
+ * Renders a dropdown for selecting an existing graph and a management dialog that lists entries with memory, node, and edge metrics (admin users see editable names). Handles loading of options and per-row metric loaders, selection state, and CRUD interactions.
  *
- * @param props.options - Array of graph/schema names shown in the list.
+ * @param props.options - Array of graph names shown in the list.
  * @param props.setOptions - Callback to replace the options array.
- * @param props.selectedValue - Currently selected graph/schema name.
- * @param props.setSelectedValue - Callback to update the selected graph/schema name.
- * @param props.type - Either `"Graph"` or `"Schema"`, used to label UI and API paths.
+ * @param props.selectedValue - Currently selected graph name.
+ * @param props.setSelectedValue - Callback to update the selected graph name.
  * @param props.setGraph - Callback to set the active Graph model instance when selection changes.
  * @returns The component's rendered JSX element.
  */
-export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, type, setGraph }: Props) {
+export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, setGraph }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext);
     const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
@@ -68,8 +66,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
 
     const getOptions = useCallback(async () =>
-        fetchOptions(type, toast, setIndicator, indicator, setSelectedValue, setOptions)
-        , [type, toast, setIndicator, indicator, setSelectedValue, setOptions]);
+        fetchOptions(toast, setIndicator, indicator, setSelectedValue, setOptions)
+        , [toast, setIndicator, indicator, setSelectedValue, setOptions]);
 
     const loadMemory = useCallback((opt: string) =>
         async () => {
@@ -109,7 +107,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const handleSetOption = useCallback(async (option: string, optionName: string) => {
         const result = await securedFetch(
-            `api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(option)}`,
+            `api/graph/${prepareArg(option)}`,
             {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
@@ -151,7 +149,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         }
 
         return result.ok;
-    }, [type, toast, setIndicator, options, setOptions, setSelectedValue, selectedValue, sessionRole, showMemoryUsage, loadNodesCount, loadEdgesCount, loadMemory]);
+    }, [toast, setIndicator, options, setOptions, setSelectedValue, selectedValue, sessionRole, showMemoryUsage, loadNodesCount, loadEdgesCount, loadMemory]);
 
     const handleSetRows = useCallback((opts: string[]) => {
         setRows(opts.map((opt) => {
@@ -228,10 +226,10 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 <PopoverTrigger disabled={options.length === 0 || indicator === "offline"} asChild>
                     <Button
                         className="min-w-0 basis-0 grow bg-background rounded-lg border border-border p-2 justify-left disabled:text-gray-400 disabled:opacity-100 p-1 text-sm"
-                        label={selectedValue || `Select ${type}`}
-                        title={options.length === 0 ? `There are no ${type}` : undefined}
+                        label={selectedValue || "Select Graph"}
+                        title={options.length === 0 ? "There are no Graphs" : undefined}
                         indicator={indicator}
-                        data-testid={`select${type}`}
+                        data-testid="selectGraph"
                     >
                         {
                             open ?
@@ -250,8 +248,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         className="basis-0 grow min-h-fit p-0"
                         list={options}
                         onClick={handleClick}
-                        dataTestId={`select${type}`}
-                        label={type}
+                        dataTestId="selectGraph"
+                        label="Graph"
                         afterSearchCallback={() => { }}
                         isSelected={(value) => selectedValue === value}
                         isLoading={isLoading}
@@ -262,7 +260,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                             className="w-fit px-2 py-1 text-xs"
                             variant="Primary"
                             label="Manage"
-                            data-testid={`manage${type}s`}
+                            data-testid="manageGraphs"
                             onClick={() => { setOpenMenage(true); }}
                         >
                             <Settings size={16} />
@@ -275,12 +273,12 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     <div
                         data-testid="manageContent"
                         role="dialog"
-                        aria-label={`Manage ${type}s`}
+                        aria-label="Manage Graphs"
                         className="fixed top-16 left-3 z-30 flex flex-col gap-2 border border-border rounded-lg shadow-lg h-[493px] w-[750px] p-2 bg-background"
                     >
                         <div className="flex flex-row justify-between items-center border-b border-border pb-1">
                             <h2 className="text-2xl font-medium flex items-center gap-2">
-                                Manage {type}s
+                                Manage Graphs
                                 <Settings size={22} className="text-foreground/60" />
                             </h2>
                             <Button
@@ -293,8 +291,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         </div>
                         <TableComponent
                             className="grow overflow-hidden gap-2"
-                            label={`${type}s`}
-                            entityName={type}
+                            label="Graphs"
+                            entityName="Graph"
                             headers={[
                                 "Name",
                                 ...(showMemoryUsage ? [{ name: "Memory Usage", width: "20%" }] : []),
@@ -310,7 +308,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                 !isReadOnly &&
                                 <>
                                     <DeleteGraph
-                                        type={type}
+                                        
                                         rows={rows.filter(opt => opt.checked)}
                                         handleSetRows={handleSetRows}
                                         selectedValue={selectedValue}
@@ -322,11 +320,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                     />
                                     <ExportGraph
                                         selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
-                                        type={type}
+                                        
                                     />
                                     <DuplicateGraph
                                         selectedValue={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)[0]}
-                                        type={type}
+                                        
                                         open={openDuplicate}
                                         onOpenChange={setOpenDuplicate}
                                         onDuplicate={(duplicateName) => {

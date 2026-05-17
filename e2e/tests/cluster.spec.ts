@@ -112,10 +112,6 @@ test.describe("Cluster Functionality Tests", () => {
       await loginPage.clickOnSettingsBtn();
       expect(loginPage.getCurrentURL()).toContain("/settings");
 
-      // Commented out due to schema code removal
-      // await loginPage.clickOnSchemasButton();
-      // expect(loginPage.getCurrentURL()).toContain("/schema");
-
       await loginPage.clickOnGraphsButton();
       expect(loginPage.getCurrentURL()).toContain("/graph");
 

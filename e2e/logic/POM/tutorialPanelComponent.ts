@@ -115,7 +115,7 @@ export default class TutorialPanel extends GraphPage {
    */
   async rightClickCanvasUntilDataPanel(): Promise<boolean> {
     // Use actual node screen positions from the graph so we always hit a node.
-    const nodes = await this.getNodesScreenPositions("graph");
+    const nodes = await this.getNodesScreenPositions();
     const visibleNodes = nodes.filter((n) => n.isVisible);
     const targets = visibleNodes.length > 0 ? visibleNodes : nodes;
 

@@ -106,7 +106,7 @@ test.describe('Canvas Tests', () => {
         await graph.addGraph(graphName);
         await graph.insertQuery(BATCH_CREATE_PERSONS);
         await graph.clickRunQuery();
-        const initialGraph = await graph.getNodesScreenPositions('graph');
+        const initialGraph = await graph.getNodesScreenPositions();
 
         expect(initialGraph.length).toBeGreaterThan(0);
 
@@ -115,7 +115,7 @@ test.describe('Canvas Tests', () => {
         const toX = fromX + 100;
         const toY = fromY + 100;
         await graph.changeNodePosition(fromX, fromY, toX, toY);
-        const updateGraph = await graph.getNodesScreenPositions('graph');
+        const updateGraph = await graph.getNodesScreenPositions();
         expect(updateGraph[0].x).not.toBe(initialGraph[0].x);
         expect(updateGraph[0].y).not.toBe(initialGraph[0].y);
         await apicalls.removeGraph(graphName);
@@ -128,7 +128,7 @@ test.describe('Canvas Tests', () => {
         await graph.addGraph(graphName,);
         await graph.insertQuery('CREATE (p:Person {name: "Alice", age: 30}) return p');
         await graph.clickRunQuery();
-        await graph.getNodesScreenPositions('graph');
+        await graph.getNodesScreenPositions();
         await graph.searchElementInCanvas("Alice");
         await graph.hoverAtCanvasCenter();
         expect(await graph.getNodeCanvasToolTip()).toBe("Alice");
@@ -174,14 +174,14 @@ test.describe('Canvas Tests', () => {
         await graph.insertQuery(CREATE_TWO_NODES_QUERY);
         await graph.clickRunQuery();
         await graph.waitForScaleToStabilize();
-        const initNodes = await graph.getNodesScreenPositions('graph');
+        const initNodes = await graph.getNodesScreenPositions();
         const fromX = initNodes[0].screenX;
         const fromY = initNodes[0].screenY;
         const toX = initNodes[1].screenX;
         const toY = initNodes[1].screenY;
         await graph.changeNodePosition(fromX, fromY, toX, toY);
         await graph.waitForScaleToStabilize();
-        const nodes = await graph.getNodesScreenPositions('graph');
+        const nodes = await graph.getNodesScreenPositions();
         expect(nodes[1].screenX - nodes[0].screenX).toBeLessThanOrEqual(2);
         expect(nodes[1].screenY - nodes[0].screenY).toBeLessThanOrEqual(2);
         await apicalls.removeGraph(graphName);
@@ -198,7 +198,7 @@ test.describe('Canvas Tests', () => {
         await graph.insertQuery(CREATE_TWO_NODES_QUERY);
         await graph.clickRunQuery();
         await graph.waitForScaleToStabilize();
-        const initNodes = await graph.getNodesScreenPositions('graph');
+        const initNodes = await graph.getNodesScreenPositions();
 
         const fromX = initNodes[0].screenX;
         const fromY = initNodes[0].screenY;
@@ -207,7 +207,7 @@ test.describe('Canvas Tests', () => {
         await graph.changeNodePosition(fromX, fromY, toX, toY);
         await graph.waitForScaleToStabilize();
 
-        const nodes = await graph.getNodesScreenPositions('graph');
+        const nodes = await graph.getNodesScreenPositions();
         expect(Math.abs(nodes[1].screenX - nodes[0].screenX)).toBeLessThanOrEqual(2);
         expect(Math.abs(nodes[1].screenY - nodes[0].screenY)).toBeLessThanOrEqual(2);
         await apicalls.removeGraph(graphName);
@@ -222,10 +222,10 @@ test.describe('Canvas Tests', () => {
         await graph.insertQuery(CREATE_NODE_QUERY);
         await graph.clickRunQuery();
         await graph.clickLabelsButtonByLabel("Labels", "person1");
-        const nodes1 = await graph.getNodesScreenPositions('graph');
+        const nodes1 = await graph.getNodesScreenPositions();
         expect(nodes1[0].visible).toBeFalsy();
         await graph.clickLabelsButtonByLabel("Labels", "person1");
-        const nodes2 = await graph.getNodesScreenPositions('graph');
+        const nodes2 = await graph.getNodesScreenPositions();
         expect(nodes2[0].visible).toBeTruthy();
         await apicalls.removeGraph(graphName);
     });
@@ -239,10 +239,10 @@ test.describe('Canvas Tests', () => {
         await graph.insertQuery(CREATE_QUERY);
         await graph.clickRunQuery();
         await graph.clickLabelsButtonByLabel("Relationships", "KNOWS");
-        const links1 = await graph.getLinksScreenPositions('graph');
+        const links1 = await graph.getLinksScreenPositions();
         expect(links1[0].visible).toBeFalsy();
         await graph.clickLabelsButtonByLabel("Relationships", "KNOWS");
-        const links2 = await graph.getLinksScreenPositions('graph');
+        const links2 = await graph.getLinksScreenPositions();
         expect(links2[0].visible).toBeTruthy();
         await apicalls.removeGraph(graphName);
     });
@@ -256,11 +256,11 @@ test.describe('Canvas Tests', () => {
         await graph.insertQuery("CREATE (p:Person:Female {name: 'Alice'})-[r:KNOWS]->(c:Company {name: 'FalkorDB'}) RETURN p, r, c");
         await graph.clickRunQuery();
         await graph.clickLabelsButtonByLabel("Labels", "Person");
-        let nodes = await graph.getNodesScreenPositions('graph');
+        let nodes = await graph.getNodesScreenPositions();
         expect(nodes[0].visible).toBeTruthy();
 
         await graph.clickLabelsButtonByLabel("Labels", "Female");
-        nodes = await graph.getNodesScreenPositions('graph');
+        nodes = await graph.getNodesScreenPositions();
         expect(nodes[0].visible).toBeFalsy();
         await apicalls.removeGraph(graphName);
     });
@@ -276,7 +276,7 @@ test.describe('Canvas Tests', () => {
             await graph.insertQuery(`CREATE (p:Childe:${label} {name: 'Alice'})-[r:KNOWS]->(c:Company {name: 'FalkorDB'}) RETURN p, r, c`);
             await graph.clickRunQuery();
             await graph.clickLabelsButtonByLabel("Labels", label);
-            const nodes = await graph.getNodesScreenPositions('graph');
+            const nodes = await graph.getNodesScreenPositions();
             expect(nodes[0].visible).toBeTruthy();
             await apicalls.removeGraph(graphName);
         });
@@ -292,7 +292,7 @@ test.describe('Canvas Tests', () => {
         await graph.clickRunQuery();
 
         await graph.clickLabelsButtonByLabel("Labels", "Female");
-        const nodes = await graph.getNodesScreenPositions('graph');
+        const nodes = await graph.getNodesScreenPositions();
         // Alice has Female label, so should be visible
         const aliceNode = nodes.find(n => n.data?.name === 'Alice');
         expect(aliceNode.visible).toBeTruthy();
@@ -314,14 +314,14 @@ test.describe('Canvas Tests', () => {
         await graph.clickLabelsButtonByLabel("Labels", "Female");
         // Toggle off 'Person' — now Alice should be hidden
         await graph.clickLabelsButtonByLabel("Labels", "Person");
-        let nodes = await graph.getNodesScreenPositions('graph');
+        let nodes = await graph.getNodesScreenPositions();
         expect(nodes.find(n => n.data?.name === 'Alice').visible).toBeFalsy();
         // Bob should still be visible
         expect(nodes.find(n => n.data?.name === 'Bob').visible).toBeTruthy();
 
         // Toggle 'Male' off — Alice should still be hidden and Bob should be hidden
         await graph.clickLabelsButtonByLabel("Labels", "Male");
-        nodes = await graph.getNodesScreenPositions('graph');
+        nodes = await graph.getNodesScreenPositions();
         expect(nodes.find(n => n.data?.name === 'Alice').visible).toBeFalsy();
         expect(nodes.find(n => n.data?.name === 'Bob').visible).toBeFalsy();
         await apicalls.removeGraph(graphName);
@@ -341,13 +341,13 @@ test.describe('Canvas Tests', () => {
         await graph.clickLabelsButtonByLabel("Labels", "Male");
         // toggle female back on — Alice visible again
         await graph.clickLabelsButtonByLabel("Labels", "Female");
-        let nodes = await graph.getNodesScreenPositions('graph');
+        let nodes = await graph.getNodesScreenPositions();
         expect(nodes.find(n => n.data?.name === 'Alice').visible).toBeTruthy();
         expect(nodes.find(n => n.data?.name === 'Bob').visible).toBeFalsy();
 
         // Toggle 'Male' back on — Alice should and bob should be visible
         await graph.clickLabelsButtonByLabel("Labels", "Male");
-        nodes = await graph.getNodesScreenPositions('graph');
+        nodes = await graph.getNodesScreenPositions();
         expect(nodes.find(n => n.data?.name === 'Alice').visible).toBeTruthy();
         expect(nodes.find(n => n.data?.name === 'Bob').visible).toBeTruthy();
         await apicalls.removeGraph(graphName);

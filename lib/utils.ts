@@ -191,8 +191,7 @@ export type Message = {
   | "Error"
   | "Status"
   | "CypherQuery"
-  | "CypherResult"
-  | "Schema";
+  | "CypherResult";
 };
 
 // [library_name, type, 'functions', function_names[]]
@@ -854,7 +853,6 @@ export const formatName = (newGraphName: string) =>
   newGraphName === '""' ? "" : newGraphName;
 
 export async function fetchOptions(
-  type: "Graph" | "Schema",
   toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void,
   indicator: "online" | "offline",
@@ -864,7 +862,7 @@ export async function fetchOptions(
   if (indicator === "offline") return;
 
   const result = await securedFetch(
-    `api/${type === "Graph" ? "graph" : "schema"}`,
+    `api/graph`,
     {
       method: "GET",
     },

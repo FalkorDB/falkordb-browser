@@ -9,7 +9,7 @@ export async function OPTIONS(request: NextRequest) {
     return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
 
-export type EventType = "Status" | "Schema" | "CypherQuery" | "CypherResult" | "ModelOutputChunk" | "Result" | "Error";
+export type EventType = "Status" | "CypherQuery" | "CypherResult" | "ModelOutputChunk" | "Result" | "Error";
 
 /**
  * Create user-friendly error message
@@ -162,10 +162,6 @@ export async function POST(request: NextRequest) {
             }
 
             // Send result events
-            if (result.schema) {
-                writer.write(encoder.encode(`event: Schema data: ${JSON.stringify(result.schema)}\n\n`));
-            }
-
             if (result.cypherQuery) {
                 writer.write(encoder.encode(`event: CypherQuery data: ${result.cypherQuery}\n\n`));
             }
@@ -190,7 +186,7 @@ export async function POST(request: NextRequest) {
         }
     } catch (error) {
         console.error(error);
-        writer.write(encoder.encode(`event: error status: ${500} data: ${JSON.stringify((error as Error).message)}\n\n`));
+        writer.write(encoder.encode(`event: error status: ${500} data: ${JSON.stringify("Internal server error")}\n\n`));
         writer.close();
     }
 

@@ -30,10 +30,6 @@ import {
   UpdateUserResponse,
 } from "./responses/userResponses";
 import {
-  AddSchemaResponse,
-  SchemaListResponse,
-} from "./responses/schemaResponses";
-import {
   ModifySettingsRoleResponse,
   GetSettingsRoleValue,
 } from "./responses/settingsResponses";
@@ -360,9 +356,12 @@ export default class ApiCalls {
     roleValue: string
   ): Promise<ModifySettingsRoleResponse> {
     try {
+      const headers = await getAdminToken();
       const result = await postRequest(
         `${urls.api.settingsConfig + roleName}`,
-        { value: roleValue }
+        { value: roleValue },
+        undefined,
+        headers
       );
       return await result.json();
     } catch (error) {
@@ -374,7 +373,8 @@ export default class ApiCalls {
 
   async getSettingsRoleValue(roleName: string): Promise<GetSettingsRoleValue> {
     try {
-      const result = await getRequest(urls.api.settingsConfig + roleName);
+      const headers = await getAdminToken();
+      const result = await getRequest(urls.api.settingsConfig + roleName, headers);
       return await result.json();
     } catch (error) {
       throw new Error(
@@ -589,55 +589,6 @@ export default class ApiCalls {
     } catch (error) {
       throw new Error(
         `Failed to revoke token as user ${username}. \n Error: ${(error as Error).message}`
-      );
-    }
-  }
-
-  async addSchema(schemaName: string): Promise<AddSchemaResponse> {
-    try {
-      const result = await postRequest(`${urls.api.schemaUrl + schemaName}`);
-      return await result.json();
-    } catch (error) {
-      throw new Error(
-        `Failed to add schema. \n Error: ${(error as Error).message}`
-      );
-    }
-  }
-
-  async removeSchema(schemaName: string): Promise<RemoveGraphResponse> {
-    try {
-      const result = await deleteRequest(urls.api.schemaUrl + schemaName);
-      return await result.json();
-    } catch (error) {
-      throw new Error(
-        `Failed to remove schema. \n Error: ${(error as Error).message}`
-      );
-    }
-  }
-
-  async runSchemaQuery(
-    schemaName: string,
-    schema: string,
-  ): Promise<AddSchemaResponse> {
-    try {
-      const url = `${
-        urls.api.graphUrl + schemaName
-      }_schema?query=${encodeURIComponent(schema)}`;
-      return await getSSEGraphResult(url);
-    } catch (error) {
-      throw new Error(
-        `Failed to run schema query. \n Error: ${(error as Error).message}`
-      );
-    }
-  }
-
-  async getSchemas(): Promise<SchemaListResponse> {
-    try {
-      const result = await getRequest(`${urls.api.schemaUrl}`);
-      return await result.json();
-    } catch (error) {
-      throw new Error(
-        `Failed to get schema. \n Error: ${(error as Error).message}`
       );
     }
   }

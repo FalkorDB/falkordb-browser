@@ -14,7 +14,6 @@ interface Props {
     open: boolean
     setOpen: (open: boolean) => void
     description: string
-    label?: "Graph" | "Schema"
 }
 
 export default function DeleteElement({
@@ -22,7 +21,6 @@ export default function DeleteElement({
     open,
     setOpen,
     description,
-    label = "Graph"
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
@@ -52,7 +50,7 @@ export default function DeleteElement({
             description={description}
             trigger={(
                 <Button
-                    data-testid={`deleteElement${label}`}
+                    data-testid="deleteElementGraph"
                     className="pointer-events-auto bg-background p-1.5"
                     variant="Delete"
                     tooltipSide="bottom"
@@ -64,7 +62,7 @@ export default function DeleteElement({
         >
             <div className="flex justify-end gap-4">
                 <Button
-                    data-testid={`deleteElementConfirm${label}`}
+                    data-testid="deleteElementConfirmGraph"
                     indicator={indicator}
                     className="text-nowrap"
                     variant="Delete"
@@ -74,7 +72,7 @@ export default function DeleteElement({
                     isLoading={isLoading}
                 />
                 <CloseDialog
-                    data-testid={`deleteElementCancel${label}`}
+                    data-testid="deleteElementCancelGraph"
                     className="text-nowrap"
                     variant="Cancel"
                     label="Cancel"

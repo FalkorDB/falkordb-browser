@@ -43,7 +43,7 @@ export async function DELETE(
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500, headers: getCorsHeaders(request) }
     );
   }
@@ -85,7 +85,7 @@ export async function POST(
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500, headers: getCorsHeaders(request) }
     );
   }
@@ -137,7 +137,7 @@ export async function PATCH(
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500, headers: getCorsHeaders(request)  }
     );
   }
@@ -231,7 +231,7 @@ export async function GET(
       writer.write(
         encoder.encode(
           `event: error\ndata: ${JSON.stringify({
-            message: (error as Error).message,
+            message: (error as Error).message || "Internal server error",
             status: 400,
           })}\n\n`
         )
@@ -243,7 +243,7 @@ export async function GET(
     writer.write(
       encoder.encode(
         `event: error\ndata: ${JSON.stringify({
-          message: (error as Error).message,
+          message: "Internal server error",
           status: 500,
         })}\n\n`
       )

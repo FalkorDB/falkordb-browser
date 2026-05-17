@@ -43,33 +43,6 @@ export const getLabelWithFewestElements = (labels: Label[]): Label =>
     labels[0]
   );
 
-const getSchemaValue = (value: string): string[] => {
-  if (typeof value !== "string") {
-    return ["string", "", "false", "false"];
-  }
-
-  let unique, required, type, description;
-  if (value.includes("!")) {
-    value = value.replace("!", "");
-    unique = "true";
-  } else {
-    unique = "false";
-  }
-  if (value.includes("*")) {
-    value = value.replace("*", "");
-    required = "true";
-  } else {
-    required = "false";
-  }
-  if (value.includes("-")) {
-    [type, description] = value.split("-");
-  } else {
-    type = "string";
-    description = "";
-  }
-  return [type, description, unique, required];
-};
-
 export function loadLabelStyle(label: Label | InfoLabel): void {
   if (typeof window === "undefined") return;
 
@@ -454,7 +427,6 @@ export class Graph {
     showPropertyKeyPrefix: boolean,
     currentLimit: number,
     graphInfo?: GraphInfo,
-    isSchema = false
   ): Promise<Graph> {
     const graph = Graph.empty(
       undefined,
@@ -462,7 +434,7 @@ export class Graph {
       currentLimit,
       graphInfo
     );
-    await graph.extend(results, isSchema);
+    await graph.extend(results);
     graph.id = id;
     return graph;
   }
@@ -503,7 +475,6 @@ export class Graph {
   public async extendNode(
     cell: NodeCell,
     collapsed: boolean,
-    isSchema: boolean,
     isColor = false
   ) {
     const labels = await this.createLabel(
@@ -524,7 +495,7 @@ export class Graph {
         data: {},
       };
       Object.entries(cell.properties).forEach(([key, value]) => {
-        node.data[key] = isSchema ? getSchemaValue(value) : value;
+        node.data[key] = value;
       });
       this.nodesMap.set(cell.id, node);
       this.elements.nodes.push(node);
@@ -545,7 +516,7 @@ export class Graph {
       currentNode.collapsed = collapsed;
       currentNode.size = mainLabel.style.size;
       Object.entries(cell.properties).forEach(([key, value]) => {
-        currentNode.data[key] = isSchema ? getSchemaValue(value) : value;
+        currentNode.data[key] = value;
       });
       labels.forEach((l) => {
         l.elements.push(currentNode);
@@ -571,7 +542,6 @@ export class Graph {
   public async extendEdge(
     cell: LinkCell,
     collapsed: boolean,
-    isSchema: boolean,
     isColor = false
   ) {
     const relation = await this.createRelationship(cell.relationshipType);
@@ -675,7 +645,7 @@ export class Graph {
       }
 
       Object.entries(cell.properties).forEach(([key, value]) => {
-        link.data[key] = isSchema ? getSchemaValue(value) : value;
+        link.data[key] = value;
       });
 
       this.linksMap.set(cell.id, link);
@@ -688,27 +658,27 @@ export class Graph {
     return undefined;
   }
 
-  public async extendCell(cell: any, collapsed: boolean, isSchema: boolean) {
+  public async extendCell(cell: any, collapsed: boolean) {
     if (cell.nodes) {
       const nodes = await Promise.all(
         cell.nodes.map((node: any) =>
-          this.extendNode(node, collapsed, isSchema)
+          this.extendNode(node, collapsed)
         )
       );
       const edges = await Promise.all(
         (cell.edges ?? []).map((edge: any) =>
-          this.extendEdge(edge, collapsed, isSchema)
+          this.extendEdge(edge, collapsed)
         )
       );
       return [...nodes, ...edges].filter((el): el is Node | Link => el !== undefined);
     }
 
     if (cell.relationshipType) {
-      return this.extendEdge(cell, collapsed, isSchema);
+      return this.extendEdge(cell, collapsed);
     }
 
     if (cell.labels) {
-      return this.extendNode(cell, collapsed, isSchema);
+      return this.extendNode(cell, collapsed);
     }
 
     return undefined;
@@ -716,7 +686,6 @@ export class Graph {
 
   public async extend(
     results: { data: Data; metadata: any[] },
-    isSchema = false,
     collapsed = false,
     isMerge = false
   ): Promise<(Node | Link)[]> {
@@ -747,7 +716,7 @@ export class Graph {
             if (Array.isArray(cell) && cell.length > 0 && cell[0] instanceof Object) {
               await cell.reduce(
                 (cPrev: Promise<void>, c: any) => cPrev.then(async () => {
-                  const elements = await this.extendCell(c, collapsed, isSchema);
+                  const elements = await this.extendCell(c, collapsed);
                   if (elements) {
                     if (Array.isArray(elements)) {
                       newElements.push(...elements);
@@ -759,7 +728,7 @@ export class Graph {
                 Promise.resolve()
               );
             } else if (cell instanceof Object) {
-              const elements = await this.extendCell(cell, collapsed, isSchema);
+              const elements = await this.extendCell(cell, collapsed);
               if (elements) {
                 if (Array.isArray(elements)) {
                   newElements.push(...elements);

@@ -23,8 +23,7 @@ interface Props {
     showUDF: boolean
 }
 
-function getPathType(pathname: string): "Schema" | "Graph" | "Settings" | "UDF" | undefined {
-    if (pathname.includes("/schema")) return "Schema";
+function getPathType(pathname: string): "Graph" | "Settings" | "UDF" | undefined {
     if (pathname.includes("/graph")) return "Graph";
     if (pathname.includes("/settings")) return "Settings";
     if (pathname.includes("/udf")) return "UDF";

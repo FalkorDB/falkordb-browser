@@ -152,11 +152,12 @@ function getAllowedOrigins(): string[] {
 
     const defaults = [...LOCALHOST_ORIGINS];
 
-    // Add NEXTAUTH_URL if configured
-    if (process.env.NEXTAUTH_URL && !isAutoNextAuthUrl()) {
-        const nextAuthOrigin = normalizeOrigin(process.env.NEXTAUTH_URL);
-        if (nextAuthOrigin) {
-            defaults.push(nextAuthOrigin);
+    // Add AUTH_URL / NEXTAUTH_URL if configured
+    const authUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL;
+    if (authUrl && !isAutoNextAuthUrl()) {
+        const authOrigin = normalizeOrigin(authUrl);
+        if (authOrigin) {
+            defaults.push(authOrigin);
         }
     }
 
@@ -207,7 +208,7 @@ export function isRequestOriginTrusted(request: Request): boolean {
 }
 
 export function shouldUseSecureCookies(request: Request): boolean {
-    const nextAuthUrl = process.env.NEXTAUTH_URL;
+    const nextAuthUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL;
     if (nextAuthUrl && !isAutoNextAuthUrl()) {
         return nextAuthUrl.startsWith("https://");
     }
@@ -233,11 +234,8 @@ export function corsHeaders(requestOrigin?: string | null): Record<string, strin
     if (origin && allowedOrigins.includes(origin)) {
         headers['Access-Control-Allow-Origin'] = origin;
         headers['Access-Control-Allow-Credentials'] = 'true';
-    } else if (process.env.NODE_ENV === 'development' && !process.env.ALLOWED_ORIGINS) {
-        // In development, allow all origins if ALLOWED_ORIGINS is not explicitly set
-        headers['Access-Control-Allow-Origin'] = '*';
     }
-    // If origin is not allowed and not in development, no CORS headers are added
+    // If origin is not allowed, no CORS headers are added
     // This will cause the browser to block the request
 
     return headers;

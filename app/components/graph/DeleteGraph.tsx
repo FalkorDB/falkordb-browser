@@ -8,7 +8,6 @@ import CloseDialog from "../CloseDialog";
 import { IndicatorContext } from "../provider";
 
 interface Props {
-  type: "Schema" | "Graph"
   rows: Row[]
   handleSetRows: (rows: string[]) => void
   setOpenMenage: (openMenage: boolean) => void
@@ -20,7 +19,6 @@ interface Props {
 }
 
 export default function DeleteGraph({
-  type,
   rows,
   handleSetRows,
   setOpenMenage,
@@ -56,7 +54,7 @@ export default function DeleteGraph({
     try {
       const [failedDeletedGraphs, successDeletedGraphs] = await Promise.all(deleteGraphNames
         .map(async (name) => {
-          const result = await securedFetch(`api/${type === "Schema" ? "schema" : "graph"}/${prepareArg(name)}`, {
+          const result = await securedFetch(`api/graph/${prepareArg(name)}`, {
             method: "DELETE"
           }, toast, setIndicator);
 

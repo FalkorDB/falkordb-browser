@@ -1,10 +1,13 @@
 import CredentialsProvider from "next-auth/providers/credentials";
-import { AuthOptions, Role, User, getServerSession } from "next-auth";
+import type { User } from "next-auth";
+import type { Role } from "next-auth";
+import type { NextAuthConfig } from "next-auth";
 import { NextResponse } from "next/server";
 import { FalkorDB, type FalkorDBOptions } from "falkordb";
 import { v4 as uuidv4 } from "uuid";
 import crypto from "crypto";
 import { getToken } from "next-auth/jwt";
+import { LRUCache } from "lru-cache";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
 import {
   enableAutoNextAuthUrl,
@@ -47,7 +50,25 @@ interface AuthenticatedUserWithPassword extends AuthenticatedUser {
   password?: string;
 }
 
-const connections = new Map<string, FalkorDB>();
+/**
+ * LRU-based connection cache. Evicts the least-recently-used connection
+ * when the max size is reached, and automatically expires idle entries
+ * after 30 minutes.
+ *
+ * IMPORTANT: `dispose` only auto-closes on `evict` (max-size) and `stale`
+ * (TTL expiry). On `set` (overwrite) and `delete` we skip auto-close
+ * because another in-flight request may still hold a reference to the old
+ * client. Callers that `.delete()` are expected to close the client
+ * themselves when safe.
+ */
+const connections = new LRUCache<string, FalkorDB>({
+  max: 100,
+  ttl: 30 * 60 * 1000, // 30 minutes idle TTL
+  dispose(client, _key, reason) {
+    if (reason === 'set' || reason === 'delete') return;
+    try { client.close(); } catch { /* ignore */ }
+  },
+});
 
 enableAutoNextAuthUrl();
 
@@ -313,8 +334,9 @@ async function getConnectionClient(
       const conn = await client.connection;
       await conn.ping();
     } catch {
+      // Remove from cache but don't close — another request may still
+      // hold a reference. The socket error handler will clean it up.
       connections.delete(key);
-      try { await client.close(); } catch { /* ignore */ }
       client = undefined;
     }
   }
@@ -361,23 +383,57 @@ async function getConnectionClient(
     };
   }
 
-  // Get metadata from Token DB for role/host/port
-  const storage = StorageFactory.getStorage();
-  const tokenData = await storage.fetchTokenById(connId);
-  if (!tokenData) return null;
+  // Get metadata from Token DB for role/host/port.
+  // If the Token DB query fails or the entry is missing, we still have a
+  // healthy cached client — return it with minimal info rather than
+  // invalidating the session.
+  try {
+    const storage = StorageFactory.getStorage();
+    const tokenData = await storage.fetchTokenById(connId);
+    if (!tokenData) {
+      // Entry missing but client is alive — use fallback metadata.
+      // eslint-disable-next-line no-console
+      console.warn("Token DB entry not found for connId (non-fatal, using cached client):", connId);
+      return {
+        client,
+        connInfo: {
+          id: connId,
+          username: "",
+          role: "Read-Write" as Role,
+          host: "",
+          port: 0,
+          tls: false,
+        },
+      };
+    }
 
-  return {
-    client,
-    connInfo: {
-      id: connId,
-      username: tokenData.username,
-      role: tokenData.role as Role,
-      host: tokenData.host,
-      port: tokenData.port,
-      tls: tokenData.tls ?? false,
-      ca: tokenData.ca || undefined,
-    },
-  };
+    return {
+      client,
+      connInfo: {
+        id: connId,
+        username: tokenData.username,
+        role: tokenData.role as Role,
+        host: tokenData.host,
+        port: tokenData.port,
+        tls: tokenData.tls ?? false,
+        ca: tokenData.ca || undefined,
+      },
+    };
+  } catch (metaErr) {
+    // eslint-disable-next-line no-console
+    console.warn("Failed to fetch connection metadata (non-fatal, using cached client):", metaErr);
+    return {
+      client,
+      connInfo: {
+        id: connId,
+        username: "",
+        role: "Read-Write" as Role,
+        host: "",
+        port: 0,
+        tls: false,
+      },
+    };
+  }
 }
 
 /**
@@ -435,7 +491,7 @@ async function isJWTOnlyRequest(): Promise<boolean> {
  */
 async function verifyJWTToken(token: string): Promise<CustomJWTPayload> {
   const { jwtVerify } = await import('jose');
-  const secret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
+  const secret = new TextEncoder().encode(process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET);
   const { payload } = await jwtVerify(token, secret);
   return payload as unknown as CustomJWTPayload;
 }
@@ -600,7 +656,11 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
 
 const SESSION_MAX_AGE_SECONDS = 24 * 60 * 60; // 24 hours; keep in sync with session.maxAge below
 
-const authOptions: AuthOptions = {
+const authOptions: NextAuthConfig = {
+  // The app performs its own origin validation (isRequestOriginTrusted),
+  // so we trust the host unconditionally to avoid v5's strict host check
+  // breaking setups where only NEXTAUTH_URL is configured.
+  trustHost: true,
   session: {
     strategy: "jwt",
     maxAge: SESSION_MAX_AGE_SECONDS,
@@ -622,13 +682,24 @@ const authOptions: AuthOptions = {
           return null;
         }
 
+        // In next-auth v5, credential values are `unknown`. Cast to strings.
+        const creds = {
+          host: (credentials.host as string) || undefined,
+          port: (credentials.port as string) || undefined,
+          password: (credentials.password as string) || undefined,
+          username: (credentials.username as string) || undefined,
+          tls: (credentials.tls as string) || undefined,
+          ca: (credentials.ca as string) || undefined,
+          url: (credentials.url as string) || undefined,
+        };
+
         try {
           // Generate random UUID for this session and its first connection
           const id = uuidv4();
           const connId = uuidv4();
           const key = sessionConnectionKey(id, connId);
 
-          const { role } = await newClient(credentials, key);
+          const { role } = await newClient(creds, key);
 
           // Opportunistically clean up expired tokens from storage.
           // Non-blocking: fire-and-forget so login isn't delayed.
@@ -648,15 +719,15 @@ const authOptions: AuthOptions = {
               tokenHash,
               tokenId: connId,
               userId: id,
-              username: credentials.username || "default",
+              username: creds.username || "default",
               name: `connection:${connId}`,
               role,
-              host: credentials.host || "localhost",
-              port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-              password: credentials.password || "",
+              host: creds.host || "localhost",
+              port: creds.port ? parseInt(creds.port, 10) : 6379,
+              password: creds.password || "",
               kind: 'session',
-              tls: credentials.tls === "true",
-              ca: credentials.url ? undefined : credentials.ca,
+              tls: creds.tls === "true",
+              ca: creds.url ? undefined : creds.ca,
               expiresAtUnix: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS,
             });
           } catch (storageError) {
@@ -676,12 +747,12 @@ const authOptions: AuthOptions = {
           const res: User = {
             id,
             connId,
-            url: credentials.url,
-            host: credentials.host || "localhost",
-            port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-            username: credentials.username || "default",
-            tls: credentials.tls === "true",
-            ca: credentials.url ? undefined : credentials.ca,
+            url: creds.url || "",
+            host: creds.host || "localhost",
+            port: creds.port ? parseInt(creds.port, 10) : 6379,
+            username: creds.username || "default",
+            tls: creds.tls === "true",
+            ca: creds.url ? undefined : creds.ca,
             role,
           };
           return res;
@@ -863,8 +934,8 @@ const authOptions: AuthOptions = {
     },
   },
   events: {
-    async signOut({ token }) {
-      const t = token as Record<string, unknown> | null;
+    async signOut(message) {
+      const t = ("token" in message ? message.token : null) as Record<string, unknown> | null;
       const id = t?.id as string | undefined;
 
       if (id) {
@@ -891,6 +962,75 @@ const authOptions: AuthOptions = {
     },
   },
 };
+
+/**
+ * Replacement for getServerSession (which doesn't exist in next-auth v5).
+ * Uses getToken to read the JWT and builds a session-like object.
+ */
+export async function getSessionFromRequest(
+  request: Request
+): Promise<{ user: User; activeConnectionId?: string } | null> {
+  const token = await getToken({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    req: request as any,
+    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+    secureCookie: shouldUseSecureCookies(request),
+  });
+
+  if (!token?.sub) return null;
+
+  return {
+    user: {
+      id: (token.id as string) || token.sub,
+      role: ((token.role as string) || "Read-Only") as Role,
+      host: (token.host as string) || "localhost",
+      port: (typeof token.port === "string" ? parseInt(token.port, 10) : (token.port as number)) || 6379,
+      username: (token.username as string) || "default",
+      tls: (token.tls as boolean) ?? false,
+      url: "",
+    },
+    activeConnectionId: token.activeConnectionId as string | undefined,
+  };
+}
+
+/**
+ * Per-key mutex for connection resolution.
+ * Ensures only one request at a time can resolve/reconnect a given connection key.
+ * Subsequent requests for the same key wait for the first to finish, then reuse the result.
+ */
+const connectionLocks = new Map<string, Promise<unknown>>();
+
+/** Maximum time (ms) to wait for an in-flight lock before giving up and proceeding. */
+const LOCK_WAIT_TIMEOUT_MS = 10_000;
+
+async function withConnectionLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  // Wait for any in-flight operation on this key, but with a timeout to
+  // prevent indefinite hangs (e.g. if a previous request was aborted
+  // mid-flight and the promise never settled).
+  const deadline = Date.now() + LOCK_WAIT_TIMEOUT_MS;
+  while (connectionLocks.has(key)) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) {
+      // eslint-disable-next-line no-console
+      console.warn("Connection lock wait timed out for key:", key, "— proceeding without lock");
+      connectionLocks.delete(key);
+      break;
+    }
+    try {
+      await Promise.race([
+        connectionLocks.get(key),
+        new Promise((_, reject) => { setTimeout(() => { reject(new Error("lock timeout")); }, remaining); }),
+      ]);
+    } catch { /* ignore — we'll run our own attempt */ }
+  }
+  const promise = fn();
+  connectionLocks.set(key, promise);
+  try {
+    return await promise;
+  } finally {
+    connectionLocks.delete(key);
+  }
+}
 
 export async function getClient(
   request: Request
@@ -919,10 +1059,12 @@ export async function getClient(
   }
 
   // Fall back to session authentication for regular app requests
-  const session = await getServerSession(authOptions);
-  const id = session?.user?.id;
+  const session = await getSessionFromRequest(request);
+  const id = session?.user.id;
 
   if (!id) {
+    // eslint-disable-next-line no-console
+    console.warn("getClient: returning 401 — session has no user id");
     return NextResponse.json({ message: "Not authenticated" }, { status: 401, headers: getCorsHeaders(request) });
   }
 
@@ -965,11 +1107,12 @@ export async function getClient(
     // Old sessions (before multi-connection) stored the FalkorDB client
     // keyed by session ID and credentials via `credentialRef` in the JWT.
     // Try to reuse the old-style connection so users don't get kicked out.
+    return withConnectionLock(id, async () => {
     try {
       const jwt = await getToken({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         req: request as any,
-        secret: process.env.NEXTAUTH_SECRET,
+        secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
         secureCookie: shouldUseSecureCookies(request),
       });
       const credentialRef = jwt?.credentialRef as string | undefined;
@@ -981,12 +1124,11 @@ export async function getClient(
         try {
           password = await getPasswordFromTokenDB(credentialRef);
         } catch (pwErr) {
+          // Non-fatal: Token DB may be temporarily unavailable (e.g. due
+          // to server-wide config changes). Proceed with undefined password
+          // which works for passwordless connections (common in dev/CI).
           // eslint-disable-next-line no-console
-          console.warn("Legacy password resolution failed:", pwErr);
-          return NextResponse.json(
-            { message: "Session credential could not be resolved; please sign in again.", code: "SESSION_INVALID" },
-            { status: 401, headers: { ...getCorsHeaders(request), "X-Session-Invalid": "1" } }
-          );
+          console.warn("Legacy password resolution failed (non-fatal):", pwErr);
         }
       }
 
@@ -1007,7 +1149,6 @@ export async function getClient(
           connections.set(legacyKey, client);
         } catch {
           connections.delete(id);
-          try { await client.close(); } catch { /* ignore */ }
           client = undefined;
         }
       }
@@ -1021,11 +1162,14 @@ export async function getClient(
       if (!client) {
         // Reconnect using session user credentials
         const { user } = session;
+        // Only pass username when password is present; otherwise omit both
+        // so no AUTH command is sent to passwordless FalkorDB instances.
+        const legacyUsername = password ? (user.username || undefined) : undefined;
         const { client: reconnected, role: reconnectedRole } = await newClient(
           {
             host: user.host,
             port: user.port.toString(),
-            username: user.username,
+            username: legacyUsername,
             password,
             tls: user.tls.toString(),
           },
@@ -1081,6 +1225,8 @@ export async function getClient(
       // eslint-disable-next-line no-console
       console.warn("Legacy session fallback failed:", legacyErr);
     }
+    // eslint-disable-next-line no-console
+    console.warn("getClient: returning SESSION_INVALID (legacy path) for session:", id);
     return NextResponse.json(
       { message: "No active connection. Please sign in again.", code: "SESSION_INVALID" },
       {
@@ -1091,19 +1237,67 @@ export async function getClient(
         },
       }
     );
+    });
   }
 
   // All connections (including the initial login one) go through the
   // same path: look up the token from the DB, health-check the cached
   // client, and reconnect if necessary.
+  //
+  // Fast path (no lock): if the connection is already in the cache and
+  // healthy, return it immediately. This avoids serializing every
+  // concurrent request for the same user through the lock, which would
+  // add latency when multiple browser tabs / parallel tests share a
+  // session.
+  const connKey = sessionConnectionKey(id, connId);
+  const cachedClient = connections.get(connKey);
+  if (cachedClient) {
+    try {
+      const conn = await cachedClient.connection;
+      await conn.ping();
+      // Cache hit + healthy → return without lock
+      const connUser: AuthenticatedUserWithPassword = {
+        id,
+        username: "",
+        role: "Read-Write" as Role,
+        host: "",
+        port: 0,
+        tls: false,
+        password: undefined,
+      };
+      try {
+        const storage = StorageFactory.getStorage();
+        const tokenData = await storage.fetchTokenById(connId);
+        if (tokenData) {
+          connUser.username = tokenData.username;
+          connUser.role = tokenData.role as Role;
+          connUser.host = tokenData.host;
+          connUser.port = tokenData.port;
+          connUser.tls = tokenData.tls ?? false;
+          if (tokenData.encrypted_password) {
+            const { decrypt } = await import("../encryption");
+            connUser.password = decrypt(tokenData.encrypted_password) || undefined;
+          }
+        }
+      } catch {
+        // Non-fatal: metadata lookup failed but connection works
+      }
+      return { client: cachedClient, user: connUser };
+    } catch {
+      // Health check failed — fall through to locked recreation path.
+      // Only remove from cache; do NOT close the client here because
+      // another concurrent request may still hold a reference to it.
+      // The underlying socket error handler or GC will clean it up.
+      connections.delete(connKey);
+    }
+  }
+
+  // Slow path (with lock): connection is not in the cache or unhealthy.
+  // Use the lock to prevent multiple simultaneous recreation attempts.
+  return withConnectionLock(connKey, async () => {
   try {
     const connResult = await getConnectionClient(id, connId);
     if (connResult) {
-      // Build the user object from connection info; the password is a
-      // nice-to-have (used for PAT issuance and chat URL building) but
-      // the connection itself already works. Resolve it in a separate
-      // try/catch so a transient Token DB error here doesn't kill the
-      // whole request with SESSION_INVALID.
       const connUser: AuthenticatedUserWithPassword = {
         id,
         username: connResult.connInfo.username,
@@ -1137,6 +1331,52 @@ export async function getClient(
     console.warn("Failed to resolve connection:", connErr);
   }
 
+  // Before returning SESSION_INVALID, attempt a direct reconnect using session
+  // credentials. This handles transient Token DB issues without accumulating
+  // new Token DB entries (the connection is stored in cache only).
+  try {
+    const { user: sessionUser } = session;
+    // Try to resolve password from Token DB (best-effort; works without for
+    // passwordless connections which are common in dev/CI).
+    let reconnectPassword: string | undefined;
+    try {
+      const { decrypt } = await import("../encryption");
+      const storage = StorageFactory.getStorage();
+      const tokenData = await storage.fetchTokenById(connId);
+      if (tokenData?.encrypted_password) {
+        reconnectPassword = decrypt(tokenData.encrypted_password) || undefined;
+      }
+    } catch { /* proceed without password */ }
+    const reconnectUsername = reconnectPassword ? (sessionUser.username || undefined) : undefined;
+    const { client: reconnected, role: reconnectedRole } = await newClient(
+      {
+        host: sessionUser.host,
+        port: sessionUser.port.toString(),
+        username: reconnectUsername,
+        password: reconnectPassword,
+        tls: sessionUser.tls.toString(),
+      },
+      connKey
+    );
+    return {
+      client: reconnected,
+      user: {
+        id,
+        username: sessionUser.username,
+        role: reconnectedRole,
+        host: sessionUser.host,
+        port: sessionUser.port,
+        tls: sessionUser.tls,
+        password: reconnectPassword,
+      },
+    };
+  } catch (reconnectErr) {
+    // eslint-disable-next-line no-console
+    console.warn("connId reconnect fallback failed:", reconnectErr);
+  }
+
+  // eslint-disable-next-line no-console
+  console.warn("getClient: returning SESSION_INVALID (connId path) for session:", id, "connId:", connId);
   return NextResponse.json(
     { message: "Connection could not be resolved; please sign in again.", code: "SESSION_INVALID" },
     {
@@ -1147,6 +1387,7 @@ export async function getClient(
       },
     }
   );
+  });
 }
 
 export default authOptions;

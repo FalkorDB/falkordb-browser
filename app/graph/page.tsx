@@ -350,14 +350,14 @@ export default function Page() {
             const json = await result.json();
 
             if (isAddNode) {
-                const node = await graph.extendNode(json.result.data[0].n, false, false, true);
+                const node = await graph.extendNode(json.result.data[0].n, false, false);
 
                 if (node) {
                     setLabels(prev => [...prev, ...node.labels.filter(c => !prev.some(p => p.name === c)).map(c => graph.LabelsMap.get(c)!)]);
                     handleSetIsAdd(setIsAddNode, setIsAddEdge)(false);
                 }
             } else {
-                const link = await graph.extendEdge(json.result.data[0].e, false, false, true);
+                const link = await graph.extendEdge(json.result.data[0].e, false, false);
 
                 if (link) {
                     setRelationships(prev => [...prev.filter(p => p.name !== link.relationship), graph.RelationshipsMap.get(link.relationship)!]);
@@ -484,7 +484,6 @@ export default function Page() {
     return (
         <div className="Page p-3 gap-3">
             <Selector
-                type="Graph"
                 graph={graph}
                 options={graphNames}
                 setOptions={setGraphNames}

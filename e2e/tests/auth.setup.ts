@@ -67,5 +67,6 @@ setup("setup authentication", async () => {
 
     } catch (error) {
         console.error("Error during authentication setup:", error);
+        throw error;
     }
 });
