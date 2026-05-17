@@ -270,125 +270,140 @@ export default function Chat({ onClose }: Props) {
 
             const reader = response.body?.getReader();
             const decoder = new TextDecoder();
+            let buffer = "";
+
+            const handleEvent = (eventType: EventType | "error", eventData: string) => {
+                switch (eventType) {
+                    case "Status": {
+                        const message = {
+                            role: "assistant" as const,
+                            content: eventData,
+                            type: eventType
+                        };
+                        setMessages(prev => [...prev, message]);
+                        break;
+                    }
+
+                    case "CypherQuery":
+                        setQueryCollapse(prev => ({ ...prev, [messages.length]: false }));
+                        setMessages(prev => [
+                            ...prev,
+                            {
+                                role: "assistant",
+                                content: eventData.replace(/^cypher\s+/i, ""),
+                                type: eventType
+                            }
+                        ]);
+                        break;
+
+                    case "Result":
+                        try {
+                            setMessages(prev => [
+                                ...prev,
+                                {
+                                    role: "assistant",
+                                    content: JSON.parse(eventData),
+                                    type: eventType
+                                }
+                            ]);
+                        } catch (error) {
+                            console.error("Failed to parse Result event data:", error);
+                            setMessages(prev => [
+                                ...prev,
+                                {
+                                    role: "assistant",
+                                    content: eventData,
+                                    type: "Error"
+                                }
+                            ]);
+                        }
+                        return true;
+
+                    case "Error":
+                        setMessages(prev => [
+                            ...prev,
+                            {
+                                role: "assistant",
+                                content: eventData,
+                                type: eventType
+                            }
+                        ]);
+                        return true;
+
+                    case "error": {
+                        let statusCode = 0;
+                        let errorMessage = eventData;
+
+                        try {
+                            const parsed = JSON.parse(eventData);
+                            if (typeof parsed === "object" && parsed !== null) {
+                                statusCode = parsed.status || 0;
+                                errorMessage = parsed.message || eventData;
+                            }
+                        } catch {
+                            errorMessage = eventData;
+                        }
+
+                        if (statusCode === 401 || statusCode >= 500) setIndicator("offline");
+
+                        const friendly = toUserFriendlyMessage(errorMessage, statusCode);
+                        toast({
+                            title: friendly.title,
+                            description: friendly.description,
+                            variant: "destructive",
+                        });
+
+                        return true;
+                    }
+
+                    case "CypherResult":
+                        break;
+
+                    default:
+                        break;
+                }
+                return false;
+            };
 
             const processStream = async () => {
                 if (!reader) return;
 
-                const { done, value } = await reader.read();
+                // eslint-disable-next-line no-constant-condition
+                while (true) {
+                    const { done, value } = await reader.read();
 
-                if (done) return;
+                    if (done) break;
 
-                const chunk = decoder.decode(value, { stream: true });
+                    buffer += decoder.decode(value, { stream: true });
 
-                const lines = chunk.split('event:').filter(line => line);
-                let isResult = false;
+                    // Parse complete SSE frames (delimited by \n\n)
+                    let frameEnd: number;
+                    // eslint-disable-next-line no-cond-assign
+                    while ((frameEnd = buffer.indexOf("\n\n")) !== -1) {
+                        const frame = buffer.substring(0, frameEnd);
+                        buffer = buffer.substring(frameEnd + 2);
 
-                lines.forEach(line => {
-                    const parts = line.split('\n').map(p => p.trim()).filter(p => p);
-                    const eventType: EventType | "error" = parts[0] as EventType | "error";
-                    const dataLine = parts.find(p => p.startsWith('data:'));
-                    const eventData = dataLine ? dataLine.substring(5).trim() : "";
-                    switch (eventType) {
-                        case "Status":
-                            const message = {
-                                role: "assistant" as const,
-                                content: eventData.trim(),
-                                type: eventType
-                            };
+                        let eventType: EventType | "error" | null = null;
+                        let eventData = "";
 
-                            setMessages(prev => [...prev, message]);
-                            break;
-
-                        case "CypherQuery":
-                            setQueryCollapse(prev => ({ ...prev, [messages.length]: false }));
-                            setMessages(prev => [
-                                ...prev,
-                                {
-                                    role: "assistant",
-                                    content: eventData.trim().replace(/^cypher\s+/i, ""),
-                                    type: eventType
-                                }
-                            ]);
-                            break;
-
-                        case "Result":
-                            try {
-                                setMessages(prev => [
-                                    ...prev,
-                                    {
-                                        role: "assistant",
-                                        content: JSON.parse(eventData.trim()),
-                                        type: eventType
-                                    }
-                                ]);
-                            } catch (error) {
-                                console.error("Failed to parse Result event data:", error);
-                                setMessages(prev => [
-                                    ...prev,
-                                    {
-                                        role: "assistant",
-                                        content: eventData.trim(),
-                                        type: "Error"
-                                    }
-                                ]);
+                        for (const line of frame.split("\n")) {
+                            if (line.startsWith("event:")) {
+                                eventType = line.substring(6).trim() as EventType | "error";
+                            } else if (line.startsWith("data:")) {
+                                eventData = line.substring(5).trim();
                             }
-                            isResult = true;
-                            break;
-
-                        case "Error":
-                            setMessages(prev => [
-                                ...prev,
-                                {
-                                    role: "assistant",
-                                    content: eventData.trim(),
-                                    type: eventType
-                                }
-                            ]);
-                            isResult = true;
-                            break;
-
-                        case "error": {
-                            let statusCode = 0;
-                            let errorMessage = eventData;
-
-                            try {
-                                const parsed = JSON.parse(eventData);
-                                if (typeof parsed === "object" && parsed !== null) {
-                                    statusCode = parsed.status || 0;
-                                    errorMessage = parsed.message || eventData;
-                                }
-                            } catch {
-                                errorMessage = eventData;
-                            }
-
-                            if (statusCode === 401 || statusCode >= 500) setIndicator("offline");
-
-                            const friendly = toUserFriendlyMessage(errorMessage, statusCode);
-                            toast({
-                                title: friendly.title,
-                                description: friendly.description,
-                                variant: "destructive",
-                            });
-
-                            isResult = true;
-                            break;
                         }
 
-                        case "CypherResult":
-                            break;
-
-                        default:
-                            throw new Error(`Unknown event type: ${eventType}`);
+                        if (eventType) {
+                            const isResult = handleEvent(eventType, eventData);
+                            setTimeout(scrollToBottom, 0);
+                            if (isResult) return;
+                        }
                     }
-                });
-
-                setTimeout(scrollToBottom, 0);
-
-                if (!isResult) await processStream();
-
+                }
             };
 
-            processStream();
+            await processStream();
         } catch (error) {
             const friendly = toUserFriendlyMessage(error instanceof Error ? error.message : error, getErrorStatus(error));
             toast({

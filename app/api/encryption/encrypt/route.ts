@@ -23,6 +23,12 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    if (typeof body !== "object" || body === null) {
+      return NextResponse.json(
+        { message: "Request body must be a JSON object" },
+        { status: 400 }
+      );
+    }
     const { value } = body;
 
     if (typeof value !== "string") {

@@ -1238,7 +1238,7 @@ export default class GraphPage extends BasePage {
 
   async modifyGraphName(oldName: string, newName: string): Promise<void> {
     // Wait for graph selector to be enabled (graphs loaded)
-    await waitForElementToBeEnabled(this.select("Graph"));
+    await waitForElementToBeEnabled(this.select("Graph"), 1000, 15);
     await this.clickSelect();
     await this.clickManage();
     await this.hoverTableRowByName(oldName);

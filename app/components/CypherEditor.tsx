@@ -251,6 +251,12 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             if (prev.counter && prev.counter <= prev.queries.length) {
                 return { ...prev, query: prev.queries[prev.counter - 1].text };
             }
+            if (prev.counter && prev.counter > prev.queries.length) {
+                const clamped = prev.queries.length;
+                return clamped > 0
+                    ? { ...prev, counter: clamped, query: prev.queries[clamped - 1].text }
+                    : { ...prev, counter: 0, query: prev.currentQuery.text };
+            }
             return { ...prev, query: prev.currentQuery.text };
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps

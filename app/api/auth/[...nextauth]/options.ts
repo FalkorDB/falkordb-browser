@@ -62,7 +62,7 @@ interface AuthenticatedUserWithPassword extends AuthenticatedUser {
  * themselves when safe.
  */
 const connections = new LRUCache<string, FalkorDB>({
-  max: parseInt(process.env.MAX_CONNECTION_CACHE_SIZE || '100', 10),
+  max: (() => { const n = parseInt(process.env.MAX_CONNECTION_CACHE_SIZE || '100', 10); return Number.isFinite(n) && n > 0 ? n : 100; })(),
   ttl: 30 * 60 * 1000, // 30 minutes idle TTL
   dispose(client, _key, reason) {
     if (reason === 'set' || reason === 'delete') return;
@@ -645,6 +645,10 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
 
       return { client, user };
     } catch (error) {
+      // Surface server misconfiguration errors instead of silently falling back
+      if (error instanceof Error && (error.message.includes("AUTH_SECRET") || error.message.includes("NEXTAUTH_SECRET") || error.message.includes("ENCRYPTION_KEY"))) {
+        throw error;
+      }
       // Fall back to session auth if JWT fails
       // eslint-disable-next-line no-console
       console.warn("JWT authentication failed, falling back to session:", error);
@@ -1031,6 +1035,8 @@ async function withConnectionLock<T>(key: string, fn: () => Promise<T>): Promise
   let resolve!: (v: T) => void;
   let reject!: (e: unknown) => void;
   const sentinel = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+  // Prevent unhandled rejection if fn() rejects before any waiter attaches
+  sentinel.catch(() => {});
   connectionLocks.set(key, sentinel);
   try {
     const result = await fn();

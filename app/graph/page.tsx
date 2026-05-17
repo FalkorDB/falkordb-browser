@@ -101,7 +101,7 @@ export default function Page() {
     // Tracks whether a URL query has been dispatched but hasn't completed yet.
     // Prevents the default query from firing when `runDefaultQuery` state
     // changes (loaded from localStorage) before the async URL query finishes.
-    const urlQueryFiredRef = useRef(false);
+    const urlQueryFiredRef = useRef<string | null>(null);
 
     const onPanelResize = useCallback((size: PanelSize) => {
         setIsCollapsed(size.asPercentage === 0);
@@ -233,7 +233,7 @@ export default function Page() {
         if (pendingUrlQuery && graphName) {
             if (graphName !== graph.Id) {
                 initialUrlQueryRef.current = "";
-                urlQueryFiredRef.current = true;
+                urlQueryFiredRef.current = graphName;
                 runQuery(pendingUrlQuery, graphName);
             }
             return;
@@ -244,9 +244,13 @@ export default function Page() {
         // so it doesn't overwrite the in-flight URL query result.
         if (urlQueryFiredRef.current) {
             if (graphName === graph.Id) {
-                urlQueryFiredRef.current = false;
+                urlQueryFiredRef.current = null;
+            } else if (graphName !== urlQueryFiredRef.current) {
+                // Different graph selected — clear the stale latch
+                urlQueryFiredRef.current = null;
+            } else {
+                return;
             }
-            return;
         }
 
         // Priority 2: Default query / empty graph

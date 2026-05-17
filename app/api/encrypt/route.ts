@@ -34,6 +34,12 @@ export async function POST(request: NextRequest) {
         { status: 400, headers: corsHeaders }
       );
     }
+    if (typeof body !== "object" || body === null) {
+      return NextResponse.json(
+        { error: "Request body must be a JSON object" },
+        { status: 400, headers: corsHeaders }
+      );
+    }
     const { value, action } = body;
 
     if (typeof value !== "string") {

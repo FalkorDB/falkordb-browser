@@ -163,15 +163,15 @@ export async function POST(request: NextRequest) {
 
             // Send result events
             if (result.cypherQuery) {
-                writer.write(encoder.encode(`event: CypherQuery\ndata: ${result.cypherQuery}\n\n`));
+                await writer.write(encoder.encode(`event: CypherQuery\ndata: ${result.cypherQuery}\n\n`));
             }
 
             if (result.cypherResult) {
-                writer.write(encoder.encode(`event: CypherResult\ndata: ${JSON.stringify(result.cypherResult)}\n\n`));
+                await writer.write(encoder.encode(`event: CypherResult\ndata: ${JSON.stringify(result.cypherResult)}\n\n`));
             }
 
             if (result.answer) {
-                writer.write(encoder.encode(`event: Result\ndata: ${JSON.stringify(result.answer)}\n\n`));
+                await writer.write(encoder.encode(`event: Result\ndata: ${JSON.stringify(result.answer)}\n\n`));
             }
 
             writer.close();
@@ -181,12 +181,12 @@ export async function POST(request: NextRequest) {
             // Create user-friendly error message
             const userFriendlyMessage = createUserFriendlyErrorMessage(error as Error, model, key);
 
-            writer.write(encoder.encode(`event: error\ndata: ${JSON.stringify({ status: 400, message: userFriendlyMessage })}\n\n`));
+            await writer.write(encoder.encode(`event: error\ndata: ${JSON.stringify({ status: 400, message: userFriendlyMessage })}\n\n`));
             writer.close();
         }
     } catch (error) {
         console.error(error);
-        writer.write(encoder.encode(`event: error\ndata: ${JSON.stringify({ status: 500, message: "Internal server error" })}\n\n`));
+        await writer.write(encoder.encode(`event: error\ndata: ${JSON.stringify({ status: 500, message: "Internal server error" })}\n\n`));
         writer.close();
     }
 
