@@ -120,6 +120,15 @@ export async function POST(request: NextRequest) {
         const { messages, graphName, key, model, cypherOnly } = validation.data;
 
         try {
+            // Fail fast on model/API key provider mismatch before making any external calls
+            const modelProvider = detectProviderFromModel(model);
+            const keyProvider = detectProviderFromApiKey(key);
+            if (modelProvider !== "unknown" && keyProvider !== "unknown" && modelProvider !== keyProvider && modelProvider !== "ollama") {
+                const modelProviderName = getProviderDisplayName(modelProvider);
+                const keyProviderName = getProviderDisplayName(keyProvider);
+                throw new Error(`Model/API key mismatch: You selected a ${modelProviderName} model but provided a ${keyProviderName} API key. Please update your API key in Settings to match your selected model.`);
+            }
+
             // Build FalkorDB connection URL from user session
             const falkordbConnection = buildFalkorDBConnection(session.user);
 

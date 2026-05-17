@@ -368,7 +368,6 @@ export default function Chat({ onClose }: Props) {
             const processStream = async () => {
                 if (!reader) return;
 
-                // eslint-disable-next-line no-constant-condition
                 while (true) {
                     const { done, value } = await reader.read();
 
@@ -378,7 +377,6 @@ export default function Chat({ onClose }: Props) {
 
                     // Parse complete SSE frames (delimited by \n\n)
                     let frameEnd: number;
-                    // eslint-disable-next-line no-cond-assign
                     while ((frameEnd = buffer.indexOf("\n\n")) !== -1) {
                         const frame = buffer.substring(0, frameEnd);
                         buffer = buffer.substring(frameEnd + 2);
@@ -403,7 +401,18 @@ export default function Chat({ onClose }: Props) {
                 }
             };
 
-            await processStream();
+            processStream()
+                .catch((error) => {
+                    const friendly = toUserFriendlyMessage(error instanceof Error ? error.message : error, getErrorStatus(error));
+                    toast({
+                        title: friendly.title,
+                        description: friendly.description,
+                        variant: "destructive",
+                    });
+                })
+                .finally(() => {
+                    setIsLoading(false);
+                });
         } catch (error) {
             const friendly = toUserFriendlyMessage(error instanceof Error ? error.message : error, getErrorStatus(error));
             toast({
@@ -411,7 +420,6 @@ export default function Chat({ onClose }: Props) {
                 description: friendly.description,
                 variant: "destructive",
             });
-        } finally {
             setIsLoading(false);
         }
     };
