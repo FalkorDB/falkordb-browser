@@ -21,7 +21,7 @@ export function setUrlParam(updates: Record<string, string | null>) {
   });
 
   const search = params.toString();
-  const newUrl = `${window.location.pathname}${search ? `?${search}` : ""}`;
+  const newUrl = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
   window.history.replaceState(null, "", newUrl);
 }
 

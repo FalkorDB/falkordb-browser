@@ -36,6 +36,9 @@ export default function Header() {
     const { toast } = useToast();
 
     const [usedMemory, setUsedMemory] = useState<string | null>(null);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => { setMounted(true); }, []);
 
     useEffect(() => {
         setUsedMemory(null);
@@ -72,7 +75,7 @@ export default function Header() {
         <header className="flex gap-4 w-full border-b border-border/50 px-3 py-1.5 items-center text-sm">
             <ConnectionManager />
             {
-                formatVersion(dbVersion) &&
+                mounted && formatVersion(dbVersion) &&
                 <div className="flex gap-1 items-center">
                     <span className="font-bold">FalkorDB:</span>
                     <h2>v{formatVersion(dbVersion)}</h2>
@@ -128,7 +131,7 @@ export default function Header() {
                 <h2>{session?.user?.username || session?.user?.name || "default"}</h2>
             </div>
             {
-                session?.user &&
+                mounted && session?.user &&
                 <div className="flex gap-1 items-center">
                     <Button
                         title="Copy deployment info"

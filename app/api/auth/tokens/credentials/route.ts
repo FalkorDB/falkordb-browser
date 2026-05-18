@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
     if (!authSecret) {
       return NextResponse.json(
-        { message: "Server configuration error: AUTH_SECRET not set" },
+        { message: "Server configuration error: AUTH_SECRET or NEXTAUTH_SECRET not set" },
         { status: 500 }
       );
     }

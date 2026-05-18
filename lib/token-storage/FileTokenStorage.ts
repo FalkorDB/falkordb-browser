@@ -23,10 +23,14 @@ class FileTokenStorage implements ITokenStorage {
       // Ensure directory exists with restrictive permissions (owner-only)
       const dir = path.dirname(this.filePath);
       await fs.mkdir(dir, { recursive: true, mode: 0o700 });
+      // Enforce permissions on pre-existing directory
+      await fs.chmod(dir, 0o700);
 
       // Check if file exists
       try {
         await fs.access(this.filePath);
+        // Enforce permissions on pre-existing file
+        await fs.chmod(this.filePath, 0o600);
       } catch {
         // File doesn't exist, create it with empty array and restrictive permissions
         await fs.writeFile(this.filePath, JSON.stringify({ tokens: [] }, null, 2), { encoding: 'utf8', mode: 0o600 });

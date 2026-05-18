@@ -42,7 +42,7 @@ const defaultQueryHistory: HistoryQuery = {
  *
  * @param children - The React node(s) to render inside the provider-managed layout (main content area).
  */
-function ProvidersWithSession({ children }: { children: React.ReactNode }) {
+function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; nonce?: string }) {
   const pathname = usePathname();
   const { toast } = useToast();
   const { status, data: sessionData, update: updateSession } = useSession();
@@ -967,7 +967,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     } catch {
       // Invalid saved content, ignore
     }
-  }, [prefixReady, contentPersistence, graphNames, graph.Id, runQuery]);
+  }, [prefixReady, contentPersistence, graphNames, graph.Id, runQuery, handleSetGraphName]);
   // Reset all graph state when the active connection changes (user switch)
   useEffect(() => {
     const prev = prevActiveConnectionIdRef.current;
@@ -1103,7 +1103,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   }, [runQuery, runDefaultQuery, defaultQuery, toast, userGraphBeforeTutorial, userGraphsBeforeTutorial]);
 
   return (
-    <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange>
+    <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange nonce={nonce}>
       <LoginVerification>
         <BrowserSettingsContext.Provider value={browserSettingsContext}>
           <GraphContext.Provider value={graphContext}>
@@ -1140,11 +1140,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function NextAuthProvider({ children }: { children: React.ReactNode }) {
+export default function NextAuthProvider({ children, nonce }: { children: React.ReactNode; nonce?: string }) {
   return (
     <SessionProvider>
       <Suspense fallback={null}>
-        <ProvidersWithSession>{children}</ProvidersWithSession>
+        <ProvidersWithSession nonce={nonce}>{children}</ProvidersWithSession>
       </Suspense>
     </SessionProvider>
   );
