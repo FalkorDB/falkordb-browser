@@ -46,70 +46,6 @@ export const updateUser = z.object({
     .optional(),
 });
 
-// Schema (graph schema) schemas
-export const renameSchema = z.object({
-  sourceName: z
-    .string({
-      error: (issue) => issue.input === undefined ? "Source name is required" : "Invalid Source name",
-    })
-    .min(1, "Source name cannot be empty"),
-});
-
-export const duplicateSchema = z.object({
-  sourceName: z
-    .string({
-      error: (issue) => issue.input === undefined ? "Source name is required" : "Invalid Source name",
-    })
-    .min(1, "Source name cannot be empty"),
-});
-
-export const createSchemaElement = z.object({
-  type: z.boolean(),
-  label: z.array(z.string()),
-  attributes: z.array(
-    z.tuple([
-      z.string().min(1, "Attribute name cannot be empty"),
-      z.array(z.string().min(1, "Attribute values cannot be empty")),
-    ])
-  ),
-  selectedNodes: z
-    .array(
-      z.object({
-        id: z.number(),
-      })
-    )
-    .optional(),
-});
-
-export const deleteSchemaElement = z.object({
-  type: z.boolean(),
-});
-
-export const addSchemaElementLabel = z.object({
-  label: z
-    .string({
-      error: (issue) => issue.input === undefined ? "Label is required" : "Invalid Label",
-    })
-    .min(1, "Label cannot be empty"),
-});
-
-export const removeSchemaElementLabel = z.object({
-  label: z
-    .string({
-      error: (issue) => issue.input === undefined ? "Label is required" : "Invalid Label",
-    })
-    .min(1, "Label cannot be empty"),
-});
-
-export const updateSchemaElementAttribute = z.object({
-  type: z.boolean(),
-  attribute: z.array(z.string().min(1, "Attribute value cannot be empty")),
-});
-
-export const deleteSchemaElementAttribute = z.object({
-  type: z.boolean(),
-});
-
 // Graph schemas
 export const renameGraph = z.object({
   sourceName: z
@@ -341,3 +277,43 @@ export function validateBody<T extends z.ZodTypeAny>(
     return { success: false, error: "Validation failed" };
   }
 }
+
+// Connection schemas
+export const addConnection = z.object({
+  host: z
+    .string({ error: "Invalid Host" })
+    .optional(),
+  port: z
+    .union([z.string(), z.number()])
+    .optional(),
+  username: z
+    .string({ error: "Invalid Username" })
+    .optional(),
+  password: z
+    .string({ error: "Invalid Password" })
+    .optional(),
+  tls: z
+    .union([z.boolean(), z.string()])
+    .optional(),
+  ca: z
+    .string({ error: "Invalid CA certificate" })
+    .optional(),
+});
+
+// Token creation schema
+export const createToken = z.object({
+  name: z
+    .string({ error: "Invalid token name" })
+    .min(1, "Token name cannot be empty")
+    .default("API Token"),
+  expiresAt: z
+    .string({ error: "Invalid expiration date" })
+    .nullable()
+    .optional()
+    .default(null),
+  ttlSeconds: z
+    .number({ error: "Invalid TTL value" })
+    .min(1, "TTL must be at least 1 second")
+    .max(31622400, "TTL cannot exceed 1 year")
+    .optional(),
+});

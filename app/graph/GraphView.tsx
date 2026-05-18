@@ -1,5 +1,3 @@
-/* eslint-disable no-param-reassign */
-
 'use client';
 
 import { useEffect, Dispatch, SetStateAction, useContext, useCallback, useState } from "react";
@@ -18,7 +16,7 @@ import MetadataView from "./MetadataView";
 
 interface Props {
     selectedElements: (Node | Link)[]
-    setSelectedElements: (elements?: (Node | Link)[]) => void
+    setSelectedElements: (elements?: (Node | Link)[], fromSearch?: boolean) => void
     canvasRef: GraphRef
     handleDeleteElement: () => Promise<void>
     setLabels: Dispatch<SetStateAction<Label[]>>
@@ -53,7 +51,7 @@ function GraphView({
     setIsAddEdge,
     setIsAddNode,
     isAddEdge,
-    isAddNode
+    isAddNode,
 }: Props) {
 
     const { graph, graphName, currentTab, setCurrentTab, isLoading, setIsLoading, expand, setExpand } = useContext(GraphContext);
@@ -79,10 +77,6 @@ function GraphView({
 
         setCurrentTab(defaultChecked);
     }, [graph, graph.getElements().length, graph.Data.length, setCurrentTab]);
-
-    useEffect(() => {
-        setSelectedElements([]);
-    }, [graph.Id, setSelectedElements]);
 
     const onLabelClick = (label: Label) => {
         const canvas = canvasRef.current;
@@ -172,7 +166,6 @@ function GraphView({
                             <Toolbar
                                 graph={graph}
                                 graphName={graphName}
-                                label="Graph"
                                 selectedElements={selectedElements}
                                 setSelectedElements={setSelectedElements}
                                 handleDeleteElement={handleDeleteElement}
@@ -187,9 +180,9 @@ function GraphView({
                             {
                                 expand && (labels.length !== 0 || relationships.length !== 0) &&
                                 <div className={cn("w-fit max-w-[180px] h-1 grow grid gap-1.5", labels.length !== 0 && relationships.length !== 0 ? "grid-rows-[minmax(0,max-content)_max-content_minmax(0,max-content)]" : "grid-rows-[minmax(0,max-content)]")}>
-                                    {labels.length !== 0 && <Labels labels={labels} onClick={onLabelClick} label="Labels" type="Graph" />}
+                                    {labels.length !== 0 && <Labels labels={labels} onClick={onLabelClick} label="Labels" />}
                                     {labels.length !== 0 && relationships.length > 0 && <div className="h-px bg-border/40 rounded-full" />}
-                                    {relationships.length !== 0 && <Labels labels={relationships} onClick={onRelationshipClick} label="Relationships" type="Graph" />}
+                                    {relationships.length !== 0 && <Labels labels={relationships} onClick={onRelationshipClick} label="Relationships" />}
                                 </div>
                             }
                         </>

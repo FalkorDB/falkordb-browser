@@ -20,11 +20,12 @@ type Tab = "text" | "metadata" | "explain" | "profile";
 
 interface Props {
     onClose: () => void;
+    graphName: string;
 }
 
-export default function QueryHistoryPanel({ onClose }: Props) {
+export default function QueryHistoryPanel({ onClose, graphName }: Props) {
     const { historyQuery, setHistoryQuery } = useContext(HistoryQueryContext);
-    const { graphName, graphNames, runQuery, fetchCount } = useContext(GraphContext);
+    const { graphNames, runQuery, fetchCount } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
     const { indicator } = useContext(IndicatorContext);
 
@@ -55,18 +56,7 @@ export default function QueryHistoryPanel({ onClose }: Props) {
         ? historyQuery.currentQuery
         : historyQuery?.queries[historyQuery.counter - 1];
 
-    useEffect(() => {
-        if (!historyQuery || !setHistoryQuery) return;
-        setHistoryQuery(prev => ({
-            ...prev,
-            query: prev.counter ? prev.queries[prev.counter - 1].text : prev.currentQuery.text
-        }));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [historyQuery?.counter, setHistoryQuery]);
-
     const afterSearchCallback = useCallback((newFilteredList: Query[]) => {
-        if (!historyQuery || !setHistoryQuery) return;
-
         const selectedQuery = historyQuery.counter === 0
             ? historyQuery.currentQuery
             : historyQuery.queries[historyQuery.counter - 1];

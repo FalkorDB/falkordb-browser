@@ -204,7 +204,7 @@ export default function EditorComponent({
 
             editorRef.current = editor;
 
-            // Listen for content changes
+            // Listen for content changes — skip callback when change is from our own setValue
             editor.onDidChangeModelContent(() => {
                 onChangeRef.current?.(editor.getValue());
             });
@@ -242,14 +242,23 @@ export default function EditorComponent({
         }
     }, [languageConfig, language]);
 
-    // Update value when prop changes (but not if the editor content already matches)
+    // Sync external value changes (history navigation, etc.) into the editor.
     useEffect(() => {
         const editor = editorRef.current;
-        
-        if (editor && value !== undefined && editor.getValue() !== value) {
-            editor.setValue(value);
+        if (!editor || value === undefined) return;
+        if (editor.getValue() === value) return;
+
+        editor.setValue(value);
+
+        // Move cursor to end so context keys (isFirstLine/isLastLine) stay accurate
+        const model = editor.getModel();
+        if (model) {
+            const lastLine = model.getLineCount();
+            const lastCol = model.getLineMaxColumn(lastLine);
+            editor.setPosition({ lineNumber: lastLine, column: lastCol });
         }
-    }, [value, editorRef.current]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [value]);
 
     // Update options when they change
     useEffect(() => {

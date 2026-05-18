@@ -420,7 +420,7 @@ test.describe("Customize Style Tests", () => {
     await dataGraph.clickRunQuery(false);
 
     // Get initial canvas nodes - find the node with person1 label
-    let nodes = await dataGraph.getNodesScreenPositions("graph");
+    let nodes = await dataGraph.getNodesScreenPositions();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const targetNode = nodes.find((n: any) => n.labels?.includes("person1"));
     expect(targetNode).toBeTruthy();
@@ -450,7 +450,7 @@ test.describe("Customize Style Tests", () => {
     // We cannot use getNodesScreenPositions() here because canvas v0.0.49
     // does not update data-engine-status to "stopped" after re-renders
     // triggered by label edits when autoStopOnSettle is false.
-    const result = await dataGraph.waitForGraphNodeUpdate("graph", {
+    const result = await dataGraph.waitForGraphNodeUpdate({
       label: newLabel,
       notColor: initialNodeColor,
       nodeId: String(targetNode.id),
@@ -472,7 +472,7 @@ test.describe("Customize Style Tests", () => {
     await graph.clickRunQuery(false);
     
     // Get initial nodes from window.graph - find person1 nodes
-    let nodes = await graph.getNodesScreenPositions("graph");
+    let nodes = await graph.getNodesScreenPositions();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const person1Nodes = nodes.filter((n: any) => n.labels?.includes("person1"));
     expect(person1Nodes.length).toBeGreaterThan(0);
@@ -512,7 +512,7 @@ test.describe("Customize Style Tests", () => {
     await graph.clickRunQuery(false);
 
     // Get nodes after refresh
-    nodes = await graph.getNodesScreenPositions("graph");
+    nodes = await graph.getNodesScreenPositions();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const person1NodesAfterRefresh = nodes.filter((n: any) => n.labels?.includes("person1"));
     expect(person1NodesAfterRefresh.length).toBeGreaterThan(0);
@@ -535,7 +535,7 @@ test.describe("Customize Style Tests", () => {
     await graph.clickRunQuery(false);
     
     // Get initial nodes - find person1 nodes
-    let nodes = await graph.getNodesScreenPositions("graph");
+    let nodes = await graph.getNodesScreenPositions();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const person1Nodes = nodes.filter((n: any) => n.labels?.includes("person1"));
     expect(person1Nodes.length).toBeGreaterThan(0);
@@ -574,7 +574,7 @@ test.describe("Customize Style Tests", () => {
     await graph.clickRunQuery(false);
 
     // Get nodes after refresh
-    nodes = await graph.getNodesScreenPositions("graph");
+    nodes = await graph.getNodesScreenPositions();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const person1NodesAfterRefresh = nodes.filter((n: any) => n.labels?.includes("person1"));
     expect(person1NodesAfterRefresh.length).toBeGreaterThan(0);

@@ -172,9 +172,9 @@ export async function getAdminToken(): Promise<
     }
 
     const requiredCookies = [
-      "next-auth.callback-url",
-      "next-auth.csrf-token",
-      "next-auth.session-token",
+      "authjs.callback-url",
+      "authjs.csrf-token",
+      "authjs.session-token",
     ];
     const cookieString = authState.cookies
       .filter((cookie: { name: string }) =>
@@ -216,11 +216,6 @@ export async function interactWhenVisible<T>(
   const isVisible = await waitForElementToBeVisible(element, time, retry);
   if (!isVisible) throw new Error(`${name} is not visible!`);
   return action(element);
-}
-
-export function inferLabelFromGraph(graph: string): string {
-  if (graph.toLowerCase().includes("schema")) return "Schema";
-  return "Graph";
 }
 
 export async function pollForElementContent(

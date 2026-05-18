@@ -6,6 +6,7 @@ import StorageFactory from "@/lib/token-storage/StorageFactory";
 import { getClient, generateTimeUUID } from "../[...nextauth]/options";
 import { storeEncryptedCredential } from "../tokenUtils";
 import { getCorsHeaders } from "../../utils";
+import { createToken, validateBody } from "../../validate-body";
 
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
@@ -116,13 +117,14 @@ export async function GET(request: Request) {
 export async function POST(request: NextRequest) {
   try {
     // 1. Validate JWT secret
-    if (!process.env.NEXTAUTH_SECRET) {
+    const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+    if (!authSecret) {
       return NextResponse.json(
         { message: "Server configuration error" },
         { status: 500, headers: getCorsHeaders(request) }
       );
     }
-    const jwtSecret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
+    const jwtSecret = new TextEncoder().encode(authSecret);
 
     // 2. Get authenticated user from session
     const session = await getClient(request);
@@ -131,10 +133,10 @@ export async function POST(request: NextRequest) {
     }
     const { user } = session;
 
-    // 3. Parse request body for token metadata
-    let body;
+    // 3. Parse and validate request body
+    let rawBody: unknown;
     try {
-      body = await request.json();
+      rawBody = await request.json();
     } catch {
       return NextResponse.json(
         { message: "Invalid JSON in request body" },
@@ -142,13 +144,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const {
-      name = "API Token",
-      expiresAt = null,
-      ttlSeconds = undefined,
-    } = body;
+    const result = validateBody(createToken, rawBody);
+    if (!result.success) {
+      return NextResponse.json(
+        { message: result.error },
+        { status: 400, headers: getCorsHeaders(request) }
+      );
+    }
 
-    // 4. Validate expiration parameters
+    const {
+      name,
+      expiresAt,
+      ttlSeconds,
+    } = result.data;
+
+    // 4. Validate expiration date is in the future
     let expiresAtDate: Date | null = null;
     if (expiresAt) {
       expiresAtDate = new Date(expiresAt);
@@ -158,12 +168,6 @@ export async function POST(request: NextRequest) {
           { status: 400, headers: getCorsHeaders(request) }
         );
       }
-    }
-    if (ttlSeconds !== undefined && (ttlSeconds > 31622400 || ttlSeconds < 1)) {
-      return NextResponse.json(
-        { message: "Invalid TTL value" },
-        { status: 400, headers: getCorsHeaders(request) }
-      );
     }
 
     // 5. Generate random token ID (jti)

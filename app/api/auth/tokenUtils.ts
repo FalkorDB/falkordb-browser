@@ -8,9 +8,10 @@ import { encrypt } from "./encryption";
  * Validates JWT secret exists in environment
  */
 export function validateJWTSecret(): { valid: boolean; secret?: Uint8Array; error?: NextResponse } {
-  if (!process.env.NEXTAUTH_SECRET) {
+  const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+  if (!authSecret) {
     // eslint-disable-next-line no-console
-    console.error("NEXTAUTH_SECRET environment variable is required");
+    console.error("AUTH_SECRET environment variable is required");
     return {
       valid: false,
       error: NextResponse.json(
@@ -21,7 +22,7 @@ export function validateJWTSecret(): { valid: boolean; secret?: Uint8Array; erro
   }
   return {
     valid: true,
-    secret: new TextEncoder().encode(process.env.NEXTAUTH_SECRET),
+    secret: new TextEncoder().encode(authSecret),
   };
 }
 
@@ -36,11 +37,12 @@ export async function isTokenActive(
   token: string
 ): Promise<boolean> {
   try {
-    if (!process.env.NEXTAUTH_SECRET) {
+    const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+    if (!authSecret) {
       return false; // Fail-closed: cannot validate without secret
     }
 
-    const JWT_SECRET = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
+    const JWT_SECRET = new TextEncoder().encode(authSecret);
     
     // Verify the JWT is valid
     await jwtVerify(token, JWT_SECRET);

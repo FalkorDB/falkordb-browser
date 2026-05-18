@@ -247,6 +247,22 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         [blur, lineNumber]);
 
     useEffect(() => {
+        setHistoryQuery(prev => {
+            if (prev.counter && prev.counter <= prev.queries.length) {
+                return { ...prev, query: prev.queries[prev.counter - 1].text };
+            }
+            if (prev.counter && prev.counter > prev.queries.length) {
+                const clamped = prev.queries.length;
+                return clamped > 0
+                    ? { ...prev, counter: clamped, query: prev.queries[clamped - 1].text }
+                    : { ...prev, counter: 0, query: prev.currentQuery.text };
+            }
+            return { ...prev, query: prev.currentQuery.text };
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [historyQuery.counter, setHistoryQuery]);
+
+    useEffect(() => {
         tutorialOpenRef.current = tutorialOpen;
     }, [tutorialOpen]);
 
@@ -526,14 +542,20 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         const isFirstLine = e.createContextKey<boolean>('isFirstLine', true);
         const isLastLine = e.createContextKey<boolean>('isLastLine', true);
 
-        // Update the context key value based on the cursor position
-        e.onDidChangeCursorPosition(() => {
+        const updateLineKeys = () => {
             const position = e.getPosition();
             if (position) {
+                const lineCount = e.getModel()?.getLineCount() ?? 1;
                 isFirstLine.set(position.lineNumber === 1);
-                isLastLine.set(position.lineNumber === e.getModel()?.getLineCount());
+                isLastLine.set(position.lineNumber === lineCount);
             }
-        });
+        };
+
+        // Update the context key value based on the cursor position
+        e.onDidChangeCursorPosition(updateLineKeys);
+
+        // Also update when content changes (e.g. setValue from history navigation)
+        e.onDidChangeModelContent(updateLineKeys);
 
         e.addCommand(monaco.KeyCode.Escape, () => {
             const domNode = e.getDomNode();
@@ -577,17 +599,11 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                 setHistoryQuery(prev => {
                     if (prev.queries.length === 0) return prev;
 
-                    let counter;
-                    if (prev.counter !== 1) {
-                        counter = prev.counter ? prev.counter - 1 : prev.queries.length;
-                    } else {
-                        counter = 1;
-                    }
+                    const counter = prev.counter > 1 ? prev.counter - 1 : (prev.counter === 0 ? prev.queries.length : 1);
+                    if (counter === prev.counter) return prev;
 
-                    return {
-                        ...prev,
-                        counter
-                    };
+                    const query = prev.queries[counter - 1].text;
+                    return { ...prev, counter, query };
                 });
             },
             precondition: 'isFirstLine && !suggestWidgetVisible',
@@ -602,18 +618,11 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                 setHistoryQuery(prev => {
                     if (prev.queries.length === 0) return prev;
 
-                    let counter;
+                    const counter = prev.counter ? (prev.counter + 1 > prev.queries.length ? 0 : prev.counter + 1) : 0;
+                    if (counter === prev.counter) return prev;
 
-                    if (prev.counter) {
-                        counter = prev.counter + 1 > prev.queries.length ? 0 : prev.counter + 1;
-                    } else {
-                        counter = 0;
-                    }
-
-                    return {
-                        ...prev,
-                        counter
-                    };
+                    const query = counter ? prev.queries[counter - 1].text : prev.currentQuery.text;
+                    return { ...prev, counter, query };
                 });
             },
             precondition: 'isLastLine && !suggestWidgetVisible',
@@ -646,19 +655,21 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                         value={blur ? historyQuery.query.replace(/\n/g, ' ') : historyQuery.query}
                         onChange={(val) => {
                             if (blur) return;
+                            const newVal = val || "";
+                            if (newVal === historyQuery.query) return;
                             if (!historyQuery.counter) {
                                 setHistoryQuery(prev => ({
                                     ...prev,
                                     currentQuery: {
                                         ...prev.currentQuery,
-                                        text: val || "",
+                                        text: newVal,
                                     },
-                                    query: val || "",
+                                    query: newVal,
                                 }));
                             } else {
                                 setHistoryQuery(prev => ({
                                     ...prev,
-                                    query: val || "",
+                                    query: newVal,
                                 }));
                             }
                         }}
@@ -673,7 +684,19 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                         {PLACEHOLDER}
                     </span>
                 </div>
-                <div style={{ height: LINE_HEIGHT }} className={cn("flex gap-2")}>
+                <div style={{ height: LINE_HEIGHT }} className={cn("flex gap-2 items-center px-2", historyQuery.query ? "bg-background" : "bg-transparent")} data-testid="editorToolbar">
+                    {historyQuery.counter > 0 && (
+                        <Tooltip>
+                            <TooltipTrigger>
+                                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                    [ {historyQuery.queries.length - historyQuery.counter + 1}/{historyQuery.queries.length} ]
+                                </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                Query History Index: {historyQuery.queries.length - historyQuery.counter + 1}
+                            </TooltipContent>
+                        </Tooltip>
+                    )}
                     {
                         historyQuery.query &&
                         <Button
@@ -710,7 +733,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                         </Tooltip>
                     </TooltipProvider>
                     <Button
-                        className="py-1"
+                        className="text-xs py-0.5"
                         data-testid="editorRun"
                         ref={submitQuery}
                         indicator={indicator}

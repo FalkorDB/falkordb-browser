@@ -10,18 +10,20 @@ import { useRouter, usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import pkg from '@/package.json';
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { useToast } from "@/components/ui/use-toast";
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import Button from "./ui/Button";
+import DialogComponent from "./DialogComponent";
+import CloseDialog from "./CloseDialog";
 
 interface Props {
     showUDF: boolean
 }
 
-function getPathType(pathname: string): "Schema" | "Graph" | "Settings" | "UDF" | undefined {
-    if (pathname.includes("/schema")) return "Schema";
+function getPathType(pathname: string): "Graph" | "Settings" | "UDF" | undefined {
     if (pathname.includes("/graph")) return "Graph";
     if (pathname.includes("/settings")) return "Settings";
     if (pathname.includes("/udf")) return "UDF";
@@ -36,8 +38,24 @@ export default function Navbar({ showUDF }: Props) {
     const { currentTheme } = getTheme(theme);
     const pathname = usePathname();
     const router = useRouter();
+    const { toast } = useToast();
 
     const [mounted, setMounted] = useState(false);
+    const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+    const [loggingOut, setLoggingOut] = useState(false);
+
+    const handleConfirmLogout = async () => {
+        setLoggingOut(true);
+        try {
+            await signOut({ redirect: false });
+            setLogoutDialogOpen(false);
+            router.push("/login");
+        } catch {
+            toast({ title: "Failed to sign out", description: "Please try again.", variant: "destructive" });
+        } finally {
+            setLoggingOut(false);
+        }
+    };
 
     const type = getPathType(pathname);
 
@@ -195,14 +213,36 @@ export default function Navbar({ showUDF }: Props) {
                     </>
                 }
                 {separator}
-                <Button
-                    title="Log Out"
-                    className="text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10"
-                    data-testid="logoutButton"
-                    onClick={() => signOut({ redirect: false }).then(() => router.push("/login"))}
+                <DialogComponent
+                    open={logoutDialogOpen}
+                    onOpenChange={(open) => { if (!loggingOut) setLogoutDialogOpen(open); }}
+                    title="Logout All?"
+                    description="In addition to logging out of every connection, this will end your FalkorDB Browser session, remove all stored connection credentials from this session, and require you to log in again to reconnect."
+                    trigger={
+                        <Button
+                            title="Logout All"
+                            className="text-foreground p-1 rounded-lg border border-transparent hover:bg-secondary hover:border-border/10"
+                            data-testid="logoutButton"
+                        >
+                            <LogOut size={iconSize} />
+                        </Button>
+                    }
                 >
-                    <LogOut size={iconSize} />
-                </Button>
+                    <div className="flex justify-end gap-2">
+                        <Button
+                            data-testid="logoutConfirm"
+                            variant="Delete"
+                            label="Logout All"
+                            onClick={handleConfirmLogout}
+                            isLoading={loggingOut}
+                        />
+                        <CloseDialog
+                            data-testid="logoutCancel"
+                            label="Cancel"
+                            disabled={loggingOut}
+                        />
+                    </div>
+                </DialogComponent>
             </div>
         </div >
     );

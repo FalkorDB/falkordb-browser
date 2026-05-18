@@ -57,7 +57,9 @@ export default defineConfig({
       testMatch: /.*cluster\.spec\.ts$/,
     },
     
-    // Regular projects for sharding (exclude TLS and settings)
+    // Regular projects for sharding (exclude TLS, settings, and tests that
+    // call Logout() — those destroy shared Token DB entries and break other
+    // parallel tests using the same admin session).
     {
       name: '[Admin] Chromium',
       use: { 
@@ -176,6 +178,25 @@ export default defineConfig({
       grep: /@admin|@config/,
       dependencies: ['setup'],
       testMatch: /.*(settingsConfig|settingsUsers)\.spec\.ts$/,
+    },
+
+    // Smoke tests (run separately against the dockers - browser + core).
+    // Self-contained: no setup dependency, no stored auth state.
+    {
+      name: '[Smoke] - Chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+      grep: /@smoke/,
+      testMatch: /.*smoke\.spec\.ts$/,
+    },
+    {
+      name: '[Smoke] - Firefox',
+      use: {
+        ...devices['Desktop Firefox'],
+      },
+      grep: /@smoke/,
+      testMatch: /.*smoke\.spec\.ts$/,
     },
 
     // TLS tests (run separately)

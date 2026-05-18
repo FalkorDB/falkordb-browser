@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import authOptions, { removeSessionConnection } from "@/app/api/auth/[...nextauth]/options";
+import { getSessionFromRequest, removeSessionConnection } from "@/app/api/auth/[...nextauth]/options";
 import { getCorsHeaders, isRequestOriginTrusted, rejectUntrustedOrigin } from "@/app/api/utils";
 
 export async function OPTIONS(request: Request) {
@@ -20,7 +19,7 @@ export async function DELETE(
       return rejectUntrustedOrigin(request);
     }
 
-    const session = await getServerSession(authOptions);
+    const session = await getSessionFromRequest(request);
     const id = session?.user?.id;
 
     if (!id) {
@@ -56,7 +55,7 @@ export async function DELETE(
     // eslint-disable-next-line no-console
     console.error("Failed to remove connection:", err);
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500, headers: getCorsHeaders(request) }
     );
   }

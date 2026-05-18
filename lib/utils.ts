@@ -191,8 +191,7 @@ export type Message = {
   | "Error"
   | "Status"
   | "CypherQuery"
-  | "CypherResult"
-  | "Schema";
+  | "CypherResult";
 };
 
 // [library_name, type, 'functions', function_names[]]
@@ -549,7 +548,7 @@ export async function securedFetch(
   input: string,
   init: RequestInit,
   toast: ToastFn,
-  setIndicator: (indicator: "online" | "offline") => void
+  setIndicator: (indicator: "online" | "offline") => void,
 ): Promise<Response> {
   // Inject X-Connection-Id header when an additional connection is active.
   // Callers that already set the header explicitly take priority — the global
@@ -854,18 +853,16 @@ export const formatName = (newGraphName: string) =>
   newGraphName === '""' ? "" : newGraphName;
 
 export async function fetchOptions(
-  type: "Graph" | "Schema",
   toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void,
   indicator: "online" | "offline",
   setSelectedValue: (value: string) => void,
   setOptions: (options: string[]) => void,
-  contentPersistence: boolean
 ) {
   if (indicator === "offline") return;
 
   const result = await securedFetch(
-    `api/${type === "Graph" ? "graph" : "schema"}`,
+    `/api/graph`,
     {
       method: "GET",
     },
@@ -880,12 +877,7 @@ export async function fetchOptions(
 
   setOptions(opts);
 
-  if (
-    setSelectedValue &&
-    opts.length === 1 &&
-    (!contentPersistence || type === "Graph")
-  )
-    setSelectedValue(formatName(opts[0]));
+  if (opts.length === 1) setSelectedValue(formatName(opts[0]));
 }
 
 export const areCaptionKeysEqual = (left: [string, boolean][], right: [string, boolean][]) =>

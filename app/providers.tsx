@@ -2,31 +2,20 @@
 
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
-import { Dispatch, SetStateAction, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import dynamic from "next/dynamic";
-import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, InfoLabel, Query, Data, MemoryValue, SyntaxErrorInfo, parseSyntaxError } from "@/lib/utils";
-import { encryptValue, decryptValue, isCryptoAvailable, isEncrypted } from "@/lib/encryption";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, SyntaxErrorInfo, parseSyntaxError } from "@/lib/utils";
+import { serverEncrypt, serverDecrypt, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import { usePathname, useRouter } from "next/navigation";
+import { setUrlParam, useGraphParams } from "@/lib/useUrlParams";
 import { useToast } from "@/components/ui/use-toast";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
+import { PanelImperativeHandle } from "react-resizable-panels";
 import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphInfo } from "./api/graph/model";
-import Navbar from "./components/Navbar";
-import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, SyntaxErrorContext, SessionConnection } from "./components/provider";
-import Tutorial from "./components/Tutorial";
+import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, SyntaxErrorContext, SessionConnection } from "./components/provider";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
-import Header from "./components/Header";
-
-const GraphInfoPanel = dynamic(() => import("./graph/graphInfo"), {
-  ssr: false,
-});
-
-const UdfPanel = dynamic(() => import("./udf/udfPanel"), {
-  ssr: false,
-});
+import ProviderLayout from "./components/ProviderLayout";
 
 const defaultQueryHistory: HistoryQuery = {
   queries: [],
@@ -46,16 +35,14 @@ const defaultQueryHistory: HistoryQuery = {
 };
 
 /**
- * Wraps application UI with authentication-aware providers, state, and layout for graph and schema views.
+ * Wraps application UI with authentication-aware providers, state, and layout for graph views.
  *
  * This component wires authentication/session handling, global UI and graph state, periodic status checks,
- * query execution helpers, and the nested context providers used throughout the app. It also renders the
- * main layout including header, tutorial, graph info panel, and the resizable content panels.
+ * query execution helpers, and the nested context providers used throughout the app.
  *
  * @param children - The React node(s) to render inside the provider-managed layout (main content area).
- * @returns A React element containing the provider hierarchy and application layout used by graph/schema pages.
  */
-function ProvidersWithSession({ children }: { children: React.ReactNode }) {
+function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; nonce?: string }) {
   const pathname = usePathname();
   const { toast } = useToast();
   const { status, data: sessionData, update: updateSession } = useSession();
@@ -85,19 +72,21 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
   const panelRef = useRef<PanelImperativeHandle>(null);
   const canvasRef = useRef<GraphRef["current"]>(null);
+  const contentRestoredRef = useRef(false);
+
+  const { graphName: urlGraphName, selected: urlSelected, query: urlQuery } = useGraphParams();
+  const initialQueryRef = useRef(urlQuery);
 
   const [indicator, setIndicator] = useState<"online" | "offline">("online");
   const [historyQuery, setHistoryQuery] = useState<HistoryQuery>(defaultQueryHistory);
+  const [selectedParam, setSelectedParam] = useState<string>(urlSelected);
   const [runDefaultQuery, setRunDefaultQuery] = useState(false);
-  const [schemaNames, setSchemaNames] = useState<string[]>([]);
   const [graphNames, setGraphNames] = useState<string[]>([]);
-  const [schema, setSchema] = useState<Graph>(Graph.empty());
   const [graph, setGraph] = useState<Graph>(Graph.empty());
   const [data, setData] = useState<GraphData>({ ...graph.Elements });
   const [graphData, setGraphData] = useState<CanvasData>();
   const [graphInfo, setGraphInfo] = useState<GraphInfo>(GraphInfo.empty(toast, setIndicator));
-  const [schemaName, setSchemaName] = useState<string>("");
-  const [graphName, setGraphName] = useState<string>("");
+  const [graphName, setGraphName] = useState<string>(urlGraphName);
   const [contentPersistence, setContentPersistence] = useState(false);
   const [defaultQuery, setDefaultQuery] = useState("");
   const [timeout, setTimeout] = useState(0);
@@ -121,18 +110,15 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [maxSavedMessages, setMaxSavedMessages] = useState(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0);
-  const [panel, setPanel] = useState<Panel>();
   const [isQueryLoading, setIsQueryLoading] = useState(false);
   const [syntaxError, setSyntaxError] = useState<SyntaxErrorInfo | null>(null);
   const [model, setModel] = useState("");
   const [tutorialOpen, setTutorialOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(true);
   const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>([]);
   const [userGraphBeforeTutorial, setUserGraphBeforeTutorial] = useState<string>("");
   const [showMemoryUsage, setShowMemoryUsage] = useState(false);
   const [labels, setLabels] = useState<Label[]>([]);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
-  const [customizingLabel, setCustomizingLabel] = useState<InfoLabel | null>(null);
   const [dbVersion, setDbVersion] = useState<string>("");
   const [connectionType, setConnectionType] = useState<ConnectionType>("Standalone");
   const [connectionInfo, setConnectionInfo] = useState<ConnectionInfo>({});
@@ -159,7 +145,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const sessionSyncedRef = useRef(false);
   const prevActiveConnectionIdRef = useRef<string | null>(null);
   const connectionSwitchFetchedRef = useRef(false);
-  const showNavbarAndHeader = pathname !== "/" && pathname !== "/login";
 
   const replayTutorial = useCallback(() => {
     router.push("/graph");
@@ -223,25 +208,15 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       // Only encrypt and save secret key if it has changed
       if (newSecretKey !== secretKey) {
         if (newSecretKey) {
-          // Key has a value - encrypt it
-          if (!isCryptoAvailable()) {
-            toast({
-              title: "Error",
-              description: "Encryption not available in this browser. Cannot save secret key.",
-              variant: "destructive",
-            });
-            return; // Stop saving if crypto not available
-          }
-
           try {
-            const encryptedKey = await encryptValue(newSecretKey);
+            const encryptedKey = await serverEncrypt(newSecretKey);
             if (!encryptedKey) {
               toast({
                 title: "Error",
                 description: "Could not encrypt secret key. Please try again.",
                 variant: "destructive",
               });
-              return; // Stop saving if encryption returns empty string
+              return;
             }
             localStorage.setItem("secretKey", encryptedKey);
           } catch (error) {
@@ -251,7 +226,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
               description: "Could not encrypt secret key. Please try again.",
               variant: "destructive",
             });
-            return; // Stop saving if encryption fails
+            return;
           }
         } else {
           // Key is empty - remove it from storage
@@ -305,7 +280,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setNewMaxItemsForSearch(maxItemsForSearch);
       setHasChanges(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, toast]);
 
   const historyQueryContext = useMemo(() => ({
@@ -317,25 +292,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     indicator,
     setIndicator,
   }), [indicator]);
-
-  const onExpand = useCallback(() => {
-    const currentPanel = panelRef.current;
-
-    if (!currentPanel) return;
-
-    if (currentPanel.isCollapsed()) {
-      currentPanel.expand();
-    } else {
-      currentPanel.collapse();
-    }
-  }, []);
-
-  const panelContext = useMemo(() => ({
-    panel,
-    setPanel,
-    panelOpen: !isCollapsed,
-    onTogglePanel: onExpand,
-  }), [panel, isCollapsed, onExpand]);
 
   const queryLoadingContext = useMemo(() => ({
     isQueryLoading,
@@ -398,15 +354,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     selectedUdf,
     setSelectedUdf
   }), [selectedUdf, udfList]);
-
-  const schemaContext = useMemo(() => ({
-    schema,
-    setSchema,
-    schemaName,
-    setSchemaName,
-    schemaNames,
-    setSchemaNames
-  }), [schema, schemaName, schemaNames]);
 
   const fetchCount = useCallback(async (name?: string) => {
     const n = name || graphName;
@@ -565,13 +512,33 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graphName, limit, timeout, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries, showMemoryUsage, captionsKeys, showPropertyKeyPrefix, tutorialOpen, prefixReady]);
 
+  const graphNameRef = useRef(graphName);
+  graphNameRef.current = graphName;
+
+  const handleSetGraphName = useCallback((name: string) => {
+    if (graphNameRef.current === name) return;
+    // Clear stale state from the previous graph so old data doesn't linger
+    setGraphName(name);
+    setSelectedParam("");
+    setGraphInfo(GraphInfo.empty(toast, setIndicator));
+    setNodesCount(undefined);
+    setEdgesCount(undefined);
+    setData({ nodes: [], links: [] });
+    setGraphData(undefined);
+    setViewport(undefined);
+    setSearch("");
+    setScrollPosition(0);
+    setSyntaxError(null);
+    setHistoryQuery(h => ({ ...h, query: "", currentQuery: defaultQueryHistory.currentQuery }));
+  }, [toast, setIndicator]);
+
   const graphContext = useMemo(() => ({
     graph,
     setGraph,
+    graphName,
+    handleSetGraphName,
     graphInfo,
     setGraphInfo,
-    graphName,
-    setGraphName,
     graphNames,
     setGraphNames,
     labels,
@@ -591,8 +558,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     isLoading,
     setIsLoading,
     expand: expandFilter,
-    setExpand: setExpandFilter
-  }), [graph, graphInfo, graphName, graphNames, labels, relationships, nodesCount, edgesCount, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter]);
+    setExpand: setExpandFilter,
+    selectedParam,
+    setSelectedParam,
+    initialQuery: initialQueryRef.current,
+  }), [graph, graphName, handleSetGraphName, graphInfo, graphNames, labels, relationships, nodesCount, edgesCount, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, selectedParam]);
 
   useEffect(() => {
     setRelationships([...graph.Relationships]);
@@ -602,7 +572,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   // Keep the module-level global in sync with React state on every render.
   // This is intentionally dependency-free so it runs after every render,
   // restoring _activeConnectionId even when Next.js HMR resets the module.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   useEffect(() => { setActiveConnectionIdGlobal(activeConnectionId); });
 
   useEffect(() => {
@@ -623,7 +593,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         setShowMemoryUsage(name === "graph" && version >= MEMORY_USAGE_VERSION_THRESHOLD);
       } catch { /* ignore */ }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [status, activeConnectionId]);
   useEffect(() => {
     if (status !== "authenticated") {
@@ -791,9 +761,9 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         const queries = raw.map(q => ({ ...q, fav: q.fav ?? false }));
         // Persist migrated data so legacy objects are normalized in storage
         setConnectionItem("query history", JSON.stringify(queries));
-        setHistoryQuery({ ...defaultQueryHistory, queries });
+        setHistoryQuery(prev => ({ ...prev, queries }));
       } catch (error) {
-        setHistoryQuery({ ...defaultQueryHistory, queries: [] });
+        setHistoryQuery(prev => ({ ...prev, queries: [] }));
         console.error("Failed to parse query history from localStorage", error);
       }
       try {
@@ -824,36 +794,55 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setRowHeightExpandMultiple(parseInt(localStorage.getItem("rowHeightExpandMultiple") || "3", 10));
       const parsedMaxItems = parseInt(localStorage.getItem("maxItemsForSearch") || "20", 10);
       setMaxItemsForSearch(Number.isFinite(parsedMaxItems) ? Math.min(Math.max(parsedMaxItems, 10), 50) : 20);
-      // Decrypt secret key if encrypted, or migrate plain text keys to encrypted format
+      // Decrypt secret key using server-side decryption, with migration from old client-side encryption
       const storedSecretKey = localStorage.getItem("secretKey") || "";
       if (storedSecretKey) {
-        if (!isCryptoAvailable()) {
-          console.error('Encryption not available - cannot decrypt secret key');
-          setSecretKey('');
-        } else if (isEncrypted(storedSecretKey)) {
-          // Already encrypted - decrypt it
-          const decryptedKey = await decryptValue(storedSecretKey);
-          if (decryptedKey) {
-            setSecretKey(decryptedKey);
-          } else {
-            // Decryption failed (corrupted or key mismatch) - clear it
-            // eslint-disable-next-line no-console
-            console.warn('Clearing corrupted encrypted secret key');
+        if (isLegacyEncrypted(storedSecretKey)) {
+          // Old client-side encrypted value - decrypt with legacy method, then re-encrypt server-side
+          try {
+            const plainKey = await legacyDecrypt(storedSecretKey);
+            if (plainKey) {
+              setSecretKey(plainKey);
+              const newEncrypted = await serverEncrypt(plainKey);
+              if (newEncrypted) {
+                localStorage.setItem("secretKey", newEncrypted);
+              }
+              clearLegacyEncryptionKey();
+            } else {
+              // eslint-disable-next-line no-console
+              console.warn('Could not decrypt legacy secret key, clearing');
+              setSecretKey('');
+              localStorage.removeItem("secretKey");
+              clearLegacyEncryptionKey();
+            }
+          } catch (error) {
+            console.error('Failed to migrate legacy secret key:', error);
             setSecretKey('');
             localStorage.removeItem("secretKey");
           }
         } else {
-          // Plain text key from existing users - migrate to encrypted
+          // Try server-side decryption (new format or plain text)
           try {
-            setSecretKey(storedSecretKey);
-            const encryptedKey = await encryptValue(storedSecretKey);
-            if (encryptedKey) {
-              localStorage.setItem("secretKey", encryptedKey);
+            const decryptedKey = await serverDecrypt(storedSecretKey);
+            if (decryptedKey) {
+              setSecretKey(decryptedKey);
             } else {
-              console.error('Failed to encrypt plain text key');
+              // eslint-disable-next-line no-console
+              console.warn('Clearing corrupted encrypted secret key');
+              setSecretKey('');
+              localStorage.removeItem("secretKey");
             }
-          } catch (error) {
-            console.error('Failed to encrypt plain text key:', error);
+          } catch {
+            // Not server-encrypted - treat as plain text, migrate to server encryption
+            try {
+              setSecretKey(storedSecretKey);
+              const encryptedKey = await serverEncrypt(storedSecretKey);
+              if (encryptedKey) {
+                localStorage.setItem("secretKey", encryptedKey);
+              }
+            } catch (migrateError) {
+              console.error('Failed to migrate plain text key:', migrateError);
+            }
           }
         }
       }
@@ -888,32 +877,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, activeConnectionId]);
 
-  const onPanelResize = useCallback((size: PanelSize) => {
-    setIsCollapsed(size.asPercentage === 0);
-  }, []);
-
-  useEffect(() => {
-    const currentPanel = panelRef.current;
-
-    if (!currentPanel) return;
-
-    let rafId: number | undefined;
-
-    if (pathname === "/graph" || pathname === "/udf") {
-      if (currentPanel.isCollapsed()) currentPanel.expand();
-    } else if (!currentPanel.isCollapsed()) {
-      // Defer collapse to next frame so the collapsible prop change
-      // (e.g. from false on /udf to true on /settings) takes effect first
-      rafId = requestAnimationFrame(() => {
-        if (!currentPanel.isCollapsed()) currentPanel.collapse();
-      });
-    }
-
-    return () => {
-      if (rafId !== undefined) cancelAnimationFrame(rafId);
-    };
-  }, [pathname, panelRef.current]);
-
   const checkStatus = useCallback(() => {
     securedFetch("/api/status", {
       method: "GET",
@@ -932,25 +895,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [checkStatus, status]);
 
-  const handleOnSetGraphName = (newGraphName: string) => {
-    if (pathname.includes("/schema")) {
-      setSchemaName(formatName(newGraphName));
-      setSchemaNames(prev => [...prev, formatName(newGraphName)]);
-    } else {
-      setGraphName(formatName(newGraphName));
-      setGraphNames(prev => [...prev, formatName(newGraphName)]);
-    }
-  };
-
   const handleFetchOptions = useCallback(async () => {
-    if (indicator === "offline") return;
-    if (tutorialOpen) return;
+    if (indicator === "offline" || tutorialOpen) return;
 
-    await Promise.all(([["Graph", setGraphNames, setGraphName],/* ["Schema", setSchemaNames, setSchemaName] */] as ["Graph" | "Schema", Dispatch<SetStateAction<string[]>>, Dispatch<SetStateAction<string>>][]).map(async ([type, setOptions, setName]) => {
-      await fetchOptions(type, toast, setIndicator, indicator, setName, setOptions, contentPersistence);
-    }));
+    await fetchOptions(toast, setIndicator, indicator, setGraphName, setGraphNames);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toast, contentPersistence, tutorialOpen]);
+  }, [toast, tutorialOpen]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -962,6 +912,62 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     handleFetchOptions();
   }, [handleFetchOptions, status]);
 
+  // Sync URL → local state only when on /graph (consumers like graphInfo update URL directly)
+  useEffect(() => {
+    // [URL] providers: urlGraphName sync effect
+    if (pathname !== "/graph") return;
+    if (urlGraphName !== graphName) {
+      // [URL] providers: syncing URL→state
+      setGraphName(urlGraphName);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlGraphName]);
+
+  // One-way sync: context state → URL (only while on /graph)
+  const prevPathnameRef = useRef(pathname);
+
+  useEffect(() => {
+    prevPathnameRef.current = pathname;
+
+    // Only write URL while on /graph
+    if (pathname !== "/graph") return;
+
+    const queryForUrl = (graph.Id && graph.Id === graphName && historyQuery.currentQuery.text && historyQuery.currentQuery.graphName === graphName)
+      ? historyQuery.currentQuery.text
+      : null;
+
+    // Sync all context state to URL
+    setUrlParam({
+      graph: graphName || null,
+      query: queryForUrl,
+      selected: selectedParam || null,
+    });
+  }, [pathname, selectedParam, graphName, historyQuery.currentQuery.text, historyQuery.currentQuery.graphName, graph.Id]);
+
+  // Restore content persistence once on app mount (after auth + settings + graph names loaded)
+  useEffect(() => {
+    if (contentRestoredRef.current || !prefixReady || !contentPersistence || graphNames.length === 0) return;
+
+    // If a graph is already loaded, mark as restored and skip
+    if (graph.Id) {
+      contentRestoredRef.current = true;
+      return;
+    }
+
+    const content = getConnectionItem("savedContent");
+    if (!content) return;
+
+    try {
+      const { graphName: name, query } = JSON.parse(content);
+      if (graphNames.includes(name)) {
+        contentRestoredRef.current = true;
+        handleSetGraphName(name);
+        runQuery(query, name);
+      }
+    } catch {
+      // Invalid saved content, ignore
+    }
+  }, [prefixReady, contentPersistence, graphNames, graph.Id, runQuery, handleSetGraphName]);
   // Reset all graph state when the active connection changes (user switch)
   useEffect(() => {
     const prev = prevActiveConnectionIdRef.current;
@@ -972,14 +978,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     // Skip if unchanged
     if (prev === activeConnectionId) return;
 
-    // Clear graph / schema data so stale results from the old connection are gone
+    // Clear graph data so stale results from the old connection are gone
     setGraph(Graph.empty());
     setGraphInfo(GraphInfo.empty(toast, setIndicator));
     setGraphName("");
+    setSelectedParam("");
     setGraphNames([]);
-    setSchema(Graph.empty());
-    setSchemaName("");
-    setSchemaNames([]);
     setNodesCount(undefined);
     setEdgesCount(undefined);
     setHistoryQuery(h => ({ ...h, query: "", currentQuery: defaultQueryHistory.currentQuery }));
@@ -1039,13 +1043,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
       // Update graph list to only show demo graphs
       setGraphNames(["social-demo", "social-demo-test"]);
-      setGraphName("");
+      handleSetGraphName("");
       setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }));
       setGraph(Graph.empty());
       setData({ nodes: [], links: [] });
-      setCustomizingLabel(null);
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error("Failed to load demo graphs", error);
       toast({
         title: "Error",
@@ -1066,7 +1069,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         }, toast, setIndicator)
       ]);
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error("Failed to cleanup demo graphs", error);
     }
 
@@ -1076,10 +1079,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setData({ nodes: [], links: [] });
 
     if (userGraphBeforeTutorial && userGraphsBeforeTutorial.includes(userGraphBeforeTutorial)) {
-      setGraphName(userGraphBeforeTutorial);
+      handleSetGraphName(userGraphBeforeTutorial);
       setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }));
     } else if (userGraphsBeforeTutorial.length === 1) {
-      setGraphName(userGraphsBeforeTutorial[0]);
+      handleSetGraphName(userGraphsBeforeTutorial[0]);
 
       // Run default query for the graph if enabled
       if (runDefaultQuery && defaultQuery) {
@@ -1090,7 +1093,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }));
       }
     } else {
-      setGraphName("");
+      handleSetGraphName("");
       setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }));
     }
 
@@ -1100,106 +1103,48 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   }, [runQuery, runDefaultQuery, defaultQuery, toast, userGraphBeforeTutorial, userGraphsBeforeTutorial]);
 
   return (
-    <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange>
+    <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange nonce={nonce}>
       <LoginVerification>
         <BrowserSettingsContext.Provider value={browserSettingsContext}>
-          <SchemaContext.Provider value={schemaContext}>
-            <GraphContext.Provider value={graphContext}>
-              <HistoryQueryContext.Provider value={historyQueryContext}>
-                <IndicatorContext.Provider value={indicatorContext}>
-                  <PanelContext.Provider value={panelContext}>
-                    <QueryLoadingContext.Provider value={queryLoadingContext}>
-                      <SyntaxErrorContext.Provider value={syntaxErrorContext}>
-                        <ForceGraphContext.Provider value={forceGraphContext}>
-                          <TableViewContext.Provider value={tableViewContext}>
-                            <ConnectionContext.Provider value={connectionContext}>
-                              <UDFContext.Provider value={udfContext}>
-                                {
-                                  pathname === "/graph" &&
-                                  <Tutorial
-                                    open={tutorialOpen}
-                                    onClose={handleCloseTutorial}
-                                    onLoadDemoGraphs={handleLoadDemoGraphs}
-                                    onCleanupDemoGraphs={handleCleanupDemoGraphs}
-                                  />
-                                }
-                                {
-                                  showNavbarAndHeader &&
-                                  <Header />
-                                }
-                                <div className="basis-0 grow min-h-0 flex">
-                                  {
-                                    showNavbarAndHeader &&
-                                    <Navbar
-                                      showUDF={showUDF}
-                                    />
-                                  }
-                                  <ResizablePanelGroup orientation="horizontal" className="w-1 grow">
-                                    <ResizablePanel
-                                      panelRef={panelRef}
-                                      defaultSize="0%"
-                                      collapsible={pathname !== "/udf"}
-                                      minSize="15%"
-                                      maxSize="30%"
-                                      onResize={onPanelResize}
-                                      data-testid="graphInfoPanel"
-                                    >
-                                      {
-                                        pathname === "/udf" ?
-                                          <UdfPanel />
-                                          : pathname === "/graph" &&
-                                          <GraphInfoPanel
-                                            onClose={onExpand}
-                                            customizingLabel={customizingLabel}
-                                            setCustomizingLabel={setCustomizingLabel}
-                                          />
-                                      }
-                                    </ResizablePanel>
-                                    <ResizableHandle
-                                      withHandle
-                                      onMouseUp={() => isCollapsed && onExpand()}
-                                      className={cn("bg-border", isCollapsed && "hidden")}
-                                      disabled={isCollapsed}
-                                    />
-                                    <ResizablePanel
-                                      defaultSize="100%"
-                                      minSize="70%"
-                                      maxSize="100%"
-                                    >
-                                      {
-                                        (pathname === "/graph" || pathname === "/schema") ?
-                                          <div className="h-full w-full flex flex-col">
-                                            {children}
-                                            <div className="h-4 w-full Gradient" />
-                                          </div>
-                                          :
-                                          children
-                                      }
-                                    </ResizablePanel>
-                                  </ResizablePanelGroup>
-                                </div>
-                              </UDFContext.Provider>
-                            </ConnectionContext.Provider>
-                          </TableViewContext.Provider>
-                        </ForceGraphContext.Provider>
-                      </SyntaxErrorContext.Provider>
-                    </QueryLoadingContext.Provider>
-                  </PanelContext.Provider>
-                </IndicatorContext.Provider>
-              </HistoryQueryContext.Provider>
-            </GraphContext.Provider>
-          </SchemaContext.Provider>
+          <GraphContext.Provider value={graphContext}>
+            <HistoryQueryContext.Provider value={historyQueryContext}>
+              <IndicatorContext.Provider value={indicatorContext}>
+                <QueryLoadingContext.Provider value={queryLoadingContext}>
+                  <SyntaxErrorContext.Provider value={syntaxErrorContext}>
+                    <ForceGraphContext.Provider value={forceGraphContext}>
+                      <TableViewContext.Provider value={tableViewContext}>
+                        <ConnectionContext.Provider value={connectionContext}>
+                          <UDFContext.Provider value={udfContext}>
+                            <ProviderLayout
+                              panelRef={panelRef}
+                              tutorialOpen={tutorialOpen}
+                              onCloseTutorial={handleCloseTutorial}
+                              onLoadDemoGraphs={handleLoadDemoGraphs}
+                              onCleanupDemoGraphs={handleCleanupDemoGraphs}
+                              showUDF={showUDF}
+                            >
+                              {children}
+                            </ProviderLayout>
+                          </UDFContext.Provider>
+                        </ConnectionContext.Provider>
+                      </TableViewContext.Provider>
+                    </ForceGraphContext.Provider>
+                  </SyntaxErrorContext.Provider>
+                </QueryLoadingContext.Provider>
+              </IndicatorContext.Provider>
+            </HistoryQueryContext.Provider>
+          </GraphContext.Provider>
         </BrowserSettingsContext.Provider>
       </LoginVerification>
-    </ThemeProvider >
+    </ThemeProvider>
   );
 }
 
-export default function NextAuthProvider({ children }: { children: React.ReactNode }) {
+export default function NextAuthProvider({ children, nonce }: { children: React.ReactNode; nonce?: string }) {
   return (
     <SessionProvider>
       <Suspense fallback={null}>
-        <ProvidersWithSession>{children}</ProvidersWithSession>
+        <ProvidersWithSession nonce={nonce}>{children}</ProvidersWithSession>
       </Suspense>
     </SessionProvider>
   );
