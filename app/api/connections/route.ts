@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { addSessionConnection, getSessionFromRequest, listSessionConnections } from "@/app/api/auth/[...nextauth]/options";
 import { getCorsHeaders, isRequestOriginTrusted, rejectUntrustedOrigin } from "@/app/api/utils";
+import { addConnection, validateBody } from "@/app/api/validate-body";
 
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
@@ -59,9 +60,9 @@ export async function POST(request: Request) {
       );
     }
 
-    let body: Record<string, unknown>;
+    let rawBody: unknown;
     try {
-      body = await request.json();
+      rawBody = await request.json();
     } catch {
       return NextResponse.json(
         { message: "Invalid JSON payload" },
@@ -69,14 +70,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const { host, port, username, password, tls, ca } = body;
-
-    if (!password) {
+    const result = validateBody(addConnection, rawBody);
+    if (!result.success) {
       return NextResponse.json(
-        { message: "Password is required" },
+        { message: result.error },
         { status: 400, headers: getCorsHeaders(request) }
       );
     }
+
+    const { host, port, username, password, tls, ca } = result.data;
 
     const connInfo = await addSessionConnection(id, {
       host: (host as string) || session.user.host,

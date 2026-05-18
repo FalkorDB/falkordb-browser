@@ -1178,6 +1178,8 @@ export default class GraphPage extends BasePage {
     if (waitForVisibility) {
       await waitForElementToNotBeVisible(this.createConfirm);
     }
+    // Wait for the editor to stabilize after graph creation triggers re-renders
+    await waitForElementToBeVisible(this.editorContainer, 500, 20);
   }
 
   async removeGraph(graphName: string): Promise<void> {
