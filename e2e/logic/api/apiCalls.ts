@@ -162,7 +162,7 @@ export default class ApiCalls {
     const headers = role === "admin" ? await getAdminToken() : undefined;
     let lastError: Error | undefined;
 
-    for (let attempt = 0; attempt < REMOVE_GRAPH_MAX_RETRY_ATTEMPTS; attempt += 1) {
+    for (let attemptIndex = 0; attemptIndex < REMOVE_GRAPH_MAX_RETRY_ATTEMPTS; attemptIndex += 1) {
       try {
         const result = await deleteRequest(
           urls.api.graphUrl + graphName,
@@ -171,8 +171,8 @@ export default class ApiCalls {
         return await result.json();
       } catch (error) {
         lastError = error as Error;
-        if (attempt < REMOVE_GRAPH_MAX_RETRY_ATTEMPTS - 1) {
-          await delay(REMOVE_GRAPH_RETRY_BASE_DELAY_MS * 2 ** attempt);
+        if (attemptIndex < REMOVE_GRAPH_MAX_RETRY_ATTEMPTS - 1) {
+          await delay(REMOVE_GRAPH_RETRY_BASE_DELAY_MS * 2 ** attemptIndex);
         }
       }
     }

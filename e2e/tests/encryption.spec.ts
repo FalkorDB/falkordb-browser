@@ -30,7 +30,12 @@ async function waitForServerEncryptedSecretKey(
         { timeout }
     );
 
-    return (await page.evaluate(() => localStorage.getItem("secretKey"))) ?? "";
+    const secretKey = await page.evaluate(() => localStorage.getItem("secretKey"));
+    if (secretKey === null) {
+        throw new Error("secretKey was expected to be server-encrypted but is missing");
+    }
+
+    return secretKey;
 }
 
 async function waitForClearedSecretKey(
