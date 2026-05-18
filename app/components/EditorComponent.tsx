@@ -257,7 +257,8 @@ export default function EditorComponent({
             const lastCol = model.getLineMaxColumn(lastLine);
             editor.setPosition({ lineNumber: lastLine, column: lastCol });
         }
-    }, [value, editorRef.current]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [value]);
 
     // Update options when they change
     useEffect(() => {
