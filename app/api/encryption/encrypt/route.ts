@@ -14,8 +14,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { value } = body;
+    // Wrap JSON parsing so malformed or null bodies return 400 (client error)
+    // instead of bubbling up to the outer catch and returning 500.
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { message: "Invalid JSON body" },
+        { status: 400 }
+      );
+    }
+
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json(
+        { message: "Missing required field: value" },
+        { status: 400 }
+      );
+    }
+
+    const { value } = body as { value?: unknown };
 
     if (typeof value !== "string") {
       return NextResponse.json(

@@ -179,7 +179,7 @@ export default function ForceGraph({
                 handleCooldown(cooldown);
             }
         }
-    }, [canvasRef, canvasLoaded, graph, toast, setIndicator, cooldownTicks, handleCooldown]);
+    }, [canvasRef, canvasLoaded, graph, isReadOnly, toast, setIndicator, cooldownTicks, handleCooldown]);
 
     const deleteNeighbors = useCallback((nodes: Node[]) => {
         if (nodes.length === 0) return;

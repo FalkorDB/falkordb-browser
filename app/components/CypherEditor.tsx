@@ -249,9 +249,10 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     useEffect(() => {
         setHistoryQuery(prev => ({
             ...prev,
-            query: prev.counter ? prev.queries[prev.counter - 1].text : prev.currentQuery.text
+            // Use optional chaining so a stale counter (> queries.length) after
+            // a history reset doesn't throw a "cannot read .text of undefined" error.
+            query: prev.counter ? (prev.queries[prev.counter - 1]?.text ?? prev.currentQuery.text) : prev.currentQuery.text
         }));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [historyQuery.counter, setHistoryQuery]);
 
     useEffect(() => {

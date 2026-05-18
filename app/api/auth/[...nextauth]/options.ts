@@ -61,8 +61,15 @@ interface AuthenticatedUserWithPassword extends AuthenticatedUser {
  * client. Callers that `.delete()` are expected to close the client
  * themselves when safe.
  */
+// Wire cache size to the MAX_CONNECTION_CACHE_SIZE env var (defaults to 100).
+// Without this the env var has no effect even though it is documented.
+const maxConnectionCacheSize = Math.max(
+  1,
+  Number.parseInt(process.env.MAX_CONNECTION_CACHE_SIZE ?? "100", 10) || 100
+);
+
 const connections = new LRUCache<string, FalkorDB>({
-  max: 100,
+  max: maxConnectionCacheSize,
   ttl: 30 * 60 * 1000, // 30 minutes idle TTL
   dispose(client, _key, reason) {
     if (reason === 'set' || reason === 'delete') return;
@@ -491,7 +498,13 @@ async function isJWTOnlyRequest(): Promise<boolean> {
  */
 async function verifyJWTToken(token: string): Promise<CustomJWTPayload> {
   const { jwtVerify } = await import('jose');
-  const secret = new TextEncoder().encode(process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET);
+  // Validate that the secret is set before encoding — an empty or undefined
+  // secret would let jwtVerify succeed with any token (fail-open vulnerability).
+  const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+  if (!authSecret) {
+    throw new Error("AUTH_SECRET or NEXTAUTH_SECRET is required but not set");
+  }
+  const secret = new TextEncoder().encode(authSecret);
   const { payload } = await jwtVerify(token, secret);
   return payload as unknown as CustomJWTPayload;
 }
@@ -1004,32 +1017,38 @@ const connectionLocks = new Map<string, Promise<unknown>>();
 const LOCK_WAIT_TIMEOUT_MS = 10_000;
 
 async function withConnectionLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
-  // Wait for any in-flight operation on this key, but with a timeout to
-  // prevent indefinite hangs (e.g. if a previous request was aborted
-  // mid-flight and the promise never settled).
-  const deadline = Date.now() + LOCK_WAIT_TIMEOUT_MS;
-  while (connectionLocks.has(key)) {
-    const remaining = deadline - Date.now();
-    if (remaining <= 0) {
+  // Use a promise-chain approach to guarantee exclusive execution.
+  // Reading the current tail and immediately installing our chained promise
+  // is synchronous — there is no await between the two steps — so there is
+  // no TOCTOU window where two callers can both see an empty slot and both
+  // call fn() concurrently.
+  const previous = connectionLocks.get(key) ?? Promise.resolve<unknown>(undefined);
+
+  // Chain fn() so it runs only after the previous occupant finishes.
+  // We wrap fn() with a timeout so a hung previous caller cannot block
+  // subsequent callers indefinitely.
+  const chain: Promise<T> = Promise.race([
+    previous,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("lock timeout")), LOCK_WAIT_TIMEOUT_MS)
+    ),
+  ])
+    .catch(() => {
       // eslint-disable-next-line no-console
       console.warn("Connection lock wait timed out for key:", key, "— proceeding without lock");
-      connectionLocks.delete(key);
-      break;
-    }
-    try {
-      await Promise.race([
-        connectionLocks.get(key),
-        new Promise((_, reject) => { setTimeout(() => { reject(new Error("lock timeout")); }, remaining); }),
-      ]);
-    } catch { /* ignore — we'll run our own attempt */ }
-  }
-  const promise = fn();
-  connectionLocks.set(key, promise);
-  try {
-    return await promise;
-  } finally {
-    connectionLocks.delete(key);
-  }
+    })
+    .then(() => fn())
+    .finally(() => {
+      // Only clean up if our chain is still the current tail so a newer
+      // waiter that replaced us doesn't accidentally clear its own lock.
+      if (connectionLocks.get(key) === chain) {
+        connectionLocks.delete(key);
+      }
+    }) as Promise<T>;
+
+  // Install atomically before any await so no concurrent caller can slip in.
+  connectionLocks.set(key, chain);
+  return chain;
 }
 
 export async function getClient(

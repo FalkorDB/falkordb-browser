@@ -270,7 +270,10 @@ export default function Page() {
         }
     }, [setPanel, setChatOpen, setSelectedParam]);
 
-    // Restore selected element from context when graph data loads, otherwise clear selection
+    // Restore selected element from context when graph data loads, otherwise clear selection.
+    // selectedParam is included in the dependency array so that browser navigation that
+    // changes the `selected=` URL param without changing the graph (e.g. back/forward) also
+    // triggers a restore — which is what makes the shareable/bookmarkable URL param work.
     useEffect(() => {
         if (!graph.Id) return;
         if (graph.NodesMap.size === 0 && graph.LinksMap.size === 0) return;
@@ -312,7 +315,7 @@ export default function Page() {
 
         handleSetSelectedElements();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [graph]);
+    }, [graph, selectedParam]);
 
     // Apply pending zoom once canvas animation finishes (isLoading goes false)
     useEffect(() => {

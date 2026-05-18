@@ -74,23 +74,9 @@ const getErrorStatus = (error: unknown) => {
     return 0;
 };
 
-const getStreamStatusCode = (line: string) => {
-    const match = line.match(/\bstatus:\s*(\d+)/);
-    return match ? Number(match[1]) : 0;
-};
-
-const getStreamData = (line: string) => {
-    const data = line.match(/\bdata:\s*([\s\S]*)/)?.[1]?.trim() || "";
-
-    if (!data) return "";
-
-    try {
-        const parsed = JSON.parse(data);
-        return typeof parsed === "string" ? parsed : JSON.stringify(parsed);
-    } catch {
-        return data;
-    }
-};
+// Removed getStreamStatusCode / getStreamData: the server now uses the standard
+// SSE format ("event: <type>\ndata: <json>\n\n"), so status and data are parsed
+// directly from the structured JSON payload in each event block.
 
 export default function Chat({ onClose }: Props) {
     const { resolvedTheme } = useTheme();
@@ -298,14 +284,25 @@ export default function Chat({ onClose }: Props) {
 
                 const chunk = decoder.decode(value, { stream: true });
 
-                const lines = chunk.split('event:').filter(line => line);
+                // Parse standard SSE format: events are separated by "\n\n".
+                // Each event block contains "event: <type>" and "data: <payload>" lines.
+                const events = chunk.split('\n\n').filter(Boolean);
                 let isResult = false;
 
-                lines.forEach(line => {
-                    const eventType: EventType | "error" = line.split(" ")[1] as EventType | "error";
-                    const eventData = line.split("data:")[1];
+                events.forEach(eventBlock => {
+                    let eventType: EventType | "" = "";
+                    let eventData = "";
+                    for (const line of eventBlock.split('\n')) {
+                        if (line.startsWith('event: ')) {
+                            eventType = line.slice(7).trim() as EventType;
+                        } else if (line.startsWith('data: ')) {
+                            eventData = line.slice(6);
+                        }
+                    }
+                    if (!eventType) return;
+
                     switch (eventType) {
-                        case "Status":
+                        case "Status": {
                             const message = {
                                 role: "assistant" as const,
                                 content: eventData.trim(),
@@ -314,6 +311,7 @@ export default function Chat({ onClose }: Props) {
 
                             setMessages(prev => [...prev, message]);
                             break;
+                        }
 
                         case "CypherQuery":
                             setQueryCollapse(prev => ({ ...prev, [messages.length]: false }));
@@ -351,21 +349,15 @@ export default function Chat({ onClose }: Props) {
                             isResult = true;
                             break;
 
-                        case "Error":
-                            setMessages(prev => [
-                                ...prev,
-                                {
-                                    role: "assistant",
-                                    content: eventData.trim(),
-                                    type: eventType
-                                }
-                            ]);
-                            isResult = true;
-                            break;
-
-                        case "error": {
-                            const statusCode = getStreamStatusCode(line);
-                            const errorMessage = getStreamData(line);
+                        case "Error": {
+                            // The server embeds { status, message } in the JSON payload.
+                            let statusCode = 0;
+                            let errorMessage = eventData.trim();
+                            try {
+                                const parsed = JSON.parse(errorMessage);
+                                statusCode = parsed.status ?? 0;
+                                errorMessage = parsed.message ?? errorMessage;
+                            } catch { /* use raw eventData as message */ }
 
                             if (statusCode === 401 || statusCode >= 500) setIndicator("offline");
 
@@ -384,7 +376,8 @@ export default function Chat({ onClose }: Props) {
                             break;
 
                         default:
-                            throw new Error(`Unknown event type: ${eventType}`);
+                            // eslint-disable-next-line no-console
+                            console.warn(`Unknown SSE event type: ${eventType}`);
                     }
                 });
 

@@ -243,6 +243,10 @@ export default function EditorComponent({
     }, [languageConfig, language]);
 
     // Sync external value changes (history navigation, etc.) into the editor.
+    // We read editorRef.current inside the effect rather than declaring it as
+    // a dependency — ref mutations don't trigger re-renders, so listing
+    // editorRef.current would not reliably fire the effect when the editor
+    // first mounts and would trip the react-hooks/exhaustive-deps lint rule.
     useEffect(() => {
         const editor = editorRef.current;
         if (!editor || value === undefined) return;
@@ -257,7 +261,7 @@ export default function EditorComponent({
             const lastCol = model.getLineMaxColumn(lastLine);
             editor.setPosition({ lineNumber: lastLine, column: lastCol });
         }
-    }, [value, editorRef.current]);
+    }, [value]);
 
     // Update options when they change
     useEffect(() => {

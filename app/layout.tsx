@@ -7,7 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NextAuthProvider from "./providers";
 import GTM from "./GTM";
 
-// Force dynamic rendering on all pages so the CSP nonce from proxy.ts
+// Force dynamic rendering on all pages so the CSP nonce from middleware.ts
 // is applied to every inline <script> tag at request time.
 export const dynamic = "force-dynamic";
 

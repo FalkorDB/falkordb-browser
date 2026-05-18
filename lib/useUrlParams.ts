@@ -21,7 +21,8 @@ export function setUrlParam(updates: Record<string, string | null>) {
   });
 
   const search = params.toString();
-  const newUrl = `${window.location.pathname}${search ? `?${search}` : ""}`;
+  // Preserve the hash fragment so existing anchors are not lost after setUrlParam.
+  const newUrl = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
   window.history.replaceState(null, "", newUrl);
 }
 

@@ -54,6 +54,11 @@ function getClientIP(request: NextRequest): string {
     if (forwarded) {
         return forwarded.split(",")[0].trim();
     }
+    // Fall back to x-real-ip, then "unknown".
+    // Using "unknown" as a last resort means all requests without any IP header
+    // share the same rate-limit bucket — consider x-real-ip set by your reverse
+    // proxy so each client gets its own bucket.
+    // Note: NextRequest.ip was removed in Next.js 13+ and is no longer available.
     return request.headers.get("x-real-ip") ?? "unknown";
 }
 
@@ -92,7 +97,11 @@ function getRateLimitConfig(pathname: string): RateLimitConfig | null {
     return null;
 }
 
-export function proxy(request: NextRequest) {
+// Next.js executes middleware only when it is the default export of a root
+// "middleware.ts" file.  The old "proxy.ts" name was never picked up — renaming
+// this file (proxy.ts → middleware.ts) and exporting the handler as the default
+// export makes CSP nonce injection and rate-limiting actually run on requests.
+export function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
     // --- Rate limiting (API routes only) ---
@@ -168,3 +177,5 @@ export const config = {
         "/api/:path*",
     ],
 };
+
+export default middleware;

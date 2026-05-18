@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const path = require('path');
+const fs = require('fs');
 const nextConfig = {
   allowedDevOrigins: ['127.0.0.1', '0.0.0.0'],
   output: 'standalone',
@@ -60,8 +61,17 @@ const nextConfig = {
   // Webpack config for production builds (next build --webpack)
   // SVG handling + local @falkordb/canvas alias
   webpack(config) {
-    // Alias local @falkordb/canvas to its built dist when using webpack
-    config.resolve.alias['@falkordb/canvas'] = path.resolve(__dirname, '../falkordb-canvas/dist/index.js');
+    // In local development, falkordb-canvas may be checked out as a sibling
+    // directory (../falkordb-canvas).  Aliasing to that local build enables
+    // live iteration without publishing to npm.
+    //
+    // In Docker / CI builds the sibling directory does not exist, so we fall
+    // back to the published npm package that is already in node_modules.
+    // The hard-coded path that was here before broke every non-local build.
+    const localCanvasDist = path.resolve(__dirname, '../falkordb-canvas/dist/index.js');
+    if (fs.existsSync(localCanvasDist)) {
+      config.resolve.alias['@falkordb/canvas'] = localCanvasDist;
+    }
 
     // Grab the existing rule that handles SVG imports
     const fileLoaderRule = config.module.rules.find((rule) =>

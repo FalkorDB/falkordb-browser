@@ -161,17 +161,18 @@ export async function POST(request: NextRequest) {
                 throw new Error(result.error || 'Text-to-Cypher failed');
             }
 
-            // Send result events
+            // Send result events.
+            // Each SSE frame uses the standard format: "event: <name>\ndata: <payload>\n\n"
             if (result.cypherQuery) {
-                writer.write(encoder.encode(`event: CypherQuery data: ${result.cypherQuery}\n\n`));
+                writer.write(encoder.encode(`event: CypherQuery\ndata: ${result.cypherQuery}\n\n`));
             }
 
             if (result.cypherResult) {
-                writer.write(encoder.encode(`event: CypherResult data: ${JSON.stringify(result.cypherResult)}\n\n`));
+                writer.write(encoder.encode(`event: CypherResult\ndata: ${JSON.stringify(result.cypherResult)}\n\n`));
             }
 
             if (result.answer) {
-                writer.write(encoder.encode(`event: Result data: ${JSON.stringify(result.answer)}\n\n`));
+                writer.write(encoder.encode(`event: Result\ndata: ${JSON.stringify(result.answer)}\n\n`));
             }
 
             writer.close();
@@ -181,12 +182,13 @@ export async function POST(request: NextRequest) {
             // Create user-friendly error message
             const userFriendlyMessage = createUserFriendlyErrorMessage(error as Error, model, key);
 
-            writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(userFriendlyMessage)}\n\n`));
+            // Embed status in the JSON payload so the client can set the indicator correctly.
+            writer.write(encoder.encode(`event: Error\ndata: ${JSON.stringify({ status: 400, message: userFriendlyMessage })}\n\n`));
             writer.close();
         }
     } catch (error) {
         console.error(error);
-        writer.write(encoder.encode(`event: error status: ${500} data: ${JSON.stringify("Internal server error")}\n\n`));
+        writer.write(encoder.encode(`event: Error\ndata: ${JSON.stringify({ status: 500, message: "Internal server error" })}\n\n`));
         writer.close();
     }
 

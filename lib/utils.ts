@@ -862,7 +862,9 @@ export async function fetchOptions(
   if (indicator === "offline") return;
 
   const result = await securedFetch(
-    `api/graph`,
+    // Use an absolute path so this works from any route (e.g. /settings would
+    // otherwise resolve "api/graph" to "/settings/api/graph").
+    `/api/graph`,
     {
       method: "GET",
     },

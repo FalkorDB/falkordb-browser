@@ -25,7 +25,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    // Wrap JSON parsing so a malformed body returns 400 (client error) instead
+    // of bubbling up to the outer catch and returning 500 (server error).
+    let body: { value?: unknown; action?: unknown };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON payload" },
+        { status: 400, headers: corsHeaders }
+      );
+    }
     const { value, action } = body;
 
     if (typeof value !== "string") {

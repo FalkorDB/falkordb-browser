@@ -967,7 +967,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     } catch {
       // Invalid saved content, ignore
     }
-  }, [prefixReady, contentPersistence, graphNames, graph.Id, runQuery]);
+  }, [prefixReady, contentPersistence, graphNames, graph.Id, handleSetGraphName, runQuery]);
   // Reset all graph state when the active connection changes (user switch)
   useEffect(() => {
     const prev = prevActiveConnectionIdRef.current;
