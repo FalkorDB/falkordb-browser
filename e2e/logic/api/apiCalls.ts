@@ -184,7 +184,7 @@ export default class ApiCalls {
     }
 
     throw new Error(
-      `Failed to remove graph.\\nError: ${lastError?.message ?? "Unknown error"}`
+      `Failed to remove graph.\nError: ${lastError?.message ?? "Unknown error"}`
     );
   }
 
