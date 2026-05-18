@@ -141,6 +141,14 @@ jobs:
         with:
           name: nextjs-build-${{ github.run_id }}
           path: .next/
+      - name: Wait for FalkorDB services to be ready
+        run: |
+          echo "Waiting for FalkorDB (port 6379)..."
+          timeout 60s bash -c 'until echo PING | nc -w 2 localhost 6379 | grep -q PONG; do sleep 1; done'
+          echo "FalkorDB (port 6379) is ready"
+          echo "Waiting for FalkorDB PAT (port 6380)..."
+          timeout 60s bash -c 'until echo PING | nc -w 2 localhost 6380 | grep -q PONG; do sleep 1; done'
+          echo "FalkorDB PAT (port 6380) is ready"
       - name: Run Playwright tests (shard ${{ matrix.shard }} of 6)
         env:
           OPENAI_TOKEN: ${{ secrets.OPENAI_TOKEN }}
