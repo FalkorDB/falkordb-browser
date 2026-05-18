@@ -2,7 +2,7 @@
 /* eslint-disable class-methods-use-this */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { getAdminToken } from "@/e2e/infra/utils";
+import { delay, getAdminToken } from "@/e2e/infra/utils";
 import { APIRequestContext } from "playwright";
 import { EventSource } from "eventsource";
 import {
@@ -156,18 +156,27 @@ export default class ApiCalls {
     graphName: string,
     role?: string
   ): Promise<RemoveGraphResponse> {
-    try {
-      const headers = role === "admin" ? await getAdminToken() : undefined;
-      const result = await deleteRequest(
-        urls.api.graphUrl + graphName,
-        headers
-      );
-      return await result.json();
-    } catch (error) {
-      throw new Error(
-        `Failed to remove graph. \n Error: ${(error as Error).message}`
-      );
+    const headers = role === "admin" ? await getAdminToken() : undefined;
+    let lastError: Error | undefined;
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const result = await deleteRequest(
+          urls.api.graphUrl + graphName,
+          headers
+        );
+        return await result.json();
+      } catch (error) {
+        lastError = error as Error;
+        if (attempt < 2) {
+          await delay(500);
+        }
+      }
     }
+
+    throw new Error(
+      `Failed to remove graph. \n Error: ${lastError?.message ?? "Unknown error"}`
+    );
   }
 
   async changeGraphName(

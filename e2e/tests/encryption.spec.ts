@@ -1,4 +1,4 @@
-import test, { expect } from "@playwright/test";
+import test, { expect, Page } from "@playwright/test";
 import urls from '../config/urls.json';
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import LoginPage from "../logic/POM/loginPage";
@@ -16,6 +16,38 @@ import LoginPage from "../logic/POM/loginPage";
  */
 
 const HEX_COLON_PATTERN = /^[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+$/;
+
+async function waitForServerEncryptedSecretKey(
+    page: Page,
+    timeout = 15000
+): Promise<string> {
+    await page.waitForFunction(
+        () => {
+            const secretKey = localStorage.getItem("secretKey");
+            return secretKey !== null && /^[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+$/.test(secretKey);
+        },
+        undefined,
+        { timeout }
+    );
+
+    return (await page.evaluate(() => localStorage.getItem("secretKey"))) ?? "";
+}
+
+async function waitForClearedSecretKey(
+    page: Page,
+    timeout = 15000
+): Promise<string | null> {
+    await page.waitForFunction(
+        () => {
+            const secretKey = localStorage.getItem("secretKey");
+            return secretKey === null || secretKey === "";
+        },
+        undefined,
+        { timeout }
+    );
+
+    return page.evaluate(() => localStorage.getItem("secretKey"));
+}
 
 test.describe(`@admin Encryption migration tests`, () => {
     // Run serially: each test disconnects + re-authenticates which is resource-heavy;
@@ -47,11 +79,9 @@ test.describe(`@admin Encryption migration tests`, () => {
 
         // Log in so the app loads and the migration code in providers.tsx runs
         await login.clickOnConnect();
-        // Wait for the app to stabilize and the migration effect to run
-        await page.waitForTimeout(2000);
 
         // Read back the secretKey from localStorage
-        const storedKey = await page.evaluate(() => localStorage.getItem("secretKey"));
+        const storedKey = await waitForServerEncryptedSecretKey(page);
 
         // It should now be server-encrypted (iv:authTag:ciphertext hex format)
         expect(storedKey).not.toBeNull();
@@ -78,10 +108,9 @@ test.describe(`@admin Encryption migration tests`, () => {
         });
 
         await login.clickOnConnect();
-        await page.waitForTimeout(2000);
 
         // The legacy key should be cleared since there's no valid old crypto key
-        const storedKey = await page.evaluate(() => localStorage.getItem("secretKey"));
+        const storedKey = await waitForClearedSecretKey(page);
         // Should either be removed or be empty (cleared by the migration)
         expect(storedKey === null || storedKey === "").toBe(true);
     });
@@ -131,11 +160,9 @@ test.describe(`@admin Encryption migration tests`, () => {
         });
 
         await login.clickOnConnect();
-        // Wait for the migration effect to run
-        await page.waitForTimeout(3000);
 
         // The legacy key should have been decrypted and re-encrypted server-side
-        const storedKey = await page.evaluate(() => localStorage.getItem("secretKey"));
+        const storedKey = await waitForServerEncryptedSecretKey(page);
         const legacyKeyRemains = await page.evaluate(() =>
             localStorage.getItem("falkordb-key") !== null || sessionStorage.getItem("falkordb-key") !== null
         );
@@ -161,17 +188,20 @@ test.describe(`@admin Encryption migration tests`, () => {
         });
 
         await login.clickOnConnect();
-        await page.waitForTimeout(2000);
 
         // Read the now-encrypted value
-        const encryptedValue = await page.evaluate(() => localStorage.getItem("secretKey"));
+        const encryptedValue = await waitForServerEncryptedSecretKey(page);
         expect(encryptedValue).not.toBeNull();
         expect(encryptedValue!).toMatch(HEX_COLON_PATTERN);
 
         // Reload the page — the encrypted value should stay the same
         // (should not be double-encrypted)
         await page.reload({ waitUntil: "networkidle" });
-        await page.waitForTimeout(2000);
+        await page.waitForFunction(
+            (expectedSecretKey) => localStorage.getItem("secretKey") === expectedSecretKey,
+            encryptedValue,
+            { timeout: 15000 }
+        );
 
         const afterReload = await page.evaluate(() => localStorage.getItem("secretKey"));
         expect(afterReload).toBe(encryptedValue);
@@ -190,7 +220,7 @@ test.describe(`@admin Encryption migration tests`, () => {
         });
 
         await login.clickOnConnect();
-        await page.waitForTimeout(2000);
+        await waitForClearedSecretKey(page);
 
         const storedKey = await page.evaluate(() => localStorage.getItem("secretKey"));
         // Should still be absent

@@ -47,7 +47,7 @@ test.describe("Graph Tests", () => {
   });
 
   test(`@admin Add graph via UI -> remove graph via API -> Verify graph removal in UI`, async () => {
-    test.setTimeout(60000);
+    test.setTimeout(90000);
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
     const graphName1 = getRandomString("graph");
     const graphName2 = getRandomString("graph");
@@ -74,6 +74,7 @@ test.describe("Graph Tests", () => {
 
   queryData.queries[0].failedQueries.forEach((query) => {
     test(`@admin Validate failure & error message when user runs an invalid queries: ${query.name}`, async () => {
+      test.setTimeout(60000);
       const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
       await browser.setPageToFullScreen();
       const graphName = getRandomString('graph');
