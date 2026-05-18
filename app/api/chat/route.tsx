@@ -89,36 +89,53 @@ function createUserFriendlyErrorMessage(error: unknown, model: string, apiKey: s
 // eslint-disable-next-line import/prefer-default-export
 export async function POST(request: NextRequest) {
     const encoder = new TextEncoder();
+
+    let session;
+    try {
+        // Verify authentication via getClient
+        session = await getClient(request);
+    } catch (error) {
+        console.error(error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500, headers: getCorsHeaders(request) });
+    }
+
+    if (session instanceof NextResponse) {
+        return session;
+    }
+
+    let body;
+    try {
+        body = await request.json();
+    } catch (error) {
+        console.error(error);
+        return new Response("Invalid JSON body", { status: 400, headers: getCorsHeaders(request) });
+    }
+
+    // Validate request body
+    const validation = validateBody(chatRequest, body);
+
+    if (!validation.success) {
+        return new Response(validation.error, {
+            status: 400,
+            headers: {
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache",
+                Connection: "keep-alive",
+                ...getCorsHeaders(request),
+            },
+        });
+    }
+
+    const { messages, graphName, key, model, cypherOnly } = validation.data;
+
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
 
-    try {
-        // Verify authentication via getClient
-        const session = await getClient(request);
-
-        if (session instanceof NextResponse) {
-            return session;
-        }
-
-        const body = await request.json();
-
-        // Validate request body
-        const validation = validateBody(chatRequest, body);
-
-        if (!validation.success) {
-            return new Response(validation.error, {
-                status: 400,
-                headers: {
-                    "Content-Type": "text/event-stream",
-                    "Cache-Control": "no-cache",
-                    Connection: "keep-alive",
-                    ...getCorsHeaders(request),
-                },
-            });
-        }
-
-        const { messages, graphName, key, model, cypherOnly } = validation.data;
-
+    // Process the text-to-cypher request in the background so the Response
+    // (and its readable stream) is returned immediately to the client.
+    // This prevents a deadlock where awaited writes block because the readable
+    // side has no consumer yet (consumer starts only after Response is returned).
+    (async () => {
         try {
             // Fail fast on model/API key provider mismatch before making any external calls
             const modelProvider = detectProviderFromModel(model);
@@ -193,11 +210,7 @@ export async function POST(request: NextRequest) {
             await writer.write(encoder.encode(`event: error\ndata: ${JSON.stringify({ status: 400, message: userFriendlyMessage })}\n\n`));
             await writer.close();
         }
-    } catch (error) {
-        console.error(error);
-        await writer.write(encoder.encode(`event: error\ndata: ${JSON.stringify({ status: 500, message: "Internal server error" })}\n\n`));
-        await writer.close();
-    }
+    })();
 
     request.signal.addEventListener("abort", () => {
         writer.close().catch(() => { /* already closed */ });
