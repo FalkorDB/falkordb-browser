@@ -1249,6 +1249,8 @@ export default class GraphPage extends BasePage {
   }
 
   async selectGraphByName(graphName: string): Promise<void> {
+    // Wait for graph selector to be enabled (graphs loaded from API)
+    await waitForElementToBeEnabled(this.select("Graph"), 1000, 15);
     await this.clickSelect();
     await this.fillSearch(graphName);
     await this.page.waitForTimeout(500); // wait for the search results to be populated

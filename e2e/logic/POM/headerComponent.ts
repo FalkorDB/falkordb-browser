@@ -49,7 +49,7 @@ export default class HeaderComponent extends BasePage {
     }
 
     async clickOnGraphsButton(): Promise<void> {
-        await interactWhenVisible(this.graphsButton, (el) => el.click(), "Click Graphs Button");
+        await interactWhenVisible(this.graphsButton, (el) => el.click(), "Click Graphs Button", 1000, 15);
         await waitForURL(this.page, urls.graphUrl);
     }
 
