@@ -22,11 +22,11 @@ async function waitForServerEncryptedSecretKey(
     timeout = 15000
 ): Promise<string> {
     await page.waitForFunction(
-        () => {
+        (patternSource) => {
             const secretKey = localStorage.getItem("secretKey");
-            return secretKey !== null && /^[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+$/.test(secretKey);
+            return secretKey !== null && new RegExp(patternSource).test(secretKey);
         },
-        undefined,
+        HEX_COLON_PATTERN.source,
         { timeout }
     );
 
