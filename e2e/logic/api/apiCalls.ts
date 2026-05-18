@@ -41,6 +41,7 @@ import { ListTokensResponse, TokenDetailsResponse } from "./responses/tokenRespo
 
 const REMOVE_GRAPH_MAX_RETRY_ATTEMPTS = 3;
 const REMOVE_GRAPH_RETRY_BASE_DELAY_MS = 500;
+const REMOVE_GRAPH_MAX_RETRY_DELAY_MS = 2000;
 
 export async function getSSEGraphResult(
   url: string,
@@ -172,7 +173,12 @@ export default class ApiCalls {
       } catch (error) {
         lastError = error as Error;
         if (attemptIndex < REMOVE_GRAPH_MAX_RETRY_ATTEMPTS - 1) {
-          await delay(REMOVE_GRAPH_RETRY_BASE_DELAY_MS * 2 ** attemptIndex);
+          await delay(
+            Math.min(
+              REMOVE_GRAPH_RETRY_BASE_DELAY_MS * 2 ** attemptIndex,
+              REMOVE_GRAPH_MAX_RETRY_DELAY_MS
+            )
+          );
         }
       }
     }

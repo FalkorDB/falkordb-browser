@@ -41,7 +41,7 @@ async function waitForServerEncryptedSecretKey(
 async function waitForClearedSecretKey(
     page: Page,
     timeout = 15000
-): Promise<string | null> {
+): Promise<void> {
     await page.waitForFunction(
         () => {
             const secretKey = localStorage.getItem("secretKey");
@@ -50,8 +50,6 @@ async function waitForClearedSecretKey(
         undefined,
         { timeout }
     );
-
-    return page.evaluate(() => localStorage.getItem("secretKey"));
 }
 
 test.describe(`@admin Encryption migration tests`, () => {
@@ -115,7 +113,8 @@ test.describe(`@admin Encryption migration tests`, () => {
         await login.clickOnConnect();
 
         // The legacy key should be cleared since there's no valid old crypto key
-        const storedKey = await waitForClearedSecretKey(page);
+        await waitForClearedSecretKey(page);
+        const storedKey = await page.evaluate(() => localStorage.getItem("secretKey"));
         // Should either be removed or be empty (cleared by the migration)
         expect(storedKey === null || storedKey === "").toBe(true);
     });
