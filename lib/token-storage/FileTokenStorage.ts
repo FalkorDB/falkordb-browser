@@ -32,6 +32,15 @@ class FileTokenStorage implements ITokenStorage {
     return next;
   }
 
+  private async cleanupTempFile(tmpPath: string): Promise<void> {
+    try {
+      await fs.unlink(tmpPath);
+    } catch (cleanupError) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to clean up token storage temp file:', { tmpPath, cleanupError });
+    }
+  }
+
   /**
    * Ensures the storage file and directory exist
    */
@@ -104,14 +113,14 @@ class FileTokenStorage implements ITokenStorage {
     try {
       await fs.writeFile(tmpPath, content, { encoding: 'utf8', mode: 0o600 });
       await fs.rename(tmpPath, this.filePath);
-    } catch {
+    } catch (renameError) {
       // Atomic rename failed — fall back to direct write
-      try { await fs.unlink(tmpPath); } catch { /* ignore cleanup failure */ }
+      await this.cleanupTempFile(tmpPath);
       try {
         await fs.writeFile(this.filePath, content, { encoding: 'utf8', mode: 0o600 });
       } catch (writeError) {
         // eslint-disable-next-line no-console
-        console.error('Failed to write tokens to file:', writeError);
+        console.error('Failed to write tokens to file:', { writeError, renameError });
         throw new Error('Failed to save tokens');
       }
     }
