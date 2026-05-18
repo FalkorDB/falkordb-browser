@@ -163,7 +163,7 @@ export default class ApiCalls {
     const headers = role === "admin" ? await getAdminToken() : undefined;
     let lastError: Error | undefined;
 
-    for (let attemptIndex = 0; attemptIndex < REMOVE_GRAPH_MAX_RETRY_ATTEMPTS; attemptIndex += 1) {
+    for (let attemptNumber = 0; attemptNumber < REMOVE_GRAPH_MAX_RETRY_ATTEMPTS; attemptNumber += 1) {
       try {
         const result = await deleteRequest(
           urls.api.graphUrl + graphName,
@@ -172,10 +172,10 @@ export default class ApiCalls {
         return await result.json();
       } catch (error) {
         lastError = error as Error;
-        if (attemptIndex < REMOVE_GRAPH_MAX_RETRY_ATTEMPTS - 1) {
+        if (attemptNumber < REMOVE_GRAPH_MAX_RETRY_ATTEMPTS - 1) {
           await delay(
             Math.min(
-              REMOVE_GRAPH_RETRY_BASE_DELAY_MS * 2 ** attemptIndex,
+              REMOVE_GRAPH_RETRY_BASE_DELAY_MS * 2 ** attemptNumber,
               REMOVE_GRAPH_MAX_RETRY_DELAY_MS
             )
           );
@@ -184,7 +184,8 @@ export default class ApiCalls {
     }
 
     throw new Error(
-      `Failed to remove graph. \n Error: ${lastError?.message ?? "Unknown error"}`
+      `Failed to remove graph.
+Error: ${lastError?.message ?? "Unknown error"}`
     );
   }
 
