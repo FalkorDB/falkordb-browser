@@ -428,7 +428,7 @@ export default function QueryHistoryPanel({ onClose, graphName }: Props) {
                         }
                     </ul>
                 </PaginationList>
-                <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="w-full flex flex-col items-center basis-0 grow">
+                <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="w-full flex flex-col items-center basis-0 grow min-h-0 overflow-hidden">
                     <TabsList className="h-fit bg-background gap-1">
                         <TabsTrigger className={cn("px-2 py-0.5 text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
                         <TabsTrigger className={cn("px-2 py-0.5 text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>
