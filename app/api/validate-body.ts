@@ -277,3 +277,43 @@ export function validateBody<T extends z.ZodTypeAny>(
     return { success: false, error: "Validation failed" };
   }
 }
+
+// Connection schemas
+export const addConnection = z.object({
+  host: z
+    .string({ error: "Invalid Host" })
+    .optional(),
+  port: z
+    .union([z.string(), z.number()])
+    .optional(),
+  username: z
+    .string({ error: "Invalid Username" })
+    .optional(),
+  password: z
+    .string({ error: "Invalid Password" })
+    .optional(),
+  tls: z
+    .union([z.boolean(), z.string()])
+    .optional(),
+  ca: z
+    .string({ error: "Invalid CA certificate" })
+    .optional(),
+});
+
+// Token creation schema
+export const createToken = z.object({
+  name: z
+    .string({ error: "Invalid token name" })
+    .min(1, "Token name cannot be empty")
+    .default("API Token"),
+  expiresAt: z
+    .string({ error: "Invalid expiration date" })
+    .nullable()
+    .optional()
+    .default(null),
+  ttlSeconds: z
+    .number({ error: "Invalid TTL value" })
+    .min(1, "TTL must be at least 1 second")
+    .max(31622400, "TTL cannot exceed 1 year")
+    .optional(),
+});

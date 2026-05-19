@@ -862,7 +862,7 @@ export async function fetchOptions(
   if (indicator === "offline") return;
 
   const result = await securedFetch(
-    `api/graph`,
+    `/api/graph`,
     {
       method: "GET",
     },

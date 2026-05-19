@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import { ITokenStorage, TokenData, TokenFetchOptions } from './ITokenStorage';
 
 /**
@@ -9,10 +10,35 @@ import { ITokenStorage, TokenData, TokenFetchOptions } from './ITokenStorage';
 class FileTokenStorage implements ITokenStorage {
   private filePath: string;
 
+  // Serializes all read-modify-write operations within this process so that
+  // concurrent createToken / revokeToken / updateLastUsed calls cannot:
+  //   (a) race on the atomic-rename tmp file (ENOENT on rename), or
+  //   (b) drop each other's updates (read N, both push, write N+1).
+  private writeQueue: Promise<unknown> = Promise.resolve();
+
   constructor(filePath?: string) {
     // Default to .data/api_tokens.json in project root
     // Can be overridden via API_TOKEN_STORAGE_PATH environment variable
     this.filePath = filePath || process.env.API_TOKEN_STORAGE_PATH || path.join(process.cwd(), '.data', 'api_tokens.json');
+  }
+
+  /**
+   * Run a read-modify-write operation under the in-process mutex.
+   * Failures do not poison the queue for subsequent callers.
+   */
+  private withLock<T>(op: () => Promise<T>): Promise<T> {
+    const next = this.writeQueue.then(op, op);
+    this.writeQueue = next.catch(() => undefined);
+    return next;
+  }
+
+  private async cleanupTempFile(tmpPath: string): Promise<void> {
+    try {
+      await fs.unlink(tmpPath);
+    } catch (cleanupError) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to clean up token storage temp file:', { tmpPath, cleanupError });
+    }
   }
 
   /**
@@ -23,10 +49,14 @@ class FileTokenStorage implements ITokenStorage {
       // Ensure directory exists with restrictive permissions (owner-only)
       const dir = path.dirname(this.filePath);
       await fs.mkdir(dir, { recursive: true, mode: 0o700 });
+      // Enforce permissions on pre-existing directory
+      await fs.chmod(dir, 0o700);
 
       // Check if file exists
       try {
         await fs.access(this.filePath);
+        // Enforce permissions on pre-existing file
+        await fs.chmod(this.filePath, 0o600);
       } catch {
         // File doesn't exist, create it with empty array and restrictive permissions
         await fs.writeFile(this.filePath, JSON.stringify({ tokens: [] }, null, 2), { encoding: 'utf8', mode: 0o600 });
@@ -67,9 +97,10 @@ class FileTokenStorage implements ITokenStorage {
   }
 
   /**
-   * Write tokens to file atomically: write to a temp file first, then rename.
-   * fs.rename is atomic on POSIX systems (same filesystem), so readers
-   * always see either the old or the new complete file — never a partial write.
+   * Write tokens to file atomically: write to a UNIQUE temp file first, then rename.
+   * fs.rename is atomic on POSIX systems (same filesystem). Each writer uses its
+   * own tmp filename (pid + timestamp + random) so concurrent writers cannot
+   * consume each other's staging file and trigger ENOENT on rename.
    * Falls back to direct write if atomic rename fails.
    */
   private async writeTokens(tokens: TokenData[]): Promise<void> {
@@ -77,27 +108,30 @@ class FileTokenStorage implements ITokenStorage {
     await fs.mkdir(dir, { recursive: true, mode: 0o700 });
 
     const content = JSON.stringify({ tokens }, null, 2);
-    const tmpPath = `${this.filePath}.${process.pid}-${Date.now()}.tmp`;
+    const unique = `${process.pid}.${Date.now()}.${crypto.randomBytes(6).toString('hex')}`;
+    const tmpPath = `${this.filePath}.${unique}.tmp`;
     try {
       await fs.writeFile(tmpPath, content, { encoding: 'utf8', mode: 0o600 });
       await fs.rename(tmpPath, this.filePath);
-    } catch {
+    } catch (renameError) {
       // Atomic rename failed — fall back to direct write
-      try { await fs.unlink(tmpPath); } catch { /* ignore cleanup failure */ }
+      await this.cleanupTempFile(tmpPath);
       try {
         await fs.writeFile(this.filePath, content, { encoding: 'utf8', mode: 0o600 });
       } catch (writeError) {
         // eslint-disable-next-line no-console
-        console.error('Failed to write tokens to file:', writeError);
+        console.error('Failed to write tokens to file:', { writeError, renameError });
         throw new Error('Failed to save tokens');
       }
     }
   }
 
   async createToken(tokenData: TokenData): Promise<void> {
-    const tokens = await this.readTokens();
-    tokens.push(tokenData);
-    await this.writeTokens(tokens);
+    return this.withLock(async () => {
+      const tokens = await this.readTokens();
+      tokens.push(tokenData);
+      await this.writeTokens(tokens);
+    });
   }
 
   async fetchTokens(options: TokenFetchOptions): Promise<TokenData[]> {
@@ -128,36 +162,42 @@ class FileTokenStorage implements ITokenStorage {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async revokeToken(tokenId: string, revokerUsername: string): Promise<boolean> {
-    const tokens = await this.readTokens();
-    const token = tokens.find(t => t.token_id === tokenId);
+    return this.withLock(async () => {
+      const tokens = await this.readTokens();
+      const token = tokens.find(t => t.token_id === tokenId);
 
-    if (!token) {
-      return false;
-    }
+      if (!token) {
+        return false;
+      }
 
-    token.is_active = false;
-    await this.writeTokens(tokens);
-    return true;
+      token.is_active = false;
+      await this.writeTokens(tokens);
+      return true;
+    });
   }
 
   async deleteToken(tokenId: string): Promise<boolean> {
-    const tokens = await this.readTokens();
-    const next = tokens.filter(t => t.token_id !== tokenId);
-    if (next.length === tokens.length) {
-      return false;
-    }
-    await this.writeTokens(next);
-    return true;
+    return this.withLock(async () => {
+      const tokens = await this.readTokens();
+      const next = tokens.filter(t => t.token_id !== tokenId);
+      if (next.length === tokens.length) {
+        return false;
+      }
+      await this.writeTokens(next);
+      return true;
+    });
   }
 
   async updateLastUsed(tokenId: string): Promise<void> {
-    const tokens = await this.readTokens();
-    const token = tokens.find(t => t.token_id === tokenId);
+    return this.withLock(async () => {
+      const tokens = await this.readTokens();
+      const token = tokens.find(t => t.token_id === tokenId);
 
-    if (token) {
-      token.last_used = Math.floor(Date.now() / 1000);
-      await this.writeTokens(tokens);
-    }
+      if (token) {
+        token.last_used = Math.floor(Date.now() / 1000);
+        await this.writeTokens(tokens);
+      }
+    });
   }
 
   async isTokenActive(tokenHash: string): Promise<boolean> {
@@ -195,20 +235,22 @@ class FileTokenStorage implements ITokenStorage {
   }
 
   async cleanupExpiredTokens(): Promise<number> {
-    const tokens = await this.readTokens();
-    const now = Math.floor(Date.now() / 1000);
+    return this.withLock(async () => {
+      const tokens = await this.readTokens();
+      const now = Math.floor(Date.now() / 1000);
 
-    const validTokens = tokens.filter(
-      t => t.expires_at === -1 || t.expires_at > now
-    );
+      const validTokens = tokens.filter(
+        t => t.expires_at === -1 || t.expires_at > now
+      );
 
-    const removedCount = tokens.length - validTokens.length;
+      const removedCount = tokens.length - validTokens.length;
 
-    if (removedCount > 0) {
-      await this.writeTokens(validTokens);
-    }
+      if (removedCount > 0) {
+        await this.writeTokens(validTokens);
+      }
 
-    return removedCount;
+      return removedCount;
+    });
   }
 }
 

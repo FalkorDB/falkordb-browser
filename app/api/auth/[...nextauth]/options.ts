@@ -62,7 +62,7 @@ interface AuthenticatedUserWithPassword extends AuthenticatedUser {
  * themselves when safe.
  */
 const connections = new LRUCache<string, FalkorDB>({
-  max: 100,
+  max: (() => { const n = parseInt(process.env.MAX_CONNECTION_CACHE_SIZE || '100', 10); return Number.isFinite(n) && n > 0 ? n : 100; })(),
   ttl: 30 * 60 * 1000, // 30 minutes idle TTL
   dispose(client, _key, reason) {
     if (reason === 'set' || reason === 'delete') return;
@@ -491,7 +491,9 @@ async function isJWTOnlyRequest(): Promise<boolean> {
  */
 async function verifyJWTToken(token: string): Promise<CustomJWTPayload> {
   const { jwtVerify } = await import('jose');
-  const secret = new TextEncoder().encode(process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET);
+  const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+  if (!authSecret) throw new Error('AUTH_SECRET or NEXTAUTH_SECRET must be set');
+  const secret = new TextEncoder().encode(authSecret);
   const { payload } = await jwtVerify(token, secret);
   return payload as unknown as CustomJWTPayload;
 }
@@ -643,6 +645,10 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
 
       return { client, user };
     } catch (error) {
+      // Surface server misconfiguration errors instead of silently falling back
+      if (error instanceof Error && (error.message.includes("AUTH_SECRET") || error.message.includes("NEXTAUTH_SECRET") || error.message.includes("ENCRYPTION_KEY"))) {
+        throw error;
+      }
       // Fall back to session auth if JWT fails
       // eslint-disable-next-line no-console
       console.warn("JWT authentication failed, falling back to session:", error);
@@ -1023,10 +1029,22 @@ async function withConnectionLock<T>(key: string, fn: () => Promise<T>): Promise
       ]);
     } catch { /* ignore — we'll run our own attempt */ }
   }
-  const promise = fn();
-  connectionLocks.set(key, promise);
+  // Claim the lock before starting fn() to prevent TOCTOU races:
+  // another awaiter that passed the while-check in the same microtask
+  // will now see the lock and wait.
+  let resolve!: (v: T) => void;
+  let reject!: (e: unknown) => void;
+  const sentinel = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+  // Prevent unhandled rejection if fn() rejects before any waiter attaches
+  sentinel.catch(() => {});
+  connectionLocks.set(key, sentinel);
   try {
-    return await promise;
+    const result = await fn();
+    resolve(result);
+    return result;
+  } catch (err) {
+    reject(err);
+    throw err;
   } finally {
     connectionLocks.delete(key);
   }

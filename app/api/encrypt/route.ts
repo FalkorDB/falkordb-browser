@@ -25,7 +25,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON in request body" },
+        { status: 400, headers: corsHeaders }
+      );
+    }
+    if (typeof body !== "object" || body === null) {
+      return NextResponse.json(
+        { error: "Request body must be a JSON object" },
+        { status: 400, headers: corsHeaders }
+      );
+    }
     const { value, action } = body;
 
     if (typeof value !== "string") {

@@ -702,7 +702,9 @@ export default class GraphPage extends BasePage {
     await interactWhenVisible(
       this.editorContainer,
       (el) => el.click(),
-      "Editor Input"
+      "Editor Input",
+      1000,
+      15
     );
   }
 
@@ -1177,7 +1179,11 @@ export default class GraphPage extends BasePage {
     await this.clickConfirmCreateGraph();
     if (waitForVisibility) {
       await waitForElementToNotBeVisible(this.createConfirm);
+      // Wait for the editor to become visible after graph creation
+      await waitForElementToBeVisible(this.editorContainer, 1000, 10);
     }
+    // Wait for the editor to stabilize after graph creation triggers re-renders
+    await waitForElementToBeVisible(this.editorContainer, 500, 20);
   }
 
   async removeGraph(graphName: string): Promise<void> {
@@ -1233,6 +1239,8 @@ export default class GraphPage extends BasePage {
   }
 
   async modifyGraphName(oldName: string, newName: string): Promise<void> {
+    // Wait for graph selector to be enabled (graphs loaded)
+    await waitForElementToBeEnabled(this.select("Graph"), 1000, 15);
     await this.clickSelect();
     await this.clickManage();
     await this.hoverTableRowByName(oldName);
@@ -1243,6 +1251,8 @@ export default class GraphPage extends BasePage {
   }
 
   async selectGraphByName(graphName: string): Promise<void> {
+    // Wait for graph selector to be enabled (graphs loaded from API)
+    await waitForElementToBeEnabled(this.select("Graph"), 1000, 15);
     await this.clickSelect();
     await this.fillSearch(graphName);
     await this.page.waitForTimeout(500); // wait for the search results to be populated

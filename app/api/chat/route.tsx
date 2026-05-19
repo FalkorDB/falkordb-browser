@@ -89,37 +89,63 @@ function createUserFriendlyErrorMessage(error: unknown, model: string, apiKey: s
 // eslint-disable-next-line import/prefer-default-export
 export async function POST(request: NextRequest) {
     const encoder = new TextEncoder();
+
+    let session;
+    try {
+        // Verify authentication via getClient
+        session = await getClient(request);
+    } catch (error) {
+        console.error(error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500, headers: getCorsHeaders(request) });
+    }
+
+    if (session instanceof NextResponse) {
+        return session;
+    }
+
+    let body;
+    try {
+        body = await request.json();
+    } catch (error) {
+        console.error(error);
+        return new Response("Invalid JSON body", { status: 400, headers: getCorsHeaders(request) });
+    }
+
+    // Validate request body
+    const validation = validateBody(chatRequest, body);
+
+    if (!validation.success) {
+        return new Response(validation.error, {
+            status: 400,
+            headers: {
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache",
+                Connection: "keep-alive",
+                ...getCorsHeaders(request),
+            },
+        });
+    }
+
+    const { messages, graphName, key, model, cypherOnly } = validation.data;
+
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
 
-    try {
-        // Verify authentication via getClient
-        const session = await getClient(request);
-
-        if (session instanceof NextResponse) {
-            return session;
-        }
-
-        const body = await request.json();
-
-        // Validate request body
-        const validation = validateBody(chatRequest, body);
-
-        if (!validation.success) {
-            return new Response(validation.error, {
-                status: 400,
-                headers: {
-                    "Content-Type": "text/event-stream",
-                    "Cache-Control": "no-cache",
-                    Connection: "keep-alive",
-                    ...getCorsHeaders(request),
-                },
-            });
-        }
-
-        const { messages, graphName, key, model, cypherOnly } = validation.data;
-
+    // Process the text-to-cypher request in the background so the Response
+    // (and its readable stream) is returned immediately to the client.
+    // This prevents a deadlock where awaited writes block because the readable
+    // side has no consumer yet (consumer starts only after Response is returned).
+    (async () => {
         try {
+            // Fail fast on model/API key provider mismatch before making any external calls
+            const modelProvider = detectProviderFromModel(model);
+            const keyProvider = detectProviderFromApiKey(key);
+            if (modelProvider !== "unknown" && keyProvider !== "unknown" && modelProvider !== keyProvider && modelProvider !== "ollama") {
+                const modelProviderName = getProviderDisplayName(modelProvider);
+                const keyProviderName = getProviderDisplayName(keyProvider);
+                throw new Error(`Model/API key mismatch: You selected a ${modelProviderName} model but provided a ${keyProviderName} API key. Please update your API key in Settings to match your selected model.`);
+            }
+
             // Build FalkorDB connection URL from user session
             const falkordbConnection = buildFalkorDBConnection(session.user);
 
@@ -163,35 +189,31 @@ export async function POST(request: NextRequest) {
 
             // Send result events
             if (result.cypherQuery) {
-                writer.write(encoder.encode(`event: CypherQuery data: ${result.cypherQuery}\n\n`));
+                await writer.write(encoder.encode(`event: CypherQuery\ndata: ${JSON.stringify(result.cypherQuery)}\n\n`));
             }
 
             if (result.cypherResult) {
-                writer.write(encoder.encode(`event: CypherResult data: ${JSON.stringify(result.cypherResult)}\n\n`));
+                await writer.write(encoder.encode(`event: CypherResult\ndata: ${JSON.stringify(result.cypherResult)}\n\n`));
             }
 
             if (result.answer) {
-                writer.write(encoder.encode(`event: Result data: ${JSON.stringify(result.answer)}\n\n`));
+                await writer.write(encoder.encode(`event: Result\ndata: ${JSON.stringify(result.answer)}\n\n`));
             }
 
-            writer.close();
+            await writer.close();
         } catch (error) {
             console.error('Text-to-Cypher error details:', error);
 
             // Create user-friendly error message
             const userFriendlyMessage = createUserFriendlyErrorMessage(error as Error, model, key);
 
-            writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(userFriendlyMessage)}\n\n`));
-            writer.close();
+            await writer.write(encoder.encode(`event: error\ndata: ${JSON.stringify({ status: 400, message: userFriendlyMessage })}\n\n`));
+            await writer.close();
         }
-    } catch (error) {
-        console.error(error);
-        writer.write(encoder.encode(`event: error status: ${500} data: ${JSON.stringify("Internal server error")}\n\n`));
-        writer.close();
-    }
+    })();
 
     request.signal.addEventListener("abort", () => {
-        writer.close();
+        writer.close().catch(() => { /* already closed */ });
     });
 
     return new Response(readable, {

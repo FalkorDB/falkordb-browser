@@ -40,6 +40,10 @@ export default class HeaderComponent extends BasePage {
         return this.page.getByTestId("logoutButton")
     }
 
+    private get LogoutConfirmButton(): Locator {
+        return this.page.getByTestId("logoutConfirm")
+    }
+
     private get aboutPopUp(): Locator {
         return this.page.locator('//div[@id="about"]');
     }
@@ -49,7 +53,7 @@ export default class HeaderComponent extends BasePage {
     }
 
     async clickOnGraphsButton(): Promise<void> {
-        await interactWhenVisible(this.graphsButton, (el) => el.click(), "Click Graphs Button");
+        await interactWhenVisible(this.graphsButton, (el) => el.click(), "Click Graphs Button", 1000, 15);
         await waitForURL(this.page, urls.graphUrl);
     }
 
@@ -94,6 +98,7 @@ export default class HeaderComponent extends BasePage {
         }
         await this.waitForPageIdle();
         await interactWhenVisible(this.LogoutButton, (el) => el.click(), "Click Logout Button");
+        await interactWhenVisible(this.LogoutConfirmButton, (el) => el.click(), "Confirm Logout");
         await waitForURL(this.page, urls.loginUrl);
     }
 

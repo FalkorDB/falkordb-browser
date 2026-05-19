@@ -1,11 +1,11 @@
 import { Suspense } from "react";
-import LoginForm from "./LoginForm";
+import LoginPage from "./LoginPage";
 
 export default function Page() {
   return (
     <div className="Page">
       <Suspense fallback={<div>Loading...</div>}>
-        <LoginForm />
+        <LoginPage />
       </Suspense>
     </div>
   );
