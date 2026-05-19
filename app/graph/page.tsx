@@ -10,6 +10,8 @@ import { Graph, GraphInfo } from "../api/graph/model";
 import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ForceGraphContext, ConnectionContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
+import ResizableBox from "@/components/ui/ResizableBox";
+import { useResizableSize } from "@/lib/useResizableSize";
 
 const DataPanel = dynamicImport(() => import("./DataPanel"), {
     ssr: false,
@@ -93,6 +95,7 @@ export default function Page() {
 
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
     const [chatOpen, setChatOpen] = useState(false);
+    const { size: chatSize, onResize: onChatResize } = useResizableSize("chat-size", 400, 500, 300, 300);
     const [queriesOpen, setQueriesOpen] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(true);
     const [isAddNode, setIsAddNode] = useState(false);
@@ -105,22 +108,29 @@ export default function Page() {
 
     const onPanelResize = useCallback((size: PanelSize) => {
         setIsCollapsed(size.asPercentage === 0);
-    }, []);
+        if (size.asPercentage > 0 && panel) {
+            localStorage.setItem(`panel-size-${panel}`, JSON.stringify(size.asPercentage));
+        }
+    }, [panel]);
 
-    const panelSizes: Record<string, { size: string; min: string }> = {
+    const panelSizes: Record<string, { size: string; min: string }> = useMemo(() => ({
         data: { size: "200px", min: "200px" },
         add: { size: "30%", min: "25%" },
-    };
+    }), []);
 
     const getPanelSize = useCallback(() => {
         if (!panel) return "0%";
+        const stored = localStorage.getItem(`panel-size-${panel}`);
+        if (stored) {
+            return `${JSON.parse(stored)}%`;
+        }
         return panelSizes[panel]?.size ?? "0%";
-    }, [panel]);
+    }, [panel, panelSizes]);
 
     const panelMinSize = useMemo(() => {
         if (!panel) return "0%";
         return panelSizes[panel]?.min ?? "0%";
-    }, [panel]);
+    }, [panel, panelSizes]);
 
     useEffect(() => {
         const currentPanel = panelRef.current;
@@ -561,8 +571,17 @@ export default function Page() {
                 </ResizablePanel>
                 {
                     chatOpen && graphName &&
-                    <div className="absolute bottom-3 right-3 w-[400px] max-w-[95dvw] h-[500px] max-h-[80dvh] z-30">
-                        <Chat onClose={() => setChatOpen(false)} />
+                    <div className="absolute bottom-3 right-3 z-30">
+                        <ResizableBox
+                            width={chatSize.width}
+                            height={chatSize.height}
+                            minWidth={300}
+                            minHeight={300}
+                            onResizeEnd={(w, h) => onChatResize(w, h)}
+                            direction="top-left"
+                        >
+                            <Chat onClose={() => setChatOpen(false)} />
+                        </ResizableBox>
                     </div>
                 }
             </ResizablePanelGroup>

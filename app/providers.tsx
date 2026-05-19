@@ -79,6 +79,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   const [indicator, setIndicator] = useState<"online" | "offline">("online");
   const [historyQuery, setHistoryQuery] = useState<HistoryQuery>(defaultQueryHistory);
+  const [urlQueryText, setUrlQueryText] = useState<string | null>(null);
   const [selectedParam, setSelectedParam] = useState<string>(urlSelected);
   const [runDefaultQuery, setRunDefaultQuery] = useState(false);
   const [graphNames, setGraphNames] = useState<string[]>([]);
@@ -497,6 +498,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         currentQuery: newQuery,
         counter: 0
       }));
+      setUrlQueryText(newQuery.text);
       setViewport(undefined);
       setGraphData(undefined);
       setSearch("");
@@ -530,6 +532,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setScrollPosition(0);
     setSyntaxError(null);
     setHistoryQuery(h => ({ ...h, query: "", currentQuery: defaultQueryHistory.currentQuery }));
+    setUrlQueryText(null);
   }, [toast, setIndicator]);
 
   const graphContext = useMemo(() => ({
@@ -932,17 +935,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Only write URL while on /graph
     if (pathname !== "/graph") return;
 
-    const queryForUrl = (graph.Id && graph.Id === graphName && historyQuery.currentQuery.text && historyQuery.currentQuery.graphName === graphName)
-      ? historyQuery.currentQuery.text
-      : null;
-
     // Sync all context state to URL
     setUrlParam({
       graph: graphName || null,
-      query: queryForUrl,
+      query: urlQueryText,
       selected: selectedParam || null,
     });
-  }, [pathname, selectedParam, graphName, historyQuery.currentQuery.text, historyQuery.currentQuery.graphName, graph.Id]);
+  }, [pathname, selectedParam, graphName, urlQueryText, graph.Id]);
 
   // Restore content persistence once on app mount (after auth + settings + graph names loaded)
   useEffect(() => {
