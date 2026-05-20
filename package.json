@@ -98,7 +98,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/react-gtm-module": "^2.0.4",
     "@types/swagger-ui-react": "^5.18.0",
-    "eslint": "^9.39.4",
+    "eslint": "^10.4.0",
     "eslint-config-next": "^16.2.6",
     "playwright": "^1.59.1",
     "typescript": "^6.0.3"
