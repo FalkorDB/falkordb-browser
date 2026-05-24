@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useContext, useState } from "react";
+import { FormEvent, useContext, useEffect, useState } from "react";
 import { Check, Info } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -113,6 +113,13 @@ export default function LoginForm({
   const [TLS, setTLS] = useState(initialTLS);
   const [CA, setCA] = useState<string>();
   const [uploadedFileName, setUploadedFileName] = useState<string>("");
+
+  useEffect(() => {
+    setHost(initialHost);
+    setPort(initialPort);
+    setUsername(initialUsername);
+    setTLS(initialTLS);
+  }, [initialHost, initialPort, initialUsername, initialTLS]);
   const [error, setError] = useState<{
     message: React.ReactNode
     show: boolean

@@ -214,6 +214,25 @@ export default class LoginPage extends HeaderComponent {
     await this.clickConnect();
   }
 
+  async connectWithQueryParams(
+    credentials: { username?: string; password?: string; host?: string; port?: string; tls?: boolean }
+  ): Promise<void> {
+    const params = new URLSearchParams();
+    if (credentials.host) params.set("host", credentials.host);
+    if (credentials.port) params.set("port", credentials.port);
+    if (credentials.username) params.set("username", credentials.username);
+    if (credentials.tls) params.set("tls", "true");
+
+    const loginUrlWithParams = `${urls.loginUrl}?${params.toString()}`;
+    await this.page.goto(loginUrlWithParams);
+    await this.page.waitForLoadState("domcontentloaded");
+
+    if (credentials.password) {
+      await this.fillPassword(credentials.password);
+    }
+    await this.clickConnect();
+  }
+
   async uploadCertificate(filePath: string): Promise<void> {
     if (!existsSync(filePath)) {
       throw new Error(`Certificate file does not exist: ${filePath}`);
