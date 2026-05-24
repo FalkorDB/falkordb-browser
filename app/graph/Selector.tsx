@@ -12,6 +12,8 @@ import { BrowserSettingsContext, ConnectionContext, IndicatorContext, PanelConte
 import CypherEditor from "../components/CypherEditor";
 import { Graph } from "../api/graph/model";
 import QueryHistoryPanel from "./QueryHistoryPanel";
+import ResizableBox from "@/components/ui/ResizableBox";
+import { useResizableSize } from "@/lib/useResizableSize";
 
 interface Props {
     graph: Graph
@@ -53,6 +55,8 @@ export default function Selector({
     const { panelOpen, onTogglePanel } = useContext(PanelContext);
 
     const [maximize, setMaximize] = useState(false);
+
+    const { size: historySize, onResize: onHistoryResize } = useResizableSize("queryHistory-size", 560, 600, 350, 300);
 
     const separator = <div className="h-[80%] w-0.5 bg-border rounded-full" />;
 
@@ -108,10 +112,13 @@ export default function Selector({
                     <PopoverContent
                         align="start"
                         sideOffset={20}
-                        className="z-30 w-[560px] h-[600px] p-0 border-none bg-transparent shadow-none"
+                        className="z-30 p-0 border-none bg-transparent shadow-none w-auto h-auto overflow-visible"
                         onOpenAutoFocus={(e) => e.preventDefault()}
                         onInteractOutside={(e) => {
                             if ((e.target as Element)?.closest?.('[data-tutorial-overlay]')) {
+                                e.preventDefault();
+                            }
+                            if ((e.target as Element)?.closest?.('[role="separator"]')) {
                                 e.preventDefault();
                             }
                         }}
@@ -121,7 +128,16 @@ export default function Selector({
                             }
                         }}
                     >
-                        <QueryHistoryPanel graphName={graphName} onClose={() => setQueriesOpen?.(false)} />
+                        <ResizableBox
+                            width={historySize.width}
+                            height={historySize.height}
+                            minWidth={350}
+                            minHeight={300}
+                            onResizeEnd={(w, h) => onHistoryResize(w, h)}
+                            direction="bottom-left"
+                        >
+                            <QueryHistoryPanel graphName={graphName} onClose={() => setQueriesOpen?.(false)} />
+                        </ResizableBox>
                     </PopoverContent>
                 </Popover>
                 {
