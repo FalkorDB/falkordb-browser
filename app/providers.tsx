@@ -7,10 +7,10 @@ import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, pr
 import { serverEncrypt, serverDecrypt, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import { usePathname, useRouter } from "next/navigation";
-import { setUrlParam, useGraphParams } from "@/lib/useUrlParams";
+import { setUrlParam, useGraphParams, buildGraphUrlParams, syncRouteUrlParams } from "@/lib/useUrlParams";
 import { useToast } from "@/components/ui/use-toast";
 import { PanelImperativeHandle } from "react-resizable-panels";
-import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
+import type { Data as CanvasData, LayoutMode, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphInfo } from "./api/graph/model";
 import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, SyntaxErrorContext, SessionConnection } from "./components/provider";
@@ -74,7 +74,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const canvasRef = useRef<GraphRef["current"]>(null);
   const contentRestoredRef = useRef(false);
 
-  const { graphName: urlGraphName, selected: urlSelected, query: urlQuery } = useGraphParams();
+  const { graphName: urlGraphName, selected: urlSelected, query: urlQuery, layout: urlLayout, direction: urlDirection } = useGraphParams();
   const initialQueryRef = useRef(urlQuery);
 
   const [indicator, setIndicator] = useState<"online" | "offline">("online");
@@ -86,6 +86,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [graph, setGraph] = useState<Graph>(Graph.empty());
   const [data, setData] = useState<GraphData>({ ...graph.Elements });
   const [graphData, setGraphData] = useState<CanvasData>();
+  const [layout, setLayout] = useState<LayoutMode>((urlLayout || 'force') as LayoutMode);
+  const [direction, setDirection] = useState(urlDirection || '');
   const [graphInfo, setGraphInfo] = useState<GraphInfo>(GraphInfo.empty(toast, setIndicator));
   const [graphName, setGraphName] = useState<string>(urlGraphName);
   const [contentPersistence, setContentPersistence] = useState(false);
@@ -312,7 +314,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setData,
     graphData,
     setGraphData,
-  }), [canvasRef, viewport, data, graphData]);
+    layout,
+    setLayout,
+    direction,
+    setDirection,
+  }), [canvasRef, viewport, data, graphData, layout, direction]);
 
   const tableViewContext = useMemo(() => ({
     scrollPosition,
@@ -935,13 +941,15 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Only write URL while on /graph
     if (pathname !== "/graph") return;
 
-    // Sync all context state to URL
-    setUrlParam({
-      graph: graphName || null,
+    // Sync all context state to URL via centralized builder
+    syncRouteUrlParams(pathname, {
+      graph: graphName,
       query: urlQueryText,
-      selected: selectedParam || null,
+      selected: selectedParam,
+      layout,
+      direction,
     });
-  }, [pathname, selectedParam, graphName, urlQueryText, graph.Id]);
+  }, [pathname, selectedParam, graphName, urlQueryText, graph.Id, layout, direction]);
 
   // Restore content persistence once on app mount (after auth + settings + graph names loaded)
   useEffect(() => {

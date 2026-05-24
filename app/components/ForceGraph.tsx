@@ -5,50 +5,25 @@
 
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
-import type { Data, GraphLink, GraphNode, GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
-import { dataToGraphData } from "@falkordb/canvas";
-import { securedFetch, getTheme, GraphRef, GraphData, Node, Relationship, Link } from "@/lib/utils";
+import type { Data, GraphLink, GraphNode, ViewportState, LayoutMode, HierarchyDirection, RadialDirection } from "@falkordb/canvas";
+import { securedFetch, getTheme, GraphRef, GraphData, Node, Relationship, Link, convertToCanvasData } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Graph } from "../api/graph/model";
-import { BrowserSettingsContext, IndicatorContext, ConnectionContext } from "./provider";
+import { BrowserSettingsContext, IndicatorContext, ConnectionContext, ForceGraphContext } from "./provider";
 
 interface Props {
     graph: Graph
     data: GraphData
     setData: Dispatch<SetStateAction<GraphData>>
-    graphData: CanvasData | undefined
-    setGraphData: Dispatch<SetStateAction<CanvasData | undefined>>
+    graphData: Data | undefined
+    setGraphData: Dispatch<SetStateAction<Data | undefined>>
     canvasRef: GraphRef
     selectedElements: (Node | Link)[]
     setSelectedElements: (el?: (Node | Link)[]) => void
     setRelationships: Dispatch<SetStateAction<Relationship[]>>
-    isLoading: boolean
-    setIsLoading: (loading: boolean) => void
-    cooldownTicks: number | undefined
-    handleCooldown: (ticks?: number) => void
     viewport?: ViewportState
     setViewport?: Dispatch<SetStateAction<ViewportState>>
 }
-
-const convertToCanvasData = (graphData: GraphData): Data => ({
-    nodes: graphData.nodes.map(({ id, labels, color, visible, size, data }) => ({
-        id,
-        labels,
-        color,
-        visible,
-        size: size,
-        data
-    })),
-    links: graphData.links.map(({ id, relationship, color, visible, source, target, data }) => ({
-        id,
-        relationship,
-        color,
-        visible,
-        source,
-        target,
-        data
-    }))
-});
 
 export default function ForceGraph({
     graph,
@@ -59,10 +34,6 @@ export default function ForceGraph({
     selectedElements,
     setSelectedElements,
     setRelationships,
-    isLoading,
-    setIsLoading,
-    cooldownTicks,
-    handleCooldown,
     viewport = undefined,
     setViewport = undefined,
 }: Props) {
@@ -70,6 +41,7 @@ export default function ForceGraph({
     const { setIndicator } = useContext(IndicatorContext);
     const { settings: { captionsKeysSettings: { captionsKeys }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
+    const { layout: ctxLayout, direction: ctxDirection } = useContext(ForceGraphContext);
 
     const { theme } = useTheme();
     const { toast } = useToast();
@@ -109,13 +81,10 @@ export default function ForceGraph({
 
         return () => {
             if (canvas && setViewport && canvasLoaded) {
-                const savedData = canvas.getGraphData();
+                const savedData = canvas.getData();
 
                 if (savedData.nodes.length !== 0) {
                     setViewport(canvas.getViewport());
-                    savedData.nodes.forEach(node => {
-                        node.displayName = ["", ""];
-                    });
                     setGraphData(savedData);
                 }
             }
@@ -144,14 +113,8 @@ export default function ForceGraph({
                     description: `No neighbors found`,
                 });
             } else {
-                const currentData = canvas.getGraphData();
-
-                // Get existing IDs
-                const existingNodeIds = new Set(currentData.nodes.map(n => n.id));
-                const existingLinkIds = new Set(currentData.links.map(l => l.id));
-
-                // Get only new elements from graph
-                const dataElements: Data = {
+                // Pass only new elements — canvas merges internally and runs simulation
+                const newData: Data = {
                     nodes: graph.Elements.nodes
                         .map(({ id, labels, color, visible, data: nodeData }) => ({ id, labels, color, visible, data: nodeData })),
                     links: graph.Elements.links
@@ -160,26 +123,10 @@ export default function ForceGraph({
                         }))
                 };
 
-                const newDataElements: Data = {
-                    nodes: dataElements.nodes.filter(n => !existingNodeIds.has(n.id)),
-                    links: dataElements.links.filter(l => !existingLinkIds.has(l.id))
-                };
-
-                // Convert only new data to GraphData format
-                const newGraphData = dataToGraphData(newDataElements, { x: clickedNode.x, y: clickedNode.y }, new Map(currentData.nodes.map(n => [n.id, n])));
-
-                // Merge with existing data
-                canvas.setGraphData({
-                    nodes: [...currentData.nodes, ...newGraphData.nodes],
-                    links: [...currentData.links, ...newGraphData.links]
-                });
-
-                const cooldown = cooldownTicks === undefined ? undefined : -1;
-
-                handleCooldown(cooldown);
+                canvas.setGraphData(newData);
             }
         }
-    }, [canvasRef, canvasLoaded, graph, toast, setIndicator, cooldownTicks, handleCooldown]);
+    }, [canvasRef, canvasLoaded, graph, toast, setIndicator]);
 
     const deleteNeighbors = useCallback((nodes: Node[]) => {
         if (nodes.length === 0) return;
@@ -212,18 +159,8 @@ export default function ForceGraph({
 
         setRelationships(graph.removeLinks(nodes.map(n => n.id)));
 
-        const currentData = canvas.getGraphData();
-        const updatedNodes = currentData.nodes.filter(n => !nodeIdsToRemove.has(n.id));
-        const updatedLinks = currentData.links.filter(l =>
-            !nodeIdsToRemove.has(l.source.id) && !nodeIdsToRemove.has(l.target.id)
-        );
-
-        canvas.setGraphData({ nodes: updatedNodes, links: updatedLinks });
-
-        const cooldown = cooldownTicks === undefined ? undefined : -1;
-
-        handleCooldown(cooldown);
-    }, [canvasRef, canvasLoaded, graph, setRelationships, cooldownTicks, handleCooldown]);
+        canvas.setGraphData(convertToCanvasData(graph.Elements));
+    }, [canvasRef, canvasLoaded, graph, setRelationships]);
 
     const handleNodeClick = useCallback(async (node: GraphNode) => {
         const fullNode = graph.NodesMap.get(node.id);
@@ -298,16 +235,6 @@ export default function ForceGraph({
         (!!hoverElement && 'source' in hoverElement && hoverElement.id === link.id)
         , [selectedElements, hoverElement]);
 
-    const handleEngineStop = useCallback(() => {
-        if (cooldownTicks !== -1) return;
-
-        handleCooldown(0);
-    }, [cooldownTicks, handleCooldown]);
-
-    const handleLoadingChange = useCallback((loading: boolean) => {
-        setIsLoading(loading);
-    }, [setIsLoading]);
-
     // Update colors
     useEffect(() => {
         if (!canvasRef.current || !canvasLoaded) return;
@@ -319,23 +246,31 @@ export default function ForceGraph({
         canvasRef.current.setForegroundColor(foreground);
     }, [canvasRef, foreground, canvasLoaded]);
 
-    // Update loading state
+    // Initialize layout from context (sourced from URL on first load)
     useEffect(() => {
         if (!canvasRef.current || !canvasLoaded) return;
-        canvasRef.current.setIsLoading(isLoading);
-    }, [canvasRef, isLoading, canvasLoaded]);
+        const mode = (ctxLayout || 'force') as LayoutMode;
 
-    // Update cooldown ticks
-    useEffect(() => {
-        if (!canvasRef.current || !canvasLoaded) return;
-        canvasRef.current.setCooldownTicks(cooldownTicks === -1 ? undefined : cooldownTicks);
-    }, [canvasRef, cooldownTicks, canvasLoaded]);
+        // Apply direction options before setting layout so applyLayout uses them
+        if (ctxDirection && mode !== 'force') {
+            if (mode === 'tree' || mode === 'flow') {
+                canvasRef.current.setLayoutOptions({
+                    [mode]: { direction: ctxDirection as HierarchyDirection }
+                });
+            } else if (mode === 'radial') {
+                canvasRef.current.setLayoutOptions({
+                    radial: { direction: ctxDirection as RadialDirection }
+                });
+            }
+        }
+
+        canvasRef.current.setLayout(mode);
+    }, [canvasRef, canvasLoaded]);
 
     // Update event handlers and selection functions
     useEffect(() => {
         if (!canvasRef.current || !canvasLoaded) return;
         canvasRef.current.setConfig({
-            autoStopOnSettle: false,
             captionsKeys,
             showPropertyKeyPrefix,
             onNodeClick: handleNodeClick,
@@ -346,10 +281,8 @@ export default function ForceGraph({
             onBackgroundClick: handleUnselected,
             isNodeSelected: checkIsNodeSelected,
             isLinkSelected: checkIsLinkSelected,
-            onEngineStop: handleEngineStop,
-            onLoadingChange: handleLoadingChange
         });
-    }, [handleNodeClick, handleRightClick, handleHover, handleUnselected, checkIsNodeSelected, checkIsLinkSelected, handleEngineStop, handleLoadingChange, canvasRef, canvasLoaded, captionsKeys, showPropertyKeyPrefix]);
+    }, [handleNodeClick, handleRightClick, handleHover, handleUnselected, checkIsNodeSelected, checkIsLinkSelected, canvasRef, canvasLoaded, captionsKeys, showPropertyKeyPrefix]);
 
     // Update canvas data
     useEffect(() => {
@@ -358,7 +291,7 @@ export default function ForceGraph({
         if (!canvas || !canvasLoaded) return;
 
         if (graphData) {
-            canvas.setGraphData(graphData);
+            canvas.setData(graphData);
             setGraphData(undefined);
         } else {
             const canvasData = convertToCanvasData(data);
