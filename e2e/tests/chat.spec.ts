@@ -3,11 +3,12 @@ import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import ChatComponent from "../logic/POM/chatComponent";
 import SettingsBrowserPage from "../logic/POM/settingsBrowserPage";
-import HeaderComponent from "../logic/POM/headerComponent";
 import urls from "../config/urls.json";
 import { getRandomString } from "../infra/utils";
 
 test.describe("Chat Feature Tests", () => {
+  test.setTimeout(60_000);
+
   let browser: BrowserWrapper;
   let apiCall: ApiCalls;
 
@@ -63,8 +64,6 @@ test.describe("Chat Feature Tests", () => {
     await settings.fillChatApiKey(""); // Clear API key to simulate missing key
     await settings.clickSaveSettingsButton();
     
-    const header = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
-    await header.clickOnGraphsButton();
     const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
     await chat.selectGraphByName(graphName);
     
@@ -115,10 +114,6 @@ test.describe("Chat Feature Tests", () => {
     // This is especially important for the first test in a shard where the Next.js
     // server may need extra time to handle the initial /api/chat/models request.
     await settings.waitForModelAutoDetection();
-    
-    // Navigate to graph page
-    const header = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
-    await header.clickOnGraphsButton();
     
     // Select the graph and open chat
     const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
@@ -258,10 +253,6 @@ test.describe("Chat Feature Tests", () => {
     await settings.setChatApiKeyAndSave(testApiKey);
     await settings.waitForTimeout(1000);
     
-    // Navigate to graph page
-    const header = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
-    await header.clickOnGraphsButton();
-    
     // Open chat and send question
     const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
     await chat.selectGraphByName(graphName);
@@ -306,10 +297,6 @@ test.describe("Chat Feature Tests", () => {
     const testApiKey = process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY || "test-api-key-placeholder";
     await settings.setChatApiKeyAndSave(testApiKey);
     await settings.waitForTimeout(1000);
-    
-    // Navigate to graph page
-    const header = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
-    await header.clickOnGraphsButton();
     
     // Open chat and send question
     const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
@@ -372,10 +359,6 @@ test.describe("Chat Feature Tests", () => {
       const testApiKey = process.env.OPENAI_TOKEN || process.env.OPEN_API_KEY || "test-api-key-placeholder";
       await settings.setChatApiKeyAndSave(testApiKey);
       await settings.waitForTimeout(1000);
-
-      // Navigate to graph page
-      const header = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
-      await header.clickOnGraphsButton();
 
       const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
       await chat.selectGraphByName(graphName);
@@ -562,10 +545,6 @@ test.describe("Chat Feature Tests", () => {
 
     await settings.fillChatApiKey(testApiKey);
     await settings.clickSaveSettingsButton();
-    
-    // Navigate to graphs page
-    const header = await browser.createNewPage(HeaderComponent, urls.settingsUrl);
-    await header.clickOnGraphsButton();
     
     const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
     await chat.selectGraphByName(graph1Name);
