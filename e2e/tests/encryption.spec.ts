@@ -155,18 +155,20 @@ test.describe(`@admin Encryption migration tests`, () => {
 
         const page = await browser.getPage();
 
-        // First, set a plain key and let the server encrypt it
+        // First, set a plain key and let the app migrate it to server encryption
         await page.evaluate(() => {
             localStorage.setItem("secretKey", "key-that-will-be-encrypted");
         });
 
         await login.clickOnConnect();
-        await page.waitForTimeout(2000);
 
-        // Read the now-encrypted value
+        await expect.poll(async () =>
+            page.evaluate(() => localStorage.getItem("secretKey")),
+            { timeout: 15000 }
+        ).toMatch(HEX_COLON_PATTERN);
+
         const encryptedValue = await page.evaluate(() => localStorage.getItem("secretKey"));
-        expect(encryptedValue).not.toBeNull();
-        expect(encryptedValue!).toMatch(HEX_COLON_PATTERN);
+        expect(encryptedValue).toMatch(HEX_COLON_PATTERN);
 
         // Reload the page — the encrypted value should stay the same
         // (should not be double-encrypted)
