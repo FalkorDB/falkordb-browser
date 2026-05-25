@@ -1251,6 +1251,7 @@ export default class GraphPage extends BasePage {
   }
 
   async selectGraphByName(graphName: string): Promise<void> {
+    await this.ensureGraphInfoPanelOpen();
     // Wait for graph selector to be enabled (graphs loaded from API)
     let isEnabled = await waitForElementToBeEnabled(this.select("Graph"), 1000, 15);
     if (!isEnabled) {
