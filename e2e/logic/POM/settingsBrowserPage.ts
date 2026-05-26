@@ -79,6 +79,7 @@ export default class SettingsBrowserPage extends BasePage {
       (el) => el.click(),
       "Save Settings Button"
     );
+    await this.saveSettingsButton.waitFor({ state: "hidden", timeout: 30000 });
   }
 
   async clickCancelSettingsButton(): Promise<void> {
