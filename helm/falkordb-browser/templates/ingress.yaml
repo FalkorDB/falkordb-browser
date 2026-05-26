@@ -44,7 +44,7 @@ spec:
         paths:
           {{- range .paths }}
           {{- $path := .path }}
-          {{- if and $basePath (eq $path "/") }}
+          {{- if and $basePath (eq $path "/") $.Values.ingress.rewriteRootToBasePath }}
           {{- $path = $basePath }}
           {{- end }}
           - path: {{ $path }}

@@ -60,7 +60,7 @@ export default function LoginPage() {
       throw new Error("Invalid credentials please recheck username and password or your connection settings. Check server logs for more info.");
     }
 
-    router.push("/graph");
+    router.push(withBasePath("/graph"));
   };
 
   return (

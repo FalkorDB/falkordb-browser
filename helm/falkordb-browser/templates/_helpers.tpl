@@ -73,3 +73,18 @@ Normalize the optional browser base path used when hosting the app under a subpa
 {{- $basePath | trimSuffix "/" -}}
 {{- end -}}
 {{- end }}
+
+{{/*
+Validate that env.nextauthUrl path matches browser.basePath if set.
+*/}}
+{{- define "falkordb-browser.validateNextAuthUrl" -}}
+{{- $basePath := include "falkordb-browser.basePath" . -}}
+{{- $nextauthUrl := .Values.env.nextauthUrl | default "" -}}
+{{- if and $basePath $nextauthUrl (ne $basePath "") (ne $basePath "/") -}}
+  {{- $urlParts := splitList "/" $nextauthUrl -}}
+  {{- $urlPath := printf "/%s" (join "/" (slice $urlParts 3)) | trimSuffix "/" -}}
+  {{- if ne $urlPath $basePath -}}
+    {{- fail (printf "env.nextauthUrl path (%s) must match browser.basePath (%s) when basePath is set" $urlPath $basePath) -}}
+  {{- end -}}
+{{- end -}}
+{{- end }}

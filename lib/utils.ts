@@ -247,10 +247,21 @@ const rawBasePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 export const appBasePath = rawBasePath === "/" ? "" : rawBasePath.replace(/\/$/, "");
 
 export function withBasePath(url: string): string {
+  // Absolute URLs and http(s) URLs pass through unchanged
   if (!appBasePath || /^https?:\/\//i.test(url)) return url;
+
+  // Already prefixed with basePath
   if (url === appBasePath || url.startsWith(`${appBasePath}/`)) return url;
+
+  // Relative URLs: trim leading './' and prefix with basePath
   if (url.startsWith("/")) return `${appBasePath}${url}`;
+  if (url.startsWith("./")) return `${appBasePath}/${url.slice(2)}`;
   if (url.startsWith("api/")) return `${appBasePath}/${url}`;
+
+  // For other relative URLs (without leading / or ./), prefix with basePath
+  if (!url.startsWith("#") && url.length > 0) return `${appBasePath}/${url}`;
+
+  // Fragments and empty strings pass through unchanged
   return url;
 }
 
