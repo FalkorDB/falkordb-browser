@@ -4,13 +4,15 @@
  * Includes legacy migration support for old client-side encrypted values.
  */
 
+import { withBasePath } from './utils';
+
 const LEGACY_ENCRYPTED_PREFIX = 'enc:';
 const LEGACY_KEY_STORAGE_KEY = 'falkordb-key';
 
 export async function serverEncrypt(value: string): Promise<string> {
   if (!value) return '';
 
-  const res = await fetch('/api/encrypt', {
+  const res = await fetch(withBasePath('/api/encrypt'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value, action: 'encrypt' }),
@@ -27,7 +29,7 @@ export async function serverEncrypt(value: string): Promise<string> {
 export async function serverDecrypt(encryptedValue: string): Promise<string> {
   if (!encryptedValue) return '';
 
-  const res = await fetch('/api/encrypt', {
+  const res = await fetch(withBasePath('/api/encrypt'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: encryptedValue, action: 'decrypt' }),

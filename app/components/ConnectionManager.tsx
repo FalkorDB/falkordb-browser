@@ -6,7 +6,7 @@ import { Check, ChevronDown, LogOut, Plus } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/use-toast";
-import { securedFetch, setActiveConnectionIdGlobal } from "@/lib/utils";
+import { securedFetch, setActiveConnectionIdGlobal, withBasePath } from "@/lib/utils";
 
 import { ConnectionContext, IndicatorContext, SessionConnection } from "./provider";
 import Button from "./ui/Button";
@@ -69,7 +69,7 @@ export default function ConnectionManager() {
     try {
       // If this is the last connection, sign out instead.
       if (isLast) {
-        await signOut({ callbackUrl: "/login" });
+        await signOut({ callbackUrl: withBasePath("/login") });
         return;
       }
 

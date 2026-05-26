@@ -5,7 +5,7 @@
 import { ArrowUpRight, FileCode, LogOut, Monitor, Moon, Sun, Settings, FunctionSquare, GitGraph } from "lucide-react";
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import { cn, getTheme } from "@/lib/utils";
+import { cn, getTheme, withBasePath } from "@/lib/utils";
 import { useRouter, usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import pkg from '@/package.json';
@@ -76,7 +76,7 @@ export default function Navbar({ showUDF }: Props) {
                         href="https://www.falkordb.com"
                         target="_blank" rel="noreferrer"
                     >
-                        <Image style={{ width: 'auto', height: '48px' }} priority src={`/icons/F-${currentTheme}.svg`} alt="FalkorDB Logo" width={0} height={0} />
+                        <Image style={{ width: 'auto', height: '48px' }} priority src={withBasePath(`/icons/F-${currentTheme}.svg`)} alt="FalkorDB Logo" width={0} height={0} />
                     </Link>
                 }
                 <div data-testid="NavigationButtons" className="p-1 flex flex-col items-center gap-2 bg-foreground/5 rounded-lg">
@@ -149,7 +149,7 @@ export default function Navbar({ showUDF }: Props) {
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem className="focus:bg-transparent">
                                     <a className="flex gap-2 items-center" href="https://discord.com/invite/jyUgBweNQz" target="_blank" rel="noreferrer noreferrer">
-                                        <Image style={{ width: 'auto', height: currentTheme === "dark" ? '14px' : '18px' }} src={`/icons/Discord-${currentTheme}.svg`} alt="" width={0} height={0} />
+                                        <Image style={{ width: 'auto', height: currentTheme === "dark" ? '14px' : '18px' }} src={withBasePath(`/icons/Discord-${currentTheme}.svg`)} alt="" width={0} height={0} />
                                         <span>
                                             Get Support
                                         </span>
@@ -175,7 +175,7 @@ export default function Navbar({ showUDF }: Props) {
                         </VisuallyHidden>
                         <div className="h-full flex flex-col gap-8 max-w-[30rem] p-4">
                             <div className="h-1 grow flex flex-col gap-8 items-center justify-center">
-                                {mounted && currentTheme && <Image style={{ width: 'auto', height: '50px' }} priority src={`/icons/Falkordb-${currentTheme}.svg`} alt="" width={0} height={0} />}
+                                {mounted && currentTheme && <Image style={{ width: 'auto', height: '50px' }} priority src={withBasePath(`/icons/Falkordb-${currentTheme}.svg`)} alt="" width={0} height={0} />}
                                 <h1 className="text-3xl font-bold">We Make AI Reliable</h1>
                                 <p className="text-xl text-center">
                                     Delivering a scalable,

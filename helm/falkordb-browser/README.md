@@ -69,6 +69,7 @@ The following table lists the configurable parameters of the FalkorDB Browser ch
 | `image.repository` | Image repository | `falkordb/falkordb-browser` |
 | `image.tag` | Image tag | `""` (uses chart appVersion) |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
+| `browser.basePath` | Path prefix for hosting the browser, for example `/browser` | `""` |
 | `service.type` | Kubernetes service type | `ClusterIP` |
 | `service.port` | Service port for browser | `3000` |
 | `service.restPort` | Service port for REST API | `8080` |
@@ -132,6 +133,40 @@ Install:
 ```bash
 helm install falkordb-browser ./falkordb-browser -f ingress-values.yaml
 ```
+
+### Installation Under a Path Prefix
+
+To host the full browser under a subpath such as `/browser`, build the image with the same base path and set `browser.basePath` in the chart:
+
+```bash
+docker build \
+  --build-arg NEXT_PUBLIC_BASE_PATH=/browser \
+  -t your-registry/falkordb-browser:browser-path .
+```
+
+```yaml
+image:
+  repository: your-registry/falkordb-browser
+  tag: browser-path
+
+browser:
+  basePath: /browser
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: falkordb-browser.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+env:
+  nextauthUrl: https://falkordb-browser.example.com/browser
+  nextauthSecret: "your-secure-secret-here"
+```
+
+When `browser.basePath` is set and an ingress path is `/`, the chart renders that path as the configured prefix.
 
 ### Installation with persistence
 

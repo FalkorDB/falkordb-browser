@@ -14,6 +14,11 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
+browser:
+  # Host the browser under a path prefix such as /browser.
+  # Images must be built with the same NEXT_PUBLIC_BASE_PATH value.
+  basePath: ""
+
 serviceAccount:
   # Specifies whether a service account should be created
   create: true

@@ -60,3 +60,16 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Normalize the optional browser base path used when hosting the app under a subpath.
+*/}}
+{{- define "falkordb-browser.basePath" -}}
+{{- $basePath := default "" .Values.browser.basePath -}}
+{{- if and $basePath (ne $basePath "/") -}}
+{{- if not (hasPrefix "/" $basePath) -}}
+{{- fail "browser.basePath must start with /" -}}
+{{- end -}}
+{{- $basePath | trimSuffix "/" -}}
+{{- end -}}
+{{- end }}

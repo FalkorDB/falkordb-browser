@@ -243,6 +243,17 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+const rawBasePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+export const appBasePath = rawBasePath === "/" ? "" : rawBasePath.replace(/\/$/, "");
+
+export function withBasePath(url: string): string {
+  if (!appBasePath || /^https?:\/\//i.test(url)) return url;
+  if (url === appBasePath || url.startsWith(`${appBasePath}/`)) return url;
+  if (url.startsWith("/")) return `${appBasePath}${url}`;
+  if (url.startsWith("api/")) return `${appBasePath}/${url}`;
+  return url;
+}
+
 export async function getSSEGraphResult(
   url: string,
   toast: ToastFn,
@@ -258,7 +269,7 @@ export async function getSSEGraphResult(
       effectiveUrl += `${sep}connectionId=${encodeURIComponent(_activeConnectionId)}`;
     }
 
-    const evtSource = new EventSource(effectiveUrl);
+    const evtSource = new EventSource(withBasePath(effectiveUrl));
     evtSource.addEventListener("result", (event: MessageEvent) => {
       const result = JSON.parse(event.data);
       evtSource.close();
@@ -517,7 +528,7 @@ let sessionInvalidationInFlight = false;
 function triggerSessionInvalidationSignOut(): void {
   if (sessionInvalidationInFlight) return;
   sessionInvalidationInFlight = true;
-  signOut({ callbackUrl: "/login" }).catch(() => {
+  signOut({ callbackUrl: withBasePath("/login") }).catch(() => {
     sessionInvalidationInFlight = false;
   });
 }
@@ -561,7 +572,7 @@ export async function securedFetch(
   }
   effectiveInit.headers = existingHeaders;
 
-  const response = await fetch(input, effectiveInit);
+  const response = await fetch(withBasePath(input), effectiveInit);
   const { status } = response;
 
   // The server signals "your session is orphaned, sign out now" via this
@@ -709,7 +720,7 @@ export const getMemoryUsage = async (
     if (effectiveConnId) {
       headers.set("X-Connection-Id", effectiveConnId);
     }
-    const result = await fetch(`/api/graph/${prepareArg(name)}/memory`, { headers });
+    const result = await fetch(withBasePath(`/api/graph/${prepareArg(name)}/memory`), { headers });
     if (!result.ok) return new Map();
     const json = await result.json();
     return processEntries(json.result);
