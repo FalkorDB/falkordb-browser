@@ -267,8 +267,8 @@ export default class ChatComponent extends GraphPage {
     await this.clickChatSendButton();
   }
 
-  async waitForAssistantResponse(type: string = "Result"): Promise<void> {
-    await this.waitForChatAssistantMessage(type);
+  async waitForAssistantResponse(type: string = "Result"): Promise<boolean> {
+    return this.waitForChatAssistantMessage(type);
   }
 
   async sendMessageAndWaitForResponse(
