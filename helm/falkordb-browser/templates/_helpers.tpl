@@ -65,12 +65,20 @@ Create the name of the service account to use
 Normalize the optional browser base path used when hosting the app under a subpath.
 */}}
 {{- define "falkordb-browser.basePath" -}}
-{{- $basePath := default "" .Values.browser.basePath -}}
+{{- $rawBasePath := default "" .Values.browser.basePath -}}
+{{- $basePath := trim $rawBasePath -}}
 {{- if and $basePath (ne $basePath "/") -}}
+{{- if or (ne $basePath $rawBasePath) (regexMatch "\\s" $basePath) -}}
+{{- fail "browser.basePath must not contain whitespace" -}}
+{{- end -}}
 {{- if not (hasPrefix "/" $basePath) -}}
 {{- fail "browser.basePath must start with /" -}}
 {{- end -}}
-{{- $basePath | trimSuffix "/" -}}
+{{- $basePath = trimSuffix "/" $basePath -}}
+{{- if contains "//" $basePath -}}
+{{- fail "browser.basePath must not contain empty path segments" -}}
+{{- end -}}
+{{- $basePath -}}
 {{- end -}}
 {{- end }}
 

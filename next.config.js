@@ -2,13 +2,23 @@
 const path = require('path');
 
 function normalizeBasePath(value) {
-  if (!value || value === '/') return '';
+  const normalized = (value || '').trim();
+  if (!normalized || normalized === '/') return '';
 
-  if (!value.startsWith('/')) {
-    throw new Error('NEXT_PUBLIC_BASE_PATH must start with /');
+  if (normalized !== value || /\s/.test(normalized)) {
+    throw new Error('NEXT_PUBLIC_BASE_PATH must not contain whitespace');
   }
 
-  return value.replace(/\/$/, '');
+  if (!normalized.startsWith('/')) {
+    throw new Error('NEXT_PUBLIC_BASE_PATH must be empty, /, or start with /');
+  }
+
+  const basePath = normalized.replace(/\/$/, '');
+  if (basePath.includes('//')) {
+    throw new Error('NEXT_PUBLIC_BASE_PATH must not contain empty path segments');
+  }
+
+  return basePath;
 }
 
 const basePath = normalizeBasePath(process.env.NEXT_PUBLIC_BASE_PATH);

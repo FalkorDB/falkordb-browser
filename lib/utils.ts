@@ -244,11 +244,19 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 function normalizeAppBasePath(value: string): string {
-  if (!value || value === "/") return "";
-  if (!value.startsWith("/")) {
+  const normalized = value.trim();
+  if (!normalized || normalized === "/") return "";
+  if (normalized !== value || /\s/.test(normalized)) {
+    throw new Error("NEXT_PUBLIC_BASE_PATH must not contain whitespace");
+  }
+  if (!normalized.startsWith("/")) {
     throw new Error("NEXT_PUBLIC_BASE_PATH must be empty, /, or start with /");
   }
-  return value.replace(/\/$/, "");
+  const basePath = normalized.replace(/\/$/, "");
+  if (basePath.includes("//")) {
+    throw new Error("NEXT_PUBLIC_BASE_PATH must not contain empty path segments");
+  }
+  return basePath;
 }
 
 const rawBasePath = process.env.NEXT_PUBLIC_BASE_PATH || "";

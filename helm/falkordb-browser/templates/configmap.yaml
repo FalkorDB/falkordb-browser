@@ -4,6 +4,7 @@ metadata:
   name: {{ include "falkordb-browser.fullname" . }}
   labels:
     {{- include "falkordb-browser.labels" . | nindent 4 }}
+{{ include "falkordb-browser.validateNextAuthUrl" . }}
 data:
   CHAT_URL: {{ .Values.env.chatUrl | quote }}
   NEXTAUTH_URL: {{ .Values.env.nextauthUrl | quote }}
