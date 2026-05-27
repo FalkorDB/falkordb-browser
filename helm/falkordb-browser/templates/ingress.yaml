@@ -1,6 +1,7 @@
 {{- if .Values.ingress.enabled -}}
 {{- $fullName := include "falkordb-browser.fullname" . -}}
 {{- $svcPort := .Values.service.port -}}
+{{- $basePath := include "falkordb-browser.basePath" . -}}
 {{- if and .Values.ingress.className (not (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion)) }}
   {{- if not (hasKey .Values.ingress.annotations "kubernetes.io/ingress.class") }}
   {{- $_ := set .Values.ingress.annotations "kubernetes.io/ingress.class" .Values.ingress.className}}
@@ -42,7 +43,11 @@ spec:
       http:
         paths:
           {{- range .paths }}
-          - path: {{ .path }}
+          {{- $path := .path }}
+          {{- if and $basePath (eq $path "/") $.Values.ingress.rewriteRootToBasePath }}
+          {{- $path = $basePath }}
+          {{- end }}
+          - path: {{ $path }}
             {{- if and .pathType (semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion) }}
             pathType: {{ .pathType }}
             {{- end }}

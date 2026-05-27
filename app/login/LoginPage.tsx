@@ -7,7 +7,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { FileText } from "lucide-react";
 import { useTheme } from "next-themes";
-import { getTheme } from "@/lib/utils";
+import { getTheme, withBasePath } from "@/lib/utils";
 import LoginForm, { LoginFormCredentials } from "./LoginForm";
 
 export default function LoginPage() {
@@ -60,14 +60,14 @@ export default function LoginPage() {
       throw new Error("Invalid credentials please recheck username and password or your connection settings. Check server logs for more info.");
     }
 
-    router.push("/graph");
+    router.push(withBasePath("/graph"));
   };
 
   return (
     <div className="relative h-full w-full flex flex-col">
       <div className="grow basis-0 flex items-center justify-center overflow-auto">
         <div className="flex flex-col gap-2 items-center max-h-full w-[500px]">
-          {mounted && currentTheme && <Image style={{ width: 'auto', height: '80px' }} priority src={`/icons/Browser-${currentTheme}.svg`} alt="FalkorDB Browser Logo" width={0} height={0} />}
+          {mounted && currentTheme && <Image style={{ width: 'auto', height: '80px' }} priority src={withBasePath(`/icons/Browser-${currentTheme}.svg`)} alt="FalkorDB Browser Logo" width={0} height={0} />}
           <LoginForm
             onSubmit={handleLogin}
             submitButtonLabel="Log in"
