@@ -6,7 +6,6 @@ metadata:
     {{- include "falkordb-browser.labels" . | nindent 4 }}
 {{ include "falkordb-browser.validateNextAuthUrl" . }}
 data:
-  NEXT_PUBLIC_BASE_PATH: {{ include "falkordb-browser.basePath" . | quote }}
   CHAT_URL: {{ .Values.env.chatUrl | quote }}
   NEXTAUTH_URL: {{ .Values.env.nextauthUrl | quote }}
   NEXT_PUBLIC_GOOGLE_ANALYTICS: {{ .Values.env.googleAnalytics | quote }}
