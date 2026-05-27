@@ -56,7 +56,7 @@ jobs:
           
           echo "Testing with serviceAccount.create=false..."
           helm template test helm/falkordb-browser --set serviceAccount.create=false > /dev/null
-          
+
           echo "✅ All configuration tests passed"
 
   kind-test:

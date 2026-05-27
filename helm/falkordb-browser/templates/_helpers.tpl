@@ -4,7 +4,6 @@ Expand the name of the chart.
 {{- define "falkordb-browser.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
-
 {{/*
 Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
@@ -59,46 +58,4 @@ Create the name of the service account to use
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
-{{- end }}
-
-{{/*
-Normalize the optional browser base path used when hosting the app under a subpath.
-*/}}
-{{- define "falkordb-browser.basePath" -}}
-{{- $rawBasePath := default "" .Values.browser.basePath -}}
-{{- $basePath := trim $rawBasePath -}}
-{{- if and $basePath (ne $basePath "/") -}}
-{{- if or (ne $basePath $rawBasePath) (regexMatch "\\s" $basePath) -}}
-{{- fail "browser.basePath must not contain whitespace" -}}
-{{- end -}}
-{{- if not (hasPrefix "/" $basePath) -}}
-{{- fail "browser.basePath must start with /" -}}
-{{- end -}}
-{{- $basePath = trimSuffix "/" $basePath -}}
-{{- if contains "//" $basePath -}}
-{{- fail "browser.basePath must not contain empty path segments" -}}
-{{- end -}}
-{{- $basePath -}}
-{{- end -}}
-{{- end }}
-
-{{/*
-Validate that env.nextauthUrl path matches browser.basePath if set.
-*/}}
-{{- define "falkordb-browser.validateNextAuthUrl" -}}
-{{- $basePath := include "falkordb-browser.basePath" . -}}
-{{- $nextauthUrl := .Values.env.nextauthUrl | default "" -}}
-{{- if and $basePath $nextauthUrl (ne $basePath "") (ne $basePath "/") -}}
-  {{- $requiredMessage := printf "env.nextauthUrl must be an absolute http(s) URL whose path matches browser.basePath (%s), for example https://host%s" $basePath $basePath -}}
-  {{- if not (regexMatch "^https?://[^/?#]+(/[^?#]*)?([?#].*)?$" $nextauthUrl) -}}
-    {{- fail $requiredMessage -}}
-  {{- end -}}
-  {{- $urlPath := regexReplaceAll "^https?://[^/?#]+([^?#]*).*$" $nextauthUrl "${1}" | trimSuffix "/" -}}
-  {{- if eq $urlPath "" -}}
-    {{- fail $requiredMessage -}}
-  {{- end -}}
-  {{- if ne $urlPath $basePath -}}
-    {{- fail (printf "env.nextauthUrl path (%s) must match browser.basePath (%s) when basePath is set" $urlPath $basePath) -}}
-  {{- end -}}
-{{- end -}}
 {{- end }}

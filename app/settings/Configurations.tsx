@@ -6,7 +6,7 @@
 "use client";
 
 import { useEffect, useState, useContext } from "react";
-import { prepareArg, securedFetch, Row, DataCell, withBasePath } from "@/lib/utils";
+import { prepareArg, securedFetch, Row, DataCell } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import TableComponent from "../components/TableComponent";
 import ToastButton from "../components/ToastButton";
@@ -217,7 +217,7 @@ export default function Configurations() {
         // The server uses session.activeConnectionId from the JWT as the
         // authoritative connection (set by every handleSelect call), so
         // this is always correct regardless of client-side global state.
-        const result = await fetch(withBasePath("/api/graph/config"), { method: "GET" });
+        const result = await fetch("/api/graph/config", { method: "GET" });
         if (!result.ok) {
             const body = await result.text().catch(() => "");
             let message = "Failed to load DB configurations";
