@@ -81,8 +81,14 @@ Validate that env.nextauthUrl path matches browser.basePath if set.
 {{- $basePath := include "falkordb-browser.basePath" . -}}
 {{- $nextauthUrl := .Values.env.nextauthUrl | default "" -}}
 {{- if and $basePath $nextauthUrl (ne $basePath "") (ne $basePath "/") -}}
-  {{- $urlParts := splitList "/" $nextauthUrl -}}
-  {{- $urlPath := printf "/%s" (join "/" (slice $urlParts 3)) | trimSuffix "/" -}}
+  {{- $requiredMessage := printf "env.nextauthUrl must be an absolute http(s) URL whose path matches browser.basePath (%s), for example https://host%s" $basePath $basePath -}}
+  {{- if not (regexMatch "^https?://[^/?#]+(/[^?#]*)?([?#].*)?$" $nextauthUrl) -}}
+    {{- fail $requiredMessage -}}
+  {{- end -}}
+  {{- $urlPath := regexReplaceAll "^https?://[^/?#]+([^?#]*).*$" $nextauthUrl "${1}" | trimSuffix "/" -}}
+  {{- if eq $urlPath "" -}}
+    {{- fail $requiredMessage -}}
+  {{- end -}}
   {{- if ne $urlPath $basePath -}}
     {{- fail (printf "env.nextauthUrl path (%s) must match browser.basePath (%s) when basePath is set" $urlPath $basePath) -}}
   {{- end -}}

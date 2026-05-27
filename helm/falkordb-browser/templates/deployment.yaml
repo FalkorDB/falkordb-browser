@@ -1,3 +1,4 @@
+{{ include "falkordb-browser.validateNextAuthUrl" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:

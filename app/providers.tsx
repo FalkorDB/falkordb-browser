@@ -1141,7 +1141,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
 export default function NextAuthProvider({ children, nonce }: { children: React.ReactNode; nonce?: string }) {
   return (
-    <SessionProvider basePath={withBasePath("/api/auth")}>
+    <SessionProvider basePath="/api/auth">
       <Suspense fallback={null}>
         <ProvidersWithSession nonce={nonce}>{children}</ProvidersWithSession>
       </Suspense>

@@ -141,6 +141,8 @@ To host the full browser under a subpath such as `/browser`, you must:
 
 1. **Build the image with the base path:**
 
+    `NEXT_PUBLIC_BASE_PATH` is a Next.js build-time setting. The running container must use an image built with the same path as `browser.basePath`; do not change this value only at deployment time.
+
    ```bash
    docker build \
      --build-arg NEXT_PUBLIC_BASE_PATH=/browser \
@@ -174,7 +176,7 @@ To host the full browser under a subpath such as `/browser`, you must:
 
 3. **Ingress/proxy routing:**
 
-   You must route both `${browser.basePath}/*` and `${browser.basePath}/api/auth/*` to the app service. For example, in NGINX:
+    You must route both the app route `${browser.basePath}/*` and the auth callback route `${browser.basePath}/api/auth/*` to the app service. A single prefix route such as `/browser` is sufficient only if your ingress/proxy forwards all nested paths under that prefix, including `/browser/api/auth/*`. For example, in NGINX:
 
    ```nginx
    location /browser/ {
@@ -185,7 +187,7 @@ To host the full browser under a subpath such as `/browser`, you must:
    }
    ```
 
-   > **Note:** Auth/session callbacks must be reachable at `${browser.basePath}/api/auth/*`. If ingress/proxy does not forward this path, login/logout will fail.
+    > **Note:** Auth/session callbacks must be reachable at `${browser.basePath}/api/auth/*`. If ingress/proxy does not forward this path, login/logout will fail even when the main app route loads.
 
 4. **Validation:**
 

@@ -243,12 +243,19 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+function normalizeAppBasePath(value: string): string {
+  if (!value || value === "/") return "";
+  if (!value.startsWith("/")) {
+    throw new Error("NEXT_PUBLIC_BASE_PATH must be empty, /, or start with /");
+  }
+  return value.replace(/\/$/, "");
+}
+
 const rawBasePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
-export const appBasePath = rawBasePath === "/" ? "" : rawBasePath.replace(/\/$/, "");
+export const appBasePath = normalizeAppBasePath(rawBasePath);
 
 export function withBasePath(url: string): string {
-  // Absolute URLs and http(s) URLs pass through unchanged
-  if (!appBasePath || /^https?:\/\//i.test(url)) return url;
+  if (!appBasePath || url.startsWith("//") || /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(url)) return url;
 
   // Already prefixed with basePath
   if (url === appBasePath || url.startsWith(`${appBasePath}/`)) return url;
