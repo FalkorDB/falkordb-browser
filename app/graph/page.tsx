@@ -362,7 +362,7 @@ export default function Page() {
 
     const handleCreateElement = useCallback(async (attributes: [string, Value][], label: string[]) => {
         if (!canvasRef.current) return false;
-        
+
         const fakeId = "-1";
         const readOnlyParam = isReadOnlyRef.current ? '?readOnly=true' : '';
         const result = await securedFetch(`api/graph/${prepareArg(graphName)}/${fakeId}${readOnlyParam}`, {

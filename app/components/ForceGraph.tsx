@@ -116,7 +116,7 @@ export default function ForceGraph({
                 // Pass only new elements — canvas merges internally and runs simulation
                 const newData: Data = {
                     nodes: graph.Elements.nodes
-                        .map(({ id, labels, color, visible, data: nodeData }) => ({ id, labels, color, visible, data: nodeData })),
+                        .map(({ id, labels, color, visible, data: nodeData, expand }) => ({ id, labels, color, visible, expand, data: nodeData })),
                     links: graph.Elements.links
                         .map(({ id, relationship, color, visible, source, target, data: linkData }) => ({
                             id, relationship, color, visible, source, target, data: linkData
@@ -169,16 +169,19 @@ export default function ForceGraph({
 
         const now = new Date();
         const { date, id: name } = lastClick.current;
-        lastClick.current = { date: now, id: node.id };
 
         if (now.getTime() - date.getTime() < 1000 && name === node.id) {
-            if (!fullNode.expand) {
+            fullNode.expand = !fullNode.expand;
+
+            if (fullNode.expand) {
                 await onFetchNode(fullNode, node);
             } else {
                 deleteNeighbors([fullNode]);
             }
-
-            fullNode.expand = !fullNode.expand;
+            
+            lastClick.current = { date: now, id: -1 };
+        } else {
+            lastClick.current = { date: now, id: node.id };
         }
     }, [graph.NodesMap, onFetchNode, deleteNeighbors]);
 
@@ -273,14 +276,16 @@ export default function ForceGraph({
         canvasRef.current.setConfig({
             captionsKeys,
             showPropertyKeyPrefix,
-            onNodeClick: handleNodeClick,
-            onNodeRightClick: handleRightClick,
-            onLinkRightClick: handleRightClick,
-            onNodeHover: handleHover,
-            onLinkHover: handleHover,
-            onBackgroundClick: handleUnselected,
             isNodeSelected: checkIsNodeSelected,
             isLinkSelected: checkIsLinkSelected,
+            eventHandlers: {
+                onNodeClick: handleNodeClick,
+                onNodeRightClick: handleRightClick,
+                onLinkRightClick: handleRightClick,
+                onNodeHover: handleHover,
+                onLinkHover: handleHover,
+                onBackgroundClick: handleUnselected,
+            },
         });
     }, [handleNodeClick, handleRightClick, handleHover, handleUnselected, checkIsNodeSelected, checkIsLinkSelected, canvasRef, canvasLoaded, captionsKeys, showPropertyKeyPrefix]);
 

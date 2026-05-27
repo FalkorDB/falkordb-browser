@@ -850,12 +850,13 @@ export function getQueryWithLimit(
 }
 
 export const convertToCanvasData = (graphData: GraphData): CanvasData => ({
-    nodes: graphData.nodes.map(({ id, labels, color, visible, size, data }) => ({
+    nodes: graphData.nodes.map(({ id, labels, color, visible, size, data, expand }) => ({
         id,
         labels,
         color,
         visible,
-        size: size,
+        size,
+        expand,
         data
     })),
     links: graphData.links.map(({ id, relationship, color, visible, source, target, data }) => ({

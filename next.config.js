@@ -4,10 +4,6 @@ const nextConfig = {
   allowedDevOrigins: ['127.0.0.1', '0.0.0.0'],
   output: 'standalone',
   reactStrictMode: true,
-  experimental: {
-    externalDir: true,
-  },
-  transpilePackages: ['@falkordb/canvas'],
   // Keep falkordb server-only to avoid bundling BigInt in client/runtime
   // Keep text-to-cypher external to avoid bundling native .node binaries
   serverExternalPackages: ['falkordb', '@falkordb/text-to-cypher'],
