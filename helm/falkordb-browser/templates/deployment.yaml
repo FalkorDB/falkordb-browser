@@ -1,4 +1,5 @@
 {{ include "falkordb-browser.validateNextAuthUrl" . }}
+{{ include "falkordb-browser.validateEncryptionKeySecret" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -54,6 +55,14 @@ spec:
             name: {{ include "falkordb-browser.fullname" . }}
         - secretRef:
             name: {{ include "falkordb-browser.fullname" . }}
+        {{- if .Values.encryption.existingSecret.name }}
+        env:
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.encryption.existingSecret.name | quote }}
+              key: {{ .Values.encryption.existingSecret.key | default "ENCRYPTION_KEY" | quote }}
+        {{- end }}
         livenessProbe:
           {{- toYaml .Values.livenessProbe | nindent 12 }}
         readinessProbe:

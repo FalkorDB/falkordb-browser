@@ -70,6 +70,9 @@ The following table lists the configurable parameters of the FalkorDB Browser ch
 | `image.tag` | Image tag | `""` (uses chart appVersion) |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
 | `browser.basePath` | Path prefix for hosting the browser, for example `/browser` | `""` |
+| `encryption.key` | 64-character hex key for server-side encryption. Generated and reused from the release Secret when empty. | `""` |
+| `encryption.existingSecret.name` | Existing Secret name for `ENCRYPTION_KEY`. Mutually exclusive with `encryption.key`. | `""` |
+| `encryption.existingSecret.key` | Key in `encryption.existingSecret.name` that contains the encryption key. | `ENCRYPTION_KEY` |
 | `service.type` | Kubernetes service type | `ClusterIP` |
 | `service.port` | Service port for browser | `3000` |
 | `service.restPort` | Service port for REST API | `8080` |
@@ -208,6 +211,32 @@ persistence:
 env:
   nextauthSecret: "your-secure-secret-here"
 ```
+
+### Encryption key management
+
+`ENCRYPTION_KEY` is required by the browser for server-side encryption of stored credentials and tokens. The key must be 64 hexadecimal characters (32 bytes).
+
+By default, the chart generates a random key and stores it in the release Secret as `ENCRYPTION_KEY`. On upgrades, the chart reuses the existing Secret value so restarted or rescheduled containers keep using the same key.
+
+To supply your own key:
+
+```bash
+helm install falkordb-browser ./falkordb-browser \
+  --set encryption.key="$(openssl rand -hex 32)"
+```
+
+To reference an existing Secret in the release namespace instead:
+
+```bash
+kubectl create secret generic falkordb-browser-encryption \
+  --from-literal=ENCRYPTION_KEY="$(openssl rand -hex 32)"
+
+helm install falkordb-browser ./falkordb-browser \
+  --set encryption.existingSecret.name=falkordb-browser-encryption \
+  --set encryption.existingSecret.key=ENCRYPTION_KEY
+```
+
+Do not rotate this key unless you are prepared to invalidate or migrate data encrypted with the previous key.
 
 ### Installation with resource limits
 

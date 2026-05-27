@@ -19,6 +19,18 @@ browser:
   # Images must be built with the same NEXT_PUBLIC_BASE_PATH value.
   basePath: ""
 
+encryption:
+  # Server-side encryption key for stored credentials and tokens.
+  # Must be 64 hexadecimal characters (32 bytes). If empty, the chart generates
+  # one and reuses the existing Secret value on upgrades.
+  # You can generate one with: openssl rand -hex 32
+  key: ""
+  # Use an existing Secret in the release namespace for ENCRYPTION_KEY instead
+  # of setting encryption.key or generating a key in the chart Secret.
+  existingSecret:
+    name: ""
+    key: "ENCRYPTION_KEY"
+
 serviceAccount:
   # Specifies whether a service account should be created
   create: true
