@@ -243,43 +243,6 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-function normalizeAppBasePath(value: string): string {
-  const normalized = value.trim();
-  if (!normalized || normalized === "/") return "";
-  if (normalized !== value || /\s/.test(normalized)) {
-    throw new Error("NEXT_PUBLIC_BASE_PATH must not contain whitespace");
-  }
-  if (!normalized.startsWith("/")) {
-    throw new Error("NEXT_PUBLIC_BASE_PATH must be empty, /, or start with /");
-  }
-  const basePath = normalized.replace(/\/$/, "");
-  if (basePath.includes("//")) {
-    throw new Error("NEXT_PUBLIC_BASE_PATH must not contain empty path segments");
-  }
-  return basePath;
-}
-
-const rawBasePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
-export const appBasePath = normalizeAppBasePath(rawBasePath);
-
-export function withBasePath(url: string): string {
-  if (!appBasePath || url.startsWith("//") || /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(url)) return url;
-
-  // Already prefixed with basePath
-  if (url === appBasePath || url.startsWith(`${appBasePath}/`)) return url;
-
-  // Relative URLs: trim leading './' and prefix with basePath
-  if (url.startsWith("/")) return `${appBasePath}${url}`;
-  if (url.startsWith("./")) return `${appBasePath}/${url.slice(2)}`;
-  if (url.startsWith("api/")) return `${appBasePath}/${url}`;
-
-  // For other relative URLs (without leading / or ./), prefix with basePath
-  if (!url.startsWith("#") && url.length > 0) return `${appBasePath}/${url}`;
-
-  // Fragments and empty strings pass through unchanged
-  return url;
-}
-
 export async function getSSEGraphResult(
   url: string,
   toast: ToastFn,
@@ -295,7 +258,7 @@ export async function getSSEGraphResult(
       effectiveUrl += `${sep}connectionId=${encodeURIComponent(_activeConnectionId)}`;
     }
 
-    const evtSource = new EventSource(withBasePath(effectiveUrl));
+    const evtSource = new EventSource(effectiveUrl);
     evtSource.addEventListener("result", (event: MessageEvent) => {
       const result = JSON.parse(event.data);
       evtSource.close();
@@ -554,7 +517,7 @@ let sessionInvalidationInFlight = false;
 function triggerSessionInvalidationSignOut(): void {
   if (sessionInvalidationInFlight) return;
   sessionInvalidationInFlight = true;
-  signOut({ callbackUrl: withBasePath("/login") }).catch(() => {
+  signOut({ callbackUrl: "/login" }).catch(() => {
     sessionInvalidationInFlight = false;
   });
 }
@@ -598,7 +561,7 @@ export async function securedFetch(
   }
   effectiveInit.headers = existingHeaders;
 
-  const response = await fetch(withBasePath(input), effectiveInit);
+  const response = await fetch(input, effectiveInit);
   const { status } = response;
 
   // The server signals "your session is orphaned, sign out now" via this
@@ -746,7 +709,7 @@ export const getMemoryUsage = async (
     if (effectiveConnId) {
       headers.set("X-Connection-Id", effectiveConnId);
     }
-    const result = await fetch(withBasePath(`/api/graph/${prepareArg(name)}/memory`), { headers });
+    const result = await fetch(`/api/graph/${prepareArg(name)}/memory`, { headers });
     if (!result.ok) return new Map();
     const json = await result.json();
     return processEntries(json.result);
