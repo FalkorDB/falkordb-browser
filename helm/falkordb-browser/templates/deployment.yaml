@@ -53,16 +53,22 @@ spec:
         envFrom:
         - configMapRef:
             name: {{ include "falkordb-browser.fullname" . }}
-        - secretRef:
-            name: {{ include "falkordb-browser.fullname" . }}
-        {{- if .Values.encryption.existingSecret.name }}
         env:
+        - name: NEXTAUTH_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "falkordb-browser.fullname" . }}
+              key: NEXTAUTH_SECRET
         - name: ENCRYPTION_KEY
           valueFrom:
             secretKeyRef:
+              {{- if .Values.encryption.existingSecret.name }}
               name: {{ .Values.encryption.existingSecret.name | quote }}
               key: {{ .Values.encryption.existingSecret.key | default "ENCRYPTION_KEY" | quote }}
-        {{- end }}
+              {{- else }}
+              name: {{ include "falkordb-browser.fullname" . }}
+              key: ENCRYPTION_KEY
+              {{- end }}
         livenessProbe:
           {{- toYaml .Values.livenessProbe | nindent 12 }}
         readinessProbe:

@@ -143,21 +143,26 @@ Validate existing Secret based ENCRYPTION_KEY configuration.
 {{- define "falkordb-browser.validateEncryptionKeySecret" -}}
 {{- $providedKey := .Values.encryption.key | default "" -}}
 {{- $existingSecretName := .Values.encryption.existingSecret.name | default "" -}}
-{{- $existingSecretKey := .Values.encryption.existingSecret.key | default "ENCRYPTION_KEY" -}}
+{{- $rawExistingSecretKey := .Values.encryption.existingSecret.key -}}
 {{- $chartSecretName := include "falkordb-browser.fullname" . -}}
 {{- if and $providedKey $existingSecretName -}}
 {{- fail "set either encryption.key or encryption.existingSecret.name, not both" -}}
 {{- end -}}
-{{- if and $existingSecretName (not $existingSecretKey) -}}
+{{- if and $existingSecretName (not $rawExistingSecretKey) -}}
 {{- fail "encryption.existingSecret.key is required when encryption.existingSecret.name is set" -}}
 {{- end -}}
 {{- if and $existingSecretName (eq $existingSecretName $chartSecretName) -}}
 {{- fail "encryption.existingSecret.name must reference a Secret not managed by this chart" -}}
 {{- end -}}
 {{- if $existingSecretName -}}
+{{- $existingSecretKey := $rawExistingSecretKey | default "ENCRYPTION_KEY" -}}
 {{- $existingSecret := lookup "v1" "Secret" .Release.Namespace $existingSecretName -}}
-{{- if and $existingSecret (hasKey $existingSecret.data $existingSecretKey) -}}
-{{- $existingKey := index $existingSecret.data $existingSecretKey | b64dec -}}
+{{- if $existingSecret -}}
+{{- $existingSecretData := $existingSecret.data | default dict -}}
+{{- if not (hasKey $existingSecretData $existingSecretKey) -}}
+{{- fail (printf "existing Secret %s must contain key %s" $existingSecretName $existingSecretKey) -}}
+{{- end -}}
+{{- $existingKey := index $existingSecretData $existingSecretKey | b64dec -}}
 {{- if not (regexMatch "^[0-9a-fA-F]{64}$" $existingKey) -}}
 {{- fail (printf "existing Secret %s key %s must be 64 hexadecimal characters (32 bytes)" $existingSecretName $existingSecretKey) -}}
 {{- end -}}

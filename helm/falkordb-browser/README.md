@@ -218,6 +218,8 @@ env:
 
 By default, the chart generates a random key and stores it in the release Secret as `ENCRYPTION_KEY`. On upgrades, the chart reuses the existing Secret value so restarted or rescheduled containers keep using the same key.
 
+Preserve or restore the same `ENCRYPTION_KEY` across upgrades, reinstalls, and chart-managed Secret recreation. If the release Secret is deleted or the chart is reinstalled without the previous key, the chart generates a new key and existing encrypted credentials and tokens become unreadable.
+
 To supply your own key:
 
 ```bash

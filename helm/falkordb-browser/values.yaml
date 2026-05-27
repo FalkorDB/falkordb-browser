@@ -21,8 +21,10 @@ browser:
 
 encryption:
   # Server-side encryption key for stored credentials and tokens.
-  # Must be 64 hexadecimal characters (32 bytes). If empty, the chart generates
-  # one and reuses the existing Secret value on upgrades.
+  # Precedence is: existingSecret.name, then key, then a generated key. Set only
+  # one of existingSecret.name or key. Generated keys are reused from the release
+  # Secret on upgrades.
+  # Must be 64 hexadecimal characters (32 bytes).
   # You can generate one with: openssl rand -hex 32
   key: ""
   # Use an existing Secret in the release namespace for ENCRYPTION_KEY instead
