@@ -1,30 +1,7 @@
 /** @type {import('next').NextConfig} */
 const path = require('path');
 
-function normalizeBasePath(value) {
-  const normalized = (value || '').trim();
-  if (!normalized || normalized === '/') return '';
-
-  if (normalized !== value || /\s/.test(normalized)) {
-    throw new Error('NEXT_PUBLIC_BASE_PATH must not contain whitespace');
-  }
-
-  if (!normalized.startsWith('/')) {
-    throw new Error('NEXT_PUBLIC_BASE_PATH must be empty, /, or start with /');
-  }
-
-  const basePath = normalized.replace(/\/$/, '');
-  if (basePath.includes('//')) {
-    throw new Error('NEXT_PUBLIC_BASE_PATH must not contain empty path segments');
-  }
-
-  return basePath;
-}
-
-const basePath = normalizeBasePath(process.env.NEXT_PUBLIC_BASE_PATH);
-
 const nextConfig = {
-  basePath,
   allowedDevOrigins: ['127.0.0.1', '0.0.0.0'],
   output: 'standalone',
   reactStrictMode: true,

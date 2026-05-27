@@ -1,4 +1,4 @@
-import { cn, getTheme, Message, toUserFriendlyMessage, withBasePath } from "@/lib/utils";
+import { cn, getTheme, Message, toUserFriendlyMessage } from "@/lib/utils";
 import { memo, useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
@@ -263,7 +263,7 @@ export default function Chat({ onClose }: Props) {
         }
 
         try {
-            const response = await fetch(withBasePath("/api/chat"), {
+            const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -598,7 +598,7 @@ export default function Chat({ onClose }: Props) {
                                     <p className="text-foreground text-sm truncate text-center">{message.role.charAt(0).toUpperCase()}</p>
                                 </div>
                                 : <div className="h-8 w-8 relative">
-                                    {mounted && currentTheme && <Image className="rounded-full" src={withBasePath(`/icons/F-${currentTheme}.svg`)} alt="Assistant" fill />}
+                                    {mounted && currentTheme && <Image className="rounded-full" src={`/icons/F-${currentTheme}.svg`} alt="Assistant" fill />}
                                 </div>;
                             return (
                                 <li

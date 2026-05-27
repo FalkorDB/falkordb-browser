@@ -69,7 +69,6 @@ The following table lists the configurable parameters of the FalkorDB Browser ch
 | `image.repository` | Image repository | `falkordb/falkordb-browser` |
 | `image.tag` | Image tag | `""` (uses chart appVersion) |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
-| `browser.basePath` | Path prefix for hosting the browser, for example `/browser` | `""` |
 | `encryption.key` | 64-character hex key for server-side encryption. Generated and reused from the release Secret when empty. | `""` |
 | `encryption.existingSecret.name` | Existing Secret name for `ENCRYPTION_KEY`. Mutually exclusive with `encryption.key`. | `""` |
 | `encryption.existingSecret.key` | Key in `encryption.existingSecret.name` that contains the encryption key. | `ENCRYPTION_KEY` |
@@ -79,7 +78,6 @@ The following table lists the configurable parameters of the FalkorDB Browser ch
 | `service.mcpPort` | Service port for MCP | `3001` |
 | `ingress.enabled` | Enable ingress | `false` |
 | `ingress.className` | Ingress class name | `""` |
-| `ingress.rewriteRootToBasePath` | Rewrite ingress path `/` to `browser.basePath` if set (required for sub-path hosting) | `false` |
 | `ingress.hosts` | Ingress hosts configuration | `[{host: falkordb-browser.local, paths: [{path: /, pathType: ImplementationSpecific}]}]` |
 | `ingress.tls` | Ingress TLS configuration | `[]` |
 | `resources` | CPU/Memory resource requests/limits | `{}` |
@@ -137,68 +135,6 @@ Install:
 ```bash
 helm install falkordb-browser ./falkordb-browser -f ingress-values.yaml
 ```
-
-### Installation Under a Path Prefix (Sub-path Hosting)
-
-To host the full browser under a subpath such as `/browser`, you must:
-
-1. **Build the image with the base path:**
-
-    `NEXT_PUBLIC_BASE_PATH` is a Next.js build-time setting. The running container must use an image built with the same path as `browser.basePath`; do not change this value only at deployment time.
-
-   ```bash
-   docker build \
-     --build-arg NEXT_PUBLIC_BASE_PATH=/browser \
-     -t your-registry/falkordb-browser:browser-path .
-   ```
-
-2. **Set the base path and ingress rewrite in your values:**
-
-   ```yaml
-   image:
-     repository: your-registry/falkordb-browser
-     tag: browser-path
-
-   browser:
-     basePath: /browser
-
-   ingress:
-     enabled: true
-     className: nginx
-     rewriteRootToBasePath: true  # Required for sub-path hosting
-     hosts:
-       - host: falkordb-browser.example.com
-         paths:
-           - path: /
-             pathType: Prefix
-
-   env:
-     nextauthUrl: https://falkordb-browser.example.com/browser
-     nextauthSecret: "your-secure-secret-here"
-   ```
-
-3. **Ingress/proxy routing:**
-
-    You must route both the app route `${browser.basePath}/*` and the auth callback route `${browser.basePath}/api/auth/*` to the app service. A single prefix route such as `/browser` is sufficient only if your ingress/proxy forwards all nested paths under that prefix, including `/browser/api/auth/*`. For example, in NGINX:
-
-   ```nginx
-   location /browser/ {
-     proxy_pass http://falkordb-browser-service;
-   }
-   location /browser/api/auth/ {
-     proxy_pass http://falkordb-browser-service;
-   }
-   ```
-
-    > **Note:** Auth/session callbacks must be reachable at `${browser.basePath}/api/auth/*`. If ingress/proxy does not forward this path, login/logout will fail even when the main app route loads.
-
-4. **Validation:**
-
-   The chart will fail to render if `env.nextauthUrl`'s path does not match `browser.basePath`.
-
-5. **Migration:**
-
-   The chart no longer rewrites ingress `/` to the base path by default. Set `ingress.rewriteRootToBasePath: true` to enable this for sub-path hosting. Review your ingress rules if upgrading.
 
 ### Installation with persistence
 

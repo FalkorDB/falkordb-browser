@@ -1,4 +1,3 @@
-{{ include "falkordb-browser.validateNextAuthUrl" . }}
 {{ include "falkordb-browser.validateEncryptionKeySecret" . }}
 apiVersion: apps/v1
 kind: Deployment
