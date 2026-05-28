@@ -99,6 +99,27 @@ export default class TutorialPanel extends GraphPage {
   }
 
   /**
+   * Hover over a tutorial target element to trigger pointermove/pointerenter.
+   * Moves to the element, waits for sub-content to potentially render,
+   * then moves slightly to fire additional pointermove events.
+   */
+  async hoverTutorialTarget(selector: string): Promise<void> {
+    const target = this.page.locator(selector).first();
+    await waitForElementToBeVisible(target);
+    const box = await target.boundingBox();
+    if (!box) throw new Error(`Target ${selector} has no bounding box`);
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    await this.page.mouse.move(cx, cy);
+    // Wait for sub-content to render, then fire additional pointermove events
+    // so the tutorial's advanceHandler can re-check the condition.
+    for (let i = 0; i < 10; i++) {
+      await this.page.waitForTimeout(300);
+      await this.page.mouse.move(cx + (i % 2), cy);
+    }
+  }
+
+  /**
    * Right-click on the tutorial canvas target.
    */
   async rightClickTutorialTarget(selector: string): Promise<void> {

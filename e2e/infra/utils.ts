@@ -138,7 +138,9 @@ export async function waitForURL(
 
   while (elapsed < timeout) {
     const currentURL = page.url();
-    if (currentURL === expectedURL) {
+    const currentPath = new URL(currentURL).origin + new URL(currentURL).pathname;
+    const expectedPath = new URL(expectedURL).origin + new URL(expectedURL).pathname;
+    if (currentPath === expectedPath) {
       return;
     }
     await new Promise((resolve) => {

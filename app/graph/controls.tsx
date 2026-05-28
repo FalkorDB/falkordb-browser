@@ -2,22 +2,21 @@
 
 /* eslint-disable react/require-default-props */
 
-import { ChevronDown, Pause, Pin, PinOff, Play, Shrink, ZoomIn, ZoomOut } from "lucide-react";
+import { ChevronDown, Circle, Pause, Pin, PinOff, Play, Shrink, ZoomIn, ZoomOut } from "lucide-react";
 import { useContext, useRef, useState } from "react";
 import type { HierarchyDirection, LayoutMode, RadialDirection } from "@falkordb/canvas";
-import { GraphRef } from "@/lib/utils";
+import { cn, GraphRef } from "@/lib/utils";
 import { setUrlParam } from "@/lib/useUrlParams";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import Button from "../components/ui/Button";
-import { ForceGraphContext, IndicatorContext } from "../components/provider";
+import { ForceGraphContext, IndicatorContext, BrowserSettingsContext } from "../components/provider";
 import { Graph } from "../api/graph/model";
 
 const LAYOUTS: { value: LayoutMode; label: string }[] = [
     { value: 'force', label: 'Force' },
     { value: 'tree', label: 'Tree' },
-    { value: 'flow', label: 'Flow' },
     { value: 'radial', label: 'Radial' },
 ];
 
@@ -35,7 +34,6 @@ const RADIAL_DIRECTIONS: { value: RadialDirection; label: string }[] = [
 
 function getDefaultDirection(mode: LayoutMode): string {
     if (mode === 'tree') return 'td';
-    if (mode === 'flow') return 'lr';
     if (mode === 'radial') return 'out';
     return '';
 }
@@ -54,13 +52,15 @@ export default function Controls({
 
     const { indicator } = useContext(IndicatorContext);
     const { layout, setLayout: setContextLayout, direction: contextDirection, setDirection: setContextDirection } = useContext(ForceGraphContext);
-    const [animation, setAnimation] = useState(false);
-    const [pinned, setPinned] = useState(layout !== 'force');
+    const { tutorialOpen } = useContext(BrowserSettingsContext);
+
     const directionsRef = useRef<Record<string, string>>({
         tree: layout === 'tree' ? (contextDirection || 'td') : 'td',
-        flow: layout === 'flow' ? (contextDirection || 'lr') : 'lr',
         radial: layout === 'radial' ? (contextDirection || 'out') : 'out',
     });
+
+    const [animation, setAnimation] = useState(false);
+    const [pinned, setPinned] = useState(layout !== 'force');
     const direction = layout === 'force' ? '' : (directionsRef.current[layout] || getDefaultDirection(layout));
 
     const handleZoomClick = (changeFactor: number) => {
@@ -106,7 +106,7 @@ export default function Controls({
         setContextDirection(value);
         setUrlParam({ direction: value || null });
 
-        if (layout === 'tree' || layout === 'flow') {
+        if (layout === 'tree') {
             canvasRef.current?.setLayoutOptions({
                 [layout]: { direction: value as HierarchyDirection }
             });
@@ -117,11 +117,6 @@ export default function Controls({
         }
     };
 
-    const showDirectionDropdown = layout !== 'force';
-    const directionOptions = (layout === 'tree' || layout === 'flow')
-        ? HIERARCHY_DIRECTIONS
-        : RADIAL_DIRECTIONS;
-
     const animationDisabled = pinned || layout !== 'force';
 
     return (
@@ -131,7 +126,7 @@ export default function Controls({
                 <>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <div className="flex items-center gap-2">
+                            <div data-testid="animationContainer" className="flex items-center gap-2">
                                 {animation ? <Pause size={18} /> : <Play size={18} />}
                                 <Switch
                                     data-testid="animationControl"
@@ -167,6 +162,7 @@ export default function Controls({
                 </>
             }
             <div className="h-4 w-px bg-border rounded-full" />
+            {/* Layout dropdown: click layout to select, sub-menu shows directions */}
             <DropdownMenu>
                 <Tooltip>
                     <TooltipTrigger asChild>
@@ -186,49 +182,80 @@ export default function Controls({
                         <p>Layout</p>
                     </TooltipContent>
                 </Tooltip>
-                <DropdownMenuContent align="center">
+                <DropdownMenuContent align="center" data-testid="layoutDropdownContent" preventOutsideClose={tutorialOpen}>
                     <DropdownMenuRadioGroup value={layout} onValueChange={handleLayoutChange}>
-                        {LAYOUTS.map(l => (
-                            <DropdownMenuRadioItem key={l.value} value={l.value}>
-                                {l.label}
-                            </DropdownMenuRadioItem>
-                        ))}
+                        <DropdownMenuRadioItem value="force">Force</DropdownMenuRadioItem>
                     </DropdownMenuRadioGroup>
+                    <DropdownMenuSub>
+                        <DropdownMenuSubTrigger data-testid="layoutTreeSub" className="pl-8 relative">
+                            {
+                                layout === 'tree' && (
+                                    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                                        <Circle className="h-2 w-2 fill-current" />
+                                    </span>
+                                )
+                            }
+                            Tree
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent preventOutsideClose={tutorialOpen}>
+                            {HIERARCHY_DIRECTIONS.map(d => (
+                                <DropdownMenuItem
+                                    key={d.value}
+                                    data-testid={`layoutTreeDirection-${d.value}`}
+                                    className={cn("pl-8 relative", layout === 'tree' && direction === d.value ? 'bg-accent' : '')}
+                                    onSelect={() => {
+                                        if (layout !== 'tree') handleLayoutChange('tree');
+                                        handleDirectionChange(d.value);
+                                    }}
+                                >
+                                    {
+                                        direction === d.value && (
+                                            <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                                                <Circle className="h-2 w-2 fill-current" />
+                                            </span>
+                                        )
+                                    }
+                                    {d.label}
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                    <DropdownMenuSub>
+                        <DropdownMenuSubTrigger data-testid="layoutRadialSub" className="pl-8 relative">
+                            {layout === 'radial' && (
+                                <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                                    <Circle className="h-2 w-2 fill-current" />
+                                </span>
+                            )}
+                            Radial
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent preventOutsideClose={tutorialOpen}>
+                            {RADIAL_DIRECTIONS.map(d => (
+                                <DropdownMenuItem
+                                    key={d.value}
+                                    data-testid={`layoutRadialDirection-${d.value}`}
+                                    className={cn("pl-8 relative", layout === 'radial' && direction === d.value ? 'bg-accent' : '')}
+                                    onSelect={() => {
+                                        if (layout !== 'radial') handleLayoutChange('radial');
+                                        handleDirectionChange(d.value);
+                                    }}
+                                >
+                                    {
+                                        layout === 'radial' && direction === d.value && (
+                                            <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                                                <Circle className="h-2 w-2 fill-current" />
+                                            </span>
+                                        )
+                                    }
+                                    {d.label}
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuSubContent>
+                    </DropdownMenuSub>
                 </DropdownMenuContent>
             </DropdownMenu>
-            {showDirectionDropdown && (
-                <DropdownMenu>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <DropdownMenuTrigger asChild>
-                                <button
-                                    type="button"
-                                    data-testid="directionControl"
-                                    className="flex items-center gap-1 text-sm pointer-events-auto rounded-md px-2 py-1 hover:bg-secondary disabled:opacity-50"
-                                    disabled={disabled}
-                                >
-                                    {directionOptions.find(d => d.value === direction)?.label ?? direction}
-                                    <ChevronDown size={14} />
-                                </button>
-                            </DropdownMenuTrigger>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Direction</p>
-                        </TooltipContent>
-                    </Tooltip>
-                    <DropdownMenuContent align="center">
-                        <DropdownMenuRadioGroup value={direction} onValueChange={handleDirectionChange}>
-                            {directionOptions.map(d => (
-                                <DropdownMenuRadioItem key={d.value} value={d.value}>
-                                    {d.label}
-                                </DropdownMenuRadioItem>
-                            ))}
-                        </DropdownMenuRadioGroup>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            )}
             <div className="h-4 w-px bg-border rounded-full" />
-            <div className="flex items-center gap-1">
+            <div data-testid="zoomControls" className="flex items-center gap-1">
                 <Button
                     data-testid="zoomInControl"
                     className="text-nowrap p-1 pointer-events-auto rounded-md hover:bg-secondary"

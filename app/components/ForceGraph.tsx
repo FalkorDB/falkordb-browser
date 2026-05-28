@@ -135,8 +135,9 @@ export default function ForceGraph({
 
         if (!canvas || !canvasLoaded) return;
 
+        const parentNodeIds = new Set<number>(nodes.map(n => n.id));
         const expandedNodes: Node[] = [];
-        const nodeIdsToRemove = new Set();
+        const nodeIdsToRemove = new Set<number>();
 
         graph.Elements = {
             nodes: graph.Elements.nodes.filter(node => {
@@ -256,9 +257,9 @@ export default function ForceGraph({
 
         // Apply direction options before setting layout so applyLayout uses them
         if (ctxDirection && mode !== 'force') {
-            if (mode === 'tree' || mode === 'flow') {
+            if (mode === 'tree') {
                 canvasRef.current.setLayoutOptions({
-                    [mode]: { direction: ctxDirection as HierarchyDirection }
+                    tree: { direction: ctxDirection as HierarchyDirection }
                 });
             } else if (mode === 'radial') {
                 canvasRef.current.setLayoutOptions({

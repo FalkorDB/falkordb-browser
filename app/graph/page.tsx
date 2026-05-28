@@ -263,7 +263,7 @@ export default function Page() {
 
         // Priority 2: Default query / empty graph
         if (graphName && graphName !== graph.Id) {
-            if (runDefaultQuery) {
+            if (runDefaultQuery && !tutorialOpen) {
                 runQuery(defaultQuery, graphName);
                 return;
             }

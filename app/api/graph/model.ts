@@ -869,12 +869,18 @@ export class Graph {
       nodes: this.elements.nodes,
       links: this.elements.links
         .map((link) => {
+          // Keep the link if it's not connected to any of the given ids AND both endpoints exist
           if (
             (ids.length !== 0 && !links.includes(link)) ||
             (this.nodesMap.has(link.source) &&
               this.nodesMap.has(link.target))
           ) {
-            return link;
+            // But still remove collapsed links connected to the given ids
+            if (link.collapsed && links.includes(link)) {
+              // fall through to removal below
+            } else {
+              return link;
+            }
           }
 
           const category = this.relationshipsMap.get(link.relationship);

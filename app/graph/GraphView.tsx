@@ -4,7 +4,7 @@ import { useEffect, Dispatch, SetStateAction, useContext, useCallback, useState 
 import { GitGraph, ScrollText, Table } from "lucide-react";
 import { cn, GraphRef, Tab, Label, Link, Node, Relationship, HistoryQuery } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { GraphContext, ForceGraphContext } from "@/app/components/provider";
+import { GraphContext, ForceGraphContext, BrowserSettingsContext } from "@/app/components/provider";
 import ForceGraph from "@/app/components/ForceGraph";
 import { setConnectionItem } from "@/lib/connection-storage";
 import Button from "../components/ui/Button";
@@ -52,6 +52,7 @@ function GraphView({
 
     const { graph, graphName, currentTab, setCurrentTab, isLoading, setIsLoading, expand, setExpand } = useContext(GraphContext);
     const { setData, data, graphData, setGraphData, setViewport, viewport } = useContext(ForceGraphContext);
+    const { tutorialOpen } = useContext(BrowserSettingsContext);
 
     const elementsLength = graph.getElements().length;
 
@@ -68,11 +69,14 @@ function GraphView({
     }, [graph, historyQuery.currentQuery]);
 
     useEffect(() => {
+        // During tutorial, track setups control the active tab directly
+        if (tutorialOpen) return;
+
         let defaultChecked: Tab = "Graph";
         if (elementsLength === 0 && graph.Data.length !== 0) defaultChecked = "Table";
 
         setCurrentTab(defaultChecked);
-    }, [graph, graph.getElements().length, graph.Data.length, setCurrentTab]);
+    }, [graph, graph.getElements().length, graph.Data.length, setCurrentTab, tutorialOpen]);
 
     const onLabelClick = (label: Label) => {
         const canvas = canvasRef.current;
