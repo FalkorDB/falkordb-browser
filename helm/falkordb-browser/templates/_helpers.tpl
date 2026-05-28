@@ -60,3 +60,31 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Normalize the optional browser base path used when hosting the app under a subpath.
+*/}}
+{{- define "falkordb-browser.basePath" -}}
+{{- $basePath := default "" .Values.browser.basePath -}}
+{{- if and $basePath (ne $basePath "/") -}}
+{{- if not (hasPrefix "/" $basePath) -}}
+{{- fail "browser.basePath must start with /" -}}
+{{- end -}}
+{{- $basePath | trimSuffix "/" -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Validate that env.nextauthUrl path matches browser.basePath if set.
+*/}}
+{{- define "falkordb-browser.validateNextAuthUrl" -}}
+{{- $basePath := include "falkordb-browser.basePath" . -}}
+{{- $nextauthUrl := .Values.env.nextauthUrl | default "" -}}
+{{- if and $basePath $nextauthUrl (ne $basePath "") (ne $basePath "/") -}}
+  {{- $urlParts := splitList "/" $nextauthUrl -}}
+  {{- $urlPath := printf "/%s" (join "/" (slice $urlParts 3)) | trimSuffix "/" -}}
+  {{- if ne $urlPath $basePath -}}
+    {{- fail (printf "env.nextauthUrl path (%s) must match browser.basePath (%s) when basePath is set" $urlPath $basePath) -}}
+  {{- end -}}
+{{- end -}}
+{{- end }}

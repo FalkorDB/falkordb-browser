@@ -3,7 +3,7 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, SyntaxErrorInfo, parseSyntaxError } from "@/lib/utils";
+import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, SyntaxErrorInfo, parseSyntaxError, withBasePath } from "@/lib/utils";
 import { serverEncrypt, serverDecrypt, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import { usePathname, useRouter } from "next/navigation";
@@ -593,7 +593,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // where activeConnectionId is null on page load and the check never fires.
     (async () => {
       try {
-        const result = await fetch("/api/DBVersion", { method: "GET" });
+        const result = await fetch(withBasePath("/api/DBVersion"), { method: "GET" });
         if (!result.ok) {
           setShowMemoryUsage(false);
           return;
@@ -868,7 +868,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (status !== "authenticated") return;
     // Use plain fetch with no X-Connection-Id — server resolves via JWT.
     (async () => {
-      const res = await fetch("/api/udf", { method: "GET" });
+      const res = await fetch(withBasePath("/api/udf"), { method: "GET" });
       if (!res.ok) { setShowUDF(false); return; }
 
       const json = await res.json();
@@ -1177,7 +1177,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
 export default function NextAuthProvider({ children, nonce }: { children: React.ReactNode; nonce?: string }) {
   return (
-    <SessionProvider>
+    <SessionProvider basePath={withBasePath("/api/auth")}>
       <Suspense fallback={null}>
         <ProvidersWithSession nonce={nonce}>{children}</ProvidersWithSession>
       </Suspense>
