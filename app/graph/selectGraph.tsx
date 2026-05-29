@@ -14,6 +14,7 @@ import TableComponent from "../components/TableComponent";
 import ExportGraph from "../components/ExportGraph";
 import DeleteGraph from "../components/graph/DeleteGraph";
 import DuplicateGraph from "../components/graph/DuplicateGraph";
+import RestoreGraph from "../components/graph/RestoreGraph";
 import { Graph } from "../api/graph/model";
 import ResizableBox from "@/components/ui/ResizableBox";
 import { useResizableSize } from "@/lib/useResizableSize";
@@ -333,7 +334,16 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                         />
                                         <ExportGraph
                                             selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
-                                            
+
+                                        />
+                                        <RestoreGraph
+                                            existingGraphs={options}
+                                            onRestore={(restoredName) => {
+                                                if (!options.includes(restoredName)) {
+                                                    setOptions!([...options, restoredName]);
+                                                }
+                                                setSelectedValue(restoredName);
+                                            }}
                                         />
                                         <DuplicateGraph
                                             selectedValue={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)[0]}
