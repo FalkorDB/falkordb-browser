@@ -4,7 +4,6 @@ Expand the name of the chart.
 {{- define "falkordb-browser.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
-
 {{/*
 Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
@@ -62,29 +61,68 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
-Normalize the optional browser base path used when hosting the app under a subpath.
+Return a valid 64-character hexadecimal ENCRYPTION_KEY.
+Uses .Values.encryption.key when set, otherwise reuses the existing release
+Secret value or generates a new key for first install.
 */}}
-{{- define "falkordb-browser.basePath" -}}
-{{- $basePath := default "" .Values.browser.basePath -}}
-{{- if and $basePath (ne $basePath "/") -}}
-{{- if not (hasPrefix "/" $basePath) -}}
-{{- fail "browser.basePath must start with /" -}}
+{{- define "falkordb-browser.encryptionKey" -}}
+{{- $providedKey := .Values.encryption.key | default "" -}}
+{{- $existingSecretName := .Values.encryption.existingSecret.name | default "" -}}
+{{- if and $providedKey $existingSecretName -}}
+{{- fail "set either encryption.key or encryption.existingSecret.name, not both" -}}
 {{- end -}}
-{{- $basePath | trimSuffix "/" -}}
+{{- if $providedKey -}}
+{{- if not (regexMatch "^[0-9a-fA-F]{64}$" $providedKey) -}}
+{{- fail "encryption.key must be 64 hexadecimal characters (32 bytes)" -}}
+{{- end -}}
+{{- $providedKey -}}
+{{- else -}}
+{{- $secretName := include "falkordb-browser.fullname" . -}}
+{{- $existingSecret := lookup "v1" "Secret" .Release.Namespace $secretName -}}
+{{- $existingKey := "" -}}
+{{- if and $existingSecret (hasKey $existingSecret.data "ENCRYPTION_KEY") -}}
+{{- $existingKey = index $existingSecret.data "ENCRYPTION_KEY" | b64dec -}}
+{{- end -}}
+{{- if $existingKey -}}
+{{- if not (regexMatch "^[0-9a-fA-F]{64}$" $existingKey) -}}
+{{- fail (printf "existing Secret %s ENCRYPTION_KEY must be 64 hexadecimal characters (32 bytes)" $secretName) -}}
+{{- end -}}
+{{- $existingKey -}}
+{{- else -}}
+{{- randBytes 32 | sha256sum -}}
+{{- end -}}
 {{- end -}}
 {{- end }}
 
 {{/*
-Validate that env.nextauthUrl path matches browser.basePath if set.
+Validate existing Secret based ENCRYPTION_KEY configuration.
 */}}
-{{- define "falkordb-browser.validateNextAuthUrl" -}}
-{{- $basePath := include "falkordb-browser.basePath" . -}}
-{{- $nextauthUrl := .Values.env.nextauthUrl | default "" -}}
-{{- if and $basePath $nextauthUrl (ne $basePath "") (ne $basePath "/") -}}
-  {{- $urlParts := splitList "/" $nextauthUrl -}}
-  {{- $urlPath := printf "/%s" (join "/" (slice $urlParts 3)) | trimSuffix "/" -}}
-  {{- if ne $urlPath $basePath -}}
-    {{- fail (printf "env.nextauthUrl path (%s) must match browser.basePath (%s) when basePath is set" $urlPath $basePath) -}}
-  {{- end -}}
+{{- define "falkordb-browser.validateEncryptionKeySecret" -}}
+{{- $providedKey := .Values.encryption.key | default "" -}}
+{{- $existingSecretName := .Values.encryption.existingSecret.name | default "" -}}
+{{- $rawExistingSecretKey := .Values.encryption.existingSecret.key -}}
+{{- $chartSecretName := include "falkordb-browser.fullname" . -}}
+{{- if and $providedKey $existingSecretName -}}
+{{- fail "set either encryption.key or encryption.existingSecret.name, not both" -}}
+{{- end -}}
+{{- if and $existingSecretName (not $rawExistingSecretKey) -}}
+{{- fail "encryption.existingSecret.key is required when encryption.existingSecret.name is set" -}}
+{{- end -}}
+{{- if and $existingSecretName (eq $existingSecretName $chartSecretName) -}}
+{{- fail "encryption.existingSecret.name must reference a Secret not managed by this chart" -}}
+{{- end -}}
+{{- if $existingSecretName -}}
+{{- $existingSecretKey := $rawExistingSecretKey | default "ENCRYPTION_KEY" -}}
+{{- $existingSecret := lookup "v1" "Secret" .Release.Namespace $existingSecretName -}}
+{{- if $existingSecret -}}
+{{- $existingSecretData := $existingSecret.data | default dict -}}
+{{- if not (hasKey $existingSecretData $existingSecretKey) -}}
+{{- fail (printf "existing Secret %s must contain key %s" $existingSecretName $existingSecretKey) -}}
+{{- end -}}
+{{- $existingKey := index $existingSecretData $existingSecretKey | b64dec -}}
+{{- if not (regexMatch "^[0-9a-fA-F]{64}$" $existingKey) -}}
+{{- fail (printf "existing Secret %s key %s must be 64 hexadecimal characters (32 bytes)" $existingSecretName $existingSecretKey) -}}
+{{- end -}}
+{{- end -}}
 {{- end -}}
 {{- end }}
