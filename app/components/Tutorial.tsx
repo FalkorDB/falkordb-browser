@@ -2,11 +2,14 @@
 
 "use client";
 
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useCallback, useContext, useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Copy, CornerDownLeft, CornerDownRight, CornerLeftDown, CornerRightDown } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { cn } from "@/lib/utils";
+import { cn, Tab, GraphRef } from "@/lib/utils";
+import type { LayoutMode, RadialDirection } from "@falkordb/canvas";
+import { Graph } from "@/app/api/graph/model";
+import { GraphContext, PanelContext, ForceGraphContext } from "./provider";
 import Button from "./ui/Button";
 
 interface TutorialStep {
@@ -18,8 +21,31 @@ interface TutorialStep {
     placementAxis?: "x" | "y";
     advanceOn?: string;
     advanceCondition?: () => boolean;
+    advanceAction?: (ctx: TrackSetupContext) => Promise<void> | void;
     forward?: (keyof HTMLElementEventMap)[];
     hidePrev?: boolean;
+    passthrough?: boolean;
+    overrideDisabled?: boolean;
+}
+
+interface TutorialTrack {
+    name: string;
+    startIndex: number;
+    /** Prepare the browser/page state so this track's first step can render correctly */
+    setup: (ctx: TrackSetupContext) => Promise<void> | void;
+}
+
+/** Context passed to track setup functions so they can manipulate React state directly */
+interface TrackSetupContext {
+    handleSetGraphName: (name: string) => void;
+    setGraph: (graph: Graph) => void;
+    runQuery: (query: string, name?: string) => Promise<void>;
+    setCurrentTab: (tab: Tab) => void;
+    setLayout: (layout: LayoutMode) => void;
+    setDirection: (direction: string) => void;
+    onTogglePanel: () => void;
+    panelOpen: boolean;
+    canvasRef: GraphRef;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -44,7 +70,18 @@ const parseDescription = (description: string, toast: any) => {
                 </div>
             );
         }
-        return <span key={index}>{part}</span>;
+        // Render **bold** markdown as <strong> elements
+        const boldParts = part.split(/(\*\*[^*]+\*\*)/);
+        return (
+            <span key={index}>
+                {boldParts.map((seg, i) => {
+                    if (seg.startsWith('**') && seg.endsWith('**')) {
+                        return <strong key={i}>{seg.slice(2, -2)}</strong>;
+                    }
+                    return <span key={i}>{seg}</span>;
+                })}
+            </span>
+        );
     });
 };
 
@@ -59,6 +96,7 @@ const tutorialSteps: TutorialStep[] = [
         description: "Let's take a quick tour to help you get started with the graph database interface. This tour will guide you through the main features.",
         position: { top: "50%", left: "50%" }
     },
+    ///// Graph management steps (Track 1)
     {
         title: "Select a Graph",
         description: "This dropdown lets you select which graph to work with. We've loaded demo graphs for this tour. Click the highlighted dropdown to see them.",
@@ -100,6 +138,7 @@ const tutorialSteps: TutorialStep[] = [
         forward: ["mouseenter", "mouseleave"],
         hidePrev: true
     },
+    ///// Graph info steps (Track 2)
     {
         title: "Graph Info Panel",
         description: "The Graph Info panel displays node labels, edge types, and graph statistics. You can click on the elements to trigger a custom query that filters the graph by that label or edge type. This is a great way to explore the structure of your graph and understand what data it contains.",
@@ -164,6 +203,7 @@ const tutorialSteps: TutorialStep[] = [
         advanceOn: "click",
         forward: ["mouseenter", "mouseleave"]
     },
+    ///// Query and Canvas (Track 3)
     {
         title: "Query Editor",
         description: "Write and execute your Cypher queries here. Try modifying the query by adding a filter, for example: ```MATCH p=()-[r:KNOWS]-() WHERE r.since > 2018 RETURN p```. Then click Run to execute your modified query.",
@@ -181,6 +221,22 @@ const tutorialSteps: TutorialStep[] = [
         targetSelector: 'falkordb-canvas',
         spotlightSelector: '[data-testid="graphView"]',
         forward: ["mousedown", "mouseup", "mousemove", "mouseenter", "mouseleave", "mouseover", "mouseout", "contextmenu", "pointerdown", "pointerup", "pointermove", "pointerenter", "pointerleave", "wheel"],
+    },
+    {
+        title: "Expand Node",
+        description: "Double-click any node to expand it and reveal its neighbors. Try double-clicking a node now — new connected nodes and edges will appear around it.",
+        placementAxis: "x",
+        targetSelector: 'falkordb-canvas',
+        spotlightSelector: '[data-testid="graphView"]',
+        forward: ["mousedown", "mouseup", "mousemove", "mouseenter", "mouseleave", "mouseover", "mouseout", "contextmenu", "pointerdown", "pointerup", "pointermove", "pointerenter", "pointerleave", "wheel", "click"],
+    },
+    {
+        title: "Collapse Node",
+        description: "Double-click the same node again to collapse it and hide the expanded neighbors. This helps keep your view clean while exploring large graphs.",
+        placementAxis: "x",
+        targetSelector: 'falkordb-canvas',
+        spotlightSelector: '[data-testid="graphView"]',
+        forward: ["mousedown", "mouseup", "mousemove", "mouseenter", "mouseleave", "mouseover", "mouseout", "contextmenu", "pointerdown", "pointerup", "pointermove", "pointerenter", "pointerleave", "wheel", "click"],
     },
     {
         title: "View Node / Edge Details",
@@ -251,6 +307,115 @@ const tutorialSteps: TutorialStep[] = [
         advanceOn: "click",
         forward: ["mouseenter", "mouseleave"],
     },
+    ///// Layouts and advance canvas actions (Track 4)
+    {
+        title: "Graph View",
+        description: "Switch back to the Graph tab to see the canvas controls for layout, animation, and zoom.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="graphTab"]',
+        advanceOn: "mousedown",
+        forward: ["mouseenter", "mouseleave", "pointerdown", "mousedown"],
+        hidePrev: true,
+        advanceAction: async (ctx) => {
+            await ctx.runQuery("MATCH p=()-[:MANAGES]->() RETURN p", "social-demo");
+        }
+    },
+    {
+        title: "Open Layout Dropdown",
+        description: "Click the **Layout** dropdown to see the available graph visualization modes.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="layoutControl"]',
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave", "pointerdown"],
+        hidePrev: true
+    },
+    {
+        title: "Hover Tree",
+        description: "Hover over **Tree** to see the available directions for the hierarchical layout.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="layoutTreeSub"]',
+        advanceOn: "pointermove",
+        advanceCondition: () => !!document.querySelector('[data-testid="layoutTreeDirection-td"]'),
+        forward: ["mouseenter", "mouseleave", "pointerdown", "pointerenter", "pointermove"],
+        hidePrev: true
+    },
+    {
+        title: "Select Tree Direction",
+        description: "Click **Top → Down** to arrange the graph hierarchically from top to bottom.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="layoutTreeDirection-td"]',
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave", "pointerdown"],
+        hidePrev: true,
+        passthrough: true
+    },
+    {
+        title: "Tree Layout Active",
+        description: "The graph is now arranged hierarchically using the **Tree** layout. Nodes flow in a parent-child structure from top to bottom. Now let's try the Radial layout.",
+        placementAxis: "x",
+        targetSelector: 'falkordb-canvas',
+        spotlightSelector: '[data-testid="graphView"]',
+        forward: ["mousedown", "mouseup", "mousemove", "mouseenter", "mouseleave", "mouseover", "mouseout", "contextmenu", "pointerdown", "pointerup", "pointermove", "pointerenter", "pointerleave", "wheel"],
+        hidePrev: true
+    },
+    {
+        title: "Open Layout Dropdown",
+        description: "Click the **Layout** dropdown again to switch to a different layout mode.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="layoutControl"]',
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave", "pointerdown"],
+        hidePrev: true
+    },
+    {
+        title: "Hover Radial",
+        description: "Hover over **Radial** to see the direction options for the concentric ring layout.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="layoutRadialSub"]',
+        advanceOn: "pointermove",
+        advanceCondition: () => !!document.querySelector('[data-testid="layoutRadialDirection-out"]'),
+        forward: ["mouseenter", "mouseleave", "pointerdown", "pointerenter", "pointermove"],
+        hidePrev: true
+    },
+    {
+        title: "Select Radial Direction",
+        description: "Click **Outward** to arrange nodes in concentric rings radiating from the center.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="layoutRadialDirection-out"]',
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave", "pointerdown"],
+        hidePrev: true,
+        passthrough: true
+    },
+    {
+        title: "Radial Layout Active",
+        description: "The graph is now arranged in concentric rings using the **Radial** layout. Connected nodes radiate outward from the center. You can change layouts anytime using this dropdown.",
+        placementAxis: "x",
+        targetSelector: 'falkordb-canvas',
+        spotlightSelector: '[data-testid="graphView"]',
+        forward: ["mousedown", "mouseup", "mousemove", "mouseenter", "mouseleave", "mouseover", "mouseout", "contextmenu", "pointerdown", "pointerup", "pointermove", "pointerenter", "pointerleave", "wheel"],
+        hidePrev: true
+    },
+    {
+        title: "Animation Control",
+        description: "When using the Force layout, toggle animation on to let nodes continuously reposition via physics simulation. When off, nodes stay in place. This is disabled for Tree and Radial layouts since they use fixed positions.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="animationContainer"]',
+        overrideDisabled: true,
+    },
+    {
+        title: "Pin on Drag",
+        description: "When enabled, nodes stay where you drop them after dragging. When disabled, nodes float back into the simulation. Tree and Radial layouts always pin nodes.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="pinControl"]',
+    },
+    {
+        title: "Zoom Controls",
+        description: "Use Zoom In, Zoom Out, and Fit-to-Screen to navigate your graph. You can also scroll to zoom and drag the background to pan.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="zoomControls"]',
+    },
+    ///// Theme and Navigation (Track 5)
     {
         title: "Theme Toggle",
         description: "Switch between light, dark, and system themes for a comfortable viewing experience.",
@@ -269,6 +434,120 @@ const tutorialSteps: TutorialStep[] = [
         position: { top: "50%", left: "50%" }
     }
 ];
+
+/** Helper: close any open overlays/panels that might be stale */
+function closeStaleOverlays(): void {
+    // Close layout dropdown if open (check content portal existence, not data-state which conflicts with TooltipTrigger)
+    if (document.querySelector('[data-testid="layoutDropdownContent"]')) {
+        const layoutTrigger = document.querySelector('[data-testid="layoutControl"]') as HTMLElement | null;
+        if (layoutTrigger) layoutTrigger.click();
+    }
+    // Close manage graphs dialog
+    const closeManage = document.querySelector('[data-testid="closeManage"]') as HTMLElement | null;
+    if (closeManage) closeManage.click();
+    // Close data panel (right side)
+    const closeDataPanel = document.querySelector('[data-testid="DataPanelClose"]') as HTMLElement | null;
+    if (closeDataPanel) closeDataPanel.click();
+    // Close query history panel
+    const closeHistory = document.querySelector('[data-testid="queryHistoryCloseButton"]') as HTMLElement | null;
+    if (closeHistory) closeHistory.click();
+}
+
+/**
+ * Track definitions — each track groups related tutorial steps.
+ * The `setup` function puts the page in the right state for the track's first step.
+ * Each setup recreates the exact state that exists at the end of the step immediately
+ * before the track's startIndex.
+ */
+const tutorialTracks: TutorialTrack[] = [
+    {
+        // State after step 1 (Welcome): clean page, no graph selected, no panels open
+        name: "Graph Management",
+        startIndex: 2,
+        setup: (ctx) => {
+            closeStaleOverlays();
+            // Reset to clean state: no graph selected, no query results
+            ctx.handleSetGraphName("");
+            ctx.setGraph(Graph.empty());
+            ctx.setCurrentTab("Graph");
+        },
+    },
+    {
+        // State after step 6 (Select a Demo Graph): social-demo selected & loaded,
+        // popover closed, Graph tab active (no elements yet — first query happens in this track),
+        // no DataPanel, no query history
+        name: "Graph Info & Styling",
+        startIndex: 7,
+        setup: (ctx) => {
+            closeStaleOverlays();
+            // Graph selected but no query run yet — clears any existing results
+            ctx.handleSetGraphName("social-demo");
+            ctx.setGraph(Graph.empty());
+            ctx.setCurrentTab("Graph");
+            ctx.setLayout('force');
+            ctx.setDirection('');
+            ctx.canvasRef.current?.setLayout('force');
+        },
+    },
+    {
+        // State after step 14 (Get KNOWS edge): social-demo selected,
+        // KNOWS query was run → graph has edges visible, Graph tab active,
+        // no DataPanel open, no query history open
+        name: "Query & Results",
+        startIndex: 15,
+        setup: async (ctx) => {
+            closeStaleOverlays();
+            ctx.handleSetGraphName("social-demo");
+            await ctx.runQuery("MATCH p=()-[r:KNOWS]-() RETURN p", "social-demo");
+            ctx.setCurrentTab("Graph");
+            ctx.setLayout('force');
+            ctx.setDirection('');
+            ctx.canvasRef.current?.setLayout('force');
+        },
+    },
+    {
+        // State after step 27 (Close Query History Window): social-demo selected,
+        // query was run (graph has elements), Metadata tab is active (from step 24),
+        // query history panel is CLOSED (step 27 closed it), no DataPanel
+        name: "Layouts & Canvas",
+        startIndex: 28,
+        setup: async (ctx) => {
+            closeStaleOverlays();
+            ctx.handleSetGraphName("social-demo");
+            await ctx.runQuery("MATCH p=()-[r:KNOWS]-() WHERE r.since > 2018 RETURN p ", "social-demo");
+            // Set Metadata tab directly — the auto-tab-switch useEffect is suppressed during tutorial
+            ctx.setCurrentTab("Metadata");
+            ctx.setLayout('force');
+            ctx.setDirection('');
+            ctx.canvasRef.current?.setLayout('force');
+        },
+    },
+    {
+        // State after step 39 (Zoom Controls): social-demo selected, graph has elements,
+        // Graph tab active, controls visible, radial layout active, no overlays open
+        name: "Theme & Navigation",
+        startIndex: 40,
+        setup: async (ctx) => {
+            closeStaleOverlays();
+            ctx.handleSetGraphName("social-demo");
+            await ctx.runQuery("MATCH p=()-[:MANAGES]->() RETURN p", "social-demo");
+            ctx.setCurrentTab("Graph");
+            ctx.setLayout('radial');
+            ctx.setDirection('out');
+            ctx.canvasRef.current?.setLayout('radial');
+            ctx.canvasRef.current?.setLayoutOptions({ radial: { direction: 'out' as RadialDirection } });
+        },
+    },
+];
+
+/** Get the track index for a given step, or -1 if before all tracks */
+function getTrackForStep(stepIndex: number): number {
+    for (let i = tutorialTracks.length - 1; i >= 0; i -= 1) {
+        if (stepIndex >= tutorialTracks[i].startIndex) return i;
+    }
+    return -1;
+}
+
 
 // Arrow icon component based on direction
 function ArrowIcon({ direction }: { direction: "left" | "right" | "top" | "bottom" }) {
@@ -290,12 +569,14 @@ function TutorialPortal({
     step,
     onNext,
     onPrev,
-    onClose
+    onClose,
+    onGoToTrack
 }: {
     step: number;
     onNext: () => void;
     onPrev: () => void;
     onClose: () => void;
+    onGoToTrack: (trackIndex: number) => void;
 }) {
     const { toast } = useToast();
 
@@ -349,9 +630,19 @@ function TutorialPortal({
 
             if (!element) {
                 // Element not yet in DOM (e.g. inside a dropdown that hasn’t opened).
-                // Schedule a retry by bumping retryCount, which re-runs this effect.
+                // For direction steps inside a sub-menu, re-trigger the parent sub-trigger
+                // hover so Radix re-opens the sub-content if it closed.
                 if (retryCount < 10) {
-                    const id = window.setTimeout(() => setRetryCount(c => c + 1), 50);
+                    if (tutorialSteps[step].passthrough && targetSelector.includes('Direction')) {
+                        const subTriggerTestId = targetSelector.includes('Tree') ? 'layoutTreeSub' : 'layoutRadialSub';
+                        const subTrigger = document.querySelector(`[data-testid="${subTriggerTestId}"]`) as HTMLElement | null;
+                        if (subTrigger) {
+                            const rect = subTrigger.getBoundingClientRect();
+                            subTrigger.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true, clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 }));
+                            subTrigger.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 }));
+                        }
+                    }
+                    const id = window.setTimeout(() => setRetryCount(c => c + 1), 100);
                     return () => window.clearTimeout(id);
                 }
                 // Gave up after 10 retries — hide arrow
@@ -372,8 +663,15 @@ function TutorialPortal({
                 // Create an invisible overlay over the element to catch clicks
                 const overlay = document.createElement('div');
                 overlay.style.position = 'fixed';
-                overlay.style.zIndex = '40';
+                overlay.style.zIndex = '51';
                 overlay.setAttribute('data-tutorial-overlay', 'true');
+
+                // Temporarily override disabled state if step requests it
+                let wasDisabled = false;
+                if (tutorialSteps[step].overrideDisabled && element instanceof HTMLButtonElement) {
+                    wasDisabled = element.disabled;
+                    element.disabled = false;
+                }
 
                 const applyDisabledStyle = () => {
                     // Check if the element is disabled
@@ -491,7 +789,7 @@ function TutorialPortal({
                             position: 'fixed',
                             left: `${arrowLeft}px`,
                             top: `${arrowTop}px`,
-                            zIndex: 45,
+                            zIndex: 52,
                             pointerEvents: 'none',
                             transition: 'left 300ms ease-in-out, top 300ms ease-in-out',
                             display: 'block'
@@ -506,6 +804,10 @@ function TutorialPortal({
 
                 const cleanup = () => {
                     element.classList.remove('tutorial-highlight');
+                    // Restore disabled state if it was overridden
+                    if (tutorialSteps[step].overrideDisabled && element instanceof HTMLButtonElement && wasDisabled) {
+                        element.disabled = true;
+                    }
                     resizeObserver.disconnect();
                     window.removeEventListener('resize', updateOverlayPosition);
                     if (wheelHandler) {
@@ -687,6 +989,92 @@ function TutorialPortal({
                         });
                 };
 
+                // For hover-based advance (pointermove with condition), let real events pass through
+                // the overlay and spotlight so Radix sub-menus open naturally.
+                // Siblings are dimmed and non-interactive so only the target can be hovered.
+                const hoverAdvance = advanceOn === 'pointermove' && tutorialSteps[step].advanceCondition;
+                if (hoverAdvance) {
+                    overlay.style.pointerEvents = 'none';
+
+                    // Dim and disable pointer-events on sibling items, keep target bright
+                    const dimmedSiblings: HTMLElement[] = [];
+                    const dropdownContent = (element as HTMLElement).closest('[data-testid="layoutDropdownContent"]') as HTMLElement | null;
+                    if (dropdownContent) {
+                        const allItems = dropdownContent.querySelectorAll(':scope > *');
+                        allItems.forEach(item => {
+                            const htmlItem = item as HTMLElement;
+                            if (!htmlItem.contains(element)) {
+                                htmlItem.style.pointerEvents = 'none';
+                                htmlItem.style.opacity = '0.3';
+                                dimmedSiblings.push(htmlItem);
+                            }
+                        });
+                    }
+
+                    const condition = tutorialSteps[step].advanceCondition!;
+                    const advanceHandler = () => {
+                        if (advancePendingRef.current) return;
+                        if (!condition()) return;
+                        advancePendingRef.current = true;
+                        advanceCancelledRef.current = false;
+                        advanceRaf1Ref.current = window.requestAnimationFrame(() => {
+                            advanceRaf1Ref.current = null;
+                            if (advanceCancelledRef.current) return;
+                            advanceRaf2Ref.current = window.requestAnimationFrame(() => {
+                                advanceRaf2Ref.current = null;
+                                if (advanceCancelledRef.current) return;
+                                advancePendingRef.current = false;
+                                element.removeEventListener('pointermove', advanceHandler);
+                                onNextRef.current();
+                            });
+                        });
+                    };
+                    element.addEventListener('pointermove', advanceHandler);
+
+                    return () => {
+                        clearAdvance();
+                        disabledObserver.disconnect();
+                        element.removeEventListener('pointermove', advanceHandler);
+                        dimmedSiblings.forEach(item => {
+                            item.style.pointerEvents = '';
+                            item.style.opacity = '';
+                        });
+                        cleanup();
+                    };
+                }
+
+                // For passthrough click steps (e.g. direction items inside an open sub-menu),
+                // let all events pass through so the sub-menu stays open naturally.
+                // Listen for click directly on the element to advance.
+                if (tutorialSteps[step].passthrough && advanceOn === 'click') {
+                    overlay.style.pointerEvents = 'none';
+
+                    const clickHandler = () => {
+                        if (advancePendingRef.current) return;
+                        advancePendingRef.current = true;
+                        advanceCancelledRef.current = false;
+                        advanceRaf1Ref.current = window.requestAnimationFrame(() => {
+                            advanceRaf1Ref.current = null;
+                            if (advanceCancelledRef.current) return;
+                            advanceRaf2Ref.current = window.requestAnimationFrame(() => {
+                                advanceRaf2Ref.current = null;
+                                if (advanceCancelledRef.current) return;
+                                advancePendingRef.current = false;
+                                element.removeEventListener('click', clickHandler);
+                                onNextRef.current();
+                            });
+                        });
+                    };
+                    element.addEventListener('click', clickHandler);
+
+                    return () => {
+                        clearAdvance();
+                        disabledObserver.disconnect();
+                        element.removeEventListener('click', clickHandler);
+                        cleanup();
+                    };
+                }
+
                 addForwarders();
 
                 return () => {
@@ -728,7 +1116,7 @@ function TutorialPortal({
         <div
             ref={tooltipRef}
             data-tutorial-overlay="true"
-            className="fixed bg-background border border-border rounded-lg p-6 shadow-2xl max-w-[500px] z-50 pointer-events-auto"
+            className="fixed bg-background border border-border rounded-lg p-6 shadow-2xl max-w-[500px] z-[52] pointer-events-auto"
             style={fixedPositionStyle}
         >
             <div className="space-y-4">
@@ -736,7 +1124,7 @@ function TutorialPortal({
                     {
                         step > 0 && (
                             <div className="text-sm text-muted-foreground mb-1">
-                                Step {step} of {tutorialSteps.length - 1}
+                                {getTrackForStep(step) >= 0 ? `${tutorialTracks[getTrackForStep(step)].name} · ` : ""}Step {step} of {tutorialSteps.length - 1}
                             </div>
                         )
                     }
@@ -784,7 +1172,7 @@ function TutorialPortal({
                                 onClick={onClose}
                             />
                         }
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 items-center">
                             {
                                 step > 1 && !hidePrev &&
                                 <Button
@@ -805,6 +1193,32 @@ function TutorialPortal({
                                 )
                             }
                         </div>
+                    </div>
+                }
+                {
+                    step > 0 &&
+                    <div className="flex items-center justify-center gap-1 pt-3 border-t border-border mt-3">
+                        {tutorialTracks.map((track, i) => {
+                            const currentTrack = getTrackForStep(step);
+                            const isActive = i === currentTrack;
+                            return (
+                                <button
+                                    key={track.name}
+                                    type="button"
+                                    data-testid={`track-${i}`}
+                                    title={track.name}
+                                    className={cn(
+                                        "px-2 py-1 text-xs rounded transition-colors",
+                                        isActive
+                                            ? "bg-primary text-primary-foreground font-medium"
+                                            : "text-muted-foreground hover:bg-secondary"
+                                    )}
+                                    onClick={() => onGoToTrack(i)}
+                                >
+                                    {track.name}
+                                </button>
+                            );
+                        })}
                     </div>
                 }
             </div>
@@ -833,14 +1247,16 @@ interface TutorialProps {
     onCleanupDemoGraphs?: () => Promise<void>;
 }
 
-function TutorialSpotlight({ targetSelector, spotlightSelector }: { targetSelector?: string; spotlightSelector?: string }) {
+function TutorialSpotlight({ targetSelector, spotlightSelector, passthrough }: { targetSelector?: string; spotlightSelector?: string; passthrough?: boolean }) {
     const [spotlightStyle, setSpotlightStyle] = useState<React.CSSProperties>({});
+    const [frameRects, setFrameRects] = useState<{ top: number; left: number; right: number; bottom: number } | null>(null);
 
     useEffect(() => {
         const selector = spotlightSelector || targetSelector;
 
         if (!selector) {
             setSpotlightStyle({});
+            setFrameRects(null);
             return () => { };
         }
 
@@ -848,46 +1264,71 @@ function TutorialSpotlight({ targetSelector, spotlightSelector }: { targetSelect
 
         if (!element) {
             setSpotlightStyle({});
+            setFrameRects(null);
             return () => { };
         }
 
-        const updateSpotlight = () => {
+        const update = () => {
             const rect = element.getBoundingClientRect();
-            // Align spotlight with the target element with padding
             const padding = 2;
             const left = Math.round(rect.left) - padding;
             const top = Math.round(rect.top) - padding;
             const right = Math.round(rect.right) + padding;
             const bottom = Math.round(rect.bottom) + padding;
 
-            setSpotlightStyle({
-                clipPath: `polygon(
-            0% 0%,
-            0% 100%,
-            ${left}px 100%,
-            ${left}px ${top}px,
-            ${right}px ${top}px,
-            ${right}px ${bottom}px,
-            ${left}px ${bottom}px,
-            ${left}px 100%,
-            100% 100%,
-            100% 0%
-          )`
-            });
+            if (passthrough) {
+                // Frame mode: store hole coordinates for 4-div rendering
+                setFrameRects({ top, left, right, bottom });
+                setSpotlightStyle({});
+            } else {
+                // Clip-path mode: single div with visual hole
+                setFrameRects(null);
+                setSpotlightStyle({
+                    clipPath: `polygon(
+                0% 0%,
+                0% 100%,
+                ${left}px 100%,
+                ${left}px ${top}px,
+                ${right}px ${top}px,
+                ${right}px ${bottom}px,
+                ${left}px ${bottom}px,
+                ${left}px 100%,
+                100% 100%,
+                100% 0%
+              )`
+                });
+            }
         };
 
-        updateSpotlight();
+        update();
 
-        // Update on window resize
-        const resizeObserver = new ResizeObserver(updateSpotlight);
+        const resizeObserver = new ResizeObserver(update);
         resizeObserver.observe(element);
-        window.addEventListener('resize', updateSpotlight);
+        window.addEventListener('resize', update);
 
         return () => {
             resizeObserver.disconnect();
-            window.removeEventListener('resize', updateSpotlight);
+            window.removeEventListener('resize', update);
         };
-    }, [targetSelector, spotlightSelector]);
+    }, [targetSelector, spotlightSelector, passthrough]);
+
+    // Frame mode: 4 divs forming a frame around the hole (events blocked everywhere except the hole)
+    if (passthrough && frameRects) {
+        const { top, left, right, bottom } = frameRects;
+        const common = "fixed z-40 bg-black opacity-50 pointer-events-auto";
+        return (
+            <>
+                {/* Top bar */}
+                <div data-tutorial-overlay="true" className={common} style={{ top: 0, left: 0, right: 0, height: `${top}px` }} />
+                {/* Bottom bar */}
+                <div data-tutorial-overlay="true" className={common} style={{ top: `${bottom}px`, left: 0, right: 0, bottom: 0 }} />
+                {/* Left bar */}
+                <div data-tutorial-overlay="true" className={common} style={{ top: `${top}px`, left: 0, width: `${left}px`, height: `${bottom - top}px` }} />
+                {/* Right bar */}
+                <div data-tutorial-overlay="true" className={common} style={{ top: `${top}px`, left: `${right}px`, right: 0, height: `${bottom - top}px` }} />
+            </>
+        );
+    }
 
     return (
         <div
@@ -899,14 +1340,14 @@ function TutorialSpotlight({ targetSelector, spotlightSelector }: { targetSelect
     );
 }
 
-TutorialSpotlight.defaultProps = {
-    targetSelector: undefined,
-    spotlightSelector: undefined
-};
+
 
 function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: TutorialProps) {
     const [step, setStep] = useState(0);
     const [demoLoaded, setDemoLoaded] = useState(false);
+    const { handleSetGraphName, runQuery, setCurrentTab, setGraph } = useContext(GraphContext);
+    const { panelOpen, onTogglePanel } = useContext(PanelContext);
+    const { setLayout, setDirection, canvasRef } = useContext(ForceGraphContext);
 
     const currentStep = tutorialSteps[step];
 
@@ -930,13 +1371,32 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
         }
     }, [open, step, demoLoaded, onLoadDemoGraphs, onClose]);
 
-    const handleNextStep = useCallback(() => {
+    const handleNextStep = useCallback(async () => {
+        const currentStepDef = tutorialSteps[step];
+        if (currentStepDef.advanceAction) {
+            try {
+                await currentStepDef.advanceAction({ handleSetGraphName, setGraph, runQuery, setCurrentTab, setLayout, setDirection, onTogglePanel, panelOpen, canvasRef });
+            } catch {
+                // Keep the current step if the advance action fails
+                return;
+            }
+        }
         setStep(prev => Math.min(prev + 1, tutorialSteps.length - 1));
-    }, []);
+    }, [step, handleSetGraphName, setGraph, runQuery, setCurrentTab, setLayout, setDirection, onTogglePanel, panelOpen, canvasRef]);
 
     const handlePrevStep = useCallback(() => {
         setStep(prev => Math.max(prev - 1, 1)); // Don't go back to step 0 (loading)
     }, []);
+
+    const handleGoToTrack = useCallback(async (trackIndex: number) => {
+        const track = tutorialTracks[trackIndex];
+        try {
+            await track.setup({ handleSetGraphName, setGraph, runQuery, setCurrentTab, setLayout, setDirection, onTogglePanel, panelOpen, canvasRef });
+            setStep(track.startIndex);
+        } catch {
+            // Keep the current step if track setup fails
+        }
+    }, [handleSetGraphName, setGraph, runQuery, setCurrentTab, setLayout, setDirection, onTogglePanel, panelOpen, canvasRef]);
 
     const handleClose = async () => {
         // Cleanup demo graphs before closing
@@ -954,20 +1414,18 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
 
     return (
         <>
-            <TutorialSpotlight targetSelector={currentStep.targetSelector} spotlightSelector={currentStep.spotlightSelector} />
+            <TutorialSpotlight targetSelector={currentStep.targetSelector} spotlightSelector={currentStep.spotlightSelector} passthrough={currentStep.passthrough || (currentStep.advanceOn === 'pointermove' && !!currentStep.advanceCondition)} />
             <TutorialPortal
                 step={step}
                 onNext={handleNextStep}
                 onPrev={handlePrevStep}
                 onClose={handleClose}
+                onGoToTrack={handleGoToTrack}
             />
         </>
     );
 }
 
-Tutorial.defaultProps = {
-    onLoadDemoGraphs: undefined,
-    onCleanupDemoGraphs: undefined
-};
+
 
 export default Tutorial;

@@ -1,6 +1,6 @@
 import { createContext, Dispatch, SetStateAction } from "react";
 import { ConnectionInfo, ConnectionType, GraphData, GraphRef, HistoryQuery, Label, Panel, Relationship, SyntaxErrorInfo, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
-import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
+import type { Data as CanvasData, LayoutMode, ViewportState } from "@falkordb/canvas";
 import type { SessionConnection } from "next-auth";
 import { Graph, GraphInfo } from "../api/graph/model";
 
@@ -186,6 +186,10 @@ type ForceGraphContextType = {
   setData: Dispatch<SetStateAction<GraphData>>;
   graphData: CanvasData | undefined;
   setGraphData: Dispatch<SetStateAction<CanvasData | undefined>>;
+  layout: LayoutMode;
+  setLayout: Dispatch<SetStateAction<LayoutMode>>;
+  direction: string;
+  setDirection: Dispatch<SetStateAction<string>>;
 };
 
 type TableViewContextType = {
@@ -411,6 +415,10 @@ export const ForceGraphContext = createContext<ForceGraphContextType>({
   setData: () => { },
   graphData: { nodes: [], links: [] },
   setGraphData: () => { },
+  layout: 'force',
+  setLayout: () => { },
+  direction: '',
+  setDirection: () => { },
 });
 
 export const TableViewContext = createContext<TableViewContextType>({

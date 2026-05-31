@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { cn, getMemoryUsage, getMetaStats, isTwoNodes, Link, MemoryValue, Node, prepareArg, securedFetch, Value } from "@/lib/utils";
+import { cn, convertToCanvasData, getMemoryUsage, getMetaStats, isTwoNodes, Link, MemoryValue, Node, prepareArg, securedFetch, Value } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamicImport from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -50,7 +50,7 @@ export default function Page() {
     const { panel, setPanel } = useContext(PanelContext);
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext);
-    const { setData, canvasRef, graphData, setViewport } = useContext(ForceGraphContext);
+    const { canvasRef, graphData, setViewport } = useContext(ForceGraphContext);
     const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
     const isReadOnlyRef = useRef(isReadOnly);
     isReadOnlyRef.current = isReadOnly;
@@ -69,8 +69,6 @@ export default function Page() {
         setRelationships,
         runQuery,
         fetchCount,
-        handleCooldown,
-        cooldownTicks,
         selectedParam,
         setSelectedParam,
         isLoading,
@@ -265,7 +263,7 @@ export default function Page() {
 
         // Priority 2: Default query / empty graph
         if (graphName && graphName !== graph.Id) {
-            if (runDefaultQuery) {
+            if (runDefaultQuery && !tutorialOpen) {
                 runQuery(defaultQuery, graphName);
                 return;
             }
@@ -363,6 +361,8 @@ export default function Page() {
     }, [setPanel]);
 
     const handleCreateElement = useCallback(async (attributes: [string, Value][], label: string[]) => {
+        if (!canvasRef.current) return false;
+
         const fakeId = "-1";
         const readOnlyParam = isReadOnlyRef.current ? '?readOnly=true' : '';
         const result = await securedFetch(`api/graph/${prepareArg(graphName)}/${fakeId}${readOnlyParam}`, {
@@ -379,14 +379,14 @@ export default function Page() {
             const json = await result.json();
 
             if (isAddNode) {
-                const node = await graph.extendNode(json.result.data[0].n, false, false);
+                const node = await graph.extendNode(json.result.data[0].n, false, true);
 
                 if (node) {
                     setLabels(prev => [...prev, ...node.labels.filter(c => !prev.some(p => p.name === c)).map(c => graph.LabelsMap.get(c)!)]);
                     handleSetIsAdd(setIsAddNode, setIsAddEdge)(false);
                 }
             } else {
-                const link = await graph.extendEdge(json.result.data[0].e, false, false);
+                const link = await graph.extendEdge(json.result.data[0].e, false, true);
 
                 if (link) {
                     setRelationships(prev => [...prev.filter(p => p.name !== link.relationship), graph.RelationshipsMap.get(link.relationship)!]);
@@ -399,12 +399,14 @@ export default function Page() {
             setSelectedElements([]);
         }
 
-        setData({ ...graph.Elements });
+        canvasRef.current?.setGraphData(convertToCanvasData(graph.Elements));
 
         return result.ok;
-    }, [fetchCount, graph, graphName, handleSetIsAdd, isAddNode, selectedElements, setData, setIndicator, setLabels, setRelationships, toast]);
+    }, [fetchCount, graph, graphName, handleSetIsAdd, isAddNode, selectedElements, canvasRef, setIndicator, setLabels, setRelationships, toast]);
 
     const handleDeleteElement = useCallback(async () => {
+        if (!canvasRef.current) return;
+
         const deletedElements = (await Promise.all(selectedElements.map(async (element) => {
             const type = !('source' in element);
             const readOnlyParam = isReadOnlyRef.current ? '?readOnly=true' : '';
@@ -449,7 +451,7 @@ export default function Page() {
         graph.removeElements(deletedElements);
 
         setRelationships(graph.removeLinks(deletedElements.map((element) => element.id)));
-        setData({ ...graph.Elements });
+        canvasRef.current.setGraphData(convertToCanvasData(graph.Elements));
         fetchCount(graphName);
         setSelectedElements([]);
 
@@ -461,7 +463,7 @@ export default function Page() {
             description: `${deletedElements.length > 1 ? "Elements" : "Element"} deleted
             ${selectedElements.length > deletedElements.length ? `, ${selectedElements.length - deletedElements.length} failed` : ""}.`,
         });
-    }, [selectedElements, graph, setRelationships, setData, fetchCount, panel, handleSetSelectedElements, toast, setIndicator]);
+    }, [selectedElements, graph, setRelationships, canvasRef, fetchCount, panel, handleSetSelectedElements, toast, setIndicator]);
 
     const getCurrentPanel = useCallback(() => {
         if (!graphName) return undefined;
@@ -543,8 +545,6 @@ export default function Page() {
                         setRelationships={setRelationships}
                         labels={labels}
                         relationships={relationships}
-                        handleCooldown={handleCooldown}
-                        cooldownTicks={cooldownTicks}
                         fetchCount={fetchCount}
                         historyQuery={historyQuery}
                         setHistoryQuery={setHistoryQuery}

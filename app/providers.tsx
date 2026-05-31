@@ -7,10 +7,10 @@ import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, pr
 import { serverEncrypt, serverDecrypt, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import { usePathname, useRouter } from "next/navigation";
-import { setUrlParam, useGraphParams } from "@/lib/useUrlParams";
+import { useGraphParams, syncRouteUrlParams } from "@/lib/useUrlParams";
 import { useToast } from "@/components/ui/use-toast";
 import { PanelImperativeHandle } from "react-resizable-panels";
-import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
+import type { Data as CanvasData, LayoutMode, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphInfo } from "./api/graph/model";
 import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, SyntaxErrorContext, SessionConnection } from "./components/provider";
@@ -74,7 +74,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const canvasRef = useRef<GraphRef["current"]>(null);
   const contentRestoredRef = useRef(false);
 
-  const { graphName: urlGraphName, selected: urlSelected, query: urlQuery } = useGraphParams();
+  const { graphName: urlGraphName, selected: urlSelected, query: urlQuery, layout: urlLayout, direction: urlDirection } = useGraphParams();
   const initialQueryRef = useRef(urlQuery);
 
   const [indicator, setIndicator] = useState<"online" | "offline">("online");
@@ -86,6 +86,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [graph, setGraph] = useState<Graph>(Graph.empty());
   const [data, setData] = useState<GraphData>({ ...graph.Elements });
   const [graphData, setGraphData] = useState<CanvasData>();
+  const [layout, setLayout] = useState<LayoutMode>((urlLayout || 'force') as LayoutMode);
+  const [direction, setDirection] = useState(urlDirection || '');
   const [graphInfo, setGraphInfo] = useState<GraphInfo>(GraphInfo.empty(toast, setIndicator));
   const [graphName, setGraphName] = useState<string>(urlGraphName);
   const [contentPersistence, setContentPersistence] = useState(false);
@@ -117,6 +119,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>([]);
   const [userGraphBeforeTutorial, setUserGraphBeforeTutorial] = useState<string>("");
+  const [urlParamsBeforeTutorial, setUrlParamsBeforeTutorial] = useState<string>("");
   const [showMemoryUsage, setShowMemoryUsage] = useState(false);
   const [labels, setLabels] = useState<Label[]>([]);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
@@ -312,7 +315,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setData,
     graphData,
     setGraphData,
-  }), [canvasRef, viewport, data, graphData]);
+    layout,
+    setLayout,
+    direction,
+    setDirection,
+  }), [canvasRef, viewport, data, graphData, layout, direction]);
 
   const tableViewContext = useMemo(() => ({
     scrollPosition,
@@ -932,16 +939,18 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   useEffect(() => {
     prevPathnameRef.current = pathname;
 
-    // Only write URL while on /graph
-    if (pathname !== "/graph") return;
+    // Only write URL while on /graph and not during tutorial
+    if (pathname !== "/graph" || tutorialOpen) return;
 
-    // Sync all context state to URL
-    setUrlParam({
-      graph: graphName || null,
+    // Sync all context state to URL via centralized builder
+    syncRouteUrlParams(pathname, {
+      graph: graphName,
       query: urlQueryText,
-      selected: selectedParam || null,
+      selected: selectedParam,
+      layout,
+      direction,
     });
-  }, [pathname, selectedParam, graphName, urlQueryText, graph.Id]);
+  }, [pathname, selectedParam, graphName, urlQueryText, graph.Id, layout, direction, tutorialOpen]);
 
   // Restore content persistence once on app mount (after auth + settings + graph names loaded)
   useEffect(() => {
@@ -1000,22 +1009,43 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   const handleLoadDemoGraphs = useCallback(async () => {
     try {
-      // Store current user graphs
+      // Store current user graphs and URL params
       setUserGraphsBeforeTutorial(graphNames);
       setUserGraphBeforeTutorial(graphName);
+      setUrlParamsBeforeTutorial(window.location.search);
+
+      // Clear URL params during tutorial
+      window.history.replaceState(null, "", window.location.pathname);
+
+      // Reset layout to force for a clean tutorial experience
+      setLayout('force');
+      setDirection('');
 
       // Create social demo graph
       const socialQuery = `
         CREATE 
-          (alice:Person {name: 'Alice', age: 30, city: 'New York'}),
-          (bob:Person {name: 'Bob', age: 25, city: 'Los Angeles'}),
-          (charlie:Person {name: 'Charlie', age: 35, city: 'Chicago'}),
-          (diana:Person {name: 'Diana', age: 28, city: 'New York'}),
+          (alice:Person {name: 'Alice', age: 30, role: 'CEO'}),
+          (bob:Person {name: 'Bob', age: 25, role: 'VP Engineering'}),
+          (charlie:Person {name: 'Charlie', age: 35, role: 'VP Marketing'}),
+          (diana:Person {name: 'Diana', age: 28, role: 'VP Sales'}),
+          (eve:Person {name: 'Eve', age: 26, role: 'Developer'}),
+          (frank:Person {name: 'Frank', age: 31, role: 'Developer'}),
+          (grace:Person {name: 'Grace', age: 29, role: 'Designer'}),
+          (heidi:Person {name: 'Heidi', age: 27, role: 'Analyst'}),
+          (ivan:Person {name: 'Ivan', age: 33, role: 'Sales Rep'}),
+          (alice)-[:MANAGES]->(bob),
+          (alice)-[:MANAGES]->(charlie),
+          (alice)-[:MANAGES]->(diana),
+          (bob)-[:MANAGES]->(eve),
+          (bob)-[:MANAGES]->(frank),
+          (charlie)-[:MANAGES]->(grace),
+          (charlie)-[:MANAGES]->(heidi),
+          (diana)-[:MANAGES]->(ivan),
           (alice)-[:KNOWS {since: 2015}]->(bob),
           (alice)-[:KNOWS {since: 2018}]->(charlie),
           (bob)-[:KNOWS {since: 2020}]->(diana),
           (charlie)-[:KNOWS {since: 2017}]->(diana),
-          (alice)-[:WORKS_WITH]->(diana)
+          (eve)-[:KNOWS {since: 2021}]->(frank)
       `;
 
       // Create social-test demo graph
@@ -1099,7 +1129,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setGraphNames(userGraphsBeforeTutorial);
     setUserGraphsBeforeTutorial([]);
     setUserGraphBeforeTutorial("");
-  }, [runQuery, runDefaultQuery, defaultQuery, toast, userGraphBeforeTutorial, userGraphsBeforeTutorial]);
+
+    // Restore URL params that were active before the tutorial
+    if (urlParamsBeforeTutorial) {
+      window.history.replaceState(null, "", `${window.location.pathname}${urlParamsBeforeTutorial}`);
+    }
+    setUrlParamsBeforeTutorial("");
+  }, [runQuery, runDefaultQuery, defaultQuery, toast, userGraphBeforeTutorial, userGraphsBeforeTutorial, urlParamsBeforeTutorial]);
 
   return (
     <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange nonce={nonce}>
