@@ -63,6 +63,19 @@ export const duplicateGraph = z.object({
     .min(1, "Source name cannot be empty"),
 });
 
+export const restoreGraphFromUrl = z.object({
+  source: z
+    .string({
+      error: (issue) => issue.input === undefined ? "Source URL is required" : "Invalid Source URL",
+    })
+    .url("Source must be a valid URL")
+    .refine(
+      (val) => val.startsWith("https://") || val.startsWith("http://"),
+      "Only http(s) URLs are supported in this release (use a presigned S3/GCS URL)"
+    ),
+  replace: z.boolean().optional().default(false),
+});
+
 export const createGraphElement = z.object({
   type: z.boolean(),
   label: z.array(z.string()),
