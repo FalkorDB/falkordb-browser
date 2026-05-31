@@ -103,7 +103,7 @@ export default class TutorialPanel extends GraphPage {
    * Moves to the element, waits for sub-content to potentially render,
    * then moves slightly to fire additional pointermove events.
    */
-  async hoverTutorialTarget(selector: string): Promise<void> {
+  async hoverTutorialTarget(selector: string, nextStepTitle?: string): Promise<void> {
     const target = this.page.locator(selector).first();
     await waitForElementToBeVisible(target);
     const box = await target.boundingBox();
@@ -111,10 +111,14 @@ export default class TutorialPanel extends GraphPage {
     const cx = box.x + box.width / 2;
     const cy = box.y + box.height / 2;
     await this.page.mouse.move(cx, cy);
-    // Wait for sub-content to render, then fire additional pointermove events
-    // so the tutorial's advanceHandler can re-check the condition.
+    // Fire additional pointermove events until the tutorial advances or timeout.
     for (let i = 0; i < 10; i++) {
       await this.page.waitForTimeout(300);
+      // Break early if the step already advanced
+      if (nextStepTitle) {
+        const title = await this.getStepTitle();
+        if (title?.trim() === nextStepTitle) return;
+      }
       await this.page.mouse.move(cx + (i % 2), cy);
     }
   }

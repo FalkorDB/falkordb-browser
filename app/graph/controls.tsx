@@ -86,31 +86,37 @@ export default function Controls({
     const handleLayoutChange = (value: string) => {
         const mode = value as LayoutMode;
         setContextLayout(mode);
-        canvasRef.current?.setLayout(mode);
 
-        // Non-force layouts auto-pin, sync UI
-        if (mode !== 'force') {
-            setPinned(true);
-        } else {
-            setPinned(false);
+        // Apply direction options before setLayout so the layout engine uses them
+        const dir = mode === 'force' ? '' : (directionsRef.current[mode] || getDefaultDirection(mode));
+        if (mode === 'tree') {
+            canvasRef.current?.setLayoutOptions({ tree: { direction: dir as HierarchyDirection } });
+        } else if (mode === 'radial') {
+            canvasRef.current?.setLayoutOptions({ radial: { direction: dir as RadialDirection } });
         }
 
-        // Use the remembered direction for this layout
-        const dir = mode === 'force' ? '' : (directionsRef.current[mode] || getDefaultDirection(mode));
+        canvasRef.current?.setLayout(mode);
+
+        // Non-force layouts auto-pin, sync UI and canvas
+        const nextPinned = mode !== 'force';
+        setPinned(nextPinned);
+        canvasRef.current?.setPinOnDragEnd(nextPinned);
+
         setContextDirection(dir);
         setUrlParam({ layout: mode, direction: dir || null });
     };
 
-    const handleDirectionChange = (value: string) => {
-        directionsRef.current = { ...directionsRef.current, [layout]: value };
+    const handleDirectionChange = (value: string, targetLayout?: string) => {
+        const effectiveLayout = targetLayout || layout;
+        directionsRef.current = { ...directionsRef.current, [effectiveLayout]: value };
         setContextDirection(value);
         setUrlParam({ direction: value || null });
 
-        if (layout === 'tree') {
+        if (effectiveLayout === 'tree') {
             canvasRef.current?.setLayoutOptions({
-                [layout]: { direction: value as HierarchyDirection }
+                tree: { direction: value as HierarchyDirection }
             });
-        } else if (layout === 'radial') {
+        } else if (effectiveLayout === 'radial') {
             canvasRef.current?.setLayoutOptions({
                 radial: { direction: value as RadialDirection }
             });
@@ -205,7 +211,7 @@ export default function Controls({
                                     className={cn("pl-8 relative", layout === 'tree' && direction === d.value ? 'bg-accent' : '')}
                                     onSelect={() => {
                                         if (layout !== 'tree') handleLayoutChange('tree');
-                                        handleDirectionChange(d.value);
+                                        handleDirectionChange(d.value, 'tree');
                                     }}
                                 >
                                     {
@@ -237,7 +243,7 @@ export default function Controls({
                                     className={cn("pl-8 relative", layout === 'radial' && direction === d.value ? 'bg-accent' : '')}
                                     onSelect={() => {
                                         if (layout !== 'radial') handleLayoutChange('radial');
-                                        handleDirectionChange(d.value);
+                                        handleDirectionChange(d.value, 'radial');
                                     }}
                                 >
                                     {

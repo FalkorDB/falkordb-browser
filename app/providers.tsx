@@ -7,7 +7,7 @@ import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, pr
 import { serverEncrypt, serverDecrypt, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import { usePathname, useRouter } from "next/navigation";
-import { setUrlParam, useGraphParams, buildGraphUrlParams, syncRouteUrlParams } from "@/lib/useUrlParams";
+import { useGraphParams, syncRouteUrlParams } from "@/lib/useUrlParams";
 import { useToast } from "@/components/ui/use-toast";
 import { PanelImperativeHandle } from "react-resizable-panels";
 import type { Data as CanvasData, LayoutMode, ViewportState } from "@falkordb/canvas";

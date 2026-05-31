@@ -70,7 +70,18 @@ const parseDescription = (description: string, toast: any) => {
                 </div>
             );
         }
-        return <span key={index}>{part}</span>;
+        // Render **bold** markdown as <strong> elements
+        const boldParts = part.split(/(\*\*[^*]+\*\*)/);
+        return (
+            <span key={index}>
+                {boldParts.map((seg, i) => {
+                    if (seg.startsWith('**') && seg.endsWith('**')) {
+                        return <strong key={i}>{seg.slice(2, -2)}</strong>;
+                    }
+                    return <span key={i}>{seg}</span>;
+                })}
+            </span>
+        );
     });
 };
 
@@ -495,11 +506,11 @@ const tutorialTracks: TutorialTrack[] = [
         },
     },
     {
-        // State after step 25 (Close Query History Window): social-demo selected,
-        // query was run (graph has elements), Metadata tab is active (from step 22),
-        // query history panel is CLOSED (step 25 closed it), no DataPanel
+        // State after step 27 (Close Query History Window): social-demo selected,
+        // query was run (graph has elements), Metadata tab is active (from step 24),
+        // query history panel is CLOSED (step 27 closed it), no DataPanel
         name: "Layouts & Canvas",
-        startIndex: 26,
+        startIndex: 28,
         setup: async (ctx) => {
             closeStaleOverlays();
             ctx.handleSetGraphName("social-demo");
@@ -512,10 +523,10 @@ const tutorialTracks: TutorialTrack[] = [
         },
     },
     {
-        // State after step 37 (Zoom Controls): social-demo selected, graph has elements,
+        // State after step 39 (Zoom Controls): social-demo selected, graph has elements,
         // Graph tab active, controls visible, radial layout active, no overlays open
         name: "Theme & Navigation",
-        startIndex: 38,
+        startIndex: 40,
         setup: async (ctx) => {
             closeStaleOverlays();
             ctx.handleSetGraphName("social-demo");
@@ -1329,11 +1340,7 @@ function TutorialSpotlight({ targetSelector, spotlightSelector, passthrough }: {
     );
 }
 
-TutorialSpotlight.defaultProps = {
-    targetSelector: undefined,
-    spotlightSelector: undefined,
-    passthrough: false
-};
+
 
 function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: TutorialProps) {
     const [step, setStep] = useState(0);
@@ -1367,7 +1374,12 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
     const handleNextStep = useCallback(async () => {
         const currentStepDef = tutorialSteps[step];
         if (currentStepDef.advanceAction) {
-            await currentStepDef.advanceAction({ handleSetGraphName, setGraph, runQuery, setCurrentTab, setLayout, setDirection, onTogglePanel, panelOpen, canvasRef });
+            try {
+                await currentStepDef.advanceAction({ handleSetGraphName, setGraph, runQuery, setCurrentTab, setLayout, setDirection, onTogglePanel, panelOpen, canvasRef });
+            } catch {
+                // Keep the current step if the advance action fails
+                return;
+            }
         }
         setStep(prev => Math.min(prev + 1, tutorialSteps.length - 1));
     }, [step, handleSetGraphName, setGraph, runQuery, setCurrentTab, setLayout, setDirection, onTogglePanel, panelOpen, canvasRef]);
@@ -1378,8 +1390,12 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
 
     const handleGoToTrack = useCallback(async (trackIndex: number) => {
         const track = tutorialTracks[trackIndex];
-        await track.setup({ handleSetGraphName, setGraph, runQuery, setCurrentTab, setLayout, setDirection, onTogglePanel, panelOpen, canvasRef });
-        setStep(track.startIndex);
+        try {
+            await track.setup({ handleSetGraphName, setGraph, runQuery, setCurrentTab, setLayout, setDirection, onTogglePanel, panelOpen, canvasRef });
+            setStep(track.startIndex);
+        } catch {
+            // Keep the current step if track setup fails
+        }
     }, [handleSetGraphName, setGraph, runQuery, setCurrentTab, setLayout, setDirection, onTogglePanel, panelOpen, canvasRef]);
 
     const handleClose = async () => {
@@ -1410,9 +1426,6 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
     );
 }
 
-Tutorial.defaultProps = {
-    onLoadDemoGraphs: undefined,
-    onCleanupDemoGraphs: undefined
-};
+
 
 export default Tutorial;

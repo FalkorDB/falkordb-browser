@@ -135,7 +135,6 @@ export default function ForceGraph({
 
         if (!canvas || !canvasLoaded) return;
 
-        const parentNodeIds = new Set<number>(nodes.map(n => n.id));
         const expandedNodes: Node[] = [];
         const nodeIdsToRemove = new Set<number>();
 
@@ -269,7 +268,7 @@ export default function ForceGraph({
         }
 
         canvasRef.current.setLayout(mode);
-    }, [canvasRef, canvasLoaded]);
+    }, [canvasRef, canvasLoaded, ctxLayout, ctxDirection]);
 
     // Update event handlers and selection functions
     useEffect(() => {
