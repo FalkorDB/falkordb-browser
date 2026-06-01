@@ -168,6 +168,10 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("animationControl");
   }
 
+  public get pinControl(): Locator {
+    return this.page.getByTestId("pinControl");
+  }
+
   public get zoomInControl(): Locator {
     return this.page.getByTestId("zoomInControl");
   }

@@ -10,7 +10,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useGraphParams, syncRouteUrlParams } from "@/lib/useUrlParams";
 import { useToast } from "@/components/ui/use-toast";
 import { PanelImperativeHandle } from "react-resizable-panels";
-import type { Data as CanvasData, LayoutMode, ViewportState } from "@falkordb/canvas";
+import type { Data as CanvasData, HierarchyDirection, LayoutMode, RadialDirection, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphInfo } from "./api/graph/model";
 import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, SyntaxErrorContext, SessionConnection } from "./components/provider";
@@ -32,6 +32,25 @@ const defaultQueryHistory: HistoryQuery = {
     fav: false
   },
   counter: 0
+};
+
+const VALID_LAYOUTS: LayoutMode[] = ['force', 'tree', 'radial'];
+const HIERARCHY_DIRECTION_VALUES: HierarchyDirection[] = ['td', 'bu', 'lr', 'rl'];
+const RADIAL_DIRECTION_VALUES: RadialDirection[] = ['out', 'in'];
+
+const normalizeLayout = (value: string | null | undefined): LayoutMode =>
+  value && VALID_LAYOUTS.includes(value as LayoutMode) ? (value as LayoutMode) : 'force';
+
+// Normalize the URL direction against the resolved layout so an incompatible
+// combination (e.g. layout=radial&direction=td) falls back to a safe default.
+const normalizeDirection = (layout: LayoutMode, value: string | null | undefined): string => {
+  if (layout === 'tree') {
+    return value && HIERARCHY_DIRECTION_VALUES.includes(value as HierarchyDirection) ? value : 'td';
+  }
+  if (layout === 'radial') {
+    return value && RADIAL_DIRECTION_VALUES.includes(value as RadialDirection) ? value : 'out';
+  }
+  return '';
 };
 
 /**
@@ -86,8 +105,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [graph, setGraph] = useState<Graph>(Graph.empty());
   const [data, setData] = useState<GraphData>({ ...graph.Elements });
   const [graphData, setGraphData] = useState<CanvasData>();
-  const [layout, setLayout] = useState<LayoutMode>((urlLayout || 'force') as LayoutMode);
-  const [direction, setDirection] = useState(urlDirection || '');
+  const [layout, setLayout] = useState<LayoutMode>(normalizeLayout(urlLayout));
+  const [direction, setDirection] = useState(() => normalizeDirection(normalizeLayout(urlLayout), urlDirection));
   const [graphInfo, setGraphInfo] = useState<GraphInfo>(GraphInfo.empty(toast, setIndicator));
   const [graphName, setGraphName] = useState<string>(urlGraphName);
   const [contentPersistence, setContentPersistence] = useState(false);

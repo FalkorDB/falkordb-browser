@@ -13,6 +13,7 @@ import { getNodeDisplayKey } from "@falkordb/canvas";
 import Input from "../components/ui/Input";
 import DialogComponent from "../components/DialogComponent";
 import CloseDialog from "../components/CloseDialog";
+import { EMPTY_DISPLAY_NAME } from "../api/graph/model";
 import { BrowserSettingsContext, GraphContext, IndicatorContext, ConnectionContext } from "../components/provider";
 import ToastButton from "../components/ToastButton";
 import Button from "../components/ui/Button";
@@ -240,6 +241,12 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
 
                         if (canvasNode) {
                             canvasNode.data[key] = val;
+
+                            // Invalidate the cached caption so the canvas recomputes
+                            // the node title when the edited key drives the display name.
+                            if (getNodeDisplayKey(object as Node, captionsKeys) === key) {
+                                canvasNode.displayName = EMPTY_DISPLAY_NAME;
+                            }
                         }
                     } else {
                         const canvasLink = graphData.links.find(l => l.id === object.id);
@@ -322,6 +329,12 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
 
                         if (canvasNode) {
                             delete canvasNode.data[key];
+
+                            // Invalidate the cached caption so the canvas recomputes
+                            // the node title when the removed key drove the display name.
+                            if (isDisplayKey) {
+                                canvasNode.displayName = EMPTY_DISPLAY_NAME;
+                            }
                         }
                     } else {
                         const canvasLink = graphData.links.find(l => l.id === object.id);

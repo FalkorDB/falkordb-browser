@@ -100,26 +100,37 @@ export default class TutorialPanel extends GraphPage {
 
   /**
    * Hover over a tutorial target element to trigger pointermove/pointerenter.
-   * Moves to the element, waits for sub-content to potentially render,
-   * then moves slightly to fire additional pointermove events.
+   * Keeps firing pointermove events (needed to open Radix hover submenus) but
+   * exits as soon as a concrete UI condition is met — either the expected
+   * submenu element becomes visible or the tutorial advances to the next step —
+   * instead of relying purely on fixed-timeout polling.
    */
-  async hoverTutorialTarget(selector: string, nextStepTitle?: string): Promise<void> {
+  async hoverTutorialTarget(
+    selector: string,
+    nextStepTitle?: string,
+    expectVisibleSelector?: string
+  ): Promise<void> {
     const target = this.page.locator(selector).first();
     await waitForElementToBeVisible(target);
     const box = await target.boundingBox();
     if (!box) throw new Error(`Target ${selector} has no bounding box`);
     const cx = box.x + box.width / 2;
     const cy = box.y + box.height / 2;
+    const expected = expectVisibleSelector
+      ? this.page.locator(expectVisibleSelector).first()
+      : null;
     await this.page.mouse.move(cx, cy);
-    // Fire additional pointermove events until the tutorial advances or timeout.
+    // Fire additional pointermove events until a concrete condition is met.
     for (let i = 0; i < 10; i++) {
-      await this.page.waitForTimeout(300);
-      // Break early if the step already advanced
+      await this.page.mouse.move(cx + (i % 2), cy);
+      // Event-driven: break as soon as the expected submenu element renders.
+      if (expected && (await expected.isVisible())) return;
+      // Or break once the tutorial has advanced to the next step.
       if (nextStepTitle) {
         const title = await this.getStepTitle();
         if (title?.trim() === nextStepTitle) return;
       }
-      await this.page.mouse.move(cx + (i % 2), cy);
+      await this.page.waitForTimeout(300);
     }
   }
 

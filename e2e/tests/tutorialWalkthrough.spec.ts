@@ -126,10 +126,15 @@ test.describe("Tutorial Walkthrough", () => {
 
         // Step 17: "Expand Node" — no advanceOn, has Next button (forwards events for optional interaction)
         await tutorial.waitForStep("Expand Node");
+        // The canvas remains interactive and populated for the optional expand interaction.
+        await expect(tutorial.canvasElement).toBeVisible();
+        expect((await tutorial.getNodesScreenPositions()).length).toBeGreaterThan(0);
         await tutorial.clickNextButton();
 
         // Step 18: "Collapse Node" — no advanceOn, has Next button (forwards events for optional interaction)
         await tutorial.waitForStep("Collapse Node");
+        await expect(tutorial.canvasElement).toBeVisible();
+        expect((await tutorial.getNodesScreenPositions()).length).toBeGreaterThan(0);
         await tutorial.clickNextButton();
 
         // Step 19: "View Node / Edge Details" — advanceOn: "contextmenu", with advanceCondition
@@ -182,7 +187,11 @@ test.describe("Tutorial Walkthrough", () => {
 
         // Step 30: "Hover Tree" — advanceOn: "pointermove" on layoutTreeSub, advanceCondition checks sub-content
         await tutorial.waitForStep("Hover Tree");
-        await tutorial.hoverTutorialTarget('[data-testid="layoutTreeSub"]', "Select Tree Direction");
+        await tutorial.hoverTutorialTarget(
+            '[data-testid="layoutTreeSub"]',
+            "Select Tree Direction",
+            '[data-testid="layoutTreeDirection-td"]'
+        );
 
         // Step 31: "Select Tree Direction" — advanceOn: "click" on layoutTreeDirection-td, passthrough
         await tutorial.waitForStep("Select Tree Direction");
@@ -199,7 +208,11 @@ test.describe("Tutorial Walkthrough", () => {
 
         // Step 34: "Hover Radial" — advanceOn: "pointermove" on layoutRadialSub, advanceCondition checks sub-content
         await tutorial.waitForStep("Hover Radial");
-        await tutorial.hoverTutorialTarget('[data-testid="layoutRadialSub"]', "Select Radial Direction");
+        await tutorial.hoverTutorialTarget(
+            '[data-testid="layoutRadialSub"]',
+            "Select Radial Direction",
+            '[data-testid="layoutRadialDirection-out"]'
+        );
 
         // Step 35: "Select Radial Direction" — advanceOn: "click" on layoutRadialDirection-out, passthrough
         await tutorial.waitForStep("Select Radial Direction");
@@ -210,12 +223,17 @@ test.describe("Tutorial Walkthrough", () => {
         await tutorial.waitForTimeout(1000);
         await tutorial.clickNextButton();
 
-        // Step 37: "Animation Control" — no advanceOn, has Next button
+        // Step 37: "Animation Control" — no advanceOn, has Next button.
+        // The radial layout is active here, so animation auto-pins and the
+        // control must be disabled (animationDisabled = pinned || layout !== 'force').
         await tutorial.waitForStep("Animation Control");
+        await expect(tutorial.animationControl).toBeVisible();
+        await expect(tutorial.animationControl).toBeDisabled();
         await tutorial.clickNextButton();
 
-        // Step 38: "Pin on Drag" — no advanceOn, has Next button
+        // Step 38: "Pin on Drag" — no advanceOn, has Next button.
         await tutorial.waitForStep("Pin on Drag");
+        await expect(tutorial.pinControl).toBeVisible();
         await tutorial.clickNextButton();
 
         // Step 39: "Zoom Controls" — no advanceOn, has Next button

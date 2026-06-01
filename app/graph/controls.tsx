@@ -3,7 +3,7 @@
 /* eslint-disable react/require-default-props */
 
 import { ChevronDown, Circle, Pause, Pin, PinOff, Play, Shrink, ZoomIn, ZoomOut } from "lucide-react";
-import { useContext, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import type { HierarchyDirection, LayoutMode, RadialDirection } from "@falkordb/canvas";
 import { cn, GraphRef } from "@/lib/utils";
 import { setUrlParam } from "@/lib/useUrlParams";
@@ -38,6 +38,12 @@ function getDefaultDirection(mode: LayoutMode): string {
     return '';
 }
 
+function isDirectionValidForLayout(mode: LayoutMode, dir: string): boolean {
+    if (mode === 'tree') return HIERARCHY_DIRECTIONS.some(d => d.value === dir);
+    if (mode === 'radial') return RADIAL_DIRECTIONS.some(d => d.value === dir);
+    return false;
+}
+
 interface Props {
     graph: Graph,
     disabled: boolean,
@@ -61,7 +67,22 @@ export default function Controls({
 
     const [animation, setAnimation] = useState(false);
     const [pinned, setPinned] = useState(layout !== 'force');
-    const direction = layout === 'force' ? '' : (directionsRef.current[layout] || getDefaultDirection(layout));
+
+    // Keep the per-layout direction memory in sync with externally driven context
+    // updates (e.g. URL restoration), without letting a direction from one layout
+    // bleed into another.
+    useEffect(() => {
+        if (layout === 'force' || !contextDirection) return;
+        if (isDirectionValidForLayout(layout, contextDirection)) {
+            directionsRef.current = { ...directionsRef.current, [layout]: contextDirection };
+        }
+    }, [layout, contextDirection]);
+
+    const direction = (() => {
+        if (layout === 'force') return '';
+        if (isDirectionValidForLayout(layout, contextDirection)) return contextDirection;
+        return directionsRef.current[layout] || getDefaultDirection(layout);
+    })();
 
     const handleZoomClick = (changeFactor: number) => {
         canvasRef.current?.zoom(canvasRef.current.getZoom() * changeFactor);
@@ -176,6 +197,7 @@ export default function Controls({
                             <button
                                 type="button"
                                 data-testid="layoutControl"
+                                aria-label="Select graph layout"
                                 className="flex items-center gap-1 text-sm pointer-events-auto rounded-md px-2 py-1 hover:bg-secondary disabled:opacity-50"
                                 disabled={disabled}
                             >
@@ -193,7 +215,7 @@ export default function Controls({
                         <DropdownMenuRadioItem value="force">Force</DropdownMenuRadioItem>
                     </DropdownMenuRadioGroup>
                     <DropdownMenuSub>
-                        <DropdownMenuSubTrigger data-testid="layoutTreeSub" className="pl-8 relative">
+                        <DropdownMenuSubTrigger data-testid="layoutTreeSub" aria-label="Tree layout" aria-current={layout === 'tree'} className="pl-8 relative">
                             {
                                 layout === 'tree' && (
                                     <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
@@ -208,6 +230,8 @@ export default function Controls({
                                 <DropdownMenuItem
                                     key={d.value}
                                     data-testid={`layoutTreeDirection-${d.value}`}
+                                    aria-label={`Tree direction ${d.label}`}
+                                    aria-current={layout === 'tree' && direction === d.value}
                                     className={cn("pl-8 relative", layout === 'tree' && direction === d.value ? 'bg-accent' : '')}
                                     onSelect={() => {
                                         if (layout !== 'tree') handleLayoutChange('tree');
@@ -227,7 +251,7 @@ export default function Controls({
                         </DropdownMenuSubContent>
                     </DropdownMenuSub>
                     <DropdownMenuSub>
-                        <DropdownMenuSubTrigger data-testid="layoutRadialSub" className="pl-8 relative">
+                        <DropdownMenuSubTrigger data-testid="layoutRadialSub" aria-label="Radial layout" aria-current={layout === 'radial'} className="pl-8 relative">
                             {layout === 'radial' && (
                                 <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
                                     <Circle className="h-2 w-2 fill-current" />
@@ -240,6 +264,8 @@ export default function Controls({
                                 <DropdownMenuItem
                                     key={d.value}
                                     data-testid={`layoutRadialDirection-${d.value}`}
+                                    aria-label={`Radial direction ${d.label}`}
+                                    aria-current={layout === 'radial' && direction === d.value}
                                     className={cn("pl-8 relative", layout === 'radial' && direction === d.value ? 'bg-accent' : '')}
                                     onSelect={() => {
                                         if (layout !== 'radial') handleLayoutChange('radial');
