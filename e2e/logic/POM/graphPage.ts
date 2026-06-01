@@ -60,6 +60,27 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("exportGraphCancel");
   }
 
+  // RESTORE
+  public get restoreBtn(): Locator {
+    return this.page.getByTestId("restoreGraph");
+  }
+
+  public get restoreFileInput(): Locator {
+    return this.page.getByTestId("restoreFileInput");
+  }
+
+  public get restoreGraphNameInput(): Locator {
+    return this.page.getByTestId("restoreGraphNameInput");
+  }
+
+  public get restoreReplaceCheckbox(): Locator {
+    return this.page.getByTestId("restoreReplaceCheckbox");
+  }
+
+  public get restoreConfirm(): Locator {
+    return this.page.getByTestId("restoreGraphConfirm");
+  }
+
   // RELOAD
   public get reloadList(): Locator {
     return this.page.getByTestId("reloadGraphsList");
@@ -1232,6 +1253,44 @@ export default class GraphPage extends BasePage {
       this.clickExportConfirm(),
     ]);
     return download;
+  }
+
+  async restoreGraphFromFile(
+    targetName: string,
+    dump: Buffer,
+    fileName = "dump.dump",
+    replace = false
+  ): Promise<void> {
+    await this.clickSelect();
+    await this.clickManage();
+    await interactWhenVisible(
+      this.restoreBtn,
+      (el) => el.click(),
+      "Restore Graph Button"
+    );
+    await this.restoreFileInput.setInputFiles({
+      name: fileName,
+      mimeType: "application/octet-stream",
+      buffer: dump,
+    });
+    await interactWhenVisible(
+      this.restoreGraphNameInput,
+      (el) => el.fill(targetName),
+      "Restore Graph Name Input"
+    );
+    if (replace) {
+      await interactWhenVisible(
+        this.restoreReplaceCheckbox,
+        (el) => el.click(),
+        "Restore Replace Checkbox"
+      );
+    }
+    await interactWhenVisible(
+      this.restoreConfirm,
+      (el) => el.click(),
+      "Confirm Restore Graph"
+    );
+    await waitForElementToNotBeVisible(this.restoreConfirm);
   }
 
   async isModifyGraphNameButtonVisible(graphName: string): Promise<boolean> {

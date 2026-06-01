@@ -375,4 +375,113 @@ test.describe("Graph Tests", () => {
     await apiCall.removeGraph(graphName);
     await apiCall.removeGraph(duplicatedGraphName);
   });
+
+  test(`@admin Restore round-trip via API: export a graph then restore it under a new name and verify counts match`, async () => {
+    const graphName = getRandomString("graph");
+    const restoredName = getRandomString("restored");
+    try {
+      await apiCall.addGraph(graphName);
+      await apiCall.runQuery(graphName, CREATE_QUERY);
+
+      const dump = await apiCall.exportGraphData(graphName);
+      expect(dump.byteLength).toBeGreaterThan(0);
+
+      const res = await apiCall.restoreGraphFromFile(restoredName, dump);
+      expect(res.status).toBe(200);
+
+      const graphs = await apiCall.getGraphs();
+      expect(graphs.opts.includes(restoredName)).toBeTruthy();
+
+      const originalCount = await apiCall.getGraphCount(graphName);
+      const restoredCount = await apiCall.getGraphCount(restoredName);
+      expect(restoredCount.result.nodes).toBe(originalCount.result.nodes);
+      expect(restoredCount.result.edges).toBe(originalCount.result.edges);
+    } finally {
+      await apiCall.removeGraph(graphName);
+      await apiCall.removeGraph(restoredName);
+    }
+  });
+
+  test(`@admin Restore onto an existing graph without replace returns 409 and leaves the original untouched`, async () => {
+    const graphName = getRandomString("graph");
+    try {
+      await apiCall.addGraph(graphName);
+      await apiCall.runQuery(graphName, CREATE_QUERY);
+      const dump = await apiCall.exportGraphData(graphName);
+
+      const before = await apiCall.getGraphCount(graphName);
+      const res = await apiCall.restoreGraphFromFile(graphName, dump);
+      expect(res.status).toBe(409);
+
+      const after = await apiCall.getGraphCount(graphName);
+      expect(after.result.nodes).toBe(before.result.nodes);
+      expect(after.result.edges).toBe(before.result.edges);
+    } finally {
+      await apiCall.removeGraph(graphName);
+    }
+  });
+
+  test(`@admin Restore with replace=true overwrites an existing graph with the dump contents`, async () => {
+    const sourceName = getRandomString("source");
+    const targetName = getRandomString("target");
+    try {
+      await apiCall.addGraph(sourceName);
+      await apiCall.runQuery(sourceName, CREATE_QUERY);
+      const dump = await apiCall.exportGraphData(sourceName);
+
+      await apiCall.addGraph(targetName);
+      await apiCall.runQuery(targetName, DEFAULT_CREATE_QUERY);
+
+      const sourceCount = await apiCall.getGraphCount(sourceName);
+      const targetCountBefore = await apiCall.getGraphCount(targetName);
+      expect(targetCountBefore.result.nodes).not.toBe(sourceCount.result.nodes);
+
+      const res = await apiCall.restoreGraphFromFile(targetName, dump, "dump.dump", true);
+      expect(res.status).toBe(200);
+
+      const targetCountAfter = await apiCall.getGraphCount(targetName);
+      expect(targetCountAfter.result.nodes).toBe(sourceCount.result.nodes);
+      expect(targetCountAfter.result.edges).toBe(sourceCount.result.edges);
+    } finally {
+      await apiCall.removeGraph(sourceName);
+      await apiCall.removeGraph(targetName);
+    }
+  });
+
+  test(`@admin Restore from a non-HTTPS URL is rejected with 400`, async () => {
+    const graphName = getRandomString("restored");
+    const res = await apiCall.restoreGraphFromUrl(
+      graphName,
+      "http://example.com/graph.dump"
+    );
+    expect(res.status).toBe(400);
+    const graphs = await apiCall.getGraphs();
+    expect(graphs.opts.includes(graphName)).toBeFalsy();
+  });
+
+  test(`@admin Restore from an invalid URL is rejected with 400`, async () => {
+    const graphName = getRandomString("restored");
+    const res = await apiCall.restoreGraphFromUrl(graphName, "not-a-valid-url");
+    expect(res.status).toBe(400);
+  });
+
+  test(`@admin Restore a graph via the UI upload modal and verify it appears`, async () => {
+    const graphName = getRandomString("graph");
+    const restoredName = getRandomString("restored");
+    try {
+      await apiCall.addGraph(graphName);
+      await apiCall.runQuery(graphName, CREATE_QUERY);
+      const dump = await apiCall.exportGraphData(graphName);
+
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      await browser.setPageToFullScreen();
+      await graph.restoreGraphFromFile(restoredName, dump);
+
+      const graphs = await apiCall.getGraphs();
+      expect(graphs.opts.includes(restoredName)).toBeTruthy();
+    } finally {
+      await apiCall.removeGraph(graphName);
+      await apiCall.removeGraph(restoredName);
+    }
+  });
 });

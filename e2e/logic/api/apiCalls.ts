@@ -10,6 +10,7 @@ import {
   getRequest,
   patchRequest,
   postRequest,
+  postMultipartRequest,
 } from "../../infra/api/apiRequests";
 import urls from "../../config/urls.json";
 import {
@@ -214,6 +215,68 @@ export default class ApiCalls {
     } catch (error) {
       throw new Error(
         `Failed to duplicate graph. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
+  async exportGraphData(graphName: string): Promise<Buffer> {
+    try {
+      const result = await getRequest(
+        `${urls.api.graphUrl + graphName}/export`
+      );
+      return Buffer.from(await result.body());
+    } catch (error) {
+      throw new Error(
+        `Failed to export graph data. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
+  async restoreGraphFromFile(
+    graphName: string,
+    dump: Buffer,
+    fileName = "dump.dump",
+    replace = false
+  ): Promise<{ status: number; body: any }> {
+    try {
+      const headers = await getAdminToken();
+      const url = `${urls.api.graphUrl + graphName}/restore${replace ? "?replace=true" : ""}`;
+      const result = await postMultipartRequest(
+        url,
+        {
+          file: {
+            name: fileName,
+            mimeType: "application/octet-stream",
+            buffer: dump,
+          },
+        },
+        undefined,
+        headers
+      );
+      return { status: result.status(), body: await result.json() };
+    } catch (error) {
+      throw new Error(
+        `Failed to restore graph from file. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
+  async restoreGraphFromUrl(
+    graphName: string,
+    source: string,
+    replace = false
+  ): Promise<{ status: number; body: any }> {
+    try {
+      const headers = await getAdminToken();
+      const url = `${urls.api.graphUrl + graphName}/restore${replace ? "?replace=true" : ""}`;
+      const result = await postRequest(url, { source, replace }, undefined, {
+        "Content-Type": "application/json",
+        ...(headers ?? {}),
+      });
+      return { status: result.status(), body: await result.json() };
+    } catch (error) {
+      throw new Error(
+        `Failed to restore graph from URL. \n Error: ${(error as Error).message}`
       );
     }
   }

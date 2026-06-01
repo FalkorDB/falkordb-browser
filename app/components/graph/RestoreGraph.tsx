@@ -133,7 +133,11 @@ export default function RestoreGraph({ existingGraphs, onRestore }: Props) {
             <TabsTrigger value="url" data-testid="restoreTabUrl">From URL</TabsTrigger>
           </TabsList>
           <TabsContent value="upload" className="mt-4">
+            <label htmlFor="restoreFileInput" className="block text-sm mb-1">
+              Dump file (.dump or .rdb)
+            </label>
             <input
+              id="restoreFileInput"
               ref={fileInputRef}
               type="file"
               accept=".dump,.rdb,application/octet-stream"

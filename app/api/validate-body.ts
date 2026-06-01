@@ -70,8 +70,8 @@ export const restoreGraphFromUrl = z.object({
     })
     .url("Source must be a valid URL")
     .refine(
-      (val) => val.startsWith("https://") || val.startsWith("http://"),
-      "Only http(s) URLs are supported in this release (use a presigned S3/GCS URL)"
+      (val) => val.startsWith("https://"),
+      "Only https URLs are supported in this release (use a presigned S3/GCS URL)"
     ),
   replace: z.boolean().optional().default(false),
 });

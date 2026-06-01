@@ -24,23 +24,62 @@ async function readUploadedDump(request: NextRequest): Promise<Buffer> {
   return Buffer.from(await file.arrayBuffer());
 }
 
+const parsedTimeout = Number(process.env.FALKOR_RESTORE_FETCH_TIMEOUT_MS);
+const FETCH_TIMEOUT_MS = Number.isFinite(parsedTimeout) && parsedTimeout > 0 ? parsedTimeout : 30_000;
+
 async function fetchRemoteDump(source: string): Promise<Buffer> {
-  const res = await fetch(source);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-  if (!res.ok) {
-    throw new Error(`Failed to fetch dump (${res.status} ${res.statusText})`);
-  }
+  try {
+    const res = await fetch(source, { signal: controller.signal, redirect: "error" });
 
-  const contentLength = Number(res.headers.get("content-length") ?? 0);
-  if (contentLength > MAX_DUMP_BYTES) {
-    throw new Error(`Remote dump exceeds maximum size of ${MAX_DUMP_BYTES} bytes`);
-  }
+    if (!res.ok) {
+      throw new Error(`Failed to fetch dump (${res.status} ${res.statusText})`);
+    }
 
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.byteLength > MAX_DUMP_BYTES) {
-    throw new Error(`Remote dump exceeds maximum size of ${MAX_DUMP_BYTES} bytes`);
+    const header = res.headers.get("content-length");
+    if (header !== null && Number(header) > MAX_DUMP_BYTES) {
+      throw new Error(`Remote dump exceeds maximum size of ${MAX_DUMP_BYTES} bytes`);
+    }
+
+    if (!res.body) {
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (buf.byteLength > MAX_DUMP_BYTES) {
+        throw new Error(`Remote dump exceeds maximum size of ${MAX_DUMP_BYTES} bytes`);
+      }
+      return buf;
+    }
+
+    // Stream-bounded read: abort as soon as the accumulated size exceeds the cap
+    // so a chunked response without a content-length can't exhaust memory.
+    const reader = res.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let received = 0;
+
+    for (;;) {
+      // eslint-disable-next-line no-await-in-loop
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        received += value.byteLength;
+        if (received > MAX_DUMP_BYTES) {
+          controller.abort();
+          try {
+            await reader.cancel();
+          } catch {
+            // ignore cancellation failures; the size error below is the meaningful one
+          }
+          throw new Error(`Remote dump exceeds maximum size of ${MAX_DUMP_BYTES} bytes`);
+        }
+        chunks.push(value);
+      }
+    }
+
+    return Buffer.concat(chunks);
+  } finally {
+    clearTimeout(timeout);
   }
-  return buf;
 }
 
 export async function POST(
