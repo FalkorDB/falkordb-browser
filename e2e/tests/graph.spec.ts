@@ -465,6 +465,17 @@ test.describe("Graph Tests", () => {
     expect(res.status).toBe(400);
   });
 
+  test(`@admin Restore with a corrupt dump payload is rejected with 400 and creates no graph`, async () => {
+    const graphName = getRandomString("restored");
+    const res = await apiCall.restoreGraphFromFile(
+      graphName,
+      Buffer.from("this-is-not-a-valid-redis-dump-payload")
+    );
+    expect(res.status).toBe(400);
+    const graphs = await apiCall.getGraphs();
+    expect(graphs.opts.includes(graphName)).toBeFalsy();
+  });
+
   test(`@admin Restore a graph via the UI upload modal and verify it appears`, async () => {
     const graphName = getRandomString("graph");
     const restoredName = getRandomString("restored");
