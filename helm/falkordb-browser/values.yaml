@@ -14,10 +14,19 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
-browser:
-  # Host the browser under a path prefix such as /browser.
-  # Images must be built with the same NEXT_PUBLIC_BASE_PATH value.
-  basePath: ""
+encryption:
+  # Server-side encryption key for stored credentials and tokens.
+  # Precedence is: existingSecret.name, then key, then a generated key. Set only
+  # one of existingSecret.name or key. Generated keys are reused from the release
+  # Secret on upgrades.
+  # Must be 64 hexadecimal characters (32 bytes).
+  # You can generate one with: openssl rand -hex 32
+  key: ""
+  # Use an existing Secret in the release namespace for ENCRYPTION_KEY instead
+  # of setting encryption.key or generating a key in the chart Secret.
+  existingSecret:
+    name: ""
+    key: "ENCRYPTION_KEY"
 
 serviceAccount:
   # Specifies whether a service account should be created
@@ -60,9 +69,6 @@ service:
 ingress:
   enabled: false
   className: ""
-  # If true, rewrite any ingress rule with path: / to browser.basePath (if set).
-  # This is required for sub-path hosting but is off by default for backward compatibility.
-  rewriteRootToBasePath: false
   annotations: {}
     # kubernetes.io/ingress.class: nginx
     # kubernetes.io/tls-acme: "true"

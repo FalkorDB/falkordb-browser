@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useContext, useCallback } from "react";
 import { CreateUser, User } from "@/app/api/user/model";
-import { prepareArg, securedFetch, Row, ToastFn, withBasePath } from "@/lib/utils";
+import { prepareArg, securedFetch, Row, ToastFn } from "@/lib/utils";
 import TableComponent from "@/app/components/TableComponent";
 import { useToast } from "@/components/ui/use-toast";
 import { IndicatorContext, ConnectionContext } from "@/app/components/provider";
@@ -32,7 +32,7 @@ export default function Users() {
             // Use plain fetch with no X-Connection-Id header.
             // The server resolves the correct connection via session.activeConnectionId
             // from the JWT (updated by every handleSelect call).
-            const result = await fetch(withBasePath("/api/user"), { method: 'GET' });
+            const result = await fetch("/api/user", { method: 'GET' });
             if (!result.ok) return;
             const data = await result.json();
             setUsers(data.result.map((user: User) => ({ ...user, selected: false })));

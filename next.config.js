@@ -1,20 +1,7 @@
 /** @type {import('next').NextConfig} */
 const path = require('path');
 
-function normalizeBasePath(value) {
-  if (!value || value === '/') return '';
-
-  if (!value.startsWith('/')) {
-    throw new Error('NEXT_PUBLIC_BASE_PATH must start with /');
-  }
-
-  return value.replace(/\/$/, '');
-}
-
-const basePath = normalizeBasePath(process.env.NEXT_PUBLIC_BASE_PATH);
-
 const nextConfig = {
-  basePath,
   allowedDevOrigins: ['127.0.0.1', '0.0.0.0'],
   output: 'standalone',
   reactStrictMode: true,
