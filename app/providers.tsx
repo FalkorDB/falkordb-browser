@@ -1033,8 +1033,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setUserGraphBeforeTutorial(graphName);
       setUrlParamsBeforeTutorial(window.location.search);
 
-      // Clear URL params during tutorial
-      window.history.replaceState(null, "", window.location.pathname);
+      // Clear the visible URL params for the tutorial, but push a new history
+      // entry (rather than replacing) so the user's pre-tutorial URL stays in
+      // the back stack and the browser Back button returns to it.
+      window.history.pushState(null, "", window.location.pathname);
 
       // Reset layout to force for a clean tutorial experience
       setLayout('force');
