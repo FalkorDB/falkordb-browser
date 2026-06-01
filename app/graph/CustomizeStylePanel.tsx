@@ -18,7 +18,7 @@ interface Props {
 }
 
 export default function CustomizeStylePanel({ label, onClose }: Props) {
-    const { graph, setLabels, handleCooldown, cooldownTicks } = useContext(GraphContext);
+    const { graph, setLabels } = useContext(GraphContext);
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { canvasRef } = useContext(ForceGraphContext);
 
@@ -79,24 +79,21 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
         const canvas = canvasRef.current;
 
         if (canvas) {
-            const currentData = canvas.getGraphData();
+            const graphData = canvas.getGraphData();
 
-            currentData.nodes.forEach(node => {
+            graphData.nodes.forEach(node => {
                 if (getLabelWithFewestElements(node.labels.map(l => graph.LabelsMap.get(l)).filter(Boolean) as Label[])?.name === label.name) {
                     node.color = color;
 
                     if (node.size !== size) {
                         node.size = size;
-                        node.displayName = ["", ""]; // Force re-render by clearing displayName (it will be recalculated in canvas)
                     }
                 }
             });
 
-            canvas.setGraphData(currentData);
+            canvas.refresh();
         }
-
-        handleCooldown(cooldownTicks === undefined ? undefined : -1);
-    }, [canvasRef, graph.Labels, graph.LabelsMap, label, setLabels, handleCooldown, cooldownTicks]);
+    }, [canvasRef, graph.Labels, graph.LabelsMap, label, setLabels]);
 
     const handleColorSelect = (color: string) => {
         setSelectedColor(color);

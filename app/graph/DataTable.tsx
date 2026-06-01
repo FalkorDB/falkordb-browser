@@ -234,27 +234,29 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                 const canvas = canvasRef.current;
 
                 if (canvas) {
-                    const currentData = canvas.getGraphData();
+                    const graphData = canvas.getGraphData();
 
                     if (type) {
-                        const canvasNode = currentData.nodes.find(n => n.id === object.id);
+                        const canvasNode = graphData.nodes.find(n => n.id === object.id);
 
                         if (canvasNode) {
                             canvasNode.data[key] = val;
 
+                            // Invalidate the cached caption so the canvas recomputes
+                            // the node title when the edited key drives the display name.
                             if (getNodeDisplayKey(object as Node, captionsKeys) === key) {
                                 canvasNode.displayName = EMPTY_DISPLAY_NAME;
                             }
                         }
                     } else {
-                        const canvasLink = currentData.links.find(l => l.id === object.id);
+                        const canvasLink = graphData.links.find(l => l.id === object.id);
 
                         if (canvasLink) {
                             canvasLink.data[key] = val;
                         }
                     }
 
-                    canvas.setGraphData({ ...currentData });
+                    canvas.refresh();
                 }
 
                 handleSetEditable("");
@@ -320,27 +322,29 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                 const canvas = canvasRef.current;
 
                 if (canvas) {
-                    const currentData = canvas.getGraphData();
+                    const graphData = canvas.getGraphData();
 
                     if (type) {
-                        const canvasNode = currentData.nodes.find(n => n.id === object.id);
+                        const canvasNode = graphData.nodes.find(n => n.id === object.id);
 
                         if (canvasNode) {
                             delete canvasNode.data[key];
 
+                            // Invalidate the cached caption so the canvas recomputes
+                            // the node title when the removed key drove the display name.
                             if (isDisplayKey) {
                                 canvasNode.displayName = EMPTY_DISPLAY_NAME;
                             }
                         }
                     } else {
-                        const canvasLink = currentData.links.find(l => l.id === object.id);
+                        const canvasLink = graphData.links.find(l => l.id === object.id);
 
                         if (canvasLink) {
                             delete canvasLink.data[key];
                         }
                     }
 
-                    canvas.setGraphData({ ...currentData });
+                    canvas.refresh();
                 }
 
                 toast({

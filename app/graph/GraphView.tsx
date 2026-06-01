@@ -4,7 +4,7 @@ import { useEffect, Dispatch, SetStateAction, useContext, useCallback, useState 
 import { GitGraph, ScrollText, Table } from "lucide-react";
 import { cn, GraphRef, Tab, Label, Link, Node, Relationship, HistoryQuery } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { GraphContext, ForceGraphContext } from "@/app/components/provider";
+import { GraphContext, ForceGraphContext, BrowserSettingsContext } from "@/app/components/provider";
 import ForceGraph from "@/app/components/ForceGraph";
 import { setConnectionItem } from "@/lib/connection-storage";
 import Button from "../components/ui/Button";
@@ -23,8 +23,6 @@ interface Props {
     setRelationships: Dispatch<SetStateAction<Relationship[]>>
     labels: Label[]
     relationships: Relationship[]
-    handleCooldown: (ticks?: number) => void
-    cooldownTicks: number | undefined
     fetchCount: () => Promise<void>
     historyQuery: HistoryQuery
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
@@ -43,8 +41,6 @@ function GraphView({
     setRelationships,
     labels,
     relationships,
-    handleCooldown,
-    cooldownTicks,
     fetchCount,
     historyQuery,
     setHistoryQuery,
@@ -56,6 +52,7 @@ function GraphView({
 
     const { graph, graphName, currentTab, setCurrentTab, isLoading, setIsLoading, expand, setExpand } = useContext(GraphContext);
     const { setData, data, graphData, setGraphData, setViewport, viewport } = useContext(ForceGraphContext);
+    const { tutorialOpen } = useContext(BrowserSettingsContext);
 
     const elementsLength = graph.getElements().length;
 
@@ -72,11 +69,14 @@ function GraphView({
     }, [graph, historyQuery.currentQuery]);
 
     useEffect(() => {
+        // During tutorial, track setups control the active tab directly
+        if (tutorialOpen) return;
+
         let defaultChecked: Tab = "Graph";
         if (elementsLength === 0 && graph.Data.length !== 0) defaultChecked = "Table";
 
         setCurrentTab(defaultChecked);
-    }, [graph, graph.getElements().length, graph.Data.length, setCurrentTab]);
+    }, [graph, graph.getElements().length, graph.Data.length, setCurrentTab, tutorialOpen]);
 
     const onLabelClick = (label: Label) => {
         const canvas = canvasRef.current;
@@ -93,16 +93,16 @@ function GraphView({
         graph.visibleLinks(label.show);
         graph.LabelsMap.set(label.name, label);
 
-        const currentData = canvas.getGraphData();
+        const graphData = canvas.getGraphData();
 
-        currentData.nodes.forEach(canvasNode => {
+        graphData.nodes.forEach(canvasNode => {
             const appNode = graph.NodesMap.get(canvasNode.id);
 
             if (appNode) {
                 canvasNode.visible = appNode.visible;
             }
         });
-        currentData.links.forEach(canvasLink => {
+        graphData.links.forEach(canvasLink => {
             const appLink = graph.LinksMap.get(canvasLink.id);
 
             if (appLink) {
@@ -110,10 +110,8 @@ function GraphView({
             }
         });
 
-        canvas.setGraphData({ ...currentData });
+        canvas.refresh();
 
-        const cooldown = cooldownTicks === undefined ? undefined : -1;
-        handleCooldown(cooldown);
         setLabels([...graph.Labels]);
     };
 
@@ -130,25 +128,23 @@ function GraphView({
 
         graph.RelationshipsMap.set(relationship.name, relationship);
 
-        const currentData = canvas.getGraphData();
+        const graphData = canvas.getGraphData();
 
-        currentData.nodes.forEach(canvasNode => {
+        graphData.nodes.forEach(canvasNode => {
             const appNode = graph.NodesMap.get(canvasNode.id);
             if (appNode) {
                 canvasNode.visible = appNode.visible;
             }
         });
-        currentData.links.forEach(canvasLink => {
+        graphData.links.forEach(canvasLink => {
             const appLink = graph.LinksMap.get(canvasLink.id);
             if (appLink) {
                 canvasLink.visible = appLink.visible;
             }
         });
 
-        canvas.setGraphData({ ...currentData });
+        canvas.refresh();
 
-        const cooldown = cooldownTicks === undefined ? undefined : -1;
-        handleCooldown(cooldown);
         setRelationships([...graph.Relationships]);
     };
 
@@ -238,8 +234,6 @@ function GraphView({
                                     graph={graph}
                                     canvasRef={canvasRef}
                                     disabled={graph.getElements().length === 0}
-                                    handleCooldown={handleCooldown}
-                                    cooldownTicks={cooldownTicks}
                                 />
                             </>
                         }
@@ -257,10 +251,6 @@ function GraphView({
                     selectedElements={selectedElements}
                     setSelectedElements={setSelectedElements}
                     setRelationships={setRelationships}
-                    isLoading={isLoading}
-                    setIsLoading={setIsLoading}
-                    cooldownTicks={cooldownTicks}
-                    handleCooldown={handleCooldown}
                     viewport={viewport}
                     setViewport={setViewport}
                 />

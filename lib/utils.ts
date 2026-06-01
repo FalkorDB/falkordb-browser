@@ -7,7 +7,7 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import React, { RefObject } from "react";
-import type { FalkorDBCanvas } from "@falkordb/canvas";
+import type { FalkorDBCanvas, Data as CanvasData } from "@falkordb/canvas";
 import { signOut } from "next-auth/react";
 
 export type ToastArguments = {
@@ -848,6 +848,27 @@ export function getQueryWithLimit(
 
   return [query, existingLimit];
 }
+
+export const convertToCanvasData = (graphData: GraphData): CanvasData => ({
+    nodes: graphData.nodes.map(({ id, labels, color, visible, size, data, expand }) => ({
+        id,
+        labels,
+        color,
+        visible,
+        size,
+        expand,
+        data
+    })),
+    links: graphData.links.map(({ id, relationship, color, visible, source, target, data }) => ({
+        id,
+        relationship,
+        color,
+        visible,
+        source,
+        target,
+        data
+    }))
+});
 
 export const formatName = (newGraphName: string) =>
   newGraphName === '""' ? "" : newGraphName;
