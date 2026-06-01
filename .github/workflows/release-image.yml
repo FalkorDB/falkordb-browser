@@ -43,6 +43,7 @@ jobs:
   build-and-push:
     needs: prepare
     strategy:
+      fail-fast: false
       matrix:
         include:
           - arch: amd64
@@ -84,6 +85,8 @@ jobs:
           tags: ${{ env.ARCH_TAGS }}
           build-args: |
             CYPHER_VERSION=${{ env.CYPHER_VERSION }}
+          cache-from: type=gha,scope=falkordb-browser-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=falkordb-browser-${{ matrix.arch }}
 
       - name: Run Trivy vulnerability scanner
         if: matrix.arch == 'amd64'
