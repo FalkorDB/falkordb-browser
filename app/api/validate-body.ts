@@ -70,7 +70,15 @@ export const restoreGraphFromUrl = z.object({
     })
     .url("Source must be a valid URL")
     .refine(
-      (val) => val.startsWith("https://"),
+      (val) => {
+        try {
+          // URL schemes are case-insensitive; compare the normalized protocol
+          // so values like `HTTPS://…` aren't wrongly rejected.
+          return new URL(val).protocol === "https:";
+        } catch {
+          return false;
+        }
+      },
       "Only https URLs are supported in this release (use a presigned S3/GCS URL)"
     ),
   replace: z.boolean().optional().default(false),

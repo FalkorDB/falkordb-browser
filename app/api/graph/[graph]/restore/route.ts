@@ -2,8 +2,11 @@ import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
 import { getCorsHeaders } from "@/app/api/utils";
 import { restoreGraphFromUrl, validateBody } from "@/app/api/validate-body";
-import { lookup } from "dns/promises";
+import https from "https";
+import { lookup as dnsLookup } from "dns";
+import type { LookupAddress, LookupOptions } from "dns";
 import net from "net";
+import type { LookupFunction } from "net";
 
 const DEFAULT_MAX_DUMP_BYTES = 512 * 1024 * 1024;
 
@@ -15,12 +18,55 @@ const MAX_DUMP_BYTES =
     ? parsedMaxBytes
     : DEFAULT_MAX_DUMP_BYTES;
 
+// Headroom for the multipart envelope (boundary lines + part headers) on top of
+// the dump cap, so a within-limit file isn't rejected by envelope overhead.
+const MULTIPART_ENVELOPE_ALLOWANCE = 8 * 1024;
+
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
 
+// Reads a request/response body stream, aborting as soon as the accumulated
+// size exceeds `limit` so an oversized upload can't be buffered in full.
+async function readBoundedBody(
+  body: ReadableStream<Uint8Array>,
+  limit: number
+): Promise<Buffer> {
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+
+  for (;;) {
+    // eslint-disable-next-line no-await-in-loop
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value) {
+      received += value.byteLength;
+      if (received > limit) {
+        try {
+          await reader.cancel();
+        } catch {
+          // ignore cancellation failures; the size error below is the meaningful one
+        }
+        throw new Error(`Dump exceeds maximum size of ${MAX_DUMP_BYTES} bytes`);
+      }
+      chunks.push(value);
+    }
+  }
+
+  return Buffer.concat(chunks);
+}
+
 async function readUploadedDump(request: NextRequest): Promise<Buffer> {
-  const form = await request.formData();
+  // Bound the multipart body while streaming so a huge upload isn't buffered in
+  // full before the size check. formData() then parses the (now bounded) bytes.
+  const raw = request.body
+    ? await readBoundedBody(request.body, MAX_DUMP_BYTES + MULTIPART_ENVELOPE_ALLOWANCE)
+    : Buffer.from(await request.arrayBuffer());
+
+  const form = await new Response(raw as unknown as BodyInit, {
+    headers: { "content-type": request.headers.get("content-type") ?? "" },
+  }).formData();
   const file = form.get("file");
 
   if (!(file instanceof File)) {
@@ -98,82 +144,121 @@ function isPrivateIp(ip: string): boolean {
   return false;
 }
 
-// Best-effort SSRF guard: reject remote dumps hosted on private/reserved
-// addresses (loopback, RFC1918, link-local cloud-metadata, etc.). Presigned
-// S3/GCS URLs resolve to public IPs, so legitimate use is unaffected.
-async function assertPublicHost(source: string): Promise<void> {
-  const host = new URL(source).hostname.replace(/^\[|\]$/g, "");
-
-  const addresses = net.isIP(host)
-    ? [{ address: host }]
-    : await lookup(host, { all: true });
-
-  if (addresses.length === 0) {
-    throw new Error(`Could not resolve host for remote dump: ${host}`);
-  }
-
-  for (const { address } of addresses) {
-    if (isPrivateIp(address)) {
-      throw new Error("Refusing to fetch dump from a private or reserved network address");
-    }
-  }
-}
-
-async function fetchRemoteDump(source: string): Promise<Buffer> {
-  await assertPublicHost(source);
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
-  try {
-    const res = await fetch(source, { signal: controller.signal, redirect: "error" });
-
-    if (!res.ok) {
-      throw new Error(`Failed to fetch dump (${res.status} ${res.statusText})`);
+// Best-effort SSRF guard used at *connect* time: Node calls this custom lookup
+// to resolve the host, and we validate the very addresses the socket will use.
+// Pinning the guard here (rather than a separate pre-fetch lookup) closes the
+// DNS-rebinding/TOCTOU gap where a second resolution could return a private IP.
+// Presigned S3/GCS URLs resolve to public IPs, so legitimate use is unaffected.
+const validatingLookup: LookupFunction = (host, options, callback) => {
+  dnsLookup(host, { ...(options as LookupOptions), all: true }, (err, addresses) => {
+    if (err) {
+      callback(err, "", 0);
+      return;
     }
 
-    const header = res.headers.get("content-length");
-    if (header !== null && Number(header) > MAX_DUMP_BYTES) {
-      throw new Error(`Remote dump exceeds maximum size of ${MAX_DUMP_BYTES} bytes`);
+    const list = addresses as LookupAddress[];
+    if (!list || list.length === 0) {
+      callback(
+        new Error(`Could not resolve host for remote dump: ${host}`) as NodeJS.ErrnoException,
+        "",
+        0
+      );
+      return;
     }
 
-    if (!res.body) {
-      const buf = Buffer.from(await res.arrayBuffer());
-      if (buf.byteLength > MAX_DUMP_BYTES) {
-        throw new Error(`Remote dump exceeds maximum size of ${MAX_DUMP_BYTES} bytes`);
-      }
-      return buf;
+    if (list.some(({ address }) => isPrivateIp(address))) {
+      callback(
+        new Error(
+          "Refusing to fetch dump from a private or reserved network address"
+        ) as NodeJS.ErrnoException,
+        "",
+        0
+      );
+      return;
     }
 
-    // Stream-bounded read: abort as soon as the accumulated size exceeds the cap
-    // so a chunked response without a content-length can't exhaust memory.
-    const reader = res.body.getReader();
-    const chunks: Uint8Array[] = [];
-    let received = 0;
+    if ((options as LookupOptions).all) {
+      callback(null, list as unknown as string, 0);
+    } else {
+      callback(null, list[0].address, list[0].family);
+    }
+  });
+};
 
-    for (;;) {
-      // eslint-disable-next-line no-await-in-loop
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (value) {
-        received += value.byteLength;
-        if (received > MAX_DUMP_BYTES) {
-          controller.abort();
-          try {
-            await reader.cancel();
-          } catch {
-            // ignore cancellation failures; the size error below is the meaningful one
-          }
-          throw new Error(`Remote dump exceeds maximum size of ${MAX_DUMP_BYTES} bytes`);
+function fetchRemoteDump(source: string): Promise<Buffer> {
+  return new Promise<Buffer>((resolve, reject) => {
+    let settled = false;
+    const settle = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      fn();
+    };
+
+    // Node does not invoke the custom `lookup` for literal IP hosts, so guard
+    // those statically here. Hostnames are validated at connect time by
+    // `validatingLookup` (which closes the DNS-rebinding/TOCTOU gap).
+    const host = new URL(source).hostname.replace(/^\[|\]$/g, "");
+    if (net.isIP(host) && isPrivateIp(host)) {
+      settle(() =>
+        reject(new Error("Refusing to fetch dump from a private or reserved network address"))
+      );
+      return;
+    }
+
+    // Node's https module does not follow redirects, so a 3xx is surfaced here
+    // and rejected — this also blocks redirect-based SSRF bypasses.
+    const req = https.get(
+      source,
+      { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), lookup: validatingLookup },
+      (res) => {
+        const status = res.statusCode ?? 0;
+
+        if (status >= 300 && status < 400) {
+          res.resume();
+          settle(() => reject(new Error("Refusing to follow redirect while fetching remote dump")));
+          return;
         }
-        chunks.push(value);
-      }
-    }
 
-    return Buffer.concat(chunks);
-  } finally {
-    clearTimeout(timeout);
-  }
+        if (status < 200 || status >= 300) {
+          res.resume();
+          settle(() =>
+            reject(new Error(`Failed to fetch dump (${status} ${res.statusMessage ?? ""})`.trim()))
+          );
+          return;
+        }
+
+        const header = res.headers["content-length"];
+        if (header !== undefined && Number(header) > MAX_DUMP_BYTES) {
+          res.destroy();
+          settle(() => reject(new Error(`Remote dump exceeds maximum size of ${MAX_DUMP_BYTES} bytes`)));
+          return;
+        }
+
+        const chunks: Buffer[] = [];
+        let received = 0;
+
+        res.on("data", (chunk: Buffer) => {
+          received += chunk.length;
+          // Stream-bounded read: abort as soon as the accumulated size exceeds
+          // the cap so a chunked response without a content-length can't
+          // exhaust memory.
+          if (received > MAX_DUMP_BYTES) {
+            res.destroy();
+            settle(() =>
+              reject(new Error(`Remote dump exceeds maximum size of ${MAX_DUMP_BYTES} bytes`))
+            );
+            return;
+          }
+          chunks.push(chunk);
+        });
+
+        res.on("end", () => settle(() => resolve(Buffer.concat(chunks))));
+        res.on("error", (err) => settle(() => reject(err)));
+      }
+    );
+
+    req.on("error", (err) => settle(() => reject(err)));
+  });
 }
 
 export async function POST(
@@ -201,21 +286,27 @@ export async function POST(
       const contentType = request.headers.get("content-type") ?? "";
       const url = new URL(request.url);
       const replace = url.searchParams.get("replace") === "true";
+      const isMultipart = contentType.startsWith("multipart/form-data");
 
-      // Reject oversized requests up front so a large multipart upload isn't
-      // fully buffered by formData()/json() before the size check runs.
-      const contentLength = request.headers.get("content-length");
-      if (contentLength !== null && Number(contentLength) > MAX_DUMP_BYTES) {
-        return NextResponse.json(
-          { message: `Dump exceeds maximum size of ${MAX_DUMP_BYTES} bytes` },
-          { status: 400, headers: getCorsHeaders(request) }
-        );
+      // For the JSON/URL path the content-length maps directly to the body
+      // request.json() buffers, so reject oversized bodies up front. Multipart
+      // uploads are bounded while streaming in readUploadedDump instead — their
+      // content-length includes envelope overhead and can't be compared to the
+      // dump cap directly.
+      if (!isMultipart) {
+        const contentLength = request.headers.get("content-length");
+        if (contentLength !== null && Number(contentLength) > MAX_DUMP_BYTES) {
+          return NextResponse.json(
+            { message: `Request body exceeds maximum size of ${MAX_DUMP_BYTES} bytes` },
+            { status: 400, headers: getCorsHeaders(request) }
+          );
+        }
       }
 
       let dump: Buffer;
       let shouldReplace = replace;
 
-      if (contentType.startsWith("multipart/form-data")) {
+      if (isMultipart) {
         dump = await readUploadedDump(request);
       } else {
         const body = await request.json();
@@ -247,18 +338,14 @@ export async function POST(
         const wakeMessage = (wakeErr as Error)?.message ?? "";
 
         // A WRONGTYPE error means RESTORE wrote a non-graph value (string/list/etc.)
-        // under this key — the payload is not a FalkorDB graph. Fail closed.
+        // under this key — the payload is not a FalkorDB graph. Fail closed and
+        // always remove the bogus key: whether or not REPLACE was set, leaving a
+        // non-graph value under the graph key would break later graph operations.
         if (/WRONGTYPE/i.test(wakeMessage)) {
-          // When we created a brand-new key (no REPLACE — RESTORE would have failed
-          // with BUSYKEY otherwise) remove the bogus key so we don't leave non-graph
-          // data behind. With REPLACE the previous value is already gone, so we only
-          // report the failure.
-          if (!shouldReplace) {
-            try {
-              await connection.del(graphId);
-            } catch (cleanupErr) {
-              console.warn(`Failed to clean up invalid restored key ${graphId}:`, cleanupErr);
-            }
+          try {
+            await connection.del(graphId);
+          } catch (cleanupErr) {
+            console.warn(`Failed to clean up invalid restored key ${graphId}:`, cleanupErr);
           }
 
           return NextResponse.json(

@@ -46,6 +46,12 @@ export default function RestoreGraph({ existingGraphs, onRestore }: Props) {
       setReplace(false);
       setIsLoading(false);
       setTab("upload");
+      // Clearing React state alone leaves the native <input type="file"> showing
+      // the previously picked file and blocks re-selecting the same file (no
+      // change event fires), so reset the element value too.
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   }, [open]);
 
