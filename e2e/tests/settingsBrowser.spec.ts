@@ -422,4 +422,218 @@ test.describe('@browser Browser Settings tests', () => {
         }
     });
 
+    // ===== Max Saved Messages =====
+
+    test('@readwrite Verify max saved messages can be set and persists', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.waitForMaxSavedMessagesInput();
+
+        await settingsBrowserPage.fillMaxSavedMessages(7);
+        await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForTimeout(500);
+
+        await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.waitForTimeout(1000);
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.waitForMaxSavedMessagesInput();
+
+        const savedValue = await settingsBrowserPage.getMaxSavedMessagesValue();
+        expect(savedValue).toBe('7');
+    });
+
+    test('@readwrite Verify max saved messages rejects values below 5', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.waitForMaxSavedMessagesInput();
+
+        await settingsBrowserPage.fillMaxSavedMessages(3);
+        await settingsBrowserPage.clickSaveSettingsButtonWithoutWait();
+        await settingsBrowserPage.waitForTimeout(1000);
+
+        await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.waitForTimeout(1000);
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.waitForMaxSavedMessagesInput();
+
+        const savedValue = await settingsBrowserPage.getMaxSavedMessagesValue();
+        expect(Number(savedValue)).toBeGreaterThanOrEqual(5);
+    });
+
+    test('@readwrite Verify max saved messages rejects values above 10', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.waitForMaxSavedMessagesInput();
+
+        await settingsBrowserPage.fillMaxSavedMessages(15);
+        await settingsBrowserPage.clickSaveSettingsButtonWithoutWait();
+        await settingsBrowserPage.waitForTimeout(1000);
+
+        await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.waitForTimeout(1000);
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.waitForMaxSavedMessagesInput();
+
+        const savedValue = await settingsBrowserPage.getMaxSavedMessagesValue();
+        expect(Number(savedValue)).toBeLessThanOrEqual(10);
+    });
+
+    // ===== Graph Info Section =====
+
+    test('@readwrite Verify refresh interval slider can be changed and persists', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settingsBrowserPage.expandGraphInfoSection();
+
+        await settingsBrowserPage.setRefreshIntervalSlider(30);
+        await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForTimeout(500);
+
+        await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.waitForTimeout(1000);
+        await settingsBrowserPage.expandGraphInfoSection();
+
+        const value = await settingsBrowserPage.getRefreshIntervalValue();
+        expect(value).toBe(30);
+    });
+
+    test('@readwrite Verify max items for search slider can be changed and persists', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settingsBrowserPage.expandGraphInfoSection();
+
+        await settingsBrowserPage.setMaxItemsForSearchSlider(25);
+        await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForTimeout(500);
+
+        await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.waitForTimeout(1000);
+        await settingsBrowserPage.expandGraphInfoSection();
+
+        const value = await settingsBrowserPage.getMaxItemsForSearchValue();
+        expect(value).toBe(25);
+    });
+
+    // ===== Table View Settings =====
+
+    test('@readwrite Verify column width slider can be changed and persists', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        await settingsBrowserPage.setColumnWidthSlider(50);
+        await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForTimeout(500);
+
+        await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.waitForTimeout(1000);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        const value = await settingsBrowserPage.getColumnWidthValue();
+        expect(value).toBe(50);
+    });
+
+    test('@readwrite Verify row height slider can be changed and persists', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        await settingsBrowserPage.setRowHeightSlider(60);
+        await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForTimeout(500);
+
+        await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.waitForTimeout(1000);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        const value = await settingsBrowserPage.getRowHeightValue();
+        expect(value).toBe(60);
+    });
+
+    test('@readwrite Verify row height expand multiplier slider can be changed and persists', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        await settingsBrowserPage.setRowHeightExpandMultipleSlider(4);
+        await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForTimeout(500);
+
+        await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.waitForTimeout(1000);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        const value = await settingsBrowserPage.getRowHeightExpandMultipleValue();
+        expect(value).toBe(4);
+    });
+
+    // ===== User Experience - Captions Keys =====
+
+    test('@readwrite Verify caption key can be added and persists', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        // Use a unique key name to avoid collisions with existing keys
+        const captionKey = `testkey_${Date.now()}`;
+        await settingsBrowserPage.addCaptionKey(captionKey);
+        await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForTimeout(500);
+
+        await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.waitForTimeout(1000);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        const keys = await settingsBrowserPage.getCaptionKeys();
+        expect(keys).toContain(captionKey);
+
+        // Cleanup: remove the test key
+        await settingsBrowserPage.removeCaptionKey(captionKey);
+        await settingsBrowserPage.clickSaveSettingsButton();
+    });
+
+    test('@readwrite Verify caption key can be removed', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        // Add a unique key to remove
+        const captionKey = `removekey_${Date.now()}`;
+        await settingsBrowserPage.addCaptionKey(captionKey);
+        await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForTimeout(500);
+
+        await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.waitForTimeout(1000);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        // Remove the key
+        await settingsBrowserPage.removeCaptionKey(captionKey);
+        await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForTimeout(500);
+
+        await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.waitForTimeout(1000);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        const keys = await settingsBrowserPage.getCaptionKeys();
+        expect(keys).not.toContain(captionKey);
+    });
+
+    // ===== User Experience - Show Property Key Prefix =====
+
+    test('@readwrite Verify show property key prefix toggle can be changed and persists', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        const initialState = await settingsBrowserPage.getShowPropertyKeyPrefixState();
+        await settingsBrowserPage.clickShowPropertyKeyPrefixSwitch();
+        await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForTimeout(500);
+
+        await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.waitForTimeout(1000);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        const newState = await settingsBrowserPage.getShowPropertyKeyPrefixState();
+        expect(newState).toBe(!initialState);
+
+        // Reset to original state
+        await settingsBrowserPage.clickShowPropertyKeyPrefixSwitch();
+        await settingsBrowserPage.clickSaveSettingsButton();
+    });
+
 });
