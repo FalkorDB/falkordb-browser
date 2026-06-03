@@ -41,9 +41,6 @@ export async function GET(request: NextRequest) {
         } else {
             // Fetch all models
             models = await textToCypher.listModels();
-
-            console.log(models);
-            
         }
 
         return NextResponse.json({ models }, { status: 200, headers: getCorsHeaders(request) });

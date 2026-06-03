@@ -84,6 +84,7 @@ export default function Chat({ onClose }: Props) {
     const [messagesList, setMessagesList] = useState<(Message | [Message[], boolean])[]>([]);
     const [newMessage, setNewMessage] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+    const [totalTokens, setTotalTokens] = useState(0);
     const [queryCollapse, setQueryCollapse] = useState<{ [key: string]: boolean }>({});
     const [collapseEligible, setCollapseEligible] = useState<{ [key: number]: boolean }>({});
     const textRefs = useRef<Map<number, HTMLElement>>(new Map());
@@ -181,7 +182,7 @@ export default function Chat({ onClose }: Props) {
     const handleSetMessages = (newMessages: Message[] | Message) => {
         setMessages(newMessages instanceof Array ? newMessages : prev => [...prev, newMessages]);
         setTimeout(scrollToBottom, 0);
-    }
+    };
 
     const handleSubmit = async (e?: React.FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>) => {
         e?.preventDefault();
@@ -278,7 +279,18 @@ export default function Chat({ onClose }: Props) {
                 })
             });
 
-            const data = await response.json();
+            let data;
+            try {
+                data = await response.json();
+            } catch {
+                handleSetMessages({
+                    role: "assistant",
+                    content: "Failed to parse server response",
+                    type: "Error"
+                });
+                setIsLoading(false);
+                return;
+            }
 
             if (!response.ok) {
                 if (response.status === 401 || response.status >= 500) setIndicator("offline");
@@ -308,11 +320,13 @@ export default function Chat({ onClose }: Props) {
             if (data.tokenUsage) {
                 const usage = data.tokenUsage;
 
-                console.log(usage);
+                const newTotal = totalTokens + usage.totalTokens;
+
+                setTotalTokens(newTotal);
 
                 handleSetMessages({
                     role: "assistant",
-                    content: `${usage.totalTokens} (${usage.promptTokens} + ${usage.completionTokens}) - ${(Number(messages.findLast(m => m.type === "Usage")?.content.split("-")[1]) || 0) + Number(usage.totalTokens)}`,
+                    content: `${usage.totalTokens} - ${newTotal}`,
                     type: "Usage"
                 });
             }

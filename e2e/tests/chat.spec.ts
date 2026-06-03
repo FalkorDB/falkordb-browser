@@ -497,23 +497,23 @@ test.describe("Chat Feature Tests", () => {
     await chat.openChat();
     await chat.waitForChatPanel();
 
-    // Build a mock SSE response containing markdown-formatted text
+    // Build a mock JSON response containing markdown-formatted text
     const markdownAnswer = "Here are Alice's friends:\n\n**Bob** is her friend.\n\n- Item one\n- Item two\n\n```cypher\nMATCH (n) RETURN n\n```";
-    const ssePayload = [
-      `event: CypherQuery\ndata: ${JSON.stringify('MATCH (a:Person {name: "Alice"})-[:KNOWS]->(b) RETURN b.name')}\n\n`,
-      `event: Result\ndata: ${JSON.stringify(markdownAnswer)}\n\n`,
-    ].join("");
 
-    // Intercept the /api/chat POST and return the mock SSE stream
+    // Intercept the /api/chat POST and return the mock JSON response
     await page.route("**/api/chat", (route) => {
       route.fulfill({
         status: 200,
         headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          "Connection": "keep-alive",
+          "Content-Type": "application/json",
         },
-        body: ssePayload,
+        body: JSON.stringify({
+          cypherQuery: 'MATCH (a:Person {name: "Alice"})-[:KNOWS]->(b) RETURN b.name',
+          cypherResult: null,
+          answer: markdownAnswer,
+          confidence: null,
+          tokenUsage: null,
+        }),
       });
     });
 
