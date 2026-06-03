@@ -303,6 +303,8 @@ export default function Chat({ onClose }: Props) {
                 return;
             }
 
+            setIndicator("online");
+
             // Show cypher query if available
             if (data.cypherQuery) {
                 const cypherContent = typeof data.cypherQuery === "string"
