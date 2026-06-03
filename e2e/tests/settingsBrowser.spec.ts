@@ -447,6 +447,9 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForMaxSavedMessagesInput();
 
+        // Store the original value before entering invalid input
+        const originalValue = await settingsBrowserPage.getMaxSavedMessagesValue();
+
         await settingsBrowserPage.fillMaxSavedMessages(3);
         await settingsBrowserPage.clickSaveSettingsButtonWithoutWait();
         await settingsBrowserPage.waitForTimeout(1000);
@@ -457,13 +460,16 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.waitForMaxSavedMessagesInput();
 
         const savedValue = await settingsBrowserPage.getMaxSavedMessagesValue();
-        expect(Number(savedValue)).toBeGreaterThanOrEqual(5);
+        expect(savedValue).toBe(originalValue);
     });
 
     test('@readwrite Verify max saved messages rejects values above 10', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForMaxSavedMessagesInput();
+
+        // Store the original value before entering invalid input
+        const originalValue = await settingsBrowserPage.getMaxSavedMessagesValue();
 
         await settingsBrowserPage.fillMaxSavedMessages(15);
         await settingsBrowserPage.clickSaveSettingsButtonWithoutWait();
@@ -475,7 +481,7 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.waitForMaxSavedMessagesInput();
 
         const savedValue = await settingsBrowserPage.getMaxSavedMessagesValue();
-        expect(Number(savedValue)).toBeLessThanOrEqual(10);
+        expect(savedValue).toBe(originalValue);
     });
 
     // ===== Graph Info Section =====
@@ -620,20 +626,25 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.expandUserExperienceSection();
 
         const initialState = await settingsBrowserPage.getShowPropertyKeyPrefixState();
-        await settingsBrowserPage.clickShowPropertyKeyPrefixSwitch();
-        await settingsBrowserPage.clickSaveSettingsButton();
-        await settingsBrowserPage.waitForTimeout(500);
+        try {
+            await settingsBrowserPage.clickShowPropertyKeyPrefixSwitch();
+            await settingsBrowserPage.clickSaveSettingsButton();
+            await settingsBrowserPage.waitForTimeout(500);
 
-        await settingsBrowserPage.reloadPage();
-        await settingsBrowserPage.waitForTimeout(1000);
-        await settingsBrowserPage.expandUserExperienceSection();
+            await settingsBrowserPage.reloadPage();
+            await settingsBrowserPage.waitForTimeout(1000);
+            await settingsBrowserPage.expandUserExperienceSection();
 
-        const newState = await settingsBrowserPage.getShowPropertyKeyPrefixState();
-        expect(newState).toBe(!initialState);
-
-        // Reset to original state
-        await settingsBrowserPage.clickShowPropertyKeyPrefixSwitch();
-        await settingsBrowserPage.clickSaveSettingsButton();
+            const newState = await settingsBrowserPage.getShowPropertyKeyPrefixState();
+            expect(newState).toBe(!initialState);
+        } finally {
+            // Always reset to original state
+            const currentState = await settingsBrowserPage.getShowPropertyKeyPrefixState();
+            if (currentState !== initialState) {
+                await settingsBrowserPage.clickShowPropertyKeyPrefixSwitch();
+                await settingsBrowserPage.clickSaveSettingsButton();
+            }
+        }
     });
 
 });

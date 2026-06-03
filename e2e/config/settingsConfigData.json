@@ -57,7 +57,11 @@
     ],
     "searchElements": [
       {"input": "CACHE_SIZE", "expected": 1},
-      {"input": "RESULTSET_SIZE", "expected": 1}
+      {"input": "RESULTSET_SIZE", "expected": 1},
+      {"input": "EFFECTS_THRESHOLD", "expected": 1},
+      {"input": "DELTA_MAX_PENDING_CHANGES", "expected": 1},
+      {"input": "JS_HEAP_SIZE", "expected": 1},
+      {"input": "JS_STACK_SIZE", "expected": 1}
     ]
 }
   

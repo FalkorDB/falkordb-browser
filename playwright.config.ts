@@ -176,7 +176,7 @@ export default defineConfig({
         storageState: 'playwright/.auth/admin.json',
       },
       grep: /@admin|@config/,
-      dependencies: ['setup'],
+      dependencies: ['setup', '[Admin: Settings - Chromium]'],
       testMatch: /.*(settingsConfig|settingsUsers)\.spec\.ts$/,
     },
 

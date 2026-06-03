@@ -460,37 +460,19 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   async setRefreshIntervalSlider(value: number): Promise<void> {
-    // Sliders in Radix use a thumb that can be dragged; we set via keyboard for reliability
-    const thumb = this.refreshIntervalSlider.locator('[role="slider"]');
-    await thumb.focus();
-    // Set the value using aria-valuenow by pressing keys
-    const current = Number(await thumb.getAttribute('aria-valuenow'));
-    const diff = value - current;
-    const key = diff > 0 ? 'ArrowRight' : 'ArrowLeft';
-    for (let i = 0; i < Math.abs(diff); i += 1) {
-      await thumb.press(key);
-    }
+    await this.setSliderByStep(this.refreshIntervalSlider, value, 1);
   }
 
   async getRefreshIntervalValue(): Promise<number> {
-    const thumb = this.refreshIntervalSlider.locator('[role="slider"]');
-    return Number(await thumb.getAttribute('aria-valuenow'));
+    return this.getSliderValue(this.refreshIntervalSlider);
   }
 
   async setMaxItemsForSearchSlider(value: number): Promise<void> {
-    const thumb = this.maxItemsForSearchSlider.locator('[role="slider"]');
-    await thumb.focus();
-    const current = Number(await thumb.getAttribute('aria-valuenow'));
-    const diff = value - current;
-    const key = diff > 0 ? 'ArrowRight' : 'ArrowLeft';
-    for (let i = 0; i < Math.abs(diff); i += 1) {
-      await thumb.press(key);
-    }
+    await this.setSliderByStep(this.maxItemsForSearchSlider, value, 1);
   }
 
   async getMaxItemsForSearchValue(): Promise<number> {
-    const thumb = this.maxItemsForSearchSlider.locator('[role="slider"]');
-    return Number(await thumb.getAttribute('aria-valuenow'));
+    return this.getSliderValue(this.maxItemsForSearchSlider);
   }
 
   // ===== User Experience Section =====
@@ -547,7 +529,9 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   async removeCaptionKey(key: string): Promise<void> {
-    const listItem = this.page.locator('li').filter({ hasText: key });
+    // Scope to the caption list container to avoid matching unrelated <li> elements
+    const captionsContainer = this.captionKeyInput.locator('..').locator('..');
+    const listItem = captionsContainer.locator('li').filter({ hasText: key });
     const deleteBtn = listItem.getByLabel('Remove Caption');
     await deleteBtn.click();
   }
@@ -566,52 +550,45 @@ export default class SettingsBrowserPage extends BasePage {
     return this.page.locator('#rowHeightExpandMultiple');
   }
 
-  async getColumnWidthValue(): Promise<number> {
-    const thumb = this.columnWidthSlider.locator('[role="slider"]');
-    return Number(await thumb.getAttribute('aria-valuenow'));
+  private async getSliderValue(slider: Locator): Promise<number> {
+    const thumb = slider.locator('[role="slider"]');
+    const raw = await thumb.getAttribute('aria-valuenow');
+    return Number(raw ?? 0);
   }
 
-  async setColumnWidthSlider(value: number): Promise<void> {
-    const thumb = this.columnWidthSlider.locator('[role="slider"]');
+  private async setSliderByStep(slider: Locator, targetValue: number, step: number): Promise<void> {
+    const thumb = slider.locator('[role="slider"]');
     await thumb.focus();
-    const current = Number(await thumb.getAttribute('aria-valuenow'));
-    // Step is 5 for column width
-    const steps = (value - current) / 5;
+    const raw = await thumb.getAttribute('aria-valuenow');
+    const current = Number(raw ?? 0);
+    const steps = Math.round((targetValue - current) / step);
     const key = steps > 0 ? 'ArrowRight' : 'ArrowLeft';
     for (let i = 0; i < Math.abs(steps); i += 1) {
       await thumb.press(key);
     }
   }
 
+  async getColumnWidthValue(): Promise<number> {
+    return this.getSliderValue(this.columnWidthSlider);
+  }
+
+  async setColumnWidthSlider(value: number): Promise<void> {
+    await this.setSliderByStep(this.columnWidthSlider, value, 5);
+  }
+
   async getRowHeightValue(): Promise<number> {
-    const thumb = this.rowHeightSlider.locator('[role="slider"]');
-    return Number(await thumb.getAttribute('aria-valuenow'));
+    return this.getSliderValue(this.rowHeightSlider);
   }
 
   async setRowHeightSlider(value: number): Promise<void> {
-    const thumb = this.rowHeightSlider.locator('[role="slider"]');
-    await thumb.focus();
-    const current = Number(await thumb.getAttribute('aria-valuenow'));
-    const diff = value - current;
-    const key = diff > 0 ? 'ArrowRight' : 'ArrowLeft';
-    for (let i = 0; i < Math.abs(diff); i += 1) {
-      await thumb.press(key);
-    }
+    await this.setSliderByStep(this.rowHeightSlider, value, 1);
   }
 
   async getRowHeightExpandMultipleValue(): Promise<number> {
-    const thumb = this.rowHeightExpandMultipleSlider.locator('[role="slider"]');
-    return Number(await thumb.getAttribute('aria-valuenow'));
+    return this.getSliderValue(this.rowHeightExpandMultipleSlider);
   }
 
   async setRowHeightExpandMultipleSlider(value: number): Promise<void> {
-    const thumb = this.rowHeightExpandMultipleSlider.locator('[role="slider"]');
-    await thumb.focus();
-    const current = Number(await thumb.getAttribute('aria-valuenow'));
-    const diff = value - current;
-    const key = diff > 0 ? 'ArrowRight' : 'ArrowLeft';
-    for (let i = 0; i < Math.abs(diff); i += 1) {
-      await thumb.press(key);
-    }
+    await this.setSliderByStep(this.rowHeightExpandMultipleSlider, value, 1);
   }
 }
