@@ -352,10 +352,10 @@ test.describe('@browser Browser Settings tests', () => {
             // Verify user message was sent (appears in chat)
             await chatComponent.waitForChatUserMessage();
 
-            // Verify error toast is displayed due to model/API key mismatch
+            // Verify error message is displayed inline in chat due to model/API key mismatch
             // The error message should be: "Model/API key mismatch: You selected a Anthropic model but provided a OpenAI API key..."
-            const isErrorToastVisible = await chatComponent.getNotificationErrorToast();
-            expect(isErrorToastVisible).toBe(true);
+            const hasErrorMessage = await chatComponent.waitForAssistantResponse("Error");
+            expect(hasErrorMessage).toBe(true);
         } finally {
             // Clean up - always remove graph even if test fails
             await apiCall.removeGraph(graphName);
@@ -413,9 +413,9 @@ test.describe('@browser Browser Settings tests', () => {
             // Verify user message was sent
             await chatComponent.waitForChatUserMessage();
 
-            // Verify error toast is displayed due to model/API key mismatch
-            const isErrorToastVisible = await chatComponent.getNotificationErrorToast();
-            expect(isErrorToastVisible).toBe(true);
+            // Verify error message is displayed inline in chat due to model/API key mismatch
+            const hasErrorMessage = await chatComponent.waitForAssistantResponse("Error");
+            expect(hasErrorMessage).toBe(true);
         } finally {
             // Clean up - always remove graph even if test fails
             await apiCall.removeGraph(graphName);
