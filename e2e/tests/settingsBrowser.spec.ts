@@ -424,8 +424,7 @@ test.describe('@browser Browser Settings tests', () => {
 
     // ===== Max Saved Messages =====
 
-    test('@readwrite Verify max saved messages can be set and persists', async ({ }, testInfo) => {
-        testInfo.setTimeout(60000);
+    test('@readwrite Verify max saved messages can be set and persists', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForMaxSavedMessagesInput();
@@ -443,8 +442,7 @@ test.describe('@browser Browser Settings tests', () => {
         expect(savedValue).toBe('7');
     });
 
-    test('@readwrite Verify max saved messages rejects values below 5', async ({ }, testInfo) => {
-        testInfo.setTimeout(60000);
+    test('@readwrite Verify max saved messages rejects values below 5', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForMaxSavedMessagesInput();
@@ -465,8 +463,7 @@ test.describe('@browser Browser Settings tests', () => {
         expect(savedValue).toBe(originalValue);
     });
 
-    test('@readwrite Verify max saved messages rejects values above 10', async ({ }, testInfo) => {
-        testInfo.setTimeout(60000);
+    test('@readwrite Verify max saved messages rejects values above 10', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForMaxSavedMessagesInput();
@@ -489,8 +486,7 @@ test.describe('@browser Browser Settings tests', () => {
 
     // ===== Graph Info Section =====
 
-    test('@readwrite Verify refresh interval slider can be changed and persists', async ({ }, testInfo) => {
-        testInfo.setTimeout(60000);
+    test('@readwrite Verify refresh interval slider can be changed and persists', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
         await settingsBrowserPage.expandGraphInfoSection();
 
@@ -506,8 +502,7 @@ test.describe('@browser Browser Settings tests', () => {
         expect(value).toBe(30);
     });
 
-    test('@readwrite Verify max items for search slider can be changed and persists', async ({ }, testInfo) => {
-        testInfo.setTimeout(60000);
+    test('@readwrite Verify max items for search slider can be changed and persists', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
         await settingsBrowserPage.expandGraphInfoSection();
 
@@ -525,8 +520,7 @@ test.describe('@browser Browser Settings tests', () => {
 
     // ===== Table View Settings =====
 
-    test('@readwrite Verify column width slider can be changed and persists', async ({ }, testInfo) => {
-        testInfo.setTimeout(60000);
+    test('@readwrite Verify column width slider can be changed and persists', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
         await settingsBrowserPage.expandUserExperienceSection();
 
@@ -542,8 +536,7 @@ test.describe('@browser Browser Settings tests', () => {
         expect(value).toBe(50);
     });
 
-    test('@readwrite Verify row height slider can be changed and persists', async ({ }, testInfo) => {
-        testInfo.setTimeout(60000);
+    test('@readwrite Verify row height slider can be changed and persists', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
         await settingsBrowserPage.expandUserExperienceSection();
 
@@ -559,8 +552,7 @@ test.describe('@browser Browser Settings tests', () => {
         expect(value).toBe(60);
     });
 
-    test('@readwrite Verify row height expand multiplier slider can be changed and persists', async ({ }, testInfo) => {
-        testInfo.setTimeout(60000);
+    test('@readwrite Verify row height expand multiplier slider can be changed and persists', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
         await settingsBrowserPage.expandUserExperienceSection();
 
@@ -578,8 +570,7 @@ test.describe('@browser Browser Settings tests', () => {
 
     // ===== User Experience - Captions Keys =====
 
-    test('@readwrite Verify caption key can be added and persists', async ({ }, testInfo) => {
-        testInfo.setTimeout(60000);
+    test('@readwrite Verify caption key can be added and persists', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
         await settingsBrowserPage.expandUserExperienceSection();
 
@@ -601,8 +592,7 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.clickSaveSettingsButton();
     });
 
-    test('@readwrite Verify caption key can be removed', async ({ }, testInfo) => {
-        testInfo.setTimeout(60000);
+    test('@readwrite Verify caption key can be removed', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
         await settingsBrowserPage.expandUserExperienceSection();
 
@@ -631,8 +621,7 @@ test.describe('@browser Browser Settings tests', () => {
 
     // ===== User Experience - Show Property Key Prefix =====
 
-    test('@readwrite Verify show property key prefix toggle can be changed and persists', async ({ }, testInfo) => {
-        testInfo.setTimeout(60000);
+    test('@readwrite Verify show property key prefix toggle can be changed and persists', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
         await settingsBrowserPage.expandUserExperienceSection();
 
