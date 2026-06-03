@@ -78,6 +78,7 @@ export default function Page() {
     const {
         settings: {
             runDefaultQuerySettings: { runDefaultQuery },
+            contentPersistenceSettings: { contentPersistence },
             defaultQuerySettings: { defaultQuery },
             graphInfo: { showMemoryUsage, refreshInterval }
         }

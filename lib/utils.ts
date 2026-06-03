@@ -183,7 +183,7 @@ export type LazyCell = {
 };
 
 export type Message = {
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "info";
   content: string;
   type:
   | "Text"
@@ -191,7 +191,9 @@ export type Message = {
   | "Error"
   | "Status"
   | "CypherQuery"
-  | "CypherResult";
+  | "CypherResult"
+  | "Usage";
+  confidence?: number;
 };
 
 // [library_name, type, 'functions', function_names[]]

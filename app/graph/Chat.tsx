@@ -11,7 +11,6 @@ import { useRouter } from "next/navigation";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import { GraphContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext } from "../components/provider";
-import { EventType } from "../api/chat/route";
 import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import ToastButton from "../components/ToastButton";
 import { ShineBorder } from "@/components/ui/shine-border";
@@ -33,7 +32,7 @@ const MarkdownMessage = memo(function MarkdownMessage({ content }: { content: st
         <div
             data-testid="chatMessageMarkdown"
             className="text-sm markdown-body"
-             
+
             dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
     );
@@ -61,14 +60,6 @@ const getLastUserMessagesWithContext = (allMessages: Message[], maxUserMessages:
 interface Props {
     onClose: () => void
 }
-
-type ErrorWithStatus = Error & { status?: number };
-
-const createResponseError = async (response: Response): Promise<ErrorWithStatus> => {
-    const error = new Error(await response.text()) as ErrorWithStatus;
-    error.status = response.status;
-    return error;
-};
 
 const getErrorStatus = (error: unknown) => {
     if (error instanceof Error && "status" in error && typeof error.status === "number") return error.status;
@@ -187,6 +178,11 @@ export default function Chat({ onClose }: Props) {
         }
     };
 
+    const handleSetMessages = (newMessages: Message[] | Message) => {
+        setMessages(newMessages instanceof Array ? newMessages : prev => [...prev, newMessages]);
+        setTimeout(scrollToBottom, 0);
+    }
+
     const handleSubmit = async (e?: React.FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>) => {
         e?.preventDefault();
 
@@ -243,8 +239,7 @@ export default function Chat({ onClose }: Props) {
 
         const newMessages = [...messages, { role: "user", type: "Text", content: newMessage } as const];
 
-        setMessages(newMessages);
-        setTimeout(scrollToBottom, 0);
+        handleSetMessages(newMessages);
         setNewMessage("");
 
         // Client-side fail-fast: detect model/API key provider mismatch before making any request
@@ -253,11 +248,14 @@ export default function Chat({ onClose }: Props) {
         if (modelProvider !== "unknown" && keyProvider !== "unknown" && modelProvider !== keyProvider && modelProvider !== "ollama") {
             const modelProviderName = getProviderDisplayName(modelProvider);
             const keyProviderName = getProviderDisplayName(keyProvider);
-            toast({
-                title: "Error",
-                description: `Model/API key mismatch: You selected a ${modelProviderName} model but provided a ${keyProviderName} API key. Please update your API key in Settings to match your selected model.`,
-                variant: "destructive",
-            });
+            setMessages(prev => [
+                ...prev,
+                {
+                    role: "assistant",
+                    content: `Model/API key mismatch: You selected a ${modelProviderName} model but provided a ${keyProviderName} API key. Please update your API key in Settings to match your selected model.`,
+                    type: "Error"
+                }
+            ]);
             setIsLoading(false);
             return;
         }
@@ -280,168 +278,65 @@ export default function Chat({ onClose }: Props) {
                 })
             });
 
+            const data = await response.json();
+
             if (!response.ok) {
-                throw await createResponseError(response);
+                if (response.status === 401 || response.status >= 500) setIndicator("offline");
+                handleSetMessages({
+                    role: "assistant",
+                    content: data.error || "An error occurred",
+                    type: "Error"
+                });
+                setIsLoading(false);
+                return;
             }
 
-            const reader = response.body?.getReader();
-            const decoder = new TextDecoder();
-            let buffer = "";
-
-            const handleEvent = (eventType: EventType | "error", eventData: string) => {
-                switch (eventType) {
-                    case "Status": {
-                        const message = {
-                            role: "assistant" as const,
-                            content: eventData,
-                            type: eventType
-                        };
-                        setMessages(prev => [...prev, message]);
-                        break;
-                    }
-
-                    case "CypherQuery": {
-                        let cypherContent = eventData;
-                        try {
-                            cypherContent = JSON.parse(eventData);
-                        } catch {
-                            // Use raw eventData if not valid JSON
-                        }
-                        setQueryCollapse(prev => ({ ...prev, [messages.length]: false }));
-                        setMessages(prev => [
-                            ...prev,
-                            {
-                                role: "assistant",
-                                content: typeof cypherContent === "string" ? cypherContent.replace(/^cypher\s+/i, "") : cypherContent,
-                                type: eventType
-                            }
-                        ]);
-                    }
-                        break;
-
-                    case "Result":
-                        try {
-                            setMessages(prev => [
-                                ...prev,
-                                {
-                                    role: "assistant",
-                                    content: JSON.parse(eventData),
-                                    type: eventType
-                                }
-                            ]);
-                        } catch (error) {
-                            console.error("Failed to parse Result event data:", error);
-                            setMessages(prev => [
-                                ...prev,
-                                {
-                                    role: "assistant",
-                                    content: eventData,
-                                    type: "Error"
-                                }
-                            ]);
-                        }
-                        return true;
-
-                    case "Error":
-                        setMessages(prev => [
-                            ...prev,
-                            {
-                                role: "assistant",
-                                content: eventData,
-                                type: eventType
-                            }
-                        ]);
-                        return true;
-
-                    case "error": {
-                        let statusCode = 0;
-                        let errorMessage = eventData;
-
-                        try {
-                            const parsed = JSON.parse(eventData);
-                            if (typeof parsed === "object" && parsed !== null) {
-                                statusCode = parsed.status || 0;
-                                errorMessage = parsed.message || eventData;
-                            }
-                        } catch {
-                            errorMessage = eventData;
-                        }
-
-                        if (statusCode === 401 || statusCode >= 500) setIndicator("offline");
-
-                        const friendly = toUserFriendlyMessage(errorMessage, statusCode);
-                        toast({
-                            title: friendly.title,
-                            description: friendly.description,
-                            variant: "destructive",
-                        });
-
-                        return true;
-                    }
-
-                    case "CypherResult":
-                        break;
-
-                    default:
-                        break;
-                }
-                return false;
-            };
-
-            const processStream = async () => {
-                if (!reader) return;
-
-                while (true) {
-                    const { done, value } = await reader.read();
-
-                    if (done) break;
-
-                    buffer += decoder.decode(value, { stream: true });
-
-                    // Parse complete SSE frames (delimited by \n\n)
-                    let frameEnd: number;
-                    while ((frameEnd = buffer.indexOf("\n\n")) !== -1) {
-                        const frame = buffer.substring(0, frameEnd);
-                        buffer = buffer.substring(frameEnd + 2);
-
-                        let eventType: EventType | "error" | null = null;
-                        let eventData = "";
-
-                        for (const line of frame.split("\n")) {
-                            if (line.startsWith("event:")) {
-                                eventType = line.substring(6).trim() as EventType | "error";
-                            } else if (line.startsWith("data:")) {
-                                eventData = line.substring(5).trim();
-                            }
-                        }
-
-                        if (eventType) {
-                            const isResult = handleEvent(eventType, eventData);
-                            setTimeout(scrollToBottom, 0);
-                            if (isResult) return;
-                        }
-                    }
-                }
-            };
-
-            processStream()
-                .catch((error) => {
-                    const friendly = toUserFriendlyMessage(error instanceof Error ? error.message : error, getErrorStatus(error));
-                    toast({
-                        title: friendly.title,
-                        description: friendly.description,
-                        variant: "destructive",
-                    });
-                })
-                .finally(() => {
-                    setIsLoading(false);
+            // Show cypher query if available
+            if (data.cypherQuery) {
+                const cypherContent = typeof data.cypherQuery === "string"
+                    ? data.cypherQuery.replace(/^cypher\s+/i, "")
+                    : data.cypherQuery;
+                setQueryCollapse(prev => ({ ...prev, [messages.length]: false }));
+                handleSetMessages({
+                    role: "assistant",
+                    content: cypherContent,
+                    type: "CypherQuery"
                 });
+            }
+
+            // Show token usage if available
+            if (data.tokenUsage) {
+                const usage = data.tokenUsage;
+
+                console.log(usage);
+
+                handleSetMessages({
+                    role: "assistant",
+                    content: `${usage.totalTokens} (${usage.promptTokens} + ${usage.completionTokens}) - ${(Number(messages.findLast(m => m.type === "Usage")?.content.split("-")[1]) || 0) + Number(usage.totalTokens)}`,
+                    type: "Usage"
+                });
+            }
+
+            // Show answer
+            if (data.answer) {
+                const confidence = typeof data.confidence === "number" ? data.confidence : undefined;
+                handleSetMessages({
+                    role: "assistant",
+                    content: typeof data.answer === "string" ? data.answer : JSON.stringify(data.answer),
+                    type: "Result",
+                    confidence
+                });
+            }
+
+            setTimeout(scrollToBottom, 0);
+            setIsLoading(false);
+
         } catch (error) {
             const friendly = toUserFriendlyMessage(error instanceof Error ? error.message : error, getErrorStatus(error));
-            toast({
-                title: friendly.title,
-                description: friendly.description,
-                variant: "destructive",
+            handleSetMessages({
+                role: "assistant",
+                content: `${friendly.title}: ${friendly.description}`,
+                type: "Error"
             });
             setIsLoading(false);
         }
@@ -526,8 +421,31 @@ export default function Chat({ onClose }: Props) {
                         </div>
                     </div>
                 );
+            case "Usage": {
+                return (
+                    <div className="flex flex-col gap-1">
+                        <span className="text-xs px-1.5 py-0.5 rounded w-fit">
+                            Session Tokens: {message.content}
+                        </span>
+                    </div>
+                );
+            }
             default:
-                return <MarkdownMessage content={message.content} />;
+                return (
+                    <div className="flex flex-col gap-1">
+                        <MarkdownMessage content={message.content} />
+                        {message.type === "Result" && message.confidence != null && (
+                            <span className={cn(
+                                "text-xs px-1.5 py-0.5 rounded w-fit",
+                                message.confidence >= 0.9 ? "bg-green-500/20 text-green-400" :
+                                    message.confidence >= 0.7 ? "bg-yellow-500/20 text-yellow-400" :
+                                        "bg-red-500/20 text-red-400"
+                            )}>
+                                Confidence: {Math.round(message.confidence * 100)}%
+                            </span>
+                        )}
+                    </div>
+                );
         }
     };
 
@@ -544,7 +462,9 @@ export default function Chat({ onClose }: Props) {
                 </Button>
                 <div className="w-full flex justify-between items-center pr-8">
                     <h1 className="text-lg font-semibold">Chat</h1>
-                    <Sparkles size={25} />
+                    <div className="flex items-center gap-2">
+                        <Sparkles size={25} />
+                    </div>
                 </div>
                 <span id="chat-prerequisites" className="text-center">Use English to query the graph. The feature requires LLM model and API key. Update local user parameters in Settings.</span>
                 <ul data-testid="chatMessagesList" className="w-full h-1 grow flex flex-col gap-[12px] overflow-x-hidden overflow-y-auto chat-container">
@@ -592,6 +512,7 @@ export default function Chat({ onClose }: Props) {
                                 );
                             }
                             const isUser = message.role === "user";
+                            const isInfo = message.role === "info";
                             const assistantBg = message.type === "Error" ? "bg-destructive" : "bg-secondary";
                             const avatar = isUser
                                 ? <div className="h-8 w-8 rounded-full flex items-center justify-center bg-primary">
@@ -607,13 +528,13 @@ export default function Chat({ onClose }: Props) {
                                     key={index}
                                 >
                                     {
-                                        !isUser && avatar
+                                        !isUser && !isInfo && avatar
                                     }
                                     <div className={cn("max-w-[80%] p-2 rounded-lg overflow-hidden", isUser ? "bg-primary" : assistantBg)}>
                                         {getMessage(message)}
                                     </div>
                                     {
-                                        isUser && avatar
+                                        isUser && !isInfo && avatar
                                     }
                                 </li>
                             );

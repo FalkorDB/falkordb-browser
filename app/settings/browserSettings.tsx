@@ -70,7 +70,7 @@ export default function BrowserSettings() {
         setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
     };
 
-    // Fetch all available models once on mount
+    // Fetch all available models when secretKey changes
     useEffect(() => {
         (async () => {
             setIsLoadingModels(true);
@@ -89,14 +89,17 @@ export default function BrowserSettings() {
 
             setIsLoadingModels(false);
         })();
-    }, [toast, setIndicator]);
+    }, [secretKey, toast, setIndicator]);
 
     useEffect(() => {
         (async () => {
             const detectedProvider = detectProviderFromApiKey(secretKey);
             if (!model && detectedProvider !== "unknown") {
+                const params = new URLSearchParams({ provider: detectedProvider });
+                if (secretKey) params.set("apiKey", secretKey);
+
                 const res = await securedFetch(
-                    `/api/chat/models?provider=${detectedProvider}`,
+                    `/api/chat/models?${params.toString()}`,
                     { method: "GET" },
                     toast,
                     setIndicator

@@ -34,7 +34,12 @@ export default function Settings() {
     const { tab: urlTab, setTab } = useSettingsParams();
 
     const [current, setCurrent] = useState<Tab>("Browser");
+    const [hasMounted, setHasMounted] = useState(false);
     const prevActiveConnectionIdRef = useRef<string | null | undefined>(undefined);
+
+    useEffect(() => {
+        setHasMounted(true);
+    }, []);
 
     // Sync tab from URL param (after hydration, useSearchParams populates)
     useEffect(() => {
@@ -133,7 +138,7 @@ export default function Settings() {
                     onClick={() => handleSetCurrent("Browser")}
                 />
                 {
-                    session?.user.role === "Admin" && indicator === "online" &&
+                    hasMounted && session?.user.role === "Admin" && indicator === "online" &&
                     <>
                         <Button
                             data-testid="settingsTabConfigurations"

@@ -9,8 +9,6 @@ export async function OPTIONS(request: NextRequest) {
     return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
 
-export type EventType = "Status" | "CypherQuery" | "CypherResult" | "ModelOutputChunk" | "Result" | "Error";
-
 /**
  * Create user-friendly error message
  */
@@ -88,7 +86,6 @@ function createUserFriendlyErrorMessage(error: unknown, model: string, apiKey: s
 
 // eslint-disable-next-line import/prefer-default-export
 export async function POST(request: NextRequest) {
-    const encoder = new TextEncoder();
 
     let session;
     try {
@@ -115,113 +112,81 @@ export async function POST(request: NextRequest) {
     const validation = validateBody(chatRequest, body);
 
     if (!validation.success) {
-        return new Response(validation.error, {
-            status: 400,
-            headers: {
-                "Content-Type": "text/event-stream",
-                "Cache-Control": "no-cache",
-                Connection: "keep-alive",
-                ...getCorsHeaders(request),
-            },
-        });
+        return NextResponse.json(
+            { error: validation.error },
+            { status: 400, headers: getCorsHeaders(request) }
+        );
     }
 
     const { messages, graphName, key, model, cypherOnly } = validation.data;
 
-    const { readable, writable } = new TransformStream();
-    const writer = writable.getWriter();
-
-    // Process the text-to-cypher request in the background so the Response
-    // (and its readable stream) is returned immediately to the client.
-    // This prevents a deadlock where awaited writes block because the readable
-    // side has no consumer yet (consumer starts only after Response is returned).
-    (async () => {
-        try {
-            // Fail fast on model/API key provider mismatch before making any external calls
-            const modelProvider = detectProviderFromModel(model);
-            const keyProvider = detectProviderFromApiKey(key);
-            if (modelProvider !== "unknown" && keyProvider !== "unknown" && modelProvider !== keyProvider && modelProvider !== "ollama") {
-                const modelProviderName = getProviderDisplayName(modelProvider);
-                const keyProviderName = getProviderDisplayName(keyProvider);
-                throw new Error(`Model/API key mismatch: You selected a ${modelProviderName} model but provided a ${keyProviderName} API key. Please update your API key in Settings to match your selected model.`);
-            }
-
-            // Build FalkorDB connection URL from user session
-            const falkordbConnection = buildFalkorDBConnection(session.user);
-
-            // Create TextToCypher client
-            const textToCypher = new TextToCypher({
-                falkordbConnection,
-                model,
-                apiKey: key,
-            });
-
-            // Get the last user message
-            if (messages.length === 0) {
-                throw new Error('No messages provided');
-            }
-            const lastUserMessage = messages.filter(msg => msg.role === 'user').pop();
-            if (!lastUserMessage) {
-                throw new Error('No user messages found');
-            }
-            const question = lastUserMessage.content;
-
-            // Check if graph exists and has data before calling text-to-cypher
-            const graphs = await session.client.list();
-            if (!graphs.includes(graphName)) {
-                throw new Error("GRAPH_NOT_FOUND");
-            }
-            const graph = session.client.selectGraph(graphName);
-            const existsResult = await graph.roQuery("MATCH (n) RETURN 1 LIMIT 1");
-            if (!existsResult?.data?.length) {
-                throw new Error("EMPTY_GRAPH");
-            }
-
-            // Call textToCypher and get the result
-            const result = cypherOnly
-                ? await textToCypher.cypherOnly(graphName, question)
-                : await textToCypher.textToCypher(graphName, question);
-
-            // Check if the result has an error status
-            if (result.status === 'error') {
-                throw new Error(result.error || 'Text-to-Cypher failed');
-            }
-
-            // Send result events
-            if (result.cypherQuery) {
-                await writer.write(encoder.encode(`event: CypherQuery\ndata: ${JSON.stringify(result.cypherQuery)}\n\n`));
-            }
-
-            if (result.cypherResult) {
-                await writer.write(encoder.encode(`event: CypherResult\ndata: ${JSON.stringify(result.cypherResult)}\n\n`));
-            }
-
-            if (result.answer) {
-                await writer.write(encoder.encode(`event: Result\ndata: ${JSON.stringify(result.answer)}\n\n`));
-            }
-
-            await writer.close();
-        } catch (error) {
-            console.error('Text-to-Cypher error details:', error);
-
-            // Create user-friendly error message
-            const userFriendlyMessage = createUserFriendlyErrorMessage(error as Error, model, key);
-
-            await writer.write(encoder.encode(`event: error\ndata: ${JSON.stringify({ status: 400, message: userFriendlyMessage })}\n\n`));
-            await writer.close();
+    try {
+        // Fail fast on model/API key provider mismatch before making any external calls
+        const modelProvider = detectProviderFromModel(model);
+        const keyProvider = detectProviderFromApiKey(key);
+        if (modelProvider !== "unknown" && keyProvider !== "unknown" && modelProvider !== keyProvider && modelProvider !== "ollama") {
+            const modelProviderName = getProviderDisplayName(modelProvider);
+            const keyProviderName = getProviderDisplayName(keyProvider);
+            throw new Error(`Model/API key mismatch: You selected a ${modelProviderName} model but provided a ${keyProviderName} API key. Please update your API key in Settings to match your selected model.`);
         }
-    })();
 
-    request.signal.addEventListener("abort", () => {
-        writer.close().catch(() => { /* already closed */ });
-    });
+        // Build FalkorDB connection URL from user session
+        const falkordbConnection = buildFalkorDBConnection(session.user);
 
-    return new Response(readable, {
-        headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache",
-            Connection: "keep-alive",
-            ...getCorsHeaders(request),
-        },
-    });
+        // Create TextToCypher client
+        const textToCypher = new TextToCypher({
+            falkordbConnection,
+            model,
+            apiKey: key,
+        });
+
+        // Get the last user message
+        if (messages.length === 0) {
+            throw new Error('No messages provided');
+        }
+        const lastUserMessage = messages.filter(msg => msg.role === 'user').pop();
+        if (!lastUserMessage) {
+            throw new Error('No user messages found');
+        }
+        const question = lastUserMessage.content;
+
+        // Check if graph exists and has data before calling text-to-cypher
+        const graphs = await session.client.list();
+        if (!graphs.includes(graphName)) {
+            throw new Error("GRAPH_NOT_FOUND");
+        }
+        const graph = session.client.selectGraph(graphName);
+        const existsResult = await graph.roQuery("MATCH (n) RETURN 1 LIMIT 1");
+        if (!existsResult?.data?.length) {
+            throw new Error("EMPTY_GRAPH");
+        }
+
+        // Call textToCypher and get the result
+        const result = cypherOnly
+            ? await textToCypher.cypherOnly(graphName, question)
+            : await textToCypher.textToCypher(graphName, question);
+
+        // Check if the result has an error status
+        if (result.status === 'error') {
+            throw new Error(result.error || 'Text-to-Cypher failed');
+        }
+
+        return NextResponse.json({
+            cypherQuery: result.cypherQuery || null,
+            cypherResult: result.cypherResult || null,
+            answer: result.answer || null,
+            confidence: (result as { confidence?: number }).confidence ?? null,
+            tokenUsage: result.tokenUsage || null,
+        }, { headers: getCorsHeaders(request) });
+
+    } catch (error) {
+        console.error('Text-to-Cypher error details:', error);
+
+        const userFriendlyMessage = createUserFriendlyErrorMessage(error as Error, model, key);
+
+        return NextResponse.json(
+            { error: userFriendlyMessage },
+            { status: 500, headers: getCorsHeaders(request) }
+        );
+    }
 }

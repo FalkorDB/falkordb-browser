@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url);
         const provider = searchParams.get("provider");
 
-        // Create a TextToCypher instance (API key can be placeholder for listing models)
+        // Create a TextToCypher instance
         const textToCypher = new TextToCypher({
             falkordbConnection: buildFalkorDBConnection(session.user),
             model: "",
@@ -41,6 +41,9 @@ export async function GET(request: NextRequest) {
         } else {
             // Fetch all models
             models = await textToCypher.listModels();
+
+            console.log(models);
+            
         }
 
         return NextResponse.json({ models }, { status: 200, headers: getCorsHeaders(request) });
