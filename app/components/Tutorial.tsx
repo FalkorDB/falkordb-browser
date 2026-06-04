@@ -565,6 +565,85 @@ function ArrowIcon({ direction }: { direction: "left" | "right" | "top" | "botto
     }
 }
 
+/**
+ * Module-level mechanism to keep Radix sub-menus open during tutorial step transitions.
+ * When the hover step detects its condition (sub-menu opened), it starts this keep-alive
+ * BEFORE calling onNext. This prevents Radix from closing the sub-menu during the
+ * React render/effect cycle that follows the step change.
+ */
+let subMenuKeepAlive: {
+    interval: ReturnType<typeof setInterval>;
+    blockers: Array<{ el: Element; handler: (e: Event) => void }>;
+    dimmedSiblings: HTMLElement[];
+    cleanup: () => void;
+} | null = null;
+
+function startSubMenuKeepAlive(subTrigger: HTMLElement, dimmedSiblings: HTMLElement[]) {
+    // Clean up any previous keep-alive
+    if (subMenuKeepAlive) subMenuKeepAlive.cleanup();
+
+    // Continuously dispatch pointermove on the SubTrigger to keep Radix thinking the pointer is there
+    const interval = setInterval(() => {
+        const currentRect = subTrigger.getBoundingClientRect();
+        subTrigger.dispatchEvent(new PointerEvent('pointermove', {
+            bubbles: true,
+            clientX: currentRect.left + currentRect.width / 2,
+            clientY: currentRect.top + currentRect.height / 2,
+            pointerId: 1,
+            pointerType: 'mouse',
+        }));
+    }, 30);
+
+    // Block pointerleave events on the SubTrigger and the dropdown content
+    const blocker = (e: Event) => { e.stopImmediatePropagation(); };
+    const blockers: Array<{ el: Element; handler: (e: Event) => void }> = [];
+
+    subTrigger.addEventListener('pointerleave', blocker, true);
+    blockers.push({ el: subTrigger, handler: blocker });
+
+    const dropdownContent = subTrigger.closest('[data-testid="layoutDropdownContent"]');
+    if (dropdownContent) {
+        dropdownContent.addEventListener('pointerleave', blocker, true);
+        blockers.push({ el: dropdownContent, handler: blocker });
+        // Also block pointermove on sibling items so Radix doesn't highlight them
+        // and close our sub-menu
+        const allItems = dropdownContent.querySelectorAll(':scope > *');
+        allItems.forEach(item => {
+            if (!item.contains(subTrigger)) {
+                item.addEventListener('pointermove', blocker, true);
+                item.addEventListener('pointerenter', blocker, true);
+                blockers.push({ el: item, handler: blocker });
+            }
+        });
+    }
+
+    subMenuKeepAlive = {
+        interval,
+        blockers,
+        dimmedSiblings,
+        cleanup: () => {
+            clearInterval(interval);
+            blockers.forEach(({ el, handler }) => {
+                el.removeEventListener('pointerleave', handler, true);
+                el.removeEventListener('pointermove', handler, true);
+                el.removeEventListener('pointerenter', handler, true);
+            });
+            // Restore dimmed siblings
+            dimmedSiblings.forEach(item => {
+                item.style.pointerEvents = '';
+                item.style.opacity = '';
+            });
+            subMenuKeepAlive = null;
+        }
+    };
+}
+
+function stopSubMenuKeepAlive() {
+    if (subMenuKeepAlive) {
+        subMenuKeepAlive.cleanup();
+    }
+}
+
 function TutorialPortal({
     step,
     onNext,
@@ -632,20 +711,31 @@ function TutorialPortal({
                 // Element not yet in DOM (e.g. inside a dropdown that hasn’t opened).
                 // For direction steps inside a sub-menu, re-trigger the parent sub-trigger
                 // hover so Radix re-opens the sub-content if it closed.
-                if (retryCount < 10) {
+                if (retryCount < 15) {
                     if (tutorialSteps[step].passthrough && targetSelector.includes('Direction')) {
+                        // Stop any stale keep-alive before re-triggering
+                        stopSubMenuKeepAlive();
+
                         const subTriggerTestId = targetSelector.includes('Tree') ? 'layoutTreeSub' : 'layoutRadialSub';
                         const subTrigger = document.querySelector(`[data-testid="${subTriggerTestId}"]`) as HTMLElement | null;
                         if (subTrigger) {
                             const rect = subTrigger.getBoundingClientRect();
-                            subTrigger.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true, clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 }));
-                            subTrigger.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 }));
+                            const cx = rect.left + rect.width / 2;
+                            const cy = rect.top + rect.height / 2;
+                            // Dispatch a complete hover sequence to reliably open the Radix sub-menu
+                            subTrigger.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true, clientX: cx, clientY: cy, pointerId: 1, pointerType: 'mouse' }));
+                            subTrigger.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false, clientX: cx, clientY: cy }));
+                            subTrigger.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: cx, clientY: cy, pointerId: 1, pointerType: 'mouse' }));
+                            subTrigger.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, clientX: cx, clientY: cy }));
+                            // Also focus the trigger to help Radix highlight it
+                            subTrigger.focus();
                         }
                     }
-                    const id = window.setTimeout(() => setRetryCount(c => c + 1), 100);
+                    const id = window.setTimeout(() => setRetryCount(c => c + 1), 150);
                     return () => window.clearTimeout(id);
                 }
-                // Gave up after 10 retries — hide arrow
+                // Gave up after 15 retries — clean up keep-alive and hide arrow
+                stopSubMenuKeepAlive();
                 setArrowStyle({ display: 'none' });
                 return () => { };
             }
@@ -1025,6 +1115,11 @@ function TutorialPortal({
                                 if (advanceCancelledRef.current) return;
                                 advancePendingRef.current = false;
                                 element.removeEventListener('pointermove', advanceHandler);
+                                // Start keep-alive BEFORE calling onNext to prevent
+                                // Radix from closing the sub-menu during the step transition.
+                                // The dimmed siblings are handed off to the keep-alive and
+                                // will be restored by the next step (passthrough direction step).
+                                startSubMenuKeepAlive(element as HTMLElement, dimmedSiblings);
                                 onNextRef.current();
                             });
                         });
@@ -1035,10 +1130,15 @@ function TutorialPortal({
                         clearAdvance();
                         disabledObserver.disconnect();
                         element.removeEventListener('pointermove', advanceHandler);
-                        dimmedSiblings.forEach(item => {
-                            item.style.pointerEvents = '';
-                            item.style.opacity = '';
-                        });
+                        // Don't restore dimmed siblings here — the keep-alive owns them
+                        // and will restore them when the next step cleans up.
+                        // Only restore if keep-alive was NOT started (e.g. user went back).
+                        if (!subMenuKeepAlive) {
+                            dimmedSiblings.forEach(item => {
+                                item.style.pointerEvents = '';
+                                item.style.opacity = '';
+                            });
+                        }
                         cleanup();
                     };
                 }
@@ -1048,6 +1148,35 @@ function TutorialPortal({
                 // Listen for click directly on the element to advance.
                 if (tutorialSteps[step].passthrough && advanceOn === 'click') {
                     overlay.style.pointerEvents = 'none';
+
+                    // Add pointerleave protection on the sub-trigger so the sub-menu
+                    // can't close while the user moves to click the direction item.
+                    const subTriggerTestId = targetSelector!.includes('Tree') ? 'layoutTreeSub' : 'layoutRadialSub';
+                    const subTrigger = document.querySelector(`[data-testid="${subTriggerTestId}"]`) as HTMLElement | null;
+                    const leaveBlocker = (e: Event) => { e.stopImmediatePropagation(); };
+                    if (subTrigger) {
+                        subTrigger.addEventListener('pointerleave', leaveBlocker, true);
+                    }
+                    const dropdownContent = element.closest('[data-testid="layoutDropdownContent"]');
+                    if (dropdownContent) {
+                        dropdownContent.addEventListener('pointerleave', leaveBlocker, true);
+                    }
+
+                    // Now that our own blockers are in place, safely stop the keep-alive.
+                    // Don't use stopSubMenuKeepAlive() because it restores siblings
+                    // which could let Radix detect pointer on a sibling and close the sub.
+                    // Instead, just stop the interval; the old blockers are redundant (ours are active).
+                    // We'll do full cleanup (including siblings) when THIS step's cleanup runs.
+                    const keepAliveSiblings = subMenuKeepAlive?.dimmedSiblings || [];
+                    if (subMenuKeepAlive) {
+                        clearInterval(subMenuKeepAlive.interval);
+                        subMenuKeepAlive.blockers.forEach(({ el, handler }) => {
+                            el.removeEventListener('pointerleave', handler, true);
+                            el.removeEventListener('pointermove', handler, true);
+                            el.removeEventListener('pointerenter', handler, true);
+                        });
+                        subMenuKeepAlive = null;
+                    }
 
                     const clickHandler = () => {
                         if (advancePendingRef.current) return;
@@ -1071,6 +1200,14 @@ function TutorialPortal({
                         clearAdvance();
                         disabledObserver.disconnect();
                         element.removeEventListener('click', clickHandler);
+                        // Remove pointerleave protection
+                        if (subTrigger) subTrigger.removeEventListener('pointerleave', leaveBlocker, true);
+                        if (dropdownContent) dropdownContent.removeEventListener('pointerleave', leaveBlocker, true);
+                        // Restore dimmed siblings from the keep-alive (safe now — step is done)
+                        keepAliveSiblings.forEach(item => {
+                            item.style.pointerEvents = '';
+                            item.style.opacity = '';
+                        });
                         cleanup();
                     };
                 }
