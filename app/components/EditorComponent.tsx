@@ -88,7 +88,12 @@ export interface LanguageConfig {
      * Async function that returns completion suggestions. 
      * Called once on mount and whenever the completion provider triggers.
      */
-    getSuggestions?: (monacoInstance: Monaco, context?: monaco.languages.CompletionContext) => Promise<monaco.languages.CompletionItem[]>;
+    getSuggestions?: (
+        monacoInstance: Monaco,
+        context?: monaco.languages.CompletionContext,
+        model?: monaco.editor.ITextModel,
+        position?: monaco.Position
+    ) => Promise<monaco.languages.CompletionItem[]>;
     /** Characters that trigger the completion provider in addition to typing identifier characters. */
     triggerCharacters?: string[];
 }
@@ -187,7 +192,7 @@ export default function EditorComponent({
                             if (!currentConfig?.getSuggestions) return { suggestions: [] };
                             const word = model.getWordUntilPosition(position);
                             const range = new monacoInstance.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
-                            const suggestions = await currentConfig.getSuggestions(monacoInstance, context);
+                            const suggestions = await currentConfig.getSuggestions(monacoInstance, context, model, position);
                             return {
                                 suggestions: suggestions.map(s => ({ ...s, range }))
                             };

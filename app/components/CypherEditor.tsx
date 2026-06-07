@@ -230,6 +230,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const containerRef = useRef<HTMLDivElement>(null);
     const indicatorRef = useRef(indicator);
     const graphIdRef = useRef(graph.Id);
+    const graphRef = useRef(graph);
     const graphNameRef = useRef(graphName);
     const queryRef = useRef(historyQuery.query);
     const tutorialOpenRef = useRef(tutorialOpen);
@@ -288,7 +289,8 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
     useEffect(() => {
         graphIdRef.current = graph.Id;
-    }, [graph.Id]);
+        graphRef.current = graph;
+    }, [graph.Id, graph]);
 
     useEffect(() => {
         isReadOnlyRef.current = isReadOnly;
@@ -498,13 +500,88 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         monarchTokensProvider: DEFAULT_MONARCH_TOKENIZER,
         languageConfiguration: CYPHER_LANGUAGE_CONFIGURATION,
         triggerCharacters: ['.'],
-        getSuggestions: async (monacoI: Monaco, context?: monaco.languages.CompletionContext) => {
+        getSuggestions: async (
+            monacoI: Monaco,
+            context?: monaco.languages.CompletionContext,
+            model?: monaco.editor.ITextModel,
+            position?: monaco.Position,
+        ) => {
             const sug = await getAllSuggestions();
             // Also update the tokenizer with dynamic suggestions
             await updateTokenizer(monacoI);
-            // When triggered by '.', only show property keys (e.g. after `p.` on a bound variable)
-            if (context?.triggerCharacter === '.') {
-                return sug.filter(s => s.detail === '(property key)');
+
+            // When triggered by '.', narrow to property keys of the bound element's type.
+            // Identify whether the variable preceding '.' is bound to a node or a relationship,
+            // resolve its label / relationship type, and return only the keys present on
+            // elements of that type. Falls back to the full property-key list when the
+            // binding cannot be resolved.
+            if (context?.triggerCharacter === '.' && model && position) {
+                const allPropertyKeys = sug.filter(s => s.detail === '(property key)');
+
+                // Extract the variable name immediately before the '.'.
+                const linePrefix = model.getValueInRange({
+                    startLineNumber: position.lineNumber,
+                    startColumn: 1,
+                    endLineNumber: position.lineNumber,
+                    endColumn: position.column,
+                });
+                const varMatch = linePrefix.match(/([A-Za-z_][A-Za-z0-9_]*)\.$/);
+                if (!varMatch) return allPropertyKeys;
+                const varName = varMatch[1];
+
+                // Search the entire query for binding patterns of this variable.
+                // Node:        (varName:Label1[:Label2 ...] ...)
+                // Relationship: [varName:TYPE ...]  or  -[varName ...]-
+                const queryText = model.getValue();
+                const escapedVar = varName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+                const nodeRegex = new RegExp(`\\(\\s*${escapedVar}\\s*((?::[A-Za-z_][A-Za-z0-9_]*)+)`, 'g');
+                const relRegex = new RegExp(`\\[\\s*${escapedVar}\\s*((?::[A-Za-z_][A-Za-z0-9_]*)+)`, 'g');
+
+                const collectTypes = (re: RegExp): string[] => {
+                    const types = new Set<string>();
+                    let m = re.exec(queryText);
+                    while (m) {
+                        m[1].split(':').filter(Boolean).forEach(t => types.add(t));
+                        m = re.exec(queryText);
+                    }
+                    return Array.from(types);
+                };
+
+                const nodeLabels = collectTypes(nodeRegex);
+                const relTypes = collectTypes(relRegex);
+
+                const g = graphRef.current;
+                const keys = new Set<string>();
+
+                nodeLabels.forEach(name => {
+                    const lbl = g.LabelsMap.get(name);
+                    if (!lbl) return;
+                    lbl.elements.forEach(node => {
+                        if (node.data) Object.keys(node.data).forEach(k => keys.add(k));
+                    });
+                });
+
+                relTypes.forEach(name => {
+                    const rel = g.RelationshipsMap.get(name);
+                    if (!rel) return;
+                    rel.elements.forEach(link => {
+                        if (link.data) Object.keys(link.data).forEach(k => keys.add(k));
+                    });
+                });
+
+                if (keys.size === 0) {
+                    // Could not resolve type or no cached elements — fall back to all property keys.
+                    return allPropertyKeys;
+                }
+
+                return Array.from(keys).map(k => ({
+                    insertText: k,
+                    label: k,
+                    kind: monaco.languages.CompletionItemKind.Property,
+                    range: new monaco.Range(1, 1, 1, 1),
+                    detail: '(property key)',
+                }));
             }
             return sug;
         },
