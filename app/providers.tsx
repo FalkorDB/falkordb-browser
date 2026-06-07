@@ -80,9 +80,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setConnectionPrefix(sessionData.user.host, sessionData.user.port, sessionData.user.username || "default");
       migrateToScopedStorage();
       setPrefixReady(true);
-    } else {
+    } else if (status === "unauthenticated") {
       // Clean up scoped data before clearing the prefix,
       // so removeConnectionItem can still resolve the scoped key.
+      // Only do this on explicit unauthenticated — not during "loading" —
+      // so savedContent isn't removed before content persistence can restore it.
       removeConnectionItem("savedContent");
       clearConnectionPrefix();
       setPrefixReady(false);
