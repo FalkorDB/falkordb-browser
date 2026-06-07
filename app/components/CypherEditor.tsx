@@ -497,10 +497,15 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const cypherLanguageConfig: LanguageConfig = useMemo(() => ({
         monarchTokensProvider: DEFAULT_MONARCH_TOKENIZER,
         languageConfiguration: CYPHER_LANGUAGE_CONFIGURATION,
-        getSuggestions: async (monacoI: Monaco) => {
+        triggerCharacters: ['.'],
+        getSuggestions: async (monacoI: Monaco, context?: monaco.languages.CompletionContext) => {
             const sug = await getAllSuggestions();
             // Also update the tokenizer with dynamic suggestions
             await updateTokenizer(monacoI);
+            // When triggered by '.', only show property keys (e.g. after `p.` on a bound variable)
+            if (context?.triggerCharacter === '.') {
+                return sug.filter(s => s.detail === '(property key)');
+            }
             return sug;
         },
     }), []);
