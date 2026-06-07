@@ -26,6 +26,8 @@ interface TutorialStep {
     hidePrev?: boolean;
     passthrough?: boolean;
     overrideDisabled?: boolean;
+    /** data-testid of the parent sub-trigger element for passthrough/retry flows */
+    parentSubTrigger?: string;
 }
 
 interface TutorialTrack {
@@ -347,7 +349,8 @@ const tutorialSteps: TutorialStep[] = [
         advanceOn: "click",
         forward: ["mouseenter", "mouseleave", "pointerdown"],
         hidePrev: true,
-        passthrough: true
+        passthrough: true,
+        parentSubTrigger: "layoutTreeSub"
     },
     {
         title: "Tree Layout Active",
@@ -385,7 +388,8 @@ const tutorialSteps: TutorialStep[] = [
         advanceOn: "click",
         forward: ["mouseenter", "mouseleave", "pointerdown"],
         hidePrev: true,
-        passthrough: true
+        passthrough: true,
+        parentSubTrigger: "layoutRadialSub"
     },
     {
         title: "Radial Layout Active",
@@ -565,23 +569,19 @@ function ArrowIcon({ direction }: { direction: "left" | "right" | "top" | "botto
     }
 }
 
-/**
- * Module-level mechanism to keep Radix sub-menus open during tutorial step transitions.
- * When the hover step detects its condition (sub-menu opened), it starts this keep-alive
- * BEFORE calling onNext. This prevents Radix from closing the sub-menu during the
- * React render/effect cycle that follows the step change.
- */
-let subMenuKeepAlive: {
+/** Shape of the keep-alive state for Radix sub-menus during tutorial transitions. */
+interface SubMenuKeepAliveState {
     interval: ReturnType<typeof setInterval>;
     blockers: Array<{ el: Element; handler: (e: Event) => void }>;
     dimmedSiblings: HTMLElement[];
-    cleanup: () => void;
-} | null = null;
+}
 
-function startSubMenuKeepAlive(subTrigger: HTMLElement, dimmedSiblings: HTMLElement[]) {
-    // Clean up any previous keep-alive
-    if (subMenuKeepAlive) subMenuKeepAlive.cleanup();
-
+/**
+ * Creates a keep-alive that continuously pokes the sub-trigger to prevent Radix
+ * from closing the sub-menu during step transitions.
+ * Returns the state object (caller stores it in a ref).
+ */
+function createSubMenuKeepAlive(subTrigger: HTMLElement, dimmedSiblings: HTMLElement[]): SubMenuKeepAliveState {
     // Continuously dispatch pointermove on the SubTrigger to keep Radix thinking the pointer is there
     const interval = setInterval(() => {
         const currentRect = subTrigger.getBoundingClientRect();
@@ -617,31 +617,21 @@ function startSubMenuKeepAlive(subTrigger: HTMLElement, dimmedSiblings: HTMLElem
         });
     }
 
-    subMenuKeepAlive = {
-        interval,
-        blockers,
-        dimmedSiblings,
-        cleanup: () => {
-            clearInterval(interval);
-            blockers.forEach(({ el, handler }) => {
-                el.removeEventListener('pointerleave', handler, true);
-                el.removeEventListener('pointermove', handler, true);
-                el.removeEventListener('pointerenter', handler, true);
-            });
-            // Restore dimmed siblings
-            dimmedSiblings.forEach(item => {
-                item.style.pointerEvents = '';
-                item.style.opacity = '';
-            });
-            subMenuKeepAlive = null;
-        }
-    };
+    return { interval, blockers, dimmedSiblings };
 }
 
-function stopSubMenuKeepAlive() {
-    if (subMenuKeepAlive) {
-        subMenuKeepAlive.cleanup();
-    }
+/** Tears down a keep-alive state: stops interval, removes event blockers, restores siblings. */
+function destroySubMenuKeepAlive(state: SubMenuKeepAliveState): void {
+    clearInterval(state.interval);
+    state.blockers.forEach(({ el, handler }) => {
+        el.removeEventListener('pointerleave', handler, true);
+        el.removeEventListener('pointermove', handler, true);
+        el.removeEventListener('pointerenter', handler, true);
+    });
+    state.dimmedSiblings.forEach(item => {
+        item.style.pointerEvents = '';
+        item.style.opacity = '';
+    });
 }
 
 function TutorialPortal({
@@ -679,6 +669,8 @@ function TutorialPortal({
     const advanceRaf1Ref = useRef<number | null>(null);
     const advanceRaf2Ref = useRef<number | null>(null);
     const advanceCancelledRef = useRef(false);
+    // Instance-scoped keep-alive state (not module-level) to avoid shared mutable state
+    const keepAliveRef = useRef<SubMenuKeepAliveState | null>(null);
 
     const clearAdvance = () => {
         advanceCancelledRef.current = true;
@@ -686,6 +678,15 @@ function TutorialPortal({
         if (advanceRaf2Ref.current !== null) { window.cancelAnimationFrame(advanceRaf2Ref.current); advanceRaf2Ref.current = null; }
         if (advanceIntervalRef.current !== null) { clearInterval(advanceIntervalRef.current); advanceIntervalRef.current = null; }
     };
+
+    /** Stop and clean up the keep-alive, restoring all temporary UI mutations. */
+    const stopKeepAlive = useCallback(() => {
+        if (keepAliveRef.current) {
+            destroySubMenuKeepAlive(keepAliveRef.current);
+            keepAliveRef.current = null;
+        }
+    }, []);
+
     const currentStep = tutorialSteps[step];
     const { targetSelector, advanceOn, forward, description, position, title, hidePrev, spotlightSelector, placementAxis } = currentStep;
 
@@ -693,12 +694,20 @@ function TutorialPortal({
         setMounted(true);
     }, []);
 
-    // Reset retryCount and advance state whenever the step changes
+    // Unconditional cleanup on unmount — guarantees no leaked intervals/listeners
+    useEffect(() => () => { stopKeepAlive(); }, [stopKeepAlive]);
+
+    // Reset retryCount and advance state whenever the step changes.
+    // Also stop keep-alive UNLESS the incoming step is the expected passthrough consumer.
     useEffect(() => {
         setRetryCount(0);
         advancePendingRef.current = false;
         advanceCancelledRef.current = false;
-    }, [step]);
+        // Only preserve keep-alive for passthrough steps that will consume it
+        if (!tutorialSteps[step].passthrough) {
+            stopKeepAlive();
+        }
+    }, [step, stopKeepAlive]);
 
     useEffect(() => {
         const forwardArr = [...(forward || []), advanceOn].filter(ev => !!ev);
@@ -712,30 +721,30 @@ function TutorialPortal({
                 // For direction steps inside a sub-menu, re-trigger the parent sub-trigger
                 // hover so Radix re-opens the sub-content if it closed.
                 if (retryCount < 15) {
-                    if (tutorialSteps[step].passthrough && targetSelector.includes('Direction')) {
+                    if (tutorialSteps[step].passthrough && tutorialSteps[step].parentSubTrigger) {
                         // Stop any stale keep-alive before re-triggering
-                        stopSubMenuKeepAlive();
+                        stopKeepAlive();
 
-                        const subTriggerTestId = targetSelector.includes('Tree') ? 'layoutTreeSub' : 'layoutRadialSub';
-                        const subTrigger = document.querySelector(`[data-testid="${subTriggerTestId}"]`) as HTMLElement | null;
+                        const subTrigger = document.querySelector(`[data-testid="${tutorialSteps[step].parentSubTrigger}"]`) as HTMLElement | null;
                         if (subTrigger) {
                             const rect = subTrigger.getBoundingClientRect();
                             const cx = rect.left + rect.width / 2;
                             const cy = rect.top + rect.height / 2;
-                            // Dispatch a complete hover sequence to reliably open the Radix sub-menu
+                            // Dispatch a complete hover sequence to reliably open the Radix sub-menu.
+                            // Use mouseover (bubbles) instead of mouseenter (doesn’t bubble) so
+                            // delegated React/Radix hover handlers receive the event.
                             subTrigger.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true, clientX: cx, clientY: cy, pointerId: 1, pointerType: 'mouse' }));
-                            subTrigger.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false, clientX: cx, clientY: cy }));
-                            subTrigger.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: cx, clientY: cy, pointerId: 1, pointerType: 'mouse' }));
                             subTrigger.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, clientX: cx, clientY: cy }));
-                            // Also focus the trigger to help Radix highlight it
-                            subTrigger.focus();
+                            subTrigger.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: cx, clientY: cy, pointerId: 1, pointerType: 'mouse' }));
+                            // Focus the trigger to help Radix highlight it (safe — no-op if unfocusable)
+                            try { subTrigger.focus(); } catch { /* ignore if focus fails in detached/invisible state */ }
                         }
                     }
                     const id = window.setTimeout(() => setRetryCount(c => c + 1), 150);
                     return () => window.clearTimeout(id);
                 }
                 // Gave up after 15 retries — clean up keep-alive and hide arrow
-                stopSubMenuKeepAlive();
+                stopKeepAlive();
                 setArrowStyle({ display: 'none' });
                 return () => { };
             }
@@ -1119,7 +1128,11 @@ function TutorialPortal({
                                 // Radix from closing the sub-menu during the step transition.
                                 // The dimmed siblings are handed off to the keep-alive and
                                 // will be restored by the next step (passthrough direction step).
-                                startSubMenuKeepAlive(element as HTMLElement, dimmedSiblings);
+                                // Clean up any previous keep-alive before starting a new one
+                                if (keepAliveRef.current) {
+                                    destroySubMenuKeepAlive(keepAliveRef.current);
+                                }
+                                keepAliveRef.current = createSubMenuKeepAlive(element as HTMLElement, dimmedSiblings);
                                 onNextRef.current();
                             });
                         });
@@ -1133,7 +1146,7 @@ function TutorialPortal({
                         // Don't restore dimmed siblings here — the keep-alive owns them
                         // and will restore them when the next step cleans up.
                         // Only restore if keep-alive was NOT started (e.g. user went back).
-                        if (!subMenuKeepAlive) {
+                        if (!keepAliveRef.current) {
                             dimmedSiblings.forEach(item => {
                                 item.style.pointerEvents = '';
                                 item.style.opacity = '';
@@ -1151,7 +1164,7 @@ function TutorialPortal({
 
                     // Add pointerleave protection on the sub-trigger so the sub-menu
                     // can't close while the user moves to click the direction item.
-                    const subTriggerTestId = targetSelector!.includes('Tree') ? 'layoutTreeSub' : 'layoutRadialSub';
+                    const subTriggerTestId = tutorialSteps[step].parentSubTrigger!;
                     const subTrigger = document.querySelector(`[data-testid="${subTriggerTestId}"]`) as HTMLElement | null;
                     const leaveBlocker = (e: Event) => { e.stopImmediatePropagation(); };
                     if (subTrigger) {
@@ -1163,19 +1176,19 @@ function TutorialPortal({
                     }
 
                     // Now that our own blockers are in place, safely stop the keep-alive.
-                    // Don't use stopSubMenuKeepAlive() because it restores siblings
+                    // Don't use stopKeepAlive() because it restores siblings
                     // which could let Radix detect pointer on a sibling and close the sub.
                     // Instead, just stop the interval; the old blockers are redundant (ours are active).
                     // We'll do full cleanup (including siblings) when THIS step's cleanup runs.
-                    const keepAliveSiblings = subMenuKeepAlive?.dimmedSiblings || [];
-                    if (subMenuKeepAlive) {
-                        clearInterval(subMenuKeepAlive.interval);
-                        subMenuKeepAlive.blockers.forEach(({ el, handler }) => {
+                    const keepAliveSiblings = keepAliveRef.current?.dimmedSiblings || [];
+                    if (keepAliveRef.current) {
+                        clearInterval(keepAliveRef.current.interval);
+                        keepAliveRef.current.blockers.forEach(({ el, handler }) => {
                             el.removeEventListener('pointerleave', handler, true);
                             el.removeEventListener('pointermove', handler, true);
                             el.removeEventListener('pointerenter', handler, true);
                         });
-                        subMenuKeepAlive = null;
+                        keepAliveRef.current = null;
                     }
 
                     const clickHandler = () => {
@@ -1227,7 +1240,7 @@ function TutorialPortal({
         }
 
         return () => { };
-    }, [step, retryCount, forward, advanceOn, targetSelector, spotlightSelector, placementAxis]);
+    }, [step, retryCount, forward, advanceOn, targetSelector, spotlightSelector, placementAxis, stopKeepAlive]);
 
     if (!mounted) return null;
 
