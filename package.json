@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@falkordb/canvas": "v0.1.0",
-    "@falkordb/text-to-cypher": "^0.1.14",
+    "@falkordb/text-to-cypher": "^0.1.16",
     "@hookform/resolvers": "^5.4.0",
     "@monaco-editor/react": "^4.6.0",
     "@radix-ui/react-alert-dialog": "^1.1.6",
@@ -47,7 +47,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
-    "cytoscape": "^3.33.4",
+    "cytoscape": "^3.34.0",
     "cytoscape-fcose": "^2.2.0",
     "d3": "^7.9.0",
     "date-fns": "^4.4.0",
