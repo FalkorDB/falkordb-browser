@@ -70,29 +70,25 @@ export default function BrowserSettings() {
         setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
     };
 
-    // Fetch all available models when secretKey changes (debounced)
+    // Fetch all available models when secretKey changes (secretKey updates only on settings save)
     useEffect(() => {
-        const timeout = setTimeout(() => {
-            (async () => {
-                setIsLoadingModels(true);
+        (async () => {
+            setIsLoadingModels(true);
 
-                const result = await securedFetch(
-                    "/api/chat/models",
-                    { method: "GET" },
-                    toast,
-                    setIndicator
-                );
+            const result = await securedFetch(
+                "/api/chat/models",
+                { method: "GET" },
+                toast,
+                setIndicator
+            );
 
-                if (result.ok) {
-                    const { models } = await result.json();
-                    setModelDisplayNames(models);
-                }
+            if (result.ok) {
+                const { models } = await result.json();
+                setModelDisplayNames(models);
+            }
 
-                setIsLoadingModels(false);
-            })();
-        }, 500);
-
-        return () => clearTimeout(timeout);
+            setIsLoadingModels(false);
+        })();
     }, [secretKey, toast, setIndicator]);
 
     useEffect(() => {

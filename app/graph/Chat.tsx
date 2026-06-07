@@ -310,11 +310,20 @@ export default function Chat({ onClose }: Props) {
                 const cypherContent = typeof data.cypherQuery === "string"
                     ? data.cypherQuery.replace(/^cypher\s+/i, "")
                     : data.cypherQuery;
-                setQueryCollapse(prev => ({ ...prev, [messages.length]: false }));
+                setQueryCollapse(prev => ({ ...prev, [newMessages.length]: false }));
                 handleSetMessages({
                     role: "assistant",
                     content: cypherContent,
                     type: "CypherQuery"
+                });
+            }
+
+            // Show cypher result if available
+            if (data.cypherResult) {
+                handleSetMessages({
+                    role: "assistant",
+                    content: typeof data.cypherResult === "string" ? data.cypherResult : JSON.stringify(data.cypherResult),
+                    type: "CypherResult"
                 });
             }
 
@@ -327,7 +336,7 @@ export default function Chat({ onClose }: Props) {
                 setTotalTokens(newTotal);
 
                 handleSetMessages({
-                    role: "assistant",
+                    role: "info",
                     content: `${usage.totalTokens} - ${newTotal}`,
                     type: "Usage"
                 });
@@ -537,6 +546,21 @@ export default function Chat({ onClose }: Props) {
                                 : <div className="h-8 w-8 relative">
                                     {mounted && currentTheme && <Image className="rounded-full" src={`/icons/F-${currentTheme}.svg`} alt="Assistant" fill />}
                                 </div>;
+
+                            if (isInfo) {
+                                return (
+                                    <li
+                                        data-testid={`chatInfoMessage-${message.type}`}
+                                        className="w-full flex justify-center"
+                                        key={index}
+                                    >
+                                        <div className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
+                                            {getMessage(message)}
+                                        </div>
+                                    </li>
+                                );
+                            }
+
                             return (
                                 <li
                                     data-testid={isUser ? "chatUserMessage" : `chatAssistantMessage-${message.type}`}
@@ -544,13 +568,13 @@ export default function Chat({ onClose }: Props) {
                                     key={index}
                                 >
                                     {
-                                        !isUser && !isInfo && avatar
+                                        !isUser && avatar
                                     }
                                     <div className={cn("max-w-[80%] p-2 rounded-lg overflow-hidden", isUser ? "bg-primary" : assistantBg)}>
                                         {getMessage(message)}
                                     </div>
                                     {
-                                        isUser && !isInfo && avatar
+                                        isUser && avatar
                                     }
                                 </li>
                             );

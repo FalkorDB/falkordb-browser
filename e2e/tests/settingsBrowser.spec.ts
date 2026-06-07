@@ -299,7 +299,7 @@ test.describe('@browser Browser Settings tests', () => {
         expect(isPreviousSelected).toBe(false);
     });
 
-    test('@readwrite Verify model/API key mismatch shows error toast in chat', async () => {
+    test('@readwrite Verify model/API key mismatch shows inline error in chat', async () => {
         // Create a graph first
         const graphName = getRandomString("chat");
         await apiCall.addGraph(graphName);
@@ -362,7 +362,7 @@ test.describe('@browser Browser Settings tests', () => {
         }
     });
 
-    test('@readwrite Verify xAI API key mismatch shows error toast in chat', async () => {
+    test('@readwrite Verify xAI API key mismatch shows inline error in chat', async () => {
         // Create a graph first
         const graphName = getRandomString("chat");
         await apiCall.addGraph(graphName);
