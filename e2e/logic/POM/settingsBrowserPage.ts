@@ -82,6 +82,14 @@ export default class SettingsBrowserPage extends BasePage {
     await this.saveSettingsButton.waitFor({ state: "hidden", timeout: 30000 });
   }
 
+  async clickSaveSettingsButtonWithoutWait(): Promise<void> {
+    await interactWhenVisible(
+      this.saveSettingsButton,
+      (el) => el.click(),
+      "Save Settings Button (no wait)"
+    );
+  }
+
   async clickCancelSettingsButton(): Promise<void> {
     await interactWhenVisible(
       this.cancelSettingsButton,
@@ -170,6 +178,10 @@ export default class SettingsBrowserPage extends BasePage {
       await this.clickChatSectionHeader();
       await this.waitForChatApiKeyInput();
     }
+  }
+
+  async waitForMaxSavedMessagesInput(): Promise<void> {
+    await this.maxSaveMessagesInput.waitFor({ state: "visible", timeout: 10000 });
   }
 
   async setChatApiKey(apiKey: string): Promise<void> {
@@ -423,5 +435,160 @@ export default class SettingsBrowserPage extends BasePage {
       !model.toLowerCase().includes(searchTerm.toLowerCase())
     );
     return nonMatchingModel || null;
+  }
+
+  // ===== Graph Info Section =====
+
+  private get graphInfoSectionHeader(): Locator {
+    return this.page.locator('[aria-expanded]').filter({ has: this.page.locator('text=Graph Info') }).first();
+  }
+
+  private get refreshIntervalSlider(): Locator {
+    return this.page.locator('#refreshInterval');
+  }
+
+  private get maxItemsForSearchSlider(): Locator {
+    return this.page.locator('#maxItemsForSearch');
+  }
+
+  async expandGraphInfoSection(): Promise<void> {
+    const isExpanded = await this.graphInfoSectionHeader.getAttribute('aria-expanded');
+    if (isExpanded !== 'true') {
+      await this.graphInfoSectionHeader.click();
+      await this.refreshIntervalSlider.waitFor({ state: 'visible', timeout: 5000 });
+    }
+  }
+
+  async setRefreshIntervalSlider(value: number): Promise<void> {
+    await this.setSliderByStep(this.refreshIntervalSlider, value, 1);
+  }
+
+  async getRefreshIntervalValue(): Promise<number> {
+    return this.getSliderValue(this.refreshIntervalSlider);
+  }
+
+  async setMaxItemsForSearchSlider(value: number): Promise<void> {
+    await this.setSliderByStep(this.maxItemsForSearchSlider, value, 1);
+  }
+
+  async getMaxItemsForSearchValue(): Promise<number> {
+    return this.getSliderValue(this.maxItemsForSearchSlider);
+  }
+
+  // ===== User Experience Section =====
+
+  private get userExperienceSectionHeader(): Locator {
+    return this.page.locator('[aria-expanded]').filter({ has: this.page.locator('text=User Experience') }).first();
+  }
+
+  private get showPropertyKeyPrefixSwitch(): Locator {
+    return this.page.locator('#showPropertyKeyPrefixSwitch');
+  }
+
+  private get captionKeyInput(): Locator {
+    return this.page.locator('#captionKeyInput');
+  }
+
+  private get addCaptionKeyBtn(): Locator {
+    return this.page.locator('#addCaptionKeyBtn');
+  }
+
+  async expandUserExperienceSection(): Promise<void> {
+    const isExpanded = await this.userExperienceSectionHeader.getAttribute('aria-expanded');
+    if (isExpanded !== 'true') {
+      await this.userExperienceSectionHeader.click();
+      await this.showPropertyKeyPrefixSwitch.waitFor({ state: 'visible', timeout: 5000 });
+    }
+  }
+
+  async getShowPropertyKeyPrefixState(): Promise<boolean> {
+    return (await this.showPropertyKeyPrefixSwitch.getAttribute('data-state')) === 'checked';
+  }
+
+  async clickShowPropertyKeyPrefixSwitch(): Promise<void> {
+    await this.showPropertyKeyPrefixSwitch.click();
+  }
+
+  async addCaptionKey(key: string): Promise<void> {
+    await this.captionKeyInput.fill(key);
+    await this.addCaptionKeyBtn.click();
+  }
+
+  async getCaptionKeys(): Promise<string[]> {
+    // The caption keys list (ul) is in the same container as the captionKeyInput form
+    // Navigate: captionKeyInput -> form -> captions container div -> ul li p
+    const captionsContainer = this.captionKeyInput.locator('..').locator('..');
+    const items = captionsContainer.locator('ul li p');
+    const count = await items.count();
+    const keys: string[] = [];
+    for (let i = 0; i < count; i += 1) {
+      const text = await items.nth(i).textContent();
+      if (text) keys.push(text);
+    }
+    return keys;
+  }
+
+  async removeCaptionKey(key: string): Promise<void> {
+    // Scope to the caption list container to avoid matching unrelated <li> elements
+    const captionsContainer = this.captionKeyInput.locator('..').locator('..');
+    const listItem = captionsContainer.locator('li').filter({ hasText: key });
+    const deleteBtn = listItem.getByRole('button', { name: 'Remove Caption' });
+    await deleteBtn.click();
+  }
+
+  // ===== Table View Section (within User Experience) =====
+
+  private get columnWidthSlider(): Locator {
+    return this.page.locator('#columnWidth');
+  }
+
+  private get rowHeightSlider(): Locator {
+    return this.page.locator('#rowHeight');
+  }
+
+  private get rowHeightExpandMultipleSlider(): Locator {
+    return this.page.locator('#rowHeightExpandMultiple');
+  }
+
+  private async getSliderValue(slider: Locator): Promise<number> {
+    const thumb = slider.locator('[role="slider"]');
+    const raw = await thumb.getAttribute('aria-valuenow');
+    return Number(raw ?? 0);
+  }
+
+  private async setSliderByStep(slider: Locator, targetValue: number, step: number): Promise<void> {
+    const thumb = slider.locator('[role="slider"]');
+    await thumb.focus();
+    const raw = await thumb.getAttribute('aria-valuenow');
+    const current = Number(raw ?? 0);
+    const steps = Math.round((targetValue - current) / step);
+    const key = steps > 0 ? 'ArrowRight' : 'ArrowLeft';
+    for (let i = 0; i < Math.abs(steps); i += 1) {
+      await thumb.press(key);
+    }
+  }
+
+  async getColumnWidthValue(): Promise<number> {
+    return this.getSliderValue(this.columnWidthSlider);
+  }
+
+  async setColumnWidthSlider(value: number): Promise<void> {
+    await this.setSliderByStep(this.columnWidthSlider, value, 5);
+  }
+
+  async getRowHeightValue(): Promise<number> {
+    return this.getSliderValue(this.rowHeightSlider);
+  }
+
+  async setRowHeightSlider(value: number): Promise<void> {
+    await this.setSliderByStep(this.rowHeightSlider, value, 1);
+  }
+
+  async getRowHeightExpandMultipleValue(): Promise<number> {
+    return this.getSliderValue(this.rowHeightExpandMultipleSlider);
+  }
+
+  async setRowHeightExpandMultipleSlider(value: number): Promise<void> {
+    await this.setSliderByStep(this.rowHeightExpandMultipleSlider, value, 1);
   }
 }
