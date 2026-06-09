@@ -20,6 +20,7 @@ export const DEFAULT_MONACO_OPTIONS: monaco.editor.IStandaloneEditorConstruction
     folding: false,
     fixedOverflowWidgets: true,
     occurrencesHighlight: "off",
+    wordBasedSuggestions: "off",
     hover: {
         delay: 100,
     },
@@ -205,13 +206,16 @@ export default function EditorComponent({
 
             onMonacoReadyRef.current?.(monacoInstance);
 
-            // Create the editor
+            //Claude Create the editor
             const editor = monacoInstance.editor.create(containerRef.current, {
                 ...mergedOptions,
                 value: valueRef.current,
                 language,
                 theme: themeName,
             });
+
+            // Disable F1 (command palette)
+            editor.addCommand(monacoInstance.KeyCode.F1, () => {});
 
             editorRef.current = editor;
 

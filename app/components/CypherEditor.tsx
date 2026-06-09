@@ -177,15 +177,25 @@ const DEFAULT_MONARCH_TOKENIZER: monaco.languages.IMonarchLanguage = {
             [/\d+/, 'number'],
             [/:(\w+)/, 'type'],
             [/\{/, { token: 'delimiter.curly', next: '@bracketCounting' }],
-            [/\[/, { token: 'delimiter.square', next: '@bracketCounting' }],
-            [/\(/, { token: 'delimiter.parenthesis', next: '@bracketCounting' }],
+            [/\[/, { token: 'delimiter.square', next: '@insideBracket' }],
+            [/\(/, { token: 'delimiter.parenthesis', next: '@insideParen' }],
+        ],
+        insideParen: [
+            [/[A-Za-z_]\w*/, { token: 'variable', next: '@bracketCounting' }],
+            [/\)/, { token: 'delimiter.parenthesis', next: '@pop' }],
+            [/./, { token: '@rematch', next: '@bracketCounting' }],
+        ],
+        insideBracket: [
+            [/[A-Za-z_]\w*/, { token: 'variable', next: '@bracketCounting' }],
+            [/\]/, { token: 'delimiter.square', next: '@pop' }],
+            [/./, { token: '@rematch', next: '@bracketCounting' }],
         ],
         bracketCounting: [
             [/\{/, 'delimiter.curly', '@bracketCounting'],
             [/\}/, 'delimiter.curly', '@pop'],
-            [/\[/, 'delimiter.square', '@bracketCounting'],
+            [/\[/, 'delimiter.square', '@insideBracket'],
             [/\]/, 'delimiter.square', '@pop'],
-            [/\(/, 'delimiter.parenthesis', '@bracketCounting'],
+            [/\(/, 'delimiter.parenthesis', '@insideParen'],
             [/\)/, 'delimiter.parenthesis', '@pop'],
             { include: 'root' }
         ],
@@ -230,13 +240,13 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const containerRef = useRef<HTMLDivElement>(null);
     const indicatorRef = useRef(indicator);
     const graphIdRef = useRef(graph.Id);
-    const graphRef = useRef(graph);
     const graphNameRef = useRef(graphName);
     const queryRef = useRef(historyQuery.query);
     const tutorialOpenRef = useRef(tutorialOpen);
     const isReadOnlyRef = useRef(isReadOnly);
     const monacoRef = useRef<Monaco | null>(null);
     const decorationsRef = useRef<monaco.editor.IEditorDecorationsCollection | null>(null);
+    const boundVarsRef = useRef<Set<string>>(new Set());
 
     const [lineNumber, setLineNumber] = useState(1);
     const [blur, setBlur] = useState(false);
@@ -289,8 +299,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
     useEffect(() => {
         graphIdRef.current = graph.Id;
-        graphRef.current = graph;
-    }, [graph.Id, graph]);
+    }, [graph.Id]);
 
     useEffect(() => {
         isReadOnlyRef.current = isReadOnly;
@@ -357,6 +366,40 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         }
     }, [historyQuery.query]);
 
+    // Extract bound element variables from the query and rebuild tokenizer when they change
+    // Use Monaco's tokenizer to detect bound variables (tokens marked as 'variable'
+    // by the insideParen/insideBracket states) and rebuild tokenizer to color them everywhere.
+    useEffect(() => {
+        if (!monacoRef.current) return;
+
+        const queryText = historyQuery.query;
+        const lines = queryText.split('\n');
+
+        // Tokenize the query using Monaco's built-in tokenizer
+        const tokenized = monacoRef.current.editor.tokenize(queryText, LANGUAGE_NAME);
+
+        const boundVars = new Set<string>();
+        tokenized.forEach((lineTokens: monaco.Token[], lineIdx: number) => {
+            const line = lines[lineIdx];
+            lineTokens.forEach((token: monaco.Token, tokenIdx: number) => {
+                if (token.type === `variable.${LANGUAGE_NAME}`) {
+                    const start = token.offset;
+                    const end = tokenIdx < lineTokens.length - 1 ? lineTokens[tokenIdx + 1].offset : line.length;
+                    const varName = line.substring(start, end);
+                    if (varName) boundVars.add(varName);
+                }
+            });
+        });
+
+        // Only rebuild tokenizer if the set of variables actually changed
+        const newVars = Array.from(boundVars).sort().join(',');
+        const oldVars = Array.from(boundVarsRef.current).sort().join(',');
+        if (newVars !== oldVars) {
+            boundVarsRef.current = boundVars;
+            updateTokenizer(monacoRef.current);
+        }
+    }, [historyQuery.query]);
+
     const fetchSuggestions = async (detail: string): Promise<monaco.languages.CompletionItem[]> => {
         if (indicator === "offline") return [];
 
@@ -381,6 +424,10 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                         return monaco.languages.CompletionItemKind.Function;
                     case '(property key)':
                         return monaco.languages.CompletionItemKind.Property;
+                    case '(label)':
+                        return monaco.languages.CompletionItemKind.Class;
+                    case '(relationship type)':
+                        return monaco.languages.CompletionItemKind.Interface;
                     default:
                         return monaco.languages.CompletionItemKind.Variable;
                 }
@@ -410,30 +457,103 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         )
         , [udfList]);
 
-    const getAllSuggestions = useCallback(async (): Promise<monaco.languages.CompletionItem[]> => {
+    // Returns ALL suggestions including full-path namespaced functions (for tokenizer & dot navigation)
+    const getFullSuggestions = useCallback(async (): Promise<monaco.languages.CompletionItem[]> => {
         const remoteSuggestions = graphIdRef.current ? await getRemoteSuggestions() : [];
-        const all = [...STATIC_SUGGESTIONS, ...udfSuggestions, ...remoteSuggestions];
+
+        // Add bound element variables as suggestions
+        const varSuggestions: monaco.languages.CompletionItem[] = Array.from(boundVarsRef.current).map(v => ({
+            insertText: v,
+            label: v,
+            kind: monaco.languages.CompletionItemKind.Variable,
+            range: new monaco.Range(1, 1, 1, 1),
+            detail: '(variable)',
+        }));
+
+        // Extract only top-level namespace prefixes from all namespaced functions
+        // (e.g. db.idx.fulltext.queryNodes -> "db"). Deeper levels show via '.' trigger.
+        const allFunctions = [...STATIC_SUGGESTIONS, ...udfSuggestions, ...remoteSuggestions].filter(s => s.detail === '(function)' || s.detail === '(udf function)');
+        const namespaceParts = new Set<string>();
+        allFunctions.forEach(({ label }) => {
+            const name = typeof label === 'string' ? label : label.label;
+            if (name.includes('.')) {
+                const topLevel = name.split('.')[0];
+                namespaceParts.add(topLevel);
+            }
+        });
+        const namespaceSuggestions: monaco.languages.CompletionItem[] = Array.from(namespaceParts).map(ns => ({
+            insertText: ns,
+            label: ns,
+            kind: monaco.languages.CompletionItemKind.Module,
+            range: new monaco.Range(1, 1, 1, 1),
+            detail: '(namespace)',
+        }));
+
+        const all = [...STATIC_SUGGESTIONS, ...udfSuggestions, ...remoteSuggestions, ...varSuggestions, ...namespaceSuggestions];
 
         // Deduplicate by label + detail
         const seen = new Set<string>();
         return all.filter(s => {
-            const key = `${s.label}::${s.detail}`;
+            const label = typeof s.label === 'string' ? s.label : s.label.label;
+            const key = `${label}::${s.detail}`;
             if (seen.has(key)) return false;
             seen.add(key);
             return true;
         });
     }, [udfSuggestions]);
 
+    // Returns filtered suggestions for the default (non-dot) autocomplete display:
+    // excludes full-path namespaced functions and property keys (both accessed via dot navigation)
+    const getAllSuggestions = useCallback(async (): Promise<monaco.languages.CompletionItem[]> => {
+        const full = await getFullSuggestions();
+
+        const filtered = full.filter(s => {
+            const label = typeof s.label === 'string' ? s.label : s.label.label;
+            // Skip namespaced functions — they are accessed via dot navigation
+            if ((s.detail === '(function)' || s.detail === '(udf function)') && label.includes('.')) return false;
+            // Skip property keys — they are shown only after typing '.' on a bound variable
+            if (s.detail === '(property key)') return false;
+            return true;
+        });
+
+        // Sort priority by type, then alphabetically within each type
+        const typePriority: Record<string, string> = {
+            '(variable)': '0',
+            '(keyword)': '1',
+            '(namespace)': '2',
+            '(label)': '3',
+            '(relationship type)': '4',
+            '(property key)': '5',
+            '(function)': '6',
+            '(udf function)': '6',
+        };
+
+        return filtered.map(s => {
+            const prefix = typePriority[s.detail as string] ?? '9';
+            const label = typeof s.label === 'string' ? s.label : s.label.label;
+            return { ...s, sortText: `${prefix}_${label.toLowerCase()}` };
+        });
+    }, [udfSuggestions]);
+
     const updateTokenizer = async (monacoI: Monaco, prefetchedSuggestions?: monaco.languages.CompletionItem[]) => {
-        const sug = prefetchedSuggestions ?? await getAllSuggestions();
+        const sug = prefetchedSuggestions ?? await getFullSuggestions();
 
         const functions = sug.filter(({ detail }) => detail === "(function)" || detail === "(udf function)");
+
+        // Collect labels and relationship types as element namespaces
+        const labels = sug.filter(({ detail }) => detail === '(label)').map(({ label }) => label as string);
+        const relTypes = sug.filter(({ detail }) => detail === '(relationship type)').map(({ label }) => label as string);
+
+        // Collect property keys for keyword coloring
+        const propertyKeys = sug.filter(({ detail }) => detail === '(property key)').map(({ label }) => label as string);
 
         // Collect UDF library names for keyword coloring
         const udfLibNames = udfList.map(([, libName]) => libName).filter(Boolean);
 
         const namespaces = new Set([
             ...udfLibNames,
+            ...labels,
+            ...relTypes,
             ...functions
                 .filter(({ label }) => (label as string).includes("."))
                 .map(({ label }) => {
@@ -443,11 +563,21 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                 }).flat()
         ]);
 
+        // Build keywords regex including static keywords and property keys
+        const allKeywords = [...KEYWORDS, ...propertyKeys].join('|');
+
+        // Build bound variables rule from the ref
+        const boundVarsArray = Array.from(boundVarsRef.current);
+        const boundVarsRule: [RegExp, string][] = boundVarsArray.length > 0
+            ? [[new RegExp(`\\b(${boundVarsArray.map(v => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`), "variable"]]
+            : [];
+
         monacoI.languages.setMonarchTokensProvider(LANGUAGE_NAME, {
             tokenizer: {
                 root: graphIdRef.current ? [
-                    [new RegExp(`\\b(${Array.from(namespaces.keys()).join('|')})\\b`), "keyword"],
-                    [new RegExp(`\\b(${KEYWORDS.join('|')})\\b`), "keyword"],
+                    ...boundVarsRule,
+                    ...(namespaces.size > 0 ? [[new RegExp(`\\b(${Array.from(namespaces.keys()).join('|')})\\b`), "keyword"] as [RegExp, string]] : []),
+                    [new RegExp(`\\b(${allKeywords})\\b`), "keyword"],
                     [
                         new RegExp(`\\b(${functions.map(({ label }) => {
                             if ((label as string).includes(".")) {
@@ -463,24 +593,35 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                     [/\d+/, 'number'],
                     [/:(\w+)/, 'type'],
                     [/\{/, { token: 'delimiter.curly', next: '@bracketCounting' }],
-                    [/\[/, { token: 'delimiter.square', next: '@bracketCounting' }],
-                    [/\(/, { token: 'delimiter.parenthesis', next: '@bracketCounting' }],
+                    [/\[/, { token: 'delimiter.square', next: '@insideBracket' }],
+                    [/\(/, { token: 'delimiter.parenthesis', next: '@insideParen' }],
                 ] : [
+                    ...boundVarsRule,
                     [new RegExp(`\\b(${KEYWORDS.join('|')})\\b`), "keyword"],
                     [/"([^"\\]|\\.)*"/, 'string'],
                     [/'([^'\\]|\\.)*'/, 'string'],
                     [/\d+/, 'number'],
                     [/:(\w+)/, 'type'],
                     [/\{/, { token: 'delimiter.curly', next: '@bracketCounting' }],
-                    [/\[/, { token: 'delimiter.square', next: '@bracketCounting' }],
-                    [/\(/, { token: 'delimiter.parenthesis', next: '@bracketCounting' }],
+                    [/\[/, { token: 'delimiter.square', next: '@insideBracket' }],
+                    [/\(/, { token: 'delimiter.parenthesis', next: '@insideParen' }],
+                ],
+                insideParen: [
+                    [/[A-Za-z_]\w*/, { token: 'variable', next: '@bracketCounting' }],
+                    [/\)/, { token: 'delimiter.parenthesis', next: '@pop' }],
+                    [/./, { token: '@rematch', next: '@bracketCounting' }],
+                ],
+                insideBracket: [
+                    [/[A-Za-z_]\w*/, { token: 'variable', next: '@bracketCounting' }],
+                    [/\]/, { token: 'delimiter.square', next: '@pop' }],
+                    [/./, { token: '@rematch', next: '@bracketCounting' }],
                 ],
                 bracketCounting: [
                     [/\{/, 'delimiter.curly', '@bracketCounting'],
                     [/\}/, 'delimiter.curly', '@pop'],
-                    [/\[/, 'delimiter.square', '@bracketCounting'],
+                    [/\[/, 'delimiter.square', '@insideBracket'],
                     [/\]/, 'delimiter.square', '@pop'],
-                    [/\(/, 'delimiter.parenthesis', '@bracketCounting'],
+                    [/\(/, 'delimiter.parenthesis', '@insideParen'],
                     [/\)/, 'delimiter.parenthesis', '@pop'],
                     { include: 'root' }
                 ],
@@ -506,83 +647,88 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             model?: monaco.editor.ITextModel,
             position?: monaco.Position,
         ) => {
-            const sug = await getAllSuggestions();
-            // Also update the tokenizer with dynamic suggestions (reuse fetched suggestions)
-            await updateTokenizer(monacoI, sug);
+            // Get the full list (including namespaced functions) for tokenizer & dot navigation
+            const fullSug = await getFullSuggestions();
+            // Update the tokenizer with the full list
+            await updateTokenizer(monacoI, fullSug);
 
-            // When triggered by '.', narrow to property keys of the bound element's type.
-            // Identify whether the variable preceding '.' is bound to a node or a relationship,
-            // resolve its label / relationship type, and return only the keys present on
-            // elements of that type. Falls back to the full property-key list when the
-            // binding cannot be resolved.
-            if (context?.triggerCharacter === '.' && model && position) {
-                const allPropertyKeys = sug.filter(s => s.detail === '(property key)');
+            // Detect dot context: either from trigger character or from cursor position.
+            // This handles both auto-trigger and manual Ctrl+Space after typing '.'.
+            let hasDot = context?.triggerCharacter === '.';
+            if (!hasDot && model && position) {
+                const charBeforeCursor = model.getValueInRange({
+                    startLineNumber: position.lineNumber,
+                    startColumn: Math.max(1, position.column - 1),
+                    endLineNumber: position.lineNumber,
+                    endColumn: position.column,
+                });
+                hasDot = charBeforeCursor === '.';
+            }
 
-                // Extract the variable name immediately before the '.'.
+            // When in dot context, show property keys if the variable before '.' is bound
+            // in a node (varName) or relationship [varName] pattern.
+            // Otherwise show only namespaced functions matching the prefix.
+            if (hasDot && model && position) {
+                const allPropertyKeys = fullSug.filter(s => s.detail === '(property key)');
+
+                // Extract the full dotted prefix before the cursor's trailing '.'.
+                // e.g. "CALL db.idx." → captures "db.idx", "RETURN n." → captures "n"
                 const linePrefix = model.getValueInRange({
                     startLineNumber: position.lineNumber,
                     startColumn: 1,
                     endLineNumber: position.lineNumber,
                     endColumn: position.column,
                 });
-                const varMatch = linePrefix.match(/([A-Za-z_][A-Za-z0-9_]*)\.$/);
-                if (!varMatch) return allPropertyKeys;
-                const varName = varMatch[1];
+                const varMatch = linePrefix.match(/([A-Za-z_]\w*(?:\.\w+)*)\.$/);
+                if (!varMatch) return [];
+                const fullPrefix = varMatch[1];
+                // The root identifier (first segment) is used to check node/rel binding
+                const varName = fullPrefix.split('.')[0];
 
-                // Search the entire query for binding patterns of this variable.
-                // Node:        (varName:Label1[:Label2 ...] ...)
-                // Relationship: [varName:TYPE ...]  or  -[varName ...]-
+                // Check if the variable is bound in a node or relationship pattern.
                 const queryText = model.getValue();
                 const escapedVar = varName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-                const nodeRegex = new RegExp(`\\(\\s*${escapedVar}\\s*((?::[A-Za-z_][A-Za-z0-9_]*)+)`, 'g');
-                const relRegex = new RegExp(`\\[\\s*${escapedVar}\\s*((?::[A-Za-z_][A-Za-z0-9_]*)+)`, 'g');
+                const nodePattern = new RegExp(`\\(\\s*${escapedVar}\\b`);
+                const relPattern = new RegExp(`\\[\\s*${escapedVar}\\b`);
 
-                const collectTypes = (re: RegExp): string[] => {
-                    const types = new Set<string>();
-                    let m = re.exec(queryText);
-                    while (m) {
-                        m[1].split(':').filter(Boolean).forEach(t => types.add(t));
-                        m = re.exec(queryText);
+                const isBound = nodePattern.test(queryText) || relPattern.test(queryText);
+
+                if (isBound) return allPropertyKeys;
+
+                // Not a node/relationship variable — show the next level inside this namespace.
+                // e.g. "db." shows ["idx", "labels"], "db.idx." shows ["vector", "fulltext"]
+                const prefix = `${fullPrefix}.`;
+                const nextSegments = new Map<string, boolean>(); // segment -> isNamespace
+                fullSug.forEach(s => {
+                    const label = typeof s.label === 'string' ? s.label : s.label.label;
+                    if (!label.startsWith(prefix)) return;
+                    const remainder = label.slice(prefix.length);
+                    const dotIdx = remainder.indexOf('.');
+                    if (dotIdx === -1) {
+                        // Leaf item (function) — show as-is
+                        nextSegments.set(remainder, false);
+                    } else {
+                        // Sub-namespace — extract just the next segment
+                        const segment = remainder.slice(0, dotIdx);
+                        if (!nextSegments.has(segment)) {
+                            nextSegments.set(segment, true);
+                        }
                     }
-                    return Array.from(types);
-                };
-
-                const nodeLabels = collectTypes(nodeRegex);
-                const relTypes = collectTypes(relRegex);
-
-                const g = graphRef.current;
-                const keys = new Set<string>();
-
-                nodeLabels.forEach(name => {
-                    const lbl = g.LabelsMap.get(name);
-                    if (!lbl) return;
-                    lbl.elements.forEach(node => {
-                        if (node.data) Object.keys(node.data).forEach(k => keys.add(k));
-                    });
                 });
 
-                relTypes.forEach(name => {
-                    const rel = g.RelationshipsMap.get(name);
-                    if (!rel) return;
-                    rel.elements.forEach(link => {
-                        if (link.data) Object.keys(link.data).forEach(k => keys.add(k));
-                    });
-                });
-
-                if (keys.size === 0) {
-                    // Could not resolve type or no cached elements — fall back to all property keys.
-                    return allPropertyKeys;
-                }
-
-                return Array.from(keys).map(k => ({
-                    insertText: k,
-                    label: k,
-                    kind: monaco.languages.CompletionItemKind.Property,
-                    detail: '(property key)',
+                return Array.from(nextSegments.entries()).map(([segment, isNamespace]) => ({
+                    insertText: segment,
+                    label: segment,
+                    kind: isNamespace
+                        ? monaco.languages.CompletionItemKind.Module
+                        : monaco.languages.CompletionItemKind.Function,
+                    detail: isNamespace ? '(namespace)' : '(function)',
                 }));
             }
-            return sug;
+
+            // Default (non-dot) case: return filtered suggestions (no full-path functions)
+            return getAllSuggestions();
         },
     }), []);
 
@@ -638,11 +784,18 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         // Also update when content changes (e.g. setValue from history navigation)
         e.onDidChangeModelContent(updateLineKeys);
 
+        // Escape: dismiss suggestions if visible, otherwise blur the editor
         e.addCommand(monaco.KeyCode.Escape, () => {
             const domNode = e.getDomNode();
-            if (domNode) {
-                const textarea = domNode.querySelector('textarea');
+            if (!domNode) return;
 
+            // Check if the suggest widget is visible in the DOM
+            const suggestWidget = domNode.querySelector('.editor-widget.suggest-widget.visible');
+            if (suggestWidget) {
+                // Dismiss the suggestion widget
+                e.trigger('keyboard', 'hideSuggestWidget', {});
+            } else {
+                const textarea = domNode.querySelector('textarea');
                 if (textarea) (textarea as HTMLTextAreaElement).blur();
             }
         });
