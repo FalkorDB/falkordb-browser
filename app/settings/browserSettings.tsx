@@ -95,11 +95,8 @@ export default function BrowserSettings() {
         (async () => {
             const detectedProvider = detectProviderFromApiKey(secretKey);
             if (!model && detectedProvider !== "unknown") {
-                const params = new URLSearchParams({ provider: detectedProvider });
-                if (secretKey) params.set("apiKey", secretKey);
-
                 const res = await securedFetch(
-                    `/api/chat/models?${params.toString()}`,
+                    `/api/chat/models?provider=${detectedProvider}`,
                     { method: "GET" },
                     toast,
                     setIndicator

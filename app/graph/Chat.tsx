@@ -249,14 +249,11 @@ export default function Chat({ onClose }: Props) {
         if (modelProvider !== "unknown" && keyProvider !== "unknown" && modelProvider !== keyProvider && modelProvider !== "ollama") {
             const modelProviderName = getProviderDisplayName(modelProvider);
             const keyProviderName = getProviderDisplayName(keyProvider);
-            setMessages(prev => [
-                ...prev,
-                {
-                    role: "assistant",
-                    content: `Model/API key mismatch: You selected a ${modelProviderName} model but provided a ${keyProviderName} API key. Please update your API key in Settings to match your selected model.`,
-                    type: "Error"
-                }
-            ]);
+            handleSetMessages({
+                role: "assistant",
+                content: `Model/API key mismatch: You selected a ${modelProviderName} model but provided a ${keyProviderName} API key. Please update your API key in Settings to match your selected model.`,
+                type: "Error",
+            });
             setIsLoading(false);
             return;
         }
@@ -445,6 +442,12 @@ export default function Chat({ onClose }: Props) {
                             </Button>
                         </div>
                     </div>
+                );
+            case "CypherResult":
+                return (
+                    <pre className="text-sm whitespace-pre-wrap break-all bg-muted p-2 rounded">
+                        {message.content}
+                    </pre>
                 );
             case "Usage": {
                 return (

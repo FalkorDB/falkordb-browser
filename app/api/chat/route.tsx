@@ -185,9 +185,14 @@ export async function POST(request: NextRequest) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         const userFriendlyMessage = createUserFriendlyErrorMessage(error as Error, model, key);
 
-        // Return 400 for known client/state errors, 500 for unexpected failures
+        // Return 400 for known client/state errors, 401 for auth errors, 500 for unexpected failures
+        const authErrors = ["401", "invalid_api_key", "Incorrect API key", "Authentication failed", "Unauthorized"];
         const knownClientErrors = ["GRAPH_NOT_FOUND", "EMPTY_GRAPH", "Model/API key mismatch", "No messages provided", "No user messages found"];
-        const status = knownClientErrors.some(e => errorMessage.includes(e)) ? 400 : 500;
+        const status = authErrors.some(e => errorMessage.includes(e))
+            ? 401
+            : knownClientErrors.some(e => errorMessage.includes(e))
+                ? 400
+                : 500;
 
         return NextResponse.json(
             { error: userFriendlyMessage },
