@@ -424,8 +424,8 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         });
     }, [udfSuggestions]);
 
-    const updateTokenizer = async (monacoI: Monaco) => {
-        const sug = await getAllSuggestions();
+    const updateTokenizer = async (monacoI: Monaco, prefetchedSuggestions?: monaco.languages.CompletionItem[]) => {
+        const sug = prefetchedSuggestions ?? await getAllSuggestions();
 
         const functions = sug.filter(({ detail }) => detail === "(function)" || detail === "(udf function)");
 
@@ -507,8 +507,8 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             position?: monaco.Position,
         ) => {
             const sug = await getAllSuggestions();
-            // Also update the tokenizer with dynamic suggestions
-            await updateTokenizer(monacoI);
+            // Also update the tokenizer with dynamic suggestions (reuse fetched suggestions)
+            await updateTokenizer(monacoI, sug);
 
             // When triggered by '.', narrow to property keys of the bound element's type.
             // Identify whether the variable preceding '.' is bound to a node or a relationship,
@@ -579,7 +579,6 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                     insertText: k,
                     label: k,
                     kind: monaco.languages.CompletionItemKind.Property,
-                    range: new monaco.Range(1, 1, 1, 1),
                     detail: '(property key)',
                 }));
             }

@@ -87,13 +87,14 @@ export interface LanguageConfig {
     /** 
      * Async function that returns completion suggestions. 
      * Called once on mount and whenever the completion provider triggers.
+     * The `range` property is optional since EditorComponent always overwrites it.
      */
     getSuggestions?: (
         monacoInstance: Monaco,
         context?: monaco.languages.CompletionContext,
         model?: monaco.editor.ITextModel,
         position?: monaco.Position
-    ) => Promise<monaco.languages.CompletionItem[]>;
+    ) => Promise<(Omit<monaco.languages.CompletionItem, 'range'> & { range?: monaco.languages.CompletionItem['range'] })[]>;
     /** Characters that trigger the completion provider in addition to typing identifier characters. */
     triggerCharacters?: string[];
 }
