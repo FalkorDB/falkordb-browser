@@ -316,13 +316,13 @@ export default function Chat({ onClose }: Props) {
             }
 
             // Show cypher result if available
-            if (data.cypherResult) {
-                handleSetMessages({
-                    role: "assistant",
-                    content: typeof data.cypherResult === "string" ? data.cypherResult : JSON.stringify(data.cypherResult),
-                    type: "CypherResult"
-                });
-            }
+            // if (data.cypherResult) {
+            //     handleSetMessages({
+            //         role: "assistant",
+            //         content: typeof data.cypherResult === "string" ? data.cypherResult : JSON.stringify(data.cypherResult),
+            //         type: "CypherResult"
+            //     });
+            // }
 
             // Show token usage if available
             if (data.tokenUsage) {
@@ -443,12 +443,12 @@ export default function Chat({ onClose }: Props) {
                         </div>
                     </div>
                 );
-            case "CypherResult":
-                return (
-                    <pre className="text-sm whitespace-pre-wrap break-all bg-muted p-2 rounded">
-                        {message.content}
-                    </pre>
-                );
+            // case "CypherResult":
+            //     return (
+            //         <pre className="text-sm whitespace-pre-wrap break-all bg-muted p-2 rounded">
+            //             {message.content}
+            //         </pre>
+            //     );
             case "Usage": {
                 return (
                     <div className="flex flex-col gap-1">
@@ -557,7 +557,7 @@ export default function Chat({ onClose }: Props) {
                                         className="w-full flex justify-center"
                                         key={index}
                                     >
-                                        <div className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
+                                        <div className="px-3 py-1 bg-secondary rounded-full">
                                             {getMessage(message)}
                                         </div>
                                     </li>
