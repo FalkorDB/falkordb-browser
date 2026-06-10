@@ -4,14 +4,14 @@ import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2, Info, Eye, EyeOff, Pencil, KeyRound, CheckCircle2, Loader2 } from "lucide-react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
-import { areCaptionKeysEqual, cn, getDefaultQuery, securedFetch } from "@/lib/utils";
+import { areCaptionKeysEqual, cn, getDefaultQuery } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { detectProviderFromApiKey, getProviderDisplayName } from "@/lib/ai-provider-utils";
-import { BrowserSettingsContext, IndicatorContext } from "../components/provider";
+import { BrowserSettingsContext } from "../components/provider";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import ModelSelector from "./ModelSelector";
@@ -51,7 +51,6 @@ export default function BrowserSettings() {
         replayTutorial,
     } = useContext(BrowserSettingsContext);
 
-    const { setIndicator } = useContext(IndicatorContext);
     const scrollableContainerRef = useRef<HTMLDivElement>(null);
 
     const { toast } = useToast();
@@ -65,6 +64,7 @@ export default function BrowserSettings() {
     const [editingKeyId, setEditingKeyId] = useState<string | null>(null);
     const [editingKeyValue, setEditingKeyValue] = useState("");
     const [visibleKeyIds, setVisibleKeyIds] = useState<Set<string>>(new Set());
+    const modelFetchRequestIdRef = useRef(0);
     const [expandedSections, setExpandedSections] = useState({
         queryExecution: false,
         chat: false,
@@ -81,44 +81,65 @@ export default function BrowserSettings() {
 
     // Fetch live models whenever the selected key changes.
     useEffect(() => {
+        const requestId = modelFetchRequestIdRef.current + 1;
+        modelFetchRequestIdRef.current = requestId;
+        const controller = new AbortController();
+
         (async () => {
             if (!selectedChatApiKey) {
                 setModelDisplayNames([]);
                 setModelsMessage("Enter your API key to load live models.");
+                setIsLoadingModels(false);
                 return;
             }
 
             setIsLoadingModels(true);
             setModelsMessage("Loading live models for the selected key...");
 
-            const result = await securedFetch(
-                "/api/chat/models",
-                {
+            try {
+                const result = await fetch("/api/chat/models", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ key: selectedChatApiKey.key }),
-                },
-                toast,
-                setIndicator
-            );
+                    signal: controller.signal,
+                });
 
-            if (result.ok) {
-                const { models } = await result.json();
-                setModelDisplayNames(models);
-                setModelsMessage(models.length > 0
-                    ? `${models.length} live models loaded for ${getProviderDisplayName(selectedChatApiKey.provider)}.`
-                    : "No live models were returned for this key.");
-                if (models.length > 0) {
-                    setNewModel(currentModel => models.includes(currentModel) ? currentModel : models[0]);
+                if (requestId !== modelFetchRequestIdRef.current) return;
+
+                if (result.ok) {
+                    const { models } = await result.json();
+                    if (requestId !== modelFetchRequestIdRef.current) return;
+
+                    setModelDisplayNames(models);
+                    setModelsMessage(models.length > 0
+                        ? `${models.length} live models loaded for ${getProviderDisplayName(selectedChatApiKey.provider)}.`
+                        : "No live models were returned for this key.");
+                    if (models.length > 0) {
+                        setNewModel(currentModel => models.includes(currentModel) ? currentModel : models[0]);
+                    }
+                } else {
+                    const { error } = await result.json().catch(() => ({ error: "" }));
+                    if (requestId !== modelFetchRequestIdRef.current) return;
+
+                    setModelDisplayNames([]);
+                    setModelsMessage(error || "Could not load live models for this key. Check the key and try again.");
                 }
-            } else {
+            } catch (error) {
+                if (error instanceof DOMException && error.name === "AbortError") return;
+                if (requestId !== modelFetchRequestIdRef.current) return;
                 setModelDisplayNames([]);
                 setModelsMessage("Could not load live models for this key. Check the key and try again.");
+            } finally {
+                if (requestId === modelFetchRequestIdRef.current) {
+                    setIsLoadingModels(false);
+                }
             }
-
-            setIsLoadingModels(false);
         })();
-    }, [selectedChatApiKey, toast, setIndicator, setNewModel]);
+
+        return () => {
+            controller.abort();
+        };
+    }, [selectedChatApiKey, setNewModel]);
 
     useEffect(() => {
         setNewContentPersistence(contentPersistence);
@@ -286,7 +307,11 @@ export default function BrowserSettings() {
     };
 
     const handleSelectKey = (id: string) => {
+        if (id === newSelectedChatApiKeyId) return;
         selectChatApiKey(newChatApiKeys, id);
+        setModelDisplayNames([]);
+        setIsLoadingModels(true);
+        setModelsMessage("Loading live models for the selected key...");
         setNewModel("");
     };
 

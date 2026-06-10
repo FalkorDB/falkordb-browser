@@ -8,6 +8,23 @@ type ProviderModelResponse = {
     models?: Array<{ name?: string; supportedGenerationMethods?: string[] }>;
 };
 
+class ModelFetchError extends Error {
+    constructor(
+        provider: AIProvider,
+        upstreamStatus: number
+    ) {
+        const providerName = getProviderDisplayName(provider);
+        const message = upstreamStatus === 401 || upstreamStatus === 403
+            ? `${providerName} rejected this API key. Check the key and try again.`
+            : `Could not load live ${providerName} models right now. Try again later.`;
+
+        super(message);
+        this.status = upstreamStatus === 429 ? 429 : upstreamStatus >= 500 ? 502 : 400;
+    }
+
+    status: number;
+}
+
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
@@ -17,8 +34,7 @@ const withProviderPrefix = (provider: AIProvider, models: string[]) =>
 
 const ensureOk = async (response: Response, provider: AIProvider) => {
     if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`${getProviderDisplayName(provider)} model request failed (${response.status}): ${text}`);
+        throw new ModelFetchError(provider, response.status);
     }
 };
 
@@ -131,7 +147,7 @@ export async function POST(request: NextRequest) {
         console.error("Error fetching live models:", error);
         return NextResponse.json(
             { error: error instanceof Error ? error.message : "Internal server error" },
-            { status: 500, headers: getCorsHeaders(request) }
+            { status: error instanceof ModelFetchError ? error.status : 500, headers: getCorsHeaders(request) }
         );
     }
 }
