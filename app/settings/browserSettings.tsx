@@ -413,7 +413,7 @@ export default function BrowserSettings() {
     return (
         <div className="grow basis-0 w-full flex flex-col gap-2 overflow-hidden">
             <div className="flex items-start justify-between gap-2 px-2">
-                <div className="flex flex-col gap-2">
+                <div className="flex max-h-[18.5rem] flex-col gap-2 overflow-y-auto pr-1 custom-scrollbar">
                     <h1 className="text-3xl font-semibold">Browser Settings</h1>
                     <p className="text-base text-muted-foreground">Customize your browser experience and manage configurations</p>
                 </div>
