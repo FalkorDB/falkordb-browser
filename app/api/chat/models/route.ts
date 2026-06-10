@@ -8,7 +8,7 @@ type ProviderModelResponse = {
     models?: Array<{ name?: string; supportedGenerationMethods?: string[] }>;
 };
 
-const MODEL_FETCH_TIMEOUT_MS = 8000;
+const MODEL_FETCH_TIMEOUT_MS = 4000;
 
 class ModelFetchError extends Error {
     constructor(
@@ -35,6 +35,14 @@ class ModelFetchTimeoutError extends Error {
     status = 504;
 }
 
+class ModelFetchAbortedError extends Error {
+    constructor() {
+        super("Model request was cancelled.");
+    }
+
+    status = 499;
+}
+
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
@@ -51,34 +59,50 @@ const ensureOk = async (response: Response, provider: AIProvider) => {
 const fetchProviderModels = async (
     provider: AIProvider,
     url: string,
-    init: RequestInit
+    init: RequestInit,
+    abortSignal: AbortSignal
 ) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(new ModelFetchTimeoutError(provider)), MODEL_FETCH_TIMEOUT_MS);
+    const abortProviderRequest = () => controller.abort(new ModelFetchAbortedError());
+    abortSignal.addEventListener("abort", abortProviderRequest, { once: true });
+
     try {
         return await fetch(url, {
             ...init,
             cache: "no-store",
-            signal: AbortSignal.timeout(MODEL_FETCH_TIMEOUT_MS),
+            signal: controller.signal,
         });
     } catch (error) {
-        if (error instanceof DOMException && (error.name === "AbortError" || error.name === "TimeoutError")) {
-            throw new ModelFetchTimeoutError(provider);
+        if (error instanceof ModelFetchTimeoutError || error instanceof ModelFetchAbortedError) {
+            throw error;
+        }
+        if (controller.signal.reason instanceof ModelFetchTimeoutError || controller.signal.reason instanceof ModelFetchAbortedError) {
+            throw controller.signal.reason;
+        }
+        if (error instanceof DOMException && error.name === "AbortError") {
+            throw new ModelFetchAbortedError();
         }
 
         throw error;
+    } finally {
+        clearTimeout(timeout);
+        abortSignal.removeEventListener("abort", abortProviderRequest);
     }
 };
 
 const fetchOpenAICompatibleModels = async (
     provider: Extract<AIProvider, "openai" | "groq" | "xai">,
     url: string,
-    key: string
+    key: string,
+    abortSignal: AbortSignal
 ) => {
     const response = await fetchProviderModels(provider, url, {
         method: "GET",
         headers: {
             Authorization: `Bearer ${key}`,
         },
-    });
+    }, abortSignal);
     await ensureOk(response, provider);
     const payload = await response.json() as ProviderModelResponse;
     const models = (payload.data ?? [])
@@ -89,14 +113,14 @@ const fetchOpenAICompatibleModels = async (
     return withProviderPrefix(provider, models);
 };
 
-const fetchAnthropicModels = async (key: string) => {
+const fetchAnthropicModels = async (key: string, abortSignal: AbortSignal) => {
     const response = await fetchProviderModels("anthropic", "https://api.anthropic.com/v1/models", {
         method: "GET",
         headers: {
             "x-api-key": key,
             "anthropic-version": "2023-06-01",
         },
-    });
+    }, abortSignal);
     await ensureOk(response, "anthropic");
     const payload = await response.json() as ProviderModelResponse;
     const models = (payload.data ?? [])
@@ -107,13 +131,13 @@ const fetchAnthropicModels = async (key: string) => {
     return withProviderPrefix("anthropic", models);
 };
 
-const fetchGeminiModels = async (key: string) => {
+const fetchGeminiModels = async (key: string, abortSignal: AbortSignal) => {
     const response = await fetchProviderModels("gemini", "https://generativelanguage.googleapis.com/v1beta/models", {
         method: "GET",
         headers: {
             "x-goog-api-key": key,
         },
-    });
+    }, abortSignal);
     await ensureOk(response, "gemini");
     const payload = await response.json() as ProviderModelResponse;
     const models = (payload.models ?? [])
@@ -125,20 +149,20 @@ const fetchGeminiModels = async (key: string) => {
     return withProviderPrefix("gemini", models);
 };
 
-const fetchLiveModelsForKey = async (key: string) => {
+const fetchLiveModelsForKey = async (key: string, abortSignal: AbortSignal) => {
     const provider = detectProviderFromApiKey(key);
 
     switch (provider) {
         case "openai":
-            return fetchOpenAICompatibleModels("openai", "https://api.openai.com/v1/models", key);
+            return fetchOpenAICompatibleModels("openai", "https://api.openai.com/v1/models", key, abortSignal);
         case "anthropic":
-            return fetchAnthropicModels(key);
+            return fetchAnthropicModels(key, abortSignal);
         case "gemini":
-            return fetchGeminiModels(key);
+            return fetchGeminiModels(key, abortSignal);
         case "groq":
-            return fetchOpenAICompatibleModels("groq", "https://api.groq.com/openai/v1/models", key);
+            return fetchOpenAICompatibleModels("groq", "https://api.groq.com/openai/v1/models", key, abortSignal);
         case "xai":
-            return fetchOpenAICompatibleModels("xai", "https://api.x.ai/v1/models", key);
+            return fetchOpenAICompatibleModels("xai", "https://api.x.ai/v1/models", key, abortSignal);
         default:
             throw new Error("Could not detect the provider for this key. Add a supported OpenAI, Anthropic, Gemini, Groq, or xAI key.");
     }
@@ -168,13 +192,15 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const models = await fetchLiveModelsForKey(key);
+        const models = await fetchLiveModelsForKey(key, request.signal);
         return NextResponse.json({ models }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
-        console.error("Error fetching live models:", error);
+        if (!(error instanceof ModelFetchAbortedError)) {
+            console.error("Error fetching live models:", error);
+        }
         return NextResponse.json(
             { error: error instanceof Error ? error.message : "Internal server error" },
-            { status: error instanceof ModelFetchError || error instanceof ModelFetchTimeoutError ? error.status : 500, headers: getCorsHeaders(request) }
+            { status: error instanceof ModelFetchError || error instanceof ModelFetchTimeoutError || error instanceof ModelFetchAbortedError ? error.status : 500, headers: getCorsHeaders(request) }
         );
     }
 }

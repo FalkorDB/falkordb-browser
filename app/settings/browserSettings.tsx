@@ -326,6 +326,7 @@ export default function BrowserSettings() {
 
     const handleSelectKey = (id: string) => {
         if (isLoadingModels && id === loadingChatApiKeyId) return;
+        modelFetchRequestIdRef.current += 1;
         modelFetchAbortRef.current?.abort();
         setActiveSelectedChatApiKeyId(id);
         selectChatApiKey(newChatApiKeys, id);
@@ -534,10 +535,21 @@ export default function BrowserSettings() {
                                                     return (
                                                         <div
                                                             key={apiKey.id}
+                                                            role="button"
+                                                            tabIndex={0}
+                                                            aria-pressed={isSelected}
                                                             className={cn(
-                                                                "group rounded-xl border bg-background/80 p-3 transition-all",
+                                                                "group rounded-xl border bg-background/80 p-3 text-left transition-all",
+                                                                isLoadingKey ? "cursor-wait" : "cursor-pointer",
                                                                 isSelected ? "border-primary shadow-sm ring-1 ring-primary/20" : "border-border/70 hover:border-primary/40"
                                                             )}
+                                                            onClick={() => handleSelectKey(apiKey.id)}
+                                                            onKeyDown={(event) => {
+                                                                if (event.key === "Enter" || event.key === " ") {
+                                                                    event.preventDefault();
+                                                                    handleSelectKey(apiKey.id);
+                                                                }
+                                                            }}
                                                         >
                                                             <div className="flex w-full items-start gap-3 text-left">
                                                                 <span className={cn(
@@ -547,21 +559,20 @@ export default function BrowserSettings() {
                                                                     {isLoadingKey ? <Loader2 className="h-4 w-4 animate-spin" /> : isSelected ? <CheckCircle2 className="h-4 w-4" /> : <KeyRound className="h-4 w-4" />}
                                                                 </span>
                                                                 <span className="min-w-0 flex-1">
-                                                                    <button
-                                                                        type="button"
-                                                                        className="block w-full text-left disabled:cursor-wait"
-                                                                        disabled={isLoadingKey}
-                                                                        onClick={() => handleSelectKey(apiKey.id)}
-                                                                    >
+                                                                    <span className="block w-full text-left">
                                                                         <span className="block text-sm font-semibold">{providerName}</span>
                                                                         {!isEditing && (
                                                                             <span className="block truncate font-mono text-xs text-muted-foreground">
                                                                                 {isVisible ? apiKey.key : maskKey(apiKey.key)}
                                                                             </span>
                                                                         )}
-                                                                    </button>
+                                                                    </span>
                                                                     {isEditing && (
-                                                                        <div className="mt-2 flex gap-2">
+                                                                        <div
+                                                                            className="mt-2 flex gap-2"
+                                                                            onClick={(event) => event.stopPropagation()}
+                                                                            onKeyDown={(event) => event.stopPropagation()}
+                                                                        >
                                                                             <Input
                                                                                 className="flex-1 font-mono text-xs"
                                                                                 type={isVisible ? "text" : "password"}
@@ -571,14 +582,20 @@ export default function BrowserSettings() {
                                                                             <button
                                                                                 type="button"
                                                                                 className="rounded-md border border-primary bg-primary px-2 py-1 text-xs font-medium text-background transition-colors hover:bg-primary/90"
-                                                                                onClick={() => handleSaveEditedKey(apiKey.id)}
+                                                                                onClick={(event) => {
+                                                                                    event.stopPropagation();
+                                                                                    handleSaveEditedKey(apiKey.id);
+                                                                                }}
                                                                             >
                                                                                 Save
                                                                             </button>
                                                                             <button
                                                                                 type="button"
                                                                                 className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                                                                onClick={handleCancelEditKey}
+                                                                                onClick={(event) => {
+                                                                                    event.stopPropagation();
+                                                                                    handleCancelEditKey();
+                                                                                }}
                                                                             >
                                                                                 Cancel
                                                                             </button>
@@ -590,7 +607,10 @@ export default function BrowserSettings() {
                                                                 <button
                                                                     type="button"
                                                                     className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                                                    onClick={() => toggleKeyVisibility(apiKey.id)}
+                                                                    onClick={(event) => {
+                                                                        event.stopPropagation();
+                                                                        toggleKeyVisibility(apiKey.id);
+                                                                    }}
                                                                 >
                                                                     {isVisible ? <EyeOff className="mr-1 inline h-3.5 w-3.5" /> : <Eye className="mr-1 inline h-3.5 w-3.5" />}
                                                                     {isVisible ? "Hide" : "Show"}
@@ -598,7 +618,14 @@ export default function BrowserSettings() {
                                                                 <button
                                                                     type="button"
                                                                     className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                                                    onClick={() => isEditing ? handleCancelEditKey() : handleEditKey(apiKey.id)}
+                                                                    onClick={(event) => {
+                                                                        event.stopPropagation();
+                                                                        if (isEditing) {
+                                                                            handleCancelEditKey();
+                                                                        } else {
+                                                                            handleEditKey(apiKey.id);
+                                                                        }
+                                                                    }}
                                                                 >
                                                                     <Pencil className="mr-1 inline h-3.5 w-3.5" />
                                                                     {isEditing ? "Cancel edit" : "Edit"}
@@ -606,7 +633,10 @@ export default function BrowserSettings() {
                                                                 <button
                                                                     type="button"
                                                                     className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive transition-colors hover:bg-destructive/10"
-                                                                    onClick={() => handleDeleteKey(apiKey.id)}
+                                                                    onClick={(event) => {
+                                                                        event.stopPropagation();
+                                                                        handleDeleteKey(apiKey.id);
+                                                                    }}
                                                                 >
                                                                     <Trash2 className="mr-1 inline h-3.5 w-3.5" />
                                                                     Delete
