@@ -518,7 +518,10 @@ export default function BrowserSettings() {
                                                 </p>
                                             </div>
 
-                                            <div className="flex flex-col gap-2">
+                                            <div className={cn(
+                                                "flex flex-col gap-2",
+                                                newChatApiKeys.length > 3 && "max-h-[15rem] overflow-y-scroll pr-1 custom-scrollbar"
+                                            )}>
                                                 {newChatApiKeys.length === 0 && (
                                                     <div className="rounded-xl border border-dashed border-border bg-background/60 p-4 text-sm text-muted-foreground">
                                                         Enter your key to load the models.
