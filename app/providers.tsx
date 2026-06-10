@@ -808,7 +808,34 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         console.error("Failed to parse captions keys from localStorage", error);
         setCaptionsKeys([['name', false], ['title', false]]);
       }
-      setTimeout(parseInt(localStorage.getItem("timeout") || "60", 10));
+      const storedTimeout = localStorage.getItem("timeout");
+      let timeoutVal: number;
+      if (storedTimeout) {
+        timeoutVal = parseInt(storedTimeout, 10);
+      } else {
+        // No user-set value: cap the default (60) with TIMEOUT_MAX from server config
+        let fallback = 60;
+        try {
+          const configRes = await fetch("/api/graph/config", { method: "GET" });
+          if (configRes.ok) {
+            const { configs } = await configRes.json();
+            const timeoutMaxEntry = configs.find((c: [string, string | number]) => c[0] === "TIMEOUT_MAX");
+            if (timeoutMaxEntry) {
+              const timeoutMaxMs = Number(timeoutMaxEntry[1]);
+              if (timeoutMaxMs > 0) {
+                const timeoutMaxSeconds = Math.floor(timeoutMaxMs / 1000);
+                if (fallback > timeoutMaxSeconds) {
+                  fallback = timeoutMaxSeconds;
+                }
+              }
+            }
+          }
+        } catch {
+          // If config fetch fails, use the default as-is
+        }
+        timeoutVal = fallback;
+      }
+      setTimeout(timeoutVal);
       const l = parseInt(localStorage.getItem("limit") || "300", 10);
       setLimit(l);
       setLastLimit(l);
