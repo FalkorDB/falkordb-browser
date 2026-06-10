@@ -64,6 +64,8 @@ export default function BrowserSettings() {
     const [editingKeyId, setEditingKeyId] = useState<string | null>(null);
     const [editingKeyValue, setEditingKeyValue] = useState("");
     const [visibleKeyIds, setVisibleKeyIds] = useState<Set<string>>(new Set());
+    const [activeSelectedChatApiKeyId, setActiveSelectedChatApiKeyId] = useState("");
+    const [modelLoadNonce, setModelLoadNonce] = useState(0);
     const modelFetchRequestIdRef = useRef(0);
     const [expandedSections, setExpandedSections] = useState({
         queryExecution: false,
@@ -77,7 +79,15 @@ export default function BrowserSettings() {
         setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
     };
 
-    const selectedChatApiKey = newChatApiKeys.find(({ id }) => id === newSelectedChatApiKeyId) ?? newChatApiKeys[0];
+    const selectedChatApiKey = newChatApiKeys.find(({ id }) => id === activeSelectedChatApiKeyId) ?? newChatApiKeys[0];
+    const uiSelectedChatApiKeyId = selectedChatApiKey?.id ?? "";
+
+    useEffect(() => {
+        const nextSelectedId = newChatApiKeys.some(({ id }) => id === newSelectedChatApiKeyId)
+            ? newSelectedChatApiKeyId
+            : newChatApiKeys[0]?.id ?? "";
+        setActiveSelectedChatApiKeyId(nextSelectedId);
+    }, [newChatApiKeys, newSelectedChatApiKeyId]);
 
     // Fetch live models whenever the selected key changes.
     useEffect(() => {
@@ -139,7 +149,7 @@ export default function BrowserSettings() {
         return () => {
             controller.abort();
         };
-    }, [selectedChatApiKey, setNewModel]);
+    }, [selectedChatApiKey, modelLoadNonce, setNewModel]);
 
     useEffect(() => {
         setNewContentPersistence(contentPersistence);
@@ -307,12 +317,13 @@ export default function BrowserSettings() {
     };
 
     const handleSelectKey = (id: string) => {
-        if (id === newSelectedChatApiKeyId) return;
+        setActiveSelectedChatApiKeyId(id);
         selectChatApiKey(newChatApiKeys, id);
         setModelDisplayNames([]);
         setIsLoadingModels(true);
         setModelsMessage("Loading live models for the selected key...");
         setNewModel("");
+        setModelLoadNonce(nonce => nonce + 1);
     };
 
     const handleEditKey = (id: string) => {
@@ -503,7 +514,7 @@ export default function BrowserSettings() {
                                                 )}
 
                                                 {newChatApiKeys.map((apiKey) => {
-                                                    const isSelected = apiKey.id === newSelectedChatApiKeyId;
+                                                    const isSelected = apiKey.id === uiSelectedChatApiKeyId;
                                                     const isVisible = visibleKeyIds.has(apiKey.id);
                                                     const providerName = apiKey.provider === "unknown" ? "Unknown provider" : getProviderDisplayName(apiKey.provider);
                                                     const isEditing = editingKeyId === apiKey.id;

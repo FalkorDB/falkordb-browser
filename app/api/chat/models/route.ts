@@ -8,6 +8,8 @@ type ProviderModelResponse = {
     models?: Array<{ name?: string; supportedGenerationMethods?: string[] }>;
 };
 
+const MODEL_FETCH_TIMEOUT_MS = 8000;
+
 class ModelFetchError extends Error {
     constructor(
         provider: AIProvider,
@@ -25,6 +27,14 @@ class ModelFetchError extends Error {
     status: number;
 }
 
+class ModelFetchTimeoutError extends Error {
+    constructor(provider: AIProvider) {
+        super(`Timed out loading live ${getProviderDisplayName(provider)} models. Check the key and try again.`);
+    }
+
+    status = 504;
+}
+
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
@@ -38,17 +48,36 @@ const ensureOk = async (response: Response, provider: AIProvider) => {
     }
 };
 
+const fetchProviderModels = async (
+    provider: AIProvider,
+    url: string,
+    init: RequestInit
+) => {
+    try {
+        return await fetch(url, {
+            ...init,
+            cache: "no-store",
+            signal: AbortSignal.timeout(MODEL_FETCH_TIMEOUT_MS),
+        });
+    } catch (error) {
+        if (error instanceof DOMException && (error.name === "AbortError" || error.name === "TimeoutError")) {
+            throw new ModelFetchTimeoutError(provider);
+        }
+
+        throw error;
+    }
+};
+
 const fetchOpenAICompatibleModels = async (
     provider: Extract<AIProvider, "openai" | "groq" | "xai">,
     url: string,
     key: string
 ) => {
-    const response = await fetch(url, {
+    const response = await fetchProviderModels(provider, url, {
         method: "GET",
         headers: {
             Authorization: `Bearer ${key}`,
         },
-        cache: "no-store",
     });
     await ensureOk(response, provider);
     const payload = await response.json() as ProviderModelResponse;
@@ -61,13 +90,12 @@ const fetchOpenAICompatibleModels = async (
 };
 
 const fetchAnthropicModels = async (key: string) => {
-    const response = await fetch("https://api.anthropic.com/v1/models", {
+    const response = await fetchProviderModels("anthropic", "https://api.anthropic.com/v1/models", {
         method: "GET",
         headers: {
             "x-api-key": key,
             "anthropic-version": "2023-06-01",
         },
-        cache: "no-store",
     });
     await ensureOk(response, "anthropic");
     const payload = await response.json() as ProviderModelResponse;
@@ -80,12 +108,11 @@ const fetchAnthropicModels = async (key: string) => {
 };
 
 const fetchGeminiModels = async (key: string) => {
-    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models", {
+    const response = await fetchProviderModels("gemini", "https://generativelanguage.googleapis.com/v1beta/models", {
         method: "GET",
         headers: {
             "x-goog-api-key": key,
         },
-        cache: "no-store",
     });
     await ensureOk(response, "gemini");
     const payload = await response.json() as ProviderModelResponse;
@@ -147,7 +174,7 @@ export async function POST(request: NextRequest) {
         console.error("Error fetching live models:", error);
         return NextResponse.json(
             { error: error instanceof Error ? error.message : "Internal server error" },
-            { status: error instanceof ModelFetchError ? error.status : 500, headers: getCorsHeaders(request) }
+            { status: error instanceof ModelFetchError || error instanceof ModelFetchTimeoutError ? error.status : 500, headers: getCorsHeaders(request) }
         );
     }
 }

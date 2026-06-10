@@ -85,7 +85,7 @@ export default function ModelSelector({
     }, []);
 
     useEffect(() => {
-        const timeout = setTimeout(() => {
+        const updateModels = () => {
             const filtered = !search
                 ? models
                 : models.filter((model) =>
@@ -106,7 +106,14 @@ export default function ModelSelector({
                     if (selectedCategory) categoryRefs.current.get(selectedCategory[0])?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 }, 0);
             }
-        }, 200);
+        };
+
+        if (!search) {
+            updateModels();
+            return undefined;
+        }
+
+        const timeout = setTimeout(updateModels, 200);
 
         return () => clearTimeout(timeout);
     }, [search, models, selectedModel]);
