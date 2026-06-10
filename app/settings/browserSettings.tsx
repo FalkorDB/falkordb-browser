@@ -66,7 +66,9 @@ export default function BrowserSettings() {
     const [visibleKeyIds, setVisibleKeyIds] = useState<Set<string>>(new Set());
     const [activeSelectedChatApiKeyId, setActiveSelectedChatApiKeyId] = useState("");
     const [modelLoadNonce, setModelLoadNonce] = useState(0);
+    const [loadingChatApiKeyId, setLoadingChatApiKeyId] = useState("");
     const modelFetchRequestIdRef = useRef(0);
+    const modelFetchAbortRef = useRef<AbortController | null>(null);
     const [expandedSections, setExpandedSections] = useState({
         queryExecution: false,
         chat: false,
@@ -94,16 +96,20 @@ export default function BrowserSettings() {
         const requestId = modelFetchRequestIdRef.current + 1;
         modelFetchRequestIdRef.current = requestId;
         const controller = new AbortController();
+        modelFetchAbortRef.current = controller;
 
         (async () => {
             if (!selectedChatApiKey) {
                 setModelDisplayNames([]);
                 setModelsMessage("Enter your API key to load live models.");
                 setIsLoadingModels(false);
+                setLoadingChatApiKeyId("");
+                modelFetchAbortRef.current = null;
                 return;
             }
 
             setIsLoadingModels(true);
+            setLoadingChatApiKeyId(selectedChatApiKey.id);
             setModelsMessage("Loading live models for the selected key...");
 
             try {
@@ -142,6 +148,8 @@ export default function BrowserSettings() {
             } finally {
                 if (requestId === modelFetchRequestIdRef.current) {
                     setIsLoadingModels(false);
+                    setLoadingChatApiKeyId("");
+                    modelFetchAbortRef.current = null;
                 }
             }
         })();
@@ -317,10 +325,13 @@ export default function BrowserSettings() {
     };
 
     const handleSelectKey = (id: string) => {
+        if (isLoadingModels && id === loadingChatApiKeyId) return;
+        modelFetchAbortRef.current?.abort();
         setActiveSelectedChatApiKeyId(id);
         selectChatApiKey(newChatApiKeys, id);
         setModelDisplayNames([]);
         setIsLoadingModels(true);
+        setLoadingChatApiKeyId(id);
         setModelsMessage("Loading live models for the selected key...");
         setNewModel("");
         setModelLoadNonce(nonce => nonce + 1);
@@ -518,6 +529,7 @@ export default function BrowserSettings() {
                                                     const isVisible = visibleKeyIds.has(apiKey.id);
                                                     const providerName = apiKey.provider === "unknown" ? "Unknown provider" : getProviderDisplayName(apiKey.provider);
                                                     const isEditing = editingKeyId === apiKey.id;
+                                                    const isLoadingKey = loadingChatApiKeyId === apiKey.id;
 
                                                     return (
                                                         <div
@@ -532,12 +544,13 @@ export default function BrowserSettings() {
                                                                     "mt-0.5 flex h-8 w-8 items-center justify-center rounded-full border",
                                                                     isSelected ? "border-primary bg-primary text-background" : "border-border bg-muted/40 text-muted-foreground"
                                                                 )}>
-                                                                    {isSelected ? <CheckCircle2 className="h-4 w-4" /> : <KeyRound className="h-4 w-4" />}
+                                                                    {isLoadingKey ? <Loader2 className="h-4 w-4 animate-spin" /> : isSelected ? <CheckCircle2 className="h-4 w-4" /> : <KeyRound className="h-4 w-4" />}
                                                                 </span>
                                                                 <span className="min-w-0 flex-1">
                                                                     <button
                                                                         type="button"
-                                                                        className="block w-full text-left"
+                                                                        className="block w-full text-left disabled:cursor-wait"
+                                                                        disabled={isLoadingKey}
                                                                         onClick={() => handleSelectKey(apiKey.id)}
                                                                     >
                                                                         <span className="block text-sm font-semibold">{providerName}</span>
