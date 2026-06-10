@@ -34,7 +34,12 @@ export default function Settings() {
     const { tab: urlTab, setTab } = useSettingsParams();
 
     const [current, setCurrent] = useState<Tab>("Browser");
+    const [isMounted, setIsMounted] = useState(false);
     const prevActiveConnectionIdRef = useRef<string | null | undefined>(undefined);
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
     // Sync tab from URL param (after hydration, useSearchParams populates)
     useEffect(() => {
@@ -67,6 +72,7 @@ export default function Settings() {
     // Reset to Browser whenever the current tab requires admin access but the
     // active connection is not admin (e.g. user switches to a read/write connection).
     const isAdmin = session?.user.role === "Admin" && indicator === "online";
+    const canShowAdminTabs = isMounted && isAdmin;
     const adminOnlyTabs: Tab[] = ["Users", "Configurations"];
     useEffect(() => {
         // Don't reset tabs while session is still loading — isAdmin would be
@@ -133,7 +139,7 @@ export default function Settings() {
                     onClick={() => handleSetCurrent("Browser")}
                 />
                 {
-                    session?.user.role === "Admin" && indicator === "online" &&
+                    canShowAdminTabs &&
                     <>
                         <Button
                             data-testid="settingsTabConfigurations"
