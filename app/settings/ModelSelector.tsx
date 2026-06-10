@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { formatModelDisplayName, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
+import { formatModelDisplayName, detectProviderFromModel, getProviderDisplayName, type AIProvider } from "@/lib/ai-provider-utils";
 import { Search, Check, Sparkles, Zap, Brain, Globe, Server, Cpu, MessageSquare, ChevronRight, Rocket } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Input from "../components/ui/Input";
@@ -9,6 +9,7 @@ interface ModelSelectorProps {
     models: string[];
     selectedModel: string;
     onModelSelect: (model: string) => void;
+    provider?: AIProvider;
     disabled?: boolean;
     isLoading?: boolean;
 }
@@ -21,7 +22,7 @@ const getCategoryIcon = (category: string) => {
             return <Zap className={className} />;
         case "Anthropic":
             return <Brain className={className} />;
-        case "Google":
+        case "Google Gemini":
             return <Globe className={className} />;
         case "Ollama":
             return <Server className={className} />;
@@ -37,19 +38,19 @@ const getCategoryIcon = (category: string) => {
 };
 
 // Categorize models by provider prefix or name heuristics
-const categorizeModels = (models: string[]) => {
+const getCategoryName = (provider: AIProvider) => provider === "unknown" ? "Other" : getProviderDisplayName(provider);
+
+const categorizeModels = (models: string[], provider?: AIProvider) => {
     const uniqueModels = [...new Set(models)];
+
+    if (provider && provider !== "unknown") {
+        return [[getCategoryName(provider), uniqueModels.sort((a, b) => a.localeCompare(b))]] as [string, string[]][];
+    }
+
     const categories: Record<string, string[]> = {};
 
     uniqueModels.forEach((model) => {
-        const provider = detectProviderFromModel(model);
-        let categoryName: string;
-
-        if (provider !== "unknown") {
-            categoryName = provider === "gemini" ? "Google" : getProviderDisplayName(provider);
-        } else {
-            categoryName = "Other";
-        }
+        const categoryName = getCategoryName(detectProviderFromModel(model));
 
         if (!categories[categoryName]) {
             categories[categoryName] = [];
@@ -67,6 +68,7 @@ export default function ModelSelector({
     models,
     selectedModel,
     onModelSelect,
+    provider,
     disabled = false,
     isLoading = false
 }: ModelSelectorProps) {
@@ -92,7 +94,7 @@ export default function ModelSelector({
                     model.toLowerCase().includes(search.toLowerCase())
                 );
             setFilteredModels(filtered);
-            const categorized = categorizeModels(filtered);
+            const categorized = categorizeModels(filtered, provider);
             setCategorizedModels(categorized);
 
             // Auto-expand all matching categories when searching
@@ -116,7 +118,7 @@ export default function ModelSelector({
         const timeout = setTimeout(updateModels, 200);
 
         return () => clearTimeout(timeout);
-    }, [search, models, selectedModel]);
+    }, [search, models, selectedModel, provider]);
 
     const handleModelClick = (model: string) => {
         if (!disabled) {
@@ -272,6 +274,7 @@ export default function ModelSelector({
 }
 
 ModelSelector.defaultProps = {
+    provider: undefined,
     disabled: false,
     isLoading: false,
 };

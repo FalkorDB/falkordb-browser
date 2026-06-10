@@ -663,6 +663,7 @@ export default function BrowserSettings() {
                                                     models={modelDisplayNames}
                                                     selectedModel={newModel}
                                                     onModelSelect={handleModelChange}
+                                                    provider={selectedChatApiKey?.provider}
                                                     isLoading={isLoadingModels}
                                                     disabled={!selectedChatApiKey}
                                                 />
