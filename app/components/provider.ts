@@ -3,6 +3,9 @@ import { ConnectionInfo, ConnectionType, GraphData, GraphRef, HistoryQuery, Labe
 import type { Data as CanvasData, LayoutMode, ViewportState } from "@falkordb/canvas";
 import type { SessionConnection } from "next-auth";
 import { Graph, GraphInfo } from "../api/graph/model";
+import type { AIProvider } from "@/lib/ai-provider-utils";
+
+export type ProviderKeys = Partial<Record<AIProvider, string>>;
 
 type BrowserSettingsContextType = {
   newSettings: {
@@ -43,8 +46,8 @@ type BrowserSettingsContextType = {
       setNewShowPropertyKeyPrefix: Dispatch<SetStateAction<boolean>>;
     };
     chatSettings: {
-      newSecretKey: string;
-      setNewSecretKey: Dispatch<SetStateAction<string>>;
+      newProviderKeys: ProviderKeys;
+      setNewProviderKeys: Dispatch<SetStateAction<ProviderKeys>>;
       newModel: string;
       setNewModel: Dispatch<SetStateAction<string>>;
       newMaxSavedMessages: number;
@@ -99,8 +102,8 @@ type BrowserSettingsContextType = {
       setRowHeightExpandMultiple: Dispatch<SetStateAction<number>>;
     };
     chatSettings: {
-      secretKey: string;
-      setSecretKey: Dispatch<SetStateAction<string>>;
+      providerKeys: ProviderKeys;
+      setProviderKeys: Dispatch<SetStateAction<ProviderKeys>>;
       model: string;
       setModel: Dispatch<SetStateAction<string>>;
       maxSavedMessages: number;
@@ -262,8 +265,8 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         setNewShowPropertyKeyPrefix: () => { },
       },
       chatSettings: {
-        newSecretKey: "",
-        setNewSecretKey: () => { },
+        newProviderKeys: {},
+        setNewProviderKeys: () => { },
         newModel: "",
         setNewModel: () => { },
         newMaxSavedMessages: 0,
@@ -312,8 +315,8 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         setShowPropertyKeyPrefix: () => { },
       },
       chatSettings: {
-        secretKey: "",
-        setSecretKey: () => { },
+        providerKeys: {},
+        setProviderKeys: () => { },
         model: "",
         setModel: () => { },
         maxSavedMessages: 0,

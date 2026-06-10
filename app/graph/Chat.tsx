@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import { GraphContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext } from "../components/provider";
-import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
+import { detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import ToastButton from "../components/ToastButton";
 import { ShineBorder } from "@/components/ui/shine-border";
 import { getConnectionItem, setConnectionItem, getConnectionPrefix } from "@/lib/connection-storage";
@@ -72,7 +72,7 @@ export default function Chat({ onClose }: Props) {
     const { setIndicator } = useContext(IndicatorContext);
     const { runQuery, graphName } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
-    const { settings: { chatSettings: { secretKey, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
+    const { settings: { chatSettings: { providerKeys, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
     // Cypher Only toggle state, persisted per graph
     const [cypherOnly, setCypherOnly] = useState(false);
 
@@ -225,10 +225,13 @@ export default function Chat({ onClose }: Props) {
             return;
         }
 
-        if (!secretKey) {
+        // Check if the selected model's provider has an API key configured
+        const modelProvider = detectProviderFromModel(model);
+        if (modelProvider !== "unknown" && modelProvider !== "ollama" && !providerKeys[modelProvider]) {
+            const providerName = getProviderDisplayName(modelProvider);
             toast({
-                title: "No Api Key Provided",
-                description: "Please provide a Api Key in the settings before sending a message",
+                title: "No API Key Provided",
+                description: `Please provide a ${providerName} API key in the settings before sending a message`,
                 variant: "destructive",
                 action: ToastActionButton
             });
@@ -243,20 +246,8 @@ export default function Chat({ onClose }: Props) {
         handleSetMessages(newMessages);
         setNewMessage("");
 
-        // Client-side fail-fast: detect model/API key provider mismatch before making any request
-        const modelProvider = detectProviderFromModel(model);
-        const keyProvider = detectProviderFromApiKey(secretKey);
-        if (modelProvider !== "unknown" && keyProvider !== "unknown" && modelProvider !== keyProvider && modelProvider !== "ollama") {
-            const modelProviderName = getProviderDisplayName(modelProvider);
-            const keyProviderName = getProviderDisplayName(keyProvider);
-            handleSetMessages({
-                role: "assistant",
-                content: `Model/API key mismatch: You selected a ${modelProviderName} model but provided a ${keyProviderName} API key. Please update your API key in Settings to match your selected model.`,
-                type: "Error",
-            });
-            setIsLoading(false);
-            return;
-        }
+        // Get the API key for the selected model's provider
+        const secretKey = modelProvider !== "unknown" ? (providerKeys[modelProvider] || "") : "";
 
         try {
             const response = await fetch("/api/chat", {

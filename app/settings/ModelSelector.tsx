@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { formatModelDisplayName, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
-import { Search, Check, Sparkles, Zap, Brain, Globe, Server, Cpu, MessageSquare, ChevronRight, Rocket } from "lucide-react";
+import { formatModelDisplayName, detectProviderFromModel, getProviderDisplayName, providerRequiresApiKey, getProviderApiKeyInfo } from "@/lib/ai-provider-utils";
+import type { AIProvider } from "@/lib/ai-provider-utils";
+import type { ProviderKeys } from "../components/provider";
+import { Search, Check, Sparkles, Zap, Brain, Globe, Server, Cpu, MessageSquare, ChevronRight, Rocket, Eye, EyeOff } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Input from "../components/ui/Input";
 
@@ -11,6 +13,8 @@ interface ModelSelectorProps {
     onModelSelect: (model: string) => void;
     disabled?: boolean;
     isLoading?: boolean;
+    providerKeys?: ProviderKeys;
+    onProviderKeyChange?: (provider: AIProvider, key: string) => void;
 }
 
 // Get icon for provider category
@@ -68,12 +72,15 @@ export default function ModelSelector({
     selectedModel,
     onModelSelect,
     disabled = false,
-    isLoading = false
+    isLoading = false,
+    providerKeys = {},
+    onProviderKeyChange
 }: ModelSelectorProps) {
     const [search, setSearch] = useState("");
     const [filteredModels, setFilteredModels] = useState<string[]>(models);
     const [categorizedModels, setCategorizedModels] = useState<[string, string[]][]>([]);
     const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+    const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
     const categoryRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
     const setCategoryRef = useCallback((category: string) => (el: HTMLDivElement | null) => {
@@ -112,9 +119,11 @@ export default function ModelSelector({
     }, [search, models, selectedModel]);
 
     const handleModelClick = (model: string) => {
-        if (!disabled) {
-            onModelSelect(model);
-        }
+        if (disabled) return;
+        const provider = detectProviderFromModel(model);
+        // Don't allow selecting models from providers that need a key but don't have one
+        if (provider !== "unknown" && providerRequiresApiKey(provider) && !providerKeys[provider]) return;
+        onModelSelect(model);
     };
 
     const toggleExpand = (category: string) => {
@@ -133,6 +142,20 @@ export default function ModelSelector({
             setTimeout(() => {
                 categoryRefs.current.get(category)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }, 0);
+        }
+    };
+
+    // Map category display name to AIProvider
+    const getCategoryProvider = (category: string): AIProvider => {
+        switch (category) {
+            case "OpenAI": return "openai";
+            case "Anthropic": return "anthropic";
+            case "Google": return "gemini";
+            case "Ollama": return "ollama";
+            case "Groq": return "groq";
+            case "Cohere": return "cohere";
+            case "xAI": return "xai";
+            default: return "unknown";
         }
     };
 
@@ -182,9 +205,13 @@ export default function ModelSelector({
                             categorizedModels.map(([category, categoryModels]) => {
                                 const isCategoryExpanded = expandedCategories.has(category);
                                 const selectedInCategory = categoryModels.find(m => m === selectedModel);
+                                const provider = getCategoryProvider(category);
+                                const needsKey = provider !== "unknown" && providerRequiresApiKey(provider);
+                                const hasKey = !needsKey || !!providerKeys[provider];
+                                const keyInfo = needsKey ? getProviderApiKeyInfo(provider) : null;
 
                                 return (
-                                    <div key={category} ref={setCategoryRef(category)} className="rounded-lg border border-border/50 overflow-hidden">
+                                    <div key={category} ref={setCategoryRef(category)} className={cn("rounded-lg border border-border/50 overflow-hidden", !hasKey && "opacity-70")}>
                                         {/* Category Header */}
                                         <button
                                             type="button"
@@ -203,6 +230,11 @@ export default function ModelSelector({
                                                     {formatModelDisplayName(selectedInCategory)}
                                                 </span>
                                             )}
+                                            {!hasKey && (
+                                                <span className="text-xs text-muted-foreground italic">
+                                                    API key required
+                                                </span>
+                                            )}
                                             <span className="text-xs text-muted-foreground ml-auto">
                                                 {categoryModels.length} {categoryModels.length === 1 ? "model" : "models"}
                                             </span>
@@ -210,8 +242,48 @@ export default function ModelSelector({
 
                                         {isCategoryExpanded && (
                                             <>
+                                                {/* API Key Input (only for providers that need a key) */}
+                                                {needsKey && onProviderKeyChange && (
+                                                    <div className="flex flex-col gap-1 px-2 pt-2 pb-1 border-b border-border/30">
+                                                        <div className="relative">
+                                                            <Input
+                                                                data-testid={`providerKeyInput-${provider}`}
+                                                                className="w-full text-xs pr-8"
+                                                                id={`providerKey-${provider}`}
+                                                                type={visibleKeys.has(provider) ? "text" : "password"}
+                                                                placeholder={keyInfo ? keyInfo.description : `Enter ${category} API key...`}
+                                                                value={providerKeys[provider] || ""}
+                                                                onChange={(e) => onProviderKeyChange(provider, e.target.value)}
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                                                onClick={() => setVisibleKeys(prev => {
+                                                                    const next = new Set(prev);
+                                                                    if (next.has(provider)) next.delete(provider);
+                                                                    else next.add(provider);
+                                                                    return next;
+                                                                })}
+                                                                aria-label={visibleKeys.has(provider) ? "Hide API key" : "Show API key"}
+                                                            >
+                                                                {visibleKeys.has(provider) ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                                                            </button>
+                                                        </div>
+                                                        {keyInfo && (
+                                                            <a
+                                                                href={keyInfo.url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="text-xs text-muted-foreground hover:underline mb-1"
+                                                            >
+                                                                Get your API key &rarr;
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                )}
+
                                                 {/* Models Grid */}
-                                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5 p-1">
+                                                <div className={cn("grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5 p-1", !hasKey && "opacity-50 pointer-events-none")}>
                                                     {
                                                         categoryModels.map((model) => {
                                                             const isSelected = model === selectedModel;
@@ -223,13 +295,13 @@ export default function ModelSelector({
                                                                             data-testid={`selectModel${model}`}
                                                                             data-selected={isSelected}
                                                                             onClick={() => handleModelClick(model)}
-                                                                            disabled={disabled}
+                                                                            disabled={disabled || !hasKey}
                                                                             className={cn(
                                                                                 "flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs transition-all duration-150",
                                                                                 "border border-transparent",
                                                                                 "hover:bg-muted/60 hover:border-border/50 active:scale-[0.98]",
                                                                                 isSelected && "bg-primary border-primary hover:bg-primary hover:border-primary",
-                                                                                disabled && "opacity-50 cursor-not-allowed"
+                                                                                (disabled || !hasKey) && "opacity-50 cursor-not-allowed"
                                                                             )}
                                                                         >
                                                                             <span className={cn(
@@ -267,4 +339,6 @@ export default function ModelSelector({
 ModelSelector.defaultProps = {
     disabled: false,
     isLoading: false,
+    providerKeys: {},
+    onProviderKeyChange: undefined,
 };

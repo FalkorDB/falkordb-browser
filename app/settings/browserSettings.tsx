@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { detectProviderFromApiKey } from "@/lib/ai-provider-utils";
+import { KNOWN_PROVIDERS } from "@/lib/ai-provider-utils";
 import { BrowserSettingsContext, IndicatorContext } from "../components/provider";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -26,7 +26,7 @@ export default function BrowserSettings() {
             limitSettings: { newLimit, setNewLimit },
             captionsKeysSettings: { newCaptionsKeys, setNewCaptionsKeys },
             showPropertyKeyPrefixSettings: { newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
-            chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly },
+            chatSettings: { newProviderKeys, setNewProviderKeys, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly },
             graphInfo: { newRefreshInterval, setNewRefreshInterval, newMaxItemsForSearch, setNewMaxItemsForSearch },
             tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple }
         },
@@ -38,7 +38,7 @@ export default function BrowserSettings() {
             limitSettings: { limit },
             captionsKeysSettings: { captionsKeys },
             showPropertyKeyPrefixSettings: { showPropertyKeyPrefix },
-            chatSettings: { secretKey, model, setModel, maxSavedMessages, cypherOnly },
+            chatSettings: { providerKeys, model, setModel, maxSavedMessages, cypherOnly },
             graphInfo: { refreshInterval, maxItemsForSearch },
             tableViewSettings: { columnWidth, rowHeight, rowHeightExpandMultiple }
         },
@@ -70,7 +70,7 @@ export default function BrowserSettings() {
         setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
     };
 
-    // Fetch all available models when secretKey changes (secretKey updates only on settings save)
+    // Fetch all available models when providerKeys change (updates only on settings save)
     useEffect(() => {
         (async () => {
             setIsLoadingModels(true);
@@ -89,14 +89,15 @@ export default function BrowserSettings() {
 
             setIsLoadingModels(false);
         })();
-    }, [secretKey, toast, setIndicator]);
+    }, [providerKeys, toast, setIndicator]);
 
     useEffect(() => {
         (async () => {
-            const detectedProvider = detectProviderFromApiKey(secretKey);
-            if (!model && detectedProvider !== "unknown") {
+            // Find the first provider that has a key set
+            const firstProviderWithKey = KNOWN_PROVIDERS.find(p => providerKeys[p]);
+            if (!model && firstProviderWithKey) {
                 const res = await securedFetch(
-                    `/api/chat/models?provider=${detectedProvider}`,
+                    `/api/chat/models?provider=${firstProviderWithKey}`,
                     { method: "GET" },
                     toast,
                     setIndicator
@@ -113,7 +114,7 @@ export default function BrowserSettings() {
                 localStorage.setItem("model", defaultModel);
             }
         })();
-    }, [secretKey, model, toast, setIndicator, setNewModel, setModel]);
+    }, [providerKeys, model, toast, setIndicator, setNewModel, setModel]);
 
     useEffect(() => {
         setNewContentPersistence(contentPersistence);
@@ -121,7 +122,7 @@ export default function BrowserSettings() {
         setNewDefaultQuery(defaultQuery);
         setNewTimeout(timeoutValue);
         setNewLimit(limit);
-        setNewSecretKey(secretKey);
+        setNewProviderKeys(providerKeys);
         setNewModel(model);
         setNewRefreshInterval(refreshInterval);
         setNewMaxSavedMessages(maxSavedMessages);
@@ -132,7 +133,7 @@ export default function BrowserSettings() {
         setNewRowHeight(rowHeight);
         setNewRowHeightExpandMultiple(rowHeightExpandMultiple);
         setNewMaxItemsForSearch(maxItemsForSearch);
-    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, model, setNewModel, setNewRefreshInterval, refreshInterval, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, rowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch]);
+    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, providerKeys, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewProviderKeys, model, setNewModel, setNewRefreshInterval, refreshInterval, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, rowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch]);
 
     useEffect(() => {
         setHasChanges(
@@ -141,7 +142,7 @@ export default function BrowserSettings() {
             newLimit !== limit ||
             newDefaultQuery !== defaultQuery ||
             newRunDefaultQuery !== runDefaultQuery ||
-            newSecretKey !== secretKey ||
+            JSON.stringify(newProviderKeys) !== JSON.stringify(providerKeys) ||
             newModel !== model ||
             refreshInterval !== newRefreshInterval ||
             newMaxSavedMessages !== maxSavedMessages ||
@@ -153,7 +154,7 @@ export default function BrowserSettings() {
             newRowHeightExpandMultiple !== rowHeightExpandMultiple ||
             newMaxItemsForSearch !== maxItemsForSearch
         );
-    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey, newModel, model, refreshInterval, newRefreshInterval, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch]);
+    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newProviderKeys, providerKeys, newModel, model, refreshInterval, newRefreshInterval, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch]);
 
     const handleSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
         e?.preventDefault();
@@ -243,7 +244,7 @@ export default function BrowserSettings() {
     // Wrapper for model combobox to handle scroll and mapping
     const handleModelChange = (modelValue: string) => {
         // Model value is already the raw model name from the API
-        createChangeHandler(setNewModel)(modelValue, 'secretKeyInput');
+        createChangeHandler(setNewModel)(modelValue, 'providerKeysSection');
     };
 
     const handleAddCaptionKey = (e: React.FormEvent<HTMLFormElement>) => {
@@ -332,16 +333,10 @@ export default function BrowserSettings() {
                                         selectedModel={newModel}
                                         onModelSelect={handleModelChange}
                                         isLoading={isLoadingModels}
-                                    />
-                                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                                    <label htmlFor="secretKeyInput" className="text-sm font-medium whitespace-nowrap">Secret Key</label>
-                                    <Input
-                                        data-testid="chatApiKeyInput"
-                                        className="flex-1"
-                                        id="secretKeyInput"
-                                        placeholder="Enter your API secret key..."
-                                        value={newSecretKey}
-                                        onChange={(e) => createChangeHandler(setNewSecretKey)(e.target.value, 'secretKeyInput')}
+                                        providerKeys={newProviderKeys}
+                                        onProviderKeyChange={(provider, key) => {
+                                            setNewProviderKeys(prev => ({ ...prev, [provider]: key }));
+                                        }}
                                     />
                                 </div>
                                 <button type="submit" className="hidden" aria-hidden="true" tabIndex={-1} />

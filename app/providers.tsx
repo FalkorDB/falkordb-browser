@@ -6,6 +6,8 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, SyntaxErrorInfo, parseSyntaxError } from "@/lib/utils";
 import { serverEncrypt, serverDecrypt, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
+import { detectProviderFromApiKey, KNOWN_PROVIDERS } from "@/lib/ai-provider-utils";
+import type { ProviderKeys } from "./components/provider";
 import { usePathname, useRouter } from "next/navigation";
 import { useGraphParams, syncRouteUrlParams } from "@/lib/useUrlParams";
 import { useToast } from "@/components/ui/use-toast";
@@ -124,9 +126,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [refreshInterval, setRefreshInterval] = useState(10);
   const [newRefreshInterval, setNewRefreshInterval] = useState(0);
   const [currentTab, setCurrentTab] = useState<Tab>("Graph");
-  const [newSecretKey, setNewSecretKey] = useState("");
+  const [newProviderKeys, setNewProviderKeys] = useState<ProviderKeys>({});
   const [newModel, setNewModel] = useState("");
-  const [secretKey, setSecretKey] = useState("");
+  const [providerKeys, setProviderKeys] = useState<ProviderKeys>({});
   const [hasChanges, setHasChanges] = useState(false);
   const [nodesCount, setNodesCount] = useState<number>();
   const [edgesCount, setEdgesCount] = useState<number>();
@@ -192,7 +194,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       contentPersistenceSettings: { newContentPersistence, setNewContentPersistence },
       captionsKeysSettings: { newCaptionsKeys, setNewCaptionsKeys },
       showPropertyKeyPrefixSettings: { newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
-      chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly },
+      chatSettings: { newProviderKeys, setNewProviderKeys, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly },
       graphInfo: { newRefreshInterval, setNewRefreshInterval, newMaxItemsForSearch, setNewMaxItemsForSearch },
       tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple }
     },
@@ -204,7 +206,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       contentPersistenceSettings: { contentPersistence, setContentPersistence },
       captionsKeysSettings: { captionsKeys, setCaptionsKeys },
       showPropertyKeyPrefixSettings: { showPropertyKeyPrefix, setShowPropertyKeyPrefix },
-      chatSettings: { secretKey, setSecretKey, model, setModel, maxSavedMessages, setMaxSavedMessages, cypherOnly, setCypherOnly },
+      chatSettings: { providerKeys, setProviderKeys, model, setModel, maxSavedMessages, setMaxSavedMessages, cypherOnly, setCypherOnly },
       graphInfo: { showMemoryUsage, refreshInterval, setRefreshInterval, maxItemsForSearch, setMaxItemsForSearch },
       tableViewSettings: { columnWidth, setColumnWidth, rowHeight, setRowHeight, rowHeightExpandMultiple, setRowHeightExpandMultiple }
     },
@@ -230,32 +232,36 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       localStorage.setItem("rowHeightExpandMultiple", newRowHeightExpandMultiple.toString());
       localStorage.setItem("maxItemsForSearch", newMaxItemsForSearch.toString());
 
-      // Only encrypt and save secret key if it has changed
-      if (newSecretKey !== secretKey) {
-        if (newSecretKey) {
-          try {
-            const encryptedKey = await serverEncrypt(newSecretKey);
-            if (!encryptedKey) {
-              toast({
-                title: "Error",
-                description: "Could not encrypt secret key. Please try again.",
-                variant: "destructive",
-              });
-              return;
+      // Only encrypt and save provider keys if they have changed
+      const keysChanged = JSON.stringify(newProviderKeys) !== JSON.stringify(providerKeys);
+      if (keysChanged) {
+        try {
+          const encryptedKeys: Record<string, string> = {};
+          for (const [provider, key] of Object.entries(newProviderKeys)) {
+            if (key) {
+              const encrypted = await serverEncrypt(key);
+              if (!encrypted) {
+                toast({
+                  title: "Error",
+                  description: `Could not encrypt API key for ${provider}. Please try again.`,
+                  variant: "destructive",
+                });
+                return;
+              }
+              encryptedKeys[provider] = encrypted;
             }
-            localStorage.setItem("secretKey", encryptedKey);
-          } catch (error) {
-            console.error('Failed to encrypt secret key:', error);
-            toast({
-              title: "Error",
-              description: "Could not encrypt secret key. Please try again.",
-              variant: "destructive",
-            });
-            return;
           }
-        } else {
-          // Key is empty - remove it from storage
+          localStorage.setItem("providerKeys", JSON.stringify(encryptedKeys));
+          // Remove legacy secretKey if it exists
           localStorage.removeItem("secretKey");
+        } catch (error) {
+          console.error('Failed to encrypt provider keys:', error);
+          toast({
+            title: "Error",
+            description: "Could not encrypt API keys. Please try again.",
+            variant: "destructive",
+          });
+          return;
         }
       }
 
@@ -266,7 +272,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setTimeout(newTimeout);
       setLimit(newLimit);
       setLastLimit(limit);
-      setSecretKey(newSecretKey);
+      setProviderKeys(newProviderKeys);
       setModel(newModel);
       setRefreshInterval(newRefreshInterval);
       setMaxSavedMessages(newMaxSavedMessages);
@@ -292,7 +298,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setNewDefaultQuery(defaultQuery);
       setNewTimeout(timeout);
       setNewLimit(limit);
-      setNewSecretKey(secretKey);
+      setNewProviderKeys(providerKeys);
       setNewModel(model);
       setNewRefreshInterval(refreshInterval);
       setNewMaxSavedMessages(maxSavedMessages);
@@ -306,7 +312,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setHasChanges(false);
     }
 
-  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, toast]);
+  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newProviderKeys, newTimeout, refreshInterval, runDefaultQuery, providerKeys, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, toast]);
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -825,58 +831,72 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setRowHeightExpandMultiple(parseInt(localStorage.getItem("rowHeightExpandMultiple") || "3", 10));
       const parsedMaxItems = parseInt(localStorage.getItem("maxItemsForSearch") || "20", 10);
       setMaxItemsForSearch(Number.isFinite(parsedMaxItems) ? Math.min(Math.max(parsedMaxItems, 10), 50) : 20);
-      // Decrypt secret key using server-side decryption, with migration from old client-side encryption
-      const storedSecretKey = localStorage.getItem("secretKey") || "";
-      if (storedSecretKey) {
-        if (isLegacyEncrypted(storedSecretKey)) {
-          // Old client-side encrypted value - decrypt with legacy method, then re-encrypt server-side
-          try {
-            const plainKey = await legacyDecrypt(storedSecretKey);
-            if (plainKey) {
-              setSecretKey(plainKey);
-              const newEncrypted = await serverEncrypt(plainKey);
-              if (newEncrypted) {
-                localStorage.setItem("secretKey", newEncrypted);
+      // Decrypt provider keys from localStorage
+      const storedProviderKeys = localStorage.getItem("providerKeys");
+      const decryptedKeys: ProviderKeys = {};
+
+      if (storedProviderKeys) {
+        try {
+          const parsedKeys = JSON.parse(storedProviderKeys) as Record<string, string>;
+          for (const [provider, encryptedKey] of Object.entries(parsedKeys)) {
+            if (encryptedKey) {
+              try {
+                const decrypted = await serverDecrypt(encryptedKey);
+                if (decrypted) {
+                  decryptedKeys[provider as keyof ProviderKeys] = decrypted;
+                }
+              } catch {
+                console.error(`Failed to decrypt key for provider ${provider}`);
               }
-              clearLegacyEncryptionKey();
-            } else {
-              // eslint-disable-next-line no-console
-              console.warn('Could not decrypt legacy secret key, clearing');
-              setSecretKey('');
-              localStorage.removeItem("secretKey");
-              clearLegacyEncryptionKey();
-            }
-          } catch (error) {
-            console.error('Failed to migrate legacy secret key:', error);
-            setSecretKey('');
-            localStorage.removeItem("secretKey");
-          }
-        } else {
-          // Try server-side decryption (new format or plain text)
-          try {
-            const decryptedKey = await serverDecrypt(storedSecretKey);
-            if (decryptedKey) {
-              setSecretKey(decryptedKey);
-            } else {
-              // eslint-disable-next-line no-console
-              console.warn('Clearing corrupted encrypted secret key');
-              setSecretKey('');
-              localStorage.removeItem("secretKey");
-            }
-          } catch {
-            // Not server-encrypted - treat as plain text, migrate to server encryption
-            try {
-              setSecretKey(storedSecretKey);
-              const encryptedKey = await serverEncrypt(storedSecretKey);
-              if (encryptedKey) {
-                localStorage.setItem("secretKey", encryptedKey);
-              }
-            } catch (migrateError) {
-              console.error('Failed to migrate plain text key:', migrateError);
             }
           }
+        } catch {
+          console.error('Failed to parse stored provider keys');
         }
       }
+
+      // Migrate legacy secretKey to providerKeys if it exists
+      const storedSecretKey = localStorage.getItem("secretKey") || "";
+      if (storedSecretKey && !storedProviderKeys) {
+        let plainKey = "";
+        if (isLegacyEncrypted(storedSecretKey)) {
+          try {
+            plainKey = await legacyDecrypt(storedSecretKey) || "";
+            clearLegacyEncryptionKey();
+          } catch {
+            console.error('Failed to decrypt legacy secret key');
+          }
+        } else {
+          try {
+            plainKey = await serverDecrypt(storedSecretKey) || storedSecretKey;
+          } catch {
+            plainKey = storedSecretKey;
+          }
+        }
+        if (plainKey) {
+          const detectedProvider = detectProviderFromApiKey(plainKey);
+          if (detectedProvider !== "unknown") {
+            decryptedKeys[detectedProvider] = plainKey;
+          } else {
+            // Can't detect provider, store under openai as default
+            decryptedKeys.openai = plainKey;
+          }
+          // Re-save as providerKeys and remove old secretKey
+          const encryptedKeys: Record<string, string> = {};
+          for (const [provider, key] of Object.entries(decryptedKeys)) {
+            if (key) {
+              try {
+                const encrypted = await serverEncrypt(key);
+                if (encrypted) encryptedKeys[provider] = encrypted;
+              } catch { /* skip */ }
+            }
+          }
+          localStorage.setItem("providerKeys", JSON.stringify(encryptedKeys));
+          localStorage.removeItem("secretKey");
+        }
+      }
+
+      setProviderKeys(decryptedKeys);
 
       setModel(localStorage.getItem("model") || "");
     })();
