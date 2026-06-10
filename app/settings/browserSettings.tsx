@@ -46,6 +46,8 @@ export default function BrowserSettings() {
         setHasChanges,
         resetSettings,
         saveSettings,
+        saveChatApiKeys,
+        selectChatApiKey,
         replayTutorial,
     } = useContext(BrowserSettingsContext);
 
@@ -260,29 +262,31 @@ export default function BrowserSettings() {
         return `${key.slice(0, 6)}••••••••${key.slice(-4)}`;
     };
 
-    const handleSaveKey = () => {
+    const handleSaveKey = async () => {
         const trimmedKey = keyInput.trim();
         if (!trimmedKey) return;
 
         const provider = detectProviderFromApiKey(trimmedKey);
         const providerName = provider === "unknown" ? "LLM" : getProviderDisplayName(provider);
         const id = crypto.randomUUID();
-        setNewChatApiKeys(prev => [
-            ...prev,
+        const nextKeys = [
+            ...newChatApiKeys,
             {
                 id,
-                label: `${providerName} key ${prev.filter(item => item.provider === provider).length + 1}`,
+                label: `${providerName} key ${newChatApiKeys.filter(item => item.provider === provider).length + 1}`,
                 key: trimmedKey,
                 provider,
                 createdAt: Date.now(),
             },
-        ]);
-        setNewSelectedChatApiKeyId(id);
-        setKeyInput("");
+        ];
+        const saved = await saveChatApiKeys(nextKeys, id);
+        if (saved) {
+            setKeyInput("");
+        }
     };
 
     const handleSelectKey = (id: string) => {
-        setNewSelectedChatApiKeyId(id);
+        selectChatApiKey(newChatApiKeys, id);
         setNewModel("");
     };
 
@@ -294,23 +298,25 @@ export default function BrowserSettings() {
         setVisibleKeyIds(prev => new Set(prev).add(id));
     };
 
-    const handleSaveEditedKey = (id: string) => {
+    const handleSaveEditedKey = async (id: string) => {
         const trimmedKey = editingKeyValue.trim();
         if (!trimmedKey) return;
 
         const provider = detectProviderFromApiKey(trimmedKey);
         const providerName = provider === "unknown" ? "LLM" : getProviderDisplayName(provider);
-        setNewChatApiKeys(prev => prev.map(item => item.id === id
+        const nextKeys = newChatApiKeys.map(item => item.id === id
             ? {
                 ...item,
                 key: trimmedKey,
                 provider,
                 label: item.label || `${providerName} key`,
             }
-            : item));
-        setNewSelectedChatApiKeyId(id);
-        setEditingKeyId(null);
-        setEditingKeyValue("");
+            : item);
+        const saved = await saveChatApiKeys(nextKeys, id);
+        if (saved) {
+            setEditingKeyId(null);
+            setEditingKeyValue("");
+        }
     };
 
     const handleCancelEditKey = () => {
@@ -318,15 +324,15 @@ export default function BrowserSettings() {
         setEditingKeyValue("");
     };
 
-    const handleDeleteKey = (id: string) => {
-        setNewChatApiKeys(prev => {
-            const next = prev.filter(item => item.id !== id);
-            if (newSelectedChatApiKeyId === id) {
-                setNewSelectedChatApiKeyId(next[0]?.id ?? "");
-                setNewModel("");
-            }
-            return next;
-        });
+    const handleDeleteKey = async (id: string) => {
+        const nextKeys = newChatApiKeys.filter(item => item.id !== id);
+        const nextSelectedId = newSelectedChatApiKeyId === id ? nextKeys[0]?.id ?? "" : newSelectedChatApiKeyId;
+        const saved = await saveChatApiKeys(nextKeys, nextSelectedId);
+        if (!saved) return;
+
+        if (newSelectedChatApiKeyId === id) {
+            setNewModel("");
+        }
         if (editingKeyId === id) {
             setEditingKeyId(null);
             setEditingKeyValue("");

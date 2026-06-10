@@ -257,6 +257,63 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setHasChanges,
     replayTutorial,
     tutorialOpen,
+    selectChatApiKey: (keys: ChatApiKey[], selectedId: string) => {
+      const selectedApiKey = getSelectedChatApiKey(keys, selectedId);
+      const nextSelectedId = selectedApiKey?.id ?? "";
+
+      if (nextSelectedId) {
+        localStorage.setItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, nextSelectedId);
+      } else {
+        localStorage.removeItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY);
+      }
+
+      setSelectedChatApiKeyId(nextSelectedId);
+      setNewSelectedChatApiKeyId(nextSelectedId);
+      setSecretKey(selectedApiKey?.key ?? "");
+    },
+    saveChatApiKeys: async (keys: ChatApiKey[], selectedId: string) => {
+      const selectedApiKey = getSelectedChatApiKey(keys, selectedId);
+      const nextSelectedId = selectedApiKey?.id ?? "";
+
+      try {
+        if (keys.length > 0) {
+          const encryptedKeys = await serverEncrypt(JSON.stringify(keys));
+          if (!encryptedKeys) {
+            toast({
+              title: "Error",
+              description: "Could not encrypt API keys. Please try again.",
+              variant: "destructive",
+            });
+            return false;
+          }
+          localStorage.setItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
+        } else {
+          localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
+        }
+        localStorage.removeItem("secretKey");
+
+        if (nextSelectedId) {
+          localStorage.setItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, nextSelectedId);
+        } else {
+          localStorage.removeItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY);
+        }
+      } catch (error) {
+        console.error('Failed to encrypt API keys:', error);
+        toast({
+          title: "Error",
+          description: "Could not encrypt API keys. Please try again.",
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      setChatApiKeys(keys);
+      setNewChatApiKeys(keys);
+      setSelectedChatApiKeyId(nextSelectedId);
+      setNewSelectedChatApiKeyId(nextSelectedId);
+      setSecretKey(selectedApiKey?.key ?? "");
+      return true;
+    },
     saveSettings: async () => {
       // Save settings to local storage
       localStorage.setItem("runDefaultQuery", newRunDefaultQuery.toString());

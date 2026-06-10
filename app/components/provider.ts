@@ -136,6 +136,8 @@ type BrowserSettingsContextType = {
   hasChanges: boolean;
   setHasChanges: Dispatch<SetStateAction<boolean>>;
   saveSettings: () => void;
+  saveChatApiKeys: (keys: ChatApiKey[], selectedId: string) => Promise<boolean>;
+  selectChatApiKey: (keys: ChatApiKey[], selectedId: string) => void;
   resetSettings: () => void;
   replayTutorial: () => void;
   tutorialOpen: boolean;
@@ -357,6 +359,8 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
     hasChanges: false,
     setHasChanges: () => { },
     saveSettings: () => { },
+    saveChatApiKeys: async () => false,
+    selectChatApiKey: () => { },
     resetSettings: () => { },
     replayTutorial: () => { },
     tutorialOpen: false,
