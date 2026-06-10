@@ -94,6 +94,43 @@ const parseChatApiKeys = (value: string): ChatApiKey[] => {
     }));
 };
 
+const persistSelectedChatApiKeyId = async (selectedId: string) => {
+  if (!selectedId) {
+    localStorage.removeItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY);
+    return true;
+  }
+
+  const encryptedSelectedId = await serverEncrypt(selectedId);
+  if (!encryptedSelectedId) {
+    localStorage.removeItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY);
+    return false;
+  }
+
+  localStorage.setItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, encryptedSelectedId);
+  return true;
+};
+
+const loadSelectedChatApiKeyId = async () => {
+  const storedSelectedId = localStorage.getItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY) || "";
+  if (!storedSelectedId) return "";
+
+  try {
+    const decryptedSelectedId = await serverDecrypt(storedSelectedId);
+    if (decryptedSelectedId) return decryptedSelectedId;
+  } catch {
+    // Existing installs may have a clear-text selected id. Re-encrypt below.
+  }
+
+  const encryptedSelectedId = await serverEncrypt(storedSelectedId);
+  if (encryptedSelectedId) {
+    localStorage.setItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, encryptedSelectedId);
+  } else {
+    localStorage.removeItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY);
+  }
+
+  return storedSelectedId;
+};
+
 /**
  * Wraps application UI with authentication-aware providers, state, and layout for graph views.
  *
@@ -257,19 +294,32 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setHasChanges,
     replayTutorial,
     tutorialOpen,
-    selectChatApiKey: (keys: ChatApiKey[], selectedId: string) => {
+    selectChatApiKey: async (keys: ChatApiKey[], selectedId: string) => {
       const selectedApiKey = getSelectedChatApiKey(keys, selectedId);
       const nextSelectedId = selectedApiKey?.id ?? "";
-
-      if (nextSelectedId) {
-        localStorage.setItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, nextSelectedId);
-      } else {
-        localStorage.removeItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY);
-      }
 
       setSelectedChatApiKeyId(nextSelectedId);
       setNewSelectedChatApiKeyId(nextSelectedId);
       setSecretKey(selectedApiKey?.key ?? "");
+
+      try {
+        const saved = await persistSelectedChatApiKeyId(nextSelectedId);
+        if (!saved) {
+          toast({
+            title: "Error",
+            description: "Could not encrypt selected API key id. Please try again.",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error('Failed to encrypt selected API key id:', error);
+        localStorage.removeItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY);
+        toast({
+          title: "Error",
+          description: "Could not encrypt selected API key id. Please try again.",
+          variant: "destructive",
+        });
+      }
     },
     saveChatApiKeys: async (keys: ChatApiKey[], selectedId: string) => {
       const selectedApiKey = getSelectedChatApiKey(keys, selectedId);
@@ -292,10 +342,14 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         }
         localStorage.removeItem("secretKey");
 
-        if (nextSelectedId) {
-          localStorage.setItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, nextSelectedId);
-        } else {
-          localStorage.removeItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY);
+        const savedSelectedId = await persistSelectedChatApiKeyId(nextSelectedId);
+        if (!savedSelectedId) {
+          toast({
+            title: "Error",
+            description: "Could not encrypt selected API key id. Please try again.",
+            variant: "destructive",
+          });
+          return false;
         }
       } catch (error) {
         console.error('Failed to encrypt API keys:', error);
@@ -362,10 +416,25 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
           return;
         }
       }
-      if (nextSelectedId) {
-        localStorage.setItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, nextSelectedId);
-      } else {
+      try {
+        const savedSelectedId = await persistSelectedChatApiKeyId(nextSelectedId);
+        if (!savedSelectedId) {
+          toast({
+            title: "Error",
+            description: "Could not encrypt selected API key id. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to encrypt selected API key id:', error);
         localStorage.removeItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY);
+        toast({
+          title: "Error",
+          description: "Could not encrypt selected API key id. Please try again.",
+          variant: "destructive",
+        });
+        return;
       }
 
       // Update context
@@ -377,6 +446,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setLastLimit(limit);
       setChatApiKeys(newChatApiKeys);
       setSelectedChatApiKeyId(nextSelectedId);
+      setNewSelectedChatApiKeyId(nextSelectedId);
       setSecretKey(selectedApiKey?.key ?? "");
       setModel(newModel);
       setRefreshInterval(newRefreshInterval);
@@ -846,6 +916,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                 activeConnectionId: target,
               });
             }
+
           } else {
             // Token DB returned no connections — the session is out of sync.
             // This happens after a server restart (FileTokenStorage wiped),
@@ -946,7 +1017,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
           loadedChatApiKeys = decryptedKeys ? parseChatApiKeys(decryptedKeys) : [];
         } catch (error) {
           console.error('Failed to decrypt API keys:', error);
-          localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
         }
       }
 
@@ -970,18 +1040,20 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         }
 
         if (migratedKey) {
-          loadedChatApiKeys = [createChatApiKey(migratedKey)];
-          const encryptedKeys = await serverEncrypt(JSON.stringify(loadedChatApiKeys));
+          const migratedChatApiKeys = [createChatApiKey(migratedKey)];
+          const encryptedKeys = await serverEncrypt(JSON.stringify(migratedChatApiKeys));
           if (encryptedKeys) {
+            loadedChatApiKeys = migratedChatApiKeys;
             localStorage.setItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
+            localStorage.removeItem("secretKey");
           }
         }
-        localStorage.removeItem("secretKey");
       }
 
-      const storedSelectedId = localStorage.getItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY) || "";
+      const storedSelectedId = await loadSelectedChatApiKeyId();
       const selectedApiKey = getSelectedChatApiKey(loadedChatApiKeys, storedSelectedId);
       const selectedId = selectedApiKey?.id ?? "";
+      await persistSelectedChatApiKeyId(selectedId);
       setChatApiKeys(loadedChatApiKeys);
       setNewChatApiKeys(loadedChatApiKeys);
       setSelectedChatApiKeyId(selectedId);

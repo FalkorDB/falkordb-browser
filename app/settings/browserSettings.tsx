@@ -329,7 +329,7 @@ export default function BrowserSettings() {
         modelFetchRequestIdRef.current += 1;
         modelFetchAbortRef.current?.abort();
         setActiveSelectedChatApiKeyId(id);
-        selectChatApiKey(newChatApiKeys, id);
+        void selectChatApiKey(newChatApiKeys, id);
         setModelDisplayNames([]);
         setIsLoadingModels(true);
         setLoadingChatApiKeyId(id);
@@ -385,6 +385,11 @@ export default function BrowserSettings() {
             setEditingKeyId(null);
             setEditingKeyValue("");
         }
+        setVisibleKeyIds(prev => {
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+        });
     };
 
     const toggleKeyVisibility = (id: string) => {
