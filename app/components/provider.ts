@@ -1,8 +1,17 @@
 import { createContext, Dispatch, SetStateAction } from "react";
+import type { AIProvider } from "@/lib/ai-provider-utils";
 import { ConnectionInfo, ConnectionType, GraphData, GraphRef, HistoryQuery, Label, Panel, Relationship, SyntaxErrorInfo, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
 import type { Data as CanvasData, LayoutMode, ViewportState } from "@falkordb/canvas";
 import type { SessionConnection } from "next-auth";
 import { Graph, GraphInfo } from "../api/graph/model";
+
+export type ChatApiKey = {
+  id: string;
+  label: string;
+  key: string;
+  provider: AIProvider;
+  createdAt: number;
+};
 
 type BrowserSettingsContextType = {
   newSettings: {
@@ -45,6 +54,10 @@ type BrowserSettingsContextType = {
     chatSettings: {
       newSecretKey: string;
       setNewSecretKey: Dispatch<SetStateAction<string>>;
+      newChatApiKeys: ChatApiKey[];
+      setNewChatApiKeys: Dispatch<SetStateAction<ChatApiKey[]>>;
+      newSelectedChatApiKeyId: string;
+      setNewSelectedChatApiKeyId: Dispatch<SetStateAction<string>>;
       newModel: string;
       setNewModel: Dispatch<SetStateAction<string>>;
       newMaxSavedMessages: number;
@@ -101,6 +114,10 @@ type BrowserSettingsContextType = {
     chatSettings: {
       secretKey: string;
       setSecretKey: Dispatch<SetStateAction<string>>;
+      chatApiKeys: ChatApiKey[];
+      setChatApiKeys: Dispatch<SetStateAction<ChatApiKey[]>>;
+      selectedChatApiKeyId: string;
+      setSelectedChatApiKeyId: Dispatch<SetStateAction<string>>;
       model: string;
       setModel: Dispatch<SetStateAction<string>>;
       maxSavedMessages: number;
@@ -264,6 +281,10 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
       chatSettings: {
         newSecretKey: "",
         setNewSecretKey: () => { },
+        newChatApiKeys: [],
+        setNewChatApiKeys: () => { },
+        newSelectedChatApiKeyId: "",
+        setNewSelectedChatApiKeyId: () => { },
         newModel: "",
         setNewModel: () => { },
         newMaxSavedMessages: 0,
@@ -314,6 +335,10 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
       chatSettings: {
         secretKey: "",
         setSecretKey: () => { },
+        chatApiKeys: [],
+        setChatApiKeys: () => { },
+        selectedChatApiKeyId: "",
+        setSelectedChatApiKeyId: () => { },
         model: "",
         setModel: () => { },
         maxSavedMessages: 0,
