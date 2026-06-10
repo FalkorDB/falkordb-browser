@@ -2,7 +2,7 @@
 
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2, Info } from "lucide-react";
+import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2, Info, Eye, EyeOff, Pencil, KeyRound, CheckCircle2, Loader2 } from "lucide-react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
 import { areCaptionKeysEqual, cn, getDefaultQuery, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { detectProviderFromApiKey } from "@/lib/ai-provider-utils";
+import { detectProviderFromApiKey, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { BrowserSettingsContext, IndicatorContext } from "../components/provider";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -26,7 +26,7 @@ export default function BrowserSettings() {
             limitSettings: { newLimit, setNewLimit },
             captionsKeysSettings: { newCaptionsKeys, setNewCaptionsKeys },
             showPropertyKeyPrefixSettings: { newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
-            chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly },
+            chatSettings: { setNewSecretKey, newChatApiKeys, setNewChatApiKeys, newSelectedChatApiKeyId, setNewSelectedChatApiKeyId, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly },
             graphInfo: { newRefreshInterval, setNewRefreshInterval, newMaxItemsForSearch, setNewMaxItemsForSearch },
             tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple }
         },
@@ -38,7 +38,7 @@ export default function BrowserSettings() {
             limitSettings: { limit },
             captionsKeysSettings: { captionsKeys },
             showPropertyKeyPrefixSettings: { showPropertyKeyPrefix },
-            chatSettings: { secretKey, model, setModel, maxSavedMessages, cypherOnly },
+            chatSettings: { secretKey, chatApiKeys, selectedChatApiKeyId, model, maxSavedMessages, cypherOnly },
             graphInfo: { refreshInterval, maxItemsForSearch },
             tableViewSettings: { columnWidth, rowHeight, rowHeightExpandMultiple }
         },
@@ -58,6 +58,11 @@ export default function BrowserSettings() {
     const [isResetting, setIsResetting] = useState(false);
     const [modelDisplayNames, setModelDisplayNames] = useState<string[]>([]);
     const [isLoadingModels, setIsLoadingModels] = useState(false);
+    const [modelsMessage, setModelsMessage] = useState("Enter an API key to load live models.");
+    const [keyInput, setKeyInput] = useState("");
+    const [editingKeyId, setEditingKeyId] = useState<string | null>(null);
+    const [editingKeyValue, setEditingKeyValue] = useState("");
+    const [visibleKeyIds, setVisibleKeyIds] = useState<Set<string>>(new Set());
     const [expandedSections, setExpandedSections] = useState({
         queryExecution: false,
         chat: false,
@@ -70,14 +75,27 @@ export default function BrowserSettings() {
         setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
     };
 
-    // Fetch all available models once on mount
+    const selectedChatApiKey = newChatApiKeys.find(({ id }) => id === newSelectedChatApiKeyId) ?? newChatApiKeys[0];
+
+    // Fetch live models whenever the selected key changes.
     useEffect(() => {
         (async () => {
+            if (!selectedChatApiKey) {
+                setModelDisplayNames([]);
+                setModelsMessage("Enter your API key to load live models.");
+                return;
+            }
+
             setIsLoadingModels(true);
+            setModelsMessage("Loading live models for the selected key...");
 
             const result = await securedFetch(
                 "/api/chat/models",
-                { method: "GET" },
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ key: selectedChatApiKey.key }),
+                },
                 toast,
                 setIndicator
             );
@@ -85,35 +103,20 @@ export default function BrowserSettings() {
             if (result.ok) {
                 const { models } = await result.json();
                 setModelDisplayNames(models);
+                setModelsMessage(models.length > 0
+                    ? `${models.length} live models loaded for ${getProviderDisplayName(selectedChatApiKey.provider)}.`
+                    : "No live models were returned for this key.");
+                if (models.length > 0) {
+                    setNewModel(currentModel => models.includes(currentModel) ? currentModel : models[0]);
+                }
+            } else {
+                setModelDisplayNames([]);
+                setModelsMessage("Could not load live models for this key. Check the key and try again.");
             }
 
             setIsLoadingModels(false);
         })();
-    }, [toast, setIndicator]);
-
-    useEffect(() => {
-        (async () => {
-            const detectedProvider = detectProviderFromApiKey(secretKey);
-            if (!model && detectedProvider !== "unknown") {
-                const res = await securedFetch(
-                    `/api/chat/models?provider=${detectedProvider}`,
-                    { method: "GET" },
-                    toast,
-                    setIndicator
-                );
-
-                if (!res.ok) return;
-
-                const defaultModel = (await res.json()).models[0];
-
-                if (!defaultModel) return;
-
-                setNewModel(defaultModel);
-                setModel(defaultModel);
-                localStorage.setItem("model", defaultModel);
-            }
-        })();
-    }, [secretKey, model, toast, setIndicator, setNewModel, setModel]);
+    }, [selectedChatApiKey, toast, setIndicator, setNewModel]);
 
     useEffect(() => {
         setNewContentPersistence(contentPersistence);
@@ -122,6 +125,11 @@ export default function BrowserSettings() {
         setNewTimeout(timeoutValue);
         setNewLimit(limit);
         setNewSecretKey(secretKey);
+        setNewChatApiKeys(chatApiKeys);
+        setNewSelectedChatApiKeyId(selectedChatApiKeyId);
+        setKeyInput("");
+        setEditingKeyId(null);
+        setEditingKeyValue("");
         setNewModel(model);
         setNewRefreshInterval(refreshInterval);
         setNewMaxSavedMessages(maxSavedMessages);
@@ -132,7 +140,7 @@ export default function BrowserSettings() {
         setNewRowHeight(rowHeight);
         setNewRowHeightExpandMultiple(rowHeightExpandMultiple);
         setNewMaxItemsForSearch(maxItemsForSearch);
-    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, model, setNewModel, setNewRefreshInterval, refreshInterval, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, rowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch]);
+    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, chatApiKeys, selectedChatApiKeyId, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewChatApiKeys, setNewSelectedChatApiKeyId, model, setNewModel, setNewRefreshInterval, refreshInterval, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch]);
 
     useEffect(() => {
         setHasChanges(
@@ -141,7 +149,8 @@ export default function BrowserSettings() {
             newLimit !== limit ||
             newDefaultQuery !== defaultQuery ||
             newRunDefaultQuery !== runDefaultQuery ||
-            newSecretKey !== secretKey ||
+            JSON.stringify(newChatApiKeys) !== JSON.stringify(chatApiKeys) ||
+            newSelectedChatApiKeyId !== selectedChatApiKeyId ||
             newModel !== model ||
             refreshInterval !== newRefreshInterval ||
             newMaxSavedMessages !== maxSavedMessages ||
@@ -153,7 +162,7 @@ export default function BrowserSettings() {
             newRowHeightExpandMultiple !== rowHeightExpandMultiple ||
             newMaxItemsForSearch !== maxItemsForSearch
         );
-    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey, newModel, model, refreshInterval, newRefreshInterval, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch]);
+    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newChatApiKeys, chatApiKeys, newSelectedChatApiKeyId, selectedChatApiKeyId, newModel, model, refreshInterval, newRefreshInterval, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch]);
 
     const handleSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
         e?.preventDefault();
@@ -246,6 +255,96 @@ export default function BrowserSettings() {
         createChangeHandler(setNewModel)(modelValue, 'secretKeyInput');
     };
 
+    const maskKey = (key: string) => {
+        if (key.length <= 10) return "••••••••";
+        return `${key.slice(0, 6)}••••••••${key.slice(-4)}`;
+    };
+
+    const handleSaveKey = () => {
+        const trimmedKey = keyInput.trim();
+        if (!trimmedKey) return;
+
+        const provider = detectProviderFromApiKey(trimmedKey);
+        const providerName = provider === "unknown" ? "LLM" : getProviderDisplayName(provider);
+        const id = crypto.randomUUID();
+        setNewChatApiKeys(prev => [
+            ...prev,
+            {
+                id,
+                label: `${providerName} key ${prev.filter(item => item.provider === provider).length + 1}`,
+                key: trimmedKey,
+                provider,
+                createdAt: Date.now(),
+            },
+        ]);
+        setNewSelectedChatApiKeyId(id);
+        setKeyInput("");
+    };
+
+    const handleSelectKey = (id: string) => {
+        setNewSelectedChatApiKeyId(id);
+        setNewModel("");
+    };
+
+    const handleEditKey = (id: string) => {
+        const keyToEdit = newChatApiKeys.find(item => item.id === id);
+        if (!keyToEdit) return;
+        setEditingKeyId(id);
+        setEditingKeyValue(keyToEdit.key);
+        setVisibleKeyIds(prev => new Set(prev).add(id));
+    };
+
+    const handleSaveEditedKey = (id: string) => {
+        const trimmedKey = editingKeyValue.trim();
+        if (!trimmedKey) return;
+
+        const provider = detectProviderFromApiKey(trimmedKey);
+        const providerName = provider === "unknown" ? "LLM" : getProviderDisplayName(provider);
+        setNewChatApiKeys(prev => prev.map(item => item.id === id
+            ? {
+                ...item,
+                key: trimmedKey,
+                provider,
+                label: item.label || `${providerName} key`,
+            }
+            : item));
+        setNewSelectedChatApiKeyId(id);
+        setEditingKeyId(null);
+        setEditingKeyValue("");
+    };
+
+    const handleCancelEditKey = () => {
+        setEditingKeyId(null);
+        setEditingKeyValue("");
+    };
+
+    const handleDeleteKey = (id: string) => {
+        setNewChatApiKeys(prev => {
+            const next = prev.filter(item => item.id !== id);
+            if (newSelectedChatApiKeyId === id) {
+                setNewSelectedChatApiKeyId(next[0]?.id ?? "");
+                setNewModel("");
+            }
+            return next;
+        });
+        if (editingKeyId === id) {
+            setEditingKeyId(null);
+            setEditingKeyValue("");
+        }
+    };
+
+    const toggleKeyVisibility = (id: string) => {
+        setVisibleKeyIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
+    };
+
     const handleAddCaptionKey = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
@@ -321,28 +420,170 @@ export default function BrowserSettings() {
                                         }}
                                     />
                                 </div>
-                                <div className="flex flex-col gap-2 p-2 bg-muted/10 rounded-lg">
-                                    <h2 className="font-medium">Configure LLM access for chat functionality</h2>
-                                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                                    <label className="text-sm font-medium">
-                                        {isLoadingModels ? "Model (Loading...)" : "Model"}
-                                    </label>
-                                    <ModelSelector
-                                        models={modelDisplayNames}
-                                        selectedModel={newModel}
-                                        onModelSelect={handleModelChange}
-                                        isLoading={isLoadingModels}
-                                    />
-                                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                                    <label htmlFor="secretKeyInput" className="text-sm font-medium whitespace-nowrap">Secret Key</label>
-                                    <Input
-                                        data-testid="chatApiKeyInput"
-                                        className="flex-1"
-                                        id="secretKeyInput"
-                                        placeholder="Enter your API secret key..."
-                                        value={newSecretKey}
-                                        onChange={(e) => createChangeHandler(setNewSecretKey)(e.target.value, 'secretKeyInput')}
-                                    />
+                                <div className="overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-muted/40 via-background to-muted/10 shadow-sm">
+                                    <div className="border-b border-border/70 p-4">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <h2 className="text-lg font-semibold tracking-tight">LLM access keys</h2>
+                                                <p className="text-sm text-muted-foreground">
+                                                    Save multiple provider keys, choose one, then load only live models available to that selected key.
+                                                </p>
+                                            </div>
+                                            <div className="hidden rounded-full border border-border/80 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground sm:block">
+                                                {newChatApiKeys.length} saved
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-col gap-4 p-4">
+                                        <div className="flex flex-col gap-3">
+                                            <div className="rounded-xl border border-border/70 bg-background/80 p-3">
+                                                <label htmlFor="secretKeyInput" className="text-sm font-medium">Add an API key</label>
+                                                <div className="mt-2 flex gap-2">
+                                                    <Input
+                                                        data-testid="chatApiKeyInput"
+                                                        className="flex-1 font-mono text-xs"
+                                                        id="secretKeyInput"
+                                                        type="password"
+                                                        placeholder="Paste one provider key..."
+                                                        value={keyInput}
+                                                        onChange={(e) => setKeyInput(e.target.value)}
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="Primary"
+                                                        className="shrink-0"
+                                                        onClick={handleSaveKey}
+                                                        label="Add"
+                                                    >
+                                                        <PlusCircle className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                                <p className="mt-2 text-xs text-muted-foreground">
+                                                    One input, many keys. Pick a saved key below to refresh the model list.
+                                                </p>
+                                            </div>
+
+                                            <div className="flex flex-col gap-2">
+                                                {newChatApiKeys.length === 0 && (
+                                                    <div className="rounded-xl border border-dashed border-border bg-background/60 p-4 text-sm text-muted-foreground">
+                                                        Enter your key to load the models.
+                                                    </div>
+                                                )}
+
+                                                {newChatApiKeys.map((apiKey) => {
+                                                    const isSelected = apiKey.id === newSelectedChatApiKeyId;
+                                                    const isVisible = visibleKeyIds.has(apiKey.id);
+                                                    const providerName = apiKey.provider === "unknown" ? "Unknown provider" : getProviderDisplayName(apiKey.provider);
+                                                    const isEditing = editingKeyId === apiKey.id;
+
+                                                    return (
+                                                        <div
+                                                            key={apiKey.id}
+                                                            className={cn(
+                                                                "group rounded-xl border bg-background/80 p-3 transition-all",
+                                                                isSelected ? "border-primary shadow-sm ring-1 ring-primary/20" : "border-border/70 hover:border-primary/40"
+                                                            )}
+                                                        >
+                                                            <div className="flex w-full items-start gap-3 text-left">
+                                                                <span className={cn(
+                                                                    "mt-0.5 flex h-8 w-8 items-center justify-center rounded-full border",
+                                                                    isSelected ? "border-primary bg-primary text-background" : "border-border bg-muted/40 text-muted-foreground"
+                                                                )}>
+                                                                    {isSelected ? <CheckCircle2 className="h-4 w-4" /> : <KeyRound className="h-4 w-4" />}
+                                                                </span>
+                                                                <span className="min-w-0 flex-1">
+                                                                    <button
+                                                                        type="button"
+                                                                        className="block w-full text-left"
+                                                                        onClick={() => handleSelectKey(apiKey.id)}
+                                                                    >
+                                                                        <span className="block text-sm font-semibold">{providerName}</span>
+                                                                        {!isEditing && (
+                                                                            <span className="block truncate font-mono text-xs text-muted-foreground">
+                                                                                {isVisible ? apiKey.key : maskKey(apiKey.key)}
+                                                                            </span>
+                                                                        )}
+                                                                    </button>
+                                                                    {isEditing && (
+                                                                        <div className="mt-2 flex gap-2">
+                                                                            <Input
+                                                                                className="flex-1 font-mono text-xs"
+                                                                                type={isVisible ? "text" : "password"}
+                                                                                value={editingKeyValue}
+                                                                                onChange={(e) => setEditingKeyValue(e.target.value)}
+                                                                            />
+                                                                            <button
+                                                                                type="button"
+                                                                                className="rounded-md border border-primary bg-primary px-2 py-1 text-xs font-medium text-background transition-colors hover:bg-primary/90"
+                                                                                onClick={() => handleSaveEditedKey(apiKey.id)}
+                                                                            >
+                                                                                Save
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                                                onClick={handleCancelEditKey}
+                                                                            >
+                                                                                Cancel
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                </span>
+                                                            </div>
+                                                            <div className="mt-3 flex gap-2 pl-11">
+                                                                <button
+                                                                    type="button"
+                                                                    className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                                    onClick={() => toggleKeyVisibility(apiKey.id)}
+                                                                >
+                                                                    {isVisible ? <EyeOff className="mr-1 inline h-3.5 w-3.5" /> : <Eye className="mr-1 inline h-3.5 w-3.5" />}
+                                                                    {isVisible ? "Hide" : "Show"}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                                    onClick={() => isEditing ? handleCancelEditKey() : handleEditKey(apiKey.id)}
+                                                                >
+                                                                    <Pencil className="mr-1 inline h-3.5 w-3.5" />
+                                                                    {isEditing ? "Cancel edit" : "Edit"}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive transition-colors hover:bg-destructive/10"
+                                                                    onClick={() => handleDeleteKey(apiKey.id)}
+                                                                >
+                                                                    <Trash2 className="mr-1 inline h-3.5 w-3.5" />
+                                                                    Delete
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex min-w-0 flex-col gap-3">
+                                            <div className="rounded-xl border border-border/70 bg-background/80 p-3">
+                                                <div className="mb-2 flex items-center justify-between gap-2">
+                                                    <label className="text-sm font-medium">
+                                                        {isLoadingModels ? "Live models" : "Model"}
+                                                    </label>
+                                                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                        {isLoadingModels && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                                                        {modelsMessage}
+                                                    </span>
+                                                </div>
+                                                <ModelSelector
+                                                    models={modelDisplayNames}
+                                                    selectedModel={newModel}
+                                                    onModelSelect={handleModelChange}
+                                                    isLoading={isLoadingModels}
+                                                    disabled={!selectedChatApiKey}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <button type="submit" className="hidden" aria-hidden="true" tabIndex={-1} />
                             </form>
