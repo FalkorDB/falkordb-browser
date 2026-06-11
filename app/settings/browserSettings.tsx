@@ -2,7 +2,7 @@
 
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2, Info, Eye, EyeOff, Pencil, KeyRound, CheckCircle2, Loader2 } from "lucide-react";
+import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2, Info, Eye, EyeOff, Pencil, KeyRound, CheckCircle2, Loader2, Cloud, Laptop, Server } from "lucide-react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
 import { areCaptionKeysEqual, cn, getDefaultQuery } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
@@ -11,10 +11,20 @@ import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { detectProviderFromApiKey, getProviderDisplayName } from "@/lib/ai-provider-utils";
-import { BrowserSettingsContext } from "../components/provider";
+import { BrowserSettingsContext, type ChatModelSource, type LocalLlmProvider } from "../components/provider";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import ModelSelector from "./ModelSelector";
+
+const LOCAL_LLM_ENDPOINTS: Record<LocalLlmProvider, string> = {
+    ollama: "http://localhost:11434",
+    lmstudio: "http://localhost:1234/v1",
+};
+
+const LOCAL_LLM_LABELS: Record<LocalLlmProvider, string> = {
+    ollama: "Ollama",
+    lmstudio: "LM Studio",
+};
 
 export default function BrowserSettings() {
     const {
@@ -26,7 +36,7 @@ export default function BrowserSettings() {
             limitSettings: { newLimit, setNewLimit },
             captionsKeysSettings: { newCaptionsKeys, setNewCaptionsKeys },
             showPropertyKeyPrefixSettings: { newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
-            chatSettings: { setNewSecretKey, newChatApiKeys, setNewChatApiKeys, newSelectedChatApiKeyId, setNewSelectedChatApiKeyId, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly },
+            chatSettings: { setNewSecretKey, newChatApiKeys, setNewChatApiKeys, newSelectedChatApiKeyId, setNewSelectedChatApiKeyId, newChatModelSource, setNewChatModelSource, newLocalLlmProvider, setNewLocalLlmProvider, newLocalLlmEndpoint, setNewLocalLlmEndpoint, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly },
             graphInfo: { newRefreshInterval, setNewRefreshInterval, newMaxItemsForSearch, setNewMaxItemsForSearch },
             tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple }
         },
@@ -38,7 +48,7 @@ export default function BrowserSettings() {
             limitSettings: { limit },
             captionsKeysSettings: { captionsKeys },
             showPropertyKeyPrefixSettings: { showPropertyKeyPrefix },
-            chatSettings: { secretKey, chatApiKeys, selectedChatApiKeyId, model, maxSavedMessages, cypherOnly },
+            chatSettings: { secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, model, maxSavedMessages, cypherOnly },
             graphInfo: { refreshInterval, maxItemsForSearch },
             tableViewSettings: { columnWidth, rowHeight, rowHeightExpandMultiple }
         },
@@ -83,6 +93,9 @@ export default function BrowserSettings() {
 
     const selectedChatApiKey = newChatApiKeys.find(({ id }) => id === activeSelectedChatApiKeyId) ?? newChatApiKeys[0];
     const uiSelectedChatApiKeyId = selectedChatApiKey?.id ?? "";
+    const modelProviderForDisplay = newChatModelSource === "local"
+        ? newLocalLlmProvider === "ollama" ? "ollama" : "openai"
+        : selectedChatApiKey?.provider;
 
     useEffect(() => {
         const nextSelectedId = newChatApiKeys.some(({ id }) => id === newSelectedChatApiKeyId)
@@ -99,7 +112,7 @@ export default function BrowserSettings() {
         modelFetchAbortRef.current = controller;
 
         (async () => {
-            if (!selectedChatApiKey) {
+            if (newChatModelSource === "api-key" && !selectedChatApiKey) {
                 setModelDisplayNames([]);
                 setModelsMessage("Enter your API key to load live models.");
                 setIsLoadingModels(false);
@@ -109,14 +122,25 @@ export default function BrowserSettings() {
             }
 
             setIsLoadingModels(true);
-            setLoadingChatApiKeyId(selectedChatApiKey.id);
-            setModelsMessage("Loading live models for the selected key...");
+            setLoadingChatApiKeyId(newChatModelSource === "api-key" ? selectedChatApiKey?.id ?? "" : "");
+            setModelsMessage(newChatModelSource === "local"
+                ? `Loading local ${LOCAL_LLM_LABELS[newLocalLlmProvider]} models...`
+                : "Loading live models for the selected key...");
 
             try {
                 const result = await fetch("/api/chat/models", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ key: selectedChatApiKey.key }),
+                    body: JSON.stringify(newChatModelSource === "local"
+                        ? {
+                            source: "local",
+                            localProvider: newLocalLlmProvider,
+                            endpoint: newLocalLlmEndpoint,
+                        }
+                        : {
+                            source: "api-key",
+                            key: selectedChatApiKey?.key,
+                        }),
                     signal: controller.signal,
                 });
 
@@ -128,8 +152,12 @@ export default function BrowserSettings() {
 
                     setModelDisplayNames(models);
                     setModelsMessage(models.length > 0
-                        ? `${models.length} live models loaded for ${getProviderDisplayName(selectedChatApiKey.provider)}.`
-                        : "No live models were returned for this key.");
+                        ? newChatModelSource === "local"
+                            ? `${models.length} local ${LOCAL_LLM_LABELS[newLocalLlmProvider]} models loaded.`
+                            : `${models.length} live models loaded for ${selectedChatApiKey ? getProviderDisplayName(selectedChatApiKey.provider) : "selected provider"}.`
+                        : newChatModelSource === "local"
+                            ? `No local ${LOCAL_LLM_LABELS[newLocalLlmProvider]} models were returned.`
+                            : "No live models were returned for this key.");
                     if (models.length > 0) {
                         setNewModel(currentModel => models.includes(currentModel) ? currentModel : models[0]);
                     }
@@ -157,7 +185,7 @@ export default function BrowserSettings() {
         return () => {
             controller.abort();
         };
-    }, [selectedChatApiKey, modelLoadNonce, setNewModel]);
+    }, [selectedChatApiKey, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, modelLoadNonce, setNewModel]);
 
     useEffect(() => {
         setNewContentPersistence(contentPersistence);
@@ -168,6 +196,9 @@ export default function BrowserSettings() {
         setNewSecretKey(secretKey);
         setNewChatApiKeys(chatApiKeys);
         setNewSelectedChatApiKeyId(selectedChatApiKeyId);
+        setNewChatModelSource(chatModelSource);
+        setNewLocalLlmProvider(localLlmProvider);
+        setNewLocalLlmEndpoint(localLlmEndpoint);
         setKeyInput("");
         setEditingKeyId(null);
         setEditingKeyValue("");
@@ -181,7 +212,7 @@ export default function BrowserSettings() {
         setNewRowHeight(rowHeight);
         setNewRowHeightExpandMultiple(rowHeightExpandMultiple);
         setNewMaxItemsForSearch(maxItemsForSearch);
-    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, chatApiKeys, selectedChatApiKeyId, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewChatApiKeys, setNewSelectedChatApiKeyId, model, setNewModel, setNewRefreshInterval, refreshInterval, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch]);
+    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewChatApiKeys, setNewSelectedChatApiKeyId, setNewChatModelSource, setNewLocalLlmProvider, setNewLocalLlmEndpoint, model, setNewModel, setNewRefreshInterval, refreshInterval, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch]);
 
     useEffect(() => {
         setHasChanges(
@@ -192,6 +223,9 @@ export default function BrowserSettings() {
             newRunDefaultQuery !== runDefaultQuery ||
             JSON.stringify(newChatApiKeys) !== JSON.stringify(chatApiKeys) ||
             newSelectedChatApiKeyId !== selectedChatApiKeyId ||
+            newChatModelSource !== chatModelSource ||
+            newLocalLlmProvider !== localLlmProvider ||
+            newLocalLlmEndpoint !== localLlmEndpoint ||
             newModel !== model ||
             refreshInterval !== newRefreshInterval ||
             newMaxSavedMessages !== maxSavedMessages ||
@@ -203,7 +237,7 @@ export default function BrowserSettings() {
             newRowHeightExpandMultiple !== rowHeightExpandMultiple ||
             newMaxItemsForSearch !== maxItemsForSearch
         );
-    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newChatApiKeys, chatApiKeys, newSelectedChatApiKeyId, selectedChatApiKeyId, newModel, model, refreshInterval, newRefreshInterval, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch]);
+    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newChatApiKeys, chatApiKeys, newSelectedChatApiKeyId, selectedChatApiKeyId, newChatModelSource, chatModelSource, newLocalLlmProvider, localLlmProvider, newLocalLlmEndpoint, localLlmEndpoint, newModel, model, refreshInterval, newRefreshInterval, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch]);
 
     const handleSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
         e?.preventDefault();
@@ -294,6 +328,35 @@ export default function BrowserSettings() {
     const handleModelChange = (modelValue: string) => {
         // Model value is already the raw model name from the API
         createChangeHandler(setNewModel)(modelValue, 'secretKeyInput');
+    };
+
+    const handleModelSourceChange = (source: ChatModelSource) => {
+        if (source === newChatModelSource) return;
+        setNewChatModelSource(source);
+        setModelDisplayNames([]);
+        setNewModel("");
+        setModelsMessage(source === "local" ? "Loading local models..." : "Select a saved API key to load live models.");
+        setModelLoadNonce(nonce => nonce + 1);
+    };
+
+    const handleLocalProviderChange = (provider: LocalLlmProvider) => {
+        setNewLocalLlmProvider(provider);
+        setNewLocalLlmEndpoint(LOCAL_LLM_ENDPOINTS[provider]);
+        setModelDisplayNames([]);
+        setNewModel("");
+        setModelsMessage(`Loading local ${LOCAL_LLM_LABELS[provider]} models...`);
+        setModelLoadNonce(nonce => nonce + 1);
+    };
+
+    const handleLocalEndpointChange = (endpoint: string) => {
+        setNewLocalLlmEndpoint(endpoint);
+        setModelDisplayNames([]);
+        setNewModel("");
+        setModelsMessage("Update the endpoint to reload local models.");
+    };
+
+    const reloadLocalModels = () => {
+        setModelLoadNonce(nonce => nonce + 1);
     };
 
     const maskKey = (key: string) => {
@@ -483,9 +546,9 @@ export default function BrowserSettings() {
                                     <div className="border-b border-border/70 p-4">
                                         <div className="flex items-start justify-between gap-3">
                                             <div>
-                                                <h2 className="text-lg font-semibold tracking-tight">LLM access keys</h2>
+                                                <h2 className="text-lg font-semibold tracking-tight">LLM connection</h2>
                                                 <p className="text-sm text-muted-foreground">
-                                                    Save multiple provider keys, choose one, then load only live models available to that selected key.
+                                                    Choose hosted models with saved keys or connect to a local model server.
                                                 </p>
                                             </div>
                                             <div className="hidden rounded-full border border-border/80 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground sm:block">
@@ -495,7 +558,51 @@ export default function BrowserSettings() {
                                     </div>
 
                                     <div className="flex flex-col gap-4 p-4">
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            {([
+                                                {
+                                                    value: "api-key" as const,
+                                                    title: "Cloud/API key",
+                                                    description: "Use OpenAI, Anthropic, Gemini, Groq, or xAI with a saved key.",
+                                                    icon: Cloud,
+                                                },
+                                                {
+                                                    value: "local" as const,
+                                                    title: "Local LLM",
+                                                    description: "Use a locally running Ollama or LM Studio server.",
+                                                    icon: Laptop,
+                                                },
+                                            ]).map(({ value, title, description, icon: Icon }) => {
+                                                const isSelected = newChatModelSource === value;
+
+                                                return (
+                                                    <button
+                                                        key={value}
+                                                        type="button"
+                                                        className={cn(
+                                                            "rounded-xl border p-3 text-left transition-all",
+                                                            isSelected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border/70 bg-background/80 hover:border-primary/40"
+                                                        )}
+                                                        onClick={() => handleModelSourceChange(value)}
+                                                    >
+                                                        <span className="flex items-center gap-2 text-sm font-semibold">
+                                                            <span className={cn(
+                                                                "flex h-8 w-8 items-center justify-center rounded-full border",
+                                                                isSelected ? "border-primary bg-primary text-background" : "border-border bg-muted/40 text-muted-foreground"
+                                                            )}>
+                                                                <Icon className="h-4 w-4" />
+                                                            </span>
+                                                            {title}
+                                                        </span>
+                                                        <span className="mt-2 block text-xs text-muted-foreground">{description}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
                                         <div className="flex flex-col gap-3">
+                                            {newChatModelSource === "api-key" ? (
+                                                <>
                                             <div className="rounded-xl border border-border/70 bg-background/80 p-3">
                                                 <label htmlFor="secretKeyInput" className="text-sm font-medium">Add an API key</label>
                                                 <div className="mt-2 flex gap-2">
@@ -654,6 +761,60 @@ export default function BrowserSettings() {
                                                     );
                                                 })}
                                             </div>
+                                                </>
+                                            ) : (
+                                                <div className="rounded-xl border border-border/70 bg-background/80 p-3">
+                                                    <div className="grid gap-3 sm:grid-cols-2">
+                                                        {(["ollama", "lmstudio"] as const).map(provider => {
+                                                            const isSelected = newLocalLlmProvider === provider;
+
+                                                            return (
+                                                                <button
+                                                                    key={provider}
+                                                                    type="button"
+                                                                    className={cn(
+                                                                        "rounded-lg border p-3 text-left transition-all",
+                                                                        isSelected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border/70 hover:border-primary/40"
+                                                                    )}
+                                                                    onClick={() => handleLocalProviderChange(provider)}
+                                                                >
+                                                                    <span className="flex items-center gap-2 text-sm font-semibold">
+                                                                        <Server className="h-4 w-4" />
+                                                                        {LOCAL_LLM_LABELS[provider]}
+                                                                    </span>
+                                                                    <span className="mt-1 block text-xs text-muted-foreground">
+                                                                        {provider === "ollama"
+                                                                            ? "Reads models from /api/tags on your Ollama server."
+                                                                            : "Reads models from the OpenAI-compatible /v1/models endpoint."}
+                                                                    </span>
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                    <label htmlFor="localLlmEndpoint" className="mt-4 block text-sm font-medium">Local server URL</label>
+                                                    <div className="mt-2 flex gap-2">
+                                                        <Input
+                                                            id="localLlmEndpoint"
+                                                            className="flex-1 font-mono text-xs"
+                                                            value={newLocalLlmEndpoint}
+                                                            placeholder={LOCAL_LLM_ENDPOINTS[newLocalLlmProvider]}
+                                                            onChange={(event) => handleLocalEndpointChange(event.target.value)}
+                                                        />
+                                                        <Button
+                                                            type="button"
+                                                            variant="Primary"
+                                                            className="shrink-0"
+                                                            onClick={reloadLocalModels}
+                                                            label="Load"
+                                                        >
+                                                            <Loader2 className={cn("h-4 w-4", isLoadingModels && "animate-spin")} />
+                                                        </Button>
+                                                    </div>
+                                                    <p className="mt-2 text-xs text-muted-foreground">
+                                                        Ollama defaults to http://localhost:11434. LM Studio defaults to http://localhost:1234/v1.
+                                                    </p>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="flex min-w-0 flex-col gap-3">
@@ -671,9 +832,9 @@ export default function BrowserSettings() {
                                                     models={modelDisplayNames}
                                                     selectedModel={newModel}
                                                     onModelSelect={handleModelChange}
-                                                    provider={selectedChatApiKey?.provider}
+                                                    provider={modelProviderForDisplay}
                                                     isLoading={isLoadingModels}
-                                                    disabled={!selectedChatApiKey}
+                                                    disabled={newChatModelSource === "api-key" && !selectedChatApiKey}
                                                 />
                                             </div>
                                         </div>
