@@ -190,10 +190,22 @@ test.describe('@browser Browser Settings tests', () => {
 
     test('@readwrite Verify empty search state displays correctly', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        const page = await browser.getPage();
+        const testApiKey = `sk-e2e-${getRandomString("key")}`;
+
+        await page.route("**/api/chat/models", (route) => {
+            route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({ models: [openaiModel, "gpt-4o-mini"] }),
+            });
+        });
 
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.selectApiKeyModelSource();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+        await settingsBrowserPage.addChatApiKey(testApiKey);
+        await settingsBrowserPage.selectChatApiKey(testApiKey);
 
         // Search for non-existent model
         await settingsBrowserPage.searchModels("nonexistentmodel123");

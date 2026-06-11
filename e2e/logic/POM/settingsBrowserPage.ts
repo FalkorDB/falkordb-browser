@@ -264,6 +264,15 @@ export default class SettingsBrowserPage extends BasePage {
     await this.getMaskedChatApiKeyCard(apiKey).waitFor({ state: "visible", timeout: 5000 });
   }
 
+  async selectChatApiKey(apiKey: string): Promise<void> {
+    const card = this.getMaskedChatApiKeyCard(apiKey);
+    await interactWhenVisible(
+      card,
+      (el) => el.click(),
+      "Select Chat API Key Card"
+    );
+  }
+
   async getMaskedChatApiKeyText(apiKey: string): Promise<string> {
     const keyText = this.getMaskedChatApiKeyCard(apiKey).getByTestId("chatApiKeyValue");
     await keyText.waitFor({ state: "visible", timeout: 5000 });
