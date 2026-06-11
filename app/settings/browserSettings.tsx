@@ -563,8 +563,8 @@ export default function BrowserSettings() {
                     </CardHeader>
                     {expandedSections.chat && (
                         <CardContent>
-                            <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-                                <div className="flex flex-col gap-2 p-2 bg-muted/10 rounded-lg">
+                            <div className="flex flex-col gap-2">
+                                <form onSubmit={handleSubmit} className="flex flex-col gap-2 p-2 bg-muted/10 rounded-lg">
                                     {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                                     <label htmlFor="maxSaveMessagesInput" className="text-sm font-medium whitespace-nowrap">Store latest interactions (per graph) [5..10]</label>
                                     <Input
@@ -580,7 +580,8 @@ export default function BrowserSettings() {
                                             createChangeHandler(setNewMaxSavedMessages)(Number(e.target.value), 'maxSaveMessagesInput');
                                         }}
                                     />
-                                </div>
+                                    <button type="submit" className="hidden" aria-hidden="true" tabIndex={-1} />
+                                </form>
                                 <div className="overflow-hidden rounded-2xl border border-border">
                                     <div className="border-b border-border/70 p-2">
                                         <div className="flex items-start justify-between gap-3">
@@ -932,8 +933,7 @@ export default function BrowserSettings() {
                                         </div>
                                     </div>
                                 </div>
-                                <button type="submit" className="hidden" aria-hidden="true" tabIndex={-1} />
-                            </form>
+                            </div>
                         </CardContent>
                     )}
                 </Card>

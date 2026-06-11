@@ -193,6 +193,7 @@ export type Message = {
   | "CypherQuery"
   | "CypherResult";
   confidence?: number;
+  tokenUsage?: number;
 };
 
 // [library_name, type, 'functions', function_names[]]

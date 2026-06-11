@@ -38,22 +38,16 @@ const MarkdownMessage = memo(function MarkdownMessage({ content }: { content: st
     );
 });
 
-// Function to get the last maxSavedMessages user messages and all messages in between
-const getLastUserMessagesWithContext = (allMessages: Message[], maxUserMessages: number) => {
-    // Find indices of all user messages
+// Return the last maxExchanges Q&A exchanges (each user message + its assistant replies counts as 1)
+const getLastUserMessagesWithContext = (allMessages: Message[], maxExchanges: number) => {
     const userMessageIndices = allMessages
         .map((msg, index) => msg.role === "user" ? index : -1)
         .filter(index => index !== -1);
 
-    // If there are fewer user messages than maxUserMessages, return all messages
-    if (userMessageIndices.length <= maxUserMessages) {
-        return allMessages;
-    }
+    if (userMessageIndices.length <= maxExchanges) return allMessages;
 
-    // Get the index of the Nth-from-last user message
-    const startIndex = userMessageIndices[userMessageIndices.length - maxUserMessages];
-
-    // Return all messages from that point forward
+    // Start from the Nth-from-last user message
+    const startIndex = userMessageIndices[userMessageIndices.length - maxExchanges];
     return allMessages.slice(startIndex);
 };
 
@@ -84,12 +78,30 @@ export default function Chat({ onClose }: Props) {
     const [messagesList, setMessagesList] = useState<(Message | [Message[], boolean])[]>([]);
     const [newMessage, setNewMessage] = useState("");
     const [isLoading, setIsLoading] = useState(false);
-    const [lastMessageTokens, setLastMessageTokens] = useState<number | null>(null);
-    const [totalTokens, setTotalTokens] = useState(0);
+    // Legacy fallback: populated from old storage keys when loaded messages pre-date embedded tokenUsage
+    const [legacyTotalTokens, setLegacyTotalTokens] = useState(0);
+    const [legacyLastTokens, setLegacyLastTokens] = useState<number | null>(null);
     const [queryCollapse, setQueryCollapse] = useState<{ [key: string]: boolean }>({});
     const [collapseEligible, setCollapseEligible] = useState<{ [key: number]: boolean }>({});
     const textRefs = useRef<Map<number, HTMLElement>>(new Map());
     const observerRef = useRef<ResizeObserver | null>(null);
+    const chatContainerRef = useRef<HTMLUListElement>(null);
+    // Derived from messages — automatically in sync with trimmed message history
+    const totalTokens = useMemo(
+        () => messages.reduce((sum, m) => sum + (m.tokenUsage ?? 0), 0),
+        [messages]
+    );
+    const lastMessageTokens = useMemo(() => {
+        for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i].tokenUsage != null) return messages[i].tokenUsage!;
+        }
+        return null;
+    }, [messages]);
+
+    // Prefer embedded tokenUsage from messages; fall back to legacy storage keys
+    const displayTotalTokens = totalTokens > 0 ? totalTokens : legacyTotalTokens;
+    const displayLastTokens = lastMessageTokens !== null ? lastMessageTokens : legacyLastTokens;
+
     const queryCollapseRef = useRef(queryCollapse);
     queryCollapseRef.current = queryCollapse;
 
@@ -146,10 +158,17 @@ export default function Chat({ onClose }: Props) {
         const savedCypherOnly = getConnectionItem(`cypherOnly-${graphName}`);
         setCypherOnly(savedCypherOnly === "true");
 
-        const savedTotalTokens = getConnectionItem(`chat-totalTokens-${graphName}`);
-        const savedLastTokens = getConnectionItem(`chat-lastTokens-${graphName}`);
-        setTotalTokens(savedTotalTokens ? parseInt(savedTotalTokens, 10) : 0);
-        setLastMessageTokens(savedLastTokens ? parseInt(savedLastTokens, 10) : null);
+        // Fall back to legacy token keys for sessions saved before tokenUsage was embedded in messages
+        const hasEmbeddedTokens = currentMessages.some((m: Message) => m.tokenUsage != null);
+        if (!hasEmbeddedTokens) {
+            const legacyTotal = getConnectionItem(`chat-totalTokens-${graphName}`);
+            const legacyLast = getConnectionItem(`chat-lastTokens-${graphName}`);
+            setLegacyTotalTokens(legacyTotal ? parseInt(legacyTotal, 10) : 0);
+            setLegacyLastTokens(legacyLast ? parseInt(legacyLast, 10) : null);
+        } else {
+            setLegacyTotalTokens(0);
+            setLegacyLastTokens(null);
+        }
     }, [graphName, maxSavedMessages]);
 
     useEffect(() => {
@@ -178,16 +197,16 @@ export default function Chat({ onClose }: Props) {
         setMessagesList(newMessagesList);
     }, [maxSavedMessages, messages]);
 
-    const scrollToBottom = () => {
-        const chatContainer = document.querySelector(".chat-container");
-        if (chatContainer) {
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+    // Scroll to bottom whenever the rendered message list changes
+    useEffect(() => {
+        const el = chatContainerRef.current;
+        if (el) {
+            el.scrollTop = el.scrollHeight;
         }
-    };
+    }, [messagesList]);
 
     const handleSetMessages = (newMessages: Message[] | Message) => {
         setMessages(newMessages instanceof Array ? newMessages : prev => [...prev, newMessages]);
-        setTimeout(scrollToBottom, 0);
     };
 
     const handleSubmit = async (e?: React.FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>) => {
@@ -323,18 +342,6 @@ export default function Chat({ onClose }: Props) {
             //     });
             // }
 
-            // Track token usage in footer
-            if (data.tokenUsage) {
-                const usage = data.tokenUsage;
-                setLastMessageTokens(usage.totalTokens);
-                setTotalTokens(prev => {
-                    const next = prev + usage.totalTokens;
-                    setConnectionItem(`chat-totalTokens-${graphName}`, String(next));
-                    return next;
-                });
-                setConnectionItem(`chat-lastTokens-${graphName}`, String(usage.totalTokens));
-            }
-
             // Show answer
             if (data.answer) {
                 const confidence = typeof data.confidence === "number" ? data.confidence : undefined;
@@ -346,7 +353,20 @@ export default function Chat({ onClose }: Props) {
                 });
             }
 
-            setTimeout(scrollToBottom, 0);
+            // Stamp token usage on the last message of this turn (after all messages are added)
+            if (data.tokenUsage) {
+                const tokenCount = (data.tokenUsage as { totalTokens: number }).totalTokens;
+                setMessages(prev => {
+                    if (prev.length === 0) return prev;
+                    const updated = [...prev];
+                    updated[updated.length - 1] = { ...updated[updated.length - 1], tokenUsage: tokenCount };
+                    return updated;
+                });
+                // Once we have new embedded token data, clear legacy fallback
+                setLegacyTotalTokens(0);
+                setLegacyLastTokens(null);
+            }
+
             setIsLoading(false);
 
         } catch (error) {
@@ -483,7 +503,7 @@ export default function Chat({ onClose }: Props) {
                     </div>
                 </div>
                 <span id="chat-prerequisites" className="text-center">Use English to query the graph. The feature requires LLM model and API key. Update local user parameters in Settings.</span>
-                <ul data-testid="chatMessagesList" className="w-full h-1 grow flex flex-col gap-[12px] overflow-x-hidden overflow-y-auto chat-container">
+                <ul ref={chatContainerRef} data-testid="chatMessagesList" className="w-full h-1 grow flex flex-col gap-[12px] overflow-x-hidden overflow-y-auto chat-container">
                     {
                         messagesList.map((message, index) => {
                             if (Array.isArray(message)) {
@@ -558,7 +578,7 @@ export default function Chat({ onClose }: Props) {
                     }
                 </ul>
                 {
-                    (totalTokens > 0 || model) && (() => {
+                    (displayTotalTokens > 0 || model) && (() => {
                         const selectedChatApiKey = chatApiKeys.find(k => k.id === selectedChatApiKeyId);
                         const providerLabel = chatModelSource === "local"
                             ? localLlmProvider.charAt(0).toUpperCase() + localLlmProvider.slice(1)
@@ -566,23 +586,23 @@ export default function Chat({ onClose }: Props) {
                         return (
                             <div data-testid="chatFooter" className="w-full flex items-center justify-between gap-2 px-1 py-0.5 text-xs text-muted-foreground leading-none">
                                 <div className="flex items-center gap-2 min-w-0">
-                                    {totalTokens > 0 && (
+                                    {displayTotalTokens > 0 && (
                                         <>
                                             <span className="font-medium text-foreground/60 shrink-0">Token Usage</span>
                                             <span className="shrink-0">·</span>
-                                            {lastMessageTokens !== null && (
+                                            {displayLastTokens !== null && (
                                                 <ShadTooltip>
                                                     <ShadTooltipTrigger asChild>
-                                                        <span data-testid="chatFooterLastTokens" className="truncate max-w-[6rem]">Last: <span className="font-medium text-foreground">{lastMessageTokens.toLocaleString()}</span></span>
+                                                        <span data-testid="chatFooterLastTokens" className="truncate max-w-[6rem]">Last: <span className="font-medium text-foreground">{displayLastTokens.toLocaleString()}</span></span>
                                                     </ShadTooltipTrigger>
-                                                    <ShadTooltipContent side="top">Last message: {lastMessageTokens.toLocaleString()} tokens</ShadTooltipContent>
+                                                    <ShadTooltipContent side="top">Last message: {displayLastTokens.toLocaleString()} tokens</ShadTooltipContent>
                                                 </ShadTooltip>
                                             )}
                                             <ShadTooltip>
                                                 <ShadTooltipTrigger asChild>
-                                                    <span data-testid="chatFooterTotalTokens" className="truncate max-w-[6rem]">Total: <span className="font-medium text-foreground">{totalTokens.toLocaleString()}</span></span>
+                                                    <span data-testid="chatFooterTotalTokens" className="truncate max-w-[6rem]">Total: <span className="font-medium text-foreground">{displayTotalTokens.toLocaleString()}</span></span>
                                                 </ShadTooltipTrigger>
-                                                <ShadTooltipContent side="top">Session total: {totalTokens.toLocaleString()} tokens</ShadTooltipContent>
+                                                <ShadTooltipContent side="top">Session total: {displayTotalTokens.toLocaleString()} tokens</ShadTooltipContent>
                                             </ShadTooltip>
                                         </>
                                     )}
