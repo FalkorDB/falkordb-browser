@@ -80,6 +80,29 @@ const normalizeLocalLlmEndpoint = (
   endpoint: string | null | undefined
 ) => endpoint?.trim() || DEFAULT_LOCAL_LLM_ENDPOINTS[provider];
 
+const loadEncryptedSetting = async (key: string): Promise<string> => {
+  const storedValue = localStorage.getItem(key) || "";
+  if (!storedValue) return "";
+
+  try {
+    return await serverDecrypt(storedValue);
+  } catch {
+    return storedValue;
+  }
+};
+
+const saveEncryptedSetting = async (key: string, value: string): Promise<boolean> => {
+  try {
+    const encryptedValue = await serverEncrypt(value);
+    if (!encryptedValue) return false;
+    localStorage.setItem(key, encryptedValue);
+    return true;
+  } catch (error) {
+    console.error(`Failed to encrypt setting ${key}:`, error);
+    return false;
+  }
+};
+
 const createChatApiKey = (key: string): ChatApiKey => {
   const provider = detectProviderFromApiKey(key);
   const providerName = provider === "unknown" ? "LLM" : getProviderDisplayName(provider);
@@ -409,9 +432,20 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       localStorage.setItem("rowHeight", newRowHeight.toString());
       localStorage.setItem("rowHeightExpandMultiple", newRowHeightExpandMultiple.toString());
       localStorage.setItem("maxItemsForSearch", newMaxItemsForSearch.toString());
-      localStorage.setItem(CHAT_MODEL_SOURCE_STORAGE_KEY, newChatModelSource);
-      localStorage.setItem(LOCAL_LLM_PROVIDER_STORAGE_KEY, newLocalLlmProvider);
-      localStorage.setItem(LOCAL_LLM_ENDPOINT_STORAGE_KEY, normalizeLocalLlmEndpoint(newLocalLlmProvider, newLocalLlmEndpoint));
+      const normalizedLocalLlmEndpoint = normalizeLocalLlmEndpoint(newLocalLlmProvider, newLocalLlmEndpoint);
+      const savedChatSourceSettings = await Promise.all([
+        saveEncryptedSetting(CHAT_MODEL_SOURCE_STORAGE_KEY, newChatModelSource),
+        saveEncryptedSetting(LOCAL_LLM_PROVIDER_STORAGE_KEY, newLocalLlmProvider),
+        saveEncryptedSetting(LOCAL_LLM_ENDPOINT_STORAGE_KEY, normalizedLocalLlmEndpoint),
+      ]);
+      if (savedChatSourceSettings.some(saved => !saved)) {
+        toast({
+          title: "Error",
+          description: "Could not encrypt local LLM settings. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       const selectedApiKey = getSelectedChatApiKey(newChatApiKeys, newSelectedChatApiKeyId);
       const nextSelectedId = selectedApiKey?.id ?? "";
@@ -477,7 +511,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setSecretKey(selectedApiKey?.key ?? "");
       setChatModelSource(newChatModelSource);
       setLocalLlmProvider(newLocalLlmProvider);
-      setLocalLlmEndpoint(normalizeLocalLlmEndpoint(newLocalLlmProvider, newLocalLlmEndpoint));
+      setLocalLlmEndpoint(normalizedLocalLlmEndpoint);
       setModel(newModel);
       setRefreshInterval(newRefreshInterval);
       setMaxSavedMessages(newMaxSavedMessages);
@@ -1042,11 +1076,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setRowHeightExpandMultiple(parseInt(localStorage.getItem("rowHeightExpandMultiple") || "3", 10));
       const parsedMaxItems = parseInt(localStorage.getItem("maxItemsForSearch") || "20", 10);
       setMaxItemsForSearch(Number.isFinite(parsedMaxItems) ? Math.min(Math.max(parsedMaxItems, 10), 50) : 20);
-      const loadedChatModelSource = normalizeChatModelSource(localStorage.getItem(CHAT_MODEL_SOURCE_STORAGE_KEY));
-      const loadedLocalLlmProvider = normalizeLocalLlmProvider(localStorage.getItem(LOCAL_LLM_PROVIDER_STORAGE_KEY));
+      const loadedChatModelSource = normalizeChatModelSource(await loadEncryptedSetting(CHAT_MODEL_SOURCE_STORAGE_KEY));
+      const loadedLocalLlmProvider = normalizeLocalLlmProvider(await loadEncryptedSetting(LOCAL_LLM_PROVIDER_STORAGE_KEY));
       const loadedLocalLlmEndpoint = normalizeLocalLlmEndpoint(
         loadedLocalLlmProvider,
-        localStorage.getItem(LOCAL_LLM_ENDPOINT_STORAGE_KEY)
+        await loadEncryptedSetting(LOCAL_LLM_ENDPOINT_STORAGE_KEY)
       );
       setChatModelSource(loadedChatModelSource);
       setNewChatModelSource(loadedChatModelSource);
