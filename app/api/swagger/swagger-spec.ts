@@ -1300,8 +1300,19 @@ const swaggerSpec = {
                   type: "object",
                   properties: {
                     configs: {
-                      type: "object",
-                      description: "Configuration parameters and their values"
+                      type: "array",
+                      description: "Configuration parameters and their values as [name, value] tuples",
+                      items: {
+                        type: "array",
+                        minItems: 2,
+                        maxItems: 2,
+                        items: {
+                          oneOf: [
+                            { type: "string" },
+                            { type: "number" }
+                          ]
+                        }
+                      }
                     }
                   }
                 }
