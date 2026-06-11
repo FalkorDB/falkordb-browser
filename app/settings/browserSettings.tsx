@@ -608,7 +608,23 @@ export default function BrowserSettings() {
                                             {newChatModelSource === "api-key" ? (
                                                 <>
                                             <div className="rounded-xl border border-border/70 bg-background/80 p-3">
-                                                <label htmlFor="secretKeyInput" className="text-sm font-medium">Add an API key</label>
+                                                <div className="flex items-center gap-2">
+                                                    <label htmlFor="secretKeyInput" className="text-sm font-medium">Add an API key</label>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <button
+                                                                type="button"
+                                                                className="inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                                                aria-label="Supported API key providers"
+                                                            >
+                                                                <Info className="h-3.5 w-3.5" />
+                                                            </button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent className="max-w-64 text-xs leading-relaxed">
+                                                            Supported hosted keys: OpenAI, Anthropic, Gemini, Groq, Cohere, xAI, and DeepSeek.
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </div>
                                                 <div className="mt-2 flex gap-2">
                                                     <Input
                                                         data-testid="chatApiKeyInput"
