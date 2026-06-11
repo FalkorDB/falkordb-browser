@@ -1126,6 +1126,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             localStorage.setItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
             localStorage.removeItem("secretKey");
           }
+        } else if (isLegacyEncrypted(storedSecretKey)) {
+          localStorage.removeItem("secretKey");
         }
       }
 
