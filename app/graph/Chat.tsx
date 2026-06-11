@@ -81,7 +81,7 @@ export default function Chat({ onClose }: Props) {
     const { setIndicator } = useContext(IndicatorContext);
     const { runQuery, graphName } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
-    const { settings: { chatSettings: { secretKey, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
+    const { settings: { chatSettings: { secretKey, model, maxSavedMessages, chatModelSource, localLlmProvider, localLlmEndpoint } } } = useContext(BrowserSettingsContext);
     // Cypher Only toggle state, persisted per graph
     const [cypherOnly, setCypherOnly] = useState(false);
 
@@ -228,7 +228,7 @@ export default function Chat({ onClose }: Props) {
             return;
         }
 
-        if (!secretKey) {
+        if (chatModelSource === "api-key" && !secretKey) {
             toast({
                 title: "No Api Key Provided",
                 description: "Please provide a Api Key in the settings before sending a message",
@@ -250,7 +250,7 @@ export default function Chat({ onClose }: Props) {
         // Client-side fail-fast: detect model/API key provider mismatch before making any request
         const modelProvider = detectProviderFromModel(model);
         const keyProvider = detectProviderFromApiKey(secretKey);
-        if (modelProvider !== "unknown" && keyProvider !== "unknown" && modelProvider !== keyProvider && modelProvider !== "ollama") {
+        if (chatModelSource === "api-key" && modelProvider !== "unknown" && keyProvider !== "unknown" && modelProvider !== keyProvider && modelProvider !== "ollama") {
             const modelProviderName = getProviderDisplayName(modelProvider);
             const keyProviderName = getProviderDisplayName(keyProvider);
             toast({
@@ -276,6 +276,9 @@ export default function Chat({ onClose }: Props) {
                     graphName,
                     model,
                     key: secretKey,
+                    modelSource: chatModelSource,
+                    localProvider: localLlmProvider,
+                    localEndpoint: localLlmEndpoint,
                     cypherOnly
                 })
             });
