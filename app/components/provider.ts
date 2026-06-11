@@ -13,6 +13,9 @@ export type ChatApiKey = {
   createdAt: number;
 };
 
+export type ChatModelSource = "api-key" | "local";
+export type LocalLlmProvider = "ollama" | "lmstudio";
+
 type BrowserSettingsContextType = {
   newSettings: {
     limitSettings: {
@@ -58,6 +61,12 @@ type BrowserSettingsContextType = {
       setNewChatApiKeys: Dispatch<SetStateAction<ChatApiKey[]>>;
       newSelectedChatApiKeyId: string;
       setNewSelectedChatApiKeyId: Dispatch<SetStateAction<string>>;
+      newChatModelSource: ChatModelSource;
+      setNewChatModelSource: Dispatch<SetStateAction<ChatModelSource>>;
+      newLocalLlmProvider: LocalLlmProvider;
+      setNewLocalLlmProvider: Dispatch<SetStateAction<LocalLlmProvider>>;
+      newLocalLlmEndpoint: string;
+      setNewLocalLlmEndpoint: Dispatch<SetStateAction<string>>;
       newModel: string;
       setNewModel: Dispatch<SetStateAction<string>>;
       newMaxSavedMessages: number;
@@ -118,6 +127,12 @@ type BrowserSettingsContextType = {
       setChatApiKeys: Dispatch<SetStateAction<ChatApiKey[]>>;
       selectedChatApiKeyId: string;
       setSelectedChatApiKeyId: Dispatch<SetStateAction<string>>;
+      chatModelSource: ChatModelSource;
+      setChatModelSource: Dispatch<SetStateAction<ChatModelSource>>;
+      localLlmProvider: LocalLlmProvider;
+      setLocalLlmProvider: Dispatch<SetStateAction<LocalLlmProvider>>;
+      localLlmEndpoint: string;
+      setLocalLlmEndpoint: Dispatch<SetStateAction<string>>;
       model: string;
       setModel: Dispatch<SetStateAction<string>>;
       maxSavedMessages: number;
@@ -287,6 +302,12 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         setNewChatApiKeys: () => { },
         newSelectedChatApiKeyId: "",
         setNewSelectedChatApiKeyId: () => { },
+        newChatModelSource: "api-key",
+        setNewChatModelSource: () => { },
+        newLocalLlmProvider: "ollama",
+        setNewLocalLlmProvider: () => { },
+        newLocalLlmEndpoint: "http://localhost:11434",
+        setNewLocalLlmEndpoint: () => { },
         newModel: "",
         setNewModel: () => { },
         newMaxSavedMessages: 0,
@@ -341,6 +362,12 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         setChatApiKeys: () => { },
         selectedChatApiKeyId: "",
         setSelectedChatApiKeyId: () => { },
+        chatModelSource: "api-key",
+        setChatModelSource: () => { },
+        localLlmProvider: "ollama",
+        setLocalLlmProvider: () => { },
+        localLlmEndpoint: "http://localhost:11434",
+        setLocalLlmEndpoint: () => { },
         model: "",
         setModel: () => { },
         maxSavedMessages: 0,
