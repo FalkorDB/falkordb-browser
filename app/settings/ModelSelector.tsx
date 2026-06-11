@@ -175,7 +175,7 @@ export default function ModelSelector({
 
                 {
                     !isLoading && filteredModels.length === 0 &&
-                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                    <div data-testid="noModelsFoundMessage" className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                         <Search className="h-6 w-6 mb-2 opacity-50" />
                         <p className="text-sm">No models found</p>
                         {
