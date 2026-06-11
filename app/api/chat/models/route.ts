@@ -8,7 +8,17 @@ type ProviderModelResponse = {
     models?: Array<{ name?: string; supportedGenerationMethods?: string[] }>;
 };
 
+type LocalProvider = "ollama" | "lmstudio";
+
 const MODEL_FETCH_TIMEOUT_MS = 4000;
+const LOCAL_PROVIDER_LABELS: Record<LocalProvider, string> = {
+    ollama: "Ollama",
+    lmstudio: "LM Studio",
+};
+const LOCAL_PROVIDER_DEFAULT_ENDPOINTS: Record<LocalProvider, string> = {
+    ollama: "http://localhost:11434",
+    lmstudio: "http://localhost:1234/v1",
+};
 
 class ModelFetchError extends Error {
     constructor(
@@ -28,8 +38,8 @@ class ModelFetchError extends Error {
 }
 
 class ModelFetchTimeoutError extends Error {
-    constructor(provider: AIProvider) {
-        super(`Timed out loading live ${getProviderDisplayName(provider)} models. Check the key and try again.`);
+    constructor(providerName: string) {
+        super(`Timed out loading live ${providerName} models. Check the endpoint and try again.`);
     }
 
     status = 504;
@@ -50,6 +60,28 @@ export async function OPTIONS(request: Request) {
 const withProviderPrefix = (provider: AIProvider, models: string[]) =>
     provider === "openai" ? models : models.map(model => `${provider}::${model}`);
 
+const withLocalProviderPrefix = (provider: LocalProvider, models: string[]) =>
+    models.map(model => provider === "ollama" ? `ollama::${model}` : `openai::${model}`);
+
+const normalizeLocalEndpoint = (provider: LocalProvider, endpoint?: string) => {
+    const rawEndpoint = endpoint?.trim() || LOCAL_PROVIDER_DEFAULT_ENDPOINTS[provider];
+    const url = new URL(rawEndpoint);
+    const hostname = url.hostname.toLowerCase();
+    const isLoopback = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+
+    if (url.protocol !== "http:" || !isLoopback) {
+        throw new Error("Local LLM endpoint must be an http:// localhost or 127.0.0.1 URL.");
+    }
+
+    if (provider === "lmstudio" && (url.pathname === "/" || url.pathname === "")) {
+        url.pathname = "/v1";
+    }
+
+    return url.toString().replace(/\/$/, "");
+};
+
+const normalizeLocalProvider = (provider?: string): LocalProvider => provider === "lmstudio" ? "lmstudio" : "ollama";
+
 const ensureOk = async (response: Response, provider: AIProvider) => {
     if (!response.ok) {
         throw new ModelFetchError(provider, response.status);
@@ -57,13 +89,13 @@ const ensureOk = async (response: Response, provider: AIProvider) => {
 };
 
 const fetchProviderModels = async (
-    provider: AIProvider,
+    providerName: string,
     url: string,
     init: RequestInit,
     abortSignal: AbortSignal
 ) => {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(new ModelFetchTimeoutError(provider)), MODEL_FETCH_TIMEOUT_MS);
+    const timeout = setTimeout(() => controller.abort(new ModelFetchTimeoutError(providerName)), MODEL_FETCH_TIMEOUT_MS);
     const abortProviderRequest = () => controller.abort(new ModelFetchAbortedError());
     abortSignal.addEventListener("abort", abortProviderRequest, { once: true });
 
@@ -97,7 +129,7 @@ const fetchOpenAICompatibleModels = async (
     key: string,
     abortSignal: AbortSignal
 ) => {
-    const response = await fetchProviderModels(provider, url, {
+    const response = await fetchProviderModels(getProviderDisplayName(provider), url, {
         method: "GET",
         headers: {
             Authorization: `Bearer ${key}`,
@@ -114,7 +146,7 @@ const fetchOpenAICompatibleModels = async (
 };
 
 const fetchAnthropicModels = async (key: string, abortSignal: AbortSignal) => {
-    const response = await fetchProviderModels("anthropic", "https://api.anthropic.com/v1/models", {
+    const response = await fetchProviderModels(getProviderDisplayName("anthropic"), "https://api.anthropic.com/v1/models", {
         method: "GET",
         headers: {
             "x-api-key": key,
@@ -132,7 +164,7 @@ const fetchAnthropicModels = async (key: string, abortSignal: AbortSignal) => {
 };
 
 const fetchGeminiModels = async (key: string, abortSignal: AbortSignal) => {
-    const response = await fetchProviderModels("gemini", "https://generativelanguage.googleapis.com/v1beta/models", {
+    const response = await fetchProviderModels(getProviderDisplayName("gemini"), "https://generativelanguage.googleapis.com/v1beta/models", {
         method: "GET",
         headers: {
             "x-goog-api-key": key,
@@ -147,6 +179,29 @@ const fetchGeminiModels = async (key: string, abortSignal: AbortSignal) => {
         .sort((a, b) => a.localeCompare(b));
 
     return withProviderPrefix("gemini", models);
+};
+
+const fetchLocalModels = async (
+    provider: LocalProvider,
+    endpoint: string | undefined,
+    abortSignal: AbortSignal
+) => {
+    const baseUrl = normalizeLocalEndpoint(provider, endpoint);
+    const response = await fetchProviderModels(LOCAL_PROVIDER_LABELS[provider], provider === "ollama" ? `${baseUrl}/api/tags` : `${baseUrl}/models`, {
+        method: "GET",
+    }, abortSignal);
+
+    if (!response.ok) {
+        throw new Error(`Could not load local ${LOCAL_PROVIDER_LABELS[provider]} models (${response.status}). Check that the local server is running.`);
+    }
+    const payload = await response.json() as ProviderModelResponse;
+    const models = (provider === "ollama"
+        ? (payload.models ?? []).map(model => model.name)
+        : (payload.data ?? []).map(model => model.id))
+        .filter((model): model is string => Boolean(model))
+        .sort((a, b) => a.localeCompare(b));
+
+    return withLocalProviderPrefix(provider, models);
 };
 
 const fetchLiveModelsForKey = async (key: string, abortSignal: AbortSignal) => {
@@ -183,7 +238,21 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const body = await request.json() as { key?: string };
+        const body = await request.json() as {
+            key?: string;
+            source?: "api-key" | "local";
+            localProvider?: LocalProvider;
+            endpoint?: string;
+        };
+        if (body.source === "local") {
+            const localProvider = normalizeLocalProvider(body.localProvider);
+            const models = await fetchLocalModels(localProvider, body.endpoint, request.signal);
+            return NextResponse.json(
+                { models, providerName: LOCAL_PROVIDER_LABELS[localProvider] },
+                { status: 200, headers: getCorsHeaders(request) }
+            );
+        }
+
         const key = body.key?.trim();
         if (!key) {
             return NextResponse.json(
