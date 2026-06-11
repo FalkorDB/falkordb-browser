@@ -1,4 +1,4 @@
-import { cn, getTheme, Message, toUserFriendlyMessage } from "@/lib/utils";
+import { cn, getTheme, Message, securedFetch, toUserFriendlyMessage } from "@/lib/utils";
 import { memo, useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
@@ -241,21 +241,6 @@ export default function Chat({ onClose }: Props) {
             return;
         }
 
-        if (chatModelSource === "api-key" && requestKey) {
-            const keyProvider = detectProviderFromApiKey(requestKey);
-            if (modelProvider !== "unknown" && keyProvider !== "unknown" && modelProvider !== keyProvider && modelProvider !== "ollama") {
-                const providerName = getProviderDisplayName(modelProvider);
-                toast({
-                    title: "API key does not match model",
-                    description: `Please select a ${providerName} API key in the settings before sending a message`,
-                    variant: "destructive",
-                    action: ToastActionButton
-                });
-                setIsLoading(false);
-                return;
-            }
-        }
-
         setIsLoading(true);
 
         const newMessages = [...messages, { role: "user", type: "Text", content: newMessage } as const];
@@ -264,7 +249,7 @@ export default function Chat({ onClose }: Props) {
         setNewMessage("");
 
         try {
-            const response = await fetch("/api/chat", {
+            const response = await securedFetch("/api/chat", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -282,7 +267,7 @@ export default function Chat({ onClose }: Props) {
                     localProvider: localLlmProvider,
                     localEndpoint: localLlmEndpoint,
                 })
-            });
+            }, toast, setIndicator);
 
             let data;
             try {
