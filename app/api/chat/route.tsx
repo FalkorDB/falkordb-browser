@@ -10,6 +10,29 @@ export async function OPTIONS(request: NextRequest) {
 }
 
 export type EventType = "Status" | "CypherQuery" | "CypherResult" | "ModelOutputChunk" | "Result" | "Error";
+type LocalProvider = "ollama" | "lmstudio";
+
+const LOCAL_PROVIDER_DEFAULT_ENDPOINTS: Record<LocalProvider, string> = {
+    ollama: "http://localhost:11434",
+    lmstudio: "http://localhost:1234/v1",
+};
+
+const normalizeLocalEndpoint = (provider: LocalProvider, endpoint?: string) => {
+    const rawEndpoint = endpoint?.trim() || LOCAL_PROVIDER_DEFAULT_ENDPOINTS[provider];
+    const url = new URL(rawEndpoint);
+    const hostname = url.hostname.toLowerCase();
+    const isLoopback = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+
+    if (url.protocol !== "http:" || !isLoopback) {
+        throw new Error("Local LLM endpoint must be an http:// localhost or 127.0.0.1 URL.");
+    }
+
+    if (provider === "lmstudio" && (url.pathname === "/" || url.pathname === "")) {
+        url.pathname = "/v1";
+    }
+
+    return url.toString().replace(/\/$/, "");
+};
 
 /**
  * Create user-friendly error message
@@ -126,7 +149,7 @@ export async function POST(request: NextRequest) {
         });
     }
 
-    const { messages, graphName, key, model, cypherOnly } = validation.data;
+    const { messages, graphName, key, model, cypherOnly, modelSource, localProvider, localEndpoint } = validation.data;
 
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
@@ -140,7 +163,10 @@ export async function POST(request: NextRequest) {
             // Fail fast on model/API key provider mismatch before making any external calls
             const modelProvider = detectProviderFromModel(model);
             const keyProvider = detectProviderFromApiKey(key);
-            if (modelProvider !== "unknown" && keyProvider !== "unknown" && modelProvider !== keyProvider && modelProvider !== "ollama") {
+            if (modelSource === "api-key" && !key) {
+                throw new Error("API key is required for hosted models.");
+            }
+            if (modelSource === "api-key" && modelProvider !== "unknown" && keyProvider !== "unknown" && modelProvider !== keyProvider && modelProvider !== "ollama") {
                 const modelProviderName = getProviderDisplayName(modelProvider);
                 const keyProviderName = getProviderDisplayName(keyProvider);
                 throw new Error(`Model/API key mismatch: You selected a ${modelProviderName} model but provided a ${keyProviderName} API key. Please update your API key in Settings to match your selected model.`);
@@ -148,12 +174,16 @@ export async function POST(request: NextRequest) {
 
             // Build FalkorDB connection URL from user session
             const falkordbConnection = buildFalkorDBConnection(session.user);
+            const llmEndpoint = modelSource === "local"
+                ? normalizeLocalEndpoint(localProvider, localEndpoint)
+                : undefined;
 
             // Create TextToCypher client
             const textToCypher = new TextToCypher({
                 falkordbConnection,
                 model,
-                apiKey: key,
+                apiKey: modelSource === "local" ? localProvider : key,
+                llmEndpoint,
             });
 
             // Get the last user message
