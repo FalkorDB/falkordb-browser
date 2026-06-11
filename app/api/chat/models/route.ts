@@ -73,9 +73,24 @@ const normalizeLocalEndpoint = (provider: LocalProvider, endpoint?: string) => {
         throw new Error("Local LLM endpoint must be an http:// localhost or 127.0.0.1 URL.");
     }
 
-    if (provider === "lmstudio" && (url.pathname === "/" || url.pathname === "")) {
-        url.pathname = "/v1";
+    const allowedPorts = provider === "ollama" ? new Set(["", "11434"]) : new Set(["", "1234"]);
+    if (!allowedPorts.has(url.port)) {
+        throw new Error(`Invalid ${LOCAL_PROVIDER_LABELS[provider]} endpoint port.`);
     }
+
+    if (provider === "ollama") {
+        if (url.pathname !== "/" && url.pathname !== "") {
+            throw new Error("Ollama endpoint path must be root (/).");
+        }
+        url.pathname = "/";
+    } else if (url.pathname === "/" || url.pathname === "") {
+        url.pathname = "/v1";
+    } else if (url.pathname !== "/v1") {
+        throw new Error("LM Studio endpoint path must be /v1.");
+    }
+
+    url.search = "";
+    url.hash = "";
 
     return url.toString().replace(/\/$/, "");
 };
@@ -187,7 +202,8 @@ const fetchLocalModels = async (
     abortSignal: AbortSignal
 ) => {
     const baseUrl = normalizeLocalEndpoint(provider, endpoint);
-    const response = await fetchProviderModels(LOCAL_PROVIDER_LABELS[provider], provider === "ollama" ? `${baseUrl}/api/tags` : `${baseUrl}/models`, {
+    const targetUrl = new URL(provider === "ollama" ? "api/tags" : "models", `${baseUrl}/`).toString();
+    const response = await fetchProviderModels(LOCAL_PROVIDER_LABELS[provider], targetUrl, {
         method: "GET",
     }, abortSignal);
 
