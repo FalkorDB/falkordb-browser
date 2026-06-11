@@ -192,6 +192,7 @@ test.describe('@browser Browser Settings tests', () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
 
         await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.selectApiKeyModelSource();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
         // Search for non-existent model
@@ -201,6 +202,66 @@ test.describe('@browser Browser Settings tests', () => {
         // Verify "No models found" message is displayed
         const noModelsText = await settingsBrowserPage.getNoModelsFoundText();
         expect(noModelsText).toContain("No models found");
+    });
+
+    test('@readwrite Verify API key provider info tooltip displays supported providers', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.selectApiKeyModelSource();
+        await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+        await settingsBrowserPage.hoverApiKeyProvidersInfo();
+
+        const tooltipText = await settingsBrowserPage.getApiKeyProvidersTooltipText();
+        expect(tooltipText).toContain("OpenAI");
+        expect(tooltipText).toContain("Anthropic");
+        expect(tooltipText).toContain("Gemini");
+        expect(tooltipText).toContain("Groq");
+        expect(tooltipText).toContain("xAI");
+    });
+
+    test('@readwrite Verify API key can be added viewed edited and deleted', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        const apiKey = `sk-e2e-${getRandomString("key")}`;
+        const editedApiKey = `sk-e2e-edited-${getRandomString("key")}`;
+
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.selectApiKeyModelSource();
+        await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+        await settingsBrowserPage.addChatApiKey(apiKey);
+
+        const maskedKeyText = await settingsBrowserPage.getMaskedChatApiKeyText(apiKey);
+        expect(maskedKeyText).toContain(apiKey.slice(0, 6));
+        expect(maskedKeyText).toContain(apiKey.slice(-4));
+
+        await settingsBrowserPage.showChatApiKey(apiKey);
+        expect(await settingsBrowserPage.getVisibleChatApiKeyText(apiKey)).toBe(apiKey);
+
+        await settingsBrowserPage.editChatApiKey(apiKey, editedApiKey);
+        expect(await settingsBrowserPage.getVisibleChatApiKeyText(editedApiKey)).toBe(editedApiKey);
+
+        await settingsBrowserPage.deleteChatApiKey(editedApiKey);
+        expect(await settingsBrowserPage.isChatApiKeyPresent(editedApiKey)).toBe(false);
+    });
+
+    test('@readwrite Verify local LLM controls and load tooltip display correctly', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.selectLocalLlmModelSource();
+
+        expect(await settingsBrowserPage.isLocalLlmModelSourceSelected()).toBe(true);
+        expect(await settingsBrowserPage.isOllamaProviderVisible()).toBe(true);
+        expect(await settingsBrowserPage.isLmStudioProviderVisible()).toBe(true);
+
+        await settingsBrowserPage.selectLmStudioProvider();
+
+        expect(await settingsBrowserPage.isLmStudioProviderSelected()).toBe(true);
+        expect(await settingsBrowserPage.getLocalLlmEndpointValue()).toBe("http://localhost:1234/v1");
+        expect(await settingsBrowserPage.getLocalLlmLoadButtonText()).toBe("");
+
+        await settingsBrowserPage.hoverLocalLlmLoadButton();
+        expect(await settingsBrowserPage.isLocalLlmLoadTooltipVisible()).toBe(true);
     });
 
     test('@readwrite Verify model categories display correctly', async () => {
