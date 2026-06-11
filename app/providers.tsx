@@ -344,7 +344,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setSecretKey(selectedApiKey?.key ?? "");
       const restoredKeyModel = perSourceModels[nextSelectedId] ?? "";
       setModel(restoredKeyModel);
-      try { localStorage.setItem("model", restoredKeyModel); } catch { /* ignore */ }
+      void saveEncryptedSetting("model", restoredKeyModel);
 
       try {
         const saved = await persistSelectedChatApiKeyId(nextSelectedId);
@@ -370,7 +370,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       const targetKey = source === "local" ? localLlmProvider : selectedChatApiKeyId || "";
       const restoredSourceModel = perSourceModels[targetKey] ?? "";
       setModel(restoredSourceModel);
-      try { localStorage.setItem("model", restoredSourceModel); } catch { /* ignore */ }
+      void saveEncryptedSetting("model", restoredSourceModel);
 
       try {
         const saved = await saveEncryptedSetting(CHAT_MODEL_SOURCE_STORAGE_KEY, source);
@@ -395,19 +395,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       if (sourceKey) {
         const next = { ...perSourceModels, [sourceKey]: modelName };
         setPerSourceModels(next);
-        try { localStorage.setItem("perSourceModels", JSON.stringify(next)); } catch { /* ignore */ }
+        void saveEncryptedSetting("perSourceModels", JSON.stringify(next));
       }
 
-      try {
-        localStorage.setItem("model", modelName);
-      } catch (error) {
-        console.error('Failed to save model:', error);
-        toast({
-          title: "Error",
-          description: "Could not save model. Please try again.",
-          variant: "destructive",
-        });
-      }
+      void saveEncryptedSetting("model", modelName);
     },
     selectLocalLlmProvider: async (provider: LocalLlmProvider) => {
       const defaultEndpoint = DEFAULT_LOCAL_LLM_ENDPOINTS[provider];
@@ -1116,9 +1107,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setSelectedChatApiKeyId(selectedId);
       setSecretKey(selectedApiKey?.key ?? "");
 
-      setModel(localStorage.getItem("model") || "");
+      const storedModel = await loadEncryptedSetting("model");
+      setModel(storedModel || localStorage.getItem("model") || "");
       try {
-        const storedPerSourceModels = localStorage.getItem("perSourceModels");
+        const storedPerSourceModels = await loadEncryptedSetting("perSourceModels")
+          || localStorage.getItem("perSourceModels");
         if (storedPerSourceModels) setPerSourceModels(JSON.parse(storedPerSourceModels));
       } catch { /* ignore corrupted data */ }
     })();
