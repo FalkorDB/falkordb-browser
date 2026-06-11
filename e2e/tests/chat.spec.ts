@@ -24,6 +24,9 @@ async function createChatPageWithSettings(
 
   await page.goto(urls.graphUrl);
   await page.waitForLoadState("networkidle");
+  await expect.poll(async () => page.evaluate(() =>
+    localStorage.getItem("secretKey") === null && localStorage.getItem("chatApiKeys") !== null
+  ), { timeout: 15000 }).toBe(true);
 
   return chat;
 }
@@ -76,17 +79,20 @@ test.describe("Chat Feature Tests", () => {
     const graphName = getRandomString("chat");
     await apiCall.addGraph(graphName);
     await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
-    
-    const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
-    await browser.setPageToFullScreen();
-    await settings.expandChatSection();
 
-    const models = await settings.getAvailableModels();    
-    await settings.selectModel(models[0]); // Select a model to enable the input
-    await settings.fillChatApiKey(""); // Clear API key to simulate missing key
-    await settings.clickSaveSettingsButton();
-    
-    const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
+    const chat = await browser.createNewPage(ChatComponent);
+    await browser.setPageToFullScreen();
+    const page = await browser.getPage();
+    await page.addInitScript(({ selectedModel }) => {
+      localStorage.setItem("chatModelSource", "api-key");
+      localStorage.setItem("model", selectedModel);
+      localStorage.removeItem("secretKey");
+      localStorage.removeItem("chatApiKeys");
+      localStorage.removeItem("selectedChatApiKeyId");
+    }, { selectedModel: DEFAULT_CHAT_MODEL });
+    await page.goto(urls.graphUrl);
+    await page.waitForLoadState("networkidle");
+
     await chat.selectGraphByName(graphName);
     
     // Open chat panel
@@ -98,7 +104,7 @@ test.describe("Chat Feature Tests", () => {
     await chat.fillChatInput("Who is Alice?");
     await chat.clickChatSendButton();
     
-    // Verify error toast is displayed due to missing/invalid API key
+    // Verify error toast is displayed due to missing API key
     const isErrorToastVisible = await chat.getNotificationErrorToast();
     expect(isErrorToastVisible).toBe(true);
     
