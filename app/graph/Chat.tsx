@@ -84,6 +84,7 @@ export default function Chat({ onClose }: Props) {
     const [messagesList, setMessagesList] = useState<(Message | [Message[], boolean])[]>([]);
     const [newMessage, setNewMessage] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+    const [lastMessageTokens, setLastMessageTokens] = useState<number | null>(null);
     const [totalTokens, setTotalTokens] = useState(0);
     const [queryCollapse, setQueryCollapse] = useState<{ [key: string]: boolean }>({});
     const [collapseEligible, setCollapseEligible] = useState<{ [key: number]: boolean }>({});
@@ -144,6 +145,11 @@ export default function Chat({ onClose }: Props) {
 
         const savedCypherOnly = getConnectionItem(`cypherOnly-${graphName}`);
         setCypherOnly(savedCypherOnly === "true");
+
+        const savedTotalTokens = getConnectionItem(`chat-totalTokens-${graphName}`);
+        const savedLastTokens = getConnectionItem(`chat-lastTokens-${graphName}`);
+        setTotalTokens(savedTotalTokens ? parseInt(savedTotalTokens, 10) : 0);
+        setLastMessageTokens(savedLastTokens ? parseInt(savedLastTokens, 10) : null);
     }, [graphName, maxSavedMessages]);
 
     useEffect(() => {
@@ -317,19 +323,16 @@ export default function Chat({ onClose }: Props) {
             //     });
             // }
 
-            // Show token usage if available
+            // Track token usage in footer
             if (data.tokenUsage) {
                 const usage = data.tokenUsage;
-
-                const newTotal = totalTokens + usage.totalTokens;
-
-                setTotalTokens(newTotal);
-
-                handleSetMessages({
-                    role: "info",
-                    content: `${usage.totalTokens} - ${newTotal}`,
-                    type: "Usage"
+                setLastMessageTokens(usage.totalTokens);
+                setTotalTokens(prev => {
+                    const next = prev + usage.totalTokens;
+                    setConnectionItem(`chat-totalTokens-${graphName}`, String(next));
+                    return next;
                 });
+                setConnectionItem(`chat-lastTokens-${graphName}`, String(usage.totalTokens));
             }
 
             // Show answer
@@ -442,15 +445,7 @@ export default function Chat({ onClose }: Props) {
             //             {message.content}
             //         </pre>
             //     );
-            case "Usage": {
-                return (
-                    <div className="flex flex-col gap-1">
-                        <span className="text-xs px-1.5 py-0.5 rounded w-fit">
-                            Session Tokens: {message.content}
-                        </span>
-                    </div>
-                );
-            }
+
             default:
                 return (
                     <div className="flex flex-col gap-1">
@@ -533,7 +528,6 @@ export default function Chat({ onClose }: Props) {
                                 );
                             }
                             const isUser = message.role === "user";
-                            const isInfo = message.role === "info";
                             const assistantBg = message.type === "Error" ? "bg-destructive" : "bg-secondary";
                             const avatar = isUser
                                 ? <div className="h-8 w-8 rounded-full flex items-center justify-center bg-primary">
@@ -542,20 +536,6 @@ export default function Chat({ onClose }: Props) {
                                 : <div className="h-8 w-8 relative">
                                     {mounted && currentTheme && <Image className="rounded-full" src={`/icons/F-${currentTheme}.svg`} alt="Assistant" fill />}
                                 </div>;
-
-                            if (isInfo) {
-                                return (
-                                    <li
-                                        data-testid={`chatInfoMessage-${message.type}`}
-                                        className="w-full flex justify-center"
-                                        key={index}
-                                    >
-                                        <div className="px-3 py-1 bg-secondary rounded-full">
-                                            {getMessage(message)}
-                                        </div>
-                                    </li>
-                                );
-                            }
 
                             return (
                                 <li
@@ -577,6 +557,54 @@ export default function Chat({ onClose }: Props) {
                         })
                     }
                 </ul>
+                {
+                    (totalTokens > 0 || model) && (() => {
+                        const selectedChatApiKey = chatApiKeys.find(k => k.id === selectedChatApiKeyId);
+                        const providerLabel = chatModelSource === "local"
+                            ? localLlmProvider.charAt(0).toUpperCase() + localLlmProvider.slice(1)
+                            : getProviderDisplayName(selectedChatApiKey?.provider ?? detectProviderFromModel(model));
+                        return (
+                            <div data-testid="chatFooter" className="w-full flex items-center justify-between gap-2 px-1 py-0.5 text-xs text-muted-foreground leading-none">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    {totalTokens > 0 && (
+                                        <>
+                                            <span className="font-medium text-foreground/60 shrink-0">Token Usage</span>
+                                            <span className="shrink-0">·</span>
+                                            {lastMessageTokens !== null && (
+                                                <ShadTooltip>
+                                                    <ShadTooltipTrigger asChild>
+                                                        <span data-testid="chatFooterLastTokens" className="truncate max-w-[6rem]">Last: <span className="font-medium text-foreground">{lastMessageTokens.toLocaleString()}</span></span>
+                                                    </ShadTooltipTrigger>
+                                                    <ShadTooltipContent side="top">Last message: {lastMessageTokens.toLocaleString()} tokens</ShadTooltipContent>
+                                                </ShadTooltip>
+                                            )}
+                                            <ShadTooltip>
+                                                <ShadTooltipTrigger asChild>
+                                                    <span data-testid="chatFooterTotalTokens" className="truncate max-w-[6rem]">Total: <span className="font-medium text-foreground">{totalTokens.toLocaleString()}</span></span>
+                                                </ShadTooltipTrigger>
+                                                <ShadTooltipContent side="top">Session total: {totalTokens.toLocaleString()} tokens</ShadTooltipContent>
+                                            </ShadTooltip>
+                                        </>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0 min-w-0 max-w-[50%]">
+                                    {model && (
+                                        <>
+                                            <span className="font-medium text-foreground/70 shrink-0">{providerLabel}</span>
+                                            <span className="shrink-0">·</span>
+                                            <ShadTooltip>
+                                                <ShadTooltipTrigger asChild>
+                                                    <span data-testid="chatFooterModel" className="truncate">{model}</span>
+                                                </ShadTooltipTrigger>
+                                                <ShadTooltipContent side="top">{model}</ShadTooltipContent>
+                                            </ShadTooltip>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })()
+                }
                 <form data-testid="chatForm" className="flex gap-2 items-center border border-border rounded-lg w-full p-2" onSubmit={handleSubmit}>
                     <ShadTooltip>
                         <ShadTooltipTrigger asChild>

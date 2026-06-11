@@ -723,4 +723,62 @@ test.describe('@browser Browser Settings tests', () => {
         }
     });
 
+    // ===== Local LLM Immediate Persistence =====
+
+    test('@readwrite Verify local LLM model source persists immediately without Save', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.selectLocalLlmModelSource();
+        expect(await settingsBrowserPage.isLocalLlmModelSourceSelected()).toBe(true);
+
+        // Reload WITHOUT clicking Save — encrypted save is async so give it a moment
+        await settingsBrowserPage.waitForTimeout(1000);
+        await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.waitForTimeout(500);
+        await settingsBrowserPage.expandChatSection();
+
+        expect(await settingsBrowserPage.isLocalLlmModelSourceSelected()).toBe(true);
+    });
+
+    test('@readwrite Verify local LLM provider change persists immediately without Save', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.selectLocalLlmModelSource();
+        await settingsBrowserPage.selectLmStudioProvider();
+        expect(await settingsBrowserPage.isLmStudioProviderSelected()).toBe(true);
+        expect(await settingsBrowserPage.getLocalLlmEndpointValue()).toBe('http://localhost:1234/v1');
+
+        // Reload WITHOUT clicking Save
+        await settingsBrowserPage.waitForTimeout(1000);
+        await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.waitForTimeout(500);
+        await settingsBrowserPage.expandChatSection();
+
+        // LM Studio provider and its default endpoint should persist without Save
+        expect(await settingsBrowserPage.isLocalLlmModelSourceSelected()).toBe(true);
+        expect(await settingsBrowserPage.isLmStudioProviderSelected()).toBe(true);
+        expect(await settingsBrowserPage.getLocalLlmEndpointValue()).toBe('http://localhost:1234/v1');
+    });
+
+    test('@readwrite Verify local LLM endpoint change persists immediately without Save', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.selectLocalLlmModelSource();
+
+        const customEndpoint = 'http://localhost:8888/v1';
+        await settingsBrowserPage.fillLocalLlmEndpoint(customEndpoint);
+
+        // Reload WITHOUT clicking Save
+        await settingsBrowserPage.waitForTimeout(1000);
+        await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.waitForTimeout(500);
+        await settingsBrowserPage.expandChatSection();
+
+        // Custom endpoint should persist without Save
+        expect(await settingsBrowserPage.getLocalLlmEndpointValue()).toBe(customEndpoint);
+    });
+
 });

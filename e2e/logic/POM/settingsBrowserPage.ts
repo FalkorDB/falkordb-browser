@@ -201,6 +201,17 @@ export default class SettingsBrowserPage extends BasePage {
     );
   }
 
+  async fillLocalLlmEndpoint(endpoint: string): Promise<void> {
+    await interactWhenVisible(
+      this.localLlmEndpointInput,
+      async (el) => {
+        await el.clear();
+        await el.fill(endpoint);
+      },
+      "Local LLM Endpoint Input"
+    );
+  }
+
   async getLocalLlmLoadButtonText(): Promise<string> {
     const text = await this.localLlmLoadButton.textContent();
     return text?.trim() ?? "";

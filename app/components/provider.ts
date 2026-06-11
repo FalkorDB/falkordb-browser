@@ -57,18 +57,6 @@ type BrowserSettingsContextType = {
     chatSettings: {
       newSecretKey: string;
       setNewSecretKey: Dispatch<SetStateAction<string>>;
-      newChatApiKeys: ChatApiKey[];
-      setNewChatApiKeys: Dispatch<SetStateAction<ChatApiKey[]>>;
-      newSelectedChatApiKeyId: string;
-      setNewSelectedChatApiKeyId: Dispatch<SetStateAction<string>>;
-      newChatModelSource: ChatModelSource;
-      setNewChatModelSource: Dispatch<SetStateAction<ChatModelSource>>;
-      newLocalLlmProvider: LocalLlmProvider;
-      setNewLocalLlmProvider: Dispatch<SetStateAction<LocalLlmProvider>>;
-      newLocalLlmEndpoint: string;
-      setNewLocalLlmEndpoint: Dispatch<SetStateAction<string>>;
-      newModel: string;
-      setNewModel: Dispatch<SetStateAction<string>>;
       newMaxSavedMessages: number;
       setNewMaxSavedMessages: Dispatch<SetStateAction<number>>;
       newCypherOnly: boolean;
@@ -139,6 +127,7 @@ type BrowserSettingsContextType = {
       setMaxSavedMessages: Dispatch<SetStateAction<number>>;
       cypherOnly: boolean;
       setCypherOnly: Dispatch<SetStateAction<boolean>>;
+      perSourceModels: Record<string, string>;
     };
     graphInfo: {
       showMemoryUsage: boolean;
@@ -153,6 +142,10 @@ type BrowserSettingsContextType = {
   saveSettings: () => void;
   saveChatApiKeys: (keys: ChatApiKey[], selectedId: string) => Promise<boolean>;
   selectChatApiKey: (keys: ChatApiKey[], selectedId: string) => Promise<void>;
+  selectChatModelSource: (source: ChatModelSource) => Promise<void>;
+  selectChatModel: (modelName: string, sourceKey: string) => Promise<void>;
+  selectLocalLlmProvider: (provider: LocalLlmProvider) => Promise<void>;
+  selectLocalLlmEndpoint: (endpoint: string) => Promise<void>;
   resetSettings: () => void;
   replayTutorial: () => void;
   tutorialOpen: boolean;
@@ -298,18 +291,6 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
       chatSettings: {
         newSecretKey: "",
         setNewSecretKey: () => { },
-        newChatApiKeys: [],
-        setNewChatApiKeys: () => { },
-        newSelectedChatApiKeyId: "",
-        setNewSelectedChatApiKeyId: () => { },
-        newChatModelSource: "api-key",
-        setNewChatModelSource: () => { },
-        newLocalLlmProvider: "ollama",
-        setNewLocalLlmProvider: () => { },
-        newLocalLlmEndpoint: "http://localhost:11434",
-        setNewLocalLlmEndpoint: () => { },
-        newModel: "",
-        setNewModel: () => { },
         newMaxSavedMessages: 0,
         setNewMaxSavedMessages: () => { },
         newCypherOnly: false,
@@ -374,6 +355,7 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         setMaxSavedMessages: () => { },
         cypherOnly: false,
         setCypherOnly: () => { },
+        perSourceModels: {},
       },
       graphInfo: {
         showMemoryUsage: false,
@@ -388,6 +370,10 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
     saveSettings: () => { },
     saveChatApiKeys: async () => false,
     selectChatApiKey: async () => { },
+    selectChatModelSource: async () => { },
+    selectChatModel: async () => { },
+    selectLocalLlmProvider: async () => { },
+    selectLocalLlmEndpoint: async () => { },
     resetSettings: () => { },
     replayTutorial: () => { },
     tutorialOpen: false,
