@@ -14,7 +14,7 @@ import { PanelImperativeHandle } from "react-resizable-panels";
 import type { Data as CanvasData, HierarchyDirection, LayoutMode, RadialDirection, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphInfo } from "./api/graph/model";
-import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, SyntaxErrorContext, SessionConnection, type ChatApiKey } from "./components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, SyntaxErrorContext, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
 
@@ -56,11 +56,29 @@ const normalizeDirection = (layout: LayoutMode, value: string | null | undefined
 
 const CHAT_API_KEYS_STORAGE_KEY = "chatApiKeys";
 const SELECTED_CHAT_API_KEY_ID_STORAGE_KEY = "selectedChatApiKeyId";
+const CHAT_MODEL_SOURCE_STORAGE_KEY = "chatModelSource";
+const LOCAL_LLM_PROVIDER_STORAGE_KEY = "localLlmProvider";
+const LOCAL_LLM_ENDPOINT_STORAGE_KEY = "localLlmEndpoint";
+const DEFAULT_LOCAL_LLM_ENDPOINTS: Record<LocalLlmProvider, string> = {
+  ollama: "http://localhost:11434",
+  lmstudio: "http://localhost:1234/v1",
+};
 
 const getSelectedChatApiKey = (
   keys: ChatApiKey[],
   selectedId: string
 ): ChatApiKey | undefined => keys.find(({ id }) => id === selectedId) ?? keys[0];
+
+const normalizeChatModelSource = (value: string | null | undefined): ChatModelSource =>
+  value === "local" ? "local" : "api-key";
+
+const normalizeLocalLlmProvider = (value: string | null | undefined): LocalLlmProvider =>
+  value === "lmstudio" ? "lmstudio" : "ollama";
+
+const normalizeLocalLlmEndpoint = (
+  provider: LocalLlmProvider,
+  endpoint: string | null | undefined
+) => endpoint?.trim() || DEFAULT_LOCAL_LLM_ENDPOINTS[provider];
 
 const createChatApiKey = (key: string): ChatApiKey => {
   const provider = detectProviderFromApiKey(key);
@@ -214,6 +232,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [newChatApiKeys, setNewChatApiKeys] = useState<ChatApiKey[]>([]);
   const [selectedChatApiKeyId, setSelectedChatApiKeyId] = useState("");
   const [newSelectedChatApiKeyId, setNewSelectedChatApiKeyId] = useState("");
+  const [chatModelSource, setChatModelSource] = useState<ChatModelSource>("api-key");
+  const [newChatModelSource, setNewChatModelSource] = useState<ChatModelSource>("api-key");
+  const [localLlmProvider, setLocalLlmProvider] = useState<LocalLlmProvider>("ollama");
+  const [newLocalLlmProvider, setNewLocalLlmProvider] = useState<LocalLlmProvider>("ollama");
+  const [localLlmEndpoint, setLocalLlmEndpoint] = useState(DEFAULT_LOCAL_LLM_ENDPOINTS.ollama);
+  const [newLocalLlmEndpoint, setNewLocalLlmEndpoint] = useState(DEFAULT_LOCAL_LLM_ENDPOINTS.ollama);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0);
   const [isQueryLoading, setIsQueryLoading] = useState(false);
@@ -274,7 +298,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       contentPersistenceSettings: { newContentPersistence, setNewContentPersistence },
       captionsKeysSettings: { newCaptionsKeys, setNewCaptionsKeys },
       showPropertyKeyPrefixSettings: { newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
-      chatSettings: { newSecretKey, setNewSecretKey, newChatApiKeys, setNewChatApiKeys, newSelectedChatApiKeyId, setNewSelectedChatApiKeyId, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly },
+      chatSettings: { newSecretKey, setNewSecretKey, newChatApiKeys, setNewChatApiKeys, newSelectedChatApiKeyId, setNewSelectedChatApiKeyId, newChatModelSource, setNewChatModelSource, newLocalLlmProvider, setNewLocalLlmProvider, newLocalLlmEndpoint, setNewLocalLlmEndpoint, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly },
       graphInfo: { newRefreshInterval, setNewRefreshInterval, newMaxItemsForSearch, setNewMaxItemsForSearch },
       tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple }
     },
@@ -286,7 +310,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       contentPersistenceSettings: { contentPersistence, setContentPersistence },
       captionsKeysSettings: { captionsKeys, setCaptionsKeys },
       showPropertyKeyPrefixSettings: { showPropertyKeyPrefix, setShowPropertyKeyPrefix },
-      chatSettings: { secretKey, setSecretKey, chatApiKeys, setChatApiKeys, selectedChatApiKeyId, setSelectedChatApiKeyId, model, setModel, maxSavedMessages, setMaxSavedMessages, cypherOnly, setCypherOnly },
+      chatSettings: { secretKey, setSecretKey, chatApiKeys, setChatApiKeys, selectedChatApiKeyId, setSelectedChatApiKeyId, chatModelSource, setChatModelSource, localLlmProvider, setLocalLlmProvider, localLlmEndpoint, setLocalLlmEndpoint, model, setModel, maxSavedMessages, setMaxSavedMessages, cypherOnly, setCypherOnly },
       graphInfo: { showMemoryUsage, refreshInterval, setRefreshInterval, maxItemsForSearch, setMaxItemsForSearch },
       tableViewSettings: { columnWidth, setColumnWidth, rowHeight, setRowHeight, rowHeightExpandMultiple, setRowHeightExpandMultiple }
     },
@@ -385,6 +409,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       localStorage.setItem("rowHeight", newRowHeight.toString());
       localStorage.setItem("rowHeightExpandMultiple", newRowHeightExpandMultiple.toString());
       localStorage.setItem("maxItemsForSearch", newMaxItemsForSearch.toString());
+      localStorage.setItem(CHAT_MODEL_SOURCE_STORAGE_KEY, newChatModelSource);
+      localStorage.setItem(LOCAL_LLM_PROVIDER_STORAGE_KEY, newLocalLlmProvider);
+      localStorage.setItem(LOCAL_LLM_ENDPOINT_STORAGE_KEY, normalizeLocalLlmEndpoint(newLocalLlmProvider, newLocalLlmEndpoint));
 
       const selectedApiKey = getSelectedChatApiKey(newChatApiKeys, newSelectedChatApiKeyId);
       const nextSelectedId = selectedApiKey?.id ?? "";
@@ -448,6 +475,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setSelectedChatApiKeyId(nextSelectedId);
       setNewSelectedChatApiKeyId(nextSelectedId);
       setSecretKey(selectedApiKey?.key ?? "");
+      setChatModelSource(newChatModelSource);
+      setLocalLlmProvider(newLocalLlmProvider);
+      setLocalLlmEndpoint(normalizeLocalLlmEndpoint(newLocalLlmProvider, newLocalLlmEndpoint));
       setModel(newModel);
       setRefreshInterval(newRefreshInterval);
       setMaxSavedMessages(newMaxSavedMessages);
@@ -476,6 +506,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setNewSecretKey(secretKey);
       setNewChatApiKeys(chatApiKeys);
       setNewSelectedChatApiKeyId(selectedChatApiKeyId);
+      setNewChatModelSource(chatModelSource);
+      setNewLocalLlmProvider(localLlmProvider);
+      setNewLocalLlmEndpoint(localLlmEndpoint);
       setNewModel(model);
       setNewRefreshInterval(refreshInterval);
       setNewMaxSavedMessages(maxSavedMessages);
@@ -489,7 +522,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setHasChanges(false);
     }
 
-  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newChatApiKeys, newSelectedChatApiKeyId, newTimeout, refreshInterval, runDefaultQuery, secretKey, chatApiKeys, selectedChatApiKeyId, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, toast]);
+  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newChatApiKeys, newSelectedChatApiKeyId, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, newTimeout, refreshInterval, runDefaultQuery, secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, toast]);
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -1009,6 +1042,18 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setRowHeightExpandMultiple(parseInt(localStorage.getItem("rowHeightExpandMultiple") || "3", 10));
       const parsedMaxItems = parseInt(localStorage.getItem("maxItemsForSearch") || "20", 10);
       setMaxItemsForSearch(Number.isFinite(parsedMaxItems) ? Math.min(Math.max(parsedMaxItems, 10), 50) : 20);
+      const loadedChatModelSource = normalizeChatModelSource(localStorage.getItem(CHAT_MODEL_SOURCE_STORAGE_KEY));
+      const loadedLocalLlmProvider = normalizeLocalLlmProvider(localStorage.getItem(LOCAL_LLM_PROVIDER_STORAGE_KEY));
+      const loadedLocalLlmEndpoint = normalizeLocalLlmEndpoint(
+        loadedLocalLlmProvider,
+        localStorage.getItem(LOCAL_LLM_ENDPOINT_STORAGE_KEY)
+      );
+      setChatModelSource(loadedChatModelSource);
+      setNewChatModelSource(loadedChatModelSource);
+      setLocalLlmProvider(loadedLocalLlmProvider);
+      setNewLocalLlmProvider(loadedLocalLlmProvider);
+      setLocalLlmEndpoint(loadedLocalLlmEndpoint);
+      setNewLocalLlmEndpoint(loadedLocalLlmEndpoint);
       let loadedChatApiKeys: ChatApiKey[] = [];
       const storedChatApiKeys = localStorage.getItem(CHAT_API_KEYS_STORAGE_KEY) || "";
       if (storedChatApiKeys) {
