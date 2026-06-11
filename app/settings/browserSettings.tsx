@@ -583,6 +583,8 @@ export default function BrowserSettings() {
                                                     <button
                                                         key={value}
                                                         type="button"
+                                                        data-testid={`chatModelSource${value === "api-key" ? "ApiKey" : "Local"}`}
+                                                        aria-pressed={isSelected}
                                                         className={cn(
                                                             "rounded-xl border p-3 text-left transition-all",
                                                             isSelected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border/70 bg-background/80 hover:border-primary/40"
@@ -614,6 +616,7 @@ export default function BrowserSettings() {
                                                         <TooltipTrigger asChild>
                                                             <button
                                                                 type="button"
+                                                                data-testid="chatApiKeyProvidersInfo"
                                                                 className="inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                                                                 aria-label="Supported API key providers"
                                                             >
@@ -639,6 +642,7 @@ export default function BrowserSettings() {
                                                         type="button"
                                                         variant="Primary"
                                                         className="shrink-0"
+                                                        data-testid="addChatApiKeyButton"
                                                         onClick={handleSaveKey}
                                                         label="Add"
                                                     >
@@ -670,6 +674,7 @@ export default function BrowserSettings() {
                                                     return (
                                                         <div
                                                             key={apiKey.id}
+                                                            data-testid="chatApiKeyCard"
                                                             role="button"
                                                             tabIndex={0}
                                                             aria-pressed={isSelected}
@@ -697,7 +702,7 @@ export default function BrowserSettings() {
                                                                     <span className="block w-full text-left">
                                                                         <span className="block text-sm font-semibold">{providerName}</span>
                                                                         {!isEditing && (
-                                                                            <span className="block truncate font-mono text-xs text-muted-foreground">
+                                                                            <span data-testid="chatApiKeyValue" className="block truncate font-mono text-xs text-muted-foreground">
                                                                                 {isVisible ? apiKey.key : maskKey(apiKey.key)}
                                                                             </span>
                                                                         )}
@@ -709,6 +714,7 @@ export default function BrowserSettings() {
                                                                             onKeyDown={(event) => event.stopPropagation()}
                                                                         >
                                                                             <Input
+                                                                                data-testid="chatApiKeyEditInput"
                                                                                 className="flex-1 font-mono text-xs"
                                                                                 type={isVisible ? "text" : "password"}
                                                                                 value={editingKeyValue}
@@ -716,6 +722,7 @@ export default function BrowserSettings() {
                                                                             />
                                                                             <button
                                                                                 type="button"
+                                                                                data-testid="saveEditedChatApiKeyButton"
                                                                                 className="rounded-md border border-primary bg-primary px-2 py-1 text-xs font-medium text-background transition-colors hover:bg-primary/90"
                                                                                 onClick={(event) => {
                                                                                     event.stopPropagation();
@@ -726,6 +733,7 @@ export default function BrowserSettings() {
                                                                             </button>
                                                                             <button
                                                                                 type="button"
+                                                                                data-testid="cancelEditChatApiKeyButton"
                                                                                 className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                                                                 onClick={(event) => {
                                                                                     event.stopPropagation();
@@ -741,6 +749,7 @@ export default function BrowserSettings() {
                                                             <div className="mt-3 flex gap-2 pl-11">
                                                                 <button
                                                                     type="button"
+                                                                    data-testid="toggleChatApiKeyVisibilityButton"
                                                                     className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                                                     onClick={(event) => {
                                                                         event.stopPropagation();
@@ -752,6 +761,7 @@ export default function BrowserSettings() {
                                                                 </button>
                                                                 <button
                                                                     type="button"
+                                                                    data-testid="editChatApiKeyButton"
                                                                     className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                                                     onClick={(event) => {
                                                                         event.stopPropagation();
@@ -767,6 +777,7 @@ export default function BrowserSettings() {
                                                                 </button>
                                                                 <button
                                                                     type="button"
+                                                                    data-testid="deleteChatApiKeyButton"
                                                                     className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive transition-colors hover:bg-destructive/10"
                                                                     onClick={(event) => {
                                                                         event.stopPropagation();
@@ -792,6 +803,8 @@ export default function BrowserSettings() {
                                                                 <button
                                                                     key={provider}
                                                                     type="button"
+                                                                    data-testid={`localLlmProvider${provider === "ollama" ? "Ollama" : "LmStudio"}`}
+                                                                    aria-pressed={isSelected}
                                                                     className={cn(
                                                                         "rounded-lg border p-3 text-left transition-all",
                                                                         isSelected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border/70 hover:border-primary/40"
@@ -815,6 +828,7 @@ export default function BrowserSettings() {
                                                     <div className="mt-2 flex gap-2">
                                                         <Input
                                                             id="localLlmEndpoint"
+                                                            data-testid="localLlmEndpointInput"
                                                             className="flex-1 font-mono text-xs"
                                                             value={newLocalLlmEndpoint}
                                                             placeholder={LOCAL_LLM_ENDPOINTS[newLocalLlmProvider]}
@@ -823,6 +837,7 @@ export default function BrowserSettings() {
                                                         <Button
                                                             type="button"
                                                             variant="Primary"
+                                                            data-testid="localLlmLoadButton"
                                                             className="h-10 w-10 shrink-0 justify-center p-0"
                                                             onClick={reloadLocalModels}
                                                             title="Load"
