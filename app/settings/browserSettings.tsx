@@ -69,6 +69,7 @@ export default function BrowserSettings() {
     const [isResetting, setIsResetting] = useState(false);
     const [modelDisplayNames, setModelDisplayNames] = useState<string[]>([]);
     const [isLoadingModels, setIsLoadingModels] = useState(false);
+    const [isManualLocalModelLoad, setIsManualLocalModelLoad] = useState(false);
     const [modelsMessage, setModelsMessage] = useState("Enter an API key to load live models.");
     const [keyInput, setKeyInput] = useState("");
     const [editingKeyId, setEditingKeyId] = useState<string | null>(null);
@@ -176,6 +177,7 @@ export default function BrowserSettings() {
             } finally {
                 if (requestId === modelFetchRequestIdRef.current) {
                     setIsLoadingModels(false);
+                    setIsManualLocalModelLoad(false);
                     setLoadingChatApiKeyId("");
                     modelFetchAbortRef.current = null;
                 }
@@ -352,10 +354,12 @@ export default function BrowserSettings() {
         setNewLocalLlmEndpoint(endpoint);
         setModelDisplayNames([]);
         setNewModel("");
+        setIsManualLocalModelLoad(false);
         setModelsMessage("Update the endpoint to reload local models.");
     };
 
     const reloadLocalModels = () => {
+        setIsManualLocalModelLoad(true);
         setModelLoadNonce(nonce => nonce + 1);
     };
 
@@ -803,11 +807,12 @@ export default function BrowserSettings() {
                                                         <Button
                                                             type="button"
                                                             variant="Primary"
-                                                            className="shrink-0"
+                                                            className="h-10 w-10 shrink-0 justify-center p-0"
                                                             onClick={reloadLocalModels}
-                                                            label="Load"
+                                                            title="Load"
+                                                            isLoading={isManualLocalModelLoad && isLoadingModels}
                                                         >
-                                                            <Loader2 className={cn("h-4 w-4", isLoadingModels && "animate-spin")} />
+                                                            <RotateCcw className="h-4 w-4" />
                                                         </Button>
                                                     </div>
                                                     <p className="mt-2 text-xs text-muted-foreground">
