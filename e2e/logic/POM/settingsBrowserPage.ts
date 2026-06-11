@@ -303,7 +303,7 @@ export default class SettingsBrowserPage extends BasePage {
       "Edit Chat API Key Button"
     );
 
-    const editInput = card.getByTestId("chatApiKeyEditInput");
+    const editInput = this.page.getByTestId("chatApiKeyEditInput");
     await interactWhenVisible(
       editInput,
       async (el) => {
@@ -314,7 +314,7 @@ export default class SettingsBrowserPage extends BasePage {
     );
 
     await interactWhenVisible(
-      card.getByTestId("saveEditedChatApiKeyButton"),
+      this.page.getByTestId("saveEditedChatApiKeyButton"),
       (el) => el.click(),
       "Save Edited Chat API Key Button"
     );
