@@ -1030,7 +1030,48 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         console.error("Failed to parse captions keys from localStorage", error);
         setCaptionsKeys([['name', false], ['title', false]]);
       }
-      setTimeout(parseInt(localStorage.getItem("timeout") || "60", 10));
+      const storedTimeout = localStorage.getItem("timeout");
+      let timeoutVal: number;
+      if (storedTimeout) {
+        const parsedStoredTimeout = parseInt(storedTimeout, 10);
+        timeoutVal = Number.isFinite(parsedStoredTimeout) && parsedStoredTimeout >= 0
+          ? parsedStoredTimeout
+          : 60;
+      } else {
+        // No user-set value: cap the default (60) with TIMEOUT_MAX from server config
+        let fallback = 60;
+        try {
+          const configRes = await fetch("/api/graph/config", { method: "GET" });
+          if (configRes.ok) {
+            const { configs } = await configRes.json();
+            const typedConfigs: [string, string | number][] = Array.isArray(configs)
+              ? configs.filter((entry: unknown): entry is [string, string | number] => {
+                return (
+                  Array.isArray(entry)
+                  && entry.length >= 2
+                  && typeof entry[0] === "string"
+                  && (typeof entry[1] === "string" || typeof entry[1] === "number")
+                );
+              })
+              : [];
+            const timeoutMaxEntry = typedConfigs.find((c) => c[0] === "TIMEOUT_MAX");
+            if (timeoutMaxEntry) {
+              const timeoutMaxMs = Number(timeoutMaxEntry[1]);
+              if (timeoutMaxMs > 0) {
+                const timeoutMaxSeconds = Math.floor(timeoutMaxMs / 1000);
+                if (fallback > timeoutMaxSeconds) {
+                  fallback = timeoutMaxSeconds;
+                }
+              }
+            }
+          }
+        } catch (error) {
+          // If config fetch fails, use the default as-is
+          console.warn("Failed to fetch /api/graph/config for timeout initialization", error);
+        }
+        timeoutVal = fallback;
+      }
+      setTimeout(timeoutVal);
       const l = parseInt(localStorage.getItem("limit") || "300", 10);
       setLimit(l);
       setLastLimit(l);
