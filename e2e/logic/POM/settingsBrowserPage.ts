@@ -483,6 +483,14 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   async searchModels(searchText: string): Promise<void> {
+    await this.modelSearchInput.waitFor({ state: "visible", timeout: 10000 });
+    await this.page.waitForFunction(
+      () => {
+        const input = document.querySelector('[data-testid="modelSearch"]') as HTMLInputElement;
+        return input && !input.disabled;
+      },
+      { timeout: 30000 }
+    );
     await interactWhenVisible(
       this.modelSearchInput,
       (el) => el.fill(searchText),
