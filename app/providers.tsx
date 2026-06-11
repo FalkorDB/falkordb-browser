@@ -812,7 +812,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       let timeoutVal: number;
       if (storedTimeout) {
         const parsedStoredTimeout = parseInt(storedTimeout, 10);
-        timeoutVal = Number.isFinite(parsedStoredTimeout) && parsedStoredTimeout > 0
+        timeoutVal = Number.isFinite(parsedStoredTimeout) && parsedStoredTimeout >= 0
           ? parsedStoredTimeout
           : 60;
       } else {
