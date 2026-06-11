@@ -1,11 +1,20 @@
 import { createContext, Dispatch, SetStateAction } from "react";
+import type { AIProvider } from "@/lib/ai-provider-utils";
 import { ConnectionInfo, ConnectionType, GraphData, GraphRef, HistoryQuery, Label, Panel, Relationship, SyntaxErrorInfo, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
 import type { Data as CanvasData, LayoutMode, ViewportState } from "@falkordb/canvas";
 import type { SessionConnection } from "next-auth";
 import { Graph, GraphInfo } from "../api/graph/model";
-import type { AIProvider } from "@/lib/ai-provider-utils";
 
-export type ProviderKeys = Partial<Record<AIProvider, string>>;
+export type ChatApiKey = {
+  id: string;
+  label: string;
+  key: string;
+  provider: AIProvider;
+  createdAt: number;
+};
+
+export type ChatModelSource = "api-key" | "local";
+export type LocalLlmProvider = "ollama" | "lmstudio";
 
 type BrowserSettingsContextType = {
   newSettings: {
@@ -46,8 +55,18 @@ type BrowserSettingsContextType = {
       setNewShowPropertyKeyPrefix: Dispatch<SetStateAction<boolean>>;
     };
     chatSettings: {
-      newProviderKeys: ProviderKeys;
-      setNewProviderKeys: Dispatch<SetStateAction<ProviderKeys>>;
+      newSecretKey: string;
+      setNewSecretKey: Dispatch<SetStateAction<string>>;
+      newChatApiKeys: ChatApiKey[];
+      setNewChatApiKeys: Dispatch<SetStateAction<ChatApiKey[]>>;
+      newSelectedChatApiKeyId: string;
+      setNewSelectedChatApiKeyId: Dispatch<SetStateAction<string>>;
+      newChatModelSource: ChatModelSource;
+      setNewChatModelSource: Dispatch<SetStateAction<ChatModelSource>>;
+      newLocalLlmProvider: LocalLlmProvider;
+      setNewLocalLlmProvider: Dispatch<SetStateAction<LocalLlmProvider>>;
+      newLocalLlmEndpoint: string;
+      setNewLocalLlmEndpoint: Dispatch<SetStateAction<string>>;
       newModel: string;
       setNewModel: Dispatch<SetStateAction<string>>;
       newMaxSavedMessages: number;
@@ -102,8 +121,18 @@ type BrowserSettingsContextType = {
       setRowHeightExpandMultiple: Dispatch<SetStateAction<number>>;
     };
     chatSettings: {
-      providerKeys: ProviderKeys;
-      setProviderKeys: Dispatch<SetStateAction<ProviderKeys>>;
+      secretKey: string;
+      setSecretKey: Dispatch<SetStateAction<string>>;
+      chatApiKeys: ChatApiKey[];
+      setChatApiKeys: Dispatch<SetStateAction<ChatApiKey[]>>;
+      selectedChatApiKeyId: string;
+      setSelectedChatApiKeyId: Dispatch<SetStateAction<string>>;
+      chatModelSource: ChatModelSource;
+      setChatModelSource: Dispatch<SetStateAction<ChatModelSource>>;
+      localLlmProvider: LocalLlmProvider;
+      setLocalLlmProvider: Dispatch<SetStateAction<LocalLlmProvider>>;
+      localLlmEndpoint: string;
+      setLocalLlmEndpoint: Dispatch<SetStateAction<string>>;
       model: string;
       setModel: Dispatch<SetStateAction<string>>;
       maxSavedMessages: number;
@@ -122,6 +151,8 @@ type BrowserSettingsContextType = {
   hasChanges: boolean;
   setHasChanges: Dispatch<SetStateAction<boolean>>;
   saveSettings: () => void;
+  saveChatApiKeys: (keys: ChatApiKey[], selectedId: string) => Promise<boolean>;
+  selectChatApiKey: (keys: ChatApiKey[], selectedId: string) => Promise<void>;
   resetSettings: () => void;
   replayTutorial: () => void;
   tutorialOpen: boolean;
@@ -265,8 +296,18 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         setNewShowPropertyKeyPrefix: () => { },
       },
       chatSettings: {
-        newProviderKeys: {},
-        setNewProviderKeys: () => { },
+        newSecretKey: "",
+        setNewSecretKey: () => { },
+        newChatApiKeys: [],
+        setNewChatApiKeys: () => { },
+        newSelectedChatApiKeyId: "",
+        setNewSelectedChatApiKeyId: () => { },
+        newChatModelSource: "api-key",
+        setNewChatModelSource: () => { },
+        newLocalLlmProvider: "ollama",
+        setNewLocalLlmProvider: () => { },
+        newLocalLlmEndpoint: "http://localhost:11434",
+        setNewLocalLlmEndpoint: () => { },
         newModel: "",
         setNewModel: () => { },
         newMaxSavedMessages: 0,
@@ -315,8 +356,18 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         setShowPropertyKeyPrefix: () => { },
       },
       chatSettings: {
-        providerKeys: {},
-        setProviderKeys: () => { },
+        secretKey: "",
+        setSecretKey: () => { },
+        chatApiKeys: [],
+        setChatApiKeys: () => { },
+        selectedChatApiKeyId: "",
+        setSelectedChatApiKeyId: () => { },
+        chatModelSource: "api-key",
+        setChatModelSource: () => { },
+        localLlmProvider: "ollama",
+        setLocalLlmProvider: () => { },
+        localLlmEndpoint: "http://localhost:11434",
+        setLocalLlmEndpoint: () => { },
         model: "",
         setModel: () => { },
         maxSavedMessages: 0,
@@ -335,6 +386,8 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
     hasChanges: false,
     setHasChanges: () => { },
     saveSettings: () => { },
+    saveChatApiKeys: async () => false,
+    selectChatApiKey: async () => { },
     resetSettings: () => { },
     replayTutorial: () => { },
     tutorialOpen: false,

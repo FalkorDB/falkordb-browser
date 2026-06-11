@@ -9,6 +9,44 @@ export async function OPTIONS(request: NextRequest) {
     return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
 
+type LocalProvider = "ollama" | "lmstudio";
+
+const LOCAL_PROVIDER_DEFAULT_ENDPOINTS: Record<LocalProvider, string> = {
+    ollama: "http://localhost:11434",
+    lmstudio: "http://localhost:1234/v1",
+};
+
+const normalizeLocalEndpoint = (provider: LocalProvider, endpoint?: string) => {
+    const rawEndpoint = endpoint?.trim() || LOCAL_PROVIDER_DEFAULT_ENDPOINTS[provider];
+    const url = new URL(rawEndpoint);
+    const hostname = url.hostname.toLowerCase();
+    const isLoopback = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+
+    if (url.protocol !== "http:" || !isLoopback) {
+        throw new Error("Local LLM endpoint must be an http:// localhost or 127.0.0.1 URL.");
+    }
+
+    const allowedPorts = provider === "ollama" ? new Set(["", "11434"]) : new Set(["", "1234"]);
+    if (!allowedPorts.has(url.port)) {
+        throw new Error(`Invalid ${provider === "ollama" ? "Ollama" : "LM Studio"} endpoint port.`);
+    }
+
+    if (provider === "ollama") {
+        if (url.pathname !== "/" && url.pathname !== "") {
+            throw new Error("Ollama endpoint path must be root (/).");
+        }
+        url.pathname = "/";
+    } else if (url.pathname === "/" || url.pathname === "") {
+        url.pathname = "/v1";
+    } else if (url.pathname !== "/v1") {
+        throw new Error("LM Studio endpoint path must be /v1.");
+    }
+
+    url.search = "";
+    url.hash = "";
+    return url.toString().replace(/\/$/, "");
+};
+
 /**
  * Create user-friendly error message
  */
@@ -118,13 +156,16 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    const { messages, graphName, key, model, cypherOnly } = validation.data;
+    const { messages, graphName, key, model, cypherOnly, modelSource, localProvider, localEndpoint } = validation.data;
 
     try {
         // Fail fast on model/API key provider mismatch before making any external calls
         const modelProvider = detectProviderFromModel(model);
         const keyProvider = detectProviderFromApiKey(key);
-        if (modelProvider !== "unknown" && keyProvider !== "unknown" && modelProvider !== keyProvider && modelProvider !== "ollama") {
+        if (modelSource === "api-key" && !key) {
+            throw new Error("API key is required for hosted models.");
+        }
+        if (modelSource === "api-key" && modelProvider !== "unknown" && keyProvider !== "unknown" && modelProvider !== keyProvider && modelProvider !== "ollama") {
             const modelProviderName = getProviderDisplayName(modelProvider);
             const keyProviderName = getProviderDisplayName(keyProvider);
             throw new Error(`Model/API key mismatch: You selected a ${modelProviderName} model but provided a ${keyProviderName} API key. Please update your API key in Settings to match your selected model.`);
@@ -132,12 +173,16 @@ export async function POST(request: NextRequest) {
 
         // Build FalkorDB connection URL from user session
         const falkordbConnection = buildFalkorDBConnection(session.user);
+        const llmEndpoint = modelSource === "local"
+            ? normalizeLocalEndpoint(localProvider, localEndpoint)
+            : undefined;
 
         // Create TextToCypher client
         const textToCypher = new TextToCypher({
             falkordbConnection,
             model,
-            apiKey: key,
+            apiKey: modelSource === "local" ? localProvider : key,
+            llmEndpoint,
         });
 
         // Get the last user message
@@ -183,11 +228,11 @@ export async function POST(request: NextRequest) {
         console.error('Text-to-Cypher error details:', error);
 
         const errorMessage = error instanceof Error ? error.message : String(error);
-        const userFriendlyMessage = createUserFriendlyErrorMessage(error as Error, model, key);
+        const userFriendlyMessage = createUserFriendlyErrorMessage(error as Error, model, modelSource === "local" ? localProvider : key);
 
         // Return 400 for known client/state errors, 401 for auth errors, 500 for unexpected failures
         const authErrors = ["401", "invalid_api_key", "Incorrect API key", "Authentication failed", "Unauthorized"];
-        const knownClientErrors = ["GRAPH_NOT_FOUND", "EMPTY_GRAPH", "Model/API key mismatch", "No messages provided", "No user messages found"];
+        const knownClientErrors = ["GRAPH_NOT_FOUND", "EMPTY_GRAPH", "Model/API key mismatch", "No messages provided", "No user messages found", "API key is required", "Local LLM endpoint", "endpoint port", "endpoint path"];
         const status = authErrors.some(e => errorMessage.includes(e))
             ? 401
             : knownClientErrors.some(e => errorMessage.includes(e))
