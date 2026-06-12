@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@falkordb/canvas": "v0.1.0",
-    "@falkordb/text-to-cypher": "^0.1.16",
+    "@falkordb/text-to-cypher": "^0.1.17",
     "@hookform/resolvers": "^5.4.0",
     "@monaco-editor/react": "^4.6.0",
     "@radix-ui/react-alert-dialog": "^1.1.16",
@@ -93,7 +93,7 @@
     "@types/cytoscape-fcose": "^2.2.4",
     "@types/lodash": "^4.17.24",
     "@types/markdown-it": "^14.1.2",
-    "@types/node": "^25.9.2",
+    "@types/node": "^25.9.3",
     "@types/react": "^19.2.17",
     "@types/react-cytoscapejs": "^1.2.5",
     "@types/react-dom": "^19.2.3",
