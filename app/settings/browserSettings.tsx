@@ -1005,6 +1005,7 @@ export default function BrowserSettings() {
                 {/* Graph Info Section */}
                 <Card className="border-border shadow-sm">
                     <CardHeader
+                        data-testid="graphInfoSectionHeader"
                         className="cursor-pointer hover:bg-muted/50 transition-colors p-2"
                         role="button"
                         tabIndex={0}
@@ -1081,6 +1082,7 @@ export default function BrowserSettings() {
                 {/* Query Execution Section */}
                 <Card className="border-border shadow-sm">
                     <CardHeader
+                        data-testid="queryExecutionSectionHeader"
                         className="cursor-pointer hover:bg-muted/50 transition-colors p-2"
                         role="button"
                         tabIndex={0}
@@ -1220,6 +1222,7 @@ export default function BrowserSettings() {
                 {/* User Experience Section */}
                 <Card className="border-border shadow-sm">
                     <CardHeader
+                        data-testid="userExperienceSectionHeader"
                         className="cursor-pointer hover:bg-muted/50 transition-colors p-2"
                         role="button"
                         tabIndex={0}
