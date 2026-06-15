@@ -61,9 +61,12 @@ const getQueryElement = (item: Query) => {
     const elements: ElementItem[] = [];
 
     if (item.status) {
+        const statusTooltip = item.status === "Failed" && item.errorMessage
+            ? `Error: ${item.errorMessage}`
+            : `Status: ${item.status}`;
         elements.push({
             content: getStatusIcon(item.status),
-            tooltip: `Status: ${item.status}`,
+            tooltip: statusTooltip,
             className: "text-center truncate"
         });
     }

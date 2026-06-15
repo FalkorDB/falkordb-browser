@@ -47,6 +47,7 @@ export type Query = {
   elementsCount: number;
   fav: boolean;
   name?: string;
+  errorMessage?: string;
 };
 
 export type Node = {

@@ -1,4 +1,4 @@
-import { cn, getTheme, Message, securedFetch, toUserFriendlyMessage } from "@/lib/utils";
+import { cn, getTheme, Message, getActiveConnectionIdGlobal, toUserFriendlyMessage } from "@/lib/utils";
 import { memo, useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
@@ -255,11 +255,13 @@ export default function Chat({ onClose }: Props) {
         setNewMessage("");
 
         try {
-            const response = await securedFetch("/api/chat", {
+            const chatHeaders = new Headers({ "Content-Type": "application/json" });
+            const connectionId = getActiveConnectionIdGlobal();
+            if (connectionId) chatHeaders.set("X-Connection-Id", connectionId);
+
+            const response = await fetch("/api/chat", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
+                headers: chatHeaders,
                 body: JSON.stringify({
                     messages: newMessages.filter(message => message.role === "user" || message.type === "Result").map(({ role, content }) => ({
                         role,
@@ -273,7 +275,15 @@ export default function Chat({ onClose }: Props) {
                     localProvider: localLlmProvider,
                     localEndpoint: localLlmEndpoint,
                 })
-            }, toast, setIndicator);
+            });
+
+            if (response.status === 401 && response.headers.get("X-Session-Invalid") === "1") {
+                const { signOut } = await import("next-auth/react");
+                signOut({ callbackUrl: "/login" });
+                setIndicator("offline");
+                setIsLoading(false);
+                return;
+            }
 
             let data;
             try {

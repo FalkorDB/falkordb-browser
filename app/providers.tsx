@@ -614,8 +614,22 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       handleCooldown(-1);
     } catch (err) {
       // Errors from getSSEGraphResult are already surfaced via toast
-      const parsed = parseSyntaxError((err as Error).message || "");
+      const errorMessage = (err as Error).message || "";
+      const parsed = parseSyntaxError(errorMessage);
       if (parsed) setSyntaxError(parsed);
+
+      // Save failed query to history with the error message
+      newQuery = { ...newQuery, errorMessage };
+      const failedQueries = handelGetNewQueries(newQuery);
+      if (prefixReady) {
+        setConnectionItem("query history", JSON.stringify(failedQueries));
+      }
+      setHistoryQuery(prev => ({
+        ...prev,
+        queries: failedQueries,
+        currentQuery: newQuery,
+        counter: 0
+      }));
     } finally {
       setIsQueryLoading(false);
     }
