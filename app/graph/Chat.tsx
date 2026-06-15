@@ -299,7 +299,7 @@ export default function Chat({ onClose }: Props) {
             }
 
             if (!response.ok) {
-                if (response.status === 401 || response.status >= 500) setIndicator("offline");
+                if (response.status >= 500) setIndicator("offline");
                 handleSetMessages({
                     role: "assistant",
                     content: data.error || "An error occurred",
