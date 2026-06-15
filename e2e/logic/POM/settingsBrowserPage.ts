@@ -339,6 +339,13 @@ export default class SettingsBrowserPage extends BasePage {
       (el) => el.click(),
       "Delete Chat API Key Button"
     );
+    const dialog = this.page.getByTestId("deleteChatApiKeyDialog");
+    await dialog.waitFor({ state: "visible", timeout: 5000 });
+    await interactWhenVisible(
+      this.page.getByTestId("confirmDeleteChatApiKeyButton"),
+      (el) => el.click(),
+      "Confirm Delete Chat API Key Button"
+    );
     await card.waitFor({ state: "detached", timeout: 5000 });
   }
 
