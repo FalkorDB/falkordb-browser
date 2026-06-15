@@ -14,6 +14,13 @@ const rateLimitStore = new Map<string, RateLimitEntry>();
 // Clean up stale entries every 60 seconds
 const CLEANUP_INTERVAL = 60_000;
 let lastCleanup = Date.now();
+const DEFAULT_CONNECT_SRC = [
+    "'self'",
+    "https://cdn.jsdelivr.net",
+    "https://*.google-analytics.com",
+    "https://*.analytics.google.com",
+    "https://*.googletagmanager.com",
+];
 
 function cleanup(windowMs: number) {
     const now = Date.now();
@@ -92,6 +99,30 @@ function getRateLimitConfig(pathname: string): RateLimitConfig | null {
     return null;
 }
 
+function getExtraConnectSrc(): string[] {
+    const raw = process.env.CSP_CONNECT_SRC;
+    if (!raw) return [];
+
+    return raw
+        .split(",")
+        .map(source => source.trim())
+        .filter(Boolean)
+        .map(source => {
+            try {
+                const url = new URL(source);
+                if (url.protocol !== "https:" && url.protocol !== "http:") {
+                    console.warn(`Ignoring invalid CSP_CONNECT_SRC entry with unsupported protocol: ${source}`);
+                    return null;
+                }
+                return url.origin;
+            } catch {
+                console.warn(`Ignoring invalid CSP_CONNECT_SRC entry: ${source}`);
+                return null;
+            }
+        })
+        .filter((source): source is string => Boolean(source));
+}
+
 export function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
@@ -125,6 +156,7 @@ export function proxy(request: NextRequest) {
     const scriptSrc = isDev
         ? `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval'`
         : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`;
+    const connectSrc = [...new Set([...DEFAULT_CONNECT_SRC, ...getExtraConnectSrc()])].join(" ");
 
     const cspHeader = [
         "default-src 'self'",
@@ -132,7 +164,7 @@ export function proxy(request: NextRequest) {
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
         "img-src 'self' data: blob: https://*.googletagmanager.com",
         "font-src 'self' data: https://cdn.jsdelivr.net",
-        "connect-src 'self' https://cdn.jsdelivr.net https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com",
+        `connect-src ${connectSrc}`,
         "worker-src 'self' blob:",
         "object-src 'none'",
         "base-uri 'self'",
