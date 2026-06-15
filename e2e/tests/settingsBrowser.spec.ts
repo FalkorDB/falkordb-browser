@@ -18,8 +18,6 @@ test.describe('@browser Browser Settings tests', () => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     let geminiModel: string;
     let xaiModel: string;
-    // Whether model listing actually returned results from the AI providers
-    let modelsAvailable = false;
 
     test.beforeAll(async () => {
         // Fetch available models from each provider before running tests
@@ -37,9 +35,6 @@ test.describe('@browser Browser Settings tests', () => {
             anthropicModel = anthropicModels.models?.[0] || 'claude-3-5-sonnet';
             geminiModel = geminiModels.models?.[0] || 'gemini-2.0-flash-exp';
             xaiModel = xaiModels.models?.[0] || 'grok-3-mini';
-
-            // Models are available if at least one provider returned results
-            modelsAvailable = !!(openaiModels.models?.length || anthropicModels.models?.length || geminiModels.models?.length || xaiModels.models?.length);
         } catch (error) {
             // Fallback to default models if API call fails
             console.warn('Failed to fetch models, using defaults:', error);
@@ -68,13 +63,11 @@ test.describe('@browser Browser Settings tests', () => {
         // Wait for models to load
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
-        // Skip if models are not available (e.g., no AI provider API keys in CI)
-        if (!modelsAvailable) {
-            const isVisible = await settingsBrowserPage.isModelVisible(openaiModel);
-            if (!isVisible) {
-                test.skip();
-                return;
-            }
+        // Skip if models are not visible in the UI (models require an API key to be loaded)
+        const isVisible = await settingsBrowserPage.isModelVisible(openaiModel);
+        if (!isVisible) {
+            test.skip();
+            return;
         }
 
         // Select a model - use the first available OpenAI model
@@ -106,13 +99,10 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
-        // Skip if models are not available
-        if (!modelsAvailable) {
-            const isVisible = await settingsBrowserPage.isModelVisible(openaiModel);
-            if (!isVisible) {
-                test.skip();
-                return;
-            }
+        // Skip if models are not visible in the UI (models require an API key to be loaded)
+        if (!(await settingsBrowserPage.isModelVisible(openaiModel))) {
+            test.skip();
+            return;
         }
 
         // Select model and fill API key - use first available OpenAI model
@@ -144,8 +134,8 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
-        // Skip if models are not available
-        if (!modelsAvailable && !(await settingsBrowserPage.isModelVisible(openaiModel))) {
+        // Skip if models are not visible in the UI (models require an API key to be loaded)
+        if (!(await settingsBrowserPage.isModelVisible(openaiModel))) {
             test.skip();
             return;
         }
@@ -169,8 +159,8 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
-        // Skip if models are not available
-        if (!modelsAvailable && !(await settingsBrowserPage.isModelVisible(anthropicModel))) {
+        // Skip if models are not visible in the UI (models require an API key to be loaded)
+        if (!(await settingsBrowserPage.isModelVisible(anthropicModel))) {
             test.skip();
             return;
         }
@@ -282,8 +272,8 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
-        // Skip if models are not available
-        if (!modelsAvailable && !(await settingsBrowserPage.isCategoryVisible("OpenAI"))) {
+        // Skip if models are not visible in the UI (models require an API key to be loaded)
+        if (!(await settingsBrowserPage.isCategoryVisible("OpenAI"))) {
             test.skip();
             return;
         }
@@ -320,8 +310,8 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
-        // Skip if models are not available
-        if (!modelsAvailable && !(await settingsBrowserPage.isModelVisible(openaiModel))) {
+        // Skip if models are not visible in the UI (models require an API key to be loaded)
+        if (!(await settingsBrowserPage.isModelVisible(openaiModel))) {
             test.skip();
             return;
         }
@@ -350,8 +340,8 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
-        // Skip if models are not available
-        if (!modelsAvailable && !(await settingsBrowserPage.isModelVisible(openaiModel))) {
+        // Skip if models are not visible in the UI (models require an API key to be loaded)
+        if (!(await settingsBrowserPage.isModelVisible(openaiModel))) {
             test.skip();
             return;
         }
@@ -386,8 +376,8 @@ test.describe('@browser Browser Settings tests', () => {
             await settingsBrowserPage.expandChatSection();
             await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
-            // Skip if models are not available
-            if (!modelsAvailable && !(await settingsBrowserPage.isModelVisible(anthropicModel))) {
+            // Skip if models are not visible in the UI (models require an API key to be loaded)
+            if (!(await settingsBrowserPage.isModelVisible(anthropicModel))) {
                 test.skip();
                 return;
             }
@@ -725,15 +715,16 @@ test.describe('@browser Browser Settings tests', () => {
 
     // ===== Local LLM Immediate Persistence =====
 
-    test('@readwrite Verify local LLM model source persists immediately without Save', async () => {
+    test('@readwrite Verify local LLM model source persists after Save', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
 
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.selectLocalLlmModelSource();
         expect(await settingsBrowserPage.isLocalLlmModelSourceSelected()).toBe(true);
 
-        // Reload WITHOUT clicking Save — encrypted save is async so give it a moment
-        await settingsBrowserPage.waitForTimeout(1000);
+        // Click Save before reloading
+        await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForTimeout(500);
         await settingsBrowserPage.reloadPage();
         await settingsBrowserPage.waitForTimeout(500);
         await settingsBrowserPage.expandChatSection();
@@ -741,7 +732,7 @@ test.describe('@browser Browser Settings tests', () => {
         expect(await settingsBrowserPage.isLocalLlmModelSourceSelected()).toBe(true);
     });
 
-    test('@readwrite Verify local LLM provider change persists immediately without Save', async () => {
+    test('@readwrite Verify local LLM provider change persists after Save', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
 
         await settingsBrowserPage.expandChatSection();
@@ -750,19 +741,20 @@ test.describe('@browser Browser Settings tests', () => {
         expect(await settingsBrowserPage.isLmStudioProviderSelected()).toBe(true);
         expect(await settingsBrowserPage.getLocalLlmEndpointValue()).toBe('http://localhost:1234/v1');
 
-        // Reload WITHOUT clicking Save
-        await settingsBrowserPage.waitForTimeout(1000);
+        // Click Save before reloading
+        await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForTimeout(500);
         await settingsBrowserPage.reloadPage();
         await settingsBrowserPage.waitForTimeout(500);
         await settingsBrowserPage.expandChatSection();
 
-        // LM Studio provider and its default endpoint should persist without Save
+        // LM Studio provider and its default endpoint should persist after Save
         expect(await settingsBrowserPage.isLocalLlmModelSourceSelected()).toBe(true);
         expect(await settingsBrowserPage.isLmStudioProviderSelected()).toBe(true);
         expect(await settingsBrowserPage.getLocalLlmEndpointValue()).toBe('http://localhost:1234/v1');
     });
 
-    test('@readwrite Verify local LLM endpoint change persists immediately without Save', async () => {
+    test('@readwrite Verify local LLM endpoint change persists after Save', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
 
         await settingsBrowserPage.expandChatSection();
@@ -771,13 +763,14 @@ test.describe('@browser Browser Settings tests', () => {
         const customEndpoint = 'http://localhost:8888/v1';
         await settingsBrowserPage.fillLocalLlmEndpoint(customEndpoint);
 
-        // Reload WITHOUT clicking Save
-        await settingsBrowserPage.waitForTimeout(1000);
+        // Click Save before reloading
+        await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForTimeout(500);
         await settingsBrowserPage.reloadPage();
         await settingsBrowserPage.waitForTimeout(500);
         await settingsBrowserPage.expandChatSection();
 
-        // Custom endpoint should persist without Save
+        // Custom endpoint should persist after Save
         expect(await settingsBrowserPage.getLocalLlmEndpointValue()).toBe(customEndpoint);
     });
 

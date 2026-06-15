@@ -78,9 +78,6 @@ export default function Chat({ onClose }: Props) {
     const [messagesList, setMessagesList] = useState<(Message | [Message[], boolean])[]>([]);
     const [newMessage, setNewMessage] = useState("");
     const [isLoading, setIsLoading] = useState(false);
-    // Legacy fallback: populated from old storage keys when loaded messages pre-date embedded tokenUsage
-    const [legacyTotalTokens, setLegacyTotalTokens] = useState(0);
-    const [legacyLastTokens, setLegacyLastTokens] = useState<number | null>(null);
     const [queryCollapse, setQueryCollapse] = useState<{ [key: string]: boolean }>({});
     const [collapseEligible, setCollapseEligible] = useState<{ [key: number]: boolean }>({});
     const textRefs = useRef<Map<number, HTMLElement>>(new Map());
@@ -97,10 +94,6 @@ export default function Chat({ onClose }: Props) {
         }
         return null;
     }, [messages]);
-
-    // Prefer embedded tokenUsage from messages; fall back to legacy storage keys
-    const displayTotalTokens = totalTokens > 0 ? totalTokens : legacyTotalTokens;
-    const displayLastTokens = lastMessageTokens !== null ? lastMessageTokens : legacyLastTokens;
 
     const queryCollapseRef = useRef(queryCollapse);
     queryCollapseRef.current = queryCollapse;
@@ -157,18 +150,6 @@ export default function Chat({ onClose }: Props) {
 
         const savedCypherOnly = getConnectionItem(`cypherOnly-${graphName}`);
         setCypherOnly(savedCypherOnly === "true");
-
-        // Fall back to legacy token keys for sessions saved before tokenUsage was embedded in messages
-        const hasEmbeddedTokens = currentMessages.some((m: Message) => m.tokenUsage != null);
-        if (!hasEmbeddedTokens) {
-            const legacyTotal = getConnectionItem(`chat-totalTokens-${graphName}`);
-            const legacyLast = getConnectionItem(`chat-lastTokens-${graphName}`);
-            setLegacyTotalTokens(legacyTotal ? parseInt(legacyTotal, 10) : 0);
-            setLegacyLastTokens(legacyLast ? parseInt(legacyLast, 10) : null);
-        } else {
-            setLegacyTotalTokens(0);
-            setLegacyLastTokens(null);
-        }
     }, [graphName, maxSavedMessages]);
 
     useEffect(() => {
@@ -362,9 +343,6 @@ export default function Chat({ onClose }: Props) {
                     updated[updated.length - 1] = { ...updated[updated.length - 1], tokenUsage: tokenCount };
                     return updated;
                 });
-                // Once we have new embedded token data, clear legacy fallback
-                setLegacyTotalTokens(0);
-                setLegacyLastTokens(null);
             }
 
             setIsLoading(false);
@@ -578,7 +556,7 @@ export default function Chat({ onClose }: Props) {
                     }
                 </ul>
                 {
-                    (displayTotalTokens > 0 || model) && (() => {
+                    (totalTokens > 0 || model) && (() => {
                         const selectedChatApiKey = chatApiKeys.find(k => k.id === selectedChatApiKeyId);
                         const providerLabel = chatModelSource === "local"
                             ? localLlmProvider.charAt(0).toUpperCase() + localLlmProvider.slice(1)
@@ -586,23 +564,23 @@ export default function Chat({ onClose }: Props) {
                         return (
                             <div data-testid="chatFooter" className="w-full flex items-center justify-between gap-2 px-1 py-0.5 text-xs text-muted-foreground leading-none">
                                 <div className="flex items-center gap-2 min-w-0">
-                                    {displayTotalTokens > 0 && (
+                                    {totalTokens > 0 && (
                                         <>
                                             <span className="font-medium text-foreground/60 shrink-0">Token Usage</span>
                                             <span className="shrink-0">·</span>
-                                            {displayLastTokens !== null && (
+                                            {lastMessageTokens !== null && (
                                                 <ShadTooltip>
                                                     <ShadTooltipTrigger asChild>
-                                                        <span data-testid="chatFooterLastTokens" className="truncate max-w-[6rem]">Last: <span className="font-medium text-foreground">{displayLastTokens.toLocaleString()}</span></span>
+                                                        <span data-testid="chatFooterLastTokens" className="truncate max-w-[6rem]">Last: <span className="font-medium text-foreground">{lastMessageTokens.toLocaleString()}</span></span>
                                                     </ShadTooltipTrigger>
-                                                    <ShadTooltipContent side="top">Last message: {displayLastTokens.toLocaleString()} tokens</ShadTooltipContent>
+                                                    <ShadTooltipContent side="top">Last message: {lastMessageTokens.toLocaleString()} tokens</ShadTooltipContent>
                                                 </ShadTooltip>
                                             )}
                                             <ShadTooltip>
                                                 <ShadTooltipTrigger asChild>
-                                                    <span data-testid="chatFooterTotalTokens" className="truncate max-w-[6rem]">Total: <span className="font-medium text-foreground">{displayTotalTokens.toLocaleString()}</span></span>
+                                                    <span data-testid="chatFooterTotalTokens" className="truncate max-w-[6rem]">Total: <span className="font-medium text-foreground">{totalTokens.toLocaleString()}</span></span>
                                                 </ShadTooltipTrigger>
-                                                <ShadTooltipContent side="top">Session total: {displayTotalTokens.toLocaleString()} tokens</ShadTooltipContent>
+                                                <ShadTooltipContent side="top">Session total: {totalTokens.toLocaleString()} tokens</ShadTooltipContent>
                                             </ShadTooltip>
                                         </>
                                     )}

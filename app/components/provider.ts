@@ -61,6 +61,14 @@ type BrowserSettingsContextType = {
       setNewMaxSavedMessages: Dispatch<SetStateAction<number>>;
       newCypherOnly: boolean;
       setNewCypherOnly: Dispatch<SetStateAction<boolean>>;
+      newChatModelSource: ChatModelSource;
+      setNewChatModelSource: Dispatch<SetStateAction<ChatModelSource>>;
+      newLocalLlmProvider: LocalLlmProvider;
+      setNewLocalLlmProvider: Dispatch<SetStateAction<LocalLlmProvider>>;
+      newLocalLlmEndpoint: string;
+      setNewLocalLlmEndpoint: Dispatch<SetStateAction<string>>;
+      newModel: string;
+      setNewModel: Dispatch<SetStateAction<string>>;
     };
     graphInfo: {
       newRefreshInterval: number;
@@ -128,6 +136,7 @@ type BrowserSettingsContextType = {
       cypherOnly: boolean;
       setCypherOnly: Dispatch<SetStateAction<boolean>>;
       perSourceModels: Record<string, string>;
+      setPerSourceModels: Dispatch<SetStateAction<Record<string, string>>>;
     };
     graphInfo: {
       showMemoryUsage: boolean;
@@ -140,12 +149,6 @@ type BrowserSettingsContextType = {
   hasChanges: boolean;
   setHasChanges: Dispatch<SetStateAction<boolean>>;
   saveSettings: () => void;
-  saveChatApiKeys: (keys: ChatApiKey[], selectedId: string) => Promise<boolean>;
-  selectChatApiKey: (keys: ChatApiKey[], selectedId: string) => Promise<void>;
-  selectChatModelSource: (source: ChatModelSource) => Promise<void>;
-  selectChatModel: (modelName: string, sourceKey: string) => Promise<void>;
-  selectLocalLlmProvider: (provider: LocalLlmProvider) => Promise<void>;
-  selectLocalLlmEndpoint: (endpoint: string) => Promise<void>;
   resetSettings: () => void;
   replayTutorial: () => void;
   tutorialOpen: boolean;
@@ -295,6 +298,14 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         setNewMaxSavedMessages: () => { },
         newCypherOnly: false,
         setNewCypherOnly: () => { },
+        newChatModelSource: "api-key",
+        setNewChatModelSource: () => { },
+        newLocalLlmProvider: "ollama",
+        setNewLocalLlmProvider: () => { },
+        newLocalLlmEndpoint: "http://localhost:11434",
+        setNewLocalLlmEndpoint: () => { },
+        newModel: "",
+        setNewModel: () => { },
       },
       graphInfo: {
         newRefreshInterval: 0,
@@ -356,6 +367,7 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         cypherOnly: false,
         setCypherOnly: () => { },
         perSourceModels: {},
+        setPerSourceModels: () => { },
       },
       graphInfo: {
         showMemoryUsage: false,
@@ -368,12 +380,6 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
     hasChanges: false,
     setHasChanges: () => { },
     saveSettings: () => { },
-    saveChatApiKeys: async () => false,
-    selectChatApiKey: async () => { },
-    selectChatModelSource: async () => { },
-    selectChatModel: async () => { },
-    selectLocalLlmProvider: async () => { },
-    selectLocalLlmEndpoint: async () => { },
     resetSettings: () => { },
     replayTutorial: () => { },
     tutorialOpen: false,

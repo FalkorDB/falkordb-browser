@@ -12,6 +12,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { detectProviderFromApiKey, getProviderDisplayName } from "@/lib/ai-provider-utils";
+import { serverEncrypt } from "@/lib/server-encryption";
+import { CHAT_API_KEYS_STORAGE_KEY, getSelectedChatApiKey, saveEncryptedSetting, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { BrowserSettingsContext, type ChatModelSource, type LocalLlmProvider } from "../components/provider";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -37,7 +39,7 @@ export default function BrowserSettings() {
             limitSettings: { newLimit, setNewLimit },
             captionsKeysSettings: { newCaptionsKeys, setNewCaptionsKeys },
             showPropertyKeyPrefixSettings: { newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
-            chatSettings: { setNewSecretKey, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly },
+            chatSettings: { setNewSecretKey, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly, newChatModelSource, setNewChatModelSource, newLocalLlmProvider, setNewLocalLlmProvider, newLocalLlmEndpoint, setNewLocalLlmEndpoint, newModel, setNewModel },
             graphInfo: { newRefreshInterval, setNewRefreshInterval, newMaxItemsForSearch, setNewMaxItemsForSearch },
             tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple }
         },
@@ -49,7 +51,7 @@ export default function BrowserSettings() {
             limitSettings: { limit },
             captionsKeysSettings: { captionsKeys },
             showPropertyKeyPrefixSettings: { showPropertyKeyPrefix },
-            chatSettings: { secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, model, maxSavedMessages, cypherOnly, perSourceModels },
+            chatSettings: { secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, model, setModel, setSecretKey, setSelectedChatApiKeyId, setChatApiKeys, maxSavedMessages, cypherOnly, perSourceModels, setPerSourceModels },
             graphInfo: { refreshInterval, maxItemsForSearch },
             tableViewSettings: { columnWidth, rowHeight, rowHeightExpandMultiple }
         },
@@ -57,12 +59,6 @@ export default function BrowserSettings() {
         setHasChanges,
         resetSettings,
         saveSettings,
-        saveChatApiKeys,
-        selectChatApiKey,
-        selectChatModelSource,
-        selectChatModel,
-        selectLocalLlmProvider,
-        selectLocalLlmEndpoint,
         replayTutorial,
     } = useContext(BrowserSettingsContext);
 
@@ -90,10 +86,8 @@ export default function BrowserSettings() {
     const [isDeletingKey, setIsDeletingKey] = useState(false);
     const modelFetchRequestIdRef = useRef(0);
     const modelFetchAbortRef = useRef<AbortController | null>(null);
-    const latestModelRef = useRef(model);
-    latestModelRef.current = model;
-    const selectChatModelRef = useRef(selectChatModel);
-    selectChatModelRef.current = selectChatModel;
+    const latestModelRef = useRef(newModel);
+    latestModelRef.current = newModel;
     const [expandedSections, setExpandedSections] = useState({
         queryExecution: false,
         chat: false,
@@ -109,8 +103,8 @@ export default function BrowserSettings() {
     const selectedChatApiKey = chatApiKeys.find(({ id }) => id === activeSelectedChatApiKeyId) ?? chatApiKeys[0];
     const pendingDeleteKey = chatApiKeys.find(({ id }) => id === pendingDeleteKeyId);
     const uiSelectedChatApiKeyId = selectedChatApiKey?.id ?? "";
-    const modelProviderForDisplay = chatModelSource === "local"
-        ? localLlmProvider === "ollama" ? "ollama" : "openai"
+    const modelProviderForDisplay = newChatModelSource === "local"
+        ? newLocalLlmProvider === "ollama" ? "ollama" : "openai"
         : selectedChatApiKey?.provider;
 
     useEffect(() => {
@@ -128,7 +122,7 @@ export default function BrowserSettings() {
         modelFetchAbortRef.current = controller;
 
         (async () => {
-            if (chatModelSource === "api-key" && !selectedChatApiKey) {
+            if (newChatModelSource === "api-key" && !selectedChatApiKey) {
                 setModelDisplayNames([]);
                 setModelsMessage("Enter your API key to load live models.");
                 setIsLoadingModels(false);
@@ -138,20 +132,20 @@ export default function BrowserSettings() {
             }
 
             setIsLoadingModels(true);
-            setLoadingChatApiKeyId(chatModelSource === "api-key" ? selectedChatApiKey?.id ?? "" : "");
-            setModelsMessage(chatModelSource === "local"
-                ? `Loading local ${LOCAL_LLM_LABELS[localLlmProvider]} models...`
+            setLoadingChatApiKeyId(newChatModelSource === "api-key" ? selectedChatApiKey?.id ?? "" : "");
+            setModelsMessage(newChatModelSource === "local"
+                ? `Loading local ${LOCAL_LLM_LABELS[newLocalLlmProvider]} models...`
                 : "Loading live models for the selected key...");
 
             try {
                 const result = await fetch("/api/chat/models", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(chatModelSource === "local"
+                    body: JSON.stringify(newChatModelSource === "local"
                         ? {
                             source: "local",
-                            localProvider: localLlmProvider,
-                            endpoint: localLlmEndpoint,
+                            localProvider: newLocalLlmProvider,
+                            endpoint: newLocalLlmEndpoint,
                         }
                         : {
                             source: "api-key",
@@ -168,11 +162,11 @@ export default function BrowserSettings() {
 
                     setModelDisplayNames(models);
                     setModelsMessage(models.length > 0
-                        ? chatModelSource === "local"
-                            ? `${models.length} local ${LOCAL_LLM_LABELS[localLlmProvider]} models loaded.`
+                        ? newChatModelSource === "local"
+                            ? `${models.length} local ${LOCAL_LLM_LABELS[newLocalLlmProvider]} models loaded.`
                             : `${models.length} live models loaded for ${selectedChatApiKey ? getProviderDisplayName(selectedChatApiKey.provider) : "selected provider"}.`
-                        : chatModelSource === "local"
-                            ? `No local ${LOCAL_LLM_LABELS[localLlmProvider]} models were returned.`
+                        : newChatModelSource === "local"
+                            ? `No local ${LOCAL_LLM_LABELS[newLocalLlmProvider]} models were returned.`
                             : "No live models were returned for this key.");
                 } else {
                     const { error } = await result.json().catch(() => ({ error: "" }));
@@ -200,15 +194,16 @@ export default function BrowserSettings() {
             controller.abort();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedChatApiKey, chatModelSource, localLlmProvider, localLlmEndpoint, modelLoadNonce]);
+    }, [selectedChatApiKey, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, modelLoadNonce]);
 
     // Auto-select the best model once the list loads after a key/source change.
     useEffect(() => {
         if (modelDisplayNames.length === 0) return;
-        const currentSourceKey = chatModelSource === "local" ? localLlmProvider : (selectedChatApiKey?.id ?? "");
+        const currentSourceKey = newChatModelSource === "local" ? newLocalLlmProvider : (selectedChatApiKey?.id ?? "");
         const nextModel = modelDisplayNames.includes(latestModelRef.current) ? latestModelRef.current : modelDisplayNames[0];
         if (nextModel !== latestModelRef.current) {
-            void selectChatModelRef.current(nextModel, currentSourceKey);
+            setNewModel(nextModel);
+            if (currentSourceKey) setPerSourceModels(prev => ({ ...prev, [currentSourceKey]: nextModel }));
         }
         // chatModelSource / localLlmProvider / selectedChatApiKey are stable by the time
         // modelDisplayNames is populated — no need to add them as deps.
@@ -234,7 +229,11 @@ export default function BrowserSettings() {
         setNewRowHeight(rowHeight);
         setNewRowHeightExpandMultiple(rowHeightExpandMultiple);
         setNewMaxItemsForSearch(maxItemsForSearch);
-    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewRefreshInterval, refreshInterval, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch]);
+        setNewChatModelSource(chatModelSource);
+        setNewLocalLlmProvider(localLlmProvider);
+        setNewLocalLlmEndpoint(localLlmEndpoint);
+        setNewModel(model);
+    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewRefreshInterval, refreshInterval, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch, chatModelSource, localLlmProvider, localLlmEndpoint, model, setNewChatModelSource, setNewLocalLlmProvider, setNewLocalLlmEndpoint, setNewModel]);
 
     useEffect(() => {
         setHasChanges(
@@ -251,9 +250,13 @@ export default function BrowserSettings() {
             newColumnWidth !== columnWidth ||
             newRowHeight !== rowHeight ||
             newRowHeightExpandMultiple !== rowHeightExpandMultiple ||
-            newMaxItemsForSearch !== maxItemsForSearch
+            newMaxItemsForSearch !== maxItemsForSearch ||
+            newChatModelSource !== chatModelSource ||
+            newLocalLlmProvider !== localLlmProvider ||
+            newLocalLlmEndpoint !== localLlmEndpoint ||
+            newModel !== model
         );
-    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, refreshInterval, newRefreshInterval, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch]);
+    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, refreshInterval, newRefreshInterval, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, newChatModelSource, chatModelSource, newLocalLlmProvider, localLlmProvider, newLocalLlmEndpoint, localLlmEndpoint, newModel, model]);
 
     const handleSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
         e?.preventDefault();
@@ -342,29 +345,32 @@ export default function BrowserSettings() {
 
     // Wrapper for model combobox to handle scroll and mapping
     const handleModelChange = (modelValue: string) => {
-        const currentSourceKey = chatModelSource === "local" ? localLlmProvider : (selectedChatApiKey?.id ?? "");
-        void selectChatModel(modelValue, currentSourceKey);
+        const currentSourceKey = newChatModelSource === "local" ? newLocalLlmProvider : (selectedChatApiKey?.id ?? "");
+        setNewModel(modelValue);
+        if (currentSourceKey) setPerSourceModels(prev => ({ ...prev, [currentSourceKey]: modelValue }));
     };
 
     const handleModelSourceChange = (source: ChatModelSource) => {
-        if (source === chatModelSource) return;
-        selectChatModelSource(source);
+        if (source === newChatModelSource) return;
+        setNewChatModelSource(source);
+        const targetKey = source === "local" ? newLocalLlmProvider : (selectedChatApiKey?.id ?? "");
+        setNewModel(perSourceModels[targetKey] ?? "");
         setModelDisplayNames([]);
         setModelsMessage(source === "local" ? "Loading local models..." : "Select a saved API key to load live models.");
         setModelLoadNonce(nonce => nonce + 1);
     };
 
     const handleLocalProviderChange = (provider: LocalLlmProvider) => {
-        void selectLocalLlmProvider(provider);
+        setNewLocalLlmProvider(provider);
+        setNewLocalLlmEndpoint(LOCAL_LLM_ENDPOINTS[provider]);
         setModelDisplayNames([]);
-        const restoredModel = perSourceModels[provider] ?? "";
-        void selectChatModel(restoredModel, provider);
+        setNewModel(perSourceModels[provider] ?? "");
         setModelsMessage(`Loading local ${LOCAL_LLM_LABELS[provider]} models...`);
         setModelLoadNonce(nonce => nonce + 1);
     };
 
     const handleLocalEndpointChange = (endpoint: string) => {
-        void selectLocalLlmEndpoint(endpoint);
+        setNewLocalLlmEndpoint(endpoint);
         setModelDisplayNames([]);
         setIsManualLocalModelLoad(false);
         setModelsMessage("Update the endpoint to reload local models.");
@@ -378,6 +384,52 @@ export default function BrowserSettings() {
     const maskKey = (key: string) => {
         if (key.length <= 10) return "••••••••";
         return `${key.slice(0, 6)}••••••••${key.slice(-4)}`;
+    };
+
+    const persistChatApiKeys = async (keys: typeof chatApiKeys, selectedId: string): Promise<boolean> => {
+        const selectedApiKey = getSelectedChatApiKey(keys, selectedId);
+        const nextSelectedId = selectedApiKey?.id ?? "";
+
+        try {
+            if (keys.length > 0) {
+                const encryptedKeys = await serverEncrypt(JSON.stringify(keys));
+                if (!encryptedKeys) {
+                    toast({
+                        title: "Error",
+                        description: "Could not encrypt API keys. Please try again.",
+                        variant: "destructive",
+                    });
+                    return false;
+                }
+                localStorage.setItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
+            } else {
+                localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
+            }
+            localStorage.removeItem("secretKey");
+
+            const savedSelectedId = await persistSelectedChatApiKeyId(nextSelectedId);
+            if (!savedSelectedId) {
+                toast({
+                    title: "Error",
+                    description: "Could not encrypt selected API key id. Please try again.",
+                    variant: "destructive",
+                });
+                return false;
+            }
+        } catch (error) {
+            console.error('Failed to encrypt API keys:', error);
+            toast({
+                title: "Error",
+                description: "Could not encrypt API keys. Please try again.",
+                variant: "destructive",
+            });
+            return false;
+        }
+
+        setChatApiKeys(keys);
+        setSelectedChatApiKeyId(nextSelectedId);
+        setSecretKey(selectedApiKey?.key ?? "");
+        return true;
     };
 
     const handleSaveKey = async () => {
@@ -401,7 +453,7 @@ export default function BrowserSettings() {
                     createdAt: Date.now(),
                 },
             ];
-            const saved = await saveChatApiKeys(nextKeys, id);
+            const saved = await persistChatApiKeys(nextKeys, id);
             if (saved) {
                 setKeyInput("");
             }
@@ -415,7 +467,17 @@ export default function BrowserSettings() {
         modelFetchRequestIdRef.current += 1;
         modelFetchAbortRef.current?.abort();
         setActiveSelectedChatApiKeyId(id);
-        void selectChatApiKey(chatApiKeys, id);
+        const selectedApiKey = getSelectedChatApiKey(chatApiKeys, id);
+        const nextSelectedId = selectedApiKey?.id ?? "";
+        setSelectedChatApiKeyId(nextSelectedId);
+        setSecretKey(selectedApiKey?.key ?? "");
+        const restoredKeyModel = perSourceModels[nextSelectedId] ?? "";
+        setModel(restoredKeyModel);
+        setNewModel(restoredKeyModel);
+        void saveEncryptedSetting("model", restoredKeyModel);
+        void persistSelectedChatApiKeyId(nextSelectedId).then(saved => {
+            if (!saved) toast({ title: "Error", description: "Could not encrypt selected API key id. Please try again.", variant: "destructive" });
+        });
         setModelDisplayNames([]);
         setIsLoadingModels(true);
         setLoadingChatApiKeyId(id);
@@ -445,7 +507,7 @@ export default function BrowserSettings() {
                 label: item.label || `${providerName} key`,
             }
             : item);
-        const saved = await saveChatApiKeys(nextKeys, id);
+        const saved = await persistChatApiKeys(nextKeys, id);
         if (saved) {
             setEditingKeyId(null);
             setEditingKeyValue("");
@@ -460,11 +522,13 @@ export default function BrowserSettings() {
     const handleDeleteKey = async (id: string) => {
         const nextKeys = chatApiKeys.filter(item => item.id !== id);
         const nextSelectedId = selectedChatApiKeyId === id ? nextKeys[0]?.id ?? "" : selectedChatApiKeyId;
-        const saved = await saveChatApiKeys(nextKeys, nextSelectedId);
+        const saved = await persistChatApiKeys(nextKeys, nextSelectedId);
         if (!saved) return;
 
         if (selectedChatApiKeyId === id) {
-            void selectChatModel("", "");
+            setModel("");
+            setNewModel("");
+            void saveEncryptedSetting("model", "");
         }
         if (editingKeyId === id) {
             setEditingKeyId(null);
@@ -593,9 +657,9 @@ export default function BrowserSettings() {
                                             </div>
                                             <div className="flex flex-wrap gap-2 justify-end">
                                                 <div className="bg-primary/60 border border-primary/80 rounded-full px-3 py-1 text-xs font-medium text-background max-w-[18rem] truncate">
-                                                    {chatModelSource === "local"
-                                                        ? `Local · ${LOCAL_LLM_LABELS[localLlmProvider]}${model ? ` · ${model}` : ""}`
-                                                        : `Hosted · ${selectedChatApiKey ? getProviderDisplayName(selectedChatApiKey.provider) : "No key"}${model ? ` · ${model}` : ""}`}
+                                                    {newChatModelSource === "local"
+                                                        ? `Local · ${LOCAL_LLM_LABELS[newLocalLlmProvider]}${newModel ? ` · ${newModel}` : ""}`
+                                                        : `Hosted · ${selectedChatApiKey ? getProviderDisplayName(selectedChatApiKey.provider) : "No key"}${newModel ? ` · ${newModel}` : ""}`}
                                                 </div>
                                                 <div className="hidden rounded-full border border-border/80 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground sm:block">
                                                     {chatApiKeys.length} saved
@@ -620,7 +684,7 @@ export default function BrowserSettings() {
                                                     icon: Laptop,
                                                 },
                                             ]).map(({ value, title, description, icon: Icon }) => {
-                                                const isSelected = chatModelSource === value;
+                                                const isSelected = newChatModelSource === value;
 
                                                 return (
                                                     <button
@@ -650,7 +714,7 @@ export default function BrowserSettings() {
                                         </div>
 
                                         <div className="flex flex-col gap-3">
-                                            {chatModelSource === "api-key" ? (
+                                            {newChatModelSource === "api-key" ? (
                                                 <>
                                                     <div className="rounded-xl border border-border/70 bg-background/80 p-3">
                                                         <div className="flex items-center gap-2">
@@ -849,7 +913,7 @@ export default function BrowserSettings() {
                                                 <div className="rounded-xl border border-border/70 bg-background/80 p-3">
                                                     <div className="grid gap-3 sm:grid-cols-2">
                                                         {(["ollama", "lmstudio"] as const).map(provider => {
-                                                            const isSelected = localLlmProvider === provider;
+                                                            const isSelected = newLocalLlmProvider === provider;
 
                                                             return (
                                                                 <button
@@ -887,8 +951,8 @@ export default function BrowserSettings() {
                                                             id="localLlmEndpoint"
                                                             data-testid="localLlmEndpointInput"
                                                             className="flex-1 font-mono text-xs"
-                                                            value={localLlmEndpoint}
-                                                            placeholder={LOCAL_LLM_ENDPOINTS[localLlmProvider]}
+                                                            value={newLocalLlmEndpoint}
+                                                            placeholder={LOCAL_LLM_ENDPOINTS[newLocalLlmProvider]}
                                                             onChange={(event) => handleLocalEndpointChange(event.target.value)}
                                                         />
                                                         <Button
@@ -923,11 +987,11 @@ export default function BrowserSettings() {
                                                 </div>
                                                 <ModelSelector
                                                     models={modelDisplayNames}
-                                                    selectedModel={model}
+                                                    selectedModel={newModel}
                                                     onModelSelect={handleModelChange}
                                                     provider={modelProviderForDisplay}
                                                     isLoading={isLoadingModels}
-                                                    disabled={chatModelSource === "api-key" && !selectedChatApiKey}
+                                                    disabled={newChatModelSource === "api-key" && !selectedChatApiKey}
                                                 />
                                             </div>
                                         </div>
