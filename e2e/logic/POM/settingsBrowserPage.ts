@@ -187,6 +187,7 @@ export default class SettingsBrowserPage extends BasePage {
         const btn = document.querySelector('[data-testid="chatModelSourceLocal"]');
         return btn?.getAttribute("aria-pressed") === "true";
       },
+      null,
       { timeout: 10000 }
     );
   }
@@ -206,6 +207,7 @@ export default class SettingsBrowserPage extends BasePage {
   async waitForChatModelSourceSaved(): Promise<void> {
     await this.page.waitForFunction(
       () => localStorage.getItem("chatModelSource") !== null,
+      null,
       { timeout: 10000 }
     );
   }
