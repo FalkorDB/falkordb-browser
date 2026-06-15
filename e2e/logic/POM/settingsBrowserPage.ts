@@ -181,6 +181,16 @@ export default class SettingsBrowserPage extends BasePage {
     return (await this.chatModelSourceLocalButton.getAttribute("aria-pressed")) === "true";
   }
 
+  async waitForLocalLlmModelSourceSelected(): Promise<void> {
+    await this.page.waitForFunction(
+      () => {
+        const btn = document.querySelector('[data-testid="chatModelSourceLocal"]');
+        return btn?.getAttribute("aria-pressed") === "true";
+      },
+      { timeout: 10000 }
+    );
+  }
+
   async isLmStudioProviderSelected(): Promise<boolean> {
     return (await this.localLlmProviderLmStudioButton.getAttribute("aria-pressed")) === "true";
   }

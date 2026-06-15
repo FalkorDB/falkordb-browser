@@ -724,10 +724,9 @@ test.describe('@browser Browser Settings tests', () => {
 
         // Click Save before reloading
         await settingsBrowserPage.clickSaveSettingsButton();
-        await settingsBrowserPage.waitForTimeout(500);
         await settingsBrowserPage.reloadPage();
-        await settingsBrowserPage.waitForTimeout(500);
         await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.waitForLocalLlmModelSourceSelected();
 
         expect(await settingsBrowserPage.isLocalLlmModelSourceSelected()).toBe(true);
     });
@@ -743,10 +742,9 @@ test.describe('@browser Browser Settings tests', () => {
 
         // Click Save before reloading
         await settingsBrowserPage.clickSaveSettingsButton();
-        await settingsBrowserPage.waitForTimeout(500);
         await settingsBrowserPage.reloadPage();
-        await settingsBrowserPage.waitForTimeout(500);
         await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.waitForLocalLlmModelSourceSelected();
 
         // LM Studio provider and its default endpoint should persist after Save
         expect(await settingsBrowserPage.isLocalLlmModelSourceSelected()).toBe(true);
@@ -765,10 +763,9 @@ test.describe('@browser Browser Settings tests', () => {
 
         // Click Save before reloading
         await settingsBrowserPage.clickSaveSettingsButton();
-        await settingsBrowserPage.waitForTimeout(500);
         await settingsBrowserPage.reloadPage();
-        await settingsBrowserPage.waitForTimeout(500);
         await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.waitForLocalLlmModelSourceSelected();
 
         // Custom endpoint should persist after Save
         expect(await settingsBrowserPage.getLocalLlmEndpointValue()).toBe(customEndpoint);
