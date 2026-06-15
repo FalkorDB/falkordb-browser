@@ -4,8 +4,8 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, SyntaxErrorInfo, parseSyntaxError } from "@/lib/utils";
-import { serverEncrypt, serverDecrypt, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
-import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, saveEncryptedSetting, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
+import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
+import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import { usePathname, useRouter } from "next/navigation";
 import { useGraphParams, syncRouteUrlParams } from "@/lib/useUrlParams";
@@ -74,17 +74,6 @@ const normalizeLocalLlmEndpoint = (
   endpoint: string | null | undefined
 ) => endpoint?.trim() || DEFAULT_LOCAL_LLM_ENDPOINTS[provider];
 
-const loadEncryptedSetting = async (key: string): Promise<string> => {
-  const storedValue = localStorage.getItem(key) || "";
-  if (!storedValue) return "";
-
-  try {
-    return await serverDecrypt(storedValue);
-  } catch {
-    return storedValue;
-  }
-};
-
 const createChatApiKey = (key: string): ChatApiKey => {
   const provider = detectProviderFromApiKey(key);
   const providerName = provider === "unknown" ? "LLM" : getProviderDisplayName(provider);
@@ -117,26 +106,8 @@ const parseChatApiKeys = (value: string): ChatApiKey[] => {
     }));
 };
 
-const loadSelectedChatApiKeyId = async () => {
-  const storedSelectedId = localStorage.getItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY) || "";
-  if (!storedSelectedId) return "";
-
-  try {
-    const decryptedSelectedId = await serverDecrypt(storedSelectedId);
-    if (decryptedSelectedId) return decryptedSelectedId;
-  } catch {
-    // Existing installs may have a clear-text selected id. Re-encrypt below.
-  }
-
-  const encryptedSelectedId = await serverEncrypt(storedSelectedId);
-  if (encryptedSelectedId) {
-    localStorage.setItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, encryptedSelectedId);
-  } else {
-    localStorage.removeItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY);
-  }
-
-  return storedSelectedId;
-};
+const loadSelectedChatApiKeyId = () =>
+  localStorage.getItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY) || "";
 
 /**
  * Wraps application UI with authentication-aware providers, state, and layout for graph views.
@@ -348,12 +319,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       if (sourceKey) {
         const next = { ...perSourceModels, [sourceKey]: newModel };
         setPerSourceModels(next);
-        void saveEncryptedSetting("perSourceModels", JSON.stringify(next));
+        localStorage.setItem("perSourceModels", JSON.stringify(next));
       }
-      void saveEncryptedSetting(CHAT_MODEL_SOURCE_STORAGE_KEY, newChatModelSource);
-      void saveEncryptedSetting(LOCAL_LLM_PROVIDER_STORAGE_KEY, newLocalLlmProvider);
-      void saveEncryptedSetting(LOCAL_LLM_ENDPOINT_STORAGE_KEY, normalizeLocalLlmEndpoint(newLocalLlmProvider, newLocalLlmEndpoint));
-      void saveEncryptedSetting("model", newModel);
+      localStorage.setItem(CHAT_MODEL_SOURCE_STORAGE_KEY, newChatModelSource);
+      localStorage.setItem(LOCAL_LLM_PROVIDER_STORAGE_KEY, newLocalLlmProvider);
+      localStorage.setItem(LOCAL_LLM_ENDPOINT_STORAGE_KEY, normalizeLocalLlmEndpoint(newLocalLlmProvider, newLocalLlmEndpoint));
+      localStorage.setItem("model", newModel);
       // Reset has changes
       setHasChanges(false);
 
@@ -961,11 +932,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setRowHeightExpandMultiple(parseInt(localStorage.getItem("rowHeightExpandMultiple") || "3", 10));
       const parsedMaxItems = parseInt(localStorage.getItem("maxItemsForSearch") || "20", 10);
       setMaxItemsForSearch(Number.isFinite(parsedMaxItems) ? Math.min(Math.max(parsedMaxItems, 10), 50) : 20);
-      const loadedChatModelSource = normalizeChatModelSource(await loadEncryptedSetting(CHAT_MODEL_SOURCE_STORAGE_KEY));
-      const loadedLocalLlmProvider = normalizeLocalLlmProvider(await loadEncryptedSetting(LOCAL_LLM_PROVIDER_STORAGE_KEY));
+      const loadedChatModelSource = normalizeChatModelSource(localStorage.getItem(CHAT_MODEL_SOURCE_STORAGE_KEY));
+      const loadedLocalLlmProvider = normalizeLocalLlmProvider(localStorage.getItem(LOCAL_LLM_PROVIDER_STORAGE_KEY));
+      const rawEndpoint = localStorage.getItem(LOCAL_LLM_ENDPOINT_STORAGE_KEY);
       const loadedLocalLlmEndpoint = normalizeLocalLlmEndpoint(
         loadedLocalLlmProvider,
-        await loadEncryptedSetting(LOCAL_LLM_ENDPOINT_STORAGE_KEY)
+        looksServerEncrypted(rawEndpoint ?? "") ? null : rawEndpoint
       );
       setChatModelSource(loadedChatModelSource);
       setNewChatModelSource(loadedChatModelSource);
@@ -1016,21 +988,20 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         }
       }
 
-      const storedSelectedId = await loadSelectedChatApiKeyId();
+      const storedSelectedId = loadSelectedChatApiKeyId();
       const selectedApiKey = getSelectedChatApiKey(loadedChatApiKeys, storedSelectedId);
       const selectedId = selectedApiKey?.id ?? "";
-      await persistSelectedChatApiKeyId(selectedId);
+      persistSelectedChatApiKeyId(selectedId);
       setChatApiKeys(loadedChatApiKeys);
       setSelectedChatApiKeyId(selectedId);
       setSecretKey(selectedApiKey?.key ?? "");
 
-      const storedModel = await loadEncryptedSetting("model");
-      const loadedModel = storedModel || localStorage.getItem("model") || "";
+      const rawModel = localStorage.getItem("model") || "";
+      const loadedModel = looksServerEncrypted(rawModel) ? "" : rawModel;
       setModel(loadedModel);
       setNewModel(loadedModel);
       try {
-        const storedPerSourceModels = await loadEncryptedSetting("perSourceModels")
-          || localStorage.getItem("perSourceModels");
+        const storedPerSourceModels = localStorage.getItem("perSourceModels");
         if (storedPerSourceModels) setPerSourceModels(JSON.parse(storedPerSourceModels));
       } catch { /* ignore corrupted data */ }
     })();

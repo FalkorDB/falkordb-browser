@@ -70,35 +70,6 @@ type RateLimitConfig = {
     windowMs: number;
 };
 
-function getRateLimitConfig(pathname: string): RateLimitConfig | null {
-    // Auth callback - strict limit to prevent brute force
-    if (pathname.startsWith("/api/auth/callback")) {
-        return { maxRequests: 10, windowMs: 60_000 }; // 10 req/min
-    }
-
-    // Upload endpoint - prevent disk exhaustion
-    if (pathname.startsWith("/api/upload")) {
-        return { maxRequests: 20, windowMs: 60_000 }; // 20 req/min
-    }
-
-    // Chat/AI endpoints - prevent cost amplification
-    if (pathname.startsWith("/api/chat")) {
-        return { maxRequests: 30, windowMs: 60_000 }; // 30 req/min
-    }
-
-    // Graph query endpoints - prevent resource exhaustion
-    if (pathname.startsWith("/api/graph")) {
-        return { maxRequests: 200, windowMs: 60_000 }; // 200 req/min
-    }
-
-    // General API rate limit
-    if (pathname.startsWith("/api/")) {
-        return { maxRequests: 100, windowMs: 60_000 }; // 100 req/min
-    }
-
-    return null;
-}
-
 function getExtraConnectSrc(): string[] {
     const raw = process.env.CSP_CONNECT_SRC;
     if (!raw) return [];
@@ -127,7 +98,9 @@ export function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
     // --- Rate limiting (API routes only) ---
-    const config = getRateLimitConfig(pathname);
+    // Set RATE_LIMIT_MAX_REQUESTS=0 to disable rate limiting entirely.
+    const maxRequests = process.env.RATE_LIMIT_MAX_REQUESTS ? parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) : 200;
+    const config = maxRequests !== 0 ? { maxRequests, windowMs: 60_000 } : null;
     if (config) {
         const ip = getClientIP(request);
         const key = `${ip}:${pathname.split("/").slice(0, 4).join("/")}`;

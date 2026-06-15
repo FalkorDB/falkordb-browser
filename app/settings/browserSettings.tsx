@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { detectProviderFromApiKey, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { serverEncrypt } from "@/lib/server-encryption";
-import { CHAT_API_KEYS_STORAGE_KEY, getSelectedChatApiKey, saveEncryptedSetting, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
+import { CHAT_API_KEYS_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { BrowserSettingsContext, type ChatModelSource, type LocalLlmProvider } from "../components/provider";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -407,15 +407,7 @@ export default function BrowserSettings() {
             }
             localStorage.removeItem("secretKey");
 
-            const savedSelectedId = await persistSelectedChatApiKeyId(nextSelectedId);
-            if (!savedSelectedId) {
-                toast({
-                    title: "Error",
-                    description: "Could not encrypt selected API key id. Please try again.",
-                    variant: "destructive",
-                });
-                return false;
-            }
+            persistSelectedChatApiKeyId(nextSelectedId);
         } catch (error) {
             console.error('Failed to encrypt API keys:', error);
             toast({
@@ -474,10 +466,8 @@ export default function BrowserSettings() {
         const restoredKeyModel = perSourceModels[nextSelectedId] ?? "";
         setModel(restoredKeyModel);
         setNewModel(restoredKeyModel);
-        void saveEncryptedSetting("model", restoredKeyModel);
-        void persistSelectedChatApiKeyId(nextSelectedId).then(saved => {
-            if (!saved) toast({ title: "Error", description: "Could not encrypt selected API key id. Please try again.", variant: "destructive" });
-        });
+        localStorage.setItem("model", restoredKeyModel);
+        persistSelectedChatApiKeyId(nextSelectedId);
         setModelDisplayNames([]);
         setIsLoadingModels(true);
         setLoadingChatApiKeyId(id);
@@ -528,7 +518,7 @@ export default function BrowserSettings() {
         if (selectedChatApiKeyId === id) {
             setModel("");
             setNewModel("");
-            void saveEncryptedSetting("model", "");
+            localStorage.setItem("model", "");
         }
         if (editingKeyId === id) {
             setEditingKeyId(null);
