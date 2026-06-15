@@ -54,6 +54,14 @@ class ModelFetchAbortedError extends Error {
     status = 499;
 }
 
+class ModelFetchConnectionError extends Error {
+    constructor(providerName: string, endpoint: string) {
+        super(`Could not connect to ${providerName} at ${endpoint}. Make sure the local server is running.`);
+    }
+
+    status = 503;
+}
+
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
@@ -237,9 +245,18 @@ const fetchLocalModels = async (
 ) => {
     const baseUrl = normalizeLocalEndpoint(provider, endpoint);
     const targetUrl = new URL(provider === "ollama" ? "api/tags" : "models", `${baseUrl}/`).toString();
-    const response = await fetchProviderModels(LOCAL_PROVIDER_LABELS[provider], targetUrl, {
-        method: "GET",
-    }, abortSignal);
+    let response: Response;
+    try {
+        response = await fetchProviderModels(LOCAL_PROVIDER_LABELS[provider], targetUrl, {
+            method: "GET",
+        }, abortSignal);
+    } catch (error) {
+        if (error instanceof ModelFetchTimeoutError || error instanceof ModelFetchAbortedError) {
+            throw error;
+        }
+        // Network-level failure (e.g. ECONNREFUSED — local server not running)
+        throw new ModelFetchConnectionError(LOCAL_PROVIDER_LABELS[provider], baseUrl);
+    }
 
     if (!response.ok) {
         throw new Error(`Could not load local ${LOCAL_PROVIDER_LABELS[provider]} models (${response.status}). Check that the local server is running.`);
@@ -314,12 +331,12 @@ export async function POST(request: NextRequest) {
         const models = await fetchLiveModelsForKey(key, request.signal);
         return NextResponse.json({ models }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
-        if (!(error instanceof ModelFetchAbortedError)) {
+        if (!(error instanceof ModelFetchAbortedError) && !(error instanceof ModelFetchConnectionError)) {
             console.error("Error fetching live models:", error);
         }
         return NextResponse.json(
             { error: error instanceof Error ? error.message : "Internal server error" },
-            { status: error instanceof ModelFetchError || error instanceof ModelFetchTimeoutError || error instanceof ModelFetchAbortedError ? error.status : 500, headers: getCorsHeaders(request) }
+            { status: error instanceof ModelFetchError || error instanceof ModelFetchTimeoutError || error instanceof ModelFetchAbortedError || error instanceof ModelFetchConnectionError ? error.status : 500, headers: getCorsHeaders(request) }
         );
     }
 }
