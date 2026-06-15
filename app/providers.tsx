@@ -345,18 +345,15 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setLocalLlmEndpoint(newLocalLlmEndpoint);
       setModel(newModel);
       const sourceKey = newChatModelSource === "local" ? newLocalLlmProvider : (selectedChatApiKeyId || "");
-      const encryptedSaves: Promise<boolean>[] = [
-        saveEncryptedSetting(CHAT_MODEL_SOURCE_STORAGE_KEY, newChatModelSource),
-        saveEncryptedSetting(LOCAL_LLM_PROVIDER_STORAGE_KEY, newLocalLlmProvider),
-        saveEncryptedSetting(LOCAL_LLM_ENDPOINT_STORAGE_KEY, normalizeLocalLlmEndpoint(newLocalLlmProvider, newLocalLlmEndpoint)),
-        saveEncryptedSetting("model", newModel),
-      ];
       if (sourceKey) {
         const next = { ...perSourceModels, [sourceKey]: newModel };
         setPerSourceModels(next);
-        encryptedSaves.push(saveEncryptedSetting("perSourceModels", JSON.stringify(next)));
+        void saveEncryptedSetting("perSourceModels", JSON.stringify(next));
       }
-      await Promise.all(encryptedSaves);
+      void saveEncryptedSetting(CHAT_MODEL_SOURCE_STORAGE_KEY, newChatModelSource);
+      void saveEncryptedSetting(LOCAL_LLM_PROVIDER_STORAGE_KEY, newLocalLlmProvider);
+      void saveEncryptedSetting(LOCAL_LLM_ENDPOINT_STORAGE_KEY, normalizeLocalLlmEndpoint(newLocalLlmProvider, newLocalLlmEndpoint));
+      void saveEncryptedSetting("model", newModel);
       // Reset has changes
       setHasChanges(false);
 

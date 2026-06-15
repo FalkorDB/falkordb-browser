@@ -719,11 +719,14 @@ test.describe('@browser Browser Settings tests', () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
 
         await settingsBrowserPage.expandChatSection();
+        // Clear the key first so waitForChatModelSourceSaved can detect the fresh write
+        await settingsBrowserPage.clearChatModelSourceFromLocalStorage();
         await settingsBrowserPage.selectLocalLlmModelSource();
         expect(await settingsBrowserPage.isLocalLlmModelSourceSelected()).toBe(true);
 
-        // Click Save before reloading
+        // Click Save, then wait until the encrypted value lands in localStorage before reloading
         await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForChatModelSourceSaved();
         await settingsBrowserPage.reloadPage();
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForLocalLlmModelSourceSelected();
@@ -735,13 +738,15 @@ test.describe('@browser Browser Settings tests', () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
 
         await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.clearChatModelSourceFromLocalStorage();
         await settingsBrowserPage.selectLocalLlmModelSource();
         await settingsBrowserPage.selectLmStudioProvider();
         expect(await settingsBrowserPage.isLmStudioProviderSelected()).toBe(true);
         expect(await settingsBrowserPage.getLocalLlmEndpointValue()).toBe('http://localhost:1234/v1');
 
-        // Click Save before reloading
+        // Click Save, then wait until the encrypted value lands in localStorage before reloading
         await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForChatModelSourceSaved();
         await settingsBrowserPage.reloadPage();
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForLocalLlmModelSourceSelected();
@@ -756,13 +761,15 @@ test.describe('@browser Browser Settings tests', () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
 
         await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.clearChatModelSourceFromLocalStorage();
         await settingsBrowserPage.selectLocalLlmModelSource();
 
         const customEndpoint = 'http://localhost:8888/v1';
         await settingsBrowserPage.fillLocalLlmEndpoint(customEndpoint);
 
-        // Click Save before reloading
+        // Click Save, then wait until the encrypted value lands in localStorage before reloading
         await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForChatModelSourceSaved();
         await settingsBrowserPage.reloadPage();
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForLocalLlmModelSourceSelected();

@@ -191,6 +191,25 @@ export default class SettingsBrowserPage extends BasePage {
     );
   }
 
+  /**
+   * Remove chatModelSource from localStorage so we can reliably detect
+   * when the async encrypted save has completed.  Call this before saving.
+   */
+  async clearChatModelSourceFromLocalStorage(): Promise<void> {
+    await this.page.evaluate(() => localStorage.removeItem("chatModelSource"));
+  }
+
+  /**
+   * Wait until the async saveEncryptedSetting call has written the
+   * chatModelSource key back into localStorage.
+   */
+  async waitForChatModelSourceSaved(): Promise<void> {
+    await this.page.waitForFunction(
+      () => localStorage.getItem("chatModelSource") !== null,
+      { timeout: 10000 }
+    );
+  }
+
   async isLmStudioProviderSelected(): Promise<boolean> {
     return (await this.localLlmProviderLmStudioButton.getAttribute("aria-pressed")) === "true";
   }
