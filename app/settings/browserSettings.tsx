@@ -199,7 +199,7 @@ export default function BrowserSettings() {
     // Auto-select the best model once the list loads after a key/source change.
     useEffect(() => {
         if (modelDisplayNames.length === 0) return;
-        const currentSourceKey = newChatModelSource === "local" ? newLocalLlmProvider : (selectedChatApiKey?.id ?? "");
+        const currentSourceKey = newChatModelSource === "local" ? newLocalLlmProvider : "api-key";
         const nextModel = modelDisplayNames.includes(latestModelRef.current) ? latestModelRef.current : modelDisplayNames[0];
         if (nextModel !== latestModelRef.current) {
             setNewModel(nextModel);
@@ -345,7 +345,7 @@ export default function BrowserSettings() {
 
     // Wrapper for model combobox to handle scroll and mapping
     const handleModelChange = (modelValue: string) => {
-        const currentSourceKey = newChatModelSource === "local" ? newLocalLlmProvider : (selectedChatApiKey?.id ?? "");
+        const currentSourceKey = newChatModelSource === "local" ? newLocalLlmProvider : "api-key";
         setNewModel(modelValue);
         if (currentSourceKey) setPerSourceModels(prev => ({ ...prev, [currentSourceKey]: modelValue }));
     };
@@ -353,7 +353,7 @@ export default function BrowserSettings() {
     const handleModelSourceChange = (source: ChatModelSource) => {
         if (source === newChatModelSource) return;
         setNewChatModelSource(source);
-        const targetKey = source === "local" ? newLocalLlmProvider : (selectedChatApiKey?.id ?? "");
+        const targetKey = source === "local" ? newLocalLlmProvider : "api-key";
         setNewModel(perSourceModels[targetKey] ?? "");
         setModelDisplayNames([]);
         setModelsMessage(source === "local" ? "Loading local models..." : "Select a saved API key to load live models.");
@@ -463,7 +463,7 @@ export default function BrowserSettings() {
         const nextSelectedId = selectedApiKey?.id ?? "";
         setSelectedChatApiKeyId(nextSelectedId);
         setSecretKey(selectedApiKey?.key ?? "");
-        const restoredKeyModel = perSourceModels[nextSelectedId] ?? "";
+        const restoredKeyModel = perSourceModels["api-key"] ?? "";
         setModel(restoredKeyModel);
         setNewModel(restoredKeyModel);
         localStorage.setItem("model", restoredKeyModel);
@@ -856,9 +856,9 @@ export default function BrowserSettings() {
                                                                                         </button>
                                                                                     </div>
                                                                                 </div>
-                                                                                {perSourceModels[apiKey.id] && (
+                                                                                {apiKey.id === uiSelectedChatApiKeyId && perSourceModels["api-key"] && (
                                                                                     <span className="mt-0.5 block truncate text-xs font-medium text-primary/80">
-                                                                                        {perSourceModels[apiKey.id]}
+                                                                                        {perSourceModels["api-key"]}
                                                                                     </span>
                                                                                 )}
                                                                                 {isEditing ? (

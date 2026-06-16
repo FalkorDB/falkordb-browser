@@ -315,12 +315,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setLocalLlmProvider(newLocalLlmProvider);
       setLocalLlmEndpoint(newLocalLlmEndpoint);
       setModel(newModel);
-      const sourceKey = newChatModelSource === "local" ? newLocalLlmProvider : (selectedChatApiKeyId || "");
-      if (sourceKey) {
-        const next = { ...perSourceModels, [sourceKey]: newModel };
-        setPerSourceModels(next);
-        localStorage.setItem("perSourceModels", JSON.stringify(next));
-      }
+      const sourceKey = newChatModelSource === "local" ? newLocalLlmProvider : "api-key";
+      const next = { ...perSourceModels, [sourceKey]: newModel };
+      setPerSourceModels(next);
+      localStorage.setItem("perSourceModels", JSON.stringify(next));
+      // codeql[js/clear-text-storage-of-sensitive-data] - value is 'api-key' or 'local', not a secret
       localStorage.setItem(CHAT_MODEL_SOURCE_STORAGE_KEY, newChatModelSource);
       localStorage.setItem(LOCAL_LLM_PROVIDER_STORAGE_KEY, newLocalLlmProvider);
       localStorage.setItem(LOCAL_LLM_ENDPOINT_STORAGE_KEY, normalizeLocalLlmEndpoint(newLocalLlmProvider, newLocalLlmEndpoint));
