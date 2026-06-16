@@ -1,4 +1,4 @@
-import { cn, getTheme, Message, toUserFriendlyMessage } from "@/lib/utils";
+import { cn, getTheme, Message, getActiveConnectionIdGlobal, toUserFriendlyMessage } from "@/lib/utils";
 import { memo, useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
@@ -11,7 +11,6 @@ import { useRouter } from "next/navigation";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import { GraphContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext } from "../components/provider";
-import { EventType } from "../api/chat/route";
 import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import ToastButton from "../components/ToastButton";
 import { ShineBorder } from "@/components/ui/shine-border";
@@ -33,42 +32,28 @@ const MarkdownMessage = memo(function MarkdownMessage({ content }: { content: st
         <div
             data-testid="chatMessageMarkdown"
             className="text-sm markdown-body"
-             
+
             dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
     );
 });
 
-// Function to get the last maxSavedMessages user messages and all messages in between
-const getLastUserMessagesWithContext = (allMessages: Message[], maxUserMessages: number) => {
-    // Find indices of all user messages
+// Return the last maxExchanges Q&A exchanges (each user message + its assistant replies counts as 1)
+const getLastUserMessagesWithContext = (allMessages: Message[], maxExchanges: number) => {
     const userMessageIndices = allMessages
         .map((msg, index) => msg.role === "user" ? index : -1)
         .filter(index => index !== -1);
 
-    // If there are fewer user messages than maxUserMessages, return all messages
-    if (userMessageIndices.length <= maxUserMessages) {
-        return allMessages;
-    }
+    if (userMessageIndices.length <= maxExchanges) return allMessages;
 
-    // Get the index of the Nth-from-last user message
-    const startIndex = userMessageIndices[userMessageIndices.length - maxUserMessages];
-
-    // Return all messages from that point forward
+    // Start from the Nth-from-last user message
+    const startIndex = userMessageIndices[userMessageIndices.length - maxExchanges];
     return allMessages.slice(startIndex);
 };
 
 interface Props {
     onClose: () => void
 }
-
-type ErrorWithStatus = Error & { status?: number };
-
-const createResponseError = async (response: Response): Promise<ErrorWithStatus> => {
-    const error = new Error(await response.text()) as ErrorWithStatus;
-    error.status = response.status;
-    return error;
-};
 
 const getErrorStatus = (error: unknown) => {
     if (error instanceof Error && "status" in error && typeof error.status === "number") return error.status;
@@ -81,7 +66,7 @@ export default function Chat({ onClose }: Props) {
     const { setIndicator } = useContext(IndicatorContext);
     const { runQuery, graphName } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
-    const { settings: { chatSettings: { secretKey, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
+    const { settings: { chatSettings: { secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
     // Cypher Only toggle state, persisted per graph
     const [cypherOnly, setCypherOnly] = useState(false);
 
@@ -97,6 +82,19 @@ export default function Chat({ onClose }: Props) {
     const [collapseEligible, setCollapseEligible] = useState<{ [key: number]: boolean }>({});
     const textRefs = useRef<Map<number, HTMLElement>>(new Map());
     const observerRef = useRef<ResizeObserver | null>(null);
+    const chatContainerRef = useRef<HTMLUListElement>(null);
+    // Derived from messages — automatically in sync with trimmed message history
+    const totalTokens = useMemo(
+        () => messages.reduce((sum, m) => sum + (m.tokenUsage ?? 0), 0),
+        [messages]
+    );
+    const lastMessageTokens = useMemo(() => {
+        for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i].tokenUsage != null) return messages[i].tokenUsage!;
+        }
+        return null;
+    }, [messages]);
+
     const queryCollapseRef = useRef(queryCollapse);
     queryCollapseRef.current = queryCollapse;
 
@@ -180,11 +178,16 @@ export default function Chat({ onClose }: Props) {
         setMessagesList(newMessagesList);
     }, [maxSavedMessages, messages]);
 
-    const scrollToBottom = () => {
-        const chatContainer = document.querySelector(".chat-container");
-        if (chatContainer) {
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+    // Scroll to bottom whenever the rendered message list changes
+    useEffect(() => {
+        const el = chatContainerRef.current;
+        if (el) {
+            el.scrollTop = el.scrollHeight;
         }
+    }, [messagesList]);
+
+    const handleSetMessages = (newMessages: Message[] | Message) => {
+        setMessages(newMessages instanceof Array ? newMessages : prev => [...prev, newMessages]);
     };
 
     const handleSubmit = async (e?: React.FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>) => {
@@ -228,10 +231,15 @@ export default function Chat({ onClose }: Props) {
             return;
         }
 
-        if (!secretKey) {
+        // Check if the selected model has the required key/source configured.
+        const modelProvider = detectProviderFromModel(model);
+        const selectedChatApiKey = chatApiKeys.find(chatApiKey => chatApiKey.id === selectedChatApiKeyId);
+        const requestKey = selectedChatApiKey?.key || secretKey;
+        if (chatModelSource === "api-key" && modelProvider !== "unknown" && modelProvider !== "ollama" && !requestKey) {
+            const providerName = getProviderDisplayName(modelProvider);
             toast({
-                title: "No Api Key Provided",
-                description: "Please provide a Api Key in the settings before sending a message",
+                title: "No API Key Provided",
+                description: `Please provide a ${providerName} API key in the settings before sending a message`,
                 variant: "destructive",
                 action: ToastActionButton
             });
@@ -243,31 +251,17 @@ export default function Chat({ onClose }: Props) {
 
         const newMessages = [...messages, { role: "user", type: "Text", content: newMessage } as const];
 
-        setMessages(newMessages);
-        setTimeout(scrollToBottom, 0);
+        handleSetMessages(newMessages);
         setNewMessage("");
 
-        // Client-side fail-fast: detect model/API key provider mismatch before making any request
-        const modelProvider = detectProviderFromModel(model);
-        const keyProvider = detectProviderFromApiKey(secretKey);
-        if (modelProvider !== "unknown" && keyProvider !== "unknown" && modelProvider !== keyProvider && modelProvider !== "ollama") {
-            const modelProviderName = getProviderDisplayName(modelProvider);
-            const keyProviderName = getProviderDisplayName(keyProvider);
-            toast({
-                title: "Error",
-                description: `Model/API key mismatch: You selected a ${modelProviderName} model but provided a ${keyProviderName} API key. Please update your API key in Settings to match your selected model.`,
-                variant: "destructive",
-            });
-            setIsLoading(false);
-            return;
-        }
-
         try {
+            const chatHeaders = new Headers({ "Content-Type": "application/json" });
+            const connectionId = getActiveConnectionIdGlobal();
+            if (connectionId) chatHeaders.set("X-Connection-Id", connectionId);
+
             const response = await fetch("/api/chat", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
+                headers: chatHeaders,
                 body: JSON.stringify({
                     messages: newMessages.filter(message => message.role === "user" || message.type === "Result").map(({ role, content }) => ({
                         role,
@@ -275,173 +269,100 @@ export default function Chat({ onClose }: Props) {
                     })),
                     graphName,
                     model,
-                    key: secretKey,
-                    cypherOnly
+                    key: chatModelSource === "local" ? localLlmProvider : requestKey,
+                    cypherOnly,
+                    modelSource: chatModelSource,
+                    localProvider: localLlmProvider,
+                    localEndpoint: localLlmEndpoint,
                 })
             });
 
-            if (!response.ok) {
-                throw await createResponseError(response);
+            if (response.status === 401 && response.headers.get("X-Session-Invalid") === "1") {
+                const { signOut } = await import("next-auth/react");
+                signOut({ callbackUrl: "/login" });
+                setIndicator("offline");
+                setIsLoading(false);
+                return;
             }
 
-            const reader = response.body?.getReader();
-            const decoder = new TextDecoder();
-            let buffer = "";
-
-            const handleEvent = (eventType: EventType | "error", eventData: string) => {
-                switch (eventType) {
-                    case "Status": {
-                        const message = {
-                            role: "assistant" as const,
-                            content: eventData,
-                            type: eventType
-                        };
-                        setMessages(prev => [...prev, message]);
-                        break;
-                    }
-
-                    case "CypherQuery": {
-                        let cypherContent = eventData;
-                        try {
-                            cypherContent = JSON.parse(eventData);
-                        } catch {
-                            // Use raw eventData if not valid JSON
-                        }
-                        setQueryCollapse(prev => ({ ...prev, [messages.length]: false }));
-                        setMessages(prev => [
-                            ...prev,
-                            {
-                                role: "assistant",
-                                content: typeof cypherContent === "string" ? cypherContent.replace(/^cypher\s+/i, "") : cypherContent,
-                                type: eventType
-                            }
-                        ]);
-                    }
-                        break;
-
-                    case "Result":
-                        try {
-                            setMessages(prev => [
-                                ...prev,
-                                {
-                                    role: "assistant",
-                                    content: JSON.parse(eventData),
-                                    type: eventType
-                                }
-                            ]);
-                        } catch (error) {
-                            console.error("Failed to parse Result event data:", error);
-                            setMessages(prev => [
-                                ...prev,
-                                {
-                                    role: "assistant",
-                                    content: eventData,
-                                    type: "Error"
-                                }
-                            ]);
-                        }
-                        return true;
-
-                    case "Error":
-                        setMessages(prev => [
-                            ...prev,
-                            {
-                                role: "assistant",
-                                content: eventData,
-                                type: eventType
-                            }
-                        ]);
-                        return true;
-
-                    case "error": {
-                        let statusCode = 0;
-                        let errorMessage = eventData;
-
-                        try {
-                            const parsed = JSON.parse(eventData);
-                            if (typeof parsed === "object" && parsed !== null) {
-                                statusCode = parsed.status || 0;
-                                errorMessage = parsed.message || eventData;
-                            }
-                        } catch {
-                            errorMessage = eventData;
-                        }
-
-                        if (statusCode === 401 || statusCode >= 500) setIndicator("offline");
-
-                        const friendly = toUserFriendlyMessage(errorMessage, statusCode);
-                        toast({
-                            title: friendly.title,
-                            description: friendly.description,
-                            variant: "destructive",
-                        });
-
-                        return true;
-                    }
-
-                    case "CypherResult":
-                        break;
-
-                    default:
-                        break;
-                }
-                return false;
-            };
-
-            const processStream = async () => {
-                if (!reader) return;
-
-                while (true) {
-                    const { done, value } = await reader.read();
-
-                    if (done) break;
-
-                    buffer += decoder.decode(value, { stream: true });
-
-                    // Parse complete SSE frames (delimited by \n\n)
-                    let frameEnd: number;
-                    while ((frameEnd = buffer.indexOf("\n\n")) !== -1) {
-                        const frame = buffer.substring(0, frameEnd);
-                        buffer = buffer.substring(frameEnd + 2);
-
-                        let eventType: EventType | "error" | null = null;
-                        let eventData = "";
-
-                        for (const line of frame.split("\n")) {
-                            if (line.startsWith("event:")) {
-                                eventType = line.substring(6).trim() as EventType | "error";
-                            } else if (line.startsWith("data:")) {
-                                eventData = line.substring(5).trim();
-                            }
-                        }
-
-                        if (eventType) {
-                            const isResult = handleEvent(eventType, eventData);
-                            setTimeout(scrollToBottom, 0);
-                            if (isResult) return;
-                        }
-                    }
-                }
-            };
-
-            processStream()
-                .catch((error) => {
-                    const friendly = toUserFriendlyMessage(error instanceof Error ? error.message : error, getErrorStatus(error));
-                    toast({
-                        title: friendly.title,
-                        description: friendly.description,
-                        variant: "destructive",
-                    });
-                })
-                .finally(() => {
-                    setIsLoading(false);
+            let data;
+            try {
+                data = await response.json();
+            } catch {
+                handleSetMessages({
+                    role: "assistant",
+                    content: "Failed to parse server response",
+                    type: "Error"
                 });
+                setIsLoading(false);
+                return;
+            }
+
+            if (!response.ok) {
+                if (response.status >= 500) setIndicator("offline");
+                handleSetMessages({
+                    role: "assistant",
+                    content: data.error || "An error occurred",
+                    type: "Error"
+                });
+                setIsLoading(false);
+                return;
+            }
+
+            setIndicator("online");
+
+            // Show cypher query if available
+            if (data.cypherQuery) {
+                const cypherContent = typeof data.cypherQuery === "string"
+                    ? data.cypherQuery.replace(/^cypher\s+/i, "")
+                    : data.cypherQuery;
+                setQueryCollapse(prev => ({ ...prev, [newMessages.length]: false }));
+                handleSetMessages({
+                    role: "assistant",
+                    content: cypherContent,
+                    type: "CypherQuery"
+                });
+            }
+
+            // Show cypher result if available
+            // if (data.cypherResult) {
+            //     handleSetMessages({
+            //         role: "assistant",
+            //         content: typeof data.cypherResult === "string" ? data.cypherResult : JSON.stringify(data.cypherResult),
+            //         type: "CypherResult"
+            //     });
+            // }
+
+            // Show answer
+            if (data.answer) {
+                const confidence = typeof data.confidence === "number" ? data.confidence : undefined;
+                handleSetMessages({
+                    role: "assistant",
+                    content: typeof data.answer === "string" ? data.answer : JSON.stringify(data.answer),
+                    type: "Result",
+                    confidence
+                });
+            }
+
+            // Stamp token usage on the last message of this turn (after all messages are added)
+            if (data.tokenUsage) {
+                const tokenCount = (data.tokenUsage as { totalTokens: number }).totalTokens;
+                setMessages(prev => {
+                    if (prev.length === 0) return prev;
+                    const updated = [...prev];
+                    updated[updated.length - 1] = { ...updated[updated.length - 1], tokenUsage: tokenCount };
+                    return updated;
+                });
+            }
+
+            setIsLoading(false);
+
         } catch (error) {
             const friendly = toUserFriendlyMessage(error instanceof Error ? error.message : error, getErrorStatus(error));
-            toast({
-                title: friendly.title,
-                description: friendly.description,
-                variant: "destructive",
+            handleSetMessages({
+                role: "assistant",
+                content: `${friendly.title}: ${friendly.description}`,
+                type: "Error"
             });
             setIsLoading(false);
         }
@@ -526,8 +447,29 @@ export default function Chat({ onClose }: Props) {
                         </div>
                     </div>
                 );
+            // case "CypherResult":
+            //     return (
+            //         <pre className="text-sm whitespace-pre-wrap break-all bg-muted p-2 rounded">
+            //             {message.content}
+            //         </pre>
+            //     );
+
             default:
-                return <MarkdownMessage content={message.content} />;
+                return (
+                    <div className="flex flex-col gap-1">
+                        <MarkdownMessage content={message.content} />
+                        {message.type === "Result" && message.confidence != null && (
+                            <span className={cn(
+                                "text-xs px-1.5 py-0.5 rounded w-fit",
+                                message.confidence >= 0.9 ? "bg-green-500/20 text-green-400" :
+                                    message.confidence >= 0.7 ? "bg-yellow-500/20 text-yellow-400" :
+                                        "bg-red-500/20 text-red-400"
+                            )}>
+                                Confidence: {Math.round(message.confidence * 100)}%
+                            </span>
+                        )}
+                    </div>
+                );
         }
     };
 
@@ -544,10 +486,12 @@ export default function Chat({ onClose }: Props) {
                 </Button>
                 <div className="w-full flex justify-between items-center pr-8">
                     <h1 className="text-lg font-semibold">Chat</h1>
-                    <Sparkles size={25} />
+                    <div className="flex items-center gap-2">
+                        <Sparkles size={25} />
+                    </div>
                 </div>
                 <span id="chat-prerequisites" className="text-center">Use English to query the graph. The feature requires LLM model and API key. Update local user parameters in Settings.</span>
-                <ul data-testid="chatMessagesList" className="w-full h-1 grow flex flex-col gap-[12px] overflow-x-hidden overflow-y-auto chat-container">
+                <ul ref={chatContainerRef} data-testid="chatMessagesList" className="w-full h-1 grow flex flex-col gap-[12px] overflow-x-hidden overflow-y-auto chat-container">
                     {
                         messagesList.map((message, index) => {
                             if (Array.isArray(message)) {
@@ -600,6 +544,7 @@ export default function Chat({ onClose }: Props) {
                                 : <div className="h-8 w-8 relative">
                                     {mounted && currentTheme && <Image className="rounded-full" src={`/icons/F-${currentTheme}.svg`} alt="Assistant" fill />}
                                 </div>;
+
                             return (
                                 <li
                                     data-testid={isUser ? "chatUserMessage" : `chatAssistantMessage-${message.type}`}
@@ -620,6 +565,54 @@ export default function Chat({ onClose }: Props) {
                         })
                     }
                 </ul>
+                {
+                    (totalTokens > 0 || model) && (() => {
+                        const selectedChatApiKey = chatApiKeys.find(k => k.id === selectedChatApiKeyId);
+                        const providerLabel = chatModelSource === "local"
+                            ? localLlmProvider.charAt(0).toUpperCase() + localLlmProvider.slice(1)
+                            : getProviderDisplayName(selectedChatApiKey?.provider ?? detectProviderFromModel(model));
+                        return (
+                            <div data-testid="chatFooter" className="w-full flex items-center justify-between gap-2 px-1 py-0.5 text-xs text-muted-foreground leading-none">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    {totalTokens > 0 && (
+                                        <>
+                                            <span className="font-medium text-foreground/60 shrink-0">Token Usage</span>
+                                            <span className="shrink-0">·</span>
+                                            {lastMessageTokens !== null && (
+                                                <ShadTooltip>
+                                                    <ShadTooltipTrigger asChild>
+                                                        <span data-testid="chatFooterLastTokens" className="truncate max-w-[6rem]">Last: <span className="font-medium text-foreground">{lastMessageTokens.toLocaleString()}</span></span>
+                                                    </ShadTooltipTrigger>
+                                                    <ShadTooltipContent side="top">Last message: {lastMessageTokens.toLocaleString()} tokens</ShadTooltipContent>
+                                                </ShadTooltip>
+                                            )}
+                                            <ShadTooltip>
+                                                <ShadTooltipTrigger asChild>
+                                                    <span data-testid="chatFooterTotalTokens" className="truncate max-w-[6rem]">Total: <span className="font-medium text-foreground">{totalTokens.toLocaleString()}</span></span>
+                                                </ShadTooltipTrigger>
+                                                <ShadTooltipContent side="top">Session total: {totalTokens.toLocaleString()} tokens</ShadTooltipContent>
+                                            </ShadTooltip>
+                                        </>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0 min-w-0 max-w-[50%]">
+                                    {model && (
+                                        <>
+                                            <span className="font-medium text-foreground/70 shrink-0">{providerLabel}</span>
+                                            <span className="shrink-0">·</span>
+                                            <ShadTooltip>
+                                                <ShadTooltipTrigger asChild>
+                                                    <span data-testid="chatFooterModel" className="truncate">{model}</span>
+                                                </ShadTooltipTrigger>
+                                                <ShadTooltipContent side="top">{model}</ShadTooltipContent>
+                                            </ShadTooltip>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })()
+                }
                 <form data-testid="chatForm" className="flex gap-2 items-center border border-border rounded-lg w-full p-2" onSubmit={handleSubmit}>
                     <ShadTooltip>
                         <ShadTooltipTrigger asChild>

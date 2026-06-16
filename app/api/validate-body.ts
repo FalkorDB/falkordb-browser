@@ -171,9 +171,10 @@ export const chatRequest = z.object({
     .min(1, "Graph name cannot be empty"),
   key: z
     .string({
-      error: (issue) => issue.input === undefined ? "API key is required" : "Invalid API key",
+      error: "Invalid API key",
     })
-    .min(1, "API key cannot be empty"),
+    .optional()
+    .default(""),
   model: z
     .string({
       error: (issue) => issue.input === undefined ? "Model is required" : "Invalid Model",
@@ -185,6 +186,18 @@ export const chatRequest = z.object({
     })
     .optional()
     .default(false),
+  modelSource: z
+    .enum(["api-key", "local"])
+    .optional()
+    .default("api-key"),
+  localProvider: z
+    .enum(["ollama", "lmstudio"])
+    .optional()
+    .default("ollama"),
+  localEndpoint: z
+    .string()
+    .optional()
+    .default(""),
 });
 
 // Auth schemas

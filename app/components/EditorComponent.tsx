@@ -9,6 +9,30 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import { useTheme } from "next-themes";
 import { getTheme } from "@/lib/utils";
 
+if (typeof window !== 'undefined') {
+    (window as Window & { MonacoEnvironment?: { getWorker: (_moduleId: unknown, label: string) => Worker } }).MonacoEnvironment = {
+        getWorker(_moduleId: unknown, label: string) {
+            switch (label) {
+                case 'json':
+                    return new Worker(new URL('monaco-editor/esm/vs/language/json/json.worker', import.meta.url));
+                case 'css':
+                case 'scss':
+                case 'less':
+                    return new Worker(new URL('monaco-editor/esm/vs/language/css/css.worker', import.meta.url));
+                case 'html':
+                case 'handlebars':
+                case 'razor':
+                    return new Worker(new URL('monaco-editor/esm/vs/language/html/html.worker', import.meta.url));
+                case 'typescript':
+                case 'javascript':
+                    return new Worker(new URL('monaco-editor/esm/vs/language/typescript/ts.worker', import.meta.url));
+                default:
+                    return new Worker(new URL('monaco-editor/esm/vs/editor/editor.worker', import.meta.url));
+            }
+        },
+    };
+}
+
 loader.config({ monaco });
 
 export const LINE_HEIGHT = 22;

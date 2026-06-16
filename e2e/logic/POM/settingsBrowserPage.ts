@@ -16,6 +16,42 @@ export default class SettingsBrowserPage extends BasePage {
     return this.page.getByTestId("chatApiKeyInput");
   }
 
+  private get chatModelSourceApiKeyButton(): Locator {
+    return this.page.getByTestId("chatModelSourceApiKey");
+  }
+
+  private get chatModelSourceLocalButton(): Locator {
+    return this.page.getByTestId("chatModelSourceLocal");
+  }
+
+  private get chatApiKeyProvidersInfoButton(): Locator {
+    return this.page.getByTestId("chatApiKeyProvidersInfo");
+  }
+
+  private get addChatApiKeyButton(): Locator {
+    return this.page.getByTestId("addChatApiKeyButton");
+  }
+
+  private get chatApiKeyCards(): Locator {
+    return this.page.getByTestId("chatApiKeyCard");
+  }
+
+  private get localLlmProviderOllamaButton(): Locator {
+    return this.page.getByTestId("localLlmProviderOllama");
+  }
+
+  private get localLlmProviderLmStudioButton(): Locator {
+    return this.page.getByTestId("localLlmProviderLmStudio");
+  }
+
+  private get localLlmEndpointInput(): Locator {
+    return this.page.getByTestId("localLlmEndpointInput");
+  }
+
+  private get localLlmLoadButton(): Locator {
+    return this.page.getByTestId("localLlmLoadButton");
+  }
+
   private get maxSaveMessagesInput(): Locator {
     return this.page.getByTestId("maxSaveMessagesInput");
   }
@@ -48,7 +84,7 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   private get noModelsFoundMessage(): Locator {
-    return this.page.locator('p:has-text("No models found")');
+    return this.page.getByTestId("noModelsFoundMessage");
   }
 
   // Wait for Interactive Methods
@@ -115,6 +151,239 @@ export default class SettingsBrowserPage extends BasePage {
     );
   }
 
+  async selectApiKeyModelSource(): Promise<void> {
+    await interactWhenVisible(
+      this.chatModelSourceApiKeyButton,
+      (el) => el.click(),
+      "API Key Model Source"
+    );
+    await this.chatApiKeyInput.waitFor({ state: "visible", timeout: 5000 });
+  }
+
+  async selectLocalLlmModelSource(): Promise<void> {
+    await interactWhenVisible(
+      this.chatModelSourceLocalButton,
+      (el) => el.click(),
+      "Local LLM Model Source"
+    );
+    await this.localLlmEndpointInput.waitFor({ state: "visible", timeout: 5000 });
+  }
+
+  async selectLmStudioProvider(): Promise<void> {
+    await interactWhenVisible(
+      this.localLlmProviderLmStudioButton,
+      (el) => el.click(),
+      "LM Studio Provider"
+    );
+  }
+
+  async isLocalLlmModelSourceSelected(): Promise<boolean> {
+    return (await this.chatModelSourceLocalButton.getAttribute("aria-pressed")) === "true";
+  }
+
+  async waitForLocalLlmModelSourceSelected(): Promise<void> {
+    await this.page.waitForFunction(
+      () => {
+        const btn = document.querySelector('[data-testid="chatModelSourceLocal"]');
+        return btn?.getAttribute("aria-pressed") === "true";
+      },
+      null,
+      { timeout: 10000 }
+    );
+  }
+
+  /**
+   * Remove chatModelSource from localStorage so we can reliably detect
+   * when the async encrypted save has completed.  Call this before saving.
+   */
+  async clearChatModelSourceFromLocalStorage(): Promise<void> {
+    await this.page.evaluate(() => localStorage.removeItem("chatModelSource"));
+  }
+
+  /**
+   * Wait until the async saveEncryptedSetting call has written the
+   * chatModelSource key back into localStorage.
+   */
+  async waitForChatModelSourceSaved(): Promise<void> {
+    await this.page.waitForFunction(
+      () => localStorage.getItem("chatModelSource") !== null,
+      null,
+      { timeout: 10000 }
+    );
+  }
+
+  async isLmStudioProviderSelected(): Promise<boolean> {
+    return (await this.localLlmProviderLmStudioButton.getAttribute("aria-pressed")) === "true";
+  }
+
+  async isOllamaProviderVisible(): Promise<boolean> {
+    return this.localLlmProviderOllamaButton.isVisible();
+  }
+
+  async isLmStudioProviderVisible(): Promise<boolean> {
+    return this.localLlmProviderLmStudioButton.isVisible();
+  }
+
+  async getLocalLlmEndpointValue(): Promise<string> {
+    return interactWhenVisible(
+      this.localLlmEndpointInput,
+      (el) => el.inputValue(),
+      "Local LLM Endpoint Value"
+    );
+  }
+
+  async fillLocalLlmEndpoint(endpoint: string): Promise<void> {
+    await interactWhenVisible(
+      this.localLlmEndpointInput,
+      async (el) => {
+        await el.clear();
+        await el.fill(endpoint);
+      },
+      "Local LLM Endpoint Input"
+    );
+  }
+
+  async getLocalLlmLoadButtonText(): Promise<string> {
+    const text = await this.localLlmLoadButton.textContent();
+    return text?.trim() ?? "";
+  }
+
+  async hoverLocalLlmLoadButton(): Promise<void> {
+    await this.localLlmLoadButton.waitFor({ state: "visible", timeout: 5000 });
+    await this.page.waitForFunction(
+      () => {
+        const button = document.querySelector('[data-testid="localLlmLoadButton"]') as HTMLButtonElement | null;
+        return button && !button.disabled;
+      },
+      { timeout: 10000 }
+    );
+
+    await interactWhenVisible(
+      this.localLlmLoadButton,
+      (el) => el.hover(),
+      "Local LLM Load Button"
+    );
+  }
+
+  async isLocalLlmLoadTooltipVisible(): Promise<boolean> {
+    return waitForElementToBeVisible(this.page.getByText("Load", { exact: true }));
+  }
+
+  async hoverApiKeyProvidersInfo(): Promise<void> {
+    await interactWhenVisible(
+      this.chatApiKeyProvidersInfoButton,
+      (el) => el.hover(),
+      "API Key Providers Info"
+    );
+  }
+
+  async getApiKeyProvidersTooltipText(): Promise<string> {
+    const tooltip = this.page.getByText("Supported hosted keys:", { exact: false });
+    await tooltip.waitFor({ state: "visible", timeout: 5000 });
+    return (await tooltip.textContent()) ?? "";
+  }
+
+  private getMaskedApiKey(apiKey: string): string {
+    if (apiKey.length <= 10) return "••••••••";
+    return `${apiKey.slice(0, 6)}••••••••${apiKey.slice(-4)}`;
+  }
+
+  private getChatApiKeyCard(apiKey: string): Locator {
+    return this.chatApiKeyCards.filter({ hasText: apiKey }).first();
+  }
+
+  private getMaskedChatApiKeyCard(apiKey: string): Locator {
+    return this.chatApiKeyCards.filter({ hasText: this.getMaskedApiKey(apiKey) }).first();
+  }
+
+  async addChatApiKey(apiKey: string): Promise<void> {
+    await this.fillChatApiKey(apiKey);
+    await interactWhenVisible(
+      this.addChatApiKeyButton,
+      (el) => el.click(),
+      "Add Chat API Key Button"
+    );
+    await this.getMaskedChatApiKeyCard(apiKey).waitFor({ state: "visible", timeout: 5000 });
+  }
+
+  async selectChatApiKey(apiKey: string): Promise<void> {
+    const card = this.getMaskedChatApiKeyCard(apiKey);
+    await interactWhenVisible(
+      card,
+      (el) => el.click(),
+      "Select Chat API Key Card"
+    );
+  }
+
+  async getMaskedChatApiKeyText(apiKey: string): Promise<string> {
+    const keyText = this.getMaskedChatApiKeyCard(apiKey).getByTestId("chatApiKeyValue");
+    await keyText.waitFor({ state: "visible", timeout: 5000 });
+    return (await keyText.textContent()) ?? "";
+  }
+
+  async showChatApiKey(apiKey: string): Promise<void> {
+    const card = this.getMaskedChatApiKeyCard(apiKey);
+    await interactWhenVisible(
+      card.getByTestId("toggleChatApiKeyVisibilityButton"),
+      (el) => el.click(),
+      "Show Chat API Key Button"
+    );
+    await this.getChatApiKeyCard(apiKey).waitFor({ state: "visible", timeout: 5000 });
+  }
+
+  async getVisibleChatApiKeyText(apiKey: string): Promise<string> {
+    const keyText = this.getChatApiKeyCard(apiKey).getByTestId("chatApiKeyValue");
+    await keyText.waitFor({ state: "visible", timeout: 5000 });
+    return (await keyText.textContent()) ?? "";
+  }
+
+  async editChatApiKey(currentApiKey: string, nextApiKey: string): Promise<void> {
+    const card = this.getChatApiKeyCard(currentApiKey);
+    await interactWhenVisible(
+      card.getByTestId("editChatApiKeyButton"),
+      (el) => el.click(),
+      "Edit Chat API Key Button"
+    );
+
+    const editInput = this.page.getByTestId("chatApiKeyEditInput");
+    await interactWhenVisible(
+      editInput,
+      async (el) => {
+        await el.clear();
+        await el.fill(nextApiKey);
+      },
+      "Chat API Key Edit Input"
+    );
+
+    await interactWhenVisible(
+      this.page.getByTestId("saveEditedChatApiKeyButton"),
+      (el) => el.click(),
+      "Save Edited Chat API Key Button"
+    );
+    await this.getChatApiKeyCard(nextApiKey).waitFor({ state: "visible", timeout: 5000 });
+  }
+
+  async deleteChatApiKey(apiKey: string): Promise<void> {
+    const card = this.getChatApiKeyCard(apiKey);
+    await interactWhenVisible(
+      card.getByTestId("deleteChatApiKeyButton"),
+      (el) => el.click(),
+      "Delete Chat API Key Button"
+    );
+    const dialog = this.page.getByTestId("deleteChatApiKeyDialog");
+    await dialog.waitFor({ state: "visible", timeout: 5000 });
+    await interactWhenVisible(
+      this.page.getByTestId("confirmDeleteChatApiKeyButton"),
+      (el) => el.click(),
+      "Confirm Delete Chat API Key Button"
+    );
+    await card.waitFor({ state: "detached", timeout: 5000 });
+  }
+
+  async isChatApiKeyPresent(apiKey: string): Promise<boolean> {
+    return this.getChatApiKeyCard(apiKey).isVisible();
+  }
+
   async fillMaxSavedMessages(value: number): Promise<void> {
     await interactWhenVisible(
       this.maxSaveMessagesInput,
@@ -173,10 +442,15 @@ export default class SettingsBrowserPage extends BasePage {
   // Combined Actions
   async expandChatSection(): Promise<void> {
     await this.chatSectionHeader.waitFor({ state: "visible" });
-    const isInputVisible = await this.chatApiKeyInput.isVisible();
-    if (!isInputVisible) {
+    const isApiKeyInputVisible = await this.chatApiKeyInput.isVisible();
+    const isLocalEndpointVisible = await this.localLlmEndpointInput.isVisible();
+    if (!isApiKeyInputVisible && !isLocalEndpointVisible) {
       await this.clickChatSectionHeader();
-      await this.waitForChatApiKeyInput();
+      await this.page.waitForFunction(
+        () => document.querySelector('[data-testid="chatApiKeyInput"]') ||
+          document.querySelector('[data-testid="localLlmEndpointInput"]'),
+        { timeout: 10000 }
+      );
     }
   }
 
@@ -267,6 +541,14 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   async searchModels(searchText: string): Promise<void> {
+    await this.modelSearchInput.waitFor({ state: "visible", timeout: 10000 });
+    await this.page.waitForFunction(
+      () => {
+        const input = document.querySelector('[data-testid="modelSearch"]') as HTMLInputElement;
+        return input && !input.disabled;
+      },
+      { timeout: 30000 }
+    );
     await interactWhenVisible(
       this.modelSearchInput,
       (el) => el.fill(searchText),

@@ -16,6 +16,33 @@ import LoginPage from "../logic/POM/loginPage";
  */
 
 const HEX_COLON_PATTERN = /^[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+$/;
+const CHAT_API_KEYS_STORAGE_KEY = "chatApiKeys";
+
+async function waitForMigratedChatApiKeys(page: Awaited<ReturnType<BrowserWrapper["getPage"]>>) {
+    await expect.poll(async () => page.evaluate((storageKey) => {
+        const secretKey = localStorage.getItem("secretKey");
+        const chatApiKeys = localStorage.getItem(storageKey);
+        return secretKey === null && chatApiKeys !== null && /^[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+$/.test(chatApiKeys);
+    }, CHAT_API_KEYS_STORAGE_KEY), { timeout: 15000 }).toBe(true);
+
+    return page.evaluate(async (storageKey) => {
+        const encryptedKeys = localStorage.getItem(storageKey);
+        if (!encryptedKeys) return null;
+
+        const response = await fetch('/api/encrypt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value: encryptedKeys, action: 'decrypt' }),
+        });
+        const payload = await response.json();
+
+        return {
+            encryptedKeys,
+            decryptedKeys: payload.value as string,
+            secretKey: localStorage.getItem("secretKey"),
+        };
+    }, CHAT_API_KEYS_STORAGE_KEY);
+}
 
 test.describe(`@admin Encryption migration tests`, () => {
     // Run serially: each test disconnects + re-authenticates which is resource-heavy;
@@ -47,16 +74,13 @@ test.describe(`@admin Encryption migration tests`, () => {
         await page.goto(urls.graphUrl);
         await page.waitForLoadState("networkidle");
 
-        await expect.poll(async () =>
-            page.evaluate(() => localStorage.getItem("secretKey")),
-            { timeout: 15000 }
-        ).toMatch(HEX_COLON_PATTERN);
+        const migrated = await waitForMigratedChatApiKeys(page);
+        const migratedKeys = JSON.parse(migrated?.decryptedKeys ?? "[]") as Array<{ key?: string }>;
 
-        const storedKey = await page.evaluate(() => localStorage.getItem("secretKey"));
-
-        // It should now be server-encrypted (iv:authTag:ciphertext hex format)
-        expect(storedKey).not.toBe("my-plain-api-key-12345");
-        expect(storedKey).toMatch(HEX_COLON_PATTERN);
+        expect(migrated?.secretKey).toBeNull();
+        expect(migrated?.encryptedKeys).not.toBe("my-plain-api-key-12345");
+        expect(migrated?.encryptedKeys).toMatch(HEX_COLON_PATTERN);
+        expect(migratedKeys[0]?.key).toBe("my-plain-api-key-12345");
     });
     test(`legacy enc: prefixed secretKey is detected on page load`, async () => {
         await browser.createNewPage(LoginPage);
@@ -137,21 +161,20 @@ test.describe(`@admin Encryption migration tests`, () => {
         // Wait for the migration effect to run
         await page.waitForTimeout(3000);
 
-        // The legacy key should have been decrypted and re-encrypted server-side
-        const storedKey = await page.evaluate(() => localStorage.getItem("secretKey"));
+        const migrated = await waitForMigratedChatApiKeys(page);
+        const migratedKeys = JSON.parse(migrated?.decryptedKeys ?? "[]") as Array<{ key?: string }>;
         const legacyKeyRemains = await page.evaluate(() =>
             localStorage.getItem("falkordb-key") !== null || sessionStorage.getItem("falkordb-key") !== null
         );
 
-        // The key should now be in the new server-encrypted format
-        expect(storedKey).not.toBeNull();
-        expect(storedKey!.startsWith("enc:")).toBe(false);
-        expect(storedKey!).toMatch(HEX_COLON_PATTERN);
+        expect(migrated?.secretKey).toBeNull();
+        expect(migrated?.encryptedKeys).toMatch(HEX_COLON_PATTERN);
+        expect(migratedKeys[0]?.key).toBe("test-api-key-for-migration");
         // The old key should be cleared
         expect(legacyKeyRemains).toBe(false);
     });
 
-    test(`already server-encrypted secretKey survives page reload`, async () => {
+    test(`already server-encrypted chatApiKeys survives page reload`, async () => {
         await browser.createNewPage(LoginPage, urls.graphUrl);
         await browser.setPageToFullScreen();
 
@@ -164,12 +187,8 @@ test.describe(`@admin Encryption migration tests`, () => {
 
         await page.reload({ waitUntil: "networkidle" });
 
-        await expect.poll(async () =>
-            page.evaluate(() => localStorage.getItem("secretKey")),
-            { timeout: 15000 }
-        ).toMatch(HEX_COLON_PATTERN);
-
-        const encryptedValue = await page.evaluate(() => localStorage.getItem("secretKey"));
+        const migrated = await waitForMigratedChatApiKeys(page);
+        const encryptedValue = migrated?.encryptedKeys;
         expect(encryptedValue).toMatch(HEX_COLON_PATTERN);
 
         // Reload the page — the encrypted value should stay the same
@@ -177,7 +196,7 @@ test.describe(`@admin Encryption migration tests`, () => {
         await page.reload({ waitUntil: "networkidle" });
         await page.waitForTimeout(2000);
 
-        const afterReload = await page.evaluate(() => localStorage.getItem("secretKey"));
+        const afterReload = await page.evaluate((storageKey) => localStorage.getItem(storageKey), CHAT_API_KEYS_STORAGE_KEY);
         expect(afterReload).toBe(encryptedValue);
     });
 

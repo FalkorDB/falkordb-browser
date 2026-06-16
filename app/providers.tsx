@@ -4,16 +4,18 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, SyntaxErrorInfo, parseSyntaxError } from "@/lib/utils";
-import { serverEncrypt, serverDecrypt, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
+import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
+import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import { usePathname, useRouter } from "next/navigation";
 import { useGraphParams, syncRouteUrlParams } from "@/lib/useUrlParams";
 import { useToast } from "@/components/ui/use-toast";
+import { detectProviderFromApiKey, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { PanelImperativeHandle } from "react-resizable-panels";
 import type { Data as CanvasData, HierarchyDirection, LayoutMode, RadialDirection, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphInfo } from "./api/graph/model";
-import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, SyntaxErrorContext, SessionConnection } from "./components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, SyntaxErrorContext, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
 
@@ -51,6 +53,89 @@ const normalizeDirection = (layout: LayoutMode, value: string | null | undefined
     return value && RADIAL_DIRECTION_VALUES.includes(value as RadialDirection) ? value : 'out';
   }
   return '';
+};
+
+const CHAT_MODEL_SOURCE_STORAGE_KEY = "chatModelSource";
+const LOCAL_LLM_PROVIDER_STORAGE_KEY = "localLlmProvider";
+const LOCAL_LLM_ENDPOINT_STORAGE_KEY = "localLlmEndpoint";
+const DEFAULT_LOCAL_LLM_ENDPOINTS: Record<LocalLlmProvider, string> = {
+  ollama: "http://localhost:11434",
+  lmstudio: "http://localhost:1234/v1",
+};
+
+const normalizeChatModelSource = (value: string | null | undefined): ChatModelSource =>
+  value === "local" ? "local" : "api-key";
+
+const normalizeLocalLlmProvider = (value: string | null | undefined): LocalLlmProvider =>
+  value === "lmstudio" ? "lmstudio" : "ollama";
+
+const normalizeLocalLlmEndpoint = (
+  provider: LocalLlmProvider,
+  endpoint: string | null | undefined
+) => endpoint?.trim() || DEFAULT_LOCAL_LLM_ENDPOINTS[provider];
+
+const createChatApiKey = (key: string): ChatApiKey => {
+  const provider = detectProviderFromApiKey(key);
+  const providerName = provider === "unknown" ? "LLM" : getProviderDisplayName(provider);
+
+  return {
+    id: crypto.randomUUID(),
+    label: `${providerName} key`,
+    key,
+    provider,
+    createdAt: Date.now(),
+  };
+};
+
+const parseChatApiKeys = (value: string): ChatApiKey[] => {
+  const parsed = JSON.parse(value) as unknown;
+  if (!Array.isArray(parsed)) return [];
+
+  return parsed
+    .filter((item): item is ChatApiKey => {
+      if (!item || typeof item !== "object") return false;
+      const candidate = item as Partial<ChatApiKey>;
+      return typeof candidate.id === "string" &&
+        typeof candidate.label === "string" &&
+        typeof candidate.key === "string" &&
+        typeof candidate.provider === "string";
+    })
+    .map(item => ({
+      ...item,
+      createdAt: typeof item.createdAt === "number" ? item.createdAt : Date.now(),
+    }));
+};
+
+const loadSelectedChatApiKeyId = () =>
+  localStorage.getItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY) || "";
+
+/**
+ * Validates and normalises a model identifier before it is persisted.
+ * Only allows characters that appear in real model names (e.g. "gpt-4o",
+ * "llama3.1:8b-instruct") and blocks common API-key prefixes, ensuring that
+ * an accidentally-tainted value never reaches localStorage as a secret.
+ * Returns an empty string for anything that does not look like a model name.
+ */
+const sanitizeModelName = (value: string): string => {
+  const normalized = String(value ?? "").trim().slice(0, 128);
+  if (!normalized) return "";
+  // Block common secret-like prefixes
+  if (/^(sk-|rk-|pk-|api[_-]?key)/i.test(normalized)) return "";
+  // Allow only characters that appear in model identifiers
+  return /^[a-zA-Z0-9._:\-/]+$/.test(normalized) ? normalized : "";
+};
+
+/**
+ * Validates all values in a perSourceModels map through sanitizeModelName.
+ */
+const sanitizePerSourceModels = (value: unknown): Record<string, string> => {
+  if (!value || typeof value !== "object") return {};
+  const result: Record<string, string> = {};
+  for (const [key, modelValue] of Object.entries(value as Record<string, unknown>)) {
+    const safeModel = sanitizeModelName(String(modelValue ?? ""));
+    if (safeModel) result[String(key)] = safeModel;
+  }
+  return result;
 };
 
 /**
@@ -125,18 +210,27 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [newRefreshInterval, setNewRefreshInterval] = useState(0);
   const [currentTab, setCurrentTab] = useState<Tab>("Graph");
   const [newSecretKey, setNewSecretKey] = useState("");
-  const [newModel, setNewModel] = useState("");
   const [secretKey, setSecretKey] = useState("");
   const [hasChanges, setHasChanges] = useState(false);
   const [nodesCount, setNodesCount] = useState<number>();
   const [edgesCount, setEdgesCount] = useState<number>();
   const [newMaxSavedMessages, setNewMaxSavedMessages] = useState(0);
   const [maxSavedMessages, setMaxSavedMessages] = useState(0);
+  const [chatApiKeys, setChatApiKeys] = useState<ChatApiKey[]>([]);
+  const [selectedChatApiKeyId, setSelectedChatApiKeyId] = useState("");
+  const [chatModelSource, setChatModelSource] = useState<ChatModelSource>("api-key");
+  const [localLlmProvider, setLocalLlmProvider] = useState<LocalLlmProvider>("ollama");
+  const [localLlmEndpoint, setLocalLlmEndpoint] = useState(DEFAULT_LOCAL_LLM_ENDPOINTS.ollama);
+  const [newChatModelSource, setNewChatModelSource] = useState<ChatModelSource>("api-key");
+  const [newLocalLlmProvider, setNewLocalLlmProvider] = useState<LocalLlmProvider>("ollama");
+  const [newLocalLlmEndpoint, setNewLocalLlmEndpoint] = useState(DEFAULT_LOCAL_LLM_ENDPOINTS.ollama);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0);
   const [isQueryLoading, setIsQueryLoading] = useState(false);
   const [syntaxError, setSyntaxError] = useState<SyntaxErrorInfo | null>(null);
   const [model, setModel] = useState("");
+  const [newModel, setNewModel] = useState("");
+  const [perSourceModels, setPerSourceModels] = useState<Record<string, string>>({});
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>([]);
   const [userGraphBeforeTutorial, setUserGraphBeforeTutorial] = useState<string>("");
@@ -192,7 +286,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       contentPersistenceSettings: { newContentPersistence, setNewContentPersistence },
       captionsKeysSettings: { newCaptionsKeys, setNewCaptionsKeys },
       showPropertyKeyPrefixSettings: { newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
-      chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly },
+      chatSettings: { newSecretKey, setNewSecretKey, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly, newChatModelSource, setNewChatModelSource, newLocalLlmProvider, setNewLocalLlmProvider, newLocalLlmEndpoint, setNewLocalLlmEndpoint, newModel, setNewModel },
       graphInfo: { newRefreshInterval, setNewRefreshInterval, newMaxItemsForSearch, setNewMaxItemsForSearch },
       tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple }
     },
@@ -204,7 +298,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       contentPersistenceSettings: { contentPersistence, setContentPersistence },
       captionsKeysSettings: { captionsKeys, setCaptionsKeys },
       showPropertyKeyPrefixSettings: { showPropertyKeyPrefix, setShowPropertyKeyPrefix },
-      chatSettings: { secretKey, setSecretKey, model, setModel, maxSavedMessages, setMaxSavedMessages, cypherOnly, setCypherOnly },
+      chatSettings: { secretKey, setSecretKey, chatApiKeys, setChatApiKeys, selectedChatApiKeyId, setSelectedChatApiKeyId, chatModelSource, setChatModelSource, localLlmProvider, setLocalLlmProvider, localLlmEndpoint, setLocalLlmEndpoint, model, setModel, maxSavedMessages, setMaxSavedMessages, cypherOnly, setCypherOnly, perSourceModels, setPerSourceModels },
       graphInfo: { showMemoryUsage, refreshInterval, setRefreshInterval, maxItemsForSearch, setMaxItemsForSearch },
       tableViewSettings: { columnWidth, setColumnWidth, rowHeight, setRowHeight, rowHeightExpandMultiple, setRowHeightExpandMultiple }
     },
@@ -220,7 +314,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       localStorage.setItem("defaultQuery", newDefaultQuery);
       localStorage.setItem("limit", newLimit.toString());
       localStorage.setItem("refreshInterval", newRefreshInterval.toString());
-      localStorage.setItem("model", newModel);
       localStorage.setItem("maxSavedMessages", newMaxSavedMessages.toString());
       localStorage.setItem("captionsKeys", JSON.stringify(newCaptionsKeys));
       localStorage.setItem("showPropertyKeyPrefix", newShowPropertyKeyPrefix.toString());
@@ -230,35 +323,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       localStorage.setItem("rowHeightExpandMultiple", newRowHeightExpandMultiple.toString());
       localStorage.setItem("maxItemsForSearch", newMaxItemsForSearch.toString());
 
-      // Only encrypt and save secret key if it has changed
-      if (newSecretKey !== secretKey) {
-        if (newSecretKey) {
-          try {
-            const encryptedKey = await serverEncrypt(newSecretKey);
-            if (!encryptedKey) {
-              toast({
-                title: "Error",
-                description: "Could not encrypt secret key. Please try again.",
-                variant: "destructive",
-              });
-              return;
-            }
-            localStorage.setItem("secretKey", encryptedKey);
-          } catch (error) {
-            console.error('Failed to encrypt secret key:', error);
-            toast({
-              title: "Error",
-              description: "Could not encrypt secret key. Please try again.",
-              variant: "destructive",
-            });
-            return;
-          }
-        } else {
-          // Key is empty - remove it from storage
-          localStorage.removeItem("secretKey");
-        }
-      }
-
       // Update context
       setContentPersistence(newContentPersistence);
       setRunDefaultQuery(newRunDefaultQuery);
@@ -266,8 +330,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setTimeout(newTimeout);
       setLimit(newLimit);
       setLastLimit(limit);
-      setSecretKey(newSecretKey);
-      setModel(newModel);
       setRefreshInterval(newRefreshInterval);
       setMaxSavedMessages(newMaxSavedMessages);
       setCaptionsKeys(newCaptionsKeys);
@@ -277,6 +339,20 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setRowHeight(newRowHeight);
       setRowHeightExpandMultiple(newRowHeightExpandMultiple);
       setMaxItemsForSearch(newMaxItemsForSearch);
+      // Apply LLM connection settings
+      setChatModelSource(newChatModelSource);
+      setLocalLlmProvider(newLocalLlmProvider);
+      setLocalLlmEndpoint(newLocalLlmEndpoint);
+      setModel(newModel);
+      const sourceKey = newChatModelSource === "local" ? newLocalLlmProvider : "api-key";
+      const next = sanitizePerSourceModels({ ...perSourceModels, [sourceKey]: sanitizeModelName(newModel) });
+      setPerSourceModels(next);
+      localStorage.setItem("perSourceModels", JSON.stringify(next));
+      // chatModelSource and localLlmProvider are non-secret enum values
+      localStorage.setItem(CHAT_MODEL_SOURCE_STORAGE_KEY, newChatModelSource === "local" ? "local" : "api-key");
+      localStorage.setItem(LOCAL_LLM_PROVIDER_STORAGE_KEY, newLocalLlmProvider === "lmstudio" ? "lmstudio" : "ollama");
+      localStorage.setItem(LOCAL_LLM_ENDPOINT_STORAGE_KEY, normalizeLocalLlmEndpoint(newLocalLlmProvider, newLocalLlmEndpoint));
+      localStorage.setItem("model", sanitizeModelName(newModel));
       // Reset has changes
       setHasChanges(false);
 
@@ -293,7 +369,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setNewTimeout(timeout);
       setNewLimit(limit);
       setNewSecretKey(secretKey);
-      setNewModel(model);
       setNewRefreshInterval(refreshInterval);
       setNewMaxSavedMessages(maxSavedMessages);
       setNewCaptionsKeys(captionsKeys);
@@ -303,10 +378,14 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setNewRowHeight(rowHeight);
       setNewRowHeightExpandMultiple(rowHeightExpandMultiple);
       setNewMaxItemsForSearch(maxItemsForSearch);
+      setNewChatModelSource(chatModelSource);
+      setNewLocalLlmProvider(localLlmProvider);
+      setNewLocalLlmEndpoint(localLlmEndpoint);
+      setNewModel(model);
       setHasChanges(false);
     }
 
-  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, toast]);
+  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, newContentPersistence, newDefaultQuery, newLimit, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, toast, perSourceModels, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, newModel]);
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -534,8 +613,22 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       handleCooldown(-1);
     } catch (err) {
       // Errors from getSSEGraphResult are already surfaced via toast
-      const parsed = parseSyntaxError((err as Error).message || "");
+      const errorMessage = (err as Error).message || "";
+      const parsed = parseSyntaxError(errorMessage);
       if (parsed) setSyntaxError(parsed);
+
+      // Save failed query to history with the error message
+      newQuery = { ...newQuery, errorMessage };
+      const failedQueries = handelGetNewQueries(newQuery);
+      if (prefixReady) {
+        setConnectionItem("query history", JSON.stringify(failedQueries));
+      }
+      setHistoryQuery(prev => ({
+        ...prev,
+        queries: failedQueries,
+        currentQuery: newQuery,
+        counter: 0
+      }));
     } finally {
       setIsQueryLoading(false);
     }
@@ -733,6 +826,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                 activeConnectionId: target,
               });
             }
+
           } else {
             // Token DB returned no connections — the session is out of sync.
             // This happens after a server restart (FileTokenStorage wiped),
@@ -866,60 +960,79 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setRowHeightExpandMultiple(parseInt(localStorage.getItem("rowHeightExpandMultiple") || "3", 10));
       const parsedMaxItems = parseInt(localStorage.getItem("maxItemsForSearch") || "20", 10);
       setMaxItemsForSearch(Number.isFinite(parsedMaxItems) ? Math.min(Math.max(parsedMaxItems, 10), 50) : 20);
-      // Decrypt secret key using server-side decryption, with migration from old client-side encryption
-      const storedSecretKey = localStorage.getItem("secretKey") || "";
-      if (storedSecretKey) {
-        if (isLegacyEncrypted(storedSecretKey)) {
-          // Old client-side encrypted value - decrypt with legacy method, then re-encrypt server-side
-          try {
-            const plainKey = await legacyDecrypt(storedSecretKey);
-            if (plainKey) {
-              setSecretKey(plainKey);
-              const newEncrypted = await serverEncrypt(plainKey);
-              if (newEncrypted) {
-                localStorage.setItem("secretKey", newEncrypted);
-              }
-              clearLegacyEncryptionKey();
-            } else {
-              // eslint-disable-next-line no-console
-              console.warn('Could not decrypt legacy secret key, clearing');
-              setSecretKey('');
-              localStorage.removeItem("secretKey");
-              clearLegacyEncryptionKey();
-            }
-          } catch (error) {
-            console.error('Failed to migrate legacy secret key:', error);
-            setSecretKey('');
-            localStorage.removeItem("secretKey");
-          }
-        } else {
-          // Try server-side decryption (new format or plain text)
-          try {
-            const decryptedKey = await serverDecrypt(storedSecretKey);
-            if (decryptedKey) {
-              setSecretKey(decryptedKey);
-            } else {
-              // eslint-disable-next-line no-console
-              console.warn('Clearing corrupted encrypted secret key');
-              setSecretKey('');
-              localStorage.removeItem("secretKey");
-            }
-          } catch {
-            // Not server-encrypted - treat as plain text, migrate to server encryption
-            try {
-              setSecretKey(storedSecretKey);
-              const encryptedKey = await serverEncrypt(storedSecretKey);
-              if (encryptedKey) {
-                localStorage.setItem("secretKey", encryptedKey);
-              }
-            } catch (migrateError) {
-              console.error('Failed to migrate plain text key:', migrateError);
-            }
-          }
+      const loadedChatModelSource = normalizeChatModelSource(localStorage.getItem(CHAT_MODEL_SOURCE_STORAGE_KEY));
+      const loadedLocalLlmProvider = normalizeLocalLlmProvider(localStorage.getItem(LOCAL_LLM_PROVIDER_STORAGE_KEY));
+      const rawEndpoint = localStorage.getItem(LOCAL_LLM_ENDPOINT_STORAGE_KEY);
+      const loadedLocalLlmEndpoint = normalizeLocalLlmEndpoint(
+        loadedLocalLlmProvider,
+        looksServerEncrypted(rawEndpoint ?? "") ? null : rawEndpoint
+      );
+      setChatModelSource(loadedChatModelSource);
+      setNewChatModelSource(loadedChatModelSource);
+      setLocalLlmProvider(loadedLocalLlmProvider);
+      setNewLocalLlmProvider(loadedLocalLlmProvider);
+      setLocalLlmEndpoint(loadedLocalLlmEndpoint);
+      setNewLocalLlmEndpoint(loadedLocalLlmEndpoint);
+      let loadedChatApiKeys: ChatApiKey[] = [];
+      const storedChatApiKeys = localStorage.getItem(CHAT_API_KEYS_STORAGE_KEY) || "";
+      if (storedChatApiKeys) {
+        try {
+          const decryptedKeys = await serverDecrypt(storedChatApiKeys);
+          loadedChatApiKeys = decryptedKeys ? parseChatApiKeys(decryptedKeys) : [];
+        } catch (error) {
+          console.error('Failed to decrypt API keys:', error);
         }
       }
 
-      setModel(localStorage.getItem("model") || "");
+      // Migrate the legacy single-key setting into the new key list.
+      const storedSecretKey = localStorage.getItem("secretKey") || "";
+      if (loadedChatApiKeys.length === 0 && storedSecretKey) {
+        let migratedKey = "";
+        if (isLegacyEncrypted(storedSecretKey)) {
+          try {
+            migratedKey = await legacyDecrypt(storedSecretKey);
+            clearLegacyEncryptionKey();
+          } catch (error) {
+            console.error('Failed to migrate legacy secret key:', error);
+          }
+        } else {
+          try {
+            migratedKey = await serverDecrypt(storedSecretKey);
+          } catch {
+            migratedKey = storedSecretKey;
+          }
+        }
+
+        if (migratedKey) {
+          const migratedChatApiKeys = [createChatApiKey(migratedKey)];
+          const encryptedKeys = await serverEncrypt(JSON.stringify(migratedChatApiKeys));
+          if (encryptedKeys) {
+            loadedChatApiKeys = migratedChatApiKeys;
+            localStorage.setItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
+            localStorage.removeItem("secretKey");
+          }
+        } else if (isLegacyEncrypted(storedSecretKey)) {
+          localStorage.removeItem("secretKey");
+        }
+      }
+
+      const storedSelectedId = loadSelectedChatApiKeyId();
+      const selectedApiKey = getSelectedChatApiKey(loadedChatApiKeys, storedSelectedId);
+      // selectedApiKey.id is a UUID identifier, not the API key value itself
+      const selectedId = String(selectedApiKey?.id ?? "");
+      persistSelectedChatApiKeyId(selectedId);
+      setChatApiKeys(loadedChatApiKeys);
+      setSelectedChatApiKeyId(selectedId);
+      setSecretKey(selectedApiKey?.key ?? "");
+
+      const rawModel = localStorage.getItem("model") || "";
+      const loadedModel = looksServerEncrypted(rawModel) ? "" : rawModel;
+      setModel(loadedModel);
+      setNewModel(loadedModel);
+      try {
+        const storedPerSourceModels = localStorage.getItem("perSourceModels");
+        if (storedPerSourceModels) setPerSourceModels(sanitizePerSourceModels(JSON.parse(storedPerSourceModels)));
+      } catch { /* ignore corrupted data */ }
     })();
   }, [status, prefixReady, toast]);
 

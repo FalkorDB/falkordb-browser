@@ -171,7 +171,7 @@ export function detectProviderFromModel(model: string): AIProvider {
     }
 
     // Fallback: substring heuristics for unprefixed model names
-    if (model.startsWith("gpt") || model.startsWith("o1") || model.startsWith("o3")) return "openai";
+    if (model.startsWith("gpt") || model.startsWith("o1") || model.startsWith("o3") || model.startsWith("o4")) return "openai";
     if (model.includes("claude")) return "anthropic";
     if (model.includes("gemini")) return "gemini";
     if (model.includes("llama") || model.includes("mixtral") || model.includes("phi") || model.includes("deepseek")) return "ollama";
