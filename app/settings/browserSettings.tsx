@@ -466,8 +466,13 @@ export default function BrowserSettings() {
         const restoredKeyModel = perSourceModels["api-key"] ?? "";
         setModel(restoredKeyModel);
         setNewModel(restoredKeyModel);
-        // restoredKeyModel is a model name (e.g. "gpt-4o"), not an API key
-        localStorage.setItem("model", String(restoredKeyModel));
+        // Validate model name before persisting — avoids storing accidentally-tainted values
+        const safeModel = /^[a-zA-Z0-9._:\-/]{1,128}$/.test(restoredKeyModel) ? restoredKeyModel : "";
+        if (safeModel) {
+            localStorage.setItem("model", safeModel);
+        } else {
+            localStorage.removeItem("model");
+        }
         persistSelectedChatApiKeyId(nextSelectedId);
         setModelDisplayNames([]);
         setIsLoadingModels(true);

@@ -110,12 +110,33 @@ const loadSelectedChatApiKeyId = () =>
   localStorage.getItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY) || "";
 
 /**
- * Returns a plain string copy of a value, breaking the CodeQL taint chain.
- * Use when storing non-sensitive data (model names, UUIDs) that CodeQL
- * incorrectly taints because they are derived from objects that also contain
- * sensitive fields.
+ * Validates and normalises a model identifier before it is persisted.
+ * Only allows characters that appear in real model names (e.g. "gpt-4o",
+ * "llama3.1:8b-instruct") and blocks common API-key prefixes, ensuring that
+ * an accidentally-tainted value never reaches localStorage as a secret.
+ * Returns an empty string for anything that does not look like a model name.
  */
-const untainted = (value: string): string => String(value);
+const sanitizeModelName = (value: string): string => {
+  const normalized = String(value ?? "").trim().slice(0, 128);
+  if (!normalized) return "";
+  // Block common secret-like prefixes
+  if (/^(sk-|rk-|pk-|api[_-]?key)/i.test(normalized)) return "";
+  // Allow only characters that appear in model identifiers
+  return /^[a-zA-Z0-9._:\-/]+$/.test(normalized) ? normalized : "";
+};
+
+/**
+ * Validates all values in a perSourceModels map through sanitizeModelName.
+ */
+const sanitizePerSourceModels = (value: unknown): Record<string, string> => {
+  if (!value || typeof value !== "object") return {};
+  const result: Record<string, string> = {};
+  for (const [key, modelValue] of Object.entries(value as Record<string, unknown>)) {
+    const safeModel = sanitizeModelName(String(modelValue ?? ""));
+    if (safeModel) result[String(key)] = safeModel;
+  }
+  return result;
+};
 
 /**
  * Wraps application UI with authentication-aware providers, state, and layout for graph views.
@@ -324,7 +345,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setLocalLlmEndpoint(newLocalLlmEndpoint);
       setModel(newModel);
       const sourceKey = newChatModelSource === "local" ? newLocalLlmProvider : "api-key";
-      const next = { ...perSourceModels, [sourceKey]: untainted(newModel) };
+      const next = sanitizePerSourceModels({ ...perSourceModels, [sourceKey]: sanitizeModelName(newModel) });
       setPerSourceModels(next);
       // perSourceModels values are model names (e.g. "gpt-4o"), not API keys
       localStorage.setItem("perSourceModels", JSON.stringify(next));
@@ -333,7 +354,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       localStorage.setItem(LOCAL_LLM_PROVIDER_STORAGE_KEY, newLocalLlmProvider === "lmstudio" ? "lmstudio" : "ollama");
       localStorage.setItem(LOCAL_LLM_ENDPOINT_STORAGE_KEY, normalizeLocalLlmEndpoint(newLocalLlmProvider, newLocalLlmEndpoint));
       // model is a model name (e.g. "gpt-4o"), not an API key
-      localStorage.setItem("model", untainted(newModel));
+      localStorage.setItem("model", sanitizeModelName(newModel));
       // Reset has changes
       setHasChanges(false);
 
@@ -1000,7 +1021,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       const storedSelectedId = loadSelectedChatApiKeyId();
       const selectedApiKey = getSelectedChatApiKey(loadedChatApiKeys, storedSelectedId);
       // selectedApiKey.id is a UUID identifier, not the API key value itself
-      const selectedId = untainted(selectedApiKey?.id ?? "");
+      const selectedId = String(selectedApiKey?.id ?? "");
       persistSelectedChatApiKeyId(selectedId);
       setChatApiKeys(loadedChatApiKeys);
       setSelectedChatApiKeyId(selectedId);
@@ -1012,7 +1033,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setNewModel(loadedModel);
       try {
         const storedPerSourceModels = localStorage.getItem("perSourceModels");
-        if (storedPerSourceModels) setPerSourceModels(JSON.parse(storedPerSourceModels));
+        if (storedPerSourceModels) setPerSourceModels(sanitizePerSourceModels(JSON.parse(storedPerSourceModels)));
       } catch { /* ignore corrupted data */ }
     })();
   }, [status, prefixReady, toast]);
