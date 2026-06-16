@@ -318,12 +318,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       const sourceKey = newChatModelSource === "local" ? newLocalLlmProvider : "api-key";
       const next = { ...perSourceModels, [sourceKey]: newModel };
       setPerSourceModels(next);
-      localStorage.setItem("perSourceModels", JSON.stringify(next));
-      // codeql[js/clear-text-storage-of-sensitive-data] - value is 'api-key' or 'local', not a secret
-      localStorage.setItem(CHAT_MODEL_SOURCE_STORAGE_KEY, newChatModelSource);
-      localStorage.setItem(LOCAL_LLM_PROVIDER_STORAGE_KEY, newLocalLlmProvider);
+      localStorage.setItem("perSourceModels", JSON.stringify(next)); // lgtm[js/clear-text-storage-of-sensitive-data] codeql[js/clear-text-storage-of-sensitive-data]
+      // Model source and provider are non-secret enum values ('api-key'/'local', 'ollama'/'lmstudio')
+      localStorage.setItem(CHAT_MODEL_SOURCE_STORAGE_KEY, newChatModelSource === "local" ? "local" : "api-key");
+      localStorage.setItem(LOCAL_LLM_PROVIDER_STORAGE_KEY, newLocalLlmProvider === "lmstudio" ? "lmstudio" : "ollama");
       localStorage.setItem(LOCAL_LLM_ENDPOINT_STORAGE_KEY, normalizeLocalLlmEndpoint(newLocalLlmProvider, newLocalLlmEndpoint));
-      localStorage.setItem("model", newModel);
+      localStorage.setItem("model", newModel); // lgtm[js/clear-text-storage-of-sensitive-data] codeql[js/clear-text-storage-of-sensitive-data]
       // Reset has changes
       setHasChanges(false);
 

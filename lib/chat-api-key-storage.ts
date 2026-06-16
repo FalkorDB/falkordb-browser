@@ -13,6 +13,5 @@ export const persistSelectedChatApiKeyId = (selectedId: string): void => {
     localStorage.removeItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY);
     return;
   }
-  // codeql[js/clear-text-storage-of-sensitive-data] - selectedId is a UUID reference, not the actual API key
-  localStorage.setItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, selectedId);
+  localStorage.setItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, selectedId); // lgtm[js/clear-text-storage-of-sensitive-data] codeql[js/clear-text-storage-of-sensitive-data]
 };

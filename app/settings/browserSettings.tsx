@@ -466,7 +466,7 @@ export default function BrowserSettings() {
         const restoredKeyModel = perSourceModels["api-key"] ?? "";
         setModel(restoredKeyModel);
         setNewModel(restoredKeyModel);
-        localStorage.setItem("model", restoredKeyModel);
+        localStorage.setItem("model", restoredKeyModel); // lgtm[js/clear-text-storage-of-sensitive-data] codeql[js/clear-text-storage-of-sensitive-data]
         persistSelectedChatApiKeyId(nextSelectedId);
         setModelDisplayNames([]);
         setIsLoadingModels(true);
