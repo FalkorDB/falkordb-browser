@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { getCorsHeaders } from "../utils";
 import { encrypt, decrypt } from "../auth/encryption";
+import { getClient } from "../auth/[...nextauth]/options";
 
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
@@ -16,13 +17,10 @@ export async function POST(request: NextRequest) {
   try {
     const corsHeaders = getCorsHeaders(request);
 
-    // Lightweight auth check via JWT
-    const token = await getToken({ req: request, secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET });
-    if (!token) {
-      return NextResponse.json(
-        { error: "Not authenticated" },
-        { status: 401, headers: corsHeaders }
-      );
+    const session = await getClient(request);
+    
+    if (session instanceof NextResponse) {
+      return session;
     }
 
     let body;
