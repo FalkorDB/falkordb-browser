@@ -50,7 +50,7 @@ export default function Selector({
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
-    const { settings: { limitSettings: { limit, lastLimit }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
+    const { settings: { limitSettings: { limit, lastLimit }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } }, tutorialOpen } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
     const { panelOpen, onTogglePanel } = useContext(PanelContext);
 
@@ -115,6 +115,10 @@ export default function Selector({
                         className="z-30 p-0 border-none bg-transparent shadow-none w-auto h-auto overflow-visible"
                         onOpenAutoFocus={(e) => e.preventDefault()}
                         onInteractOutside={(e) => {
+                            if (tutorialOpen) {
+                                e.preventDefault();
+                                return;
+                            }
                             if ((e.target as Element)?.closest?.('[data-tutorial-overlay]')) {
                                 e.preventDefault();
                             }
