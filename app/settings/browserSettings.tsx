@@ -200,10 +200,16 @@ export default function BrowserSettings() {
     useEffect(() => {
         if (modelDisplayNames.length === 0) return;
         const currentSourceKey = newChatModelSource === "local" ? newLocalLlmProvider : "api-key";
-        const nextModel = modelDisplayNames.includes(latestModelRef.current) ? latestModelRef.current : modelDisplayNames[0];
+        // Prefer the stored preference for this source; fall back to first available model.
+        const storedModel = perSourceModels[currentSourceKey] ?? "";
+        const nextModel = modelDisplayNames.includes(storedModel) ? storedModel : modelDisplayNames[0];
         if (nextModel !== latestModelRef.current) {
             setNewModel(nextModel);
-            if (currentSourceKey) setPerSourceModels(prev => ({ ...prev, [currentSourceKey]: nextModel }));
+            setModel(nextModel);
+            const next = { ...perSourceModels, [currentSourceKey]: nextModel };
+            setPerSourceModels(next);
+            localStorage.setItem("perSourceModels", JSON.stringify(next));
+            localStorage.setItem("model", nextModel);
         }
         // chatModelSource / localLlmProvider / selectedChatApiKey are stable by the time
         // modelDisplayNames is populated — no need to add them as deps.
@@ -343,18 +349,18 @@ export default function BrowserSettings() {
         createChangeHandler(setter)(value, elementId);
     };
 
-    // Wrapper for model combobox to handle scroll and mapping
     const handleModelChange = (modelValue: string) => {
-        const currentSourceKey = newChatModelSource === "local" ? newLocalLlmProvider : "api-key";
         setNewModel(modelValue);
-        if (currentSourceKey) setPerSourceModels(prev => ({ ...prev, [currentSourceKey]: modelValue }));
     };
 
     const handleModelSourceChange = (source: ChatModelSource) => {
         if (source === newChatModelSource) return;
         setNewChatModelSource(source);
         const targetKey = source === "local" ? newLocalLlmProvider : "api-key";
-        setNewModel(perSourceModels[targetKey] ?? "");
+        const nextModel = perSourceModels[targetKey] ?? "";
+        setNewModel(nextModel);
+        setModel(nextModel);
+        localStorage.setItem("model", nextModel);
         setModelDisplayNames([]);
         setModelsMessage(source === "local" ? "Loading local models..." : "Select a saved API key to load live models.");
         setModelLoadNonce(nonce => nonce + 1);
@@ -364,7 +370,10 @@ export default function BrowserSettings() {
         setNewLocalLlmProvider(provider);
         setNewLocalLlmEndpoint(LOCAL_LLM_ENDPOINTS[provider]);
         setModelDisplayNames([]);
-        setNewModel(perSourceModels[provider] ?? "");
+        const nextModel = perSourceModels[provider] ?? "";
+        setNewModel(nextModel);
+        setModel(nextModel);
+        localStorage.setItem("model", nextModel);
         setModelsMessage(`Loading local ${LOCAL_LLM_LABELS[provider]} models...`);
         setModelLoadNonce(nonce => nonce + 1);
     };
@@ -868,7 +877,11 @@ export default function BrowserSettings() {
                                                                                     </span>
                                                                                 )}
                                                                                 {isEditing ? (
-                                                                                    <div
+                                                                                    <form
+                                                                                        onSubmit={(event) => {
+                                                                                            event.stopPropagation();
+                                                                                            handleSaveEditedKey(apiKey.id);
+                                                                                        }}
                                                                                         className="mt-1 flex gap-2"
                                                                                         onClick={(event) => event.stopPropagation()}
                                                                                         onKeyDown={(event) => event.stopPropagation()}
@@ -881,17 +894,13 @@ export default function BrowserSettings() {
                                                                                             onChange={(e) => setEditingKeyValue(e.target.value)}
                                                                                         />
                                                                                         <button
-                                                                                            type="button"
+                                                                                            type="submit"
                                                                                             data-testid="saveEditedChatApiKeyButton"
                                                                                             className="rounded-md border border-primary bg-primary px-2 py-1 text-xs font-medium text-background transition-colors hover:bg-primary/90"
-                                                                                            onClick={(event) => {
-                                                                                                event.stopPropagation();
-                                                                                                handleSaveEditedKey(apiKey.id);
-                                                                                            }}
                                                                                         >
                                                                                             Save
                                                                                         </button>
-                                                                                    </div>
+                                                                                    </form>
                                                                                 ) : (
                                                                                     <span data-testid="chatApiKeyValue" className="block truncate font-mono text-xs text-muted-foreground">
                                                                                         {isVisible ? apiKey.key : maskKey(apiKey.key)}

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt";
 import { getCorsHeaders } from "../utils";
 import { encrypt, decrypt } from "../auth/encryption";
 import { getClient } from "../auth/[...nextauth]/options";
