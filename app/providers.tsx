@@ -347,13 +347,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       const sourceKey = newChatModelSource === "local" ? newLocalLlmProvider : "api-key";
       const next = sanitizePerSourceModels({ ...perSourceModels, [sourceKey]: sanitizeModelName(newModel) });
       setPerSourceModels(next);
-      // perSourceModels values are model names (e.g. "gpt-4o"), not API keys
       localStorage.setItem("perSourceModels", JSON.stringify(next));
       // chatModelSource and localLlmProvider are non-secret enum values
       localStorage.setItem(CHAT_MODEL_SOURCE_STORAGE_KEY, newChatModelSource === "local" ? "local" : "api-key");
       localStorage.setItem(LOCAL_LLM_PROVIDER_STORAGE_KEY, newLocalLlmProvider === "lmstudio" ? "lmstudio" : "ollama");
       localStorage.setItem(LOCAL_LLM_ENDPOINT_STORAGE_KEY, normalizeLocalLlmEndpoint(newLocalLlmProvider, newLocalLlmEndpoint));
-      // model is a model name (e.g. "gpt-4o"), not an API key
       localStorage.setItem("model", sanitizeModelName(newModel));
       // Reset has changes
       setHasChanges(false);
