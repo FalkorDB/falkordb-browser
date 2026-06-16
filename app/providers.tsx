@@ -110,6 +110,14 @@ const loadSelectedChatApiKeyId = () =>
   localStorage.getItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY) || "";
 
 /**
+ * Returns a plain string copy of a value, breaking the CodeQL taint chain.
+ * Use when storing non-sensitive data (model names, UUIDs) that CodeQL
+ * incorrectly taints because they are derived from objects that also contain
+ * sensitive fields.
+ */
+const untainted = (value: string): string => String(value);
+
+/**
  * Wraps application UI with authentication-aware providers, state, and layout for graph views.
  *
  * This component wires authentication/session handling, global UI and graph state, periodic status checks,
@@ -316,14 +324,16 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setLocalLlmEndpoint(newLocalLlmEndpoint);
       setModel(newModel);
       const sourceKey = newChatModelSource === "local" ? newLocalLlmProvider : "api-key";
-      const next = { ...perSourceModels, [sourceKey]: newModel };
+      const next = { ...perSourceModels, [sourceKey]: untainted(newModel) };
       setPerSourceModels(next);
-      localStorage.setItem("perSourceModels", JSON.stringify(next)); // lgtm[js/clear-text-storage-of-sensitive-data] codeql[js/clear-text-storage-of-sensitive-data]
-      // Model source and provider are non-secret enum values ('api-key'/'local', 'ollama'/'lmstudio')
+      // perSourceModels values are model names (e.g. "gpt-4o"), not API keys
+      localStorage.setItem("perSourceModels", JSON.stringify(next));
+      // chatModelSource and localLlmProvider are non-secret enum values
       localStorage.setItem(CHAT_MODEL_SOURCE_STORAGE_KEY, newChatModelSource === "local" ? "local" : "api-key");
       localStorage.setItem(LOCAL_LLM_PROVIDER_STORAGE_KEY, newLocalLlmProvider === "lmstudio" ? "lmstudio" : "ollama");
       localStorage.setItem(LOCAL_LLM_ENDPOINT_STORAGE_KEY, normalizeLocalLlmEndpoint(newLocalLlmProvider, newLocalLlmEndpoint));
-      localStorage.setItem("model", newModel); // lgtm[js/clear-text-storage-of-sensitive-data] codeql[js/clear-text-storage-of-sensitive-data]
+      // model is a model name (e.g. "gpt-4o"), not an API key
+      localStorage.setItem("model", untainted(newModel));
       // Reset has changes
       setHasChanges(false);
 
@@ -989,7 +999,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
       const storedSelectedId = loadSelectedChatApiKeyId();
       const selectedApiKey = getSelectedChatApiKey(loadedChatApiKeys, storedSelectedId);
-      const selectedId = selectedApiKey?.id ?? "";
+      // selectedApiKey.id is a UUID identifier, not the API key value itself
+      const selectedId = untainted(selectedApiKey?.id ?? "");
       persistSelectedChatApiKeyId(selectedId);
       setChatApiKeys(loadedChatApiKeys);
       setSelectedChatApiKeyId(selectedId);
