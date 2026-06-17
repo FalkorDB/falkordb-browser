@@ -1164,8 +1164,10 @@ function TutorialPortal({
 
                     // Add pointerleave protection on the sub-trigger so the sub-menu
                     // can't close while the user moves to click the direction item.
-                    const subTriggerTestId = tutorialSteps[step].parentSubTrigger!;
-                    const subTrigger = document.querySelector(`[data-testid="${subTriggerTestId}"]`) as HTMLElement | null;
+                    const subTriggerTestId = tutorialSteps[step].parentSubTrigger;
+                    const subTrigger = subTriggerTestId
+                        ? document.querySelector(`[data-testid="${subTriggerTestId}"]`) as HTMLElement | null
+                        : null;
                     const leaveBlocker = (e: Event) => { e.stopImmediatePropagation(); };
                     if (subTrigger) {
                         subTrigger.addEventListener('pointerleave', leaveBlocker, true);

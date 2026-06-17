@@ -182,7 +182,6 @@ export async function POST(request: NextRequest) {
             falkordbConnection,
             model,
             apiKey: modelSource === "local" ? localProvider : key,
-            llmEndpoint,
         });
 
         // Get the last user message

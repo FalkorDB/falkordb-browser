@@ -504,8 +504,8 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
     // Returns filtered suggestions for the default (non-dot) autocomplete display:
     // excludes full-path namespaced functions and property keys (both accessed via dot navigation)
-    const getAllSuggestions = useCallback(async (): Promise<monaco.languages.CompletionItem[]> => {
-        const full = await getFullSuggestions();
+    const getAllSuggestions = useCallback(async (prefetched?: monaco.languages.CompletionItem[]): Promise<monaco.languages.CompletionItem[]> => {
+        const full = prefetched ?? await getFullSuggestions();
 
         const filtered = full.filter(s => {
             const label = typeof s.label === 'string' ? s.label : s.label.label;
@@ -728,9 +728,9 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             }
 
             // Default (non-dot) case: return filtered suggestions (no full-path functions)
-            return getAllSuggestions();
+            return getAllSuggestions(fullSug);
         },
-    }), []);
+    }), [getFullSuggestions, getAllSuggestions, updateTokenizer]);
 
     const handleSubmit = async () => {
         runQuery(historyQuery.query.trim());

@@ -22,6 +22,9 @@ const DEFAULT_CONNECT_SRC = [
     "https://*.googletagmanager.com",
 ];
 
+// Parse and cache CSP_CONNECT_SRC once at module load time
+const EXTRA_CONNECT_SRC = getExtraConnectSrc();
+
 function cleanup(windowMs: number) {
     const now = Date.now();
     if (now - lastCleanup < CLEANUP_INTERVAL) return;
@@ -129,7 +132,7 @@ export function proxy(request: NextRequest) {
     const scriptSrc = isDev
         ? `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval'`
         : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`;
-    const connectSrc = [...new Set([...DEFAULT_CONNECT_SRC, ...getExtraConnectSrc()])].join(" ");
+    const connectSrc = [...new Set([...DEFAULT_CONNECT_SRC, ...EXTRA_CONNECT_SRC])].join(" ");
 
     const cspHeader = [
         "default-src 'self'",
