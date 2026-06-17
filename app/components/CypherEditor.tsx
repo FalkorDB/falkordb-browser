@@ -168,6 +168,8 @@ const STATIC_SUGGESTIONS: monaco.languages.CompletionItem[] = [
     }))
 ];
 
+const escapeRegExp = (str: string): string => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const DEFAULT_MONARCH_TOKENIZER: monaco.languages.IMonarchLanguage = {
     tokenizer: {
         root: [
@@ -576,15 +578,16 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             tokenizer: {
                 root: graphIdRef.current ? [
                     ...boundVarsRule,
-                    ...(namespaces.size > 0 ? [[new RegExp(`\\b(${Array.from(namespaces.keys()).join('|')})\\b`), "keyword"] as [RegExp, string]] : []),
+                    ...(namespaces.size > 0 ? [[new RegExp(`\\b(${Array.from(namespaces.keys()).map(escapeRegExp).join('|')})\\b`), "keyword"] as [RegExp, string]] : []),
                     [new RegExp(`\\b(${allKeywords})\\b`), "keyword"],
                     [
                         new RegExp(`\\b(${functions.map(({ label }) => {
-                            if ((label as string).includes(".")) {
-                                const labels = (label as string).split(".");
-                                return labels[labels.length - 1];
+                            const labelStr = label as string;
+                            if (labelStr.includes(".")) {
+                                const labels = labelStr.split(".");
+                                return escapeRegExp(labels[labels.length - 1]);
                             }
-                            return label;
+                            return escapeRegExp(labelStr);
                         }).join('|')})\\b`),
                         "function"
                     ],

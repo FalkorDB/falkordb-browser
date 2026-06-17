@@ -722,7 +722,7 @@ export default class SettingsBrowserPage extends BasePage {
   // ===== Graph Info Section =====
 
   private get graphInfoSectionHeader(): Locator {
-    return this.page.locator('[aria-expanded]').filter({ has: this.page.locator('text=Graph Info') }).first();
+    return this.page.locator('[data-testid="graphInfoSectionHeader"]');
   }
 
   private get refreshIntervalSlider(): Locator {
@@ -760,7 +760,7 @@ export default class SettingsBrowserPage extends BasePage {
   // ===== User Experience Section =====
 
   private get userExperienceSectionHeader(): Locator {
-    return this.page.locator('[aria-expanded]').filter({ has: this.page.locator('text=User Experience') }).first();
+    return this.page.locator('[data-testid="userExperienceSectionHeader"]');
   }
 
   private get showPropertyKeyPrefixSwitch(): Locator {
