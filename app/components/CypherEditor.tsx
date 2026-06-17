@@ -565,8 +565,8 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                 }).flat()
         ]);
 
-        // Build keywords regex including static keywords and property keys
-        const allKeywords = [...KEYWORDS, ...propertyKeys].join('|');
+        // Build keywords regex including static keywords and (escaped) dynamic property keys
+        const allKeywords = [...KEYWORDS, ...propertyKeys.map(escapeRegExp)].join('|');
 
         // Build bound variables rule from the ref
         const boundVarsArray = Array.from(boundVarsRef.current);
