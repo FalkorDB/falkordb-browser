@@ -910,10 +910,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         const parsedStoredTimeout = parseInt(storedTimeout, 10);
         timeoutVal = Number.isFinite(parsedStoredTimeout) && parsedStoredTimeout >= 0
           ? parsedStoredTimeout
-          : 60000;
+          : 60;
       } else {
-        // No user-set value: cap the default (60000 ms) with TIMEOUT_MAX from server config
-        let fallback = 60000;
+        // No user-set value: cap the default (60s) with TIMEOUT_MAX from server config.
+        // The timeout query param is in seconds (the API multiplies by 1000), so TIMEOUT_MAX (ms) is converted to seconds below.
+        let fallback = 60;
         try {
           const configRes = await fetch("/api/graph/config", { method: "GET" });
           if (configRes.ok) {
@@ -932,8 +933,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             if (timeoutMaxEntry) {
               const timeoutMaxMs = Number(timeoutMaxEntry[1]);
               if (timeoutMaxMs > 0) {
-                if (fallback > timeoutMaxMs) {
-                  fallback = timeoutMaxMs;
+                const timeoutMaxSeconds = Math.floor(timeoutMaxMs / 1000);
+                if (fallback > timeoutMaxSeconds) {
+                  fallback = timeoutMaxSeconds;
                 }
               }
             }
