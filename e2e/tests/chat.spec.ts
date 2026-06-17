@@ -24,6 +24,9 @@ async function createChatPageWithSettings(
 
   await page.goto(urls.graphUrl);
   await page.waitForLoadState("networkidle");
+  await expect.poll(async () => page.evaluate(() =>
+    localStorage.getItem("secretKey") === null && localStorage.getItem("chatApiKeys") !== null
+  ), { timeout: 15000 }).toBe(true);
 
   return chat;
 }
@@ -76,17 +79,20 @@ test.describe("Chat Feature Tests", () => {
     const graphName = getRandomString("chat");
     await apiCall.addGraph(graphName);
     await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
-    
-    const settings = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
-    await browser.setPageToFullScreen();
-    await settings.expandChatSection();
 
-    const models = await settings.getAvailableModels();    
-    await settings.selectModel(models[0]); // Select a model to enable the input
-    await settings.fillChatApiKey(""); // Clear API key to simulate missing key
-    await settings.clickSaveSettingsButton();
-    
-    const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
+    const chat = await browser.createNewPage(ChatComponent);
+    await browser.setPageToFullScreen();
+    const page = await browser.getPage();
+    await page.addInitScript(({ selectedModel }) => {
+      localStorage.setItem("chatModelSource", "api-key");
+      localStorage.setItem("model", selectedModel);
+      localStorage.removeItem("secretKey");
+      localStorage.removeItem("chatApiKeys");
+      localStorage.removeItem("selectedChatApiKeyId");
+    }, { selectedModel: DEFAULT_CHAT_MODEL });
+    await page.goto(urls.graphUrl);
+    await page.waitForLoadState("networkidle");
+
     await chat.selectGraphByName(graphName);
     
     // Open chat panel
@@ -98,7 +104,7 @@ test.describe("Chat Feature Tests", () => {
     await chat.fillChatInput("Who is Alice?");
     await chat.clickChatSendButton();
     
-    // Verify error toast is displayed due to missing/invalid API key
+    // Verify error toast is displayed due to missing API key
     const isErrorToastVisible = await chat.getNotificationErrorToast();
     expect(isErrorToastVisible).toBe(true);
     
@@ -497,23 +503,23 @@ test.describe("Chat Feature Tests", () => {
     await chat.openChat();
     await chat.waitForChatPanel();
 
-    // Build a mock SSE response containing markdown-formatted text
+    // Build a mock JSON response containing markdown-formatted text
     const markdownAnswer = "Here are Alice's friends:\n\n**Bob** is her friend.\n\n- Item one\n- Item two\n\n```cypher\nMATCH (n) RETURN n\n```";
-    const ssePayload = [
-      `event: CypherQuery\ndata: ${JSON.stringify('MATCH (a:Person {name: "Alice"})-[:KNOWS]->(b) RETURN b.name')}\n\n`,
-      `event: Result\ndata: ${JSON.stringify(markdownAnswer)}\n\n`,
-    ].join("");
 
-    // Intercept the /api/chat POST and return the mock SSE stream
+    // Intercept the /api/chat POST and return the mock JSON response
     await page.route("**/api/chat", (route) => {
       route.fulfill({
         status: 200,
         headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          "Connection": "keep-alive",
+          "Content-Type": "application/json",
         },
-        body: ssePayload,
+        body: JSON.stringify({
+          cypherQuery: 'MATCH (a:Person {name: "Alice"})-[:KNOWS]->(b) RETURN b.name',
+          cypherResult: null,
+          answer: markdownAnswer,
+          confidence: null,
+          tokenUsage: null,
+        }),
       });
     });
 
@@ -651,5 +657,211 @@ test.describe("Chat Feature Tests", () => {
     // Clean up
     await apiCall.removeGraph(graph1Name);
     await apiCall.removeGraph(graph2Name);
+  });
+
+  test(`@readwrite Verify token usage footer appears after mocked response with token data`, async () => {
+    const graphName = getRandomString("chat");
+    await apiCall.addGraph(graphName);
+    await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
+
+    const chat = await browser.createNewPage(ChatComponent);
+    await browser.setPageToFullScreen();
+    const page = await browser.getPage();
+
+    await page.addInitScript(({ selectedModel }) => {
+      localStorage.setItem("model", selectedModel);
+      localStorage.setItem("secretKey", "fake-key-footer-test");
+    }, { selectedModel: DEFAULT_CHAT_MODEL });
+    await page.goto(urls.graphUrl);
+    await page.waitForLoadState("networkidle");
+
+    await page.route("**/api/chat", (route) => {
+      route.fulfill({
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cypherQuery: "MATCH (a:Person)-[:KNOWS]->(b) RETURN b.name",
+          cypherResult: null,
+          answer: "Bob is Alice's friend.",
+          confidence: 0.9,
+          tokenUsage: { totalTokens: 150 },
+        }),
+      });
+    });
+
+    await chat.selectGraphByName(graphName);
+    await chat.openChat();
+    await chat.waitForChatPanel();
+
+    await chat.fillChatInput("Who are Alice's friends?");
+    await chat.clickChatSendButton();
+    await chat.waitForAssistantResponse("Result");
+
+    // Footer should now display token data
+    const hasTokens = await chat.waitForChatFooterTokens();
+    expect(hasTokens).toBe(true);
+
+    const lastTokensText = await chat.getChatFooterLastTokens();
+    expect(lastTokensText).toContain("150");
+
+    const totalTokensText = await chat.getChatFooterTotalTokens();
+    expect(totalTokensText).toContain("150");
+
+    await page.unroute("**/api/chat");
+    await apiCall.removeGraph(graphName);
+  });
+
+  test(`@readwrite Verify token totals accumulate correctly across multiple messages`, async () => {
+    const graphName = getRandomString("chat");
+    await apiCall.addGraph(graphName);
+    await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
+
+    const chat = await browser.createNewPage(ChatComponent);
+    await browser.setPageToFullScreen();
+    const page = await browser.getPage();
+
+    await page.addInitScript(({ selectedModel }) => {
+      localStorage.setItem("model", selectedModel);
+      localStorage.setItem("secretKey", "fake-key-footer-test");
+    }, { selectedModel: DEFAULT_CHAT_MODEL });
+    await page.goto(urls.graphUrl);
+    await page.waitForLoadState("networkidle");
+
+    let callCount = 0;
+    await page.route("**/api/chat", (route) => {
+      callCount += 1;
+      route.fulfill({
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cypherQuery: null,
+          cypherResult: null,
+          answer: `Answer ${callCount}`,
+          confidence: null,
+          tokenUsage: { totalTokens: callCount === 1 ? 100 : 50 },
+        }),
+      });
+    });
+
+    await chat.selectGraphByName(graphName);
+    await chat.openChat();
+    await chat.waitForChatPanel();
+
+    // First message: 100 tokens
+    await chat.fillChatInput("First question");
+    await chat.clickChatSendButton();
+    await chat.waitForAssistantResponse("Result");
+    await chat.waitForChatFooterTokens();
+
+    expect(await chat.getChatFooterLastTokens()).toContain("100");
+    expect(await chat.getChatFooterTotalTokens()).toContain("100");
+
+    // Second message: 50 tokens → Last: 50, Total: 150
+    await chat.fillChatInput("Second question");
+    await chat.waitForChatSendButtonEnabled();
+    await chat.clickChatSendButton();
+    await chat.waitForAssistantResponse("Result");
+
+    // Wait for total to update to 150
+    await page.waitForFunction(
+      () => {
+        const el = document.querySelector('[data-testid="chatFooterTotalTokens"]');
+        return el?.textContent?.includes("150");
+      },
+      { timeout: 5000 }
+    );
+
+    expect(await chat.getChatFooterLastTokens()).toContain("50");
+    expect(await chat.getChatFooterTotalTokens()).toContain("150");
+
+    await page.unroute("**/api/chat");
+    await apiCall.removeGraph(graphName);
+  });
+
+  test(`@readwrite Verify token usage persists after closing and reopening chat`, async () => {
+    const graphName = getRandomString("chat");
+    await apiCall.addGraph(graphName);
+    await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
+
+    const chat = await browser.createNewPage(ChatComponent);
+    await browser.setPageToFullScreen();
+    const page = await browser.getPage();
+
+    await page.addInitScript(({ selectedModel }) => {
+      localStorage.setItem("model", selectedModel);
+      localStorage.setItem("secretKey", "fake-key-footer-persist");
+    }, { selectedModel: DEFAULT_CHAT_MODEL });
+    await page.goto(urls.graphUrl);
+    await page.waitForLoadState("networkidle");
+
+    await page.route("**/api/chat", (route) => {
+      route.fulfill({
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cypherQuery: null,
+          cypherResult: null,
+          answer: "Bob is Alice's friend.",
+          confidence: null,
+          tokenUsage: { totalTokens: 200 },
+        }),
+      });
+    });
+
+    await chat.selectGraphByName(graphName);
+    await chat.openChat();
+    await chat.waitForChatPanel();
+
+    await chat.fillChatInput("Who are Alice's friends?");
+    await chat.clickChatSendButton();
+    await chat.waitForAssistantResponse("Result");
+    await chat.waitForChatFooterTokens();
+
+    expect(await chat.getChatFooterTotalTokens()).toContain("200");
+
+    // Close and reopen chat
+    await chat.closeChat();
+    expect(await chat.isChatPanelVisible()).toBe(false);
+    await chat.openChat();
+    await chat.waitForChatPanel();
+
+    // Token values should still be present from storage
+    const hasTokens = await chat.waitForChatFooterTokens();
+    expect(hasTokens).toBe(true);
+    expect(await chat.getChatFooterLastTokens()).toContain("200");
+    expect(await chat.getChatFooterTotalTokens()).toContain("200");
+
+    await page.unroute("**/api/chat");
+    await apiCall.removeGraph(graphName);
+  });
+
+  test(`@readwrite Verify model and provider displayed in footer when model is configured`, async () => {
+    const graphName = getRandomString("chat");
+    await apiCall.addGraph(graphName);
+    await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})');
+
+    const chat = await browser.createNewPage(ChatComponent);
+    await browser.setPageToFullScreen();
+    const page = await browser.getPage();
+
+    await page.addInitScript(({ selectedModel }) => {
+      localStorage.setItem("model", selectedModel);
+      localStorage.setItem("secretKey", "fake-key-footer-model");
+    }, { selectedModel: DEFAULT_CHAT_MODEL });
+    await page.goto(urls.graphUrl);
+    await page.waitForLoadState("networkidle");
+
+    await chat.selectGraphByName(graphName);
+    await chat.openChat();
+    await chat.waitForChatPanel();
+
+    // Footer should show even before any messages, as long as a model is set
+    const isFooterVisible = await chat.isChatFooterVisible();
+    expect(isFooterVisible).toBe(true);
+
+    const modelText = await chat.getChatFooterModel();
+    expect(modelText).toContain(DEFAULT_CHAT_MODEL);
+
+    await apiCall.removeGraph(graphName);
   });
 });

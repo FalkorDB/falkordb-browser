@@ -9,6 +9,30 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import { useTheme } from "next-themes";
 import { getTheme } from "@/lib/utils";
 
+if (typeof window !== 'undefined') {
+    (window as Window & { MonacoEnvironment?: { getWorker: (_moduleId: unknown, label: string) => Worker } }).MonacoEnvironment = {
+        getWorker(_moduleId: unknown, label: string) {
+            switch (label) {
+                case 'json':
+                    return new Worker(new URL('monaco-editor/esm/vs/language/json/json.worker', import.meta.url));
+                case 'css':
+                case 'scss':
+                case 'less':
+                    return new Worker(new URL('monaco-editor/esm/vs/language/css/css.worker', import.meta.url));
+                case 'html':
+                case 'handlebars':
+                case 'razor':
+                    return new Worker(new URL('monaco-editor/esm/vs/language/html/html.worker', import.meta.url));
+                case 'typescript':
+                case 'javascript':
+                    return new Worker(new URL('monaco-editor/esm/vs/language/typescript/ts.worker', import.meta.url));
+                default:
+                    return new Worker(new URL('monaco-editor/esm/vs/editor/editor.worker', import.meta.url));
+            }
+        },
+    };
+}
+
 loader.config({ monaco });
 
 export const LINE_HEIGHT = 22;
@@ -20,6 +44,7 @@ export const DEFAULT_MONACO_OPTIONS: monaco.editor.IStandaloneEditorConstruction
     folding: false,
     fixedOverflowWidgets: true,
     occurrencesHighlight: "off",
+    wordBasedSuggestions: "off",
     hover: {
         delay: 100,
     },
@@ -87,8 +112,16 @@ export interface LanguageConfig {
     /** 
      * Async function that returns completion suggestions. 
      * Called once on mount and whenever the completion provider triggers.
+     * The `range` property is optional since EditorComponent always overwrites it.
      */
-    getSuggestions?: (monacoInstance: Monaco) => Promise<monaco.languages.CompletionItem[]>;
+    getSuggestions?: (
+        monacoInstance: Monaco,
+        context?: monaco.languages.CompletionContext,
+        model?: monaco.editor.ITextModel,
+        position?: monaco.Position
+    ) => Promise<(Omit<monaco.languages.CompletionItem, 'range'> & { range?: monaco.languages.CompletionItem['range'] })[]>;
+    /** Characters that trigger the completion provider in addition to typing identifier characters. */
+    triggerCharacters?: string[];
 }
 
 export interface EditorComponentProps {
@@ -179,12 +212,13 @@ export default function EditorComponent({
                 }
                 if (lc.getSuggestions) {
                     const provider = monacoInstance.languages.registerCompletionItemProvider(language, {
-                        provideCompletionItems: (async (model, position) => {
+                        triggerCharacters: lc.triggerCharacters,
+                        provideCompletionItems: (async (model, position, context) => {
                             const currentConfig = languageConfigRef.current;
                             if (!currentConfig?.getSuggestions) return { suggestions: [] };
                             const word = model.getWordUntilPosition(position);
                             const range = new monacoInstance.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
-                            const suggestions = await currentConfig.getSuggestions(monacoInstance);
+                            const suggestions = await currentConfig.getSuggestions(monacoInstance, context, model, position);
                             return {
                                 suggestions: suggestions.map(s => ({ ...s, range }))
                             };
@@ -196,13 +230,16 @@ export default function EditorComponent({
 
             onMonacoReadyRef.current?.(monacoInstance);
 
-            // Create the editor
+            //Claude Create the editor
             const editor = monacoInstance.editor.create(containerRef.current, {
                 ...mergedOptions,
                 value: valueRef.current,
                 language,
                 theme: themeName,
             });
+
+            // Disable F1 (command palette)
+            editor.addCommand(monacoInstance.KeyCode.F1, () => {});
 
             editorRef.current = editor;
 

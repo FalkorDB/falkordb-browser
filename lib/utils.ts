@@ -47,6 +47,7 @@ export type Query = {
   elementsCount: number;
   fav: boolean;
   name?: string;
+  errorMessage?: string;
 };
 
 export type Node = {
@@ -192,6 +193,8 @@ export type Message = {
   | "Status"
   | "CypherQuery"
   | "CypherResult";
+  confidence?: number;
+  tokenUsage?: number;
 };
 
 // [library_name, type, 'functions', function_names[]]

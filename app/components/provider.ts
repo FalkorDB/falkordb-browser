@@ -1,8 +1,20 @@
 import { createContext, Dispatch, SetStateAction } from "react";
+import type { AIProvider } from "@/lib/ai-provider-utils";
 import { ConnectionInfo, ConnectionType, GraphData, GraphRef, HistoryQuery, Label, Panel, Relationship, SyntaxErrorInfo, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
 import type { Data as CanvasData, LayoutMode, ViewportState } from "@falkordb/canvas";
 import type { SessionConnection } from "next-auth";
 import { Graph, GraphInfo } from "../api/graph/model";
+
+export type ChatApiKey = {
+  id: string;
+  label: string;
+  key: string;
+  provider: AIProvider;
+  createdAt: number;
+};
+
+export type ChatModelSource = "api-key" | "local";
+export type LocalLlmProvider = "ollama" | "lmstudio";
 
 type BrowserSettingsContextType = {
   newSettings: {
@@ -45,12 +57,18 @@ type BrowserSettingsContextType = {
     chatSettings: {
       newSecretKey: string;
       setNewSecretKey: Dispatch<SetStateAction<string>>;
-      newModel: string;
-      setNewModel: Dispatch<SetStateAction<string>>;
       newMaxSavedMessages: number;
       setNewMaxSavedMessages: Dispatch<SetStateAction<number>>;
       newCypherOnly: boolean;
       setNewCypherOnly: Dispatch<SetStateAction<boolean>>;
+      newChatModelSource: ChatModelSource;
+      setNewChatModelSource: Dispatch<SetStateAction<ChatModelSource>>;
+      newLocalLlmProvider: LocalLlmProvider;
+      setNewLocalLlmProvider: Dispatch<SetStateAction<LocalLlmProvider>>;
+      newLocalLlmEndpoint: string;
+      setNewLocalLlmEndpoint: Dispatch<SetStateAction<string>>;
+      newModel: string;
+      setNewModel: Dispatch<SetStateAction<string>>;
     };
     graphInfo: {
       newRefreshInterval: number;
@@ -101,12 +119,24 @@ type BrowserSettingsContextType = {
     chatSettings: {
       secretKey: string;
       setSecretKey: Dispatch<SetStateAction<string>>;
+      chatApiKeys: ChatApiKey[];
+      setChatApiKeys: Dispatch<SetStateAction<ChatApiKey[]>>;
+      selectedChatApiKeyId: string;
+      setSelectedChatApiKeyId: Dispatch<SetStateAction<string>>;
+      chatModelSource: ChatModelSource;
+      setChatModelSource: Dispatch<SetStateAction<ChatModelSource>>;
+      localLlmProvider: LocalLlmProvider;
+      setLocalLlmProvider: Dispatch<SetStateAction<LocalLlmProvider>>;
+      localLlmEndpoint: string;
+      setLocalLlmEndpoint: Dispatch<SetStateAction<string>>;
       model: string;
       setModel: Dispatch<SetStateAction<string>>;
       maxSavedMessages: number;
       setMaxSavedMessages: Dispatch<SetStateAction<number>>;
       cypherOnly: boolean;
       setCypherOnly: Dispatch<SetStateAction<boolean>>;
+      perSourceModels: Record<string, string>;
+      setPerSourceModels: Dispatch<SetStateAction<Record<string, string>>>;
     };
     graphInfo: {
       showMemoryUsage: boolean;
@@ -264,12 +294,18 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
       chatSettings: {
         newSecretKey: "",
         setNewSecretKey: () => { },
-        newModel: "",
-        setNewModel: () => { },
         newMaxSavedMessages: 0,
         setNewMaxSavedMessages: () => { },
         newCypherOnly: false,
         setNewCypherOnly: () => { },
+        newChatModelSource: "api-key",
+        setNewChatModelSource: () => { },
+        newLocalLlmProvider: "ollama",
+        setNewLocalLlmProvider: () => { },
+        newLocalLlmEndpoint: "http://localhost:11434",
+        setNewLocalLlmEndpoint: () => { },
+        newModel: "",
+        setNewModel: () => { },
       },
       graphInfo: {
         newRefreshInterval: 0,
@@ -314,12 +350,24 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
       chatSettings: {
         secretKey: "",
         setSecretKey: () => { },
+        chatApiKeys: [],
+        setChatApiKeys: () => { },
+        selectedChatApiKeyId: "",
+        setSelectedChatApiKeyId: () => { },
+        chatModelSource: "api-key",
+        setChatModelSource: () => { },
+        localLlmProvider: "ollama",
+        setLocalLlmProvider: () => { },
+        localLlmEndpoint: "http://localhost:11434",
+        setLocalLlmEndpoint: () => { },
         model: "",
         setModel: () => { },
         maxSavedMessages: 0,
         setMaxSavedMessages: () => { },
         cypherOnly: false,
         setCypherOnly: () => { },
+        perSourceModels: {},
+        setPerSourceModels: () => { },
       },
       graphInfo: {
         showMemoryUsage: false,

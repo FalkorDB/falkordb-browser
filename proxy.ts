@@ -14,6 +14,16 @@ const rateLimitStore = new Map<string, RateLimitEntry>();
 // Clean up stale entries every 60 seconds
 const CLEANUP_INTERVAL = 60_000;
 let lastCleanup = Date.now();
+const DEFAULT_CONNECT_SRC = [
+    "'self'",
+    "https://cdn.jsdelivr.net",
+    "https://*.google-analytics.com",
+    "https://*.analytics.google.com",
+    "https://*.googletagmanager.com",
+];
+
+// Parse and cache CSP_CONNECT_SRC once at module load time
+const EXTRA_CONNECT_SRC = getExtraConnectSrc();
 
 function cleanup(windowMs: number) {
     const now = Date.now();
@@ -63,40 +73,38 @@ type RateLimitConfig = {
     windowMs: number;
 };
 
-function getRateLimitConfig(pathname: string): RateLimitConfig | null {
-    // Auth callback - strict limit to prevent brute force
-    if (pathname.startsWith("/api/auth/callback")) {
-        return { maxRequests: 10, windowMs: 60_000 }; // 10 req/min
-    }
+function getExtraConnectSrc(): string[] {
+    const raw = process.env.CSP_CONNECT_SRC;
+    if (!raw) return [];
 
-    // Upload endpoint - prevent disk exhaustion
-    if (pathname.startsWith("/api/upload")) {
-        return { maxRequests: 20, windowMs: 60_000 }; // 20 req/min
-    }
-
-    // Chat/AI endpoints - prevent cost amplification
-    if (pathname.startsWith("/api/chat")) {
-        return { maxRequests: 30, windowMs: 60_000 }; // 30 req/min
-    }
-
-    // Graph query endpoints - prevent resource exhaustion
-    if (pathname.startsWith("/api/graph")) {
-        return { maxRequests: 200, windowMs: 60_000 }; // 200 req/min
-    }
-
-    // General API rate limit
-    if (pathname.startsWith("/api/")) {
-        return { maxRequests: 100, windowMs: 60_000 }; // 100 req/min
-    }
-
-    return null;
+    return raw
+        .split(",")
+        .map(source => source.trim())
+        .filter(Boolean)
+        .map(source => {
+            try {
+                const url = new URL(source);
+                if (url.protocol !== "https:" && url.protocol !== "http:") {
+                    console.warn(`Ignoring invalid CSP_CONNECT_SRC entry with unsupported protocol: ${source}`);
+                    return null;
+                }
+                return url.origin;
+            } catch {
+                console.warn(`Ignoring invalid CSP_CONNECT_SRC entry: ${source}`);
+                return null;
+            }
+        })
+        .filter((source): source is string => Boolean(source));
 }
 
 export function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
     // --- Rate limiting (API routes only) ---
-    const config = getRateLimitConfig(pathname);
+    // Set RATE_LIMIT_MAX_REQUESTS=0 to disable rate limiting entirely.
+    const parsedMaxRequests = process.env.RATE_LIMIT_MAX_REQUESTS ? parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) : 200;
+    const maxRequests = Number.isFinite(parsedMaxRequests) ? parsedMaxRequests : 200;
+    const config = maxRequests !== 0 ? { maxRequests, windowMs: 60_000 } : null;
     if (config) {
         const ip = getClientIP(request);
         const key = `${ip}:${pathname.split("/").slice(0, 4).join("/")}`;
@@ -125,6 +133,7 @@ export function proxy(request: NextRequest) {
     const scriptSrc = isDev
         ? `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval'`
         : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`;
+    const connectSrc = [...new Set([...DEFAULT_CONNECT_SRC, ...EXTRA_CONNECT_SRC])].join(" ");
 
     const cspHeader = [
         "default-src 'self'",
@@ -132,7 +141,7 @@ export function proxy(request: NextRequest) {
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
         "img-src 'self' data: blob: https://*.googletagmanager.com",
         "font-src 'self' data: https://cdn.jsdelivr.net",
-        "connect-src 'self' https://cdn.jsdelivr.net https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com",
+        `connect-src ${connectSrc}`,
         "worker-src 'self' blob:",
         "object-src 'none'",
         "base-uri 'self'",

@@ -18,8 +18,6 @@ test.describe('@browser Browser Settings tests', () => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     let geminiModel: string;
     let xaiModel: string;
-    // Whether model listing actually returned results from the AI providers
-    let modelsAvailable = false;
 
     test.beforeAll(async () => {
         // Fetch available models from each provider before running tests
@@ -37,9 +35,6 @@ test.describe('@browser Browser Settings tests', () => {
             anthropicModel = anthropicModels.models?.[0] || 'claude-3-5-sonnet';
             geminiModel = geminiModels.models?.[0] || 'gemini-2.0-flash-exp';
             xaiModel = xaiModels.models?.[0] || 'grok-3-mini';
-
-            // Models are available if at least one provider returned results
-            modelsAvailable = !!(openaiModels.models?.length || anthropicModels.models?.length || geminiModels.models?.length || xaiModels.models?.length);
         } catch (error) {
             // Fallback to default models if API call fails
             console.warn('Failed to fetch models, using defaults:', error);
@@ -68,13 +63,11 @@ test.describe('@browser Browser Settings tests', () => {
         // Wait for models to load
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
-        // Skip if models are not available (e.g., no AI provider API keys in CI)
-        if (!modelsAvailable) {
-            const isVisible = await settingsBrowserPage.isModelVisible(openaiModel);
-            if (!isVisible) {
-                test.skip();
-                return;
-            }
+        // Skip if models are not visible in the UI (models require an API key to be loaded)
+        const isVisible = await settingsBrowserPage.isModelVisible(openaiModel);
+        if (!isVisible) {
+            test.skip();
+            return;
         }
 
         // Select a model - use the first available OpenAI model
@@ -106,13 +99,10 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
-        // Skip if models are not available
-        if (!modelsAvailable) {
-            const isVisible = await settingsBrowserPage.isModelVisible(openaiModel);
-            if (!isVisible) {
-                test.skip();
-                return;
-            }
+        // Skip if models are not visible in the UI (models require an API key to be loaded)
+        if (!(await settingsBrowserPage.isModelVisible(openaiModel))) {
+            test.skip();
+            return;
         }
 
         // Select model and fill API key - use first available OpenAI model
@@ -144,8 +134,8 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
-        // Skip if models are not available
-        if (!modelsAvailable && !(await settingsBrowserPage.isModelVisible(openaiModel))) {
+        // Skip if models are not visible in the UI (models require an API key to be loaded)
+        if (!(await settingsBrowserPage.isModelVisible(openaiModel))) {
             test.skip();
             return;
         }
@@ -169,8 +159,8 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
-        // Skip if models are not available
-        if (!modelsAvailable && !(await settingsBrowserPage.isModelVisible(anthropicModel))) {
+        // Skip if models are not visible in the UI (models require an API key to be loaded)
+        if (!(await settingsBrowserPage.isModelVisible(anthropicModel))) {
             test.skip();
             return;
         }
@@ -190,9 +180,22 @@ test.describe('@browser Browser Settings tests', () => {
 
     test('@readwrite Verify empty search state displays correctly', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        const page = await browser.getPage();
+        const testApiKey = `sk-e2e-${getRandomString("key")}`;
+
+        await page.route("**/api/chat/models", (route) => {
+            route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({ models: [openaiModel, "gpt-4o-mini"] }),
+            });
+        });
 
         await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.selectApiKeyModelSource();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+        await settingsBrowserPage.addChatApiKey(testApiKey);
+        await settingsBrowserPage.selectChatApiKey(testApiKey);
 
         // Search for non-existent model
         await settingsBrowserPage.searchModels("nonexistentmodel123");
@@ -203,14 +206,74 @@ test.describe('@browser Browser Settings tests', () => {
         expect(noModelsText).toContain("No models found");
     });
 
+    test('@readwrite Verify API key provider info tooltip displays supported providers', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.selectApiKeyModelSource();
+        await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+        await settingsBrowserPage.hoverApiKeyProvidersInfo();
+
+        const tooltipText = await settingsBrowserPage.getApiKeyProvidersTooltipText();
+        expect(tooltipText).toContain("OpenAI");
+        expect(tooltipText).toContain("Anthropic");
+        expect(tooltipText).toContain("Gemini");
+        expect(tooltipText).toContain("Groq");
+        expect(tooltipText).toContain("xAI");
+    });
+
+    test('@readwrite Verify API key can be added viewed edited and deleted', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        const apiKey = `sk-e2e-${getRandomString("key")}`;
+        const editedApiKey = `sk-e2e-edited-${getRandomString("key")}`;
+
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.selectApiKeyModelSource();
+        await settingsBrowserPage.waitForChatApiKeyInputEnabled();
+        await settingsBrowserPage.addChatApiKey(apiKey);
+
+        const maskedKeyText = await settingsBrowserPage.getMaskedChatApiKeyText(apiKey);
+        expect(maskedKeyText).toContain(apiKey.slice(0, 6));
+        expect(maskedKeyText).toContain(apiKey.slice(-4));
+
+        await settingsBrowserPage.showChatApiKey(apiKey);
+        expect(await settingsBrowserPage.getVisibleChatApiKeyText(apiKey)).toBe(apiKey);
+
+        await settingsBrowserPage.editChatApiKey(apiKey, editedApiKey);
+        expect(await settingsBrowserPage.getVisibleChatApiKeyText(editedApiKey)).toBe(editedApiKey);
+
+        await settingsBrowserPage.deleteChatApiKey(editedApiKey);
+        expect(await settingsBrowserPage.isChatApiKeyPresent(editedApiKey)).toBe(false);
+    });
+
+    test('@readwrite Verify local LLM controls and load tooltip display correctly', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.selectLocalLlmModelSource();
+
+        expect(await settingsBrowserPage.isLocalLlmModelSourceSelected()).toBe(true);
+        expect(await settingsBrowserPage.isOllamaProviderVisible()).toBe(true);
+        expect(await settingsBrowserPage.isLmStudioProviderVisible()).toBe(true);
+
+        await settingsBrowserPage.selectLmStudioProvider();
+
+        expect(await settingsBrowserPage.isLmStudioProviderSelected()).toBe(true);
+        expect(await settingsBrowserPage.getLocalLlmEndpointValue()).toBe("http://localhost:1234/v1");
+        expect(await settingsBrowserPage.getLocalLlmLoadButtonText()).toBe("");
+
+        await settingsBrowserPage.hoverLocalLlmLoadButton();
+        expect(await settingsBrowserPage.isLocalLlmLoadTooltipVisible()).toBe(true);
+    });
+
     test('@readwrite Verify model categories display correctly', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
 
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
-        // Skip if models are not available
-        if (!modelsAvailable && !(await settingsBrowserPage.isCategoryVisible("OpenAI"))) {
+        // Skip if models are not visible in the UI (models require an API key to be loaded)
+        if (!(await settingsBrowserPage.isCategoryVisible("OpenAI"))) {
             test.skip();
             return;
         }
@@ -247,8 +310,8 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
-        // Skip if models are not available
-        if (!modelsAvailable && !(await settingsBrowserPage.isModelVisible(openaiModel))) {
+        // Skip if models are not visible in the UI (models require an API key to be loaded)
+        if (!(await settingsBrowserPage.isModelVisible(openaiModel))) {
             test.skip();
             return;
         }
@@ -277,8 +340,8 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
-        // Skip if models are not available
-        if (!modelsAvailable && !(await settingsBrowserPage.isModelVisible(openaiModel))) {
+        // Skip if models are not visible in the UI (models require an API key to be loaded)
+        if (!(await settingsBrowserPage.isModelVisible(openaiModel))) {
             test.skip();
             return;
         }
@@ -299,7 +362,7 @@ test.describe('@browser Browser Settings tests', () => {
         expect(isPreviousSelected).toBe(false);
     });
 
-    test('@readwrite Verify model/API key mismatch shows error toast in chat', async () => {
+    test('@readwrite Verify model/API key mismatch shows inline error in chat', async () => {
         // Create a graph first
         const graphName = getRandomString("chat");
         await apiCall.addGraph(graphName);
@@ -313,8 +376,8 @@ test.describe('@browser Browser Settings tests', () => {
             await settingsBrowserPage.expandChatSection();
             await settingsBrowserPage.waitForChatApiKeyInputEnabled();
 
-            // Skip if models are not available
-            if (!modelsAvailable && !(await settingsBrowserPage.isModelVisible(anthropicModel))) {
+            // Skip if models are not visible in the UI (models require an API key to be loaded)
+            if (!(await settingsBrowserPage.isModelVisible(anthropicModel))) {
                 test.skip();
                 return;
             }
@@ -352,17 +415,17 @@ test.describe('@browser Browser Settings tests', () => {
             // Verify user message was sent (appears in chat)
             await chatComponent.waitForChatUserMessage();
 
-            // Verify error toast is displayed due to model/API key mismatch
+            // Verify error message is displayed inline in chat due to model/API key mismatch
             // The error message should be: "Model/API key mismatch: You selected a Anthropic model but provided a OpenAI API key..."
-            const isErrorToastVisible = await chatComponent.getNotificationErrorToast();
-            expect(isErrorToastVisible).toBe(true);
+            const hasErrorMessage = await chatComponent.waitForAssistantResponse("Error");
+            expect(hasErrorMessage).toBe(true);
         } finally {
             // Clean up - always remove graph even if test fails
             await apiCall.removeGraph(graphName);
         }
     });
 
-    test('@readwrite Verify xAI API key mismatch shows error toast in chat', async () => {
+    test('@readwrite Verify xAI API key mismatch shows inline error in chat', async () => {
         // Create a graph first
         const graphName = getRandomString("chat");
         await apiCall.addGraph(graphName);
@@ -413,13 +476,354 @@ test.describe('@browser Browser Settings tests', () => {
             // Verify user message was sent
             await chatComponent.waitForChatUserMessage();
 
-            // Verify error toast is displayed due to model/API key mismatch
-            const isErrorToastVisible = await chatComponent.getNotificationErrorToast();
-            expect(isErrorToastVisible).toBe(true);
+            // Verify error message is displayed inline in chat due to model/API key mismatch
+            const hasErrorMessage = await chatComponent.waitForAssistantResponse("Error");
+            expect(hasErrorMessage).toBe(true);
         } finally {
             // Clean up - always remove graph even if test fails
             await apiCall.removeGraph(graphName);
         }
+    });
+
+    // ===== Max Saved Messages =====
+
+    test('@readwrite Verify max saved messages can be set and persists', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.waitForMaxSavedMessagesInput();
+
+        const originalValue = await settingsBrowserPage.getMaxSavedMessagesValue();
+
+        try {
+            await settingsBrowserPage.fillMaxSavedMessages(7);
+            await settingsBrowserPage.clickSaveSettingsButton();
+            await settingsBrowserPage.waitForTimeout(500);
+
+            await settingsBrowserPage.reloadPage();
+            await settingsBrowserPage.waitForTimeout(1000);
+            await settingsBrowserPage.expandChatSection();
+            await settingsBrowserPage.waitForMaxSavedMessagesInput();
+
+            const savedValue = await settingsBrowserPage.getMaxSavedMessagesValue();
+            expect(savedValue).toBe('7');
+        } finally {
+            // Restore original value
+            await settingsBrowserPage.fillMaxSavedMessages(parseInt(originalValue));
+            await settingsBrowserPage.clickSaveSettingsButton();
+        }
+    });
+
+    test('@readwrite Verify max saved messages rejects values below 5', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.waitForMaxSavedMessagesInput();
+
+        // Store the original value before entering invalid input
+        const originalValue = await settingsBrowserPage.getMaxSavedMessagesValue();
+
+        await settingsBrowserPage.fillMaxSavedMessages(3);
+        await settingsBrowserPage.clickSaveSettingsButtonWithoutWait();
+        await settingsBrowserPage.waitForTimeout(1000);
+
+        await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.waitForTimeout(1000);
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.waitForMaxSavedMessagesInput();
+
+        const savedValue = await settingsBrowserPage.getMaxSavedMessagesValue();
+        expect(savedValue).toBe(originalValue);
+    });
+
+    test('@readwrite Verify max saved messages rejects values above 10', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.waitForMaxSavedMessagesInput();
+
+        // Store the original value before entering invalid input
+        const originalValue = await settingsBrowserPage.getMaxSavedMessagesValue();
+
+        await settingsBrowserPage.fillMaxSavedMessages(15);
+        await settingsBrowserPage.clickSaveSettingsButtonWithoutWait();
+        await settingsBrowserPage.waitForTimeout(1000);
+
+        await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.waitForTimeout(1000);
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.waitForMaxSavedMessagesInput();
+
+        const savedValue = await settingsBrowserPage.getMaxSavedMessagesValue();
+        expect(savedValue).toBe(originalValue);
+    });
+
+    // ===== Graph Info Section =====
+
+    test('@readwrite Verify refresh interval slider can be changed and persists', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settingsBrowserPage.expandGraphInfoSection();
+
+        const originalValue = await settingsBrowserPage.getRefreshIntervalValue();
+
+        try {
+            await settingsBrowserPage.setRefreshIntervalSlider(30);
+            await settingsBrowserPage.clickSaveSettingsButton();
+            await settingsBrowserPage.waitForTimeout(500);
+
+            await settingsBrowserPage.reloadPage();
+            await settingsBrowserPage.waitForTimeout(1000);
+            await settingsBrowserPage.expandGraphInfoSection();
+
+            const value = await settingsBrowserPage.getRefreshIntervalValue();
+            expect(value).toBe(30);
+        } finally {
+            // Restore original value
+            await settingsBrowserPage.setRefreshIntervalSlider(originalValue);
+            await settingsBrowserPage.clickSaveSettingsButton();
+        }
+    });
+
+    test('@readwrite Verify max items for search slider can be changed and persists', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settingsBrowserPage.expandGraphInfoSection();
+
+        const originalValue = await settingsBrowserPage.getMaxItemsForSearchValue();
+
+        try {
+            await settingsBrowserPage.setMaxItemsForSearchSlider(25);
+            await settingsBrowserPage.clickSaveSettingsButton();
+            await settingsBrowserPage.waitForTimeout(500);
+
+            await settingsBrowserPage.reloadPage();
+            await settingsBrowserPage.waitForTimeout(1000);
+            await settingsBrowserPage.expandGraphInfoSection();
+
+            const value = await settingsBrowserPage.getMaxItemsForSearchValue();
+            expect(value).toBe(25);
+        } finally {
+            // Restore original value
+            await settingsBrowserPage.setMaxItemsForSearchSlider(originalValue);
+            await settingsBrowserPage.clickSaveSettingsButton();
+        }
+    });
+
+    // ===== Table View Settings =====
+
+    test('@readwrite Verify column width slider can be changed and persists', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        const originalValue = await settingsBrowserPage.getColumnWidthValue();
+
+        try {
+            await settingsBrowserPage.setColumnWidthSlider(50);
+            await settingsBrowserPage.clickSaveSettingsButton();
+            await settingsBrowserPage.waitForTimeout(500);
+
+            await settingsBrowserPage.reloadPage();
+            await settingsBrowserPage.waitForTimeout(1000);
+            await settingsBrowserPage.expandUserExperienceSection();
+
+            const value = await settingsBrowserPage.getColumnWidthValue();
+            expect(value).toBe(50);
+        } finally {
+            // Restore original value
+            await settingsBrowserPage.setColumnWidthSlider(originalValue);
+            await settingsBrowserPage.clickSaveSettingsButton();
+        }
+    });
+
+    test('@readwrite Verify row height slider can be changed and persists', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        const originalValue = await settingsBrowserPage.getRowHeightValue();
+
+        try {
+            await settingsBrowserPage.setRowHeightSlider(60);
+            await settingsBrowserPage.clickSaveSettingsButton();
+            await settingsBrowserPage.waitForTimeout(500);
+
+            await settingsBrowserPage.reloadPage();
+            await settingsBrowserPage.waitForTimeout(1000);
+            await settingsBrowserPage.expandUserExperienceSection();
+
+            const value = await settingsBrowserPage.getRowHeightValue();
+            expect(value).toBe(60);
+        } finally {
+            // Restore original value
+            await settingsBrowserPage.setRowHeightSlider(originalValue);
+            await settingsBrowserPage.clickSaveSettingsButton();
+        }
+    });
+
+    test('@readwrite Verify row height expand multiplier slider can be changed and persists', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        const originalValue = await settingsBrowserPage.getRowHeightExpandMultipleValue();
+
+        try {
+            await settingsBrowserPage.setRowHeightExpandMultipleSlider(4);
+            await settingsBrowserPage.clickSaveSettingsButton();
+            await settingsBrowserPage.waitForTimeout(500);
+
+            await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.waitForTimeout(1000);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        const value = await settingsBrowserPage.getRowHeightExpandMultipleValue();
+        expect(value).toBe(4);
+       } finally {
+           // Restore original value
+           await settingsBrowserPage.setRowHeightExpandMultipleSlider(originalValue);
+           await settingsBrowserPage.clickSaveSettingsButton();
+       }
+    });
+
+    // ===== User Experience - Captions Keys =====
+
+    test('@readwrite Verify caption key can be added and persists', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        // Use a unique key name to avoid collisions with existing keys
+        const captionKey = `testkey_${Date.now()}`;
+        await settingsBrowserPage.addCaptionKey(captionKey);
+        await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForTimeout(500);
+
+        await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.waitForTimeout(1000);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        const keys = await settingsBrowserPage.getCaptionKeys();
+        expect(keys).toContain(captionKey);
+
+        // Cleanup: remove the test key
+        await settingsBrowserPage.removeCaptionKey(captionKey);
+        await settingsBrowserPage.clickSaveSettingsButton();
+    });
+
+    test('@readwrite Verify caption key can be removed', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        // Add a unique key to remove
+        const captionKey = `removekey_${Date.now()}`;
+        await settingsBrowserPage.addCaptionKey(captionKey);
+        await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForTimeout(500);
+
+        await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.waitForTimeout(1000);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        // Remove the key
+        await settingsBrowserPage.removeCaptionKey(captionKey);
+        await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForTimeout(500);
+
+        await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.waitForTimeout(1000);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        const keys = await settingsBrowserPage.getCaptionKeys();
+        expect(keys).not.toContain(captionKey);
+    });
+
+    // ===== User Experience - Show Property Key Prefix =====
+
+    test('@readwrite Verify show property key prefix toggle can be changed and persists', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        const initialState = await settingsBrowserPage.getShowPropertyKeyPrefixState();
+        try {
+            await settingsBrowserPage.clickShowPropertyKeyPrefixSwitch();
+            await settingsBrowserPage.clickSaveSettingsButton();
+            await settingsBrowserPage.waitForTimeout(500);
+
+            await settingsBrowserPage.reloadPage();
+            await settingsBrowserPage.waitForTimeout(1000);
+            await settingsBrowserPage.expandUserExperienceSection();
+
+            const newState = await settingsBrowserPage.getShowPropertyKeyPrefixState();
+            expect(newState).toBe(!initialState);
+        } finally {
+            try {
+                const currentState = await settingsBrowserPage.getShowPropertyKeyPrefixState();
+                if (currentState !== initialState) {
+                    await settingsBrowserPage.clickShowPropertyKeyPrefixSwitch();
+                    await settingsBrowserPage.clickSaveSettingsButton();
+                }
+            } catch {
+                // Page was closed due to timeout - cleanup not possible
+            }
+        }
+    });
+
+    // ===== Local LLM Immediate Persistence =====
+
+    test('@readwrite Verify local LLM model source persists after Save', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+
+        await settingsBrowserPage.expandChatSection();
+        // Clear the key first so waitForChatModelSourceSaved can detect the fresh write
+        await settingsBrowserPage.clearChatModelSourceFromLocalStorage();
+        await settingsBrowserPage.selectLocalLlmModelSource();
+        expect(await settingsBrowserPage.isLocalLlmModelSourceSelected()).toBe(true);
+
+        // Click Save, then wait until the encrypted value lands in localStorage before reloading
+        await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForChatModelSourceSaved();
+        await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.waitForLocalLlmModelSourceSelected();
+
+        expect(await settingsBrowserPage.isLocalLlmModelSourceSelected()).toBe(true);
+    });
+
+    test('@readwrite Verify local LLM provider change persists after Save', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.clearChatModelSourceFromLocalStorage();
+        await settingsBrowserPage.selectLocalLlmModelSource();
+        await settingsBrowserPage.selectLmStudioProvider();
+        expect(await settingsBrowserPage.isLmStudioProviderSelected()).toBe(true);
+        expect(await settingsBrowserPage.getLocalLlmEndpointValue()).toBe('http://localhost:1234/v1');
+
+        // Click Save, then wait until the encrypted value lands in localStorage before reloading
+        await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForChatModelSourceSaved();
+        await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.waitForLocalLlmModelSourceSelected();
+
+        // LM Studio provider and its default endpoint should persist after Save
+        expect(await settingsBrowserPage.isLocalLlmModelSourceSelected()).toBe(true);
+        expect(await settingsBrowserPage.isLmStudioProviderSelected()).toBe(true);
+        expect(await settingsBrowserPage.getLocalLlmEndpointValue()).toBe('http://localhost:1234/v1');
+    });
+
+    test('@readwrite Verify local LLM endpoint change persists after Save', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.clearChatModelSourceFromLocalStorage();
+        await settingsBrowserPage.selectLocalLlmModelSource();
+
+        const customEndpoint = 'http://localhost:8888/v1';
+        await settingsBrowserPage.fillLocalLlmEndpoint(customEndpoint);
+
+        // Click Save, then wait until the encrypted value lands in localStorage before reloading
+        await settingsBrowserPage.clickSaveSettingsButton();
+        await settingsBrowserPage.waitForChatModelSourceSaved();
+        await settingsBrowserPage.reloadPage();
+        await settingsBrowserPage.expandChatSection();
+        await settingsBrowserPage.waitForLocalLlmModelSourceSelected();
+
+        // Custom endpoint should persist after Save
+        expect(await settingsBrowserPage.getLocalLlmEndpointValue()).toBe(customEndpoint);
     });
 
 });
