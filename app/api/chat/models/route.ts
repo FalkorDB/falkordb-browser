@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TextToCypher } from "@falkordb/text-to-cypher";
 import { detectProviderFromApiKey, getProviderDisplayName, type AIProvider } from "@/lib/ai-provider-utils";
+import { normalizeLocalEndpoint, LOCAL_PROVIDER_DEFAULT_ENDPOINTS, type LocalProvider } from "@/lib/local-llm-utils";
 import { getClient } from "../../auth/[...nextauth]/options";
 import { buildFalkorDBConnection, getCorsHeaders } from "../../utils";
 
@@ -9,16 +10,10 @@ type ProviderModelResponse = {
     models?: Array<{ name?: string; supportedGenerationMethods?: string[] }>;
 };
 
-type LocalProvider = "ollama" | "lmstudio";
-
 const MODEL_FETCH_TIMEOUT_MS = 4000;
 const LOCAL_PROVIDER_LABELS: Record<LocalProvider, string> = {
     ollama: "Ollama",
     lmstudio: "LM Studio",
-};
-const LOCAL_PROVIDER_DEFAULT_ENDPOINTS: Record<LocalProvider, string> = {
-    ollama: "http://localhost:11434",
-    lmstudio: "http://localhost:1234/v1",
 };
 
 class ModelFetchError extends Error {
@@ -104,38 +99,6 @@ const withProviderPrefix = (provider: AIProvider, models: string[]) =>
 
 const withLocalProviderPrefix = (provider: LocalProvider, models: string[]) =>
     models.map(model => provider === "ollama" ? `ollama::${model}` : `openai::${model}`);
-
-const normalizeLocalEndpoint = (provider: LocalProvider, endpoint?: string) => {
-    const rawEndpoint = endpoint?.trim() || LOCAL_PROVIDER_DEFAULT_ENDPOINTS[provider];
-    const url = new URL(rawEndpoint);
-    const hostname = url.hostname.toLowerCase();
-    const isLoopback = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
-
-    if (url.protocol !== "http:" || !isLoopback) {
-        throw new Error("Local LLM endpoint must be an http:// localhost or 127.0.0.1 URL.");
-    }
-
-    const allowedPorts = provider === "ollama" ? new Set(["", "11434"]) : new Set(["", "1234"]);
-    if (!allowedPorts.has(url.port)) {
-        throw new Error(`Invalid ${LOCAL_PROVIDER_LABELS[provider]} endpoint port.`);
-    }
-
-    if (provider === "ollama") {
-        if (url.pathname !== "/" && url.pathname !== "") {
-            throw new Error("Ollama endpoint path must be root (/).");
-        }
-        url.pathname = "/";
-    } else if (url.pathname === "/" || url.pathname === "") {
-        url.pathname = "/v1";
-    } else if (url.pathname !== "/v1") {
-        throw new Error("LM Studio endpoint path must be /v1.");
-    }
-
-    url.search = "";
-    url.hash = "";
-
-    return url.toString().replace(/\/$/, "");
-};
 
 const normalizeLocalProvider = (provider?: string): LocalProvider => provider === "lmstudio" ? "lmstudio" : "ollama";
 

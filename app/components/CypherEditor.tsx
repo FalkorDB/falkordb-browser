@@ -168,6 +168,8 @@ const STATIC_SUGGESTIONS: monaco.languages.CompletionItem[] = [
     }))
 ];
 
+const escapeRegExp = (str: string): string => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const DEFAULT_MONARCH_TOKENIZER: monaco.languages.IMonarchLanguage = {
     tokenizer: {
         root: [
@@ -504,8 +506,8 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
     // Returns filtered suggestions for the default (non-dot) autocomplete display:
     // excludes full-path namespaced functions and property keys (both accessed via dot navigation)
-    const getAllSuggestions = useCallback(async (): Promise<monaco.languages.CompletionItem[]> => {
-        const full = await getFullSuggestions();
+    const getAllSuggestions = useCallback(async (prefetched?: monaco.languages.CompletionItem[]): Promise<monaco.languages.CompletionItem[]> => {
+        const full = prefetched ?? await getFullSuggestions();
 
         const filtered = full.filter(s => {
             const label = typeof s.label === 'string' ? s.label : s.label.label;
@@ -563,8 +565,8 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                 }).flat()
         ]);
 
-        // Build keywords regex including static keywords and property keys
-        const allKeywords = [...KEYWORDS, ...propertyKeys].join('|');
+        // Build keywords regex including static keywords and (escaped) dynamic property keys
+        const allKeywords = [...KEYWORDS, ...propertyKeys.map(escapeRegExp)].join('|');
 
         // Build bound variables rule from the ref
         const boundVarsArray = Array.from(boundVarsRef.current);
@@ -576,15 +578,16 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             tokenizer: {
                 root: graphIdRef.current ? [
                     ...boundVarsRule,
-                    ...(namespaces.size > 0 ? [[new RegExp(`\\b(${Array.from(namespaces.keys()).join('|')})\\b`), "keyword"] as [RegExp, string]] : []),
+                    ...(namespaces.size > 0 ? [[new RegExp(`\\b(${Array.from(namespaces.keys()).map(escapeRegExp).join('|')})\\b`), "keyword"] as [RegExp, string]] : []),
                     [new RegExp(`\\b(${allKeywords})\\b`), "keyword"],
                     [
                         new RegExp(`\\b(${functions.map(({ label }) => {
-                            if ((label as string).includes(".")) {
-                                const labels = (label as string).split(".");
-                                return labels[labels.length - 1];
+                            const labelStr = label as string;
+                            if (labelStr.includes(".")) {
+                                const labels = labelStr.split(".");
+                                return escapeRegExp(labels[labels.length - 1]);
                             }
-                            return label;
+                            return escapeRegExp(labelStr);
                         }).join('|')})\\b`),
                         "function"
                     ],
@@ -728,9 +731,9 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             }
 
             // Default (non-dot) case: return filtered suggestions (no full-path functions)
-            return getAllSuggestions();
+            return getAllSuggestions(fullSug);
         },
-    }), []);
+    }), [getFullSuggestions, getAllSuggestions, updateTokenizer]);
 
     const handleSubmit = async () => {
         runQuery(historyQuery.query.trim());

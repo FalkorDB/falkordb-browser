@@ -22,6 +22,9 @@ const DEFAULT_CONNECT_SRC = [
     "https://*.googletagmanager.com",
 ];
 
+// Parse and cache CSP_CONNECT_SRC once at module load time
+const EXTRA_CONNECT_SRC = getExtraConnectSrc();
+
 function cleanup(windowMs: number) {
     const now = Date.now();
     if (now - lastCleanup < CLEANUP_INTERVAL) return;
@@ -99,7 +102,8 @@ export function proxy(request: NextRequest) {
 
     // --- Rate limiting (API routes only) ---
     // Set RATE_LIMIT_MAX_REQUESTS=0 to disable rate limiting entirely.
-    const maxRequests = process.env.RATE_LIMIT_MAX_REQUESTS ? parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) : 200;
+    const parsedMaxRequests = process.env.RATE_LIMIT_MAX_REQUESTS ? parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) : 200;
+    const maxRequests = Number.isFinite(parsedMaxRequests) ? parsedMaxRequests : 200;
     const config = maxRequests !== 0 ? { maxRequests, windowMs: 60_000 } : null;
     if (config) {
         const ip = getClientIP(request);
@@ -129,7 +133,7 @@ export function proxy(request: NextRequest) {
     const scriptSrc = isDev
         ? `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval'`
         : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`;
-    const connectSrc = [...new Set([...DEFAULT_CONNECT_SRC, ...getExtraConnectSrc()])].join(" ");
+    const connectSrc = [...new Set([...DEFAULT_CONNECT_SRC, ...EXTRA_CONNECT_SRC])].join(" ");
 
     const cspHeader = [
         "default-src 'self'",

@@ -88,6 +88,7 @@ const createChatApiKey = (key: string): ChatApiKey => {
 };
 
 const parseChatApiKeys = (value: string): ChatApiKey[] => {
+  const validProviders = new Set(["openai", "anthropic", "gemini", "ollama", "groq", "cohere", "xai"]);
   const parsed = JSON.parse(value) as unknown;
   if (!Array.isArray(parsed)) return [];
 
@@ -98,7 +99,8 @@ const parseChatApiKeys = (value: string): ChatApiKey[] => {
       return typeof candidate.id === "string" &&
         typeof candidate.label === "string" &&
         typeof candidate.key === "string" &&
-        typeof candidate.provider === "string";
+        typeof candidate.provider === "string" &&
+        validProviders.has(candidate.provider);
     })
     .map(item => ({
       ...item,
@@ -910,7 +912,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
           ? parsedStoredTimeout
           : 60;
       } else {
-        // No user-set value: cap the default (60) with TIMEOUT_MAX from server config
+        // No user-set value: cap the default (60s) with TIMEOUT_MAX from server config.
+        // The timeout query param is in seconds (the API multiplies by 1000), so TIMEOUT_MAX (ms) is converted to seconds below.
         let fallback = 60;
         try {
           const configRes = await fetch("/api/graph/config", { method: "GET" });
@@ -977,10 +980,22 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       const storedChatApiKeys = localStorage.getItem(CHAT_API_KEYS_STORAGE_KEY) || "";
       if (storedChatApiKeys) {
         try {
-          const decryptedKeys = await serverDecrypt(storedChatApiKeys);
-          loadedChatApiKeys = decryptedKeys ? parseChatApiKeys(decryptedKeys) : [];
+          // Validate format before decrypting - only decrypt if looks server-encrypted
+          if (looksServerEncrypted(storedChatApiKeys)) {
+            const decryptedKeys = await serverDecrypt(storedChatApiKeys);
+            loadedChatApiKeys = decryptedKeys ? parseChatApiKeys(decryptedKeys) : [];
+          } else {
+            // Try to parse directly as plaintext JSON for legacy or test values
+            try {
+              loadedChatApiKeys = parseChatApiKeys(storedChatApiKeys);
+            } catch {
+              console.warn('Stored API keys format unrecognized, clearing corrupted data');
+              localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
+            }
+          }
         } catch (error) {
           console.error('Failed to decrypt API keys:', error);
+          localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
         }
       }
 

@@ -492,17 +492,25 @@ test.describe('@browser Browser Settings tests', () => {
         await settingsBrowserPage.expandChatSection();
         await settingsBrowserPage.waitForMaxSavedMessagesInput();
 
-        await settingsBrowserPage.fillMaxSavedMessages(7);
-        await settingsBrowserPage.clickSaveSettingsButton();
-        await settingsBrowserPage.waitForTimeout(500);
+        const originalValue = await settingsBrowserPage.getMaxSavedMessagesValue();
 
-        await settingsBrowserPage.reloadPage();
-        await settingsBrowserPage.waitForTimeout(1000);
-        await settingsBrowserPage.expandChatSection();
-        await settingsBrowserPage.waitForMaxSavedMessagesInput();
+        try {
+            await settingsBrowserPage.fillMaxSavedMessages(7);
+            await settingsBrowserPage.clickSaveSettingsButton();
+            await settingsBrowserPage.waitForTimeout(500);
 
-        const savedValue = await settingsBrowserPage.getMaxSavedMessagesValue();
-        expect(savedValue).toBe('7');
+            await settingsBrowserPage.reloadPage();
+            await settingsBrowserPage.waitForTimeout(1000);
+            await settingsBrowserPage.expandChatSection();
+            await settingsBrowserPage.waitForMaxSavedMessagesInput();
+
+            const savedValue = await settingsBrowserPage.getMaxSavedMessagesValue();
+            expect(savedValue).toBe('7');
+        } finally {
+            // Restore original value
+            await settingsBrowserPage.fillMaxSavedMessages(parseInt(originalValue));
+            await settingsBrowserPage.clickSaveSettingsButton();
+        }
     });
 
     test('@readwrite Verify max saved messages rejects values below 5', async () => {
@@ -553,32 +561,48 @@ test.describe('@browser Browser Settings tests', () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
         await settingsBrowserPage.expandGraphInfoSection();
 
-        await settingsBrowserPage.setRefreshIntervalSlider(30);
-        await settingsBrowserPage.clickSaveSettingsButton();
-        await settingsBrowserPage.waitForTimeout(500);
+        const originalValue = await settingsBrowserPage.getRefreshIntervalValue();
 
-        await settingsBrowserPage.reloadPage();
-        await settingsBrowserPage.waitForTimeout(1000);
-        await settingsBrowserPage.expandGraphInfoSection();
+        try {
+            await settingsBrowserPage.setRefreshIntervalSlider(30);
+            await settingsBrowserPage.clickSaveSettingsButton();
+            await settingsBrowserPage.waitForTimeout(500);
 
-        const value = await settingsBrowserPage.getRefreshIntervalValue();
-        expect(value).toBe(30);
+            await settingsBrowserPage.reloadPage();
+            await settingsBrowserPage.waitForTimeout(1000);
+            await settingsBrowserPage.expandGraphInfoSection();
+
+            const value = await settingsBrowserPage.getRefreshIntervalValue();
+            expect(value).toBe(30);
+        } finally {
+            // Restore original value
+            await settingsBrowserPage.setRefreshIntervalSlider(originalValue);
+            await settingsBrowserPage.clickSaveSettingsButton();
+        }
     });
 
     test('@readwrite Verify max items for search slider can be changed and persists', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
         await settingsBrowserPage.expandGraphInfoSection();
 
-        await settingsBrowserPage.setMaxItemsForSearchSlider(25);
-        await settingsBrowserPage.clickSaveSettingsButton();
-        await settingsBrowserPage.waitForTimeout(500);
+        const originalValue = await settingsBrowserPage.getMaxItemsForSearchValue();
 
-        await settingsBrowserPage.reloadPage();
-        await settingsBrowserPage.waitForTimeout(1000);
-        await settingsBrowserPage.expandGraphInfoSection();
+        try {
+            await settingsBrowserPage.setMaxItemsForSearchSlider(25);
+            await settingsBrowserPage.clickSaveSettingsButton();
+            await settingsBrowserPage.waitForTimeout(500);
 
-        const value = await settingsBrowserPage.getMaxItemsForSearchValue();
-        expect(value).toBe(25);
+            await settingsBrowserPage.reloadPage();
+            await settingsBrowserPage.waitForTimeout(1000);
+            await settingsBrowserPage.expandGraphInfoSection();
+
+            const value = await settingsBrowserPage.getMaxItemsForSearchValue();
+            expect(value).toBe(25);
+        } finally {
+            // Restore original value
+            await settingsBrowserPage.setMaxItemsForSearchSlider(originalValue);
+            await settingsBrowserPage.clickSaveSettingsButton();
+        }
     });
 
     // ===== Table View Settings =====
@@ -587,48 +611,72 @@ test.describe('@browser Browser Settings tests', () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
         await settingsBrowserPage.expandUserExperienceSection();
 
-        await settingsBrowserPage.setColumnWidthSlider(50);
-        await settingsBrowserPage.clickSaveSettingsButton();
-        await settingsBrowserPage.waitForTimeout(500);
+        const originalValue = await settingsBrowserPage.getColumnWidthValue();
 
-        await settingsBrowserPage.reloadPage();
-        await settingsBrowserPage.waitForTimeout(1000);
-        await settingsBrowserPage.expandUserExperienceSection();
+        try {
+            await settingsBrowserPage.setColumnWidthSlider(50);
+            await settingsBrowserPage.clickSaveSettingsButton();
+            await settingsBrowserPage.waitForTimeout(500);
 
-        const value = await settingsBrowserPage.getColumnWidthValue();
-        expect(value).toBe(50);
+            await settingsBrowserPage.reloadPage();
+            await settingsBrowserPage.waitForTimeout(1000);
+            await settingsBrowserPage.expandUserExperienceSection();
+
+            const value = await settingsBrowserPage.getColumnWidthValue();
+            expect(value).toBe(50);
+        } finally {
+            // Restore original value
+            await settingsBrowserPage.setColumnWidthSlider(originalValue);
+            await settingsBrowserPage.clickSaveSettingsButton();
+        }
     });
 
     test('@readwrite Verify row height slider can be changed and persists', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
         await settingsBrowserPage.expandUserExperienceSection();
 
-        await settingsBrowserPage.setRowHeightSlider(60);
-        await settingsBrowserPage.clickSaveSettingsButton();
-        await settingsBrowserPage.waitForTimeout(500);
+        const originalValue = await settingsBrowserPage.getRowHeightValue();
 
-        await settingsBrowserPage.reloadPage();
-        await settingsBrowserPage.waitForTimeout(1000);
-        await settingsBrowserPage.expandUserExperienceSection();
+        try {
+            await settingsBrowserPage.setRowHeightSlider(60);
+            await settingsBrowserPage.clickSaveSettingsButton();
+            await settingsBrowserPage.waitForTimeout(500);
 
-        const value = await settingsBrowserPage.getRowHeightValue();
-        expect(value).toBe(60);
+            await settingsBrowserPage.reloadPage();
+            await settingsBrowserPage.waitForTimeout(1000);
+            await settingsBrowserPage.expandUserExperienceSection();
+
+            const value = await settingsBrowserPage.getRowHeightValue();
+            expect(value).toBe(60);
+        } finally {
+            // Restore original value
+            await settingsBrowserPage.setRowHeightSlider(originalValue);
+            await settingsBrowserPage.clickSaveSettingsButton();
+        }
     });
 
     test('@readwrite Verify row height expand multiplier slider can be changed and persists', async () => {
         const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
         await settingsBrowserPage.expandUserExperienceSection();
 
-        await settingsBrowserPage.setRowHeightExpandMultipleSlider(4);
-        await settingsBrowserPage.clickSaveSettingsButton();
-        await settingsBrowserPage.waitForTimeout(500);
+        const originalValue = await settingsBrowserPage.getRowHeightExpandMultipleValue();
 
-        await settingsBrowserPage.reloadPage();
+        try {
+            await settingsBrowserPage.setRowHeightExpandMultipleSlider(4);
+            await settingsBrowserPage.clickSaveSettingsButton();
+            await settingsBrowserPage.waitForTimeout(500);
+
+            await settingsBrowserPage.reloadPage();
         await settingsBrowserPage.waitForTimeout(1000);
         await settingsBrowserPage.expandUserExperienceSection();
 
         const value = await settingsBrowserPage.getRowHeightExpandMultipleValue();
         expect(value).toBe(4);
+       } finally {
+           // Restore original value
+           await settingsBrowserPage.setRowHeightExpandMultipleSlider(originalValue);
+           await settingsBrowserPage.clickSaveSettingsButton();
+       }
     });
 
     // ===== User Experience - Captions Keys =====

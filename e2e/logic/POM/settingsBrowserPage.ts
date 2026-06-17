@@ -289,11 +289,11 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   private getChatApiKeyCard(apiKey: string): Locator {
-    return this.chatApiKeyCards.filter({ hasText: apiKey }).first();
+    return this.chatApiKeyCards.filter({ hasText: new RegExp(`^${apiKey}$`) }).first();
   }
 
   private getMaskedChatApiKeyCard(apiKey: string): Locator {
-    return this.chatApiKeyCards.filter({ hasText: this.getMaskedApiKey(apiKey) }).first();
+    return this.chatApiKeyCards.filter({ hasText: new RegExp(`^${this.getMaskedApiKey(apiKey)}$`) }).first();
   }
 
   async addChatApiKey(apiKey: string): Promise<void> {
@@ -722,7 +722,7 @@ export default class SettingsBrowserPage extends BasePage {
   // ===== Graph Info Section =====
 
   private get graphInfoSectionHeader(): Locator {
-    return this.page.locator('[aria-expanded]').filter({ has: this.page.locator('text=Graph Info') }).first();
+    return this.page.locator('[data-testid="graphInfoSectionHeader"]');
   }
 
   private get refreshIntervalSlider(): Locator {
@@ -760,7 +760,7 @@ export default class SettingsBrowserPage extends BasePage {
   // ===== User Experience Section =====
 
   private get userExperienceSectionHeader(): Locator {
-    return this.page.locator('[aria-expanded]').filter({ has: this.page.locator('text=User Experience') }).first();
+    return this.page.locator('[data-testid="userExperienceSectionHeader"]');
   }
 
   private get showPropertyKeyPrefixSwitch(): Locator {
@@ -813,7 +813,7 @@ export default class SettingsBrowserPage extends BasePage {
   async removeCaptionKey(key: string): Promise<void> {
     // Scope to the caption list container to avoid matching unrelated <li> elements
     const captionsContainer = this.captionKeyInput.locator('..').locator('..');
-    const listItem = captionsContainer.locator('li').filter({ hasText: key });
+    const listItem = captionsContainer.locator('li').filter({ hasText: new RegExp(`^${key}$`) });
     const deleteBtn = listItem.getByRole('button', { name: 'Remove Caption' });
     await deleteBtn.click();
   }

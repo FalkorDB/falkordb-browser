@@ -336,22 +336,13 @@ export default function Chat({ onClose }: Props) {
             // Show answer
             if (data.answer) {
                 const confidence = typeof data.confidence === "number" ? data.confidence : undefined;
+                const tokenUsage = data.tokenUsage ? (data.tokenUsage as { totalTokens: number }).totalTokens : undefined;
                 handleSetMessages({
                     role: "assistant",
                     content: typeof data.answer === "string" ? data.answer : JSON.stringify(data.answer),
                     type: "Result",
-                    confidence
-                });
-            }
-
-            // Stamp token usage on the last message of this turn (after all messages are added)
-            if (data.tokenUsage) {
-                const tokenCount = (data.tokenUsage as { totalTokens: number }).totalTokens;
-                setMessages(prev => {
-                    if (prev.length === 0) return prev;
-                    const updated = [...prev];
-                    updated[updated.length - 1] = { ...updated[updated.length - 1], tokenUsage: tokenCount };
-                    return updated;
+                    confidence,
+                    tokenUsage
                 });
             }
 

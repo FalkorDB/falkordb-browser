@@ -261,6 +261,7 @@ test.describe('@config Settings config tests', () => {
 
     Data.inputDataNoZeroCheck.forEach(({ input, description, expected }, index) => {
         test(`@admin Modify ${roles.effectsThreshold} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
+            const originalValue = String((await apiCall.getSettingsRoleValue(roles.effectsThreshold)).config[1]);
             try {
                 await apiCall.modifySettingsRole(roles.effectsThreshold, input);
                 const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
@@ -269,9 +270,7 @@ test.describe('@config Settings config tests', () => {
                 const value = await settingsConfigPage.getRoleContentValue(roles.effectsThreshold);
                 expect(value === input).toBe(expected);
             } finally {
-                if (index === Data.inputDataNoZeroCheck.length - 1) {
-                    await apiCall.modifySettingsRole(roles.effectsThreshold, "100");
-                }
+                await apiCall.modifySettingsRole(roles.effectsThreshold, originalValue);
             }
         });
     });
@@ -280,6 +279,7 @@ test.describe('@config Settings config tests', () => {
 
     Data.inputDataNoZeroCheck.forEach(({ input, description, expected }, index) => {
         test(`@admin Modify ${roles.deltaMaxPendingChanges} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
+            const originalValue = String((await apiCall.getSettingsRoleValue(roles.deltaMaxPendingChanges)).config[1]);
             try {
                 await apiCall.modifySettingsRole(roles.deltaMaxPendingChanges, input);
                 const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
@@ -288,9 +288,7 @@ test.describe('@config Settings config tests', () => {
                 const value = await settingsConfigPage.getRoleContentValue(roles.deltaMaxPendingChanges);
                 expect(value === input).toBe(expected);
             } finally {
-                if (index === Data.inputDataNoZeroCheck.length - 1) {
-                    await apiCall.modifySettingsRole(roles.deltaMaxPendingChanges, "10000");
-                }
+                await apiCall.modifySettingsRole(roles.deltaMaxPendingChanges, originalValue);
             }
         });
     });
@@ -299,6 +297,7 @@ test.describe('@config Settings config tests', () => {
 
     Data.jsMemoryData.forEach(({ input, description, expected }, index) => {
         test(`@admin Modify ${roles.jsHeapSize} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
+            const originalValue = String((await apiCall.getSettingsRoleValue(roles.jsHeapSize)).config[1]);
             try {
                 await apiCall.modifySettingsRole(roles.jsHeapSize, input);
                 const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
@@ -307,9 +306,7 @@ test.describe('@config Settings config tests', () => {
                 const value = await settingsConfigPage.getRoleContentValue(roles.jsHeapSize);
                 expect(value === input).toBe(expected);
             } finally {
-                if (index === Data.jsMemoryData.length - 1) {
-                    await apiCall.modifySettingsRole(roles.jsHeapSize, "1048576");
-                }
+                await apiCall.modifySettingsRole(roles.jsHeapSize, originalValue);
             }
         });
     });
@@ -318,6 +315,7 @@ test.describe('@config Settings config tests', () => {
 
     Data.jsMemoryData.forEach(({ input, description, expected }, index) => {
         test(`@admin Modify ${roles.jsStackSize} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
+            const originalValue = String((await apiCall.getSettingsRoleValue(roles.jsStackSize)).config[1]);
             try {
                 await apiCall.modifySettingsRole(roles.jsStackSize, input);
                 const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
@@ -326,9 +324,7 @@ test.describe('@config Settings config tests', () => {
                 const value = await settingsConfigPage.getRoleContentValue(roles.jsStackSize);
                 expect(value === input).toBe(expected);
             } finally {
-                if (index === Data.jsMemoryData.length - 1) {
-                    await apiCall.modifySettingsRole(roles.jsStackSize, "1048576");
-                }
+                await apiCall.modifySettingsRole(roles.jsStackSize, originalValue);
             }
         });
     });
