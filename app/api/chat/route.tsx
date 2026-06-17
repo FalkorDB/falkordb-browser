@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TextToCypher } from "@falkordb/text-to-cypher";
 import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
+import { normalizeLocalEndpoint, type LocalProvider } from "@/lib/local-llm-utils";
 import { getClient } from "../auth/[...nextauth]/options";
 import { chatRequest, validateBody } from "../validate-body";
 import { buildFalkorDBConnection, getCorsHeaders } from "../utils";
@@ -9,42 +10,9 @@ export async function OPTIONS(request: NextRequest) {
     return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
 
-type LocalProvider = "ollama" | "lmstudio";
-
 const LOCAL_PROVIDER_DEFAULT_ENDPOINTS: Record<LocalProvider, string> = {
     ollama: "http://localhost:11434",
     lmstudio: "http://localhost:1234/v1",
-};
-
-const normalizeLocalEndpoint = (provider: LocalProvider, endpoint?: string) => {
-    const rawEndpoint = endpoint?.trim() || LOCAL_PROVIDER_DEFAULT_ENDPOINTS[provider];
-    const url = new URL(rawEndpoint);
-    const hostname = url.hostname.toLowerCase();
-    const isLoopback = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
-
-    if (url.protocol !== "http:" || !isLoopback) {
-        throw new Error("Local LLM endpoint must be an http:// localhost or 127.0.0.1 URL.");
-    }
-
-    const allowedPorts = provider === "ollama" ? new Set(["", "11434"]) : new Set(["", "1234"]);
-    if (!allowedPorts.has(url.port)) {
-        throw new Error(`Invalid ${provider === "ollama" ? "Ollama" : "LM Studio"} endpoint port.`);
-    }
-
-    if (provider === "ollama") {
-        if (url.pathname !== "/" && url.pathname !== "") {
-            throw new Error("Ollama endpoint path must be root (/).");
-        }
-        url.pathname = "/";
-    } else if (url.pathname === "/" || url.pathname === "") {
-        url.pathname = "/v1";
-    } else if (url.pathname !== "/v1") {
-        throw new Error("LM Studio endpoint path must be /v1.");
-    }
-
-    url.search = "";
-    url.hash = "";
-    return url.toString().replace(/\/$/, "");
 };
 
 /**

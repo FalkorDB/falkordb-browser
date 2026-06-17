@@ -102,7 +102,8 @@ export function proxy(request: NextRequest) {
 
     // --- Rate limiting (API routes only) ---
     // Set RATE_LIMIT_MAX_REQUESTS=0 to disable rate limiting entirely.
-    const maxRequests = process.env.RATE_LIMIT_MAX_REQUESTS ? parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) : 200;
+    const parsedMaxRequests = process.env.RATE_LIMIT_MAX_REQUESTS ? parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) : 200;
+    const maxRequests = Number.isFinite(parsedMaxRequests) ? parsedMaxRequests : 200;
     const config = maxRequests !== 0 ? { maxRequests, windowMs: 60_000 } : null;
     if (config) {
         const ip = getClientIP(request);

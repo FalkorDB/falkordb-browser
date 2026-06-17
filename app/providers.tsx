@@ -88,6 +88,7 @@ const createChatApiKey = (key: string): ChatApiKey => {
 };
 
 const parseChatApiKeys = (value: string): ChatApiKey[] => {
+  const validProviders = new Set(["openai", "anthropic", "gemini", "ollama", "groq", "cohere", "xai"]);
   const parsed = JSON.parse(value) as unknown;
   if (!Array.isArray(parsed)) return [];
 
@@ -98,7 +99,8 @@ const parseChatApiKeys = (value: string): ChatApiKey[] => {
       return typeof candidate.id === "string" &&
         typeof candidate.label === "string" &&
         typeof candidate.key === "string" &&
-        typeof candidate.provider === "string";
+        typeof candidate.provider === "string" &&
+        validProviders.has(candidate.provider);
     })
     .map(item => ({
       ...item,
@@ -908,10 +910,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         const parsedStoredTimeout = parseInt(storedTimeout, 10);
         timeoutVal = Number.isFinite(parsedStoredTimeout) && parsedStoredTimeout >= 0
           ? parsedStoredTimeout
-          : 60;
+          : 60000;
       } else {
-        // No user-set value: cap the default (60) with TIMEOUT_MAX from server config
-        let fallback = 60;
+        // No user-set value: cap the default (60000 ms) with TIMEOUT_MAX from server config
+        let fallback = 60000;
         try {
           const configRes = await fetch("/api/graph/config", { method: "GET" });
           if (configRes.ok) {
@@ -930,9 +932,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             if (timeoutMaxEntry) {
               const timeoutMaxMs = Number(timeoutMaxEntry[1]);
               if (timeoutMaxMs > 0) {
-                const timeoutMaxSeconds = Math.floor(timeoutMaxMs / 1000);
-                if (fallback > timeoutMaxSeconds) {
-                  fallback = timeoutMaxSeconds;
+                if (fallback > timeoutMaxMs) {
+                  fallback = timeoutMaxMs;
                 }
               }
             }
@@ -977,10 +978,22 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       const storedChatApiKeys = localStorage.getItem(CHAT_API_KEYS_STORAGE_KEY) || "";
       if (storedChatApiKeys) {
         try {
-          const decryptedKeys = await serverDecrypt(storedChatApiKeys);
-          loadedChatApiKeys = decryptedKeys ? parseChatApiKeys(decryptedKeys) : [];
+          // Validate format before decrypting - only decrypt if looks server-encrypted
+          if (looksServerEncrypted(storedChatApiKeys)) {
+            const decryptedKeys = await serverDecrypt(storedChatApiKeys);
+            loadedChatApiKeys = decryptedKeys ? parseChatApiKeys(decryptedKeys) : [];
+          } else {
+            // Try to parse directly as plaintext JSON for legacy or test values
+            try {
+              loadedChatApiKeys = parseChatApiKeys(storedChatApiKeys);
+            } catch {
+              console.warn('Stored API keys format unrecognized, clearing corrupted data');
+              localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
+            }
+          }
         } catch (error) {
           console.error('Failed to decrypt API keys:', error);
+          localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
         }
       }
 

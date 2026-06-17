@@ -792,29 +792,26 @@ export default function BrowserSettings() {
                                                                 <div
                                                                     key={apiKey.id}
                                                                     data-testid="chatApiKeyCard"
-                                                                    role="button"
-                                                                    tabIndex={0}
-                                                                    aria-pressed={isSelected}
                                                                     className={cn(
                                                                         "group rounded-xl border bg-background/80 p-2 text-left transition-all",
                                                                         isLoadingKey ? "cursor-wait" : "cursor-pointer",
                                                                         isSelected ? "border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20" : "border-border/70 hover:border-primary/40"
                                                                     )}
-                                                                    onClick={() => handleSelectKey(apiKey.id)}
-                                                                    onKeyDown={(event) => {
-                                                                        if (event.key === "Enter" || event.key === " ") {
-                                                                            event.preventDefault();
-                                                                            handleSelectKey(apiKey.id);
-                                                                        }
-                                                                    }}
                                                                 >
                                                                     <div className="flex w-full items-start gap-2 text-left">
-                                                                        <span className={cn(
-                                                                            "mt-0.5 flex h-8 w-8 items-center justify-center rounded-full border",
-                                                                            isSelected ? "border-primary bg-primary text-background" : "border-border bg-muted/40 text-muted-foreground"
-                                                                        )}>
+                                                                        <button
+                                                                            type="button"
+                                                                            data-testid="selectChatApiKeyButton"
+                                                                            aria-label={`Select ${providerName} API key`}
+                                                                            className={cn(
+                                                                                "mt-0.5 flex h-8 w-8 items-center justify-center rounded-full border transition-colors",
+                                                                                isSelected ? "border-primary bg-primary text-background" : "border-border bg-muted/40 text-muted-foreground hover:border-primary/40"
+                                                                            )}
+                                                                            onClick={() => handleSelectKey(apiKey.id)}
+                                                                            disabled={isLoadingKey}
+                                                                        >
                                                                             {isLoadingKey ? <Loader2 className="h-4 w-4 animate-spin" /> : isSelected ? <CheckCircle2 className="h-4 w-4" /> : <KeyRound className="h-4 w-4" />}
-                                                                        </span>
+                                                                        </button>
                                                                         <div className="min-w-0 flex-1">
                                                                             <div className="block w-full text-left">
                                                                                 <div className="flex justify-between items-center gap-1">
