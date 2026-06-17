@@ -876,8 +876,9 @@ export default function BrowserSettings() {
                                                                                 {isEditing ? (
                                                                                     <form
                                                                                         onSubmit={(event) => {
+                                                                                            event.preventDefault();
                                                                                             event.stopPropagation();
-                                                                                            handleSaveEditedKey(apiKey.id);
+                                                                                            void handleSaveEditedKey(apiKey.id);
                                                                                         }}
                                                                                         className="mt-1 flex gap-2"
                                                                                         onClick={(event) => event.stopPropagation()}
