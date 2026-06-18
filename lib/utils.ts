@@ -14,6 +14,7 @@ export type ToastArguments = {
   title: string;
   description: React.ReactNode;
   variant: "destructive" | "default";
+  rawMessage?: string;
 };
 
 export type ToastFn = (args: ToastArguments) => void;
@@ -215,6 +216,7 @@ export type UserFriendlyMessage = {
   title: string;
   description: React.ReactNode;
   syntaxError?: SyntaxErrorInfo;
+  rawMessage?: string;
 };
 
 export type ConnectionType = "Standalone" | "Cluster" | "Sentinel";
@@ -302,7 +304,7 @@ export async function getSSEGraphResult(
       }
 
       const friendly = toUserFriendlyMessage(message, status);
-      toast({ title: friendly.title, description: friendly.description, variant: "destructive" });
+      toast({ title: friendly.title, description: friendly.description, variant: "destructive", rawMessage: friendly.rawMessage });
 
       if (status === 401 || status >= 500) setIndicator("offline");
 
@@ -479,27 +481,27 @@ export function toUserFriendlyMessage(raw: unknown, status: number): UserFriendl
   const lower = rawMessage.toLowerCase();
 
   if (lower.includes("connection refused") || lower.includes("econnrefused")) {
-    return { title: "Error", description: "Unable to connect to the database. Please check your connection settings." };
+    return { title: "Error", description: "Unable to connect to the database. Please check your connection settings.", rawMessage };
   }
 
   if (lower.includes("noauth") || lower.includes("wrongpass")) {
-    return { title: "Error", description: "Database authentication failed. Please check your credentials." };
+    return { title: "Error", description: "Database authentication failed. Please check your credentials.", rawMessage };
   }
 
   if (lower.includes("loading") && lower.includes("dataset")) {
-    return { title: "Error", description: "The database is still loading. Please wait a moment and try again." };
+    return { title: "Error", description: "The database is still loading. Please wait a moment and try again.", rawMessage };
   }
 
   if (lower.includes("oom") || lower.includes("out of memory")) {
-    return { title: "Error", description: "The server is running low on memory. Please try again later." };
+    return { title: "Error", description: "The server is running low on memory. Please try again later.", rawMessage };
   }
 
   if (lower.includes("timeout") || lower.includes("timed out")) {
-    return { title: "Error", description: "The request timed out. Please try a simpler query or try again later." };
+    return { title: "Error", description: "The request timed out. Please try a simpler query or try again later.", rawMessage };
   }
 
   if (lower.includes("readonly") && lower.includes("replica")) {
-    return { title: "Error", description: "This operation cannot be performed on a read-only replica." };
+    return { title: "Error", description: "This operation cannot be performed on a read-only replica.", rawMessage };
   }
 
   if (status === 401) {
@@ -507,10 +509,10 @@ export function toUserFriendlyMessage(raw: unknown, status: number): UserFriendl
   }
 
   if (status >= 500) {
-    return { title: "Error", description: "Something went wrong on the server. Please try again later." };
+    return { title: "Error", description: "Something went wrong on the server. Please try again later.", rawMessage };
   }
 
-  return { title: "Error", description: "An unexpected error occurred. Please try again." };
+  return { title: "Error", description: "An unexpected error occurred. Please try again.", rawMessage };
 }
 
 // Guards against triggering multiple concurrent signOut calls when many
@@ -584,6 +586,7 @@ export async function securedFetch(
       title: friendly.title,
       description: friendly.description,
       variant: "destructive",
+      rawMessage: friendly.rawMessage,
     });
 
     if (status === 401 || status >= 500) {
