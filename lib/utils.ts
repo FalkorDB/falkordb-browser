@@ -215,8 +215,8 @@ export type SyntaxErrorInfo = {
 export type UserFriendlyMessage = {
   title: string;
   description: React.ReactNode;
-  syntaxError?: SyntaxErrorInfo;
   rawMessage?: string;
+  syntaxError?: SyntaxErrorInfo;
 };
 
 export type ConnectionType = "Standalone" | "Cluster" | "Sentinel";
@@ -468,7 +468,7 @@ export function toUserFriendlyMessage(raw: unknown, status: number): UserFriendl
 
   const parsed = parseSyntaxError(rawMessage);
   if (parsed) {
-    return { title: "Syntax Error", description: formatSyntaxError(parsed.message, parsed.context, parsed.contextOffset), syntaxError: parsed };
+    return { title: "Syntax Error", description: formatSyntaxError(parsed.message, parsed.context, parsed.contextOffset), syntaxError: parsed, rawMessage };
   }
 
   // Check the allowlist FIRST so that server-provided specific messages
@@ -505,7 +505,7 @@ export function toUserFriendlyMessage(raw: unknown, status: number): UserFriendl
   }
 
   if (status === 401) {
-    return { title: "Error", description: "Your session has expired. Please sign in again." };
+    return { title: "Error", description: "Your session has expired. Please sign in again.", rawMessage };
   }
 
   if (status >= 500) {

@@ -12,6 +12,7 @@ type ElementItem = {
     content: React.ReactNode;
     tooltip: string;
     className?: string;
+    tooltipClassName?: string;
 };
 
 const getLastRun = (timestamp: number) => {
@@ -67,7 +68,8 @@ const getQueryElement = (item: Query) => {
         elements.push({
             content: getStatusIcon(item.status),
             tooltip: statusTooltip,
-            className: "text-center truncate"
+            className: "text-center truncate",
+            tooltipClassName: item.status === "Failed" ? "bg-destructive text-destructive-foreground" : undefined
         });
     }
 
@@ -110,7 +112,7 @@ const getQueryElement = (item: Query) => {
                         <TooltipTrigger asChild>
                             <div className={cn("truncate", element.className)}>{element.content}</div>
                         </TooltipTrigger>
-                        <TooltipContent>
+                        <TooltipContent className={element.tooltipClassName}>
                             {element.tooltip}
                         </TooltipContent>
                     </Tooltip>
