@@ -11,6 +11,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useGraphParams, syncRouteUrlParams } from "@/lib/useUrlParams";
 import { useToast } from "@/components/ui/use-toast";
 import { detectProviderFromApiKey, getProviderDisplayName } from "@/lib/ai-provider-utils";
+import { setFunctionCandidates } from "@/lib/cypherSuggestions";
+import { udfFunctionNames } from "@/lib/cypherLang";
 import { PanelImperativeHandle } from "react-resizable-panels";
 import type { Data as CanvasData, HierarchyDirection, LayoutMode, RadialDirection, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
@@ -544,7 +546,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
     const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}${readOnlyParam}`;
     try {
-      const result = await getSSEGraphResult(url, toast, setIndicator) as { data: Data; metadata: string[] };
+      const result = await getSSEGraphResult(url, toast, setIndicator, { query }) as { data: Data; metadata: string[] };
 
       if (!result) throw new Error("Failed to execute query");
 
@@ -700,6 +702,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // restoring _activeConnectionId even when Next.js HMR resets the module.
 
   useEffect(() => { setActiveConnectionIdGlobal(activeConnectionId); });
+
+  // Keep "Did you mean…?" function suggestions aware of the loaded UDFs.
+  useEffect(() => { setFunctionCandidates(udfFunctionNames(udfList)); }, [udfList]);
 
   useEffect(() => {
     if (status !== "authenticated") return;

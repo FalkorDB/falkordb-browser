@@ -9,7 +9,8 @@ import { twMerge } from "tailwind-merge";
 import React, { RefObject } from "react";
 import type { FalkorDBCanvas, Data as CanvasData } from "@falkordb/canvas";
 import { signOut } from "next-auth/react";
-import { getCypherErrorHint } from "./cypherErrors";
+import { getCypherErrorHint, SYNTAX_ERROR_HINT } from "./cypherErrors";
+import { suggestForError } from "./cypherSuggestions";
 
 export type ToastArguments = {
   title: string;
@@ -254,7 +255,8 @@ export function cn(...inputs: ClassValue[]) {
 export async function getSSEGraphResult(
   url: string,
   toast: ToastFn,
-  setIndicator: (indicator: "online" | "offline") => void
+  setIndicator: (indicator: "online" | "offline") => void,
+  errorContext?: { query?: string }
 ): Promise<unknown> {
   return new Promise((resolve, reject) => {
     let handled = false;
@@ -306,7 +308,7 @@ export async function getSSEGraphResult(
         return;
       }
 
-      const friendly = toUserFriendlyMessage(message, status);
+      const friendly = toUserFriendlyMessage(message, status, errorContext);
       toast({ title: friendly.title, description: friendly.description, variant: "destructive", rawMessage: friendly.rawMessage, hint: friendly.hint });
 
       if (status === 401 || status >= 500) setIndicator("offline");
@@ -461,7 +463,7 @@ function isAllowlistedUserError(message: string): boolean {
 
 // Maps raw server/Redis/FalkorDB error messages to user-friendly descriptions.
 // Syntax errors are parsed and displayed with the error position highlighted.
-export function toUserFriendlyMessage(raw: unknown, status: number): UserFriendlyMessage {
+export function toUserFriendlyMessage(raw: unknown, status: number, ctx?: { query?: string }): UserFriendlyMessage {
   const rawMessage = normalizeErrorMessage(raw).trim();
   if (!rawMessage) {
     if (status === 401) return { title: "Error", description: "Your session has expired. Please sign in again." };
@@ -471,11 +473,13 @@ export function toUserFriendlyMessage(raw: unknown, status: number): UserFriendl
 
   const parsed = parseSyntaxError(rawMessage);
   if (parsed) {
-    return { title: "Syntax Error", description: formatSyntaxError(parsed.message, parsed.context, parsed.contextOffset), syntaxError: parsed, rawMessage };
+    return { title: "Syntax Error", description: formatSyntaxError(parsed.message, parsed.context, parsed.contextOffset), syntaxError: parsed, rawMessage, hint: SYNTAX_ERROR_HINT };
   }
 
   // Recognized FalkorDB Cypher errors carry an actionable remediation hint.
-  const hint = getCypherErrorHint(rawMessage)?.hint;
+  // A "Did you mean…?" suggestion (computed from the query + known names) is more
+  // specific than the generic catalog tip, so it takes precedence when available.
+  const hint = suggestForError(rawMessage, { query: ctx?.query }) ?? getCypherErrorHint(rawMessage)?.hint;
 
   // Show the server's own message verbatim when it is already user-readable —
   // either explicitly allowlisted, or recognized by the Cypher hint catalog

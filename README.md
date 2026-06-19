@@ -109,11 +109,30 @@ For detailed configuration options and examples, see the [Helm chart documentati
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
 
+### Error help
+
+When a Cypher query fails, the browser shows the database's message together with an
+actionable **💡 hint**. For a mistyped function or variable it offers a
+**"Did you mean…?"** suggestion (e.g. `Unknown function 'lenght'` → *Did you mean
+`length()`?*), computed from the built-in/UDF function list and the variables in your
+query. The suggestion logic lives in `lib/cypherSuggestions.ts` and the static hint
+catalog in `lib/cypherErrors.ts`.
+
 ### Testing
 
 * **Unit tests** (Node's built-in test runner, no extra tooling): `npm test`
-  Runs the `*.test.ts` suites under `app/` and `lib/` (e.g. the Cypher error-hint
-  catalog in `lib/cypherErrors.ts`). Gated in CI by the **Build** workflow.
+  Runs the `*.test.ts` suites under `app/` and `lib/`. Gated in CI by the **Build**
+  workflow.
+* **Coverage**: `npm run test:coverage` — runs the unit tests and enforces **100%**
+  line/branch/function coverage on `lib/cypherSuggestions.ts`.
+* **Smoke tests vs a real FalkorDB**: `npm run test:smoke` — verifies the
+  "Did you mean…?" suggestions against the actual server error wording. It is gated:
+  it **skips** unless `FALKORDB_SMOKE=1`, and **fails** (rather than skipping) if that
+  is set but no server is reachable. Run locally with:
+  ```bash
+  docker run -d -p 6379:6379 falkordb/falkordb
+  FALKORDB_SMOKE=1 npm run test:smoke   # optional: FALKORDB_URL=redis://host:port
+  ```
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
 

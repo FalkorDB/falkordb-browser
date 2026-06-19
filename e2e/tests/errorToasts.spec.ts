@@ -226,6 +226,25 @@ test.describe("Error Toast Messages", () => {
     expect(toastText).toContain("in scope");
   });
 
+  test(`@admin Unknown function typo shows a "Did you mean" suggestion`, async () => {
+    graphName = getRandomString("graph");
+    await apiCall.addGraph(graphName);
+
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(graphName);
+
+    await graph.insertQuery('RETURN lenght("hi")');
+    await graph.clickRunQuery(false);
+
+    expect(await graph.getNotificationErrorToast()).toBe(true);
+    const toastText = await graph.getErrorToastText();
+
+    // Raw message verbatim, plus a concrete fix suggestion.
+    expect(toastText).toContain("Unknown function");
+    expect(toastText).toContain("Did you mean length()");
+  });
+
   test(`@admin Unaliased WITH projection shows the specific message and a hint`, async () => {
     graphName = getRandomString("graph");
     await apiCall.addGraph(graphName);

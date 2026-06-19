@@ -1,5 +1,6 @@
 import { cn, Query } from "@/lib/utils";
 import { getCypherErrorHint } from "@/lib/cypherErrors";
+import { suggestForError } from "@/lib/cypherSuggestions";
 import { Fragment, KeyboardEvent, MouseEvent, useEffect, useRef, useState } from "react";
 import { Check, Circle, Loader2, Star, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -64,7 +65,7 @@ const getQueryElement = (item: Query) => {
 
     if (item.status) {
         const errorHint = item.status === "Failed" && item.errorMessage
-            ? getCypherErrorHint(item.errorMessage)?.hint
+            ? (suggestForError(item.errorMessage, { query: item.text }) ?? getCypherErrorHint(item.errorMessage)?.hint)
             : undefined;
         const statusTooltip = item.status === "Failed" && item.errorMessage
             ? `Error: ${item.errorMessage}${errorHint ? `\n💡 ${errorHint}` : ""}`
