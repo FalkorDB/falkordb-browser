@@ -1,7 +1,8 @@
 "use client"
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import ToastButton from "@/app/components/ToastButton";
+import { copyText } from "@/lib/clipboard";
 import {
   Toast,
   ToastClose,
@@ -36,22 +37,52 @@ export const getQuerySettingsNavigationToast = (
 
 function ToastItemDetails({ rawMessage }: { rawMessage: string }) {
   const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
   const detailsId = useId();
+  const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (copyResetRef.current) clearTimeout(copyResetRef.current);
+  }, []);
+
+  const handleCopy = async () => {
+    const writer =
+      typeof navigator !== "undefined"
+        ? navigator.clipboard?.writeText?.bind(navigator.clipboard)
+        : undefined;
+    if (await copyText(writer, rawMessage)) {
+      setCopied(true);
+      if (copyResetRef.current) clearTimeout(copyResetRef.current);
+      copyResetRef.current = setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   return (
     <div className="mt-1">
-      <button
-        type="button"
-        className="text-xs underline opacity-75 hover:opacity-100 cursor-pointer"
-        onClick={() => setExpanded(prev => !prev)}
-        aria-expanded={expanded}
-        aria-controls={detailsId}
-        data-testid="toast-see-more"
-      >
-        {expanded ? "See less" : "See more"}
-      </button>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          className="text-xs underline opacity-75 hover:opacity-100 cursor-pointer"
+          onClick={() => setExpanded(prev => !prev)}
+          aria-expanded={expanded}
+          aria-controls={detailsId}
+          aria-label={expanded ? "Hide raw error details" : "Show raw error details"}
+          data-testid="toast-see-more"
+        >
+          {expanded ? "See less" : "See more"}
+        </button>
+        <button
+          type="button"
+          className="text-xs underline opacity-75 hover:opacity-100 cursor-pointer"
+          onClick={() => { void handleCopy(); }}
+          aria-label="Copy raw error message"
+          data-testid="toast-copy-raw"
+        >
+          {copied ? "Copied!" : "Copy"}
+        </button>
+      </div>
       {expanded && (
-        <p id={detailsId} className="mt-1 text-xs opacity-75 break-all whitespace-pre-wrap" data-testid="toast-raw-message">
+        <p id={detailsId} aria-live="polite" className="mt-1 text-xs opacity-75 break-all whitespace-pre-wrap" data-testid="toast-raw-message">
           {rawMessage}
         </p>
       )}

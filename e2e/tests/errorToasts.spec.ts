@@ -325,4 +325,60 @@ test.describe("Error Toast Messages", () => {
     expect(toastText).toContain("must be aliased");
     expect(toastText).toContain("AS");
   });
+
+  test(`@admin "exactly one relationship type" error shows the raw message + hint (no bespoke title)`, async () => {
+    graphName = getRandomString("graph");
+    await apiCall.addGraph(graphName);
+
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(graphName);
+
+    await graph.insertQuery("CREATE ()-[r]->()");
+    await graph.clickRunQuery(false);
+
+    expect(await graph.getNotificationErrorToast()).toBe(true);
+    const toastTitle = await graph.getErrorToastTitle();
+    const toastText = await graph.getErrorToastText();
+
+    // This error now flows through the standard catalog path (raw server message + 💡 hint),
+    // instead of the old bespoke "Invalid Relationship" title.
+    expect(toastTitle).toBe("Error");
+    expect(toastTitle).not.toBe("Invalid Relationship");
+    expect(toastText).toContain("Exactly one relationship type must be specified");
+    expect(toastText).toContain("exactly one type");
+  });
+
+  // ---------------------------------------------------------------------------
+  // Copy raw error — one-click copy of the underlying server message
+  // ---------------------------------------------------------------------------
+
+  test(`@admin Copy button copies the raw error and shows "Copied!" feedback`, async () => {
+    graphName = getRandomString("graph");
+    await apiCall.addGraph(graphName);
+
+    // Create the page WITHOUT navigating yet, stub the clipboard writer before any app
+    // code runs (deterministic across browsers — the e2e context grants clipboard
+    // permission only on Chromium, not Firefox), then navigate.
+    const graph = await browser.createNewPage(GraphPage);
+    const page = await browser.getPage();
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: { writeText: async () => {} },
+      });
+    });
+    await browser.navigateTo(urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(graphName);
+
+    // A syntax error carries a distinct raw message (the "See more" region), so the
+    // Copy button is rendered.
+    await graph.insertQuery("MATCH (n) RETsURN n");
+    await graph.clickRunQuery(false);
+    expect(await graph.getNotificationErrorToast()).toBe(true);
+
+    await graph.clickErrorToastCopy();
+    expect(await graph.getErrorToastCopyLabel()).toBe("Copied!");
+  });
 });

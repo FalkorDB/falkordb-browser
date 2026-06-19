@@ -192,6 +192,12 @@ export const DRIFT_CASES: DriftCase[] = [
     // Integer overflow '999999999999999999999999999999'
     expectedMessage: /Integer overflow/i,
   },
+  {
+    id: "create-one-rel-type",
+    query: "CREATE ()-[r]->()",
+    // Exactly one relationship type must be specified for each relation in a CREATE pattern.
+    expectedMessage: /Exactly one relationship type must be specified/i,
+  },
 ];
 
 // Catalog ids that are intentionally NOT covered by a runnable drift case, with the

@@ -45,6 +45,7 @@ const RECOGNIZED_SAMPLES: Array<{ message: string; id: string; needle: string }>
     { message: "WITH imports in CALL {} must consist of only simple references to outside variables", id: "call-import-simple-refs", needle: "plain variables" },
     { message: "Missing parameters", id: "missing-parameters", needle: "parameter" },
     { message: "Integer overflow '999999999999999999999999999999'", id: "integer-overflow", needle: "64-bit" },
+    { message: "Exactly one relationship type must be specified for each relation in a CREATE pattern.", id: "create-one-rel-type", needle: "exactly one type" },
   ];
 
 describe("getCypherErrorHint — recognized FalkorDB errors", () => {

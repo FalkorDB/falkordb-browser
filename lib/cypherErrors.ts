@@ -255,6 +255,12 @@ const CATALOG: CatalogEntry[] = [
     test: /Integer overflow '/i,
     hint: "This integer is too large for a 64-bit value. Use a smaller number or a float.",
   },
+  {
+    // EMSG_ONE_RELATIONSHIP_TYPE "Exactly one relationship type must be specified for each relation in a %s pattern."
+    id: "create-one-rel-type",
+    test: /Exactly one relationship type must be specified/i,
+    hint: "Each relationship in a CREATE pattern needs exactly one type, e.g. (a)-[:KNOWS]->(b).",
+  },
 ];
 
 /** All catalog ids, in catalog order. Exposed (instead of the mutable CATALOG) so the

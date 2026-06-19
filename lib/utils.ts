@@ -494,10 +494,6 @@ export function toUserFriendlyMessage(raw: unknown, status: number, ctx?: { quer
     return { title: "Error", description: "This operation cannot be performed on a read-only replica.", rawMessage, hint };
   }
 
-  if (lower.includes("exactly one relationship type must be specified")) {
-    return { title: "Invalid Relationship", description: "Each relationship in a CREATE pattern must have exactly one type. Use the format: -[:RELATIONSHIP_TYPE]->", rawMessage };
-  }
-
   if (status === 401) {
     return { title: "Error", description: "Your session has expired. Please sign in again.", rawMessage, hint };
   }

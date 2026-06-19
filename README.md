@@ -122,8 +122,11 @@ flagged with a warning and a quick fix. When the static help isn't enough, a **"
 AI"** button (shown only when a supported OpenAI-compatible model — OpenAI/Groq/xAI/Ollama/
 LM Studio — is configured) sends the **query and its error** to your configured provider on an
 explicit click and returns an explanation + a corrected query you can insert into the editor.
+The full server message is always available — expand **"See more"** to read it and use **"Copy"**
+for one-click copy into a bug report. Hints are currently English-only; localization is a
+deliberate follow-up (it pairs with introducing stable structured error codes).
 The logic lives in `lib/cypherSuggestions.ts`, `lib/cypherDiagnostics.ts`, and `lib/aiFix.ts`,
-with the static hint catalog in `lib/cypherErrors.ts`.
+with the static hint catalog in `lib/cypherErrors.ts` and the clipboard helper in `lib/clipboard.ts`.
 
 ### Testing
 
@@ -132,7 +135,7 @@ with the static hint catalog in `lib/cypherErrors.ts`.
   workflow.
 * **Coverage**: `npm run test:coverage` — runs the unit tests and enforces **100%**
   line/branch/function coverage on `lib/cypherSuggestions.ts`, `lib/cypherDiagnostics.ts`,
-  `lib/aiFix.ts`, and `lib/cypherErrors.ts`.
+  `lib/aiFix.ts`, `lib/cypherErrors.ts`, and `lib/clipboard.ts`.
 * **Smoke tests vs a real FalkorDB**: `npm run test:smoke` — runs every `lib/**/*.smoke.ts`
   suite against the actual server error wording. This covers the "Did you mean…?"
   suggestions and the **error-hint drift guard**: each entry in the hint catalog
