@@ -10,15 +10,17 @@ import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnecti
 import { usePathname, useRouter } from "next/navigation";
 import { useGraphParams, syncRouteUrlParams } from "@/lib/useUrlParams";
 import { useToast } from "@/components/ui/use-toast";
-import { detectProviderFromApiKey, getProviderDisplayName } from "@/lib/ai-provider-utils";
+import { detectProviderFromApiKey, getProviderDisplayName, detectProviderFromModel } from "@/lib/ai-provider-utils";
 import { setFunctionCandidates } from "@/lib/cypherSuggestions";
 import { udfFunctionNames } from "@/lib/cypherLang";
 import { computeEditorDiagnostics, type DiagnosticsResult } from "@/lib/cypherDiagnostics";
+import { isAiFixSupported } from "@/lib/aiFix";
 import { PanelImperativeHandle } from "react-resizable-panels";
 import type { Data as CanvasData, HierarchyDirection, LayoutMode, RadialDirection, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
+import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
-import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
 
@@ -412,6 +414,91 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setDiagnostics,
   }), [diagnostics]);
 
+  // --- "Fix with AI" (Idea #3) -----------------------------------------------
+  const [lastFailure, setLastFailure] = useState<{ query: string; errorMessage: string } | null>(null);
+  const [aiFixResult, setAiFixResult] = useState<AiFixResult>({ status: "idle" });
+  const [pendingConsent, setPendingConsent] = useState<{ query: string; errorMessage: string } | null>(null);
+
+  const resolvedChatKey = useMemo(
+    () => (chatApiKeys.find(k => k.id === selectedChatApiKeyId)?.key) || secretKey,
+    [chatApiKeys, selectedChatApiKeyId, secretKey]
+  );
+  const aiFixSupported = useMemo(
+    () => isAiFixSupported({ model, key: resolvedChatKey, source: chatModelSource, localProvider: localLlmProvider }),
+    [model, resolvedChatKey, chatModelSource, localLlmProvider]
+  );
+
+  const doAiFix = useCallback(async (query: string, errorMessage: string) => {
+    setAiFixResult({ status: "loading" });
+    try {
+      const headers = new Headers({ "Content-Type": "application/json" });
+      const connId = getActiveConnectionIdGlobal();
+      if (connId) headers.set("X-Connection-Id", connId);
+      const res = await fetch("/api/chat/fix", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          query,
+          errorMessage,
+          graphName,
+          model,
+          key: chatModelSource === "local" ? localLlmProvider : resolvedChatKey,
+          modelSource: chatModelSource,
+          localProvider: localLlmProvider,
+          localEndpoint: localLlmEndpoint,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAiFixResult({ status: "error", error: data?.error || "Couldn't get a fix from the AI provider." });
+        return;
+      }
+      setAiFixResult({ status: "done", explanation: data.explanation, correctedQuery: data.correctedQuery });
+    } catch {
+      setAiFixResult({ status: "error", error: "Couldn't reach the server. Please try again." });
+    }
+  }, [graphName, model, chatModelSource, localLlmProvider, localLlmEndpoint, resolvedChatKey]);
+
+  const requestAiFix = useCallback((query: string, errorMessage: string) => {
+    if (aiFixResult.status === "loading") return;
+    if (chatModelSource === "api-key") {
+      const provider = detectProviderFromModel(model);
+      const consented = typeof window !== "undefined" && localStorage.getItem(`aiFixConsent-${provider}`) === "true";
+      if (!consented) {
+        setPendingConsent({ query, errorMessage });
+        return;
+      }
+    }
+    doAiFix(query, errorMessage);
+  }, [aiFixResult.status, chatModelSource, model, doAiFix]);
+
+  const confirmConsent = useCallback((dontAskAgain: boolean) => {
+    if (!pendingConsent) return;
+    if (dontAskAgain && typeof window !== "undefined") {
+      localStorage.setItem(`aiFixConsent-${detectProviderFromModel(model)}`, "true");
+    }
+    const { query, errorMessage } = pendingConsent;
+    setPendingConsent(null);
+    doAiFix(query, errorMessage);
+  }, [pendingConsent, model, doAiFix]);
+
+  const aiFixContext = useMemo(() => ({
+    aiFixSupported,
+    lastFailure,
+    result: aiFixResult,
+    pendingConsentProvider: pendingConsent ? getProviderDisplayName(detectProviderFromModel(model)) : null,
+    requestAiFix,
+    confirmConsent,
+    cancelConsent: () => setPendingConsent(null),
+    dismissResult: () => setAiFixResult({ status: "idle" }),
+    insertCorrectedQuery: (q: string) => {
+      setHistoryQuery(prev => ({ ...prev, query: q }));
+      setUrlQueryText(q);
+      setAiFixResult({ status: "idle" });
+    },
+  }), [aiFixSupported, lastFailure, aiFixResult, pendingConsent, model, requestAiFix, confirmConsent]);
+  // ---------------------------------------------------------------------------
+
   const forceGraphContext = useMemo(() => ({
     canvasRef,
     viewport,
@@ -536,6 +623,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     setIsQueryLoading(true);
     setDiagnostics(null);
+    setLastFailure(null);
 
     setHistoryQuery(prev => ({
       ...prev,
@@ -620,6 +708,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       // Errors from getSSEGraphResult are already surfaced via toast
       const errorMessage = (err as Error).message || "";
       setDiagnostics(computeEditorDiagnostics(newQuery.text, errorMessage));
+      setLastFailure({ query: newQuery.text, errorMessage });
 
       // Save failed query to history with the error message
       newQuery = { ...newQuery, errorMessage };
@@ -1343,6 +1432,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
               <IndicatorContext.Provider value={indicatorContext}>
                 <QueryLoadingContext.Provider value={queryLoadingContext}>
                   <DiagnosticsContext.Provider value={diagnosticsContext}>
+                    <AiFixContext.Provider value={aiFixContext}>
                     <ForceGraphContext.Provider value={forceGraphContext}>
                       <TableViewContext.Provider value={tableViewContext}>
                         <ConnectionContext.Provider value={connectionContext}>
@@ -1361,6 +1451,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                         </ConnectionContext.Provider>
                       </TableViewContext.Provider>
                     </ForceGraphContext.Provider>
+                    <AiFixDialogs />
+                    </AiFixContext.Provider>
                   </DiagnosticsContext.Provider>
                 </QueryLoadingContext.Provider>
               </IndicatorContext.Provider>

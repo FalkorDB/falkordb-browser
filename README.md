@@ -118,8 +118,12 @@ actionable **💡 hint**. For a mistyped function or variable it offers a
 query. The error is also surfaced **inline in the editor** as a red squiggle on the
 offending token, with the hint on hover and a one-click **quick fix** to apply the
 suggestion. As you type, unknown node labels that look like a typo of a known label are
-flagged with a warning and a quick fix. The logic lives in `lib/cypherSuggestions.ts`
-and `lib/cypherDiagnostics.ts`, with the static hint catalog in `lib/cypherErrors.ts`.
+flagged with a warning and a quick fix. When the static help isn't enough, a **"Fix with
+AI"** button (shown only when a supported OpenAI-compatible model — OpenAI/Groq/xAI/Ollama/
+LM Studio — is configured) sends the **query and its error** to your configured provider on an
+explicit click and returns an explanation + a corrected query you can insert into the editor.
+The logic lives in `lib/cypherSuggestions.ts`, `lib/cypherDiagnostics.ts`, and `lib/aiFix.ts`,
+with the static hint catalog in `lib/cypherErrors.ts`.
 
 ### Testing
 

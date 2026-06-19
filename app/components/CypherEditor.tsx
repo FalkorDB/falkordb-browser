@@ -17,6 +17,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
 import EditorComponent, { LINE_HEIGHT, LanguageConfig } from "./EditorComponent";
+import AiFixButton from "./AiFixButton";
 import { BrowserSettingsContext, IndicatorContext, UDFContext, ConnectionContext, DiagnosticsContext } from "./provider";
 import { Graph } from "../api/graph/model";
 
@@ -964,6 +965,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                             </TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
+                    <AiFixButton currentQuery={historyQuery.query} />
                     <Button
                         className="text-xs py-0.5"
                         data-testid="editorRun"

@@ -511,3 +511,34 @@ export const DiagnosticsContext = createContext<DiagnosticsContextType>({
   diagnostics: null,
   setDiagnostics: () => { },
 });
+
+export type AiFixResult = {
+  status: "idle" | "loading" | "done" | "error";
+  explanation?: string;
+  correctedQuery?: string;
+  error?: string;
+};
+
+type AiFixContextType = {
+  aiFixSupported: boolean;
+  lastFailure: { query: string; errorMessage: string } | null;
+  result: AiFixResult;
+  pendingConsentProvider: string | null;
+  requestAiFix: (query: string, errorMessage: string) => void;
+  confirmConsent: (dontAskAgain: boolean) => void;
+  cancelConsent: () => void;
+  dismissResult: () => void;
+  insertCorrectedQuery: (query: string) => void;
+};
+
+export const AiFixContext = createContext<AiFixContextType>({
+  aiFixSupported: false,
+  lastFailure: null,
+  result: { status: "idle" },
+  pendingConsentProvider: null,
+  requestAiFix: () => { },
+  confirmConsent: () => { },
+  cancelConsent: () => { },
+  dismissResult: () => { },
+  insertCorrectedQuery: () => { },
+});

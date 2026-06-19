@@ -221,6 +221,23 @@ test.describe("Error Toast Messages", () => {
     expect(await graph.hasEditorErrorMarker()).toBe(true);
   });
 
+  test(`@admin "Fix with AI" button is hidden when AI is not configured`, async () => {
+    graphName = getRandomString("graph");
+    await apiCall.addGraph(graphName);
+
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(graphName);
+
+    await graph.insertQuery("MATCH (n) RETsURN n");
+    await graph.clickRunQuery(false);
+
+    // The failure is processed (toast shown) but, with no configured AI model/key, the
+    // "Fix with AI" button must not appear.
+    expect(await graph.getNotificationErrorToast()).toBe(true);
+    expect(await graph.fixWithAiButtonCount()).toBe(0);
+  });
+
   // ---------------------------------------------------------------------------
   // Actionable hints — recognized Cypher errors carry a remediation tip
   // ---------------------------------------------------------------------------

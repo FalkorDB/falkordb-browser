@@ -424,6 +424,10 @@ export default class GraphPage extends BasePage {
     return waitForElementToBeVisible(this.page.locator(".squiggly-error").first());
   }
 
+  async fixWithAiButtonCount(): Promise<number> {
+    return this.page.getByTestId("fix-with-ai").count();
+  }
+
   async isOfflineIndicatorVisible(): Promise<boolean> {
     const indicator = this.page.locator('[role="status"][aria-label*="offline"]');
     return waitForElementToBeVisible(indicator);
