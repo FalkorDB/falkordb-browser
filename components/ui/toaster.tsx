@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import ToastButton from "@/app/components/ToastButton";
 import {
   Toast,
@@ -36,6 +36,7 @@ export const getQuerySettingsNavigationToast = (
 
 function ToastItemDetails({ rawMessage }: { rawMessage: string }) {
   const [expanded, setExpanded] = useState(false);
+  const detailsId = useId();
 
   return (
     <div className="mt-1">
@@ -44,12 +45,13 @@ function ToastItemDetails({ rawMessage }: { rawMessage: string }) {
         className="text-xs underline opacity-75 hover:opacity-100 cursor-pointer"
         onClick={() => setExpanded(prev => !prev)}
         aria-expanded={expanded}
+        aria-controls={detailsId}
         data-testid="toast-see-more"
       >
         {expanded ? "See less" : "See more"}
       </button>
       {expanded && (
-        <p className="mt-1 text-xs opacity-75 break-all whitespace-pre-wrap" data-testid="toast-raw-message">
+        <p id={detailsId} className="mt-1 text-xs opacity-75 break-all whitespace-pre-wrap" data-testid="toast-raw-message">
           {rawMessage}
         </p>
       )}

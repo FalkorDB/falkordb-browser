@@ -217,20 +217,23 @@ export const fixRequest = z.object({
     .string({
       error: (issue) => issue.input === undefined ? "Graph name is required" : "Invalid Graph name",
     })
-    .min(1, "Graph name cannot be empty"),
+    .min(1, "Graph name cannot be empty")
+    .max(255, "Graph name is too long"),
   hint: z
     .string()
     .max(1024, "Hint is too long")
     .optional(),
   key: z
     .string({ error: "Invalid API key" })
+    .max(1024, "API key is too long")
     .optional()
     .default(""),
   model: z
     .string({
       error: (issue) => issue.input === undefined ? "Model is required" : "Invalid Model",
     })
-    .min(1, "Model cannot be empty"),
+    .min(1, "Model cannot be empty")
+    .max(256, "Model is too long"),
   modelSource: z
     .enum(["api-key", "local"])
     .optional()
@@ -241,6 +244,7 @@ export const fixRequest = z.object({
     .default("ollama"),
   localEndpoint: z
     .string()
+    .max(2048, "Local endpoint is too long")
     .optional()
     .default(""),
 });

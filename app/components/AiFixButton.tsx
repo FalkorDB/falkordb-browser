@@ -11,7 +11,7 @@ import Button from "./ui/Button";
 export default function AiFixButton({ currentQuery }: { currentQuery: string }) {
     const { aiFixSupported, lastFailure, requestAiFix, result } = useContext(AiFixContext);
 
-    if (!aiFixSupported || !lastFailure || lastFailure.query !== currentQuery.trim()) return null;
+    if (!aiFixSupported || !lastFailure || lastFailure.query.trim() !== currentQuery.trim()) return null;
 
     const loading = result.status === "loading";
 
