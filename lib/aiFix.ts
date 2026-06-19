@@ -4,7 +4,7 @@
 // v1 supports OpenAI-compatible providers only: openai / groq / xai (hosted) and
 // ollama / lmstudio (local) — all speak `POST /v1/chat/completions`.
 
-import { detectProviderFromModel, getProviderDisplayName, KNOWN_PROVIDERS, type AIProvider } from "./ai-provider-utils.ts";
+import { detectProviderFromModel, detectProviderFromApiKey, getProviderDisplayName, KNOWN_PROVIDERS, type AIProvider } from "./ai-provider-utils.ts";
 import { normalizeLocalEndpoint } from "./local-llm-utils.ts";
 
 export type ChatMessage = { role: "system" | "user"; content: string };
@@ -129,6 +129,15 @@ export function resolveFixTarget(input: {
     return {
       ok: false,
       error: `Fix with AI isn't supported for ${getProviderDisplayName(provider)} yet. Use an OpenAI, Groq, xAI, Ollama, or LM Studio model.`,
+    };
+  }
+
+  // Don't forward a key to a provider it wasn't issued for (mirrors the chat route's guard).
+  const keyProvider = detectProviderFromApiKey(input.key);
+  if (keyProvider !== "unknown" && keyProvider !== provider) {
+    return {
+      ok: false,
+      error: `Model/API key mismatch: your API key looks like a ${getProviderDisplayName(keyProvider)} key but the selected model is ${getProviderDisplayName(provider)}. Update your key or model in Settings.`,
     };
   }
 

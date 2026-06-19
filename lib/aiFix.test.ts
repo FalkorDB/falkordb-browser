@@ -133,6 +133,13 @@ describe("resolveFixTarget", () => {
     assert.equal(unsupported.ok, false);
     if (!unsupported.ok) assert.ok(unsupported.error.includes("isn't supported"));
   });
+  it("rejects a key whose provider differs from the model's, but allows an unrecognized key", () => {
+    const mismatch = resolveFixTarget({ modelSource: "api-key", model: "gpt-4o-mini", key: "gsk_groqkey", localProvider: "ollama" });
+    assert.equal(mismatch.ok, false);
+    if (!mismatch.ok) assert.ok(mismatch.error.includes("mismatch"));
+    const unknownKey = resolveFixTarget({ modelSource: "api-key", model: "gpt-4o-mini", key: "no-prefix-key", localProvider: "ollama" });
+    assert.equal(unknownKey.ok, true);
+  });
   it("resolves a valid local endpoint and rejects an invalid one", () => {
     const ok = resolveFixTarget({ modelSource: "local", model: "llama3", localProvider: "ollama", localEndpoint: "http://localhost:11434" });
     assert.ok(ok.ok);
