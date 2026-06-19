@@ -1,4 +1,5 @@
 import { cn, Query } from "@/lib/utils";
+import { getCypherErrorHint } from "@/lib/cypherErrors";
 import { Fragment, KeyboardEvent, MouseEvent, useEffect, useRef, useState } from "react";
 import { Check, Circle, Loader2, Star, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -62,14 +63,17 @@ const getQueryElement = (item: Query) => {
     const elements: ElementItem[] = [];
 
     if (item.status) {
+        const errorHint = item.status === "Failed" && item.errorMessage
+            ? getCypherErrorHint(item.errorMessage)?.hint
+            : undefined;
         const statusTooltip = item.status === "Failed" && item.errorMessage
-            ? `Error: ${item.errorMessage}`
+            ? `Error: ${item.errorMessage}${errorHint ? `\n💡 ${errorHint}` : ""}`
             : `Status: ${item.status}`;
         elements.push({
             content: getStatusIcon(item.status),
             tooltip: statusTooltip,
             className: "text-center truncate",
-            tooltipClassName: item.status === "Failed" ? "bg-destructive text-destructive-foreground" : undefined
+            tooltipClassName: item.status === "Failed" ? "bg-destructive text-destructive-foreground whitespace-pre-line" : undefined
         });
     }
 

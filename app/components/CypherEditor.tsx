@@ -11,6 +11,7 @@ import * as monaco from "monaco-editor";
 import { Info, Maximize2, Minimize2, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { cn, HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
+import { SYNTAX_ERROR_HINT } from "@/lib/cypherErrors";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
@@ -349,7 +350,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                 range: new monaco.Range(line, column, line, column + 1),
                 options: {
                     inlineClassName: 'syntax-error-highlight',
-                    hoverMessage: { value: syntaxError.message },
+                    hoverMessage: { value: `${syntaxError.message}\n\n💡 ${SYNTAX_ERROR_HINT}` },
                 },
             },
         ]);

@@ -142,3 +142,9 @@ export function getCypherErrorHint(raw: string): CypherErrorHint | undefined {
   const entry = CATALOG.find(({ test }) => test.test(raw));
   return entry ? { id: entry.id, hint: entry.hint } : undefined;
 }
+
+// Generic hint for Cypher syntax/parse errors. These carry a position (so they are
+// highlighted in the editor) but no specific catalog entry, so a single generic tip
+// is shown next to the highlighted character.
+export const SYNTAX_ERROR_HINT =
+  "Check for typos, missing commas, or unbalanced brackets, parentheses, or quotes near the highlighted position.";
