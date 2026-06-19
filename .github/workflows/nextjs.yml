@@ -58,7 +58,7 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --progress=false
 
-      - name: Run unit tests
+      - name: Run unit tests with coverage
         run: npm run test:coverage
 
       - name: Build with Next.js
