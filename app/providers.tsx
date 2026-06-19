@@ -1148,12 +1148,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // Re-check UDF availability whenever the active connection changes so
   // switching back to an admin connection restores the UDF menu.
   useEffect(() => {
-    if (status === "unauthenticated") { setShowUDF(false); return; }
+    if (status === "unauthenticated") { setShowUDF(false); setUdfList([]); return; }
     if (status !== "authenticated") return;
     // Use plain fetch with no X-Connection-Id — server resolves via JWT.
     (async () => {
       const res = await fetch("/api/udf", { method: "GET" });
-      if (!res.ok) { setShowUDF(false); return; }
+      if (!res.ok) { setShowUDF(false); setUdfList([]); return; }
 
       const json = await res.json();
       setShowUDF(true);

@@ -10,6 +10,10 @@ export async function OPTIONS(request: NextRequest) {
 
 const REQUEST_TIMEOUT_MS = 30_000;
 
+// Reject oversized bodies up front (before reading/parsing) so an authenticated caller
+// can't force a large allocation. The schema field caps sum to ~17 KB; 64 KB is generous.
+const MAX_BODY_BYTES = 64 * 1024;
+
 // eslint-disable-next-line import/prefer-default-export
 export async function POST(request: NextRequest) {
     let session;
@@ -22,6 +26,11 @@ export async function POST(request: NextRequest) {
 
     if (session instanceof NextResponse) {
         return session;
+    }
+
+    const contentLength = Number(request.headers.get("content-length") ?? "");
+    if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
+        return NextResponse.json({ error: "Request body too large" }, { status: 413, headers: getCorsHeaders(request) });
     }
 
     let body;

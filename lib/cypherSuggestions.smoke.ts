@@ -23,7 +23,7 @@ test(
   "suggestForError matches live FalkorDB error wording",
   { skip: ENABLED ? false : "set FALKORDB_SMOKE=1 (and run a FalkorDB) to enable" },
   async () => {
-    let db;
+    let db!: FalkorDB;
     try {
       db = await FalkorDB.connect({ url: URL });
     } catch (error) {
@@ -62,12 +62,16 @@ test(
       );
 
       // Editor diagnostics: the live error must map to a marker over the token, with a quick fix.
-      const fnDiag = computeEditorDiagnostics('RETURN lenght("hi")', fnError).diagnostics[0];
+      const fnDiags = computeEditorDiagnostics('RETURN lenght("hi")', fnError).diagnostics;
+      assert.ok(fnDiags.length > 0, `expected a diagnostic for the function error: ${JSON.stringify(fnError)}`);
+      const fnDiag = fnDiags[0];
       assert.equal(fnDiag.code, "unknown-function");
       assert.deepEqual([fnDiag.startColumn, fnDiag.endColumn], [8, 14]);
       assert.deepEqual(fnDiag.quickFix, { title: "Replace with length", newText: "length" });
 
-      const varDiag = computeEditorDiagnostics(varQuery, varError).diagnostics[0];
+      const varDiags = computeEditorDiagnostics(varQuery, varError).diagnostics;
+      assert.ok(varDiags.length > 0, `expected a diagnostic for the variable error: ${JSON.stringify(varError)}`);
+      const varDiag = varDiags[0];
       assert.equal(varDiag.code, "undefined-variable");
       assert.equal(varDiag.quickFix?.newText, "person");
     } finally {

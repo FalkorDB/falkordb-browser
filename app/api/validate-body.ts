@@ -205,18 +205,21 @@ export const fixRequest = z.object({
     .string({
       error: (issue) => issue.input === undefined ? "Query is required" : "Invalid Query",
     })
+    .trim()
     .min(1, "Query cannot be empty")
     .max(8192, "Query is too long"),
   errorMessage: z
     .string({
       error: (issue) => issue.input === undefined ? "Error message is required" : "Invalid Error message",
     })
+    .trim()
     .min(1, "Error message cannot be empty")
     .max(4096, "Error message is too long"),
   graphName: z
     .string({
       error: (issue) => issue.input === undefined ? "Graph name is required" : "Invalid Graph name",
     })
+    .trim()
     .min(1, "Graph name cannot be empty")
     .max(255, "Graph name is too long"),
   hint: z

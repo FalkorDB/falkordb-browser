@@ -27,7 +27,7 @@ test(
   "every DRIFT_CASE still matches live FalkorDB error wording",
   { skip: ENABLED ? false : "set FALKORDB_SMOKE=1 (and run a FalkorDB) to enable" },
   async () => {
-    let db;
+    let db!: FalkorDB;
     try {
       db = await FalkorDB.connect({ url: URL });
     } catch (error) {

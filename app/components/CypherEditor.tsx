@@ -507,11 +507,12 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
         // Collect labels and relationship types as element namespaces
         const labels = sug.filter(({ detail }) => detail === '(label)').map(({ label }) => label as string);
-        // Bump a version when the known-label set changes so the schema-lint effect re-runs:
+        // Bump a version when the known-label *set* changes so the schema-lint effect re-runs:
         // it reads schemaLabelsRef (a ref), which alone wouldn't re-lint a query the user
-        // already typed before the schema finished loading.
-        const labelsChanged = labels.length !== schemaLabelsRef.current.length
-            || labels.some((l, i) => l !== schemaLabelsRef.current[i]);
+        // already typed before the schema finished loading. Compare order-insensitively, since
+        // suggestion order from the server isn't guaranteed stable.
+        const labelSetKey = (arr: string[]) => arr.slice().sort().join('\u0000');
+        const labelsChanged = labelSetKey(labels) !== labelSetKey(schemaLabelsRef.current);
         schemaLabelsRef.current = labels;
         if (labelsChanged) setSchemaLabelsVersion(v => v + 1);
         const relTypes = sug.filter(({ detail }) => detail === '(relationship type)').map(({ label }) => label as string);
