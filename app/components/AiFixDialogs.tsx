@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { AiFixContext } from "./provider";
 import DialogComponent from "./DialogComponent";
@@ -11,6 +11,12 @@ import Button from "./ui/Button";
 export default function AiFixDialogs() {
     const { result, pendingConsentProvider, confirmConsent, cancelConsent, dismissResult, insertCorrectedQuery } = useContext(AiFixContext);
     const [dontAskAgain, setDontAskAgain] = useState(false);
+
+    // Reset the opt-out whenever the consent dialog closes, so a previous check (even if
+    // the user then cancelled) doesn't silently carry into the next prompt.
+    useEffect(() => {
+        if (pendingConsentProvider === null) setDontAskAgain(false);
+    }, [pendingConsentProvider]);
 
     const resultOpen = result.status === "loading" || result.status === "done" || result.status === "error";
 

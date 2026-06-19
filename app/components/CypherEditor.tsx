@@ -149,6 +149,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const [lineNumber, setLineNumber] = useState(1);
     const [blur, setBlur] = useState(false);
     const [editorMountVersion, setEditorMountVersion] = useState(0);
+    const [schemaLabelsVersion, setSchemaLabelsVersion] = useState(0);
 
     const editorHeight = useMemo(() => blur
         ? LINE_HEIGHT
@@ -328,7 +329,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             });
         }, 400);
         return () => clearTimeout(handle);
-    }, [historyQuery.query, editorMountVersion]);
+    }, [historyQuery.query, editorMountVersion, schemaLabelsVersion]);
 
     // Extract bound element variables from the query and rebuild tokenizer when they change
     // Use Monaco's tokenizer to detect bound variables (tokens marked as 'variable'
@@ -506,7 +507,13 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
         // Collect labels and relationship types as element namespaces
         const labels = sug.filter(({ detail }) => detail === '(label)').map(({ label }) => label as string);
+        // Bump a version when the known-label set changes so the schema-lint effect re-runs:
+        // it reads schemaLabelsRef (a ref), which alone wouldn't re-lint a query the user
+        // already typed before the schema finished loading.
+        const labelsChanged = labels.length !== schemaLabelsRef.current.length
+            || labels.some((l, i) => l !== schemaLabelsRef.current[i]);
         schemaLabelsRef.current = labels;
+        if (labelsChanged) setSchemaLabelsVersion(v => v + 1);
         const relTypes = sug.filter(({ detail }) => detail === '(relationship type)').map(({ label }) => label as string);
 
         // Collect property keys for keyword coloring
