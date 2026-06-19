@@ -85,10 +85,17 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(parseFixResponse(reply, query), { headers: getCorsHeaders(request) });
     } catch (error) {
         // Avoid logging the query/error/prompt content.
-        const isTimeout = (error as Error)?.name === "TimeoutError" || (error as Error)?.name === "AbortError";
-        console.error("Fix-with-AI provider error:", (error as Error)?.name);
+        const name = (error as Error)?.name;
+        // The timeout fires a TimeoutError; a client disconnect/navigation aborts request.signal
+        // as an AbortError — don't mislabel that as a timeout.
+        const message = name === "TimeoutError"
+            ? "The AI request timed out. Please try again."
+            : name === "AbortError"
+                ? "The AI request was canceled."
+                : "Unable to reach the AI provider. Please try again.";
+        console.error("Fix-with-AI provider error:", name);
         return NextResponse.json(
-            { error: isTimeout ? "The AI request timed out. Please try again." : "Unable to reach the AI provider. Please try again." },
+            { error: message },
             { status: 422, headers: getCorsHeaders(request) }
         );
     }

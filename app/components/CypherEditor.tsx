@@ -307,6 +307,13 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     // Proactive (debounced) schema lint: warn about node labels that look like a typo of
     // a known label. Anchored to node patterns, so map keys are never flagged.
     useEffect(() => {
+        // Eagerly drop existing schema markers so warnings computed for the *previous* query
+        // text don't linger (at stale positions) during the debounce; the timeout below
+        // re-adds fresh ones once typing pauses.
+        [editorRef.current, dialogEditorRef.current].forEach(editor => {
+            const model = editor?.getModel();
+            if (model && monacoRef.current) monaco.editor.setModelMarkers(model, 'cypher-schema', []);
+        });
         const handle = setTimeout(() => {
             const warnings = analyzeSchemaWarnings(historyQuery.query, schemaLabelsRef.current);
             schemaWarningsRef.current = warnings;
