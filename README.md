@@ -115,8 +115,11 @@ When a Cypher query fails, the browser shows the database's message together wit
 actionable **💡 hint**. For a mistyped function or variable it offers a
 **"Did you mean…?"** suggestion (e.g. `Unknown function 'lenght'` → *Did you mean
 `length()`?*), computed from the built-in/UDF function list and the variables in your
-query. The suggestion logic lives in `lib/cypherSuggestions.ts` and the static hint
-catalog in `lib/cypherErrors.ts`.
+query. The error is also surfaced **inline in the editor** as a red squiggle on the
+offending token, with the hint on hover and a one-click **quick fix** to apply the
+suggestion. As you type, unknown node labels that look like a typo of a known label are
+flagged with a warning and a quick fix. The logic lives in `lib/cypherSuggestions.ts`
+and `lib/cypherDiagnostics.ts`, with the static hint catalog in `lib/cypherErrors.ts`.
 
 ### Testing
 
@@ -124,7 +127,7 @@ catalog in `lib/cypherErrors.ts`.
   Runs the `*.test.ts` suites under `app/` and `lib/`. Gated in CI by the **Build**
   workflow.
 * **Coverage**: `npm run test:coverage` — runs the unit tests and enforces **100%**
-  line/branch/function coverage on `lib/cypherSuggestions.ts`.
+  line/branch/function coverage on `lib/cypherSuggestions.ts` and `lib/cypherDiagnostics.ts`.
 * **Smoke tests vs a real FalkorDB**: `npm run test:smoke` — verifies the
   "Did you mean…?" suggestions against the actual server error wording. It is gated:
   it **skips** unless `FALKORDB_SMOKE=1`, and **fails** (rather than skipping) if that

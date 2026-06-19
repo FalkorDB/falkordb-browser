@@ -76,17 +76,23 @@ export function closestMatch(target: string, candidates: string[]): string | und
   return scored[0].candidate;
 }
 
+/** Masks comments and quoted strings with spaces of the **same length** (newlines kept),
+ *  so character offsets and line structure are preserved. Used to avoid matching
+ *  identifiers inside comments/strings while keeping positions accurate. */
+export function maskCommentsAndStrings(query: string): string {
+  return query.replace(
+    /\/\*[\s\S]*?\*\/|\/\/[^\n]*|'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"/g,
+    match => match.replace(/[^\n]/g, " ")
+  );
+}
+
 /** Extracts identifiers from binding positions only — the name right after `(` or
  *  `[`, and aliases after `AS` — after stripping comments and string literals.
  *  This deliberately excludes labels/types (after `:`), property keys (after `.`),
  *  and function-namespace pieces, so a mistyped variable is matched only against
  *  real variables. Backtick-quoted identifiers are not supported (v1). */
 export function extractVariableCandidates(query: string): string[] {
-  const cleaned = query
-    .replace(/\/\*[\s\S]*?\*\//g, " ")        // block comments
-    .replace(/\/\/[^\n]*/g, " ")               // line comments
-    .replace(/'(?:\\.|[^'\\])*'/g, " ")        // single-quoted strings
-    .replace(/"(?:\\.|[^"\\])*"/g, " ");       // double-quoted strings
+  const cleaned = maskCommentsAndStrings(query);
 
   const found = new Set<string>();
   const collect = (re: RegExp): void => {
@@ -103,6 +109,27 @@ export function extractVariableCandidates(query: string): string[] {
   return Array.from(found).filter(v => !EXCLUDED_WORDS.has(v.toLowerCase()));
 }
 
+/** Returns the raw closest-name suggestion for a recognized error (function or variable),
+ *  or `undefined`. Used both for the hint text and for the quick-fix replacement. */
+export function suggestionNameForError(
+  rawError: string,
+  ctx?: { query?: string; functions?: string[] }
+): { kind: "function" | "variable"; name: string } | undefined {
+  const fnMatch = rawError.match(/unknown function '([^']+)'/i);
+  if (fnMatch) {
+    const name = closestMatch(fnMatch[1], ctx?.functions ?? functionCandidates);
+    return name ? { kind: "function", name } : undefined;
+  }
+
+  const varMatch = rawError.match(/'([^']+)' not defined/i);
+  if (varMatch) {
+    const name = closestMatch(varMatch[1], extractVariableCandidates(ctx?.query ?? ""));
+    return name ? { kind: "variable", name } : undefined;
+  }
+
+  return undefined;
+}
+
 /** Returns a ready-to-show plain-text suggestion ("Did you mean length()?") for a
  *  recognized error, or `undefined`. Function candidates default to the registered
  *  built-in/UDF list; variable candidates are derived from `ctx.query`. */
@@ -110,17 +137,9 @@ export function suggestForError(
   rawError: string,
   ctx?: { query?: string; functions?: string[] }
 ): string | undefined {
-  const fnMatch = rawError.match(/unknown function '([^']+)'/i);
-  if (fnMatch) {
-    const suggestion = closestMatch(fnMatch[1], ctx?.functions ?? functionCandidates);
-    return suggestion ? `Did you mean ${suggestion}()?` : undefined;
-  }
-
-  const varMatch = rawError.match(/'([^']+)' not defined/i);
-  if (varMatch) {
-    const suggestion = closestMatch(varMatch[1], extractVariableCandidates(ctx?.query ?? ""));
-    return suggestion ? `Did you mean ${suggestion}?` : undefined;
-  }
-
-  return undefined;
+  const suggestion = suggestionNameForError(rawError, ctx);
+  if (!suggestion) return undefined;
+  return suggestion.kind === "function"
+    ? `Did you mean ${suggestion.name}()?`
+    : `Did you mean ${suggestion.name}?`;
 }

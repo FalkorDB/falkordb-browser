@@ -25,6 +25,31 @@ export type CypherErrorHint = {
   hint: string;
 };
 
+export type SyntaxErrorInfo = {
+  message: string;
+  context: string;
+  contextOffset: number;
+  line: number;
+  column: number;
+};
+
+// Parses FalkorDB parser error format:
+// "errMsg: <message> line: <N>, column: <N>, offset: <N> errCtx: <snippet> errCtxOffset: <N>"
+// Uses [\s\S] for multiline tolerance and avoids strict end-of-string anchoring.
+export function parseSyntaxError(raw: string): SyntaxErrorInfo | null {
+  const match = raw.match(
+    /errMsg:\s*([\s\S]+?)\s+line:\s*(\d+),\s*column:\s*(\d+),\s*offset:\s*\d+\s+errCtx:\s?([\s\S]+?)\s+errCtxOffset:\s*(\d+)/
+  );
+  if (!match) return null;
+  return {
+    message: match[1].trim(),
+    line: Math.max(1, Number(match[2])),
+    column: Math.max(1, Number(match[3])),
+    context: match[4],
+    contextOffset: Number(match[5]),
+  };
+}
+
 type CatalogEntry = CypherErrorHint & {
   test: RegExp;
 };

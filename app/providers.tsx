@@ -3,7 +3,7 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, SyntaxErrorInfo, parseSyntaxError } from "@/lib/utils";
+import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue } from "@/lib/utils";
 import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
@@ -13,11 +13,12 @@ import { useToast } from "@/components/ui/use-toast";
 import { detectProviderFromApiKey, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { setFunctionCandidates } from "@/lib/cypherSuggestions";
 import { udfFunctionNames } from "@/lib/cypherLang";
+import { computeEditorDiagnostics, type DiagnosticsResult } from "@/lib/cypherDiagnostics";
 import { PanelImperativeHandle } from "react-resizable-panels";
 import type { Data as CanvasData, HierarchyDirection, LayoutMode, RadialDirection, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphInfo } from "./api/graph/model";
-import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, SyntaxErrorContext, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
 
@@ -231,7 +232,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0);
   const [isQueryLoading, setIsQueryLoading] = useState(false);
-  const [syntaxError, setSyntaxError] = useState<SyntaxErrorInfo | null>(null);
+  const [diagnostics, setDiagnostics] = useState<DiagnosticsResult | null>(null);
   const [model, setModel] = useState("");
   const [newModel, setNewModel] = useState("");
   const [perSourceModels, setPerSourceModels] = useState<Record<string, string>>({});
@@ -406,10 +407,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setIsQueryLoading,
   }), [isQueryLoading]);
 
-  const syntaxErrorContext = useMemo(() => ({
-    syntaxError,
-    setSyntaxError,
-  }), [syntaxError]);
+  const diagnosticsContext = useMemo(() => ({
+    diagnostics,
+    setDiagnostics,
+  }), [diagnostics]);
 
   const forceGraphContext = useMemo(() => ({
     canvasRef,
@@ -534,7 +535,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     };
 
     setIsQueryLoading(true);
-    setSyntaxError(null);
+    setDiagnostics(null);
 
     setHistoryQuery(prev => ({
       ...prev,
@@ -618,8 +619,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     } catch (err) {
       // Errors from getSSEGraphResult are already surfaced via toast
       const errorMessage = (err as Error).message || "";
-      const parsed = parseSyntaxError(errorMessage);
-      if (parsed) setSyntaxError(parsed);
+      setDiagnostics(computeEditorDiagnostics(newQuery.text, errorMessage));
 
       // Save failed query to history with the error message
       newQuery = { ...newQuery, errorMessage };
@@ -655,7 +655,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setViewport(undefined);
     setSearch("");
     setScrollPosition(0);
-    setSyntaxError(null);
+    setDiagnostics(null);
     setHistoryQuery(h => ({ ...h, query: "", currentQuery: defaultQueryHistory.currentQuery }));
     setUrlQueryText(null);
   }, [toast, setIndicator]);
@@ -1342,7 +1342,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             <HistoryQueryContext.Provider value={historyQueryContext}>
               <IndicatorContext.Provider value={indicatorContext}>
                 <QueryLoadingContext.Provider value={queryLoadingContext}>
-                  <SyntaxErrorContext.Provider value={syntaxErrorContext}>
+                  <DiagnosticsContext.Provider value={diagnosticsContext}>
                     <ForceGraphContext.Provider value={forceGraphContext}>
                       <TableViewContext.Provider value={tableViewContext}>
                         <ConnectionContext.Provider value={connectionContext}>
@@ -1361,7 +1361,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                         </ConnectionContext.Provider>
                       </TableViewContext.Provider>
                     </ForceGraphContext.Provider>
-                  </SyntaxErrorContext.Provider>
+                  </DiagnosticsContext.Provider>
                 </QueryLoadingContext.Provider>
               </IndicatorContext.Provider>
             </HistoryQueryContext.Provider>

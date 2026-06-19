@@ -5,7 +5,9 @@ import {
   closestMatch,
   extractVariableCandidates,
   suggestForError,
+  suggestionNameForError,
   setFunctionCandidates,
+  maskCommentsAndStrings,
 } from "./cypherSuggestions.ts";
 import { udfFunctionNames, BUILTIN_FUNCTIONS } from "./cypherLang.ts";
 
@@ -150,5 +152,35 @@ describe("udfFunctionNames", () => {
   });
   it("exports a non-empty built-in function list", () => {
     assert.ok(BUILTIN_FUNCTIONS.includes("length"));
+  });
+});
+
+describe("maskCommentsAndStrings", () => {
+  it("masks comments and strings with same-length spaces, keeping newlines", () => {
+    const samples = ["a // b\nc", "a /* b\nx */ c", "a 'b c' d", 'a "b" d'];
+    samples.forEach(s => {
+      const masked = maskCommentsAndStrings(s);
+      assert.equal(masked.length, s.length); // length preserved
+      assert.equal((masked.match(/\n/g) ?? []).length, (s.match(/\n/g) ?? []).length); // newlines kept
+    });
+    // content outside comments/strings is preserved; inside is removed
+    assert.ok(maskCommentsAndStrings("RETURN x // 'foo'").startsWith("RETURN x "));
+    assert.ok(!maskCommentsAndStrings("RETURN 'foo' bar").includes("foo"));
+    assert.ok(maskCommentsAndStrings("RETURN 'foo' bar").includes("bar"));
+  });
+});
+
+describe("suggestionNameForError", () => {
+  beforeEach(() => setFunctionCandidates([]));
+  it("returns the raw function/variable name and kind", () => {
+    assert.deepEqual(suggestionNameForError("Unknown function 'lenght'"), { kind: "function", name: "length" });
+    assert.deepEqual(
+      suggestionNameForError("'prsn' not defined", { query: "MATCH (person) RETURN prsn" }),
+      { kind: "variable", name: "person" }
+    );
+  });
+  it("returns undefined when there is no close match or the error is unrecognized", () => {
+    assert.equal(suggestionNameForError("Unknown function 'zzzzz'", { functions: ["length"] }), undefined);
+    assert.equal(suggestionNameForError("Division by zero"), undefined);
   });
 });

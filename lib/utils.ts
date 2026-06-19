@@ -9,8 +9,11 @@ import { twMerge } from "tailwind-merge";
 import React, { RefObject } from "react";
 import type { FalkorDBCanvas, Data as CanvasData } from "@falkordb/canvas";
 import { signOut } from "next-auth/react";
-import { getCypherErrorHint, SYNTAX_ERROR_HINT } from "./cypherErrors";
+import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, type SyntaxErrorInfo } from "./cypherErrors";
 import { suggestForError } from "./cypherSuggestions";
+
+export { parseSyntaxError };
+export type { SyntaxErrorInfo };
 
 export type ToastArguments = {
   title: string;
@@ -207,14 +210,6 @@ export type UDFEntry = [string, string, string, string[]];
 // [...UDFEntry, library_code, code]
 export type UDFEntryWithCode = [...UDFEntry, string, string];
 
-export type SyntaxErrorInfo = {
-  message: string;
-  context: string;
-  contextOffset: number;
-  line: number;
-  column: number;
-};
-
 export type UserFriendlyMessage = {
   title: string;
   description: React.ReactNode;
@@ -329,23 +324,6 @@ export async function getSSEGraphResult(
       reject(new Error("Network or server error"));
     };
   });
-}
-
-// Parses FalkorDB parser error format:
-// "errMsg: <message> line: <N>, column: <N>, offset: <N> errCtx: <snippet> errCtxOffset: <N>"
-// Uses [\s\S] for multiline tolerance and avoids strict end-of-string anchoring.
-export function parseSyntaxError(raw: string): SyntaxErrorInfo | null {
-  const match = raw.match(
-    /errMsg:\s*([\s\S]+?)\s+line:\s*(\d+),\s*column:\s*(\d+),\s*offset:\s*\d+\s+errCtx:\s?([\s\S]+?)\s+errCtxOffset:\s*(\d+)/
-  );
-  if (!match) return null;
-  return {
-    message: match[1].trim(),
-    line: Math.max(1, Number(match[2])),
-    column: Math.max(1, Number(match[3])),
-    context: match[4],
-    contextOffset: Number(match[5]),
-  };
 }
 
 // Builds a React element that highlights the error position in the query snippet.

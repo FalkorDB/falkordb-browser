@@ -11,13 +11,13 @@ import * as monaco from "monaco-editor";
 import { Info, Maximize2, Minimize2, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { cn, HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
-import { SYNTAX_ERROR_HINT } from "@/lib/cypherErrors";
 import { BUILTIN_FUNCTIONS, CYPHER_KEYWORDS } from "@/lib/cypherLang";
+import { codeActionEditsForMarkers, analyzeSchemaWarnings, type EditorDiagnostic } from "@/lib/cypherDiagnostics";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
 import EditorComponent, { LINE_HEIGHT, LanguageConfig } from "./EditorComponent";
-import { BrowserSettingsContext, IndicatorContext, UDFContext, ConnectionContext, SyntaxErrorContext } from "./provider";
+import { BrowserSettingsContext, IndicatorContext, UDFContext, ConnectionContext, DiagnosticsContext } from "./provider";
 import { Graph } from "../api/graph/model";
 
 interface Props {
@@ -123,7 +123,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { udfList } = useContext(UDFContext);
     const { isReadOnly } = useContext(ConnectionContext);
-    const { syntaxError, setSyntaxError } = useContext(SyntaxErrorContext);
+    const { diagnostics, setDiagnostics } = useContext(DiagnosticsContext);
 
     const { toast } = useToast();
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -139,6 +139,10 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const isReadOnlyRef = useRef(isReadOnly);
     const monacoRef = useRef<Monaco | null>(null);
     const decorationsRef = useRef<monaco.editor.IEditorDecorationsCollection | null>(null);
+    const diagnosticsRef = useRef<EditorDiagnostic[]>([]);
+    const schemaWarningsRef = useRef<EditorDiagnostic[]>([]);
+    const schemaLabelsRef = useRef<string[]>([]);
+    const codeActionProviderRef = useRef<monaco.IDisposable | null>(null);
     const boundVarsRef = useRef<Set<string>>(new Set());
 
     const [lineNumber, setLineNumber] = useState(1);
@@ -221,43 +225,109 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         setLineNumber(historyQuery.query.split("\n").length);
     }, [historyQuery.query]);
 
-    // Apply or clear syntax error decorations in the editor
+    // Apply editor diagnostics as Monaco markers (squiggle + hover + quick fixes) on both
+    // editor models, plus a precise inline highlight on the active editor. A stale guard
+    // ensures we only mark a model whose content still matches the query that produced the
+    // diagnostics.
     useEffect(() => {
+        const editors = [editorRef.current, dialogEditorRef.current];
+
+        const markersFor = (model: monaco.editor.ITextModel): monaco.editor.IMarkerData[] => {
+            if (!diagnostics || diagnostics.sourceQuery !== model.getValue()) return [];
+            return diagnostics.diagnostics.map(d => ({
+                severity: d.severity === "warning" ? monaco.MarkerSeverity.Warning : monaco.MarkerSeverity.Error,
+                message: d.hint ? `${d.message}\n\n💡 ${d.hint}` : d.message,
+                code: d.code,
+                source: "cypher-diagnostics",
+                startLineNumber: d.startLineNumber,
+                startColumn: d.startColumn,
+                endLineNumber: d.endLineNumber,
+                endColumn: d.endColumn,
+            }));
+        };
+
+        const models: monaco.editor.ITextModel[] = [];
+        let activeMatched = false;
+        editors.forEach(editor => {
+            const model = editor?.getModel();
+            if (!model) return;
+            const markers = markersFor(model);
+            monaco.editor.setModelMarkers(model, 'cypher-diagnostics', markers);
+            models.push(model);
+            if (markers.length > 0) activeMatched = true;
+        });
+
+        // Keep the diagnostics available to the code-action provider only while a model
+        // actually shows them.
+        diagnosticsRef.current = activeMatched && diagnostics ? diagnostics.diagnostics : [];
+
+        // Precise inline highlight on the active editor.
         if (decorationsRef.current) {
             decorationsRef.current.clear();
             decorationsRef.current = null;
         }
-
-        const editor = maximize ? dialogEditorRef.current : editorRef.current;
-        if (!editor || !syntaxError) return;
-
-        const { line, column } = syntaxError;
-        const model = editor.getModel();
-        if (!model) return;
-
-        const decorations = editor.createDecorationsCollection([
-            {
-                range: new monaco.Range(line, column, line, column + 1),
-                options: {
-                    inlineClassName: 'syntax-error-highlight',
-                    hoverMessage: { value: `${syntaxError.message}\n\n💡 ${SYNTAX_ERROR_HINT}` },
-                },
-            },
-        ]);
-        decorationsRef.current = decorations;
+        const activeEditor = maximize ? dialogEditorRef.current : editorRef.current;
+        const activeModel = activeEditor?.getModel();
+        if (activeEditor && activeModel && diagnostics && diagnostics.sourceQuery === activeModel.getValue()) {
+            decorationsRef.current = activeEditor.createDecorationsCollection(
+                diagnostics.diagnostics.map(d => ({
+                    range: new monaco.Range(d.startLineNumber, d.startColumn, d.endLineNumber, d.endColumn),
+                    options: { inlineClassName: 'syntax-error-highlight' },
+                }))
+            );
+        }
 
         return () => {
-            decorations.clear();
-            if (decorationsRef.current === decorations) decorationsRef.current = null;
+            models.forEach(model => {
+                if (!model.isDisposed()) monaco.editor.setModelMarkers(model, 'cypher-diagnostics', []);
+            });
+            diagnosticsRef.current = [];
+            if (decorationsRef.current) {
+                decorationsRef.current.clear();
+                decorationsRef.current = null;
+            }
         };
-    }, [syntaxError, maximize, editorMountVersion]);
+    }, [diagnostics, maximize, editorMountVersion]);
 
-    // Clear syntax error when the user modifies the query
+    // Clear diagnostics when the user modifies the query
     useEffect(() => {
-        if (syntaxError) {
-            setSyntaxError(null);
+        if (diagnostics) {
+            setDiagnostics(null);
         }
     }, [historyQuery.query]);
+
+    // Dispose the code-action provider on unmount.
+    useEffect(() => () => {
+        codeActionProviderRef.current?.dispose();
+        codeActionProviderRef.current = null;
+    }, []);
+
+    // Proactive (debounced) schema lint: warn about node labels that look like a typo of
+    // a known label. Anchored to node patterns, so map keys are never flagged.
+    useEffect(() => {
+        const handle = setTimeout(() => {
+            const warnings = analyzeSchemaWarnings(historyQuery.query, schemaLabelsRef.current);
+            schemaWarningsRef.current = warnings;
+            [editorRef.current, dialogEditorRef.current].forEach(editor => {
+                const model = editor?.getModel();
+                if (!model || !monacoRef.current) return;
+                const markers: monaco.editor.IMarkerData[] = (warnings.length > 0 && model.getValue() === historyQuery.query)
+                    ? warnings.map(d => ({
+                        severity: monaco.MarkerSeverity.Warning,
+                        message: d.hint ? `${d.message}\n\n💡 ${d.hint}` : d.message,
+                        code: d.code,
+                        source: 'cypher-schema',
+                        startLineNumber: d.startLineNumber,
+                        startColumn: d.startColumn,
+                        endLineNumber: d.endLineNumber,
+                        endColumn: d.endColumn,
+                    }))
+                    : [];
+                monaco.editor.setModelMarkers(model, 'cypher-schema', markers);
+            });
+        }, 400);
+        return () => clearTimeout(handle);
+    }, [historyQuery.query, editorMountVersion]);
 
     // Extract bound element variables from the query and rebuild tokenizer when they change
     // Use Monaco's tokenizer to detect bound variables (tokens marked as 'variable'
@@ -435,6 +505,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
         // Collect labels and relationship types as element namespaces
         const labels = sug.filter(({ detail }) => detail === '(label)').map(({ label }) => label as string);
+        schemaLabelsRef.current = labels;
         const relTypes = sug.filter(({ detail }) => detail === '(relationship type)').map(({ label }) => label as string);
 
         // Collect property keys for keyword coloring
@@ -634,6 +705,39 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         monacoRef.current = monacoI;
         // Trigger initial tokenizer update with dynamic suggestions
         updateTokenizer(monacoI);
+
+        // Register the quick-fix (code action) provider exactly once.
+        if (!codeActionProviderRef.current) {
+            codeActionProviderRef.current = monacoI.languages.registerCodeActionProvider(LANGUAGE_NAME, {
+                provideCodeActions: (model: monaco.editor.ITextModel, _range: monaco.Range, context: monaco.languages.CodeActionContext): monaco.languages.CodeActionList => {
+                    const markers = context.markers.filter(m => m.source === 'cypher-diagnostics' || m.source === 'cypher-schema');
+                    const edits = codeActionEditsForMarkers(
+                        [...diagnosticsRef.current, ...schemaWarningsRef.current],
+                        markers.map(m => ({
+                            code: typeof m.code === 'string' ? m.code : (m.code?.value ?? ''),
+                            startLineNumber: m.startLineNumber,
+                            startColumn: m.startColumn,
+                            endLineNumber: m.endLineNumber,
+                            endColumn: m.endColumn,
+                        }))
+                    );
+                    return {
+                        actions: edits.map(edit => ({
+                            title: edit.title,
+                            kind: 'quickfix',
+                            edit: {
+                                edits: [{
+                                    resource: model.uri,
+                                    versionId: model.getVersionId(),
+                                    textEdit: { range: edit.range, text: edit.newText },
+                                }],
+                            },
+                        })),
+                        dispose: () => { },
+                    };
+                },
+            });
+        }
     };
 
     const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {

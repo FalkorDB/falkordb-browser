@@ -419,6 +419,11 @@ export default class GraphPage extends BasePage {
     return (await title.textContent()) || "";
   }
 
+  // Monaco renders a diagnostic marker as a `.squiggly-error` decoration in the editor.
+  async hasEditorErrorMarker(): Promise<boolean> {
+    return waitForElementToBeVisible(this.page.locator(".squiggly-error").first());
+  }
+
   async isOfflineIndicatorVisible(): Promise<boolean> {
     const indicator = this.page.locator('[role="status"][aria-label*="offline"]');
     return waitForElementToBeVisible(indicator);

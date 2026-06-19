@@ -14,6 +14,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { FalkorDB } from "falkordb";
 import { suggestForError } from "./cypherSuggestions.ts";
+import { computeEditorDiagnostics } from "./cypherDiagnostics.ts";
 
 const ENABLED = process.env.FALKORDB_SMOKE === "1";
 const URL = process.env.FALKORDB_URL ?? "redis://localhost:6379";
@@ -58,6 +59,16 @@ test(
         "Did you mean person?",
         `unexpected variable-error wording: ${JSON.stringify(varError)}`
       );
+
+      // Editor diagnostics: the live error must map to a marker over the token, with a quick fix.
+      const fnDiag = computeEditorDiagnostics('RETURN lenght("hi")', fnError).diagnostics[0];
+      assert.equal(fnDiag.code, "unknown-function");
+      assert.deepEqual([fnDiag.startColumn, fnDiag.endColumn], [8, 14]);
+      assert.deepEqual(fnDiag.quickFix, { title: "Replace with length", newText: "length" });
+
+      const varDiag = computeEditorDiagnostics(varQuery, varError).diagnostics[0];
+      assert.equal(varDiag.code, "undefined-variable");
+      assert.equal(varDiag.quickFix?.newText, "person");
     } finally {
       await db.close().catch(() => {});
     }

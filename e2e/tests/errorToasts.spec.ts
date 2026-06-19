@@ -203,6 +203,25 @@ test.describe("Error Toast Messages", () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Inline editor diagnostics — Monaco markers for failed queries
+  // ---------------------------------------------------------------------------
+
+  test(`@admin Failed query shows an inline error marker in the editor`, async () => {
+    graphName = getRandomString("graph");
+    await apiCall.addGraph(graphName);
+
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(graphName);
+
+    await graph.insertQuery("MATCH (n) RETsURN n");
+    await graph.clickRunQuery(false);
+
+    expect(await graph.getNotificationErrorToast()).toBe(true);
+    expect(await graph.hasEditorErrorMarker()).toBe(true);
+  });
+
+  // ---------------------------------------------------------------------------
   // Actionable hints — recognized Cypher errors carry a remediation tip
   // ---------------------------------------------------------------------------
 

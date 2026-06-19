@@ -1,6 +1,7 @@
 import { createContext, Dispatch, SetStateAction } from "react";
 import type { AIProvider } from "@/lib/ai-provider-utils";
-import { ConnectionInfo, ConnectionType, GraphData, GraphRef, HistoryQuery, Label, Panel, Relationship, SyntaxErrorInfo, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
+import { ConnectionInfo, ConnectionType, GraphData, GraphRef, HistoryQuery, Label, Panel, Relationship, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
+import type { DiagnosticsResult } from "@/lib/cypherDiagnostics";
 import type { Data as CanvasData, LayoutMode, ViewportState } from "@falkordb/canvas";
 import type { SessionConnection } from "next-auth";
 import { Graph, GraphInfo } from "../api/graph/model";
@@ -501,12 +502,12 @@ export const UDFContext = createContext<UDFContextType>({
   setSelectedUdf: () => { },
 }); 
 
-type SyntaxErrorContextType = {
-  syntaxError: SyntaxErrorInfo | null;
-  setSyntaxError: Dispatch<SetStateAction<SyntaxErrorInfo | null>>;
+type DiagnosticsContextType = {
+  diagnostics: DiagnosticsResult | null;
+  setDiagnostics: Dispatch<SetStateAction<DiagnosticsResult | null>>;
 };
 
-export const SyntaxErrorContext = createContext<SyntaxErrorContextType>({
-  syntaxError: null,
-  setSyntaxError: () => { },
+export const DiagnosticsContext = createContext<DiagnosticsContextType>({
+  diagnostics: null,
+  setDiagnostics: () => { },
 });
