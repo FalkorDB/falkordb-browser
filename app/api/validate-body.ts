@@ -235,6 +235,7 @@ export const fixRequest = z.object({
     .string({
       error: (issue) => issue.input === undefined ? "Model is required" : "Invalid Model",
     })
+    .trim()
     .min(1, "Model cannot be empty")
     .max(256, "Model is too long"),
   modelSource: z

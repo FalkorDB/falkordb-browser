@@ -10,9 +10,39 @@ export async function OPTIONS(request: NextRequest) {
 
 const REQUEST_TIMEOUT_MS = 30_000;
 
-// Reject oversized bodies up front (before reading/parsing) so an authenticated caller
-// can't force a large allocation. The schema field caps sum to ~17 KB; 64 KB is generous.
+// Reject oversized bodies so an authenticated caller can't force a large allocation.
+// The schema field caps sum to ~17 KB; 64 KB is generous.
 const MAX_BODY_BYTES = 64 * 1024;
+
+const OVER_LIMIT = Symbol("over-limit");
+
+// Reads the request body as text while enforcing a hard byte cap, so a missing or inaccurate
+// Content-Length (e.g. chunked transfer) can't bypass the limit. Returns the body text, or
+// OVER_LIMIT once the cap is exceeded (reading is then cancelled).
+async function readBodyWithLimit(request: NextRequest, maxBytes: number): Promise<string | typeof OVER_LIMIT> {
+    const reader = request.body?.getReader();
+    if (!reader) return "";
+    const chunks: Uint8Array[] = [];
+    let received = 0;
+    try {
+        for (;;) {
+            // eslint-disable-next-line no-await-in-loop
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (value) {
+                received += value.byteLength;
+                if (received > maxBytes) {
+                    await reader.cancel();
+                    return OVER_LIMIT;
+                }
+                chunks.push(value);
+            }
+        }
+    } finally {
+        reader.releaseLock();
+    }
+    return Buffer.concat(chunks).toString("utf8");
+}
 
 // eslint-disable-next-line import/prefer-default-export
 export async function POST(request: NextRequest) {
@@ -28,14 +58,21 @@ export async function POST(request: NextRequest) {
         return session;
     }
 
+    // Fast-fail on an honest Content-Length, then enforce the cap while reading so a missing
+    // or inaccurate length can't bypass it.
     const contentLength = Number(request.headers.get("content-length") ?? "");
     if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
         return NextResponse.json({ error: "Request body too large" }, { status: 413, headers: getCorsHeaders(request) });
     }
 
+    const raw = await readBodyWithLimit(request, MAX_BODY_BYTES);
+    if (raw === OVER_LIMIT) {
+        return NextResponse.json({ error: "Request body too large" }, { status: 413, headers: getCorsHeaders(request) });
+    }
+
     let body;
     try {
-        body = await request.json();
+        body = JSON.parse(raw);
     } catch {
         return NextResponse.json({ error: "Invalid JSON body" }, { status: 400, headers: getCorsHeaders(request) });
     }
