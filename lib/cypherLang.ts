@@ -5,7 +5,7 @@
 // "Did you mean…?" error suggestions (lib/cypherSuggestions.ts). Keeping them
 // here avoids duplicating the lists in two places.
 
-import type { UDFEntry } from "./utils";
+import type { UDFEntry } from "./utils.ts";
 
 export const CYPHER_KEYWORDS = [
   "CREATE",

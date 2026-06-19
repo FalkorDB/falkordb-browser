@@ -417,7 +417,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // --- "Fix with AI" (Idea #3) -----------------------------------------------
   const [lastFailure, setLastFailure] = useState<{ query: string; errorMessage: string } | null>(null);
   const [aiFixResult, setAiFixResult] = useState<AiFixResult>({ status: "idle" });
-  const [pendingConsent, setPendingConsent] = useState<{ query: string; errorMessage: string } | null>(null);
+  const [pendingConsent, setPendingConsent] = useState<{ query: string; errorMessage: string; provider: ReturnType<typeof detectProviderFromModel> } | null>(null);
 
   const resolvedChatKey = useMemo(
     () => (chatApiKeys.find(k => k.id === selectedChatApiKeyId)?.key) || secretKey,
@@ -465,7 +465,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       const provider = detectProviderFromModel(model);
       const consented = typeof window !== "undefined" && localStorage.getItem(`aiFixConsent-${provider}`) === "true";
       if (!consented) {
-        setPendingConsent({ query, errorMessage });
+        // Capture the provider now so a later model change doesn't alter what the user
+        // is consenting to (the dialog label, the localStorage key, and persistence).
+        setPendingConsent({ query, errorMessage, provider });
         return;
       }
     }
@@ -475,18 +477,18 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const confirmConsent = useCallback((dontAskAgain: boolean) => {
     if (!pendingConsent) return;
     if (dontAskAgain && typeof window !== "undefined") {
-      localStorage.setItem(`aiFixConsent-${detectProviderFromModel(model)}`, "true");
+      localStorage.setItem(`aiFixConsent-${pendingConsent.provider}`, "true");
     }
     const { query, errorMessage } = pendingConsent;
     setPendingConsent(null);
     doAiFix(query, errorMessage);
-  }, [pendingConsent, model, doAiFix]);
+  }, [pendingConsent, doAiFix]);
 
   const aiFixContext = useMemo(() => ({
     aiFixSupported,
     lastFailure,
     result: aiFixResult,
-    pendingConsentProvider: pendingConsent ? getProviderDisplayName(detectProviderFromModel(model)) : null,
+    pendingConsentProvider: pendingConsent ? getProviderDisplayName(pendingConsent.provider) : null,
     requestAiFix,
     confirmConsent,
     cancelConsent: () => setPendingConsent(null),
@@ -496,7 +498,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setUrlQueryText(q);
       setAiFixResult({ status: "idle" });
     },
-  }), [aiFixSupported, lastFailure, aiFixResult, pendingConsent, model, requestAiFix, confirmConsent]);
+  }), [aiFixSupported, lastFailure, aiFixResult, pendingConsent, requestAiFix, confirmConsent]);
   // ---------------------------------------------------------------------------
 
   const forceGraphContext = useMemo(() => ({
