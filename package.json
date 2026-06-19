@@ -12,6 +12,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "test": "node --test \"app/**/*.test.ts\" \"lib/**/*.test.ts\"",
     "test:e2e": "playwright test"
   },
   "dependencies": {

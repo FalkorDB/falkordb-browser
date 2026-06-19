@@ -43,6 +43,7 @@ function ToastItemDetails({ rawMessage }: { rawMessage: string }) {
         type="button"
         className="text-xs underline opacity-75 hover:opacity-100 cursor-pointer"
         onClick={() => setExpanded(prev => !prev)}
+        aria-expanded={expanded}
         data-testid="toast-see-more"
       >
         {expanded ? "See less" : "See more"}
@@ -61,7 +62,7 @@ export function Toaster() {
 
   return (
     <ToastProvider>
-      {toasts.map(function ({ id, title, description, action, variant, rawMessage, ...props }) {
+      {toasts.map(function ({ id, title, description, action, variant, rawMessage, hint, ...props }) {
         return (
           <Toast data-testid={variant === "destructive" ? "toast-destructive" : "toast"} variant={variant} key={id} {...props}>
             <div className="grid gap-1">
@@ -69,6 +70,11 @@ export function Toaster() {
               {description && (
                 <ToastDescription data-testid="toast-description">
                   {description}
+                  {hint && (
+                    <p className="mt-1 text-xs opacity-90" data-testid="toast-hint">
+                      💡 {hint}
+                    </p>
+                  )}
                   {rawMessage && <ToastItemDetails rawMessage={rawMessage} />}
                 </ToastDescription>
               )}

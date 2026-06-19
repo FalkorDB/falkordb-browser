@@ -109,6 +109,14 @@ For detailed configuration options and examples, see the [Helm chart documentati
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
 
+### Testing
+
+* **Unit tests** (Node's built-in test runner, no extra tooling): `npm test`
+  Runs the `*.test.ts` suites under `app/` and `lib/` (e.g. the Cypher error-hint
+  catalog in `lib/cypherErrors.ts`). Gated in CI by the **Build** workflow.
+* **Lint**: `npm run lint`
+* **End-to-end tests** (Playwright): `npm run test:e2e`
+
 
 
 

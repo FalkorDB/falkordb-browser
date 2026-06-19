@@ -9,12 +9,14 @@ import { twMerge } from "tailwind-merge";
 import React, { RefObject } from "react";
 import type { FalkorDBCanvas, Data as CanvasData } from "@falkordb/canvas";
 import { signOut } from "next-auth/react";
+import { getCypherErrorHint } from "./cypherErrors";
 
 export type ToastArguments = {
   title: string;
   description: React.ReactNode;
   variant: "destructive" | "default";
   rawMessage?: string;
+  hint?: string;
 };
 
 export type ToastFn = (args: ToastArguments) => void;
@@ -216,6 +218,7 @@ export type UserFriendlyMessage = {
   title: string;
   description: React.ReactNode;
   rawMessage?: string;
+  hint?: string;
   syntaxError?: SyntaxErrorInfo;
 };
 
@@ -304,7 +307,7 @@ export async function getSSEGraphResult(
       }
 
       const friendly = toUserFriendlyMessage(message, status);
-      toast({ title: friendly.title, description: friendly.description, variant: "destructive", rawMessage: friendly.rawMessage });
+      toast({ title: friendly.title, description: friendly.description, variant: "destructive", rawMessage: friendly.rawMessage, hint: friendly.hint });
 
       if (status === 401 || status >= 500) setIndicator("offline");
 
@@ -471,37 +474,42 @@ export function toUserFriendlyMessage(raw: unknown, status: number): UserFriendl
     return { title: "Syntax Error", description: formatSyntaxError(parsed.message, parsed.context, parsed.contextOffset), syntaxError: parsed, rawMessage };
   }
 
-  // Check the allowlist FIRST so that server-provided specific messages
-  // (e.g. "Connection timed out. Please check the host…") are shown as-is
-  // and are not overridden by the generic pattern handlers below.
-  if (isAllowlistedUserError(rawMessage)) {
-    return { title: "Error", description: rawMessage };
+  // Recognized FalkorDB Cypher errors carry an actionable remediation hint.
+  const hint = getCypherErrorHint(rawMessage)?.hint;
+
+  // Show the server's own message verbatim when it is already user-readable —
+  // either explicitly allowlisted, or recognized by the Cypher hint catalog
+  // (those messages are readable FalkorDB errors). The hint, when present, is
+  // added beside the message rather than replacing it, so the specific names in
+  // the server text (variable/function/property) are never lost.
+  if (isAllowlistedUserError(rawMessage) || hint) {
+    return { title: "Error", description: rawMessage, hint };
   }
 
   const lower = rawMessage.toLowerCase();
 
   if (lower.includes("connection refused") || lower.includes("econnrefused")) {
-    return { title: "Error", description: "Unable to connect to the database. Please check your connection settings.", rawMessage };
+    return { title: "Error", description: "Unable to connect to the database. Please check your connection settings.", rawMessage, hint };
   }
 
   if (lower.includes("noauth") || lower.includes("wrongpass")) {
-    return { title: "Error", description: "Database authentication failed. Please check your credentials.", rawMessage };
+    return { title: "Error", description: "Database authentication failed. Please check your credentials.", rawMessage, hint };
   }
 
   if (lower.includes("loading") && lower.includes("dataset")) {
-    return { title: "Error", description: "The database is still loading. Please wait a moment and try again.", rawMessage };
+    return { title: "Error", description: "The database is still loading. Please wait a moment and try again.", rawMessage, hint };
   }
 
   if (lower.includes("oom") || lower.includes("out of memory")) {
-    return { title: "Error", description: "The server is running low on memory. Please try again later.", rawMessage };
+    return { title: "Error", description: "The server is running low on memory. Please try again later.", rawMessage, hint };
   }
 
   if (lower.includes("timeout") || lower.includes("timed out")) {
-    return { title: "Error", description: "The request timed out. Please try a simpler query or try again later.", rawMessage };
+    return { title: "Error", description: "The request timed out. Please try a simpler query or try again later.", rawMessage, hint };
   }
 
   if (lower.includes("readonly") && lower.includes("replica")) {
-    return { title: "Error", description: "This operation cannot be performed on a read-only replica.", rawMessage };
+    return { title: "Error", description: "This operation cannot be performed on a read-only replica.", rawMessage, hint };
   }
 
   if (lower.includes("exactly one relationship type must be specified")) {
@@ -509,14 +517,14 @@ export function toUserFriendlyMessage(raw: unknown, status: number): UserFriendl
   }
 
   if (status === 401) {
-    return { title: "Error", description: "Your session has expired. Please sign in again.", rawMessage };
+    return { title: "Error", description: "Your session has expired. Please sign in again.", rawMessage, hint };
   }
 
   if (status >= 500) {
-    return { title: "Error", description: "Something went wrong on the server. Please try again later.", rawMessage };
+    return { title: "Error", description: "Something went wrong on the server. Please try again later.", rawMessage, hint };
   }
 
-  return { title: "Error", description: "An unexpected error occurred. Please try again.", rawMessage };
+  return { title: "Error", description: "An unexpected error occurred. Please try again.", rawMessage, hint };
 }
 
 // Guards against triggering multiple concurrent signOut calls when many
@@ -591,6 +599,7 @@ export async function securedFetch(
       description: friendly.description,
       variant: "destructive",
       rawMessage: friendly.rawMessage,
+      hint: friendly.hint,
     });
 
     if (status === 401 || status >= 500) {

@@ -201,4 +201,51 @@ test.describe("Error Toast Messages", () => {
     expect(toastTitleDup).toBe("Error");
     expect(toastText).toContain("already exists");
   });
+
+  // ---------------------------------------------------------------------------
+  // Actionable hints — recognized Cypher errors carry a remediation tip
+  // ---------------------------------------------------------------------------
+
+  test(`@admin Undefined variable error shows an actionable hint`, async () => {
+    graphName = getRandomString("graph");
+    await apiCall.addGraph(graphName);
+
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(graphName);
+
+    await graph.insertQuery("MATCH (p:Person) RETURN x");
+    await graph.clickRunQuery(false);
+
+    expect(await graph.getNotificationErrorToast()).toBe(true);
+    const toastText = await graph.getErrorToastText();
+
+    // Server message is still shown verbatim...
+    expect(toastText).toContain("not defined");
+    // ...and an actionable hint is added beside it.
+    expect(toastText).toContain("in scope");
+  });
+
+  test(`@admin Unaliased WITH projection shows the specific message and a hint`, async () => {
+    graphName = getRandomString("graph");
+    await apiCall.addGraph(graphName);
+
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(graphName);
+
+    await graph.insertQuery("MATCH (n) WITH n.name RETURN n.name");
+    await graph.clickRunQuery(false);
+
+    expect(await graph.getNotificationErrorToast()).toBe(true);
+    const toastTitle = await graph.getErrorToastTitle();
+    const toastText = await graph.getErrorToastText();
+
+    expect(toastTitle).toBe("Error");
+    // Previously this surfaced the generic "An unexpected error occurred" fallback;
+    // now the recognized FalkorDB message is shown verbatim with a remediation hint.
+    expect(toastText).not.toContain("An unexpected error occurred");
+    expect(toastText).toContain("must be aliased");
+    expect(toastText).toContain("AS");
+  });
 });
