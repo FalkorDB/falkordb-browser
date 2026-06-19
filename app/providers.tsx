@@ -442,7 +442,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
           errorMessage,
           graphName,
           model,
-          key: chatModelSource === "local" ? localLlmProvider : resolvedChatKey,
+          key: chatModelSource === "local" ? "" : resolvedChatKey,
           modelSource: chatModelSource,
           localProvider: localLlmProvider,
           localEndpoint: localLlmEndpoint,

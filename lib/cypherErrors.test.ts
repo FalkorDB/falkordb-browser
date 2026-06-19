@@ -11,8 +11,7 @@ import { DRIFT_CASES, NOT_DRIFT_TESTABLE } from "./cypherErrorDriftCases.ts";
 // Frozen sample strings: the FalkorDB error templates from src/errors/error_msgs.h
 // rendered with representative substitutions. These are NOT live server output, so
 // the test never depends on a running server build.
-describe("getCypherErrorHint — recognized FalkorDB errors", () => {
-  const cases: Array<{ message: string; id: string; needle: string }> = [
+const RECOGNIZED_SAMPLES: Array<{ message: string; id: string; needle: string }> = [
     { message: "'x' not defined", id: "undefined-variable", needle: "in scope" },
     { message: "Unknown function 'foo'", id: "unknown-function", needle: "function name" },
     { message: "Type mismatch: expected Integer but was String", id: "type-mismatch", needle: "toInteger" },
@@ -48,7 +47,8 @@ describe("getCypherErrorHint — recognized FalkorDB errors", () => {
     { message: "Integer overflow '999999999999999999999999999999'", id: "integer-overflow", needle: "64-bit" },
   ];
 
-  cases.forEach(({ message, id, needle }) => {
+describe("getCypherErrorHint — recognized FalkorDB errors", () => {
+  RECOGNIZED_SAMPLES.forEach(({ message, id, needle }) => {
     it(`recognizes ${id}`, () => {
       const result = getCypherErrorHint(message);
       assert.ok(result, `expected a hint for ${JSON.stringify(message)}`);
@@ -191,15 +191,17 @@ describe("drift-case completeness", () => {
     assert.equal(driftIds.length, driftIdSet.size);
   });
 
-  it("every drift case resolves (by id) using a sample of its expected wording", () => {
-    // Sanity check that the catalog regex and the drift expectation agree without a DB:
-    // the expectedMessage source (its pattern text) is itself a phrase the catalog must
-    // recognize back to the same id.
+  it("every drift case agrees with the catalog on a frozen sample of its wording", () => {
+    // Without a DB we can still verify the contract the smoke test checks live: for each
+    // drift id, a frozen sample of that error must (a) match the drift's expectedMessage
+    // and (b) resolve back to the same id via the catalog. This fails if the catalog regex
+    // and the drift expectation ever disagree.
+    const sampleById = new Map(RECOGNIZED_SAMPLES.map(({ id, message }) => [id, message]));
     DRIFT_CASES.forEach(({ id, expectedMessage }) => {
-      assert.ok(
-        expectedMessage instanceof RegExp,
-        `expectedMessage for ${id} must be a RegExp`
-      );
+      const sample = sampleById.get(id);
+      assert.ok(sample, `no frozen sample for drift id ${id}`);
+      assert.match(sample, expectedMessage, `drift expectedMessage for ${id} doesn't match its frozen sample`);
+      assert.equal(getCypherErrorHint(sample)?.id, id, `catalog doesn't resolve the frozen sample for ${id}`);
     });
   });
 });

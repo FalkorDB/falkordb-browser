@@ -3,7 +3,7 @@ name: Cypher error drift canary
 # Early-warning for FalkorDB error-wording drift. The PR "smoke-tests" job runs
 # against a pinned FalkorDB release so it stays deterministic; this canary runs the
 # SAME smoke tests against :latest on a schedule (and on demand). When FalkorDB
-# reweords an error, this job goes red — telling us to update lib/cypherErrors.ts and
+# rewords an error, this job goes red — telling us to update lib/cypherErrors.ts and
 # lib/cypherErrorDriftCases.ts — without ever blocking a pull request.
 
 on:
