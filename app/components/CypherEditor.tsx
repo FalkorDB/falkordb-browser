@@ -287,7 +287,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                 decorationsRef.current = null;
             }
         };
-    }, [diagnostics, maximize, editorMountVersion]);
+    }, [diagnostics, maximize, editorMountVersion, blur]);
 
     // Clear diagnostics when the user modifies the query
     useEffect(() => {
