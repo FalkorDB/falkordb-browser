@@ -6,9 +6,10 @@
 // to 100% and reused across the toast and the query-history tooltip.
 //
 // Conservative by design: if there is no sufficiently close candidate, it returns
-// `undefined` (no guess). Suggestions are drawn only from the built-in function
-// list (+ any registered UDF names) and from identifiers in the user's own query —
-// never from the raw error text.
+// `undefined` (no guess). The misspelled name is read from the error message, but the
+// suggested *correction* is drawn only from the built-in function list (+ any registered
+// UDF names) and from identifiers in the user's own query — never invented from, or
+// echoed out of, the raw error text.
 
 import { BUILTIN_FUNCTIONS, CYPHER_KEYWORDS } from "./cypherLang.ts";
 
