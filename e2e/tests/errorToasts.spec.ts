@@ -379,6 +379,8 @@ test.describe("Error Toast Messages", () => {
     expect(await graph.getNotificationErrorToast()).toBe(true);
 
     await graph.clickErrorToastCopy();
-    expect(await graph.getErrorToastCopyLabel()).toBe("Copied!");
+    // Web-first retrying assertion: setCopied runs after an await (a macrotask in React
+    // 19), so poll until the label flips rather than reading it once.
+    await expect(graph.errorToast.getByTestId("toast-copy-raw")).toHaveText("Copied!");
   });
 });

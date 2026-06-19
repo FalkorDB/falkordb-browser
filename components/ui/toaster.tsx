@@ -81,11 +81,14 @@ function ToastItemDetails({ rawMessage }: { rawMessage: string }) {
           {copied ? "Copied!" : "Copy"}
         </button>
       </div>
-      {expanded && (
-        <p id={detailsId} aria-live="polite" className="mt-1 text-xs opacity-75 break-all whitespace-pre-wrap" data-testid="toast-raw-message">
-          {rawMessage}
-        </p>
-      )}
+      <p
+        id={detailsId}
+        aria-live="polite"
+        className={expanded ? "mt-1 text-xs opacity-75 break-all whitespace-pre-wrap" : "sr-only"}
+        data-testid="toast-raw-message"
+      >
+        {expanded ? rawMessage : ""}
+      </p>
     </div>
   );
 }

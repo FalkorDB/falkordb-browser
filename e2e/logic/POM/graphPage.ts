@@ -419,24 +419,12 @@ export default class GraphPage extends BasePage {
     return (await title.textContent()) || "";
   }
 
-  async clickErrorToastSeeMore(): Promise<void> {
-    await interactWhenVisible(
-      this.errorToast.getByTestId("toast-see-more"),
-      (el) => el.click(),
-      "Error toast See more"
-    );
-  }
-
   async clickErrorToastCopy(): Promise<void> {
     await interactWhenVisible(
       this.errorToast.getByTestId("toast-copy-raw"),
       (el) => el.click(),
       "Error toast Copy"
     );
-  }
-
-  async getErrorToastCopyLabel(): Promise<string> {
-    return (await this.errorToast.getByTestId("toast-copy-raw").textContent()) || "";
   }
 
   // Monaco renders a diagnostic marker as a `.squiggly-error` decoration in the editor.
