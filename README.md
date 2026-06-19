@@ -131,15 +131,23 @@ with the static hint catalog in `lib/cypherErrors.ts`.
   Runs the `*.test.ts` suites under `app/` and `lib/`. Gated in CI by the **Build**
   workflow.
 * **Coverage**: `npm run test:coverage` — runs the unit tests and enforces **100%**
-  line/branch/function coverage on `lib/cypherSuggestions.ts` and `lib/cypherDiagnostics.ts`.
-* **Smoke tests vs a real FalkorDB**: `npm run test:smoke` — verifies the
-  "Did you mean…?" suggestions against the actual server error wording. It is gated:
-  it **skips** unless `FALKORDB_SMOKE=1`, and **fails** (rather than skipping) if that
-  is set but no server is reachable. Run locally with:
+  line/branch/function coverage on `lib/cypherSuggestions.ts`, `lib/cypherDiagnostics.ts`,
+  `lib/aiFix.ts`, and `lib/cypherErrors.ts`.
+* **Smoke tests vs a real FalkorDB**: `npm run test:smoke` — runs every `lib/**/*.smoke.ts`
+  suite against the actual server error wording. This covers the "Did you mean…?"
+  suggestions and the **error-hint drift guard**: each entry in the hint catalog
+  (`lib/cypherErrors.ts`) is paired with a query in `lib/cypherErrorDriftCases.ts`, and the
+  smoke test asserts the live FalkorDB message still matches — so a server-side rewording is
+  caught instead of silently dropping a hint. The smoke tests are gated: they **skip** unless
+  `FALKORDB_SMOKE=1`, and **fail** (rather than skipping) if that is set but no server is
+  reachable. Run locally with:
   ```bash
   docker run -d -p 6379:6379 falkordb/falkordb
   FALKORDB_SMOKE=1 npm run test:smoke   # optional: FALKORDB_URL=redis://host:port
   ```
+  In CI the **Build** workflow runs these against a pinned FalkorDB release (deterministic for
+  PRs), while the scheduled **Cypher error drift canary** workflow runs the same tests against
+  `:latest` to surface drift early without blocking pull requests.
 * **Lint**: `npm run lint`
 * **End-to-end tests** (Playwright): `npm run test:e2e`
 

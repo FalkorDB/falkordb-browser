@@ -153,7 +153,113 @@ const CATALOG: CatalogEntry[] = [
     test: /write queue is full/i,
     hint: "The server is busy processing writes. Wait a moment and retry the query.",
   },
+  {
+    // EMSG_REDECLARE "The bound %s '%s' can't be redeclared in a %s clause"
+    id: "redeclared-variable",
+    test: /can't be redeclared in a .+ clause/i,
+    hint: "This variable is already bound. Use a different name, or reference it without re-declaring it in MATCH/CREATE/MERGE.",
+  },
+  {
+    // EMSG_SAME_RESULT_COLUMN_NAME "Multiple result columns with the same name are not supported."
+    id: "duplicate-result-column",
+    test: /Multiple result columns with the same name/i,
+    hint: "Two result columns share a name. Give each one a distinct alias with AS.",
+  },
+  {
+    // EMSG_SAME_ALIAS_NODE_RELATIONSHIP "The alias '%s' was specified for both a node and a relationship."
+    id: "same-alias-node-rel",
+    test: /was specified for both a node and a relationship/i,
+    hint: "The same name is used for a node and a relationship. Rename one of them.",
+  },
+  {
+    // EMSG_SAME_ALIAS_MULTIPLE_PATTERNS "Cannot use the same relationship variable '%s' for multiple patterns."
+    id: "same-rel-var-multiple",
+    test: /same relationship variable .+ for multiple patterns/i,
+    hint: "A relationship variable can't be reused across patterns. Give each relationship its own name.",
+  },
+  {
+    // EMSG_UNION_MISMATCHED_RETURNS "All sub queries in a UNION must have the same column names."
+    id: "union-mismatched-returns",
+    test: /All sub queries in a UNION must have the same column names/i,
+    hint: "Every part of a UNION must return the same column names in the same order. Align the RETURN clauses (e.g. matching AS aliases).",
+  },
+  {
+    // EMSG_UNION_COMBINATION "Invalid combination of UNION and UNION ALL."
+    id: "union-combination",
+    test: /Invalid combination of UNION and UNION ALL/i,
+    hint: "Don't mix UNION and UNION ALL in one query — use one or the other throughout.",
+  },
+  {
+    // EMSG_QUERY_INVALID_LAST_CLAUSE "Query cannot conclude with %s (must be a RETURN clause, ...)"
+    id: "query-missing-return",
+    test: /Query cannot conclude with .+ \(must be a RETURN clause/i,
+    hint: "A query must end with RETURN, an update (CREATE/SET/DELETE/…), a procedure CALL, or a non-returning subquery. Add a RETURN.",
+  },
+  {
+    // EMSG_UNEXPECTED_CLAUSE_FOLLOWING_RETURN "Unexpected clause following RETURN"
+    id: "clause-after-return",
+    test: /Unexpected clause following RETURN/i,
+    hint: "Nothing can follow a final RETURN. Move earlier clauses before it, or use WITH instead of RETURN to continue.",
+  },
+  {
+    // EMSG_MISSING_WITH_AFTER_MATCH "A WITH clause is required to introduce a MATCH clause after an OPTIONAL MATCH."
+    id: "missing-with-after-optional-match",
+    test: /A WITH clause is required to introduce a MATCH clause after an OPTIONAL MATCH/i,
+    hint: "Add a WITH clause between an OPTIONAL MATCH and a following MATCH.",
+  },
+  {
+    // EMSG_MISSING_WITH "A WITH clause is required to introduce %s after an updating clause."
+    id: "missing-with-after-update",
+    test: /A WITH clause is required to introduce .+ after an updating clause/i,
+    hint: "After an updating clause (CREATE/MERGE/SET/…), add a WITH before introducing a new MATCH/clause.",
+  },
+  {
+    // EMSG_DELETE_INVALID_ARGUMENTS "DELETE can only be called on nodes, paths and relationships"
+    id: "delete-invalid-target",
+    test: /DELETE can only be called on nodes, paths and relationships/i,
+    hint: "DELETE works on nodes, relationships, or paths — not properties. To clear a property use REMOVE n.prop or SET n.prop = null.",
+  },
+  {
+    // EMSG_SET_LHS_NON_ALIAS "...non-alias references on the left-hand side of SET expressions"
+    id: "set-non-alias-lhs",
+    test: /non-alias references on the left-hand side of SET/i,
+    hint: "The left side of SET must be a bound variable or its property (e.g. n or n.prop), not a chained/expression reference.",
+  },
+  {
+    // EMSG_FOREACH_INVALID_BODY "Only updating clauses may reside in FOREACH"
+    id: "foreach-non-updating",
+    test: /Only updating clauses may reside in FOREACH/i,
+    hint: "FOREACH can only contain updating clauses (CREATE/MERGE/SET/DELETE/REMOVE) — not RETURN/MATCH/WITH.",
+  },
+  {
+    // EMSG_INVALID_PROPERTY_VALUE "Property values can only be of primitive types or arrays of primitive types"
+    id: "invalid-property-value",
+    test: /Property values can only be of primitive types/i,
+    hint: "Property values must be primitives (string/number/boolean) or arrays of primitives — not maps or nodes.",
+  },
+  {
+    // EMSG_CALLSUBQUERY_INVALID_REFERENCES "WITH imports in CALL {} must consist of only simple references to outside variables"
+    id: "call-import-simple-refs",
+    test: /WITH imports in CALL \{\} must consist of only simple references/i,
+    hint: "A CALL {} subquery can only import plain variables via WITH (e.g. WITH x) — not expressions like WITH x + 1.",
+  },
+  {
+    // EMSG_MISSING_PARAMETERS "Missing parameters"
+    id: "missing-parameters",
+    test: /^Missing parameters$/i,
+    hint: "This query uses a $parameter that wasn't provided. Supply the parameter, or inline the value.",
+  },
+  {
+    // EMSG_INTEGER_OVERFLOW "Integer overflow '%s'"
+    id: "integer-overflow",
+    test: /Integer overflow '/i,
+    hint: "This integer is too large for a 64-bit value. Use a smaller number or a float.",
+  },
 ];
+
+/** All catalog ids, in catalog order. Exposed (instead of the mutable CATALOG) so the
+ *  drift-guard completeness test can assert each id is covered. */
+export const CYPHER_ERROR_IDS: string[] = CATALOG.map(entry => entry.id);
 
 /**
  * Returns a short, actionable remediation hint for a recognized FalkorDB Cypher

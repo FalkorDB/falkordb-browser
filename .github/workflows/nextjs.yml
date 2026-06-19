@@ -70,7 +70,10 @@ jobs:
       contents: read
     services:
       falkordb:
-        image: falkordb/falkordb:latest
+        # Pinned to a specific release so PR smoke tests are deterministic: a
+        # server-side error rewording can't break unrelated PRs here. The
+        # drift-canary workflow runs the same tests against :latest to catch drift.
+        image: falkordb/falkordb:v4.18.10
         ports:
           - 6379:6379
     steps:
@@ -85,7 +88,7 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci --no-audit --progress=false
-      - name: Run "Did you mean" smoke tests against FalkorDB
+      - name: Run smoke tests against FalkorDB
         run: npm run test:smoke
         env:
           FALKORDB_SMOKE: "1"

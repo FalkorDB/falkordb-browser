@@ -30,8 +30,9 @@ test(
       assert.fail(`FALKORDB_SMOKE=1 but could not connect to ${URL}: ${(error as Error).message}`);
     }
 
+    const graphName = `smoke_did_you_mean_${Date.now()}`;
     try {
-      const graph = db.selectGraph(`smoke_did_you_mean_${Date.now()}`);
+      const graph = db.selectGraph(graphName);
 
       // Unknown function — both queries fail, so no graph is actually created.
       let fnError = "";
@@ -70,6 +71,7 @@ test(
       assert.equal(varDiag.code, "undefined-variable");
       assert.equal(varDiag.quickFix?.newText, "person");
     } finally {
+      await db.selectGraph(graphName).delete().catch(() => {});
       await db.close().catch(() => {});
     }
   }
