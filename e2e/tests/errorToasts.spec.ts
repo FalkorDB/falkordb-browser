@@ -5,6 +5,7 @@ import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import GraphPage from "../logic/POM/graphPage";
 import urls from "../config/urls.json";
+import { SYNTAX_ERROR_HINT } from "@/lib/cypherErrors";
 
 test.describe("Error Toast Messages", () => {
   let browser: BrowserWrapper;
@@ -138,6 +139,27 @@ test.describe("Error Toast Messages", () => {
     expect(toastTitle5).toBe("Syntax Error");
     expect(toastText5).not.toContain("errMsg:");
     expect(toastText5).toContain("Invalid input");
+  });
+
+  test(`@admin Syntax error toast includes the generic syntax hint`, async () => {
+    graphName = getRandomString("graph");
+    await apiCall.addGraph(graphName);
+
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(graphName);
+
+    await graph.insertQuery("MATCH (n) RETsURN n");
+    await graph.clickRunQuery(false);
+
+    expect(await graph.getNotificationErrorToast()).toBe(true);
+    const toastTitle = await graph.getErrorToastTitle();
+    const toastText = await graph.getErrorToastText();
+
+    // A syntax error shows the parsed message AND the generic remediation hint in the
+    // toast itself (not only on editor hover). Assert against the source-of-truth string.
+    expect(toastTitle).toBe("Syntax Error");
+    expect(toastText).toContain(SYNTAX_ERROR_HINT);
   });
 
   // ---------------------------------------------------------------------------
