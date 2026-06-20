@@ -119,6 +119,12 @@ export default function BrowserSettings() {
         }
     }, [focusParam, expandedSections.queryExecution, setFocus]);
 
+    // Re-arm the guard once the param is consumed/cleared, so a later ?focus=timeout
+    // deep-link works even if the Settings page is still mounted (no remount).
+    useEffect(() => {
+        if (focusParam !== "timeout") focusHandledRef.current = false;
+    }, [focusParam]);
+
     const toggleSection = (section: keyof typeof expandedSections) => {
         setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
     };
