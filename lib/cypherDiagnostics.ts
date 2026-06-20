@@ -116,7 +116,6 @@ function syntaxDiagnostic(query: string, syntax: SyntaxErrorInfo): EditorDiagnos
 
 function tokenDiagnostic(
   query: string,
-  token: string,
   code: string,
   message: string,
   errorMessage: string,
@@ -158,14 +157,14 @@ export function computeEditorDiagnostics(query: string, errorMessage: string): D
   const fnMatch = errorMessage.match(/unknown function '([^']+)'/i);
   if (fnMatch) {
     const located = locateFunctionToken(query, fnMatch[1]);
-    if (located) diagnostics.push(tokenDiagnostic(query, fnMatch[1], "unknown-function", `Unknown function '${fnMatch[1]}'`, errorMessage, located));
+    if (located) diagnostics.push(tokenDiagnostic(query, "unknown-function", `Unknown function '${fnMatch[1]}'`, errorMessage, located));
     return { sourceQuery: query, diagnostics };
   }
 
   const varMatch = errorMessage.match(/'([^']+)' not defined/i);
   if (varMatch) {
     const located = locateVariableToken(query, varMatch[1]);
-    if (located) diagnostics.push(tokenDiagnostic(query, varMatch[1], "undefined-variable", `'${varMatch[1]}' not defined`, errorMessage, located));
+    if (located) diagnostics.push(tokenDiagnostic(query, "undefined-variable", `'${varMatch[1]}' not defined`, errorMessage, located));
     return { sourceQuery: query, diagnostics };
   }
 
