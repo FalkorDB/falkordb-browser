@@ -131,12 +131,14 @@ export function syncRouteUrlParams(pathname: string, state: Record<string, unkno
   setUrlParam(builder(state));
 }
 
-const SETTINGS_KEYS = ["tab"] as const;
+const SETTINGS_KEYS = ["tab", "focus"] as const;
 
 export function useSettingsParams() {
   const { params, setParam } = useUrlParams(SETTINGS_KEYS);
   return {
     tab: params.tab,
     setTab: useCallback((value: string) => setParam("tab", value), [setParam]),
+    focus: params.focus,
+    setFocus: useCallback((value: string) => setParam("focus", value), [setParam]),
   };
 }

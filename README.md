@@ -123,10 +123,13 @@ AI"** button (shown only when a supported OpenAI-compatible model — OpenAI/Gro
 LM Studio — is configured) sends the **query and its error** to your configured provider on an
 explicit click and returns an explanation + a corrected query you can insert into the editor.
 The full server message is always available — expand **"See more"** to read it and use **"Copy"**
-for one-click copy into a bug report. Hints are currently English-only; localization is a
-deliberate follow-up (it pairs with introducing stable structured error codes).
+for one-click copy into a bug report. Where helpful, a hint includes a **"Learn more →"** link to
+the matching FalkorDB docs page, and the query-timeout hint deep-links straight to the **timeout
+field in Settings**. Hints are currently English-only; localization is a deliberate follow-up (it
+pairs with introducing stable structured error codes).
 The logic lives in `lib/cypherSuggestions.ts`, `lib/cypherDiagnostics.ts`, and `lib/aiFix.ts`,
-with the static hint catalog in `lib/cypherErrors.ts` and the clipboard helper in `lib/clipboard.ts`.
+with the static hint catalog (and its optional docs/deep-links) in `lib/cypherErrors.ts` and the
+clipboard helper in `lib/clipboard.ts`.
 
 ### Testing
 

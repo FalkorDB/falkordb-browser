@@ -69,6 +69,14 @@ test.describe("@admin Settings tab URL params", () => {
         expect(await settingsTabs.getCurrentTabText()).toBe("> Browser");
     });
 
+    test("Deep-link ?tab=Browser&focus=timeout opens Query Execution and focuses the timeout field", async () => {
+        const settingsTabs = await browser.createNewPage(SettingsTabsPage, `${urls.settingsUrl}?tab=Browser&focus=timeout`);
+
+        expect(await settingsTabs.getCurrentTabText()).toBe("> Browser");
+        // The (collapsed-by-default) section is expanded and the timeout input receives focus.
+        await expect(settingsTabs.timeoutInput).toBeFocused();
+    });
+
     test("Tab persists after page refresh", async () => {
         const settingsTabs = await browser.createNewPage(SettingsTabsPage, urls.settingsUrl);
 

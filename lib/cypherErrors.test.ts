@@ -5,6 +5,7 @@ import {
   parseSyntaxError,
   SYNTAX_ERROR_HINT,
   CYPHER_ERROR_IDS,
+  HINT_LINKS,
 } from "./cypherErrors.ts";
 import { DRIFT_CASES, NOT_DRIFT_TESTABLE } from "./cypherErrorDriftCases.ts";
 
@@ -203,6 +204,42 @@ describe("drift-case completeness", () => {
       assert.ok(sample, `no frozen sample for drift id ${id}`);
       assert.match(sample, expectedMessage, `drift expectedMessage for ${id} doesn't match its frozen sample`);
       assert.equal(getCypherErrorHint(sample)?.id, id, `catalog doesn't resolve the frozen sample for ${id}`);
+    });
+  });
+});
+
+describe("getCypherErrorHint — hint links", () => {
+  it("attaches an external docs link to a recognized error", () => {
+    const link = getCypherErrorHint("Unknown function 'foo'")?.link;
+    assert.deepEqual(link, {
+      href: "https://docs.falkordb.com/cypher/functions.html",
+      label: "Learn more",
+    });
+  });
+
+  it("attaches an internal Settings deep-link to the timeout error", () => {
+    const link = getCypherErrorHint("Query timed out")?.link;
+    assert.ok(link);
+    assert.equal(link.href, "/settings?tab=Browser&focus=timeout");
+    assert.ok(link.href.startsWith("/"), "timeout link should be an internal path");
+  });
+
+  it("leaves recognized errors without a curated link undefined", () => {
+    assert.equal(getCypherErrorHint("Division by zero")?.link, undefined);
+  });
+
+  it("every HINT_LINKS key is a real catalog id", () => {
+    const stray = Object.keys(HINT_LINKS).filter((id) => !CYPHER_ERROR_IDS.includes(id));
+    assert.deepEqual(stray, [], `HINT_LINKS references unknown catalog ids: ${stray.join(", ")}`);
+  });
+
+  it("links are either an internal path or an https docs URL", () => {
+    Object.entries(HINT_LINKS).forEach(([id, link]) => {
+      assert.ok(link.label.length > 0, `link for ${id} needs a label`);
+      assert.ok(
+        link.href.startsWith("/") || link.href.startsWith("https://"),
+        `link href for ${id} must be an internal path or https URL: ${link.href}`
+      );
     });
   });
 });

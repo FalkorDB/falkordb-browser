@@ -9,7 +9,7 @@ import { twMerge } from "tailwind-merge";
 import React, { RefObject } from "react";
 import type { FalkorDBCanvas, Data as CanvasData } from "@falkordb/canvas";
 import { signOut } from "next-auth/react";
-import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, type SyntaxErrorInfo } from "./cypherErrors";
+import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, type SyntaxErrorInfo, type HintLink } from "./cypherErrors";
 import { suggestForError } from "./cypherSuggestions";
 
 export { parseSyntaxError };
@@ -21,6 +21,7 @@ export type ToastArguments = {
   variant: "destructive" | "default";
   rawMessage?: string;
   hint?: string;
+  hintLink?: HintLink;
 };
 
 export type ToastFn = (args: ToastArguments) => void;
@@ -215,6 +216,7 @@ export type UserFriendlyMessage = {
   description: React.ReactNode;
   rawMessage?: string;
   hint?: string;
+  hintLink?: HintLink;
   syntaxError?: SyntaxErrorInfo;
 };
 
@@ -304,7 +306,7 @@ export async function getSSEGraphResult(
       }
 
       const friendly = toUserFriendlyMessage(message, status, errorContext);
-      toast({ title: friendly.title, description: friendly.description, variant: "destructive", rawMessage: friendly.rawMessage, hint: friendly.hint });
+      toast({ title: friendly.title, description: friendly.description, variant: "destructive", rawMessage: friendly.rawMessage, hint: friendly.hint, hintLink: friendly.hintLink });
 
       if (status === 401 || status >= 500) setIndicator("offline");
 
@@ -457,7 +459,11 @@ export function toUserFriendlyMessage(raw: unknown, status: number, ctx?: { quer
   // Recognized FalkorDB Cypher errors carry an actionable remediation hint.
   // A "Did you mean…?" suggestion (computed from the query + known names) is more
   // specific than the generic catalog tip, so it takes precedence when available.
-  const hint = suggestForError(rawMessage, { query: ctx?.query }) ?? getCypherErrorHint(rawMessage)?.hint;
+  const catalog = getCypherErrorHint(rawMessage);
+  const hint = suggestForError(rawMessage, { query: ctx?.query }) ?? catalog?.hint;
+  // The optional "learn more"/deep-link follows the catalog match even when a
+  // did-you-mean suggestion supplied the hint text.
+  const hintLink = catalog?.link;
 
   // Show the server's own message verbatim when it is already user-readable —
   // either explicitly allowlisted, or recognized by the Cypher hint catalog
@@ -465,44 +471,44 @@ export function toUserFriendlyMessage(raw: unknown, status: number, ctx?: { quer
   // added beside the message rather than replacing it, so the specific names in
   // the server text (variable/function/property) are never lost.
   if (isAllowlistedUserError(rawMessage) || hint) {
-    return { title: "Error", description: rawMessage, hint };
+    return { title: "Error", description: rawMessage, hint, hintLink };
   }
 
   const lower = rawMessage.toLowerCase();
 
   if (lower.includes("connection refused") || lower.includes("econnrefused")) {
-    return { title: "Error", description: "Unable to connect to the database. Please check your connection settings.", rawMessage, hint };
+    return { title: "Error", description: "Unable to connect to the database. Please check your connection settings.", rawMessage, hint, hintLink };
   }
 
   if (lower.includes("noauth") || lower.includes("wrongpass")) {
-    return { title: "Error", description: "Database authentication failed. Please check your credentials.", rawMessage, hint };
+    return { title: "Error", description: "Database authentication failed. Please check your credentials.", rawMessage, hint, hintLink };
   }
 
   if (lower.includes("loading") && lower.includes("dataset")) {
-    return { title: "Error", description: "The database is still loading. Please wait a moment and try again.", rawMessage, hint };
+    return { title: "Error", description: "The database is still loading. Please wait a moment and try again.", rawMessage, hint, hintLink };
   }
 
   if (lower.includes("oom") || lower.includes("out of memory")) {
-    return { title: "Error", description: "The server is running low on memory. Please try again later.", rawMessage, hint };
+    return { title: "Error", description: "The server is running low on memory. Please try again later.", rawMessage, hint, hintLink };
   }
 
   if (lower.includes("timeout") || lower.includes("timed out")) {
-    return { title: "Error", description: "The request timed out. Please try a simpler query or try again later.", rawMessage, hint };
+    return { title: "Error", description: "The request timed out. Please try a simpler query or try again later.", rawMessage, hint, hintLink };
   }
 
   if (lower.includes("readonly") && lower.includes("replica")) {
-    return { title: "Error", description: "This operation cannot be performed on a read-only replica.", rawMessage, hint };
+    return { title: "Error", description: "This operation cannot be performed on a read-only replica.", rawMessage, hint, hintLink };
   }
 
   if (status === 401) {
-    return { title: "Error", description: "Your session has expired. Please sign in again.", rawMessage, hint };
+    return { title: "Error", description: "Your session has expired. Please sign in again.", rawMessage, hint, hintLink };
   }
 
   if (status >= 500) {
-    return { title: "Error", description: "Something went wrong on the server. Please try again later.", rawMessage, hint };
+    return { title: "Error", description: "Something went wrong on the server. Please try again later.", rawMessage, hint, hintLink };
   }
 
-  return { title: "Error", description: "An unexpected error occurred. Please try again.", rawMessage, hint };
+  return { title: "Error", description: "An unexpected error occurred. Please try again.", rawMessage, hint, hintLink };
 }
 
 // Guards against triggering multiple concurrent signOut calls when many
@@ -578,6 +584,7 @@ export async function securedFetch(
       variant: "destructive",
       rawMessage: friendly.rawMessage,
       hint: friendly.hint,
+      hintLink: friendly.hintLink,
     });
 
     if (status === 401 || status >= 500) {

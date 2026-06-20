@@ -301,6 +301,12 @@ test.describe("Error Toast Messages", () => {
     // Raw message verbatim, plus a concrete fix suggestion.
     expect(toastText).toContain("Unknown function");
     expect(toastText).toContain("Did you mean length()");
+
+    // The recognized error also attaches a "Learn more" docs link — even though the hint
+    // text came from the did-you-mean suggestion. It opens the FalkorDB function docs.
+    const hintLink = graph.errorToast.getByTestId("toast-hint-link");
+    await expect(hintLink).toHaveAttribute("href", /cypher\/functions\.html/);
+    await expect(hintLink).toHaveAttribute("target", "_blank");
   });
 
   test(`@admin Unaliased WITH projection shows the specific message and a hint`, async () => {

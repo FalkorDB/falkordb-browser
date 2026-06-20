@@ -18,12 +18,24 @@
 // This module is intentionally free of React/Next/DOM imports so it stays pure and
 // can be unit-tested directly with `node --test`.
 
+export type HintLink = {
+  /** URL — an external docs page, or an internal app path (starts with "/"). */
+  href: string;
+  /** Visible link text, e.g. "Learn more". */
+  label: string;
+};
+
 export type CypherErrorHint = {
   /** Stable identifier for the recognized error (useful for tests/telemetry). */
   id: string;
   /** Short, actionable remediation tip. */
   hint: string;
+  /** Optional "learn more" / deep-link shown beside the hint. */
+  link?: HintLink;
 };
+
+// Base URL for the FalkorDB documentation (each linked entry points at a verified page).
+const DOCS = "https://docs.falkordb.com";
 
 export type SyntaxErrorInfo = {
   message: string;
@@ -274,10 +286,32 @@ export const CYPHER_ERROR_IDS: string[] = CATALOG.map(entry => entry.id);
  * The raw message is never modified or echoed into the hint — callers should keep
  * showing the original server text and use this only to add guidance beside it.
  */
+// Optional "learn more" / deep-link per recognized error. Only ids with a verified
+// destination appear here (FalkorDB docs pages confirmed reachable; the timeout entry
+// deep-links to the in-app Settings timeout field). Adding a new link is a one-liner.
+export const HINT_LINKS: Record<string, HintLink> = {
+  "unknown-function": { href: `${DOCS}/cypher/functions.html`, label: "Learn more" },
+  "with-missing-alias": { href: `${DOCS}/cypher/with.html`, label: "Learn more" },
+  "missing-with-after-optional-match": { href: `${DOCS}/cypher/with.html`, label: "Learn more" },
+  "missing-with-after-update": { href: `${DOCS}/cypher/with.html`, label: "Learn more" },
+  "return-star-no-vars": { href: `${DOCS}/cypher/return.html`, label: "Learn more" },
+  "query-missing-return": { href: `${DOCS}/cypher/return.html`, label: "Learn more" },
+  "clause-after-return": { href: `${DOCS}/cypher/return.html`, label: "Learn more" },
+  "create-directed-relationship": { href: `${DOCS}/cypher/create.html`, label: "Learn more" },
+  "create-one-rel-type": { href: `${DOCS}/cypher/create.html`, label: "Learn more" },
+  "union-mismatched-returns": { href: `${DOCS}/cypher/union.html`, label: "Learn more" },
+  "union-combination": { href: `${DOCS}/cypher/union.html`, label: "Learn more" },
+  "delete-invalid-target": { href: `${DOCS}/cypher/delete.html`, label: "Learn more" },
+  "set-non-alias-lhs": { href: `${DOCS}/cypher/set.html`, label: "Learn more" },
+  "foreach-non-updating": { href: `${DOCS}/cypher/foreach.html`, label: "Learn more" },
+  "mem-consumption": { href: `${DOCS}/configuration.html`, label: "Learn more" },
+  "query-timed-out": { href: "/settings?tab=Browser&focus=timeout", label: "Open timeout settings" },
+};
+
 export function getCypherErrorHint(raw: string): CypherErrorHint | undefined {
   if (!raw) return undefined;
   const entry = CATALOG.find(({ test }) => test.test(raw));
-  return entry ? { id: entry.id, hint: entry.hint } : undefined;
+  return entry ? { id: entry.id, hint: entry.hint, link: HINT_LINKS[entry.id] } : undefined;
 }
 
 // Generic hint for Cypher syntax/parse errors. These carry a position (so they are

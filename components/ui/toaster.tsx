@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useId, useRef, useState } from "react";
+import Link from "next/link";
 import ToastButton from "@/app/components/ToastButton";
 import { copyText } from "@/lib/clipboard";
 import {
@@ -94,11 +95,11 @@ function ToastItemDetails({ rawMessage }: { rawMessage: string }) {
 }
 
 export function Toaster() {
-  const { toasts } = useToast()
+  const { toasts, dismiss } = useToast()
 
   return (
     <ToastProvider>
-      {toasts.map(function ({ id, title, description, action, variant, rawMessage, hint, ...props }) {
+      {toasts.map(function ({ id, title, description, action, variant, rawMessage, hint, hintLink, ...props }) {
         return (
           <Toast data-testid={variant === "destructive" ? "toast-destructive" : "toast"} variant={variant} key={id} {...props}>
             <div className="grid gap-1">
@@ -110,6 +111,29 @@ export function Toaster() {
                     <p className="mt-1 text-xs opacity-90" data-testid="toast-hint">
                       💡 {hint}
                     </p>
+                  )}
+                  {hintLink && (
+                    hintLink.href.startsWith("/") ? (
+                      <Link
+                        href={hintLink.href}
+                        onClick={() => dismiss(id)}
+                        data-testid="toast-hint-link"
+                        className="mt-1 inline-block text-xs underline text-primary hover:opacity-80"
+                      >
+                        {hintLink.label} →
+                      </Link>
+                    ) : (
+                      <a
+                        href={hintLink.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`${hintLink.label} (opens in a new tab)`}
+                        data-testid="toast-hint-link"
+                        className="mt-1 inline-block text-xs underline text-primary hover:opacity-80"
+                      >
+                        {hintLink.label} →
+                      </a>
+                    )
                   )}
                   {rawMessage && <ToastItemDetails rawMessage={rawMessage} />}
                 </ToastDescription>
