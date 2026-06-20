@@ -22,7 +22,10 @@ const OVER_LIMIT = Symbol("over-limit");
 async function readBodyWithLimit(request: NextRequest, maxBytes: number): Promise<string | typeof OVER_LIMIT> {
     const reader = request.body?.getReader();
     if (!reader) return "";
-    const chunks: Uint8Array[] = [];
+    // Decode incrementally with TextDecoder (Web-runtime compatible — no Node Buffer);
+    // { stream: true } correctly handles multi-byte UTF-8 sequences split across chunks.
+    const decoder = new TextDecoder();
+    let text = "";
     let received = 0;
     try {
         for (;;) {
@@ -35,13 +38,14 @@ async function readBodyWithLimit(request: NextRequest, maxBytes: number): Promis
                     await reader.cancel();
                     return OVER_LIMIT;
                 }
-                chunks.push(value);
+                text += decoder.decode(value, { stream: true });
             }
         }
     } finally {
         reader.releaseLock();
     }
-    return Buffer.concat(chunks).toString("utf8");
+    text += decoder.decode(); // flush any trailing partial sequence
+    return text;
 }
 
 // eslint-disable-next-line import/prefer-default-export

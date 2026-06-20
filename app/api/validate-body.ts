@@ -216,12 +216,10 @@ export const fixRequest = z.object({
     .min(1, "Error message cannot be empty")
     .max(4096, "Error message is too long"),
   graphName: z
-    .string({
-      error: (issue) => issue.input === undefined ? "Graph name is required" : "Invalid Graph name",
-    })
+    .string({ error: "Invalid Graph name" })
     .trim()
-    .min(1, "Graph name cannot be empty")
-    .max(255, "Graph name is too long"),
+    .max(255, "Graph name is too long")
+    .optional(),
   hint: z
     .string()
     .max(1024, "Hint is too long")
