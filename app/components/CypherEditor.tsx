@@ -289,6 +289,12 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                 decorationsRef.current = null;
             }
         };
+        // `blur` is an intentional dependency: it isn't read by name here, but it flips the
+        // editor's displayed value (newlines→spaces, see the textarea `value` below), which
+        // changes `model.getValue()` that markersFor()/the decoration guard compare against
+        // `diagnostics.sourceQuery`. Re-running on blur keeps markers correct (cleared on the
+        // collapsed single-line view, re-applied when focused) — removing it brings back the
+        // multi-line blur marker bug.
     }, [diagnostics, maximize, editorMountVersion, blur]);
 
     // Clear diagnostics when the user modifies the query

@@ -5,6 +5,7 @@ import type {
   ToastActionElement,
   ToastProps,
 } from "@/components/ui/toast"
+import type { HintLink } from "@/lib/cypherErrors"
 
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000000
@@ -16,7 +17,7 @@ type ToasterToast = ToastProps & {
   action?: ToastActionElement
   rawMessage?: string
   hint?: string
-  hintLink?: { href: string; label: string }
+  hintLink?: HintLink
 }
 
 const actionTypes = {
