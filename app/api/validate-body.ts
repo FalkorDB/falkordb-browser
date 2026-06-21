@@ -198,6 +198,25 @@ export const chatRequest = z.object({
     .string()
     .optional()
     .default(""),
+  // Caller-supplied UDF catalog (from the already-discovered, capability-gated UDFContext). Bounded
+  // to keep an untrusted client payload from inflating the prompt.
+  udfs: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(128),
+        functions: z
+          .array(
+            z.object({
+              name: z.string().min(1).max(128),
+              signatureHint: z.string().max(256).optional(),
+              description: z.string().max(512).optional(),
+            }),
+          )
+          .max(256),
+      }),
+    )
+    .max(64)
+    .optional(),
 });
 
 // Auth schemas

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { TextToCypher } from "@falkordb/text-to-cypher";
 import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { normalizeLocalEndpoint, type LocalProvider } from "@/lib/local-llm-utils";
+import { UDF_VERSION_THRESHOLD } from "@/app/utils";
+import { GET as getDBVersion } from "@/app/api/DBVersion/route";
 import { getClient } from "../auth/[...nextauth]/options";
 import { chatRequest, validateBody } from "../validate-body";
 import { buildFalkorDBConnection, getCorsHeaders } from "../utils";
@@ -124,7 +126,7 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    const { messages, graphName, key, model, cypherOnly, modelSource, localProvider, localEndpoint } = validation.data;
+    const { messages, graphName, key, model, cypherOnly, modelSource, localProvider, localEndpoint, udfs } = validation.data;
 
     try {
         // Fail fast on model/API key provider mismatch before making any external calls
@@ -145,11 +147,27 @@ export async function POST(request: NextRequest) {
             ? normalizeLocalEndpoint(localProvider, localEndpoint)
             : undefined;
 
+        // Only honor caller-supplied UDFs when the connected graph module actually supports them.
+        // The client already gates on UDFContext, but the route must not trust a stale/tampered flag.
+        let safeUdfs = udfs && udfs.length > 0 ? udfs : undefined;
+        if (safeUdfs) {
+            try {
+                const versionRes = await getDBVersion(request);
+                const [moduleName, version] = versionRes.ok ? (await versionRes.json()).result : ["", 0];
+                if (moduleName !== "graph" || version < UDF_VERSION_THRESHOLD) {
+                    safeUdfs = undefined;
+                }
+            } catch {
+                safeUdfs = undefined;
+            }
+        }
+
         // Create TextToCypher client
         const textToCypher = new TextToCypher({
             falkordbConnection,
             model,
             apiKey: modelSource === "local" ? localProvider : key,
+            udfs: safeUdfs,
         });
 
         // Get the last user message

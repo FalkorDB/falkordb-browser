@@ -10,7 +10,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
-import { GraphContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext } from "../components/provider";
+import { GraphContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, UDFContext } from "../components/provider";
 import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import ToastButton from "../components/ToastButton";
 import { ShineBorder } from "@/components/ui/shine-border";
@@ -66,6 +66,7 @@ export default function Chat({ onClose }: Props) {
     const { setIndicator } = useContext(IndicatorContext);
     const { runQuery, graphName } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
+    const { udfList } = useContext(UDFContext);
     const { settings: { chatSettings: { secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
     // Cypher Only toggle state, persisted per graph
     const [cypherOnly, setCypherOnly] = useState(false);
@@ -274,6 +275,14 @@ export default function Chat({ onClose }: Props) {
                     modelSource: chatModelSource,
                     localProvider: localLlmProvider,
                     localEndpoint: localLlmEndpoint,
+                    // Surface the instance's user-defined functions (already discovered + capability-gated
+                    // into UDFContext) so generated Cypher can call them. Omitted when there are none.
+                    udfs: udfList.length > 0
+                        ? udfList.map(([, libraryName, , functions]) => ({
+                            name: libraryName,
+                            functions: functions.map((functionName) => ({ name: functionName })),
+                        }))
+                        : undefined,
                 })
             });
 
