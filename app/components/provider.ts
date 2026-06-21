@@ -87,6 +87,8 @@ type BrowserSettingsContextType = {
     timeoutSettings: {
       timeout: number;
       setTimeout: Dispatch<SetStateAction<number>>;
+      /** Server TIMEOUT_MAX in seconds; 0 means no server limit. */
+      timeoutMax: number;
     };
     runDefaultQuerySettings: {
       runDefaultQuery: boolean;
@@ -321,7 +323,7 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         lastLimit: 0,
         setLastLimit: () => { },
       },
-      timeoutSettings: { timeout: 0, setTimeout: () => { } },
+      timeoutSettings: { timeout: 0, setTimeout: () => { }, timeoutMax: 0 },
       runDefaultQuerySettings: {
         runDefaultQuery: false,
         setRunDefaultQuery: () => { },

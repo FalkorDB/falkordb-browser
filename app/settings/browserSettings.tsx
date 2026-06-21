@@ -47,7 +47,7 @@ export default function BrowserSettings() {
             contentPersistenceSettings: { contentPersistence },
             runDefaultQuerySettings: { runDefaultQuery },
             defaultQuerySettings: { defaultQuery, setDefaultQuery },
-            timeoutSettings: { timeout: timeoutValue },
+            timeoutSettings: { timeout: timeoutValue, timeoutMax },
             limitSettings: { limit },
             captionsKeysSettings: { captionsKeys },
             showPropertyKeyPrefixSettings: { showPropertyKeyPrefix },
@@ -346,7 +346,9 @@ export default function BrowserSettings() {
 
         if (value < 0 || Number.isNaN(value)) return;
 
-        createChangeHandler(setter)(value, elementId);
+        // Cap timeout against server TIMEOUT_MAX when this is the timeout input
+        const capped = (elementId === 'timeoutInput' && timeoutMax > 0) ? Math.min(value, timeoutMax) : value;
+        createChangeHandler(setter)(capped, elementId);
     };
 
     const handleModelChange = (modelValue: string) => {

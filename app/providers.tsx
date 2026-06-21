@@ -201,6 +201,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [contentPersistence, setContentPersistence] = useState(false);
   const [defaultQuery, setDefaultQuery] = useState("");
   const [timeout, setTimeout] = useState(0);
+  /** Server TIMEOUT_MAX in seconds; 0 means no server limit. Loaded once at init. */
+  const [timeoutMax, setTimeoutMax] = useState(0);
   const [limit, setLimit] = useState(0);
   const [lastLimit, setLastLimit] = useState(0);
   const [newLimit, setNewLimit] = useState(0);
@@ -294,7 +296,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     },
     settings: {
       limitSettings: { limit, setLimit, lastLimit, setLastLimit },
-      timeoutSettings: { timeout, setTimeout },
+      timeoutSettings: { timeout, setTimeout, timeoutMax },
       runDefaultQuerySettings: { runDefaultQuery, setRunDefaultQuery },
       defaultQuerySettings: { defaultQuery, setDefaultQuery },
       contentPersistenceSettings: { contentPersistence, setContentPersistence },
@@ -312,7 +314,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       // Save settings to local storage
       localStorage.setItem("runDefaultQuery", newRunDefaultQuery.toString());
       localStorage.setItem("contentPersistence", newContentPersistence.toString());
-      localStorage.setItem("timeout", newTimeout.toString());
+      const clampedTimeout = timeoutMax > 0 ? Math.min(newTimeout, timeoutMax) : newTimeout;
+      localStorage.setItem("timeout", clampedTimeout.toString());
       localStorage.setItem("defaultQuery", newDefaultQuery);
       localStorage.setItem("limit", newLimit.toString());
       localStorage.setItem("refreshInterval", newRefreshInterval.toString());
@@ -329,7 +332,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setContentPersistence(newContentPersistence);
       setRunDefaultQuery(newRunDefaultQuery);
       setDefaultQuery(newDefaultQuery);
-      setTimeout(newTimeout);
+      setTimeout(clampedTimeout);
       setLimit(newLimit);
       setLastLimit(limit);
       setRefreshInterval(newRefreshInterval);
@@ -368,7 +371,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setNewContentPersistence(contentPersistence);
       setNewRunDefaultQuery(runDefaultQuery);
       setNewDefaultQuery(defaultQuery);
-      setNewTimeout(timeout);
+      setNewTimeout(timeoutMax > 0 ? Math.min(timeout, timeoutMax) : timeout);
       setNewLimit(limit);
       setNewSecretKey(secretKey);
       setNewRefreshInterval(refreshInterval);
@@ -904,48 +907,32 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         console.error("Failed to parse captions keys from localStorage", error);
         setCaptionsKeys([['name', false], ['title', false]]);
       }
-      const storedTimeout = localStorage.getItem("timeout");
-      let timeoutVal: number;
-      if (storedTimeout) {
-        const parsedStoredTimeout = parseInt(storedTimeout, 10);
-        timeoutVal = Number.isFinite(parsedStoredTimeout) && parsedStoredTimeout >= 0
-          ? parsedStoredTimeout
-          : 60;
-      } else {
-        // No user-set value: cap the default (60s) with TIMEOUT_MAX from server config.
-        // The timeout query param is in seconds (the API multiplies by 1000), so TIMEOUT_MAX (ms) is converted to seconds below.
-        let fallback = 60;
-        try {
-          const configRes = await fetch("/api/graph/config", { method: "GET" });
-          if (configRes.ok) {
-            const { configs } = await configRes.json();
-            const typedConfigs: [string, string | number][] = Array.isArray(configs)
-              ? configs.filter((entry: unknown): entry is [string, string | number] => {
-                return (
-                  Array.isArray(entry)
-                  && entry.length >= 2
-                  && typeof entry[0] === "string"
-                  && (typeof entry[1] === "string" || typeof entry[1] === "number")
-                );
-              })
-              : [];
-            const timeoutMaxEntry = typedConfigs.find((c) => c[0] === "TIMEOUT_MAX");
-            if (timeoutMaxEntry) {
-              const timeoutMaxMs = Number(timeoutMaxEntry[1]);
-              if (timeoutMaxMs > 0) {
-                const timeoutMaxSeconds = Math.floor(timeoutMaxMs / 1000);
-                if (fallback > timeoutMaxSeconds) {
-                  fallback = timeoutMaxSeconds;
-                }
-              }
+      // Load TIMEOUT_MAX once from server config, then derive the effective timeout.
+      // timeoutMax=0 means no server limit. The query param is in seconds; TIMEOUT_MAX is ms.
+      let resolvedTimeoutMax = 0;
+      try {
+        const configRes = await fetch("/api/graph/config", { method: "GET" });
+        if (configRes.ok) {
+          const { configs } = await configRes.json();
+          if (Array.isArray(configs)) {
+            const entry = (configs as [string, string | number][]).find((c) => c[0] === "TIMEOUT_MAX");
+            if (entry) {
+              const ms = Number(entry[1]);
+              if (ms > 0) resolvedTimeoutMax = Math.floor(ms / 1000);
             }
           }
-        } catch (error) {
-          // If config fetch fails, use the default as-is
-          console.warn("Failed to fetch /api/graph/config for timeout initialization", error);
         }
-        timeoutVal = fallback;
+      } catch (error) {
+        console.warn("Failed to fetch /api/graph/config for timeout initialization", error);
       }
+      setTimeoutMax(resolvedTimeoutMax);
+
+      const storedTimeout = localStorage.getItem("timeout");
+      const parsedStoredTimeout = storedTimeout !== null ? parseInt(storedTimeout, 10) : null;
+      let timeoutVal = parsedStoredTimeout !== null && Number.isFinite(parsedStoredTimeout) && parsedStoredTimeout >= 0
+        ? parsedStoredTimeout
+        : 60;
+      if (resolvedTimeoutMax > 0) timeoutVal = Math.min(timeoutVal, resolvedTimeoutMax);
       setTimeout(timeoutVal);
       const l = parseInt(localStorage.getItem("limit") || "300", 10);
       setLimit(l);

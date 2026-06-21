@@ -719,6 +719,43 @@ export default class SettingsBrowserPage extends BasePage {
     return nonMatchingModel || null;
   }
 
+  // ===== Query Execution Section =====
+
+  private get queryExecutionSectionHeader(): Locator {
+    return this.page.locator('[data-testid="queryExecutionSectionHeader"]');
+  }
+
+  private get timeoutInput(): Locator {
+    return this.page.locator('#timeoutInput');
+  }
+
+  async expandQueryExecutionSection(): Promise<void> {
+    const isExpanded = await this.queryExecutionSectionHeader.getAttribute('aria-expanded');
+    if (isExpanded !== 'true') {
+      await this.queryExecutionSectionHeader.click();
+      await this.timeoutInput.waitFor({ state: 'visible', timeout: 5000 });
+    }
+  }
+
+  async getTimeoutInputValue(): Promise<string> {
+    return interactWhenVisible(
+      this.timeoutInput,
+      (el) => el.inputValue(),
+      "Timeout Input Value"
+    );
+  }
+
+  async fillTimeoutInput(seconds: number | '∞'): Promise<void> {
+    await interactWhenVisible(
+      this.timeoutInput,
+      async (el) => {
+        await el.clear();
+        await el.fill(seconds === '∞' ? '∞' : `${seconds} seconds`);
+      },
+      "Timeout Input"
+    );
+  }
+
   // ===== Graph Info Section =====
 
   private get graphInfoSectionHeader(): Locator {

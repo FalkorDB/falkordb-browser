@@ -826,4 +826,83 @@ test.describe('@browser Browser Settings tests', () => {
         expect(await settingsBrowserPage.getLocalLlmEndpointValue()).toBe(customEndpoint);
     });
 
+    // ===== TIMEOUT_MAX capping =====
+
+    test('@readwrite Verify default timeout is capped by TIMEOUT_MAX when no stored value', async () => {
+        // Create page without navigating so we can set up the route mock first
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage);
+        const page = await browser.getPage();
+
+        // Mock config: TIMEOUT_MAX = 30 seconds (30 000 ms)
+        await page.route("**/api/graph/config", (route) => {
+            route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({ configs: [["TIMEOUT_MAX", 30000]] }),
+            });
+        });
+
+        // Clear any stored timeout so the default (60s) is used before capping
+        await page.addInitScript(() => localStorage.removeItem("timeout"));
+
+        // Navigate with mock already active
+        await page.goto(urls.settingsUrl);
+        await settingsBrowserPage.waitForTimeout(1500);
+
+        await settingsBrowserPage.expandQueryExecutionSection();
+
+        const displayedTimeout = await settingsBrowserPage.getTimeoutInputValue();
+        expect(displayedTimeout).toBe("30 seconds");
+    });
+
+    test('@readwrite Verify stored timeout higher than TIMEOUT_MAX is capped on load', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage);
+        const page = await browser.getPage();
+
+        // Mock config: TIMEOUT_MAX = 45 seconds (45 000 ms)
+        await page.route("**/api/graph/config", (route) => {
+            route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({ configs: [["TIMEOUT_MAX", 45000]] }),
+            });
+        });
+
+        // Pre-seed localStorage with a stored timeout of 90s (exceeds TIMEOUT_MAX)
+        await page.addInitScript(() => localStorage.setItem("timeout", "90"));
+
+        await page.goto(urls.settingsUrl);
+        await settingsBrowserPage.waitForTimeout(1500);
+
+        await settingsBrowserPage.expandQueryExecutionSection();
+
+        const displayedTimeout = await settingsBrowserPage.getTimeoutInputValue();
+        expect(displayedTimeout).toBe("45 seconds");
+    });
+
+    test('@readwrite Verify timeout is not capped when TIMEOUT_MAX is 0 (unlimited)', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage);
+        const page = await browser.getPage();
+
+        // Mock config: TIMEOUT_MAX = 0 (no server limit)
+        await page.route("**/api/graph/config", (route) => {
+            route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({ configs: [["TIMEOUT_MAX", 0]] }),
+            });
+        });
+
+        // Clear stored timeout to test default 60s is kept when TIMEOUT_MAX=0
+        await page.addInitScript(() => localStorage.removeItem("timeout"));
+
+        await page.goto(urls.settingsUrl);
+        await settingsBrowserPage.waitForTimeout(1500);
+
+        await settingsBrowserPage.expandQueryExecutionSection();
+
+        const displayedTimeout = await settingsBrowserPage.getTimeoutInputValue();
+        expect(displayedTimeout).toBe("60 seconds");
+    });
+
 });
