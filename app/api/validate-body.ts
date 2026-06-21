@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { UDF_CHAT_MAX_LIBRARIES, UDF_CHAT_MAX_FUNCTIONS_PER_LIBRARY, UDF_CHAT_MAX_NAME_LENGTH } from "@/app/utils";
 
 export const createUser = z.object({
   username: z
@@ -199,23 +200,24 @@ export const chatRequest = z.object({
     .optional()
     .default(""),
   // Caller-supplied UDF catalog (from the already-discovered, capability-gated UDFContext). Bounded
-  // to keep an untrusted client payload from inflating the prompt.
+  // to keep an untrusted client payload from inflating the prompt; the client clamps to the same
+  // limits (see app/utils.ts) so a large catalog degrades instead of being rejected.
   udfs: z
     .array(
       z.object({
-        name: z.string().min(1).max(128),
+        name: z.string().min(1).max(UDF_CHAT_MAX_NAME_LENGTH),
         functions: z
           .array(
             z.object({
-              name: z.string().min(1).max(128),
+              name: z.string().min(1).max(UDF_CHAT_MAX_NAME_LENGTH),
               signatureHint: z.string().max(256).optional(),
               description: z.string().max(512).optional(),
             }),
           )
-          .max(256),
+          .max(UDF_CHAT_MAX_FUNCTIONS_PER_LIBRARY),
       }),
     )
-    .max(64)
+    .max(UDF_CHAT_MAX_LIBRARIES)
     .optional(),
 });
 

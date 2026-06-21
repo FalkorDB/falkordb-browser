@@ -1,4 +1,5 @@
 import { cn, getTheme, Message, getActiveConnectionIdGlobal, toUserFriendlyMessage } from "@/lib/utils";
+import { UDF_CHAT_MAX_LIBRARIES, UDF_CHAT_MAX_FUNCTIONS_PER_LIBRARY, UDF_CHAT_MAX_NAME_LENGTH } from "@/app/utils";
 import { memo, useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
@@ -276,12 +277,19 @@ export default function Chat({ onClose }: Props) {
                     localProvider: localLlmProvider,
                     localEndpoint: localLlmEndpoint,
                     // Surface the instance's user-defined functions (already discovered + capability-gated
-                    // into UDFContext) so generated Cypher can call them. Omitted when there are none.
+                    // into UDFContext) so generated Cypher can call them. Omitted when there are none, and
+                    // clamped to the API bounds so a large catalog degrades instead of being rejected.
                     udfs: udfList.length > 0
-                        ? udfList.map(([, libraryName, , functions]) => ({
-                            name: libraryName,
-                            functions: functions.map((functionName) => ({ name: functionName })),
-                        }))
+                        ? udfList
+                            .filter(([, libraryName]) => libraryName && libraryName.length <= UDF_CHAT_MAX_NAME_LENGTH)
+                            .slice(0, UDF_CHAT_MAX_LIBRARIES)
+                            .map(([, libraryName, , functions]) => ({
+                                name: libraryName,
+                                functions: functions
+                                    .filter((functionName) => functionName && functionName.length <= UDF_CHAT_MAX_NAME_LENGTH)
+                                    .slice(0, UDF_CHAT_MAX_FUNCTIONS_PER_LIBRARY)
+                                    .map((functionName) => ({ name: functionName })),
+                            }))
                         : undefined,
                 })
             });

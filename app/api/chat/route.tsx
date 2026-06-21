@@ -3,7 +3,6 @@ import { TextToCypher } from "@falkordb/text-to-cypher";
 import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { normalizeLocalEndpoint, type LocalProvider } from "@/lib/local-llm-utils";
 import { UDF_VERSION_THRESHOLD } from "@/app/utils";
-import { GET as getDBVersion } from "@/app/api/DBVersion/route";
 import { getClient } from "../auth/[...nextauth]/options";
 import { chatRequest, validateBody } from "../validate-body";
 import { buildFalkorDBConnection, getCorsHeaders } from "../utils";
@@ -149,12 +148,13 @@ export async function POST(request: NextRequest) {
 
         // Only honor caller-supplied UDFs when the connected graph module actually supports them.
         // The client already gates on UDFContext, but the route must not trust a stale/tampered flag.
+        // Reuse the already-authenticated session connection (no extra getClient / connection re-resolve).
         let safeUdfs = udfs && udfs.length > 0 ? udfs : undefined;
         if (safeUdfs) {
             try {
-                const versionRes = await getDBVersion(request);
-                const [moduleName, version] = versionRes.ok ? (await versionRes.json()).result : ["", 0];
-                if (moduleName !== "graph" || version < UDF_VERSION_THRESHOLD) {
+                const modules = await (await session.client.connection).moduleList();
+                const graphModule = modules.find((module) => module.name === "graph");
+                if (!graphModule || (graphModule.ver ?? 0) < UDF_VERSION_THRESHOLD) {
                     safeUdfs = undefined;
                 }
             } catch {
