@@ -471,7 +471,7 @@ export function toUserFriendlyMessage(raw: unknown, status: number, ctx?: { quer
   // added beside the message rather than replacing it, so the specific names in
   // the server text (variable/function/property) are never lost.
   if (isAllowlistedUserError(rawMessage) || hint) {
-    return { title: "Error", description: rawMessage, hint, hintLink };
+    return { title: "Error", description: rawMessage, rawMessage, hint, hintLink };
   }
 
   const lower = rawMessage.toLowerCase();

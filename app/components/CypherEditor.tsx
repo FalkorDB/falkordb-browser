@@ -299,9 +299,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
     // Clear diagnostics when the user modifies the query
     useEffect(() => {
-        if (diagnostics) {
-            setDiagnostics(null);
-        }
+        setDiagnostics(null);
     }, [historyQuery.query]);
 
     // Dispose the code-action provider on unmount.
