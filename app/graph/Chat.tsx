@@ -267,7 +267,6 @@ export default function Chat({ onClose }: Props) {
             // catalog degrades to a bounded subset, and drop empty libraries.
             const udfsPayload = udfList
                 .filter(([, libraryName]) => libraryName && libraryName.length <= UDF_CHAT_MAX_NAME_LENGTH)
-                .slice(0, UDF_CHAT_MAX_LIBRARIES)
                 .map(([, libraryName, , functions]) => ({
                     name: libraryName,
                     functions: functions
@@ -275,7 +274,8 @@ export default function Chat({ onClose }: Props) {
                         .slice(0, UDF_CHAT_MAX_FUNCTIONS_PER_LIBRARY)
                         .map((functionName) => ({ name: functionName })),
                 }))
-                .filter((library) => library.functions.length > 0);
+                .filter((library) => library.functions.length > 0)
+                .slice(0, UDF_CHAT_MAX_LIBRARIES);
 
             const response = await fetch("/api/chat", {
                 method: "POST",
