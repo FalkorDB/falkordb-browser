@@ -261,6 +261,22 @@ export default function Chat({ onClose }: Props) {
             const connectionId = getActiveConnectionIdGlobal();
             if (connectionId) chatHeaders.set("X-Connection-Id", connectionId);
 
+            // Surface the instance's user-defined functions (already discovered + capability-gated into
+            // UDFContext) so generated Cypher can call them. UDFEntry is [key, libraryName, key, functions]
+            // (FalkorDB GRAPH.UDF LIST shape; see app/udf/udfPanel.tsx). Clamp to the API bounds so a large
+            // catalog degrades to a bounded subset, and drop empty libraries.
+            const udfsPayload = udfList
+                .filter(([, libraryName]) => libraryName && libraryName.length <= UDF_CHAT_MAX_NAME_LENGTH)
+                .slice(0, UDF_CHAT_MAX_LIBRARIES)
+                .map(([, libraryName, , functions]) => ({
+                    name: libraryName,
+                    functions: functions
+                        .filter((functionName) => functionName && functionName.length <= UDF_CHAT_MAX_NAME_LENGTH)
+                        .slice(0, UDF_CHAT_MAX_FUNCTIONS_PER_LIBRARY)
+                        .map((functionName) => ({ name: functionName })),
+                }))
+                .filter((library) => library.functions.length > 0);
+
             const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: chatHeaders,
@@ -276,21 +292,8 @@ export default function Chat({ onClose }: Props) {
                     modelSource: chatModelSource,
                     localProvider: localLlmProvider,
                     localEndpoint: localLlmEndpoint,
-                    // Surface the instance's user-defined functions (already discovered + capability-gated
-                    // into UDFContext) so generated Cypher can call them. Omitted when there are none, and
-                    // clamped to the API bounds so a large catalog degrades instead of being rejected.
-                    udfs: udfList.length > 0
-                        ? udfList
-                            .filter(([, libraryName]) => libraryName && libraryName.length <= UDF_CHAT_MAX_NAME_LENGTH)
-                            .slice(0, UDF_CHAT_MAX_LIBRARIES)
-                            .map(([, libraryName, , functions]) => ({
-                                name: libraryName,
-                                functions: functions
-                                    .filter((functionName) => functionName && functionName.length <= UDF_CHAT_MAX_NAME_LENGTH)
-                                    .slice(0, UDF_CHAT_MAX_FUNCTIONS_PER_LIBRARY)
-                                    .map((functionName) => ({ name: functionName })),
-                            }))
-                        : undefined,
+                    // Omitted when the (filtered) catalog is empty.
+                    udfs: udfsPayload.length > 0 ? udfsPayload : undefined,
                 })
             });
 
