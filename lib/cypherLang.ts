@@ -120,6 +120,19 @@ export const BUILTIN_FUNCTIONS = [
   "vecf32",
   "vec.euclideanDistance",
   "vec.cosineDistance",
+  // Built-in FalkorDB procedures (available via CALL)
+  "db.constraints",
+  "db.indexes",
+  "db.labels",
+  "db.propertyKeys",
+  "db.relationshipTypes",
+  "db.meta.stats",
+  "db.idx.fulltext.createNodeIndex",
+  "db.idx.fulltext.drop",
+  "db.idx.fulltext.queryNodes",
+  "db.idx.vector.createNodeIndex",
+  "db.idx.vector.drop",
+  "db.idx.vector.queryNodes",
 ];
 
 // Derives the namespaced UDF function names (e.g. "myLib.myFunc") from the UDF

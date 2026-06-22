@@ -13,11 +13,11 @@ import { useToast } from "@/components/ui/use-toast";
 import { cn, HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { BUILTIN_FUNCTIONS, CYPHER_KEYWORDS } from "@/lib/cypherLang";
 import { codeActionEditsForMarkers, analyzeSchemaWarnings, type EditorDiagnostic } from "@/lib/cypherDiagnostics";
+import { extractVariableCandidates } from "@/lib/cypherSuggestions";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
 import EditorComponent, { LINE_HEIGHT, LanguageConfig } from "./EditorComponent";
-import AiFixButton from "./AiFixButton";
 import { BrowserSettingsContext, IndicatorContext, UDFContext, ConnectionContext, DiagnosticsContext } from "./provider";
 import { Graph } from "../api/graph/model";
 
@@ -65,36 +65,25 @@ const escapeRegExp = (str: string): string => str.replace(/[.*+?^${}()|[\]\\]/g,
 const DEFAULT_MONARCH_TOKENIZER: monaco.languages.IMonarchLanguage = {
     tokenizer: {
         root: [
-            [new RegExp(`\\b(${KEYWORDS.join('|')})\\b`), "keyword"],
+            [new RegExp(`\\b(${KEYWORDS.join('|')})\\b`, 'i'), "keyword"],
             [/"([^"\\]|\\.)*"/, 'string'],
             [/'([^'\\]|\\.)*'/, 'string'],
             [/\d+/, 'number'],
             [/:(\w+)/, 'type'],
             [/\{/, { token: 'delimiter.curly', next: '@bracketCounting' }],
-            [/\[/, { token: 'delimiter.square', next: '@insideBracket' }],
-            [/\(/, { token: 'delimiter.parenthesis', next: '@insideParen' }],
-        ],
-        insideParen: [
-            [/[A-Za-z_]\w*/, { token: 'variable', next: '@bracketCounting' }],
-            [/\)/, { token: 'delimiter.parenthesis', next: '@pop' }],
-            [/./, { token: '@rematch', next: '@bracketCounting' }],
-        ],
-        insideBracket: [
-            [/[A-Za-z_]\w*/, { token: 'variable', next: '@bracketCounting' }],
-            [/\]/, { token: 'delimiter.square', next: '@pop' }],
-            [/./, { token: '@rematch', next: '@bracketCounting' }],
+            [/\[/, { token: 'delimiter.square', next: '@bracketCounting' }],
+            [/\(/, { token: 'delimiter.parenthesis', next: '@bracketCounting' }],
         ],
         bracketCounting: [
             [/\{/, 'delimiter.curly', '@bracketCounting'],
             [/\}/, 'delimiter.curly', '@pop'],
-            [/\[/, 'delimiter.square', '@insideBracket'],
+            [/\[/, 'delimiter.square', '@bracketCounting'],
             [/\]/, 'delimiter.square', '@pop'],
-            [/\(/, 'delimiter.parenthesis', '@insideParen'],
+            [/\(/, 'delimiter.parenthesis', '@bracketCounting'],
             [/\)/, 'delimiter.parenthesis', '@pop'],
             { include: 'root' }
         ],
     },
-    ignoreCase: true,
 };
 
 const CYPHER_LANGUAGE_CONFIGURATION: monaco.languages.LanguageConfiguration = {
@@ -145,6 +134,8 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const schemaLabelsRef = useRef<string[]>([]);
     const codeActionProviderRef = useRef<monaco.IDisposable | null>(null);
     const boundVarsRef = useRef<Set<string>>(new Set());
+    // Cached full suggestion list so getSuggestions never calls updateTokenizer during typing.
+    const cachedSuggestionsRef = useRef<monaco.languages.CompletionItem[]>([]);
 
     const [lineNumber, setLineNumber] = useState(1);
     const [blur, setBlur] = useState(false);
@@ -221,7 +212,8 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             window.removeEventListener("resize", handleResize);
             observer.disconnect();
         };
-    }, [containerRef.current]);
+    // containerRef is stable after mount; [] is correct here.
+    }, []);
 
     useEffect(() => {
         setLineNumber(historyQuery.query.split("\n").length);
@@ -342,42 +334,36 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         return () => clearTimeout(handle);
     }, [historyQuery.query, editorMountVersion, schemaLabelsVersion]);
 
-    // Extract bound element variables from the query and rebuild tokenizer when they change
-    // Use Monaco's tokenizer to detect bound variables (tokens marked as 'variable'
-    // by the insideParen/insideBracket states) and rebuild tokenizer to color them everywhere.
+    // Extract bound variables from the query and rebuild the tokenizer whenever the set changes.
+    // boundVarsRule inside updateTokenizer reads boundVarsRef.current directly, so updating the
+    // ref before calling is all that's needed for correct highlighting. The cache is only used to
+    // avoid re-fetching schema data from the server on every keystroke.
     useEffect(() => {
         if (!monacoRef.current) return;
+        const boundVars = new Set(extractVariableCandidates(historyQuery.query));
+        boundVarsRef.current = boundVars;
 
-        const queryText = historyQuery.query;
-        const lines = queryText.split('\n');
+        const baseCache = cachedSuggestionsRef.current.filter(s => s.detail !== '(variable)');
 
-        // Tokenize the query using Monaco's built-in tokenizer
-        const tokenized = monacoRef.current.editor.tokenize(queryText, LANGUAGE_NAME);
-
-        const boundVars = new Set<string>();
-        tokenized.forEach((lineTokens: monaco.Token[], lineIdx: number) => {
-            const line = lines[lineIdx];
-            lineTokens.forEach((token: monaco.Token, tokenIdx: number) => {
-                if (token.type === `variable.${LANGUAGE_NAME}`) {
-                    const start = token.offset;
-                    const end = tokenIdx < lineTokens.length - 1 ? lineTokens[tokenIdx + 1].offset : line.length;
-                    const varName = line.substring(start, end);
-                    if (varName) boundVars.add(varName);
-                }
-            });
-        });
-
-        // Only rebuild tokenizer if the set of variables actually changed
-        const newVars = Array.from(boundVars).sort().join(',');
-        const oldVars = Array.from(boundVarsRef.current).sort().join(',');
-        if (newVars !== oldVars) {
-            boundVarsRef.current = boundVars;
+        if (baseCache.length > 0) {
+            // Schema already loaded — rebuild cache with fresh vars and retokenize (no server fetch).
+            const freshVarSuggestions: monaco.languages.CompletionItem[] = Array.from(boundVars).map(v => ({
+                insertText: v,
+                label: v,
+                kind: monaco.languages.CompletionItemKind.Variable,
+                range: new monaco.Range(1, 1, 1, 1),
+                detail: '(variable)',
+            }));
+            updateTokenizer(monacoRef.current, [...baseCache, ...freshVarSuggestions]);
+        } else {
+            // Cache empty (schema not yet loaded) — let updateTokenizer do a fresh fetch.
+            // It will include vars from boundVarsRef.current (already updated above).
             updateTokenizer(monacoRef.current);
         }
     }, [historyQuery.query]);
 
     const fetchSuggestions = async (detail: string): Promise<monaco.languages.CompletionItem[]> => {
-        if (indicator === "offline") return [];
+        if (indicatorRef.current === "offline") return [];
 
         const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
         const result = await securedFetch(`api/graph/${graphIdRef.current}/info?type=${prepareArg(detail)}${readOnlyParam}`, {
@@ -458,11 +444,12 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             }
         });
         const namespaceSuggestions: monaco.languages.CompletionItem[] = Array.from(namespaceParts).map(ns => ({
-            insertText: ns,
+            insertText: `${ns}.`,
             label: ns,
             kind: monaco.languages.CompletionItemKind.Module,
             range: new monaco.Range(1, 1, 1, 1),
             detail: '(namespace)',
+            command: { id: 'editor.action.triggerSuggest', title: 'Re-trigger completions' },
         }));
 
         const all = [...STATIC_SUGGESTIONS, ...udfSuggestions, ...remoteSuggestions, ...varSuggestions, ...namespaceSuggestions];
@@ -479,14 +466,12 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     }, [udfSuggestions]);
 
     // Returns filtered suggestions for the default (non-dot) autocomplete display:
-    // excludes full-path namespaced functions and property keys (both accessed via dot navigation)
+    // includes full-path namespaced functions so they appear when typing a prefix like "db"
+    // excludes only property keys (those are shown after typing '.' on a bound variable)
     const getAllSuggestions = useCallback(async (prefetched?: monaco.languages.CompletionItem[]): Promise<monaco.languages.CompletionItem[]> => {
         const full = prefetched ?? await getFullSuggestions();
 
         const filtered = full.filter(s => {
-            const label = typeof s.label === 'string' ? s.label : s.label.label;
-            // Skip namespaced functions — they are accessed via dot navigation
-            if ((s.detail === '(function)' || s.detail === '(udf function)') && label.includes('.')) return false;
             // Skip property keys — they are shown only after typing '.' on a bound variable
             if (s.detail === '(property key)') return false;
             return true;
@@ -513,6 +498,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
     const updateTokenizer = async (monacoI: Monaco, prefetchedSuggestions?: monaco.languages.CompletionItem[]) => {
         const sug = prefetchedSuggestions ?? await getFullSuggestions();
+        cachedSuggestionsRef.current = sug;
 
         const functions = sug.filter(({ detail }) => detail === "(function)" || detail === "(udf function)");
 
@@ -528,10 +514,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         if (labelsChanged) setSchemaLabelsVersion(v => v + 1);
         const relTypes = sug.filter(({ detail }) => detail === '(relationship type)').map(({ label }) => label as string);
 
-        // Collect property keys for keyword coloring
-        const propertyKeys = sug.filter(({ detail }) => detail === '(property key)').map(({ label }) => label as string);
-
-        // Collect UDF library names for keyword coloring
+        // Collect UDF library names for namespace coloring
         const udfLibNames = udfList.map(([, libName]) => libName).filter(Boolean);
 
         const namespaces = new Set([
@@ -547,8 +530,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                 }).flat()
         ]);
 
-        // Build keywords regex including static keywords and (escaped) dynamic property keys
-        const allKeywords = [...KEYWORDS, ...propertyKeys.map(escapeRegExp)].join('|');
+        const allKeywords = KEYWORDS.join('|');
 
         // Build bound variables rule from the ref
         const boundVarsArray = Array.from(boundVarsRef.current);
@@ -560,63 +542,55 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             tokenizer: {
                 root: graphIdRef.current ? [
                     ...boundVarsRule,
-                    ...(namespaces.size > 0 ? [[new RegExp(`\\b(${Array.from(namespaces.keys()).map(escapeRegExp).join('|')})\\b`), "keyword"] as [RegExp, string]] : []),
-                    [new RegExp(`\\b(${allKeywords})\\b`), "keyword"],
+                    ...(namespaces.size > 0 ? [[new RegExp(`\\b(${Array.from(namespaces.keys()).map(escapeRegExp).join('|')})\\b`, 'i'), "keyword"] as [RegExp, string]] : []),
+                    [new RegExp(`\\b(${allKeywords})\\b`, 'i'), "keyword"],
                     [
                         new RegExp(`\\b(${functions.map(({ label }) => {
-                            const labelStr = label as string;
+                            const labelStr = (label as string).replace(/\(\)$/, '');
                             if (labelStr.includes(".")) {
-                                const labels = labelStr.split(".");
-                                return escapeRegExp(labels[labels.length - 1]);
+                                const parts = labelStr.split(".");
+                                return escapeRegExp(parts[parts.length - 1]);
                             }
                             return escapeRegExp(labelStr);
-                        }).join('|')})\\b`),
+                        }).join('|')})\\b`, 'i'),
                         "function"
                     ],
+                    [/[A-Za-z_]\w*/, ''],
                     [/"([^"\\]|\\.)*"/, 'string'],
                     [/'([^'\\]|\\.)*'/, 'string'],
                     [/\d+/, 'number'],
                     [/:(\w+)/, 'type'],
                     [/\{/, { token: 'delimiter.curly', next: '@bracketCounting' }],
-                    [/\[/, { token: 'delimiter.square', next: '@insideBracket' }],
-                    [/\(/, { token: 'delimiter.parenthesis', next: '@insideParen' }],
+                    [/\[/, { token: 'delimiter.square', next: '@bracketCounting' }],
+                    [/\(/, { token: 'delimiter.parenthesis', next: '@bracketCounting' }],
                 ] : [
                     ...boundVarsRule,
-                    [new RegExp(`\\b(${KEYWORDS.join('|')})\\b`), "keyword"],
+                    [new RegExp(`\\b(${KEYWORDS.join('|')})\\b`, 'i'), "keyword"],
+                    [/[A-Za-z_]\w*/, ''],
                     [/"([^"\\]|\\.)*"/, 'string'],
                     [/'([^'\\]|\\.)*'/, 'string'],
                     [/\d+/, 'number'],
                     [/:(\w+)/, 'type'],
                     [/\{/, { token: 'delimiter.curly', next: '@bracketCounting' }],
-                    [/\[/, { token: 'delimiter.square', next: '@insideBracket' }],
-                    [/\(/, { token: 'delimiter.parenthesis', next: '@insideParen' }],
-                ],
-                insideParen: [
-                    [/[A-Za-z_]\w*/, { token: 'variable', next: '@bracketCounting' }],
-                    [/\)/, { token: 'delimiter.parenthesis', next: '@pop' }],
-                    [/./, { token: '@rematch', next: '@bracketCounting' }],
-                ],
-                insideBracket: [
-                    [/[A-Za-z_]\w*/, { token: 'variable', next: '@bracketCounting' }],
-                    [/\]/, { token: 'delimiter.square', next: '@pop' }],
-                    [/./, { token: '@rematch', next: '@bracketCounting' }],
+                    [/\[/, { token: 'delimiter.square', next: '@bracketCounting' }],
+                    [/\(/, { token: 'delimiter.parenthesis', next: '@bracketCounting' }],
                 ],
                 bracketCounting: [
                     [/\{/, 'delimiter.curly', '@bracketCounting'],
                     [/\}/, 'delimiter.curly', '@pop'],
-                    [/\[/, 'delimiter.square', '@insideBracket'],
+                    [/\[/, 'delimiter.square', '@bracketCounting'],
                     [/\]/, 'delimiter.square', '@pop'],
-                    [/\(/, 'delimiter.parenthesis', '@insideParen'],
+                    [/\(/, 'delimiter.parenthesis', '@bracketCounting'],
                     [/\)/, 'delimiter.parenthesis', '@pop'],
                     { include: 'root' }
                 ],
             },
-            ignoreCase: true,
         });
     };
 
-    // Update monarch tokenizer when graph or UDF list changes (to include dynamic functions/namespaces)
+    // Invalidate the suggestion cache and rebuild the tokenizer when the graph or UDFs change.
     useEffect(() => {
+        cachedSuggestionsRef.current = [];
         if (monacoRef.current && graphIdRef.current) {
             updateTokenizer(monacoRef.current);
         }
@@ -632,13 +606,14 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             model?: monaco.editor.ITextModel,
             position?: monaco.Position,
         ) => {
-            // Get the full list (including namespaced functions) for tokenizer & dot navigation
-            const fullSug = await getFullSuggestions();
-            // Update the tokenizer with the full list
-            await updateTokenizer(monacoI, fullSug);
+            // Use the suggestion cache populated by updateTokenizer (on graph/UDF/variable change).
+            // Falling back to a fresh fetch only if the cache is empty (e.g. graph not yet loaded).
+            // We intentionally do NOT call updateTokenizer here — doing so on every keystroke
+            // triggers setMonarchTokensProvider which re-tokenizes the model and flickers decorations.
+            const fullSug = cachedSuggestionsRef.current.length > 0
+                ? cachedSuggestionsRef.current
+                : await getFullSuggestions();
 
-            // Detect dot context: either from trigger character or from cursor position.
-            // This handles both auto-trigger and manual Ctrl+Space after typing '.'.
             let hasDot = context?.triggerCharacter === '.';
             if (!hasDot && model && position) {
                 const charBeforeCursor = model.getValueInRange({
@@ -679,43 +654,93 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
                 const isBound = nodePattern.test(queryText) || relPattern.test(queryText);
 
-                if (isBound) return allPropertyKeys;
+                if (isBound) return allPropertyKeys.map(s => ({ ...s, filterText: '', range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column) }));
 
-                // Not a node/relationship variable — show the next level inside this namespace.
-                // e.g. "db." shows ["idx", "labels"], "db.idx." shows ["vector", "fulltext"]
+                // Not a node/relationship variable — build a recursive flat list for this namespace.
+                // Rules:
+                //   depth 1            : direct child (function or namespace) — always show
+                //   depth 2, function  : namespace.function() — show the namespace only (drill-down),
+                //                        skip full path (too shallow to warrant a shortcut)
+                //   depth >= 2, other  : show immediate namespace + full relative path + any
+                //                        intermediate namespaces (idx.fulltext for idx.fulltext.fn())
                 const prefix = `${fullPrefix}.`;
-                const nextSegments = new Map<string, boolean>(); // segment -> isNamespace
+                const resultItems: { remainder: string; isNamespace: boolean }[] = [];
+                const seen = new Set<string>();
+
+                const addItem = (remainder: string, isNamespace: boolean) => {
+                    if (seen.has(remainder)) return;
+                    seen.add(remainder);
+                    resultItems.push({ remainder, isNamespace });
+                };
+
                 fullSug.forEach(s => {
-                    const label = typeof s.label === 'string' ? s.label : s.label.label;
-                    if (!label.startsWith(prefix)) return;
-                    const remainder = label.slice(prefix.length);
-                    const dotIdx = remainder.indexOf('.');
-                    if (dotIdx === -1) {
-                        // Leaf item (function) — show as-is
-                        nextSegments.set(remainder, false);
+                    const rawLabel = (typeof s.label === 'string' ? s.label : s.label.label) as string;
+                    if (!rawLabel.startsWith(prefix)) return;
+                    const remainder = rawLabel.slice(prefix.length);
+                    const parts = remainder.split('.');
+                    const depth = parts.length;
+                    const isFunction = parts[depth - 1].includes('(');
+
+                    if (depth === 1) {
+                        addItem(remainder, !isFunction);
+                    } else if (depth === 2 && isFunction) {
+                        // namespace.function() — only expose the namespace for drill-down
+                        addItem(parts[0], true);
                     } else {
-                        // Sub-namespace — extract just the next segment
-                        const segment = remainder.slice(0, dotIdx);
-                        if (!nextSegments.has(segment)) {
-                            nextSegments.set(segment, true);
+                        // depth >= 2: show the immediate drill-down namespace + the complete path only.
+                        // Intermediate half-paths (e.g. idx.fulltext) are intentionally omitted.
+                        addItem(parts[0], true);
+                        if (isFunction) {
+                            addItem(remainder, false);
                         }
                     }
                 });
 
-                return Array.from(nextSegments.entries()).map(([segment, isNamespace]) => ({
-                    insertText: segment,
-                    label: segment,
+                // Cursor is right after the dot — use this as the insert position so Monaco
+                // knows completions replace nothing (pure insert). filterText="" bypasses
+                // Monaco's client-side prefix filter which would otherwise hide items whose
+                // labels (e.g. "idx.fulltext.queryNodes()") don't match the typed prefix.
+                const insertRange = new monaco.Range(
+                    position.lineNumber, position.column,
+                    position.lineNumber, position.column,
+                );
+
+                return resultItems.map(({ remainder, isNamespace }) => ({
+                    insertText: isNamespace ? `${remainder}.` : remainder.replace(/\(\)$/, '(\${0})'),
+                    insertTextRules: isNamespace ? undefined : monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                    label: remainder,
+                    filterText: '',
                     kind: isNamespace
                         ? monaco.languages.CompletionItemKind.Module
                         : monaco.languages.CompletionItemKind.Function,
                     detail: isNamespace ? '(namespace)' : '(function)',
+                    command: isNamespace ? { id: 'editor.action.triggerSuggest', title: 'Re-trigger completions' } : undefined,
+                    range: insertRange,
                 }));
             }
 
-            // Default (non-dot) case: return filtered suggestions (no full-path functions)
-            return getAllSuggestions(fullSug);
+            // Default (non-dot) case: include full-path namespaced functions so typing "db"
+            // surfaces db.idx.fulltext.queryNodes() etc. Compute the word range at cursor so
+            // Monaco replaces the typed prefix correctly and can filter by it.
+            const items = await getAllSuggestions(fullSug);
+
+            if (!model || !position) return items;
+
+            const wordInfo = model.getWordUntilPosition(position);
+            const wordRange = new monaco.Range(
+                position.lineNumber, wordInfo.startColumn,
+                position.lineNumber, position.column,
+            );
+
+            return items.map(s => {
+                const label = typeof s.label === 'string' ? s.label : s.label.label;
+                // Strip trailing "()" for filterText so Monaco can fuzzy-match "db" → "db.idx.fulltext.queryNodes()"
+                const filterText = label.replace(/\(\)$/, '');
+                return { ...s, filterText, range: wordRange };
+            });
         },
-    }), [getFullSuggestions, getAllSuggestions, updateTokenizer]);
+    // updateTokenizer intentionally excluded: getSuggestions no longer calls it.
+    }), [getFullSuggestions, getAllSuggestions]);
 
     const handleSubmit = async () => {
         runQuery(historyQuery.query.trim());
@@ -723,7 +748,8 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
     const handleMonacoReady = (monacoI: Monaco) => {
         monacoRef.current = monacoI;
-        // Trigger initial tokenizer update with dynamic suggestions
+        // Pre-warm the tokenizer + suggestion cache immediately so highlights are
+        // correct before the user opens autocomplete for the first time.
         updateTokenizer(monacoI);
 
         // Register the quick-fix (code action) provider exactly once.
@@ -984,7 +1010,6 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                             </TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
-                    <AiFixButton currentQuery={historyQuery.query} />
                     <Button
                         className="text-xs py-0.5"
                         data-testid="editorRun"

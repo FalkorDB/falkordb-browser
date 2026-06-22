@@ -196,13 +196,18 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [selectedParam, setSelectedParam] = useState<string>(urlSelected);
   const [runDefaultQuery, setRunDefaultQuery] = useState(false);
   const [graphNames, setGraphNames] = useState<string[]>([]);
+  const [graphNamesLoaded, setGraphNamesLoaded] = useState(false);
   const [graph, setGraph] = useState<Graph>(Graph.empty());
   const [data, setData] = useState<GraphData>({ ...graph.Elements });
   const [graphData, setGraphData] = useState<CanvasData>();
   const [layout, setLayout] = useState<LayoutMode>(normalizeLayout(urlLayout));
   const [direction, setDirection] = useState(() => normalizeDirection(normalizeLayout(urlLayout), urlDirection));
   const [graphInfo, setGraphInfo] = useState<GraphInfo>(GraphInfo.empty(toast, setIndicator));
-  const [graphName, setGraphName] = useState<string>(urlGraphName);
+  // Do NOT initialize from urlGraphName — start empty and let the gated URL sync
+  // below apply it only after the graph list is loaded and the name is validated.
+  // This prevents page.tsx from running queries (and FalkorDB from auto-creating
+  // graphs) before we know whether the URL graph actually exists.
+  const [graphName, setGraphName] = useState<string>("");
   const [contentPersistence, setContentPersistence] = useState(false);
   const [defaultQuery, setDefaultQuery] = useState("");
   const [timeout, setTimeout] = useState(0);
@@ -499,6 +504,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setAiFixResult({ status: "idle" });
     },
   }), [aiFixSupported, lastFailure, aiFixResult, pendingConsent, requestAiFix, confirmConsent]);
+
+  // Refs so runQuery can always call the latest requestAiFix without being in its
+  // eslint-disable-next-line dependency array (avoids recreating runQuery on every AI-state change).
+  const requestAiFixRef = useRef(requestAiFix);
+  requestAiFixRef.current = requestAiFix;
   // ---------------------------------------------------------------------------
 
   const forceGraphContext = useMemo(() => ({
@@ -637,7 +647,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
     const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}${readOnlyParam}`;
     try {
-      const result = await getSSEGraphResult(url, toast, setIndicator, { query }) as { data: Data; metadata: string[] };
+      const result = await getSSEGraphResult(url, toast, setIndicator, {
+        query: q,
+      }) as { data: Data; metadata: string[] };
 
       if (!result) throw new Error("Failed to execute query");
 
@@ -700,7 +712,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         currentQuery: newQuery,
         counter: 0
       }));
-      setUrlQueryText(newQuery.text);
       setViewport(undefined);
       setGraphData(undefined);
       setSearch("");
@@ -725,6 +736,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         counter: 0
       }));
     } finally {
+      setUrlQueryText(newQuery.text);
       setIsQueryLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1195,6 +1207,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (indicator === "offline" || tutorialOpen) return;
 
     await fetchOptions(toast, setIndicator, indicator, setGraphName, setGraphNames);
+    setGraphNamesLoaded(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast, tutorialOpen]);
 
@@ -1208,16 +1221,32 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     handleFetchOptions();
   }, [handleFetchOptions, status]);
 
-  // Sync URL → local state only when on /graph (consumers like graphInfo update URL directly)
+  // Unified URL→state sync for the graph name, gated on graphNamesLoaded.
+  // By waiting for the graph list before applying the URL value we prevent:
+  //   1. Page.tsx from running queries against a non-existent graph (which
+  //      FalkorDB would silently create on the first GRAPH.QUERY call).
+  //   2. The default-query fallback from firing before we know the URL graph
+  //      is valid (which would overwrite a failing URL query result).
   useEffect(() => {
-    // [URL] providers: urlGraphName sync effect
     if (pathname !== "/graph") return;
-    if (urlGraphName !== graphName) {
-      // [URL] providers: syncing URL→state
+    if (!graphNamesLoaded) return;
+
+    if (urlGraphName && !graphNames.includes(urlGraphName)) {
+      // URL graph does not exist in DB — strip all related URL params
+      setGraphName("");
+      setSelectedParam("");
+      setUrlQueryText(null);
+      return;
+    }
+
+    // Only override state when the URL explicitly names a graph.
+    // When urlGraphName is empty, fetchOptions may have already auto-selected
+    // a graph (e.g. single-graph DB) — don't clobber that with an empty string.
+    if (urlGraphName) {
       setGraphName(urlGraphName);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlGraphName]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlGraphName, graphNamesLoaded, graphNames]);
 
   // One-way sync: context state → URL (only while on /graph)
   const prevPathnameRef = useRef(pathname);

@@ -436,6 +436,13 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("fix-with-ai").count();
   }
 
+  async getLatestErrorToastText(): Promise<string> {
+    const toasts = this.page.getByTestId("toast-destructive");
+    const count = await toasts.count();
+    if (count === 0) return "";
+    return (await toasts.nth(count - 1).textContent()) || "";
+  }
+
   async isOfflineIndicatorVisible(): Promise<boolean> {
     const indicator = this.page.locator('[role="status"][aria-label*="offline"]');
     return waitForElementToBeVisible(indicator);

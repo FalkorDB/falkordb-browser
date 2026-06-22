@@ -7,8 +7,8 @@
 // (timeout, OOM, constraint violations, …) produce no diagnostic — they stay in the
 // toast.
 
-import { parseSyntaxError, SYNTAX_ERROR_HINT, type SyntaxErrorInfo } from "./cypherErrors.ts";
-import { suggestForError, suggestionNameForError, maskCommentsAndStrings, closestMatch } from "./cypherSuggestions.ts";
+import { parseSyntaxError, SYNTAX_ERROR_HINT, enrichSyntaxMessage, type SyntaxErrorInfo } from "./cypherErrors.ts";
+import { suggestForError, suggestionNameForError, maskCommentsAndStrings, closestMatch, findFuncArgTypo } from "./cypherSuggestions.ts";
 
 export type EditorDiagnostic = {
   message: string;
@@ -78,8 +78,9 @@ export function locateVariableToken(query: string, token: string): LocatedToken 
   });
 }
 
-/** Returns the word range (1-based, end-exclusive) at `column`, or a single-character
- *  range when no word character is there (clamped to the line). */
+/** Returns the word range (1-based, end-exclusive) at `column`.
+ *  When the column lands on whitespace, steps back to highlight the preceding word
+ *  (e.g. FalkorDB points at the space after 'LIM' — we highlight 'LIM'). */
 function wordRangeAt(lineText: string, column: number): { startColumn: number; endColumn: number } {
   const idx = column - 1;
   const isWord = (c: string | undefined): boolean => c !== undefined && /\w/.test(c);
@@ -92,6 +93,28 @@ function wordRangeAt(lineText: string, column: number): { startColumn: number; e
     return { startColumn: start + 1, endColumn: end + 1 };
   }
 
+  // Whitespace: step back to the preceding word token (e.g. FalkorDB points at the space
+  // after 'LIM' — we want to highlight 'LIM').
+  if (/\s/.test(lineText[idx] ?? "")) {
+    if (idx > 0) {
+      let prevEnd = idx - 1;
+      while (prevEnd > 0 && /\s/.test(lineText[prevEnd])) prevEnd -= 1;
+      if (isWord(lineText[prevEnd])) {
+        let prevStart = prevEnd;
+        while (prevStart > 0 && isWord(lineText[prevStart - 1])) prevStart -= 1;
+        return { startColumn: prevStart + 1, endColumn: prevEnd + 2 };
+      }
+    }
+  } else {
+    // Non-word, non-space (operator/punct): highlight the consecutive run of the same char
+    // so that e.g. '==' at column N produces a 2-char underline on '==' rather than jumping
+    // back to the preceding identifier.
+    const ch = lineText[idx];
+    let runEnd = idx;
+    while (runEnd + 1 < lineText.length && lineText[runEnd + 1] === ch) runEnd += 1;
+    return { startColumn: idx + 1, endColumn: runEnd + 2 };
+  }
+
   const single = Math.max(0, Math.min(idx, lineText.length === 0 ? 0 : lineText.length - 1));
   return { startColumn: single + 1, endColumn: single + 2 };
 }
@@ -102,8 +125,9 @@ function syntaxDiagnostic(query: string, syntax: SyntaxErrorInfo): EditorDiagnos
   const lineText = lines[lineIdx];
   const column = Math.min(Math.max(syntax.column, 1), lineText.length + 1);
   const { startColumn, endColumn } = wordRangeAt(lineText, column);
+  const enrichedMessage = enrichSyntaxMessage(syntax.message, syntax.context, syntax.contextOffset);
   return {
-    message: syntax.message,
+    message: enrichedMessage,
     hint: SYNTAX_ERROR_HINT,
     severity: "error",
     code: "syntax",
@@ -150,6 +174,17 @@ export function computeEditorDiagnostics(query: string, errorMessage: string): D
 
   const syntax = parseSyntaxError(errorMessage);
   if (syntax) {
+    // If a function-arg typo is the likely root cause, highlight that token instead
+    // of the confusing parser-reported position (e.g. id(nod) → squiggle on 'nod').
+    const typo = findFuncArgTypo(query);
+    if (typo) {
+      const located = locateVariableToken(query, typo);
+      if (located) {
+        const msg = `'${typo}' not defined`;
+        diagnostics.push(tokenDiagnostic(query, "undefined-variable", msg, msg, located));
+        return { sourceQuery: query, diagnostics };
+      }
+    }
     diagnostics.push(syntaxDiagnostic(query, syntax));
     return { sourceQuery: query, diagnostics };
   }

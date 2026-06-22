@@ -243,7 +243,7 @@ test.describe("Error Toast Messages", () => {
     expect(await graph.hasEditorErrorMarker()).toBe(true);
   });
 
-  test(`@admin "Fix with AI" button is hidden when AI is not configured`, async () => {
+  test(`@admin "Fix with AI" button is always shown after a failure`, async () => {
     graphName = getRandomString("graph");
     await apiCall.addGraph(graphName);
 
@@ -254,10 +254,31 @@ test.describe("Error Toast Messages", () => {
     await graph.insertQuery("MATCH (n) RETsURN n");
     await graph.clickRunQuery(false);
 
-    // The failure is processed (toast shown) but, with no configured AI model/key, the
-    // "Fix with AI" button must not appear.
+    // The button always renders in the toast after a failure, regardless of whether
+    // AI is configured. When no model/key is set, clicking it shows a settings toast.
     expect(await graph.getNotificationErrorToast()).toBe(true);
-    expect(await graph.fixWithAiButtonCount()).toBe(0);
+    expect(await graph.fixWithAiButtonCount()).toBe(1);
+  });
+
+  test(`@admin "Fix with AI" button shows "Go to Settings" error when AI is not configured`, async () => {
+    graphName = getRandomString("graph");
+    await apiCall.addGraph(graphName);
+
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(graphName);
+
+    await graph.insertQuery("MATCH (n) RETsURN n");
+    await graph.clickRunQuery(false);
+
+    expect(await graph.getNotificationErrorToast()).toBe(true);
+
+    // Click "Fix with AI" — without a configured model this should show a new toast
+    // with a "Go to Settings" action button (same pattern as the Chat button).
+    await graph.errorToast.getByTestId("fix-with-ai").click();
+    // A second destructive toast appears describing the missing configuration.
+    const latestToastText = await graph.getLatestErrorToastText();
+    expect(latestToastText).toMatch(/No model selected|No API Key Provided|Provider not supported/);
   });
 
   // ---------------------------------------------------------------------------

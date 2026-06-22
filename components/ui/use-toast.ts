@@ -18,6 +18,7 @@ type ToasterToast = ToastProps & {
   rawMessage?: string
   hint?: string
   hintLink?: HintLink
+  query?: string
 }
 
 const actionTypes = {

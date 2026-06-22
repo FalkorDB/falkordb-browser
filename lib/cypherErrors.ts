@@ -62,6 +62,35 @@ export function parseSyntaxError(raw: string): SyntaxErrorInfo | null {
   };
 }
 
+/**
+ * Enriches a raw syntax error message with the offending token extracted from
+ * the error context snippet, e.g.:
+ *   "Invalid input ' ': expected LIMIT" + context "LIM 100" at offset 3
+ *   → "Invalid input ' ' in LIM: expected LIMIT"
+ */
+export function enrichSyntaxMessage(message: string, context: string, contextOffset: number): string {
+  const safeOffset = context.length > 0
+    ? Math.max(0, Math.min(contextOffset, context.length - 1))
+    : 0;
+  const errorChar = context[safeOffset] || "";
+  const isWhitespace = !errorChar || /\s/.test(errorChar);
+
+  // For whitespace errors, the culprit token is the word immediately before the offset.
+  // For non-whitespace errors, walk outward from safeOffset to capture the whole word.
+  let wordStart = isWhitespace ? safeOffset - 1 : safeOffset;
+  while (wordStart > 0 && !/\s/.test(context[wordStart - 1])) wordStart -= 1;
+  const wordEnd = isWhitespace ? safeOffset : (() => {
+    let end = safeOffset;
+    while (end < context.length && !/\s/.test(context[end])) end += 1;
+    return end;
+  })();
+  const errorWord = context.slice(Math.max(0, wordStart), wordEnd);
+
+  return errorWord.length > 1
+    ? message.replace(/^(Invalid input '[^']*')(:)/, `$1 in ${errorWord}$2`)
+    : message;
+}
+
 type CatalogEntry = CypherErrorHint & {
   test: RegExp;
 };

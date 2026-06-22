@@ -9,8 +9,8 @@ import { twMerge } from "tailwind-merge";
 import React, { RefObject } from "react";
 import type { FalkorDBCanvas, Data as CanvasData } from "@falkordb/canvas";
 import { signOut } from "next-auth/react";
-import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, type SyntaxErrorInfo, type HintLink } from "./cypherErrors";
-import { suggestForError } from "./cypherSuggestions";
+import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, enrichSyntaxMessage, type SyntaxErrorInfo, type HintLink } from "./cypherErrors";
+import { suggestForError, findFuncArgTypo } from "./cypherSuggestions";
 
 export { parseSyntaxError };
 export type { SyntaxErrorInfo };
@@ -22,6 +22,7 @@ export type ToastArguments = {
   rawMessage?: string;
   hint?: string;
   hintLink?: HintLink;
+  query?: string;
 };
 
 export type ToastFn = (args: ToastArguments) => void;
@@ -258,7 +259,7 @@ export async function getSSEGraphResult(
   return new Promise((resolve, reject) => {
     let handled = false;
 
-    // Inject connectionId as a query param for SSE (EventSource doesn't support headers)
+    // EventSource doesn't support headers — inject connectionId as a query param.
     let effectiveUrl = url;
     if (_activeConnectionId) {
       const sep = effectiveUrl.includes("?") ? "&" : "?";
@@ -306,7 +307,7 @@ export async function getSSEGraphResult(
       }
 
       const friendly = toUserFriendlyMessage(message, status, errorContext);
-      toast({ title: friendly.title, description: friendly.description, variant: "destructive", rawMessage: friendly.rawMessage, hint: friendly.hint, hintLink: friendly.hintLink });
+      toast({ title: friendly.title, description: friendly.description, variant: "destructive", rawMessage: friendly.rawMessage, hint: friendly.hint, hintLink: friendly.hintLink, query: errorContext?.query });
 
       if (status === 401 || status >= 500) setIndicator("offline");
 
@@ -342,18 +343,30 @@ export function formatSyntaxError(
   const errorChar = context[safeOffset] || "";
   const after = context.slice(safeOffset + 1);
 
-  // Extract the token containing the error character and enrich the message.
-  // e.g. "Invalid input 's': expected RETURN" → "Invalid input 's' in RETsURN: expected RETURN"
+  const enriched = enrichSyntaxMessage(message, context, contextOffset);
+
+  // When the error char is whitespace, step back and highlight the preceding word.
   let wordStart = safeOffset;
   while (wordStart > 0 && !/\s/.test(context[wordStart - 1])) wordStart -= 1;
   let wordEnd = safeOffset;
   while (wordEnd < context.length && !/\s/.test(context[wordEnd])) wordEnd += 1;
   const errorWord = context.slice(wordStart, wordEnd);
 
-  // Insert "in <word>" after the quoted character, before the colon
-  const enriched = errorWord.length > 1
-    ? message.replace(/^(Invalid input '[^']*')(:)/, `$1 in ${errorWord}$2`)
-    : message;
+  const isWhitespaceError = !errorChar || /\s/.test(errorChar);
+  if (isWhitespaceError && errorWord.length > 1) {
+    return React.createElement("div", { className: "flex flex-col gap-1" },
+      React.createElement("span", null, enriched),
+      React.createElement("code", {
+        className: "mt-1 block rounded px-2 py-1 text-xs font-mono whitespace-pre-wrap break-words"
+      },
+        context.slice(0, wordStart),
+        React.createElement("span", {
+          className: "font-bold text-xl underline mx-1"
+        }, errorWord),
+        context.slice(safeOffset) // space + rest
+      )
+    );
+  }
 
   return React.createElement("div", { className: "flex flex-col gap-1" },
     React.createElement("span", null, enriched),
@@ -453,25 +466,29 @@ export function toUserFriendlyMessage(raw: unknown, status: number, ctx?: { quer
 
   const parsed = parseSyntaxError(rawMessage);
   if (parsed) {
-    return { title: "Syntax Error", description: formatSyntaxError(parsed.message, parsed.context, parsed.contextOffset), syntaxError: parsed, rawMessage, hint: SYNTAX_ERROR_HINT };
+    let { message, context, contextOffset } = parsed;
+    // If a function-arg typo is the root cause, point the toast highlight at the typo.
+    const typo = ctx?.query ? findFuncArgTypo(ctx.query) : undefined;
+    if (typo) {
+      const re = new RegExp(`\\b${typo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+      const m = re.exec(context);
+      if (m) {
+        contextOffset = m.index;
+        message = `'${typo}' not defined`;
+      }
+    }
+    return { title: "Syntax Error", description: formatSyntaxError(message, context, contextOffset), syntaxError: parsed, rawMessage, hint: SYNTAX_ERROR_HINT };
   }
 
-  // Recognized FalkorDB Cypher errors carry an actionable remediation hint.
-  // A "Did you mean…?" suggestion (computed from the query + known names) is more
-  // specific than the generic catalog tip, so it takes precedence when available.
+  // "Did you mean…?" is more specific than the catalog tip, so it takes precedence.
   const catalog = getCypherErrorHint(rawMessage);
   const hint = suggestForError(rawMessage, { query: ctx?.query }) ?? catalog?.hint;
-  // The optional "learn more"/deep-link follows the catalog match even when a
-  // did-you-mean suggestion supplied the hint text.
   const hintLink = catalog?.link;
 
-  // Show the server's own message verbatim when it is already user-readable —
-  // either explicitly allowlisted, or recognized by the Cypher hint catalog
-  // (those messages are readable FalkorDB errors). The hint, when present, is
-  // added beside the message rather than replacing it, so the specific names in
-  // the server text (variable/function/property) are never lost.
+  // For user-readable errors, description IS the raw message — skip rawMessage
+  // to avoid a duplicate "See more" section.
   if (isAllowlistedUserError(rawMessage) || hint) {
-    return { title: "Error", description: rawMessage, rawMessage, hint, hintLink };
+    return { title: "Error", description: rawMessage, hint, hintLink };
   }
 
   const lower = rawMessage.toLowerCase();
@@ -511,8 +528,7 @@ export function toUserFriendlyMessage(raw: unknown, status: number, ctx?: { quer
   return { title: "Error", description: "An unexpected error occurred. Please try again.", rawMessage, hint, hintLink };
 }
 
-// Guards against triggering multiple concurrent signOut calls when many
-// in-flight requests hit a newly-invalidated session at the same time.
+// Guards against concurrent signOut calls when multiple in-flight requests hit an invalidated session.
 let sessionInvalidationInFlight = false;
 
 function triggerSessionInvalidationSignOut(): void {
@@ -523,18 +539,9 @@ function triggerSessionInvalidationSignOut(): void {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Active connection ID for multi-connection support.
-// When set, securedFetch automatically injects an X-Connection-Id header so
-// the backend routes requests to the correct FalkorDB client.
-//
-// NOTE: do NOT initialise from localStorage here. If the user's last
-// explicit connection was a restricted user (e.g. shahar), initialising
-// _activeConnectionId to that ID would cause securedFetch to overwrite
-// any explicitly-passed X-Connection-Id headers (set by settings components)
-// with the restricted ID. The dep-free effect in providers.tsx keeps this
-// global in sync with the React activeConnectionId state after every render.
-// ---------------------------------------------------------------------------
+// Active connection ID — injected into every outgoing request as X-Connection-Id.
+// Not initialised from localStorage to avoid overriding restricted-user sessions.
+// providers.tsx keeps it in sync after every render.
 let _activeConnectionId: string | null = null;
 
 export function setActiveConnectionIdGlobal(id: string | null) {
@@ -551,10 +558,7 @@ export async function securedFetch(
   toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void,
 ): Promise<Response> {
-  // Inject X-Connection-Id header when an additional connection is active.
-  // Callers that already set the header explicitly take priority — the global
-  // is only used as a fallback so stale module state can't override a
-  // deliberately-chosen connection ID.
+  // Callers that set X-Connection-Id explicitly take priority over the global.
   const effectiveInit = { ...init };
   const existingHeaders = new Headers(effectiveInit.headers);
   if (_activeConnectionId && !existingHeaders.has("X-Connection-Id")) {
@@ -565,9 +569,7 @@ export async function securedFetch(
   const response = await fetch(input, effectiveInit);
   const { status } = response;
 
-  // The server signals "your session is orphaned, sign out now" via this
-  // header. We only sign out on this explicit signal so that ordinary 401s
-  // (e.g. login form with wrong password) don't log out unrelated users.
+  // Sign out only on an explicit X-Session-Invalid signal, not on all 401s.
   if (status === 401 && response.headers.get("X-Session-Invalid") === "1") {
     triggerSessionInvalidationSignOut();
     setIndicator("offline");

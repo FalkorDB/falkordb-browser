@@ -1097,6 +1097,7 @@ export default function BrowserSettings() {
                                             className="w-full"
                                             min={10}
                                             max={50}
+                                            type="items"
                                             value={[newMaxItemsForSearch]}
                                             onValueChange={(value) => createChangeHandler(setNewMaxItemsForSearch)(value[value.length - 1], "maxItemsForSearch")}
                                         />

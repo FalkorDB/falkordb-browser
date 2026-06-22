@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import ToastButton from "@/app/components/ToastButton";
+import AiFixButton from "@/app/components/AiFixButton";
 import { copyText } from "@/lib/clipboard";
 import {
   Toast,
@@ -99,7 +100,7 @@ export function Toaster() {
 
   return (
     <ToastProvider>
-      {toasts.map(function ({ id, title, description, action, variant, rawMessage, hint, hintLink, ...props }) {
+      {toasts.map(function ({ id, title, description, action, variant, rawMessage, hint, hintLink, query, ...props }) {
         return (
           <Toast data-testid={variant === "destructive" ? "toast-destructive" : "toast"} variant={variant} key={id} {...props}>
             <div className="grid gap-1">
@@ -136,6 +137,7 @@ export function Toaster() {
                     )
                   )}
                   {rawMessage && <ToastItemDetails rawMessage={rawMessage} />}
+                  {query && <AiFixButton currentQuery={query} />}
                 </ToastDescription>
               )}
             </div>

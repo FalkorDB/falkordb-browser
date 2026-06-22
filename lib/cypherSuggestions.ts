@@ -104,8 +104,11 @@ export function extractVariableCandidates(query: string): string[] {
     }
   };
 
-  collect(/[([]\s*([A-Za-z_]\w*)/g);           // node/relationship variable
-  collect(/\bAS\s+([A-Za-z_]\w*)/gi);          // aliases (WITH/RETURN/UNWIND … AS x)
+  // Node variables: ( at start of line, after whitespace, comma, or after -> / <-
+  // Deliberately does NOT match function calls like id(nod).
+  collect(/(?:^|[-\s,><])\(\s*([A-Za-z_]\w*)/gm); // (node) at pattern boundary (also after - in paths)
+  collect(/\[\s*([A-Za-z_]\w*)/g);                  // [rel] variable
+  collect(/\bAS\s+([A-Za-z_]\w*)/gi);              // aliases (WITH/RETURN/UNWIND … AS x)
 
   return Array.from(found).filter(v => !EXCLUDED_WORDS.has(v.toLowerCase()));
 }
@@ -119,6 +122,13 @@ export function suggestionNameForError(
   const fnMatch = rawError.match(/unknown function '([^']+)'/i);
   if (fnMatch) {
     const name = closestMatch(fnMatch[1], ctx?.functions ?? functionCandidates);
+    return name ? { kind: "function", name } : undefined;
+  }
+
+  // "Procedure 'db.constraint' is not registered" — same distance logic as functions.
+  const procMatch = rawError.match(/procedure '([^']+)' is not registered/i);
+  if (procMatch) {
+    const name = closestMatch(procMatch[1], ctx?.functions ?? functionCandidates);
     return name ? { kind: "function", name } : undefined;
   }
 
@@ -143,4 +153,42 @@ export function suggestForError(
   return suggestion.kind === "function"
     ? `Did you mean ${suggestion.name}()?`
     : `Did you mean ${suggestion.name}?`;
+}
+
+/**
+ * Extracts identifiers used as function-call arguments (e.g. `id(nod)` → ["nod"]).
+ * Only captures the first identifier immediately after `(` preceded by a word char.
+ * Excludes keywords and known built-in function names.
+ */
+export function extractFunctionArgIdents(query: string): string[] {
+  const cleaned = maskCommentsAndStrings(query);
+  const found = new Set<string>();
+  const re = /\b[A-Za-z_]\w*\(\s*([A-Za-z_]\w*)/g;
+  let m = re.exec(cleaned);
+  while (m !== null) {
+    const ident = m[1];
+    if (
+      !EXCLUDED_WORDS.has(ident.toLowerCase()) &&
+      !functionCandidates.some(f => f.toLowerCase() === ident.toLowerCase())
+    ) {
+      found.add(ident);
+    }
+    m = re.exec(cleaned);
+  }
+  return Array.from(found);
+}
+
+/**
+ * Returns the first function-arg identifier that looks like a typo of a known
+ * bound variable in the query, or `undefined` if nothing suspicious is found.
+ * E.g. `MATCH (node) ... id(nod)` → "nod" (close to bound var "node").
+ */
+export function findFuncArgTypo(query: string): string | undefined {
+  const boundVars = extractVariableCandidates(query);
+  if (!boundVars.length) return undefined;
+  for (const ident of extractFunctionArgIdents(query)) {
+    if (boundVars.some(v => v.toLowerCase() === ident.toLowerCase())) continue;
+    if (closestMatch(ident, boundVars)) return ident;
+  }
+  return undefined;
 }
