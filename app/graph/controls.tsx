@@ -2,7 +2,7 @@
 
 /* eslint-disable react/require-default-props */
 
-import { ChevronDown, Circle, Pause, Pin, PinOff, Play, Shrink, ZoomIn, ZoomOut } from "lucide-react";
+import { ChevronDown, Circle, Pause, Pin, PinOff, Play, Shrink, Telescope, ZoomIn, ZoomOut } from "lucide-react";
 import { useContext, useEffect, useRef, useState } from "react";
 import type { HierarchyDirection, LayoutMode, RadialDirection } from "@falkordb/canvas";
 import { cn, GraphRef } from "@/lib/utils";
@@ -67,6 +67,7 @@ export default function Controls({
 
     const [animation, setAnimation] = useState(false);
     const [pinned, setPinned] = useState(layout !== 'force');
+    const [dimmed, setDimmed] = useState(false);
 
     // Keep the per-layout direction memory in sync with externally driven context
     // updates (e.g. URL restoration), without letting a direction from one layout
@@ -96,6 +97,12 @@ export default function Controls({
         const next = !animation;
         setAnimation(next);
         canvasRef.current?.setAnimation(next);
+    };
+
+    const handleDimToggle = () => {
+        const next = !dimmed;
+        setDimmed(next);
+        canvasRef.current?.setDimmed(next);
     };
 
     const handlePinToggle = () => {
@@ -167,6 +174,23 @@ export default function Controls({
                         </TooltipTrigger>
                         <TooltipContent>
                             <p>{animation ? "Pause animation" : "Resume animation"}</p>
+                        </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div data-testid="dimContainer" className="flex items-center gap-2">
+                                <Telescope size={18} />
+                                <Switch
+                                    data-testid="dimControl"
+                                    aria-label={dimmed ? "Disable focus mode" : "Enable focus mode"}
+                                    className="pointer-events-auto data-[state=unchecked]:bg-border"
+                                    checked={dimmed}
+                                    onCheckedChange={handleDimToggle}
+                                />
+                            </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>{dimmed ? "Disable focus mode" : "Enable focus mode"}</p>
                         </TooltipContent>
                     </Tooltip>
                     <Tooltip>
