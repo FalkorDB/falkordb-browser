@@ -149,7 +149,11 @@ export async function POST(request: NextRequest) {
         // Only honor caller-supplied UDFs when the connected graph module actually supports them.
         // The client already gates on UDFContext, but the route must not trust a stale/tampered flag.
         // Reuse the already-authenticated session connection (no extra getClient / connection re-resolve).
-        let safeUdfs = udfs && udfs.length > 0 ? udfs : undefined;
+        // Drop libraries with no functions: the schema permits empty `functions` arrays, but an empty
+        // library is useless context, so a degenerate/tampered catalog degrades to "no UDF context"
+        // instead of wasting prompt tokens.
+        const nonEmptyUdfs = udfs?.filter((library) => library.functions.length > 0);
+        let safeUdfs = nonEmptyUdfs && nonEmptyUdfs.length > 0 ? nonEmptyUdfs : undefined;
         if (safeUdfs) {
             try {
                 const modules = await (await session.client.connection).moduleList();

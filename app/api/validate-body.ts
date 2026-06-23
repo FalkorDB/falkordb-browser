@@ -199,10 +199,11 @@ export const chatRequest = z.object({
     .string()
     .optional()
     .default(""),
-  // Caller-supplied UDF catalog (from the already-discovered, capability-gated UDFContext). Bounded
-  // to keep an untrusted client payload from inflating the prompt; the client clamps to the same
-  // limits (see app/utils.ts) so a large catalog degrades instead of being rejected. Names only —
-  // signatures/descriptions are intentionally not accepted from the client (prompt-injection surface).
+  // Caller-supplied UDF catalog (from the already-discovered, capability-gated UDFContext). These
+  // `.max(...)` limits are a hard server-side contract: an oversized/untrusted payload is rejected
+  // (400) rather than inflating the prompt. The client clamps to the same limits (see app/utils.ts)
+  // before sending, so a legitimately large catalog degrades to a bounded subset instead of 400-ing.
+  // Names only — signatures/descriptions are intentionally not accepted from the client (prompt-injection surface).
   udfs: z
     .array(
       z.object({
