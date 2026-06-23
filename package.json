@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@falkordb/canvas": "v0.1.0",
-    "@falkordb/text-to-cypher": "^0.1.17",
+    "@falkordb/text-to-cypher": "^0.2.0",
     "@hookform/resolvers": "^5.4.0",
     "@monaco-editor/react": "^4.6.0",
     "@radix-ui/react-alert-dialog": "^1.1.17",
