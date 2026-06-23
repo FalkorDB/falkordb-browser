@@ -160,8 +160,7 @@ type GraphContextType = {
   setGraph: Dispatch<SetStateAction<Graph>>;
   graphName: string;
   handleSetGraphName: (name: string) => void;
-  graphInfo: GraphInfo;
-  setGraphInfo: Dispatch<SetStateAction<GraphInfo>>;
+  setGraphInfo: (gi: GraphInfo) => void;
   graphNames: string[];
   setGraphNames: Dispatch<SetStateAction<string[]>>;
   labels: Label[];
@@ -392,7 +391,6 @@ export const GraphContext = createContext<GraphContextType>({
   setGraph: () => { },
   graphName: "",
   handleSetGraphName: () => { },
-  graphInfo: GraphInfo.empty(() => { }, () => { }),
   setGraphInfo: () => { },
   graphNames: [],
   setGraphNames: () => { },

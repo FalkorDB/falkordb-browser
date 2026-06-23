@@ -198,11 +198,16 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [graphNames, setGraphNames] = useState<string[]>([]);
   const [graphNamesLoaded, setGraphNamesLoaded] = useState(false);
   const [graph, setGraph] = useState<Graph>(Graph.empty());
+  // setGraphInfo updates the GraphInfo inside the graph so there is one source of
+  // truth. Every graphInfo change produces a new Graph object reference, which
+  // triggers React re-renders for all consumers of the graph context.
+  const setGraphInfo = useCallback((gi: GraphInfo) => {
+    setGraph(prev => { const g = prev.clone(); g.GraphInfo = gi.clone(); return g; });
+  }, []);
   const [data, setData] = useState<GraphData>({ ...graph.Elements });
   const [graphData, setGraphData] = useState<CanvasData>();
   const [layout, setLayout] = useState<LayoutMode>(normalizeLayout(urlLayout));
   const [direction, setDirection] = useState(() => normalizeDirection(normalizeLayout(urlLayout), urlDirection));
-  const [graphInfo, setGraphInfo] = useState<GraphInfo>(GraphInfo.empty(toast, setIndicator));
   // Do NOT initialize from urlGraphName — start empty and let the gated URL sync
   // below apply it only after the graph list is loaded and the name is validated.
   // This prevents page.tsx from running queries (and FalkorDB from auto-creating
@@ -661,7 +666,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         const newLabels = metaStats?.[0] || [];
         const newRelationships = metaStats?.[1] || [];
         const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
-        setGraphInfo(gi);
+        // setGraph(g) below already carries gi inside — no separate setGraphInfo needed.
         return gi;
       }).catch((error) => {
         console.error("Failed to fetch graph info:", error);
@@ -768,7 +773,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setGraph,
     graphName,
     handleSetGraphName,
-    graphInfo,
     setGraphInfo,
     graphNames,
     setGraphNames,
@@ -793,7 +797,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     selectedParam,
     setSelectedParam,
     initialQuery: initialQueryRef.current,
-  }), [graph, graphName, handleSetGraphName, graphInfo, graphNames, labels, relationships, nodesCount, edgesCount, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, selectedParam]);
+  }), [graph, graphName, handleSetGraphName, graphNames, labels, relationships, nodesCount, edgesCount, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, selectedParam]);
 
   useEffect(() => {
     setRelationships([...graph.Relationships]);

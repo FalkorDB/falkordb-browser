@@ -362,11 +362,38 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         }
     }, [historyQuery.query]);
 
-    const fetchSuggestions = async (detail: string): Promise<monaco.languages.CompletionItem[]> => {
+    // Build label, relationship, and property-key suggestions directly from the graph
+    // object (already in memory) — no extra network round-trips needed.
+    const getGraphInfoSuggestions = useCallback((): monaco.languages.CompletionItem[] => {
+        const items: monaco.languages.CompletionItem[] = [];
+        const range = new monaco.Range(1, 1, 1, 1);
+
+        // Labels
+        graph.GraphInfo.Labels.forEach((_, name) => {
+            if (!name) return;
+            items.push({ insertText: name, label: name, kind: monaco.languages.CompletionItemKind.Class, range, detail: '(label)' });
+        });
+
+        // Relationship types
+        graph.GraphInfo.Relationships.forEach((_, name) => {
+            if (!name) return;
+            items.push({ insertText: name, label: name, kind: monaco.languages.CompletionItemKind.Interface, range, detail: '(relationship type)' });
+        });
+
+        // Property keys
+        (graph.GraphInfo.PropertyKeys ?? []).forEach(key => {
+            items.push({ insertText: key, label: key, kind: monaco.languages.CompletionItemKind.Property, range, detail: '(property key)' });
+        });
+
+        return items;
+    }, [graph.GraphInfo]);
+
+    // Fetch only functions from the server — everything else comes from graphInfo.
+    const fetchFunctions = async (): Promise<monaco.languages.CompletionItem[]> => {
         if (indicatorRef.current === "offline") return [];
 
         const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
-        const result = await securedFetch(`api/graph/${graphIdRef.current}/info?type=${prepareArg(detail)}${readOnlyParam}`, {
+        const result = await securedFetch(`api/graph/${graphIdRef.current}/info?type=${prepareArg('(function)')}${readOnlyParam}`, {
             method: 'GET',
         }, toast, setIndicator);
 
@@ -377,34 +404,14 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         if (json.result.data.length === 0) return [];
 
         return json.result.data.map(({ info }: { info: string }) => ({
-            insertTextRules: detail === '(function)' ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet : undefined,
-            insertText: detail === '(function)' ? `${info}(\${0})` : info,
-            label: detail === '(function)' ? `${info}()` : info,
-            kind: (() => {
-                switch (detail) {
-                    case '(function)':
-                        return monaco.languages.CompletionItemKind.Function;
-                    case '(property key)':
-                        return monaco.languages.CompletionItemKind.Property;
-                    case '(label)':
-                        return monaco.languages.CompletionItemKind.Class;
-                    case '(relationship type)':
-                        return monaco.languages.CompletionItemKind.Interface;
-                    default:
-                        return monaco.languages.CompletionItemKind.Variable;
-                }
-            })(),
+            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+            insertText: `${info}(\${0})`,
+            label: `${info}()`,
+            kind: monaco.languages.CompletionItemKind.Function,
             range: new monaco.Range(1, 1, 1, 1),
-            detail
+            detail: '(function)',
         }));
     };
-
-    const getRemoteSuggestions = async () => (await Promise.all([
-        fetchSuggestions('(function)'),
-        fetchSuggestions('(property key)'),
-        fetchSuggestions('(label)'),
-        fetchSuggestions('(relationship type)')
-    ])).flat();
 
     const udfSuggestions = useMemo((): monaco.languages.CompletionItem[] =>
         udfList.flatMap(([, libName, , functions]) =>
@@ -421,7 +428,11 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
     // Returns ALL suggestions including full-path namespaced functions (for tokenizer & dot navigation)
     const getFullSuggestions = useCallback(async (): Promise<monaco.languages.CompletionItem[]> => {
-        const remoteSuggestions = graphIdRef.current ? await getRemoteSuggestions() : [];
+        // Labels, relationship types, and property keys come from the in-memory graph object.
+        // Only functions require a server fetch (they are not part of graph metadata).
+        const graphInfoSuggestions = getGraphInfoSuggestions();
+        const functionSuggestions = graphIdRef.current ? await fetchFunctions() : [];
+        const remoteSuggestions = [...graphInfoSuggestions, ...functionSuggestions];
 
         // Add bound element variables as suggestions
         const varSuggestions: monaco.languages.CompletionItem[] = Array.from(boundVarsRef.current).map(v => ({
@@ -463,16 +474,18 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             seen.add(key);
             return true;
         });
-    }, [udfSuggestions]);
+    }, [udfSuggestions, getGraphInfoSuggestions]);
 
-    // Returns filtered suggestions for the default (non-dot) autocomplete display:
-    // includes full-path namespaced functions so they appear when typing a prefix like "db"
-    // excludes only property keys (those are shown after typing '.' on a bound variable)
+    // Returns suggestions for the default (non-dot) autocomplete display.
+    // Excludes namespaced functions (accessed via dot drill-down) and property keys.
     const getAllSuggestions = useCallback(async (prefetched?: monaco.languages.CompletionItem[]): Promise<monaco.languages.CompletionItem[]> => {
         const full = prefetched ?? await getFullSuggestions();
 
         const filtered = full.filter(s => {
-            // Skip property keys — they are shown only after typing '.' on a bound variable
+            const label = typeof s.label === 'string' ? s.label : s.label.label;
+            // Skip namespaced functions — accessed only via dot drill-down
+            if ((s.detail === '(function)' || s.detail === '(udf function)') && label.includes('.')) return false;
+            // Skip property keys — shown only after typing '.' on a bound variable
             if (s.detail === '(property key)') return false;
             return true;
         });
@@ -494,7 +507,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             const label = typeof s.label === 'string' ? s.label : s.label.label;
             return { ...s, sortText: `${prefix}_${label.toLowerCase()}` };
         });
-    }, [udfSuggestions]);
+    }, [getFullSuggestions]);
 
     const updateTokenizer = async (monacoI: Monaco, prefetchedSuggestions?: monaco.languages.CompletionItem[]) => {
         const sug = prefetchedSuggestions ?? await getFullSuggestions();
@@ -588,13 +601,13 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         });
     };
 
-    // Invalidate the suggestion cache and rebuild the tokenizer when the graph or UDFs change.
+    // Invalidate the suggestion cache and rebuild the tokenizer when the graph, its info, or UDFs change.
     useEffect(() => {
         cachedSuggestionsRef.current = [];
         if (monacoRef.current && graphIdRef.current) {
             updateTokenizer(monacoRef.current);
         }
-    }, [graph.Id, udfList]);
+    }, [graph.Id, graph.GraphInfo, udfList]);
 
     const cypherLanguageConfig: LanguageConfig = useMemo(() => ({
         monarchTokensProvider: DEFAULT_MONARCH_TOKENIZER,
@@ -682,17 +695,12 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                     const isFunction = parts[depth - 1].includes('(');
 
                     if (depth === 1) {
+                        // Direct child: show as function or namespace
                         addItem(remainder, !isFunction);
-                    } else if (depth === 2 && isFunction) {
-                        // namespace.function() — only expose the namespace for drill-down
-                        addItem(parts[0], true);
                     } else {
-                        // depth >= 2: show the immediate drill-down namespace + the complete path only.
-                        // Intermediate half-paths (e.g. idx.fulltext) are intentionally omitted.
+                        // Deeper: only expose the immediate first-level namespace for drill-down.
+                        // Never show full paths (e.g. idx.fulltext.queryNodes()) at this level.
                         addItem(parts[0], true);
-                        if (isFunction) {
-                            addItem(remainder, false);
-                        }
                     }
                 });
 
@@ -719,25 +727,10 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                 }));
             }
 
-            // Default (non-dot) case: include full-path namespaced functions so typing "db"
-            // surfaces db.idx.fulltext.queryNodes() etc. Compute the word range at cursor so
-            // Monaco replaces the typed prefix correctly and can filter by it.
-            const items = await getAllSuggestions(fullSug);
-
-            if (!model || !position) return items;
-
-            const wordInfo = model.getWordUntilPosition(position);
-            const wordRange = new monaco.Range(
-                position.lineNumber, wordInfo.startColumn,
-                position.lineNumber, position.column,
-            );
-
-            return items.map(s => {
-                const label = typeof s.label === 'string' ? s.label : s.label.label;
-                // Strip trailing "()" for filterText so Monaco can fuzzy-match "db" → "db.idx.fulltext.queryNodes()"
-                const filterText = label.replace(/\(\)$/, '');
-                return { ...s, filterText, range: wordRange };
-            });
+            // Default (non-dot) case: namespaced functions are hidden here — only the
+            // top-level namespace token (e.g. "db") is shown; drilling down via '.' reveals
+            // the contents level by level.
+            return getAllSuggestions(fullSug);
         },
     // updateTokenizer intentionally excluded: getSuggestions no longer calls it.
     }), [getFullSuggestions, getAllSuggestions]);
