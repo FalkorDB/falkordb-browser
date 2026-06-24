@@ -23,6 +23,7 @@ interface Props {
     setRelationships: Dispatch<SetStateAction<Relationship[]>>
     viewport?: ViewportState
     setViewport?: Dispatch<SetStateAction<ViewportState>>
+    dimmed?: boolean
 }
 
 export default function ForceGraph({
@@ -36,6 +37,7 @@ export default function ForceGraph({
     setRelationships,
     viewport = undefined,
     setViewport = undefined,
+    dimmed = false,
 }: Props) {
 
     const { setIndicator } = useContext(IndicatorContext);
@@ -184,23 +186,51 @@ export default function ForceGraph({
         } else {
             // Single click: select this node
             lastClick.current = { date: now, id: node.id };
-            if (event.shiftKey || event.ctrlKey) {
-                setSelectedElements([...selectedElements, fullNode]);
-            } else {
-                setSelectedElements([fullNode]);
+            const nextSelection = (event.shiftKey || event.ctrlKey)
+                ? [...selectedElements, fullNode]
+                : [fullNode];
+            setSelectedElements(nextSelection);
+
+            if (dimmed && canvasRef.current) {
+                const nodeIds = new Set(nextSelection.filter(el => !('source' in el)).map(el => el.id));
+                const graphData = canvasRef.current.getGraphData();
+                const focused = graphData.nodes.filter(n => nodeIds.has(n.id));
+                if (focused.length > 0) {
+                    const cx = focused.reduce((s, n) => s + (n.x ?? 0), 0) / focused.length;
+                    const cy = focused.reduce((s, n) => s + (n.y ?? 0), 0) / focused.length;
+                    canvasRef.current.centerAt(cx, cy, 300);
+                }
             }
         }
-    }, [graph.NodesMap, onFetchNode, deleteNeighbors, selectedElements, setSelectedElements]);
+    }, [graph.NodesMap, onFetchNode, deleteNeighbors, selectedElements, setSelectedElements, dimmed, canvasRef]);
 
     const handleLinkClick = useCallback((link: GraphLink, event: MouseEvent) => {
         const fullLink = graph.LinksMap.get(link.id);
         if (!fullLink) return;
-        if (event.shiftKey || event.ctrlKey) {
-            setSelectedElements([...selectedElements, fullLink]);
-        } else {
-            setSelectedElements([fullLink]);
+        const nextSelection = (event.shiftKey || event.ctrlKey)
+            ? [...selectedElements, fullLink]
+            : [fullLink];
+        setSelectedElements(nextSelection);
+
+        if (dimmed && canvasRef.current) {
+            const nodeIds = new Set<number>();
+            for (const el of nextSelection) {
+                if ('source' in el) {
+                    nodeIds.add(el.source as number);
+                    nodeIds.add(el.target as number);
+                } else {
+                    nodeIds.add(el.id);
+                }
+            }
+            const graphData = canvasRef.current.getGraphData();
+            const focused = graphData.nodes.filter(n => nodeIds.has(n.id));
+            if (focused.length > 0) {
+                const cx = focused.reduce((s, n) => s + (n.x ?? 0), 0) / focused.length;
+                const cy = focused.reduce((s, n) => s + (n.y ?? 0), 0) / focused.length;
+                canvasRef.current.centerAt(cx, cy, 300);
+            }
         }
-    }, [graph.LinksMap, selectedElements, setSelectedElements]);
+    }, [graph.LinksMap, selectedElements, setSelectedElements, dimmed, canvasRef]);
 
     const handleHover = useCallback((element: GraphNode | GraphLink | null) => {
         if (element === null) {
@@ -255,36 +285,77 @@ export default function ForceGraph({
         (!!hoverElement && 'source' in hoverElement && hoverElement.id === link.id)
         , [selectedElements, hoverElement]);
 
-    // Dim everything not in the selected set (including their neighborhoods).
-    // Only evaluated when the canvas `dimmed` flag is true.
+    // Dim everything not in the selected/hovered neighbourhood.
+    // - Toggle (dimmed) on: dim based on selection + hover neighborhood
+    // - Toggle off but hovering: dim based on hover neighborhood only
+    // - Toggle off, nothing hovered: no dimming
     const checkIsNodeDimmed = useCallback((node: GraphNode) => {
-        if (selectedElements.length === 0) return false;
-        // Directly selected
-        if (selectedElements.some(el => !('source' in el) && el.id === node.id)) return false;
-        // Endpoint of a selected link
-        if (selectedElements.some(el => 'source' in el && (el.source === node.id || el.target === node.id))) return false;
-        // Neighbor of a selected node
-        const selectedNodeIds = new Set(selectedElements.filter(el => !('source' in el)).map(el => el.id));
-        if (selectedNodeIds.size > 0) {
-            for (const link of graph.Elements.links) {
-                if ((link.source === node.id && selectedNodeIds.has(link.target as number)) ||
-                    (link.target === node.id && selectedNodeIds.has(link.source as number))) {
-                    return false;
+        if (!dimmed && !hoverElement) return false;
+
+        // Build active node IDs:
+        // selection is only included when the toggle is on; hover is always included
+        const activeNodeIds = new Set<number>();
+        if (dimmed) {
+            for (const el of selectedElements) {
+                if (!('source' in el)) activeNodeIds.add(el.id);
+                else {
+                    activeNodeIds.add(el.source as number);
+                    activeNodeIds.add(el.target as number);
                 }
             }
         }
+        if (hoverElement && !('source' in hoverElement)) activeNodeIds.add(hoverElement.id);
+        if (hoverElement && 'source' in hoverElement) {
+            activeNodeIds.add(hoverElement.source as number);
+            activeNodeIds.add(hoverElement.target as number);
+        }
+
+        if (activeNodeIds.size === 0) return false;
+        if (activeNodeIds.has(node.id)) return false;
+
+        // Neighbours of any active node are also undimmed
+        for (const link of graph.Elements.links) {
+            if ((activeNodeIds.has(link.source as number) && link.target === node.id) ||
+                (activeNodeIds.has(link.target as number) && link.source === node.id)) {
+                return false;
+            }
+        }
+
         return true;
-    }, [selectedElements, graph.Elements.links]);
+    }, [dimmed, selectedElements, hoverElement, graph.Elements.links]);
 
     const checkIsLinkDimmed = useCallback((link: GraphLink) => {
-        if (selectedElements.length === 0) return false;
-        // Directly selected
-        if (selectedElements.some(el => 'source' in el && el.id === link.id)) return false;
-        // At least one endpoint is a selected node
-        const selectedNodeIds = new Set(selectedElements.filter(el => !('source' in el)).map(el => el.id));
-        if (selectedNodeIds.has(link.source.id) || selectedNodeIds.has(link.target.id)) return false;
+        if (!dimmed && !hoverElement) return false;
+
+        // Hovered link itself is never dimmed
+        if (hoverElement && 'source' in hoverElement && hoverElement.id === link.id) return false;
+
+        // Build active node set (same rules as checkIsNodeDimmed)
+        const activeNodeIds = new Set<number>();
+        if (dimmed) {
+            for (const el of selectedElements) {
+                if (!('source' in el)) activeNodeIds.add(el.id);
+                else {
+                    activeNodeIds.add(el.source as number);
+                    activeNodeIds.add(el.target as number);
+                }
+            }
+            // Directly selected link
+            if (selectedElements.some(el => 'source' in el && el.id === link.id)) return false;
+        }
+        if (hoverElement && !('source' in hoverElement)) activeNodeIds.add(hoverElement.id);
+        if (hoverElement && 'source' in hoverElement) {
+            activeNodeIds.add(hoverElement.source as number);
+            activeNodeIds.add(hoverElement.target as number);
+        }
+
+        if (activeNodeIds.size === 0) return false;
+
+        // A link is undimmed if at least one endpoint is active
+        if (activeNodeIds.has(link.source.id) || activeNodeIds.has(link.target.id)) return false;
+
         return true;
-    }, [selectedElements]);
+    }, [dimmed, selectedElements, hoverElement]);
 
     // Update colors
     useEffect(() => {

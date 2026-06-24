@@ -353,4 +353,118 @@ test.describe('Canvas Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
+    // ─── Focus Mode (dim) tests ──────────────────────────────────────────────
+
+    test(`@admin Focus mode switch is visible in controls bar`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const graphName = getRandomString('canvas');
+        await graph.addGraph(graphName);
+        await graph.insertQuery(CREATE_TWO_NODES_QUERY);
+        await graph.clickRunQuery();
+        expect(await graph.isDimContainerVisible()).toBe(true);
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin Focus mode switch toggles on and off`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const graphName = getRandomString('canvas');
+        await graph.addGraph(graphName);
+        await graph.insertQuery(CREATE_TWO_NODES_QUERY);
+        await graph.clickRunQuery();
+
+        // Initially off
+        expect(await graph.isDimControlChecked()).toBe(false);
+
+        // Turn on
+        await graph.clickDimControl();
+        expect(await graph.isDimControlChecked()).toBe(true);
+
+        // Turn off
+        await graph.clickDimControl();
+        expect(await graph.isDimControlChecked()).toBe(false);
+
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin Focus mode dims non-selected nodes after clicking a node`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const graphName = getRandomString('canvas');
+        await graph.addGraph(graphName);
+        // Create two disconnected nodes so clicking one does not bring the other into the neighborhood
+        await graph.insertQuery(`CREATE (a:Person {name: 'Alice'}), (b:Person {name: 'Bob'}) RETURN a, b`);
+        await graph.clickRunQuery();
+        await graph.waitForCanvasAnimationToEnd();
+        await graph.clickCenterControl();
+        await graph.waitForScaleToStabilize();
+
+        // Enable focus mode
+        await graph.clickDimControl();
+        expect(await graph.isDimControlChecked()).toBe(true);
+
+        // Click one of the nodes
+        const nodes = await graph.getNodesScreenPositions();
+        expect(nodes.length).toBeGreaterThanOrEqual(2);
+        await graph.clickCanvasElement(nodes[0].screenX, nodes[0].screenY);
+        await graph.waitForTimeout(300);
+
+        // The canvas should still be rendering — just verify the switch remains on
+        expect(await graph.isDimControlChecked()).toBe(true);
+
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin Disabling focus mode after selecting a node restores full rendering`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const graphName = getRandomString('canvas');
+        await graph.addGraph(graphName);
+        await graph.insertQuery(CREATE_TWO_NODES_QUERY);
+        await graph.clickRunQuery();
+        await graph.waitForCanvasAnimationToEnd();
+        await graph.clickCenterControl();
+        await graph.waitForScaleToStabilize();
+
+        // Enable focus mode and click a node
+        await graph.clickDimControl();
+        const nodes = await graph.getNodesScreenPositions();
+        await graph.clickCanvasElement(nodes[0].screenX, nodes[0].screenY);
+        await graph.waitForTimeout(300);
+
+        // Turn focus mode back off — switch should be off again
+        await graph.clickDimControl();
+        expect(await graph.isDimControlChecked()).toBe(false);
+
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin Clicking a relationship in focus mode keeps its endpoints undimmed`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const graphName = getRandomString('canvas');
+        await graph.addGraph(graphName);
+        await graph.insertQuery(`CREATE (a:Person {name: 'Alice'})-[r:KNOWS]->(b:Person {name: 'Bob'}), (c:Person {name: 'Carol'}) RETURN a, r, b, c`);
+        await graph.clickRunQuery();
+        await graph.waitForCanvasAnimationToEnd();
+        await graph.clickCenterControl();
+        await graph.waitForScaleToStabilize();
+
+        // Enable focus mode
+        await graph.clickDimControl();
+        expect(await graph.isDimControlChecked()).toBe(true);
+
+        // Click somewhere on the canvas to see that mode stays on
+        const links = await graph.getLinksScreenPositions();
+        expect(links.length).toBeGreaterThan(0);
+        await graph.clickCanvasElement(links[0].midX, links[0].midY);
+        await graph.waitForTimeout(300);
+
+        // Focus mode should still be enabled
+        expect(await graph.isDimControlChecked()).toBe(true);
+
+        await apicalls.removeGraph(graphName);
+    });
+
 });

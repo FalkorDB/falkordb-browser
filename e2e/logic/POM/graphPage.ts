@@ -168,6 +168,14 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("animationControl");
   }
 
+  public get dimControl(): Locator {
+    return this.page.getByTestId("dimControl");
+  }
+
+  public get dimContainer(): Locator {
+    return this.page.getByTestId("dimContainer");
+  }
+
   public get pinControl(): Locator {
     return this.page.getByTestId("pinControl");
   }
@@ -894,6 +902,23 @@ export default class GraphPage extends BasePage {
       (el) => el.click(),
       "Animation Control"
     );
+  }
+
+  async clickDimControl(): Promise<void> {
+    await interactWhenVisible(
+      this.dimControl,
+      (el) => el.click(),
+      "Dim Control"
+    );
+  }
+
+  async isDimControlChecked(): Promise<boolean> {
+    const state = await this.dimControl.getAttribute("data-state");
+    return state === "checked";
+  }
+
+  async isDimContainerVisible(): Promise<boolean> {
+    return this.dimContainer.isVisible();
   }
 
   async clickZoomInControl(): Promise<void> {
