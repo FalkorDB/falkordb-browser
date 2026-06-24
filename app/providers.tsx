@@ -189,6 +189,15 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   const { graphName: urlGraphName, selected: urlSelected, query: urlQuery, layout: urlLayout, direction: urlDirection } = useGraphParams();
   const initialQueryRef = useRef(urlQuery);
+  // Capture the URL graph param at render time — before any effects (e.g.
+  // syncRouteUrlParams) can strip ?graph= from window.location. We cannot
+  // rely on urlGraphName (useSearchParams) because it returns "" during SSR
+  // and the URL is mutated by effects before content persistence can read it.
+  const initialUrlGraphNameRef = useRef(
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("graph") || ""
+      : ""
+  );
 
   const [indicator, setIndicator] = useState<"online" | "offline">("online");
   const [historyQuery, setHistoryQuery] = useState<HistoryQuery>(defaultQueryHistory);
@@ -1261,6 +1270,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Only write URL while on /graph and not during tutorial
     if (pathname !== "/graph" || tutorialOpen) return;
 
+    // Don't wipe URL params before the graph list has loaded. The URL→state
+    // sync is gated on graphNamesLoaded; if we write state→URL with
+    // graphName="" first, we strip ?graph= before URL sync can apply it,
+    // leaving urlGraphName="" permanently and the URL graph never loading.
+    if (!graphNamesLoaded) return;
+
     // Sync all context state to URL via centralized builder
     syncRouteUrlParams(pathname, {
       graph: graphName,
@@ -1269,7 +1284,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       layout,
       direction,
     });
-  }, [pathname, selectedParam, graphName, urlQueryText, graph.Id, layout, direction, tutorialOpen]);
+  }, [pathname, selectedParam, graphName, urlQueryText, graph.Id, layout, direction, tutorialOpen, graphNamesLoaded]);
 
   // Restore content persistence once on app mount (after auth + settings + graph names loaded)
   useEffect(() => {
@@ -1277,6 +1292,17 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     // If a graph is already loaded, mark as restored and skip
     if (graph.Id) {
+      contentRestoredRef.current = true;
+      return;
+    }
+
+    // URL takes priority over saved content. When the URL explicitly names an
+    // existing graph, the URL→state sync and the graph-loading effect handle
+    // everything — skip persistence so it doesn't overwrite the URL graph.
+    // Use the ref captured at render time: by the time this effect fires,
+    // syncRouteUrlParams may have already stripped ?graph= from window.location.
+    const urlGraph = initialUrlGraphNameRef.current;
+    if (urlGraph && graphNames.includes(urlGraph)) {
       contentRestoredRef.current = true;
       return;
     }
@@ -1294,6 +1320,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     } catch {
       // Invalid saved content, ignore
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefixReady, contentPersistence, graphNames, graph.Id, runQuery, handleSetGraphName]);
   // Reset all graph state when the active connection changes (user switch)
   useEffect(() => {

@@ -31,6 +31,8 @@ interface Props {
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
     editorKey: string
     isQueryLoading: boolean
+    /** Called whenever the Cypher language config (suggestions) is created or updated. */
+    onLanguageConfig?: (config: LanguageConfig) => void
 }
 
 const MAX_HEIGHT = 20;
@@ -42,7 +44,7 @@ const KEYWORDS = CYPHER_KEYWORDS;
 
 const FUNCTIONS = BUILTIN_FUNCTIONS;
 
-const STATIC_SUGGESTIONS: monaco.languages.CompletionItem[] = [
+export const STATIC_SUGGESTIONS: monaco.languages.CompletionItem[] = [
     ...KEYWORDS.map(key => ({
         insertText: key,
         label: key,
@@ -108,7 +110,44 @@ const CYPHER_LANGUAGE_CONFIGURATION: monaco.languages.LanguageConfiguration = {
     ]
 };
 
-export default function CypherEditor({ graph, graphName, historyQuery, maximize, setMaximize, runQuery, setHistoryQuery, editorKey, isQueryLoading }: Props) {
+// Disables Monaco's built-in power-user shortcuts for the compact query input bar.
+// The full-page (maximized) editor keeps them.
+function disableCompactEditorShortcuts(e: monaco.editor.IStandaloneCodeEditor) {
+    /* eslint-disable no-bitwise */
+    e.addCommand(monaco.KeyCode.F1, () => { });
+    e.addCommand(monaco.KeyCode.F12, () => { });
+    e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => { });
+    e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyH, () => { });
+    e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyG, () => { });
+    e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyD, () => { });
+    e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Slash, () => { });
+    e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Period, () => { });
+    e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyK, () => { });
+    e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyL, () => { });
+    e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyP, () => { });
+    e.addCommand(monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF, () => { });
+    e.addCommand(monaco.KeyMod.Alt | monaco.KeyCode.UpArrow, () => { });
+    e.addCommand(monaco.KeyMod.Alt | monaco.KeyCode.DownArrow, () => { });
+    e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.UpArrow, () => { });
+    e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.DownArrow, () => { });
+    // Pass browser reload shortcuts through rather than silently swallowing them.
+    e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyR, () => { window.location.reload(); });
+    e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyR, () => { window.location.reload(); });
+    /* eslint-enable no-bitwise */
+}
+
+// Registers Shift+Enter for all CypherEditor instances.
+// Escape is registered separately per editor context (see handleEditorDidMount).
+function registerUniversalEditorBindings(e: monaco.editor.IStandaloneCodeEditor) {
+    /* eslint-disable no-bitwise */
+    // Shift+Enter: always insert a raw newline regardless of suggest widget state.
+    e.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
+        e.trigger('keyboard', 'type', { text: '\n' });
+    });
+    /* eslint-enable no-bitwise */
+}
+
+export default function CypherEditor({ graph, graphName, historyQuery, maximize, setMaximize, runQuery, setHistoryQuery, editorKey, isQueryLoading, onLanguageConfig }: Props) {
     const { indicator, setIndicator } = useContext(IndicatorContext);
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { udfList } = useContext(UDFContext);
@@ -212,7 +251,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             window.removeEventListener("resize", handleResize);
             observer.disconnect();
         };
-    // containerRef is stable after mount; [] is correct here.
+        // containerRef is stable after mount; [] is correct here.
     }, []);
 
     useEffect(() => {
@@ -339,9 +378,12 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     // ref before calling is all that's needed for correct highlighting. The cache is only used to
     // avoid re-fetching schema data from the server on every keystroke.
     useEffect(() => {
-        if (!monacoRef.current) return;
+        // Always update the ref so that programmatically-set queries (URL params,
+        // saved context, default query) populate boundVarsRef before the editor
+        // mounts and calls updateTokenizer via handleMonacoReady.
         const boundVars = new Set(extractVariableCandidates(historyQuery.query));
         boundVarsRef.current = boundVars;
+        if (!monacoRef.current) return;
 
         const baseCache = cachedSuggestionsRef.current.filter(s => s.detail !== '(variable)');
 
@@ -487,6 +529,8 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             if ((s.detail === '(function)' || s.detail === '(udf function)') && label.includes('.')) return false;
             // Skip property keys — shown only after typing '.' on a bound variable
             if (s.detail === '(property key)') return false;
+            // Skip namespaces — shown only after CALL keyword
+            if (s.detail === '(namespace)') return false;
             return true;
         });
 
@@ -667,7 +711,10 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
                 const isBound = nodePattern.test(queryText) || relPattern.test(queryText);
 
-                if (isBound) return allPropertyKeys.map(s => ({ ...s, filterText: '', range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column) }));
+                if (isBound) return allPropertyKeys.map(s => {
+                    const keyLabel = typeof s.label === 'string' ? s.label : s.label.label;
+                    return { ...s, filterText: '', sortText: `5_${keyLabel.toLowerCase()}`, range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column) };
+                });
 
                 // Not a node/relationship variable — build a recursive flat list for this namespace.
                 // Rules:
@@ -718,6 +765,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                     insertTextRules: isNamespace ? undefined : monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
                     label: remainder,
                     filterText: '',
+                    sortText: isNamespace ? `0_${remainder.toLowerCase()}` : `1_${remainder.toLowerCase()}`,
                     kind: isNamespace
                         ? monaco.languages.CompletionItemKind.Module
                         : monaco.languages.CompletionItemKind.Function,
@@ -727,13 +775,43 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                 }));
             }
 
-            // Default (non-dot) case: namespaced functions are hidden here — only the
-            // top-level namespace token (e.g. "db") is shown; drilling down via '.' reveals
-            // the contents level by level.
+            // CALL context: show only procedure namespaces (e.g. "db", "algo").
+            // Dot-chaining after a namespace ("CALL db.") is handled by the hasDot branch above.
+            if (model && position) {
+                const linePrefix = model.getValueInRange({
+                    startLineNumber: position.lineNumber,
+                    startColumn: 1,
+                    endLineNumber: position.lineNumber,
+                    endColumn: position.column,
+                });
+                const callMatch = linePrefix.match(/\bCALL\s+(\w*)$/i);
+                if (callMatch) {
+                    const typedPrefix = callMatch[1];
+                    const namespaces = fullSug.filter(s => s.detail === '(namespace)');
+                    return namespaces.map(s => {
+                        const label = typeof s.label === 'string' ? s.label : s.label.label;
+                        return {
+                            ...s,
+                            filterText: label,
+                            range: new monaco.Range(
+                                position.lineNumber, position.column - typedPrefix.length,
+                                position.lineNumber, position.column,
+                            ),
+                        };
+                    });
+                }
+            }
+
+            // Default (non-dot, non-CALL) case.
             return getAllSuggestions(fullSug);
         },
-    // updateTokenizer intentionally excluded: getSuggestions no longer calls it.
+        // updateTokenizer intentionally excluded: getSuggestions no longer calls it.
     }), [getFullSuggestions, getAllSuggestions]);
+
+    // Publish the language config to callers (e.g. QueryHistoryPanel) whenever it changes.
+    useEffect(() => {
+        onLanguageConfig?.(cypherLanguageConfig);
+    }, [cypherLanguageConfig, onLanguageConfig]);
 
     const handleSubmit = async () => {
         runQuery(historyQuery.query.trim());
@@ -779,7 +857,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         }
     };
 
-    const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
+    const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor, onEscape?: () => void) => {
         const updatePlaceholderVisibility = () => {
             const hasContent = !!e.getValue();
             if (placeholderRef.current) {
@@ -821,25 +899,24 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         // Also update when content changes (e.g. setValue from history navigation)
         e.onDidChangeModelContent(updateLineKeys);
 
-        // Escape: dismiss suggestions if visible, otherwise blur the editor
-        e.addCommand(monaco.KeyCode.Escape, () => {
-            const domNode = e.getDomNode();
-            if (!domNode) return;
-
-            // Check if the suggest widget is visible in the DOM
-            const suggestWidget = domNode.querySelector('.editor-widget.suggest-widget.visible');
-            if (suggestWidget) {
-                // Dismiss the suggestion widget
-                e.trigger('keyboard', 'hideSuggestWidget', {});
-            } else {
-                const textarea = domNode.querySelector('textarea');
-                if (textarea) (textarea as HTMLTextAreaElement).blur();
-            }
-        });
+        // Escape: dismiss suggestions if visible (Monaco built-in), then run context action.
+        // The precondition `!suggestWidgetVisible` ensures this only fires after suggestions
+        // are already dismissed — so two Escape presses are needed when suggestions are open.
+        registerUniversalEditorBindings(e);
 
         // eslint-disable-next-line no-bitwise
-        e.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
-            e.trigger('keyboard', 'type', { text: '\n' });
+        e.addAction({
+            id: 'escape-action',
+            label: onEscape ? 'Close full-screen editor' : 'Blur editor',
+            keybindings: [monaco.KeyCode.Escape],
+            precondition: '!suggestWidgetVisible',
+            run: () => {
+                if (onEscape) {
+                    onEscape();
+                } else {
+                    (document.activeElement as HTMLElement)?.blur();
+                }
+            },
         });
 
         // eslint-disable-next-line no-bitwise
@@ -848,60 +925,62 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             submitQuery.current?.click();
         });
 
-        e.addAction({
-            id: 'submit',
-            label: 'Submit Query',
-            // eslint-disable-next-line no-bitwise
-            keybindings: [monaco.KeyCode.Enter],
-            contextMenuOrder: 1.5,
-            run: async () => {
-                if (indicatorRef.current === "offline" || !queryRef.current || !graphNameRef.current || tutorialOpenRef.current) return;
-                submitQuery.current?.click();
-            },
-            precondition: '!suggestWidgetVisible',
-        });
+        // The compact bar uses Enter to submit and Up/Down to navigate history.
+        // The fullscreen dialog editor (onEscape defined) should have standard
+        // Monaco behaviour: Enter = newline, arrow keys = cursor movement.
+        if (!onEscape) {
+            e.addAction({
+                id: 'submit',
+                label: 'Submit Query',
+                // eslint-disable-next-line no-bitwise
+                keybindings: [monaco.KeyCode.Enter],
+                contextMenuOrder: 1.5,
+                run: async () => {
+                    if (indicatorRef.current === "offline" || !queryRef.current || !graphNameRef.current || tutorialOpenRef.current) return;
+                    submitQuery.current?.click();
+                },
+                precondition: '!suggestWidgetVisible',
+            });
 
-        e.addAction({
-            id: 'history up',
-            label: 'history up',
-            keybindings: [monaco.KeyCode.UpArrow],
-            contextMenuOrder: 1.5,
-            run: async () => {
-                setHistoryQuery(prev => {
-                    if (prev.queries.length === 0) return prev;
+            e.addAction({
+                id: 'history up',
+                label: 'history up',
+                keybindings: [monaco.KeyCode.UpArrow],
+                contextMenuOrder: 1.5,
+                run: async () => {
+                    setHistoryQuery(prev => {
+                        if (prev.queries.length === 0) return prev;
 
-                    const counter = prev.counter > 1 ? prev.counter - 1 : (prev.counter === 0 ? prev.queries.length : 1);
-                    if (counter === prev.counter) return prev;
+                        const counter = prev.counter > 1 ? prev.counter - 1 : (prev.counter === 0 ? prev.queries.length : 1);
+                        if (counter === prev.counter) return prev;
 
-                    const query = prev.queries[counter - 1].text;
-                    return { ...prev, counter, query };
-                });
-            },
-            precondition: 'isFirstLine && !suggestWidgetVisible',
-        });
+                        const query = prev.queries[counter - 1].text;
+                        return { ...prev, counter, query };
+                    });
+                },
+                precondition: 'isFirstLine && !suggestWidgetVisible',
+            });
 
-        e.addAction({
-            id: 'history down',
-            label: 'history down',
-            keybindings: [monaco.KeyCode.DownArrow],
-            contextMenuOrder: 1.5,
-            run: async () => {
-                setHistoryQuery(prev => {
-                    if (prev.queries.length === 0) return prev;
+            e.addAction({
+                id: 'history down',
+                label: 'history down',
+                keybindings: [monaco.KeyCode.DownArrow],
+                contextMenuOrder: 1.5,
+                run: async () => {
+                    setHistoryQuery(prev => {
+                        if (prev.queries.length === 0) return prev;
 
-                    const counter = prev.counter ? (prev.counter + 1 > prev.queries.length ? 0 : prev.counter + 1) : 0;
-                    if (counter === prev.counter) return prev;
+                        const counter = prev.counter ? (prev.counter + 1 > prev.queries.length ? 0 : prev.counter + 1) : 0;
+                        if (counter === prev.counter) return prev;
 
-                    const query = counter ? prev.queries[counter - 1].text : prev.currentQuery.text;
-                    return { ...prev, counter, query };
-                });
-            },
-            precondition: 'isLastLine && !suggestWidgetVisible',
-        });
+                        const query = counter ? prev.queries[counter - 1].text : prev.currentQuery.text;
+                        return { ...prev, counter, query };
+                    });
+                },
+                precondition: 'isLastLine && !suggestWidgetVisible',
+            });
+        }
 
-        // Disable Ctrl+F search in the compact cypher editor
-        // eslint-disable-next-line no-bitwise
-        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => { });
     };
 
     const getLabel = () => {
@@ -947,6 +1026,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                         onMonacoReady={handleMonacoReady}
                         onMount={(e) => {
                             handleEditorDidMount(e);
+                            disableCompactEditorShortcuts(e);
                             editorRef.current = e;
                             setEditorMountVersion(version => version + 1);
                         }}
@@ -1018,7 +1098,11 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                 </div>
             </div>
             <Dialog open={maximize} onOpenChange={setMaximize}>
-                <DialogContent hideClose className="w-full h-full">
+                <DialogContent hideClose className="w-full h-full" onEscapeKeyDown={(e) => {
+                    // When Monaco has focus, let it handle Escape (closes suggestions or blurs).
+                    // Only allow the Dialog to handle Escape if Monaco is not focused.
+                    if ((e.target as HTMLElement)?.closest?.('.monaco-editor')) e.preventDefault();
+                }}>
                     <div className="relative w-full h-full">
                         <VisuallyHidden>
                             <DialogTitle />
@@ -1092,7 +1176,20 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                                 }
                             }}
                             onMount={(e) => {
-                                handleEditorDidMount(e);
+                                handleEditorDidMount(e, () => setMaximize(false));
+                                /* eslint-disable no-bitwise */
+                                // Enable find widget in the fullscreen editor (compact bar disables it).
+                                e.addAction({
+                                    id: 'open-find-dialog',
+                                    label: 'Find',
+                                    keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF],
+                                    run: (editor) => { editor.getAction('actions.find')?.run(); },
+                                });
+                                // Prevent the browser reload shortcuts from triggering a page reload
+                                // inside the fullscreen editor. Users can press Escape first to exit.
+                                e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyR, () => { });
+                                e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyR, () => { });
+                                /* eslint-enable no-bitwise */
                                 dialogEditorRef.current = e;
                                 setEditorMountVersion(version => version + 1);
                             }}

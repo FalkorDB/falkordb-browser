@@ -1414,4 +1414,24 @@ export default class GraphPage extends BasePage {
     await this.page.mouse.click(x, y, { button: "right" });
     await this.page.waitForTimeout(500);
   }
+
+  /**
+   * Returns the text currently shown in the graph selector button, e.g.
+   * the selected graph name or "Select Graph" when nothing is selected.
+   */
+  async getSelectedGraphName(): Promise<string> {
+    const text = await this.page.getByTestId("selectGraph").textContent();
+    return (text ?? "").trim();
+  }
+
+  /**
+   * Set a localStorage item directly via page.evaluate.
+   * Useful for pre-seeding connection-scoped keys before navigation.
+   */
+  async setLocalStorageItem(key: string, value: string): Promise<void> {
+    await this.page.evaluate(
+      ([k, v]) => localStorage.setItem(k, v),
+      [key, value],
+    );
+  }
 }
