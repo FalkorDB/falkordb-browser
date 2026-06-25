@@ -286,11 +286,11 @@ export default function ForceGraph({
         , [selectedElements, hoverElement]);
 
     // Dim everything not in the selected/hovered neighbourhood.
-    // - Toggle (dimmed) on: dim based on selection + hover neighborhood
-    // - Toggle off but hovering: dim based on hover neighborhood only
-    // - Toggle off, nothing hovered: no dimming
+    // - Toggle (dimmed) on + selection or hover: dim based on selection + hover neighborhood
+    // - Toggle off: no dimming at all
     const checkIsNodeDimmed = useCallback((node: GraphNode) => {
-        if (!dimmed && !hoverElement) return false;
+        if (!dimmed) return false;
+        if (selectedElements.length === 0 && !hoverElement) return false;
 
         // Build active node IDs:
         // selection is only included when the toggle is on; hover is always included
@@ -325,7 +325,8 @@ export default function ForceGraph({
     }, [dimmed, selectedElements, hoverElement, graph.Elements.links]);
 
     const checkIsLinkDimmed = useCallback((link: GraphLink) => {
-        if (!dimmed && !hoverElement) return false;
+        if (!dimmed) return false;
+        if (selectedElements.length === 0 && !hoverElement) return false;
 
         // Hovered link itself is never dimmed
         if (hoverElement && 'source' in hoverElement && hoverElement.id === link.id) return false;
