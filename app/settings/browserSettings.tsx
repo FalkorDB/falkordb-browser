@@ -122,7 +122,7 @@ export default function BrowserSettings() {
         modelFetchAbortRef.current = controller;
         console.debug('[LLM] fetch useEffect fired', { requestId, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, selectedChatApiKeyId: selectedChatApiKey?.id });
 
-        (async () => {
+        const fetchLocalModels = async () => {
             if (newChatModelSource === "api-key" && !selectedChatApiKey) {
                 console.debug('[LLM] api-key source with no key — aborting fetch');
                 setModelDisplayNames([]);
@@ -202,9 +202,12 @@ export default function BrowserSettings() {
                     modelFetchAbortRef.current = null;
                 }
             }
-        })();
+        };
+
+        const timeoutId = setTimeout(() => fetchLocalModels(), 300);
 
         return () => {
+            clearTimeout(timeoutId);
             controller.abort();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
