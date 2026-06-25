@@ -120,9 +120,11 @@ export default function BrowserSettings() {
         modelFetchRequestIdRef.current = requestId;
         const controller = new AbortController();
         modelFetchAbortRef.current = controller;
+        console.debug('[LLM] fetch useEffect fired', { requestId, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, selectedChatApiKeyId: selectedChatApiKey?.id });
 
         (async () => {
             if (newChatModelSource === "api-key" && !selectedChatApiKey) {
+                console.debug('[LLM] api-key source with no key — aborting fetch');
                 setModelDisplayNames([]);
                 setModelsMessage("Enter your API key to load live models.");
                 setIsLoadingModels(false);
@@ -136,6 +138,11 @@ export default function BrowserSettings() {
             setModelsMessage(newChatModelSource === "local"
                 ? `Loading local ${LOCAL_LLM_LABELS[newLocalLlmProvider]} models...`
                 : "Loading live models for the selected key...");
+
+            const requestBody = newChatModelSource === "local"
+                ? { source: "local", localProvider: newLocalLlmProvider, endpoint: newLocalLlmEndpoint }
+                : { source: "api-key", key: selectedChatApiKey?.key };
+            console.debug('[LLM] POST /api/chat/models', requestBody);
 
             try {
                 const result = await fetch("/api/chat/models", {
@@ -159,6 +166,7 @@ export default function BrowserSettings() {
                 if (result.ok) {
                     const { models } = await result.json();
                     if (requestId !== modelFetchRequestIdRef.current) return;
+                    console.debug('[LLM] fetch OK', { modelCount: models?.length, models });
 
                     setModelDisplayNames(models);
                     setModelsMessage(models.length > 0
@@ -171,15 +179,21 @@ export default function BrowserSettings() {
                 } else {
                     const { error } = await result.json().catch(() => ({ error: "" }));
                     if (requestId !== modelFetchRequestIdRef.current) return;
+                    console.debug('[LLM] fetch non-OK', { status: result.status, error });
 
                     setModelDisplayNames([]);
-                    setModelsMessage(error || "Could not load live models for this key. Check the key and try again.");
+                    setModelsMessage(error || (newChatModelSource === "local"
+                        ? "Could not connect to local server. Check the URL and click reload."
+                        : "Could not load live models for this key. Check the key and try again."));
                 }
             } catch (error) {
                 if (error instanceof DOMException && error.name === "AbortError") return;
                 if (requestId !== modelFetchRequestIdRef.current) return;
+                console.debug('[LLM] fetch caught exception', error);
                 setModelDisplayNames([]);
-                setModelsMessage("Could not load live models for this key. Check the key and try again.");
+                setModelsMessage(newChatModelSource === "local"
+                    ? "Could not connect to local server. Check the URL and click reload."
+                    : "Could not load live models for this key. Check the key and try again.");
             } finally {
                 if (requestId === modelFetchRequestIdRef.current) {
                     setIsLoadingModels(false);
@@ -354,28 +368,35 @@ export default function BrowserSettings() {
     };
 
     const handleModelSourceChange = (source: ChatModelSource) => {
-        if (source === newChatModelSource) return;
+        console.debug('[LLM] handleModelSourceChange called', { source, current: newChatModelSource });
+        if (source === newChatModelSource) {
+            console.debug('[LLM] same source, returning early');
+            return;
+        }
         setNewChatModelSource(source);
+        // Switching away from local — revert any unsaved provider/endpoint changes
+        if (source !== "local") {
+            setNewLocalLlmProvider(localLlmProvider);
+            setNewLocalLlmEndpoint(localLlmEndpoint);
+        }
         const targetKey = source === "local" ? newLocalLlmProvider : "api-key";
         const nextModel = perSourceModels[targetKey] ?? "";
+        console.debug('[LLM] switching source', { targetKey, nextModel, endpoint: newLocalLlmEndpoint, provider: newLocalLlmProvider });
         setNewModel(nextModel);
-        setModel(nextModel);
-        localStorage.setItem("model", nextModel);
         setModelDisplayNames([]);
         setModelsMessage(source === "local" ? "Loading local models..." : "Select a saved API key to load live models.");
-        setModelLoadNonce(nonce => nonce + 1);
+        setModelLoadNonce(nonce => { console.debug('[LLM] nonce incremented to', nonce + 1); return nonce + 1; });
     };
 
     const handleLocalProviderChange = (provider: LocalLlmProvider) => {
+        console.debug('[LLM] handleLocalProviderChange called', { provider, endpoint: LOCAL_LLM_ENDPOINTS[provider] });
         setNewLocalLlmProvider(provider);
         setNewLocalLlmEndpoint(LOCAL_LLM_ENDPOINTS[provider]);
         setModelDisplayNames([]);
         const nextModel = perSourceModels[provider] ?? "";
         setNewModel(nextModel);
-        setModel(nextModel);
-        localStorage.setItem("model", nextModel);
         setModelsMessage(`Loading local ${LOCAL_LLM_LABELS[provider]} models...`);
-        setModelLoadNonce(nonce => nonce + 1);
+        setModelLoadNonce(nonce => { console.debug('[LLM] nonce incremented to', nonce + 1); return nonce + 1; });
     };
 
     const handleLocalEndpointChange = (endpoint: string) => {
