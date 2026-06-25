@@ -43,7 +43,7 @@
     "@types/d3": "^7.4.3",
     "@types/date-fns": "^2.6.3",
     "@types/node-cache": "^4.2.5",
-    "autoprefixer": "^10.4.27",
+    "autoprefixer": "^10.5.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -78,7 +78,7 @@
     "react-hook-form": "^7.80.0",
     "react-json-tree": "^0.20.0",
     "react-resizable-panels": "^4.11.2",
-    "swagger-ui-react": "^5.32.7",
+    "swagger-ui-react": "^5.32.8",
     "swr": "^2.4.2",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.1",
@@ -88,7 +88,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@playwright/test": "^1.61.0",
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4.3.1",
     "@types/cytoscape-fcose": "^2.2.4",
     "@types/lodash": "^4.17.24",
