@@ -1,15 +1,18 @@
 "use client";
 
 import { useContext, useEffect, useState } from "react";
-import { Check, Copy, Sparkles } from "lucide-react";
+import { Check, Copy, Sparkles, X } from "lucide-react";
 import { AiFixContext } from "./provider";
 import DialogComponent from "./DialogComponent";
 import Button from "./ui/Button";
+import ResizableBox from "@/components/ui/ResizableBox";
+import { useResizableSize } from "@/lib/useResizableSize";
 
 export default function AiFixDialogs() {
     const { result, pendingConsentProvider, confirmConsent, cancelConsent, dismissResult, insertCorrectedQuery } = useContext(AiFixContext);
     const [dontAskAgain, setDontAskAgain] = useState(false);
     const [copied, setCopied] = useState(false);
+    const { size: panelSize, onResize: onPanelResize } = useResizableSize("ai-fix-panel-size", 480, 400, 300, 250);
 
     const handleCopy = async (text: string) => {
         await navigator.clipboard?.writeText(text);
@@ -21,7 +24,7 @@ export default function AiFixDialogs() {
         if (pendingConsentProvider === null) setDontAskAgain(false);
     }, [pendingConsentProvider]);
 
-    const resultOpen = result.status === "loading" || result.status === "done" || result.status === "error";
+    const panelOpen = result.status === "done" || result.status === "error";
 
     return (
         <>
@@ -57,80 +60,103 @@ export default function AiFixDialogs() {
                 </div>
             </DialogComponent>
 
-            {/* ── Result dialog ───────────────────────────────────────────── */}
-            <DialogComponent
-                title="Fix with AI"
-                label="aiFixResult"
-                trigger={<span className="hidden" aria-hidden />}
-                open={resultOpen}
-                onOpenChange={(open) => { if (!open) dismissResult(); }}
-                className="sm:max-w-2xl"
-            >
-                <div className="flex flex-col gap-5 px-2 pb-2 min-h-[120px]" data-testid="aiFixResultBody">
-
-                    {/* Loading */}
-                    {result.status === "loading" && (
-                        <div className="flex flex-1 flex-col items-center justify-center gap-3 py-10 text-muted-foreground">
-                            <Sparkles size={28} className="animate-pulse text-primary" />
-                            <p className="text-sm font-medium">Asking the AI…</p>
-                        </div>
-                    )}
-
-                    {/* Error */}
-                    {result.status === "error" && (
-                        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3">
-                            <p className="text-sm text-destructive" data-testid="aiFixError">{result.error}</p>
-                        </div>
-                    )}
-
-                    {/* Done */}
-                    {result.status === "done" && (
-                        <>
-                            {result.explanation && (
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Explanation</span>
-                                    <p className="text-sm leading-relaxed whitespace-pre-wrap" data-testid="aiFixExplanation">
-                                        {result.explanation}
-                                    </p>
-                                </div>
-                            )}
-
-                            {result.correctedQuery ? (
-                                <div className="flex flex-col gap-2">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Corrected query</span>
-                                        <button
-                                            type="button"
-                                            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                                            onClick={() => void handleCopy(result.correctedQuery as string)}
-                                            data-testid="aiFixCopy"
-                                        >
-                                            {copied ? <Check size={13} /> : <Copy size={13} />}
-                                            {copied ? "Copied!" : "Copy"}
-                                        </button>
-                                    </div>
-                                    <pre
-                                        className="rounded-lg bg-zinc-950 text-emerald-300 text-sm font-mono p-4 overflow-auto whitespace-pre-wrap leading-relaxed"
-                                        data-testid="aiFixQuery"
-                                    >
-                                        {result.correctedQuery}
-                                    </pre>
-                                    <Button
-                                        variant="Primary"
-                                        className="w-full mt-1"
-                                        data-testid="aiFixInsert"
-                                        onClick={() => insertCorrectedQuery(result.correctedQuery as string)}
-                                    >
-                                        Insert into editor
-                                    </Button>
-                                </div>
-                            ) : (
-                                <p className="text-sm text-muted-foreground">The AI couldn&apos;t produce a corrected query.</p>
-                            )}
-                        </>
-                    )}
+            {/* ── Background loading indicator (non-blocking) ────────────── */}
+            {result.status === "loading" && (
+                <div className="fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 shadow-lg text-sm text-muted-foreground pointer-events-none select-none">
+                    <Sparkles size={14} className="animate-pulse text-primary shrink-0" />
+                    <span>Asking the AI…</span>
                 </div>
-            </DialogComponent>
+            )}
+
+            {/* ── Floating resizable result panel ───────────────────────── */}
+            {panelOpen && (
+                <div className="fixed bottom-3 left-3 z-40">
+                    <ResizableBox
+                        width={panelSize.width}
+                        height={panelSize.height}
+                        minWidth={300}
+                        minHeight={250}
+                        onResizeEnd={(w, h) => onPanelResize(w, h)}
+                        direction="top-right"
+                        data-testid="aiFixResultPanel"
+                    >
+                        <div className="flex flex-col h-full rounded-lg border border-border bg-background shadow-xl overflow-hidden">
+                            {/* Header */}
+                            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
+                                <div className="flex items-center gap-2">
+                                    <Sparkles size={14} className="text-primary" />
+                                    <span className="text-sm font-medium">Fix with AI</span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={dismissResult}
+                                    className="rounded p-1 opacity-60 hover:opacity-100 hover:bg-muted transition-colors"
+                                    aria-label="Close AI fix panel"
+                                >
+                                    <X size={14} />
+                                </button>
+                            </div>
+
+                            {/* Body */}
+                            <div className="flex flex-col gap-4 p-4 overflow-y-auto flex-1" data-testid="aiFixResultBody">
+                                {/* Error */}
+                                {result.status === "error" && (
+                                    <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3">
+                                        <p className="text-sm text-destructive" data-testid="aiFixError">{result.error}</p>
+                                    </div>
+                                )}
+
+                                {/* Done */}
+                                {result.status === "done" && (
+                                    <>
+                                        {result.explanation && (
+                                            <div className="flex flex-col gap-1">
+                                                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Explanation</span>
+                                                <p className="text-sm leading-relaxed whitespace-pre-wrap" data-testid="aiFixExplanation">
+                                                    {result.explanation}
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {result.correctedQuery ? (
+                                            <div className="flex flex-col gap-2">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Corrected query</span>
+                                                    <button
+                                                        type="button"
+                                                        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                                        onClick={() => void handleCopy(result.correctedQuery as string)}
+                                                        data-testid="aiFixCopy"
+                                                    >
+                                                        {copied ? <Check size={13} /> : <Copy size={13} />}
+                                                        {copied ? "Copied!" : "Copy"}
+                                                    </button>
+                                                </div>
+                                                <pre
+                                                    className="rounded-lg bg-zinc-950 text-emerald-300 text-sm font-mono p-4 overflow-auto whitespace-pre-wrap leading-relaxed"
+                                                    data-testid="aiFixQuery"
+                                                >
+                                                    {result.correctedQuery}
+                                                </pre>
+                                                <Button
+                                                    variant="Primary"
+                                                    className="w-full mt-1"
+                                                    data-testid="aiFixInsert"
+                                                    onClick={() => insertCorrectedQuery(result.correctedQuery as string)}
+                                                >
+                                                    Insert into editor
+                                                </Button>
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-muted-foreground">The AI couldn&apos;t produce a corrected query.</p>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </ResizableBox>
+                </div>
+            )}
         </>
     );
 }

@@ -137,9 +137,9 @@ export function Toaster() {
                     )
                   )}
                   {rawMessage && <ToastItemDetails rawMessage={rawMessage} />}
-                  {query && <AiFixButton currentQuery={query} />}
                 </ToastDescription>
               )}
+              {query && <AiFixButton currentQuery={query} />}
             </div>
             {action}
             <ToastClose />

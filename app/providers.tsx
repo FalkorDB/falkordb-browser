@@ -840,7 +840,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         setShowMemoryUsage(name === "graph" && version >= MEMORY_USAGE_VERSION_THRESHOLD);
       } catch { /* ignore */ }
     })();
-     
+
   }, [status, activeConnectionId]);
   useEffect(() => {
     if (status !== "authenticated") {
@@ -1258,7 +1258,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (urlGraphName) {
       setGraphName(urlGraphName);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlGraphName, graphNamesLoaded, graphNames]);
 
   // One-way sync: context state → URL (only while on /graph)
@@ -1320,7 +1320,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     } catch {
       // Invalid saved content, ignore
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefixReady, contentPersistence, graphNames, graph.Id, runQuery, handleSetGraphName]);
   // Reset all graph state when the active connection changes (user switch)
   useEffect(() => {
@@ -1425,7 +1425,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setGraph(Graph.empty());
       setData({ nodes: [], links: [] });
     } catch (error) {
-       
+
       console.error("Failed to load demo graphs", error);
       toast({
         title: "Error",
@@ -1446,7 +1446,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         }, toast, setIndicator)
       ]);
     } catch (error) {
-       
+
       console.error("Failed to cleanup demo graphs", error);
     }
 
@@ -1494,27 +1494,27 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
               <IndicatorContext.Provider value={indicatorContext}>
                 <QueryLoadingContext.Provider value={queryLoadingContext}>
                   <DiagnosticsContext.Provider value={diagnosticsContext}>
-                    <AiFixContext.Provider value={aiFixContext}>
                     <ForceGraphContext.Provider value={forceGraphContext}>
                       <TableViewContext.Provider value={tableViewContext}>
                         <ConnectionContext.Provider value={connectionContext}>
                           <UDFContext.Provider value={udfContext}>
-                            <ProviderLayout
-                              panelRef={panelRef}
-                              tutorialOpen={tutorialOpen}
-                              onCloseTutorial={handleCloseTutorial}
-                              onLoadDemoGraphs={handleLoadDemoGraphs}
-                              onCleanupDemoGraphs={handleCleanupDemoGraphs}
-                              showUDF={showUDF}
-                            >
-                              {children}
-                            </ProviderLayout>
+                            <AiFixContext.Provider value={aiFixContext}>
+                              <ProviderLayout
+                                panelRef={panelRef}
+                                tutorialOpen={tutorialOpen}
+                                onCloseTutorial={handleCloseTutorial}
+                                onLoadDemoGraphs={handleLoadDemoGraphs}
+                                onCleanupDemoGraphs={handleCleanupDemoGraphs}
+                                showUDF={showUDF}
+                              >
+                                {children}
+                              </ProviderLayout>
+                              <AiFixDialogs />
+                            </AiFixContext.Provider>
                           </UDFContext.Provider>
                         </ConnectionContext.Provider>
                       </TableViewContext.Provider>
                     </ForceGraphContext.Provider>
-                    <AiFixDialogs />
-                    </AiFixContext.Provider>
                   </DiagnosticsContext.Provider>
                 </QueryLoadingContext.Provider>
               </IndicatorContext.Provider>
