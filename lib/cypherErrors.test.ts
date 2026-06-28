@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   getCypherErrorHint,
   parseSyntaxError,
+  enrichSyntaxMessage,
   SYNTAX_ERROR_HINT,
   CYPHER_ERROR_IDS,
   HINT_LINKS,
@@ -241,5 +242,25 @@ describe("getCypherErrorHint — hint links", () => {
         `link href for ${id} must be an internal path or https URL: ${link.href}`
       );
     });
+  });
+});
+
+describe("enrichSyntaxMessage", () => {
+  it("leaves the message unchanged when the context is empty", () => {
+    // covers: context.length > 0 → false, isWhitespace → true, errorWord.length ≤ 1
+    const msg = "Invalid input ' ': expected RETURN";
+    assert.equal(enrichSyntaxMessage(msg, "", 0), msg);
+  });
+  it("leaves the message unchanged when the error token is a single character", () => {
+    // covers: IIFE while exits because context[end] is a space (right side of && → false)
+    //         and errorWord.length > 1 → false
+    const msg = "Invalid input 'x': expected ...";
+    assert.equal(enrichSyntaxMessage(msg, "x y", 0), msg); // errorWord = "x", length 1 → unchanged
+  });
+  it("enriches the message when the error token is preceded by a space", () => {
+    // covers: backwards while exits because context[wordStart-1] is a space (right side of && → false)
+    const msg = "Invalid input 'X': expected ...";
+    const enriched = enrichSyntaxMessage(msg, "abc def", 4);
+    assert.ok(enriched.includes("def"), `expected enriched message to include 'def', got: ${enriched}`);
   });
 });

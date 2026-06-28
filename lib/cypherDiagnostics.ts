@@ -79,8 +79,8 @@ export function locateVariableToken(query: string, token: string): LocatedToken 
 }
 
 /** Returns the word range (1-based, end-exclusive) at `column`.
- *  When the column lands on whitespace, steps back to highlight the preceding word
- *  (e.g. FalkorDB points at the space after 'LIM' — we highlight 'LIM'). */
+ *  Non-word, non-space characters produce a run of the same character.
+ *  Whitespace and out-of-range columns fall back to a single-character range. */
 function wordRangeAt(lineText: string, column: number): { startColumn: number; endColumn: number } {
   const idx = column - 1;
   const isWord = (c: string | undefined): boolean => c !== undefined && /\w/.test(c);
@@ -93,29 +93,18 @@ function wordRangeAt(lineText: string, column: number): { startColumn: number; e
     return { startColumn: start + 1, endColumn: end + 1 };
   }
 
-  // Whitespace: step back to the preceding word token (e.g. FalkorDB points at the space
-  // after 'LIM' — we want to highlight 'LIM').
-  if (/\s/.test(lineText[idx] ?? "")) {
-    if (idx > 0) {
-      let prevEnd = idx - 1;
-      while (prevEnd > 0 && /\s/.test(lineText[prevEnd])) prevEnd -= 1;
-      if (isWord(lineText[prevEnd])) {
-        let prevStart = prevEnd;
-        while (prevStart > 0 && isWord(lineText[prevStart - 1])) prevStart -= 1;
-        return { startColumn: prevStart + 1, endColumn: prevEnd + 2 };
-      }
-    }
-  } else {
-    // Non-word, non-space (operator/punct): highlight the consecutive run of the same char
-    // so that e.g. '==' at column N produces a 2-char underline on '==' rather than jumping
-    // back to the preceding identifier.
+  // Non-word, non-space (operator/punct): highlight the consecutive run of the same char
+  // so that e.g. '==' at column N produces a 2-char underline on '==' rather than jumping
+  // back to the preceding identifier.
+  if (!/\s/.test(lineText[idx] ?? "")) {
     const ch = lineText[idx];
     let runEnd = idx;
     while (runEnd + 1 < lineText.length && lineText[runEnd + 1] === ch) runEnd += 1;
     return { startColumn: idx + 1, endColumn: runEnd + 2 };
   }
 
-  const single = Math.max(0, Math.min(idx, lineText.length === 0 ? 0 : lineText.length - 1));
+  // Whitespace (or out-of-range): fall back to a single-character cursor position.
+  const single = Math.max(0, Math.min(idx, lineText.length - 1));
   return { startColumn: single + 1, endColumn: single + 2 };
 }
 

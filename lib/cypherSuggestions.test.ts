@@ -8,6 +8,8 @@ import {
   suggestionNameForError,
   setFunctionCandidates,
   maskCommentsAndStrings,
+  extractFunctionArgIdents,
+  findFuncArgTypo,
 } from "./cypherSuggestions.ts";
 import { udfFunctionNames, BUILTIN_FUNCTIONS } from "./cypherLang.ts";
 
@@ -179,8 +181,39 @@ describe("suggestionNameForError", () => {
       { kind: "variable", name: "person" }
     );
   });
+  it("suggests a correction for a procedure-not-registered error", () => {
+    setFunctionCandidates(["db.fullText"]);
+    const s = suggestionNameForError("Procedure 'db.fullTxt' is not registered");
+    assert.equal(s?.kind, "function");
+    assert.equal(s?.name, "db.fullText");
+    setFunctionCandidates([]);
+  });
   it("returns undefined when there is no close match or the error is unrecognized", () => {
     assert.equal(suggestionNameForError("Unknown function 'zzzzz'", { functions: ["length"] }), undefined);
     assert.equal(suggestionNameForError("Division by zero"), undefined);
+  });
+});
+
+describe("extractFunctionArgIdents", () => {
+  it("captures the first argument identifier from function calls", () => {
+    assert.deepEqual(extractFunctionArgIdents("MATCH (node) RETURN id(nod)"), ["nod"]);
+  });
+  it("excludes Cypher keywords used as arguments", () => {
+    assert.deepEqual(extractFunctionArgIdents("RETURN count(DISTINCT n)"), []);
+  });
+  it("returns an empty array when there are no function calls with identifier args", () => {
+    assert.deepEqual(extractFunctionArgIdents("RETURN 1 + 2"), []);
+  });
+});
+
+describe("findFuncArgTypo", () => {
+  it("returns the typo'd function argument when it is close to a bound variable", () => {
+    assert.equal(findFuncArgTypo("MATCH (node) RETURN id(nod)"), "nod");
+  });
+  it("returns undefined when the function argument exactly matches a bound variable", () => {
+    assert.equal(findFuncArgTypo("MATCH (node) RETURN id(node)"), undefined);
+  });
+  it("returns undefined when there are no bound variables", () => {
+    assert.equal(findFuncArgTypo("RETURN id(nod)"), undefined);
   });
 });

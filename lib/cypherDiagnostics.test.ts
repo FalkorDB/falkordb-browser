@@ -77,6 +77,25 @@ describe("computeEditorDiagnostics — syntax errors", () => {
     const d = computeEditorDiagnostics("RETURN value", syntaxError(10)).diagnostics[0];
     assert.deepEqual([d.startColumn, d.endColumn], [8, 13]);
   });
+  it("highlights a single operator character when the next char differs", () => {
+    // non-word, non-space char '(' not followed by another '(' → single-char underline
+    const d = computeEditorDiagnostics("MATCH (n)", syntaxError(7)).diagnostics[0];
+    assert.equal(d.endColumn - d.startColumn, 1);
+  });
+  it("highlights a run of repeated operator characters (e.g. '===')", () => {
+    // non-word, non-space char '=' repeated three times → 3-char underline
+    const d = computeEditorDiagnostics("===", syntaxError(1)).diagnostics[0];
+    assert.equal(d.endColumn - d.startColumn, 3);
+  });
+  it("diagnoses a syntax error as an undefined-variable when a func-arg is a typo of a bound variable", () => {
+    // "RETUR" is a syntax error; "nod" in id(nod) is a typo of the bound variable "node"
+    const d = computeEditorDiagnostics(
+      "MATCH (node) RETUR id(nod)",
+      syntaxError(14)
+    ).diagnostics[0];
+    assert.equal(d.code, "undefined-variable");
+    assert.ok(d.message.includes("nod"));
+  });
 });
 
 describe("computeEditorDiagnostics — semantic token errors", () => {

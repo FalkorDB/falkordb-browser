@@ -87,14 +87,11 @@ export function maskCommentsAndStrings(query: string): string {
   );
 }
 
-/** Extracts identifiers from binding positions only — the name right after `(` or
- *  `[`, and aliases after `AS` — after stripping comments and string literals.
- *  This deliberately excludes labels/types (after `:`), property keys (after `.`),
- *  and function-namespace pieces, so a mistyped variable is matched only against
- *  real variables. Backtick-quoted identifiers are not supported (v1). */
-export function extractVariableCandidates(query: string): string[] {
-  const cleaned = maskCommentsAndStrings(query);
-
+/** Private helper: runs the three binding-position patterns on already-masked text
+ *  and returns the filtered list of identifiers. Used by both
+ *  `extractVariableCandidates` (which also adds function-arg identifiers) and
+ *  `findFuncArgTypo` (which needs binding-only candidates to detect typos). */
+function bindingVarsFrom(cleaned: string): string[] {
   const found = new Set<string>();
   const collect = (re: RegExp): void => {
     let match = re.exec(cleaned);
@@ -103,12 +100,31 @@ export function extractVariableCandidates(query: string): string[] {
       match = re.exec(cleaned);
     }
   };
-
-  // Node variables: ( at start of line, after whitespace, comma, or after -> / <-
-  // Deliberately does NOT match function calls like id(nod).
-  collect(/(?:^|[-\s,><])\(\s*([A-Za-z_]\w*)/gm); // (node) at pattern boundary (also after - in paths)
+  collect(/(?:^|[-\s,><])\(\s*([A-Za-z_]\w*)/gm); // (node) at pattern boundary
   collect(/\[\s*([A-Za-z_]\w*)/g);                  // [rel] variable
   collect(/\bAS\s+([A-Za-z_]\w*)/gi);              // aliases (WITH/RETURN/UNWIND … AS x)
+  return Array.from(found).filter(v => !EXCLUDED_WORDS.has(v.toLowerCase()));
+}
+
+/** Extracts identifiers from binding positions and function-argument positions —
+ *  the name right after `(` or `[`, aliases after `AS`, and standalone identifiers
+ *  used as function-call arguments — after stripping comments and string literals.
+ *  This deliberately excludes labels/types (after `:`), property keys (after `.`),
+ *  and function-namespace pieces, so a mistyped variable is matched only against
+ *  real variables. Backtick-quoted identifiers are not supported (v1). */
+export function extractVariableCandidates(query: string): string[] {
+  const cleaned = maskCommentsAndStrings(query);
+  const found = new Set(bindingVarsFrom(cleaned));
+
+  // Also capture identifiers used as function arguments
+  // (e.g. euclideanDistance(x) → x is a variable reference).
+  // Match an identifier after '(' or ',' that is followed by ',' or ')'.
+  const re = /[,(]\s*([A-Za-z_]\w*)(?=\s*[,)])/g;
+  let m = re.exec(cleaned);
+  while (m !== null) {
+    found.add(m[1]);
+    m = re.exec(cleaned);
+  }
 
   return Array.from(found).filter(v => !EXCLUDED_WORDS.has(v.toLowerCase()));
 }
@@ -184,7 +200,10 @@ export function extractFunctionArgIdents(query: string): string[] {
  * E.g. `MATCH (node) ... id(nod)` → "nod" (close to bound var "node").
  */
 export function findFuncArgTypo(query: string): string | undefined {
-  const boundVars = extractVariableCandidates(query);
+  // Use binding-only candidates (not function-arg candidates) so that a mistyped
+  // function argument like `id(nod)` is detected as differing from the bound variable
+  // `node` rather than matching itself as a "bound" variable.
+  const boundVars = bindingVarsFrom(maskCommentsAndStrings(query));
   if (!boundVars.length) return undefined;
   for (const ident of extractFunctionArgIdents(query)) {
     if (boundVars.some(v => v.toLowerCase() === ident.toLowerCase())) continue;
