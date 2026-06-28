@@ -1,4 +1,5 @@
 import { cn, getTheme, Message, getActiveConnectionIdGlobal, toUserFriendlyMessage } from "@/lib/utils";
+import { UDF_CHAT_MAX_LIBRARIES, UDF_CHAT_MAX_FUNCTIONS_PER_LIBRARY, UDF_CHAT_MAX_NAME_LENGTH } from "@/app/utils";
 import { memo, useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
@@ -10,7 +11,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
-import { GraphContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext } from "../components/provider";
+import { GraphContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, UDFContext } from "../components/provider";
 import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import ToastButton from "../components/ToastButton";
 import { ShineBorder } from "@/components/ui/shine-border";
@@ -66,6 +67,7 @@ export default function Chat({ onClose }: Props) {
     const { setIndicator } = useContext(IndicatorContext);
     const { runQuery, graphName } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
+    const { udfList } = useContext(UDFContext);
     const { settings: { chatSettings: { secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
     // Cypher Only toggle state, persisted per graph
     const [cypherOnly, setCypherOnly] = useState(false);
@@ -259,6 +261,22 @@ export default function Chat({ onClose }: Props) {
             const connectionId = getActiveConnectionIdGlobal();
             if (connectionId) chatHeaders.set("X-Connection-Id", connectionId);
 
+            // Surface the instance's user-defined functions (already discovered + capability-gated into
+            // UDFContext) so generated Cypher can call them. UDFEntry is [key, libraryName, key, functions]
+            // (FalkorDB GRAPH.UDF LIST shape; see app/udf/udfPanel.tsx). Clamp to the API bounds so a large
+            // catalog degrades to a bounded subset, and drop empty libraries.
+            const udfsPayload = udfList
+                .filter(([, libraryName]) => libraryName && libraryName.length <= UDF_CHAT_MAX_NAME_LENGTH)
+                .map(([, libraryName, , functions]) => ({
+                    name: libraryName,
+                    functions: functions
+                        .filter((functionName) => functionName && functionName.length <= UDF_CHAT_MAX_NAME_LENGTH)
+                        .slice(0, UDF_CHAT_MAX_FUNCTIONS_PER_LIBRARY)
+                        .map((functionName) => ({ name: functionName })),
+                }))
+                .filter((library) => library.functions.length > 0)
+                .slice(0, UDF_CHAT_MAX_LIBRARIES);
+
             const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: chatHeaders,
@@ -274,6 +292,8 @@ export default function Chat({ onClose }: Props) {
                     modelSource: chatModelSource,
                     localProvider: localLlmProvider,
                     localEndpoint: localLlmEndpoint,
+                    // Omitted when the (filtered) catalog is empty.
+                    udfs: udfsPayload.length > 0 ? udfsPayload : undefined,
                 })
             });
 

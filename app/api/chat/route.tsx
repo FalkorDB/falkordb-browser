@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { TextToCypher } from "@falkordb/text-to-cypher";
 import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { normalizeLocalEndpoint, type LocalProvider } from "@/lib/local-llm-utils";
+import { UDF_VERSION_THRESHOLD } from "@/app/utils";
 import { getClient } from "../auth/[...nextauth]/options";
 import { chatRequest, validateBody } from "../validate-body";
 import { buildFalkorDBConnection, getCorsHeaders } from "../utils";
@@ -124,7 +125,7 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    const { messages, graphName, key, model, cypherOnly, modelSource, localProvider, localEndpoint } = validation.data;
+    const { messages, graphName, key, model, cypherOnly, modelSource, localProvider, localEndpoint, udfs } = validation.data;
 
     try {
         // Fail fast on model/API key provider mismatch before making any external calls
@@ -145,11 +146,32 @@ export async function POST(request: NextRequest) {
             ? normalizeLocalEndpoint(localProvider, localEndpoint)
             : undefined;
 
+        // Only honor caller-supplied UDFs when the connected graph module actually supports them.
+        // The client already gates on UDFContext, but the route must not trust a stale/tampered flag.
+        // Reuse the already-authenticated session connection (no extra getClient / connection re-resolve).
+        // Drop libraries with no functions: the schema permits empty `functions` arrays, but an empty
+        // library is useless context, so a degenerate/tampered catalog degrades to "no UDF context"
+        // instead of wasting prompt tokens.
+        const nonEmptyUdfs = udfs?.filter((library) => library.functions.length > 0);
+        let safeUdfs = nonEmptyUdfs && nonEmptyUdfs.length > 0 ? nonEmptyUdfs : undefined;
+        if (safeUdfs) {
+            try {
+                const modules = await (await session.client.connection).moduleList();
+                const graphModule = modules.find((module) => module.name === "graph");
+                if (!graphModule || (graphModule.ver ?? 0) < UDF_VERSION_THRESHOLD) {
+                    safeUdfs = undefined;
+                }
+            } catch {
+                safeUdfs = undefined;
+            }
+        }
+
         // Create TextToCypher client
         const textToCypher = new TextToCypher({
             falkordbConnection,
             model,
             apiKey: modelSource === "local" ? localProvider : key,
+            udfs: safeUdfs,
         });
 
         // Get the last user message
