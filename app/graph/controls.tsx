@@ -127,10 +127,9 @@ export default function Controls({
         canvasRef.current?.setAnimation(next);
     };
 
-    const handleDimToggle = () => {
-        const next = !dimmed;
-        setDimmed(next);
-        canvasRef.current?.setDimmed(next);
+    const handleDimToggle = (checked: boolean) => {
+        setDimmed(checked);
+        canvasRef.current?.setDimmed(checked);
     };
 
     const handlePinToggle = () => {

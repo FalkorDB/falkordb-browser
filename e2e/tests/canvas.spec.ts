@@ -404,14 +404,15 @@ test.describe('Canvas Tests', () => {
         await graph.clickDimControl();
         expect(await graph.isDimControlChecked()).toBe(true);
 
-        // Click one of the nodes
+        // Right-click a node to select it (right-click triggers handleRightClick → setSelectedElements)
         const nodes = await graph.getNodesScreenPositions();
         expect(nodes.length).toBeGreaterThanOrEqual(2);
-        await graph.clickCanvasElement(nodes[0].screenX, nodes[0].screenY);
+        await graph.elementClick(nodes[0].screenX, nodes[0].screenY);
         await graph.waitForTimeout(300);
 
-        // The canvas should still be rendering — just verify the switch remains on
-        expect(await graph.isDimControlChecked()).toBe(true);
+        // Focus mode is active and a node is selected → non-selected nodes are dimmed
+        expect(await graph.isFocusActive()).toBe(true);
+        expect(await graph.getSelectionCount()).toBeGreaterThan(0);
 
         await apicalls.removeGraph(graphName);
     });
@@ -427,15 +428,17 @@ test.describe('Canvas Tests', () => {
         await graph.clickCenterControl();
         await graph.waitForScaleToStabilize();
 
-        // Enable focus mode and click a node
+        // Enable focus mode and right-click a node to select it
         await graph.clickDimControl();
         const nodes = await graph.getNodesScreenPositions();
-        await graph.clickCanvasElement(nodes[0].screenX, nodes[0].screenY);
+        await graph.elementClick(nodes[0].screenX, nodes[0].screenY);
         await graph.waitForTimeout(300);
+        expect(await graph.isFocusActive()).toBe(true);
 
-        // Turn focus mode back off — switch should be off again
+        // Turn focus mode back off — dimming should be fully restored
         await graph.clickDimControl();
         expect(await graph.isDimControlChecked()).toBe(false);
+        expect(await graph.isFocusActive()).toBe(false);
 
         await apicalls.removeGraph(graphName);
     });
@@ -445,6 +448,7 @@ test.describe('Canvas Tests', () => {
         await browser.setPageToFullScreen();
         const graphName = getRandomString('canvas');
         await graph.addGraph(graphName);
+        // Carol is disconnected: clicking the Alice–Bob link must NOT undim Carol
         await graph.insertQuery(`CREATE (a:Person {name: 'Alice'})-[r:KNOWS]->(b:Person {name: 'Bob'}), (c:Person {name: 'Carol'}) RETURN a, r, b, c`);
         await graph.clickRunQuery();
         await graph.waitForCanvasAnimationToEnd();
@@ -455,14 +459,15 @@ test.describe('Canvas Tests', () => {
         await graph.clickDimControl();
         expect(await graph.isDimControlChecked()).toBe(true);
 
-        // Click somewhere on the canvas to see that mode stays on
+        // Left-click a link to select it (handleLinkClick sets selectedElements)
         const links = await graph.getLinksScreenPositions();
         expect(links.length).toBeGreaterThan(0);
         await graph.clickCanvasElement(links[0].midX, links[0].midY);
         await graph.waitForTimeout(300);
 
-        // Focus mode should still be enabled
-        expect(await graph.isDimControlChecked()).toBe(true);
+        // The selected link is in selectedElements → focus mode is active → Carol is dimmed
+        expect(await graph.isFocusActive()).toBe(true);
+        expect(await graph.getSelectionCount()).toBeGreaterThan(0);
 
         await apicalls.removeGraph(graphName);
     });

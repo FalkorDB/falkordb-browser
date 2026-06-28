@@ -9,13 +9,13 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build --webpack",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@falkordb/canvas": "file:../falkordb-canvas",
+    "@falkordb/canvas": "^0.2.0",
     "@falkordb/text-to-cypher": "^0.1.17",
     "@hookform/resolvers": "^5.4.0",
     "@monaco-editor/react": "^4.6.0",
