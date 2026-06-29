@@ -59,7 +59,6 @@ export default function Page() {
         setGraph,
         graphName,
         handleSetGraphName,
-        graphInfo,
         setGraphInfo,
         graphNames,
         setGraphNames,
@@ -234,8 +233,6 @@ export default function Page() {
     }, [graphName]);
 
     useEffect(() => {
-        if (!graphInfo) return;
-
         // Priority 1: URL params (graph + query)
         const pendingUrlQuery = initialUrlQueryRef.current;
         if (pendingUrlQuery && graphName) {

@@ -64,4 +64,66 @@ test.describe('Query history Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
+    test(`@admin Ctrl+F opens the find widget in the history panel editor`, async () => {
+        const graphName = getRandomString('queryhistory');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        const query = "MATCH (n) RETURN n";
+        await graph.insertQuery(query);
+        await graph.clickRunQuery(false);
+        await graph.clickQueryHistoryButton();
+        await graph.clickSelectQueryInHistory(query);
+        // Click inside the history panel editor to focus it
+        await graph.clickHistoryPanelEditor();
+        // Press Ctrl+F — should open Monaco's find widget
+        await graph.openFindWidget();
+        const findVisible = await graph.waitForFindWidget(5000);
+        expect(findVisible).toBe(true);
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin history panel editor shows autocomplete suggestions`, async () => {
+        const graphName = getRandomString('queryhistory');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        const query = "MATCH (n) RETURN n";
+        await graph.insertQuery(query);
+        await graph.clickRunQuery(false);
+        await graph.clickQueryHistoryButton();
+        await graph.clickSelectQueryInHistory(query);
+        // Click inside the history panel editor and trigger completions
+        await graph.clickHistoryPanelEditor();
+        await graph.triggerSuggestions();
+        const suggestVisible = await graph.waitForSuggestWidget(5000);
+        expect(suggestVisible).toBe(true);
+        // At minimum, Cypher keywords (MATCH, RETURN, etc.) should be present
+        const count = await graph.getSuggestionCount();
+        expect(count).toBeGreaterThan(0);
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin Ctrl+F opens the find widget in the fullscreen dialog editor`, async () => {
+        const graphName = getRandomString('queryhistory');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        const query = "MATCH (n) RETURN n";
+        await graph.insertQuery(query);
+        // Open the fullscreen dialog editor
+        await graph.editorMaximize.click();
+        // The dialog editor is a Monaco editor — click to focus it
+        await graph.dialogEditor.waitFor({ state: 'visible', timeout: 5000 });
+        await graph.dialogEditor.click();
+        // Press Ctrl+F — should open Monaco's find widget
+        await graph.openFindWidget();
+        const findVisible = await graph.waitForFindWidget(5000);
+        expect(findVisible).toBe(true);
+        await apicalls.removeGraph(graphName);
+    });
+
 });

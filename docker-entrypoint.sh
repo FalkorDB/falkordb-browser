@@ -17,6 +17,22 @@ DATA_DIR="/app/.data"
 if [ ! -d "$DATA_DIR" ]; then
   mkdir -p "$DATA_DIR" 2>/dev/null || true
 fi
+
+# When running as root (default), fix ownership of the data directory so the
+# nextjs user can write to it even when a Docker named volume is mounted there
+# (named volumes are created owned by root).  Then drop privileges to nextjs.
+if [ "$(id -u)" = "0" ]; then
+  if ! chown -R nextjs:nodejs "$DATA_DIR"; then
+    echo "ERROR: Failed to set ownership on $DATA_DIR. Check volume permissions."
+    exit 1
+  fi
+  if ! su-exec nextjs:nodejs test -w "$DATA_DIR"; then
+    echo "ERROR: Data directory $DATA_DIR is not writable for nextjs (uid=1001). Check volume permissions."
+    exit 1
+  fi
+  exec su-exec nextjs:nodejs "$@"
+fi
+
 if [ ! -w "$DATA_DIR" ]; then
   echo "ERROR: Data directory $DATA_DIR is not writable. Check volume permissions (uid=1001)."
   exit 1

@@ -2,6 +2,7 @@
 
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSettingsParams } from "@/lib/useUrlParams";
 import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2, Info, Eye, EyeOff, Pencil, KeyRound, CheckCircle2, Loader2, Cloud, Laptop, Server } from "lucide-react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
 import { areCaptionKeysEqual, cn, getDefaultQuery } from "@/lib/utils";
@@ -95,6 +96,34 @@ export default function BrowserSettings() {
         userExperience: false
     });
     const [newCaption, setNewCaption] = useState("");
+
+    // Deep-link support: arriving at /settings?tab=Browser&focus=timeout opens the
+    // (collapsed-by-default) Query Execution section and focuses the timeout field.
+    // Two effects keep this deterministic: first expand, then focus once the input mounts.
+    const { focus: focusParam, setFocus } = useSettingsParams();
+    const focusHandledRef = useRef(false);
+
+    useEffect(() => {
+        if (focusParam === "timeout" && !focusHandledRef.current) {
+            setExpandedSections(prev => ({ ...prev, queryExecution: true }));
+        }
+    }, [focusParam]);
+
+    useEffect(() => {
+        if (focusParam === "timeout" && expandedSections.queryExecution && !focusHandledRef.current) {
+            focusHandledRef.current = true;
+            const input = document.getElementById("timeoutInput") as HTMLInputElement | null;
+            input?.scrollIntoView({ block: "center" });
+            input?.focus();
+            setFocus(""); // consume the param (preserves tab) so it doesn't re-fire
+        }
+    }, [focusParam, expandedSections.queryExecution, setFocus]);
+
+    // Re-arm the guard once the param is consumed/cleared, so a later ?focus=timeout
+    // deep-link works even if the Settings page is still mounted (no remount).
+    useEffect(() => {
+        if (focusParam !== "timeout") focusHandledRef.current = false;
+    }, [focusParam]);
 
     const toggleSection = (section: keyof typeof expandedSections) => {
         setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -1068,6 +1097,7 @@ export default function BrowserSettings() {
                                             className="w-full"
                                             min={10}
                                             max={50}
+                                            type="items"
                                             value={[newMaxItemsForSearch]}
                                             onValueChange={(value) => createChangeHandler(setNewMaxItemsForSearch)(value[value.length - 1], "maxItemsForSearch")}
                                         />
