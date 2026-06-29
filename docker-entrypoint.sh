@@ -22,11 +22,8 @@ fi
 # nextjs user can write to it even when a Docker named volume is mounted there
 # (named volumes are created owned by root).  Then drop privileges to nextjs.
 if [ "$(id -u)" = "0" ]; then
-  if ! chown -R nextjs:nodejs "$DATA_DIR"; then
-    echo "ERROR: Failed to set ownership on $DATA_DIR. Check volume permissions."
-    exit 1
-  fi
-  if ! su-exec nextjs:nodejs test -w "$DATA_DIR"; then
+  chown -R nextjs:nodejs "$DATA_DIR" 2>/dev/null || true
+  if ! su-exec nextjs:nodejs sh -c 'tmp="$1/.write-test.$$"; touch "$tmp" && rm -f "$tmp"' sh "$DATA_DIR"; then
     echo "ERROR: Data directory $DATA_DIR is not writable for nextjs (uid=1001). Check volume permissions."
     exit 1
   fi

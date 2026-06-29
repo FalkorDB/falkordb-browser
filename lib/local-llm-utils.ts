@@ -10,38 +10,43 @@ export const LOCAL_PROVIDER_DEFAULT_ENDPOINTS: Record<LocalProvider, string> = {
 };
 
 /**
- * Normalize and validate a local LLM endpoint URL
+ * Normalize and validate a local LLM endpoint URL.
+ *
+ * Accepts any loopback (localhost/127.0.0.1) http:// URL on any port and path so users
+ * can point at LM Studio or Ollama wherever they actually run it. The loopback-only
+ * restriction is kept as an SSRF safety guard. When no path is supplied, LM Studio
+ * defaults to `/v1` (its OpenAI-compatible base) and Ollama defaults to `/`.
+ *
  * @param provider - The local LLM provider (ollama or lmstudio)
  * @param endpoint - Optional custom endpoint URL
- * @returns Normalized endpoint URL
- * @throws Error if the endpoint is invalid
+ * @returns Normalized endpoint URL (no trailing slash)
+ * @throws Error if the endpoint is not a valid loopback http:// URL
  */
 export const normalizeLocalEndpoint = (provider: LocalProvider, endpoint?: string) => {
     const rawEndpoint = endpoint?.trim() || LOCAL_PROVIDER_DEFAULT_ENDPOINTS[provider];
-    const url = new URL(rawEndpoint);
+
+    let url: URL;
+    try {
+        url = new URL(rawEndpoint);
+    } catch {
+        throw new Error("Local LLM endpoint must be a valid http:// localhost or 127.0.0.1 URL.");
+    }
+
     const hostname = url.hostname.toLowerCase();
-    const isLoopback = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+    const isLoopback = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
 
     if (url.protocol !== "http:" || !isLoopback) {
         throw new Error("Local LLM endpoint must be an http:// localhost or 127.0.0.1 URL.");
     }
 
-    // Only allow explicit provider ports, not empty string (which would allow http://localhost/)
-    const allowedPorts = provider === "ollama" ? new Set(["11434"]) : new Set(["1234"]);
-    if (!allowedPorts.has(url.port)) {
-        throw new Error(`Invalid ${provider === "ollama" ? "Ollama" : "LM Studio"} endpoint port.`);
-    }
+    // Strip any trailing slashes so callers can append `/models` or `/api/tags` cleanly.
+    let pathname = url.pathname.replace(/\/+$/, "");
 
-    if (provider === "ollama") {
-        if (url.pathname !== "/" && url.pathname !== "") {
-            throw new Error("Ollama endpoint path must be root (/).");
-        }
-        url.pathname = "/";
-    } else if (url.pathname === "/" || url.pathname === "") {
-        url.pathname = "/v1";
-    } else if (url.pathname !== "/v1") {
-        throw new Error("LM Studio endpoint path must be /v1.");
+    // Default the path only when the user did not provide one.
+    if (pathname === "") {
+        pathname = provider === "lmstudio" ? "/v1" : "/";
     }
+    url.pathname = pathname;
 
     url.search = "";
     url.hash = "";

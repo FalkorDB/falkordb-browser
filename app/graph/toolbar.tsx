@@ -60,7 +60,10 @@ export default function Toolbar({
     const isLoading = isLoadingGraph;
 
     const { startIndex, topFakeItemHeight, bottomFakeItemHeight, visibleSuggestions } = useMemo(() => {
-        const newStartIndex = Math.max(0, Math.floor((scrollTop - ((ITEM_HEIGHT + GAP) * ITEMS_PER_PAGE)) / (ITEM_HEIGHT + GAP)));
+        const newStartIndex = Math.max(0, Math.min(
+            Math.floor((scrollTop - ((ITEM_HEIGHT + GAP) * ITEMS_PER_PAGE)) / (ITEM_HEIGHT + GAP)),
+            Math.max(0, suggestions.length - 1)
+        ));
         const newEndIndex = Math.min(suggestions.length, Math.floor((scrollTop + ((ITEM_HEIGHT + GAP) * (ITEMS_PER_PAGE * 2))) / (ITEM_HEIGHT + GAP)));
         const bottomCount = suggestions.length - newEndIndex;
         return {
@@ -75,9 +78,11 @@ export default function Toolbar({
         setScrollTop(e.currentTarget.scrollTop);
     };
 
-    const handleOnChange = useCallback(async () => {
+    const handleOnChange = useCallback(() => {
         setSuggestionIndex(0);
         setHoverIndex(-1);
+        setScrollTop(0);
+        suggestionRef.current?.scrollTo({ top: 0 });
 
         if (!searchElement) {
             setSuggestions([]);
@@ -85,7 +90,7 @@ export default function Toolbar({
         }
 
         const elements = graph.getElements().filter(el =>
-            Object.values(el.data).some(value => value.toString().toLowerCase().startsWith(searchElement.toLowerCase()))
+            Object.values(el.data).some(value => value != null && value.toString().toLowerCase().startsWith(searchElement.toLowerCase()))
             || el.id.toString().toLowerCase().includes(searchElement.toLowerCase())
             || ("relationship" in el && (el as Link).relationship.toLowerCase().includes(searchElement.toLowerCase()))
             || ("labels" in el && (el as Node).labels.some(c => c.toLowerCase().includes(searchElement.toLowerCase())))
@@ -121,7 +126,7 @@ export default function Toolbar({
         const lowerSearch = searchElement.toLowerCase();
 
         for (const [key, value] of Object.entries(el.data)) {
-            if (value.toString().toLowerCase().startsWith(lowerSearch)) {
+            if (value != null && value.toString().toLowerCase().startsWith(lowerSearch)) {
                 return { key, value: value.toString() };
             }
         }
@@ -235,33 +240,6 @@ export default function Toolbar({
                                 role="listbox"
                                 tabIndex={-1}
                                 onMouseLeave={() => setHoverIndex(-1)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Escape') {
-                                        e.preventDefault();
-                                        setSearchElement("");
-                                    }
-
-                                    if (e.key === 'Enter' && suggestions[suggestionIndex]) {
-                                        e.preventDefault();
-                                        handleSearchElement(suggestions[suggestionIndex]);
-                                        setSearchElement("");
-                                    }
-
-                                    if (e.key === 'ArrowDown') {
-                                        e.preventDefault();
-                                        const index = suggestionIndex === suggestions.length - 1 ? 0 : suggestionIndex + 1;
-                                        setSuggestionIndex(index);
-                                        scrollToSuggestion(index);
-
-                                    }
-
-                                    if (e.key === 'ArrowUp') {
-                                        e.preventDefault();
-                                        const index = suggestionIndex === 0 ? suggestions.length - 1 : suggestionIndex - 1;
-                                        setSuggestionIndex(index);
-                                        scrollToSuggestion(index);
-                                    }
-                                }}
                             >
                                 {
                                     topFakeItemHeight > 0
@@ -296,7 +274,7 @@ export default function Toolbar({
                                                                         : "bg-secondary"
                                                             )}
                                                             style={type ? { borderLeft: `2px solid ${suggestion.color}` } : undefined}
-                                                            onMouseEnter={() => setHoverIndex(actualIndex)}
+                                                            onMouseEnter={() => { setHoverIndex(actualIndex); setSuggestionIndex(actualIndex); }}
                                                             onClick={() => handleSearchElement(suggestion)}
                                                         >
                                                             <div className="w-full h-full grid gap-2 items-center" style={{ gridTemplateColumns: '1rem 1fr 2fr 1.5fr' }}>

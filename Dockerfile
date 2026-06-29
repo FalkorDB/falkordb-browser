@@ -78,6 +78,7 @@ ENV PORT=3000
 
 ENV HOSTNAME="0.0.0.0"
 
+USER nextjs
 ENTRYPOINT ["docker-entrypoint.sh"]
 
 # server.js is created by next build from the standalone output
