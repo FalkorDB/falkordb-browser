@@ -18,7 +18,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@falkordb/canvas": "v0.1.0",
+    "@falkordb/canvas": "^0.2.0",
     "@falkordb/text-to-cypher": "^0.2.0",
     "@hookform/resolvers": "^5.4.0",
     "@monaco-editor/react": "^4.6.0",
