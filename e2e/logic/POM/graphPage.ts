@@ -168,6 +168,18 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("animationControl");
   }
 
+  public get dimControl(): Locator {
+    return this.page.getByTestId("dimControl");
+  }
+
+  public get dimContainer(): Locator {
+    return this.page.getByTestId("dimContainer");
+  }
+
+  public get graphCanvasWrapper(): Locator {
+    return this.page.getByTestId("graphCanvasWrapper");
+  }
+
   public get pinControl(): Locator {
     return this.page.getByTestId("pinControl");
   }
@@ -918,6 +930,36 @@ export default class GraphPage extends BasePage {
       (el) => el.click(),
       "Animation Control"
     );
+  }
+
+  async clickDimControl(): Promise<void> {
+    await interactWhenVisible(
+      this.dimControl,
+      (el) => el.click(),
+      "Dim Control"
+    );
+  }
+
+  async isDimControlChecked(): Promise<boolean> {
+    await waitForElementToBeVisible(this.dimControl);
+    const state = await this.dimControl.getAttribute("data-state");
+    return state === "checked";
+  }
+
+  async isDimContainerVisible(): Promise<boolean> {
+    return waitForElementToBeVisible(this.dimContainer);
+  }
+
+  async getSelectionCount(): Promise<number> {
+    await waitForElementToBeVisible(this.graphCanvasWrapper);
+    const count = await this.graphCanvasWrapper.getAttribute("data-selection-count");
+    return count ? parseInt(count, 10) : 0;
+  }
+
+  async isFocusActive(): Promise<boolean> {
+    await waitForElementToBeVisible(this.graphCanvasWrapper);
+    const active = await this.graphCanvasWrapper.getAttribute("data-focus-active");
+    return active === "true";
   }
 
   async clickZoomInControl(): Promise<void> {
