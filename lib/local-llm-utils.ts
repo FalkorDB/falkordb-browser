@@ -33,7 +33,7 @@ export const normalizeLocalEndpoint = (provider: LocalProvider, endpoint?: strin
     }
 
     const hostname = url.hostname.toLowerCase();
-    const isLoopback = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+    const isLoopback = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
 
     if (url.protocol !== "http:" || !isLoopback) {
         throw new Error("Local LLM endpoint must be an http:// localhost or 127.0.0.1 URL.");
