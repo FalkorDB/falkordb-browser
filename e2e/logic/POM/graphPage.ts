@@ -419,6 +419,30 @@ export default class GraphPage extends BasePage {
     return (await title.textContent()) || "";
   }
 
+  async clickErrorToastCopy(): Promise<void> {
+    await interactWhenVisible(
+      this.errorToast.getByTestId("toast-copy-raw"),
+      (el) => el.click(),
+      "Error toast Copy"
+    );
+  }
+
+  // Monaco renders a diagnostic marker as a `.squiggly-error` decoration in the editor.
+  async hasEditorErrorMarker(): Promise<boolean> {
+    return waitForElementToBeVisible(this.page.locator(".squiggly-error:visible").first());
+  }
+
+  async fixWithAiButtonCount(): Promise<number> {
+    return this.page.getByTestId("fix-with-ai").count();
+  }
+
+  async getLatestErrorToastText(): Promise<string> {
+    const toasts = this.page.getByTestId("toast-destructive");
+    const count = await toasts.count();
+    if (count === 0) return "";
+    return (await toasts.nth(count - 1).textContent()) || "";
+  }
+
   async isOfflineIndicatorVisible(): Promise<boolean> {
     const indicator = this.page.locator('[role="status"][aria-label*="offline"]');
     return waitForElementToBeVisible(indicator);
@@ -1389,5 +1413,25 @@ export default class GraphPage extends BasePage {
   async rightClickElement(x: number, y: number): Promise<void> {
     await this.page.mouse.click(x, y, { button: "right" });
     await this.page.waitForTimeout(500);
+  }
+
+  /**
+   * Returns the text currently shown in the graph selector button, e.g.
+   * the selected graph name or "Select Graph" when nothing is selected.
+   */
+  async getSelectedGraphName(): Promise<string> {
+    const text = await this.page.getByTestId("selectGraph").textContent();
+    return (text ?? "").trim();
+  }
+
+  /**
+   * Set a localStorage item directly via page.evaluate.
+   * Useful for pre-seeding connection-scoped keys before navigation.
+   */
+  async setLocalStorageItem(key: string, value: string): Promise<void> {
+    await this.page.evaluate(
+      ([k, v]) => localStorage.setItem(k, v),
+      [key, value],
+    );
   }
 }

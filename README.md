@@ -109,6 +109,57 @@ For detailed configuration options and examples, see the [Helm chart documentati
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
 
+### Error help
+
+When a Cypher query fails, the browser shows the database's message together with an
+actionable **💡 hint**. For a mistyped function or variable it offers a
+**"Did you mean…?"** suggestion (e.g. `Unknown function 'lenght'` → *Did you mean
+`length()`?*), computed from the built-in/UDF function list and the variables in your
+query. The error is also surfaced **inline in the editor** as a red squiggle on the
+offending token, with the hint on hover and a one-click **quick fix** to apply the
+suggestion. As you type, unknown node labels that look like a typo of a known label are
+flagged with a warning and a quick fix. When the static help isn't enough, a **"Fix with
+AI"** button (shown only when a supported OpenAI-compatible model — OpenAI/Groq/xAI/Ollama/
+LM Studio — is configured) sends the **query and its error** to your configured provider on an
+explicit click and returns an explanation + a corrected query you can insert into the editor.
+The full server message is always shown — recognized errors display it directly, and when the
+toast shows a friendlier summary instead, you can expand **"See more"** to read the raw text and
+use **"Copy"** for one-click copy into a bug report. Where helpful, a hint includes a
+**"Learn more →"** link to the matching FalkorDB docs page, and the query-timeout hint deep-links
+straight to the **timeout field in Settings**. Hints are currently English-only; localization is a
+deliberate follow-up (it pairs with introducing stable structured error codes).
+The logic lives in `lib/cypherSuggestions.ts`, `lib/cypherDiagnostics.ts`, and `lib/aiFix.ts`,
+with the static hint catalog (and its optional docs/deep-links) in `lib/cypherErrors.ts` and the
+clipboard helper in `lib/clipboard.ts`.
+
+### Testing
+
+* **Unit tests** (Node's built-in test runner, no extra tooling): `npm test`
+  Runs the `*.test.ts` suites under `app/` and `lib/`. Gated in CI by the **Build**
+  workflow. These execute TypeScript directly via `node --test`, which relies on native
+  type-stripping — use **Node ≥ 22.18** (CI runs Node 24). Older Node (e.g. 20.x) can run
+  the app but cannot run these tests.
+* **Coverage**: `npm run test:coverage` — runs the unit tests and enforces **100%**
+  line/branch/function coverage on `lib/cypherSuggestions.ts`, `lib/cypherDiagnostics.ts`,
+  `lib/aiFix.ts`, `lib/cypherErrors.ts`, and `lib/clipboard.ts`.
+* **Smoke tests vs a real FalkorDB**: `npm run test:smoke` — runs every `lib/**/*.smoke.ts`
+  suite against the actual server error wording. This covers the "Did you mean…?"
+  suggestions and the **error-hint drift guard**: each entry in the hint catalog
+  (`lib/cypherErrors.ts`) is paired with a query in `lib/cypherErrorDriftCases.ts`, and the
+  smoke test asserts the live FalkorDB message still matches — so a server-side rewording is
+  caught instead of silently dropping a hint. The smoke tests are gated: they **skip** unless
+  `FALKORDB_SMOKE=1`, and **fail** (rather than skipping) if that is set but no server is
+  reachable. Run locally with:
+  ```bash
+  docker run -d -p 6379:6379 falkordb/falkordb
+  FALKORDB_SMOKE=1 npm run test:smoke   # optional: FALKORDB_URL=redis://host:port
+  ```
+  In CI the **Build** workflow runs these against a pinned FalkorDB release (deterministic for
+  PRs), while the scheduled **Cypher error drift canary** workflow runs the same tests against
+  `:latest` to surface drift early without blocking pull requests.
+* **Lint**: `npm run lint`
+* **End-to-end tests** (Playwright): `npm run test:e2e`
+
 
 
 

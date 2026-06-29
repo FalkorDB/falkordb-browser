@@ -57,9 +57,47 @@ jobs:
             
       - name: Install dependencies
         run: npm ci --no-audit --progress=false
-        
+
+      - name: Run unit tests with coverage
+        run: npm run test:coverage
+
       - name: Build with Next.js
         run: npx next build
+
+  smoke-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      falkordb:
+        # Pinned to a specific release so PR smoke tests are deterministic: a
+        # server-side error rewording can't break unrelated PRs here. The
+        # drift-canary workflow runs the same tests against :latest to catch drift.
+        image: falkordb/falkordb:v4.18.10
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --progress=false
+      - name: Run smoke tests against FalkorDB
+        run: npm run test:smoke
+        env:
+          FALKORDB_SMOKE: "1"
+          FALKORDB_URL: redis://localhost:6379
 
   security-scan:
     runs-on: ubuntu-latest

@@ -111,4 +111,75 @@ test.describe("@admin Graph URL params", () => {
         expect(queryIdx).toBeGreaterThan(-1);
         expect(graphIdx).toBeLessThan(queryIdx);
     });
+
+    test("URL with existing graph: selector shows that graph and URL param is kept", async () => {
+        const graph = await browser.createNewPage(
+            GraphPage,
+            `${urls.graphUrl}?graph=${encodeURIComponent(graphName)}`
+        );
+        const page = await browser.getPage();
+
+        // Wait until the selector reflects the URL graph — auto-retries until
+        // React effects finish loading the graph list and setting graphName.
+        await expect(page.getByTestId("selectGraph")).toContainText(graphName, { timeout: 15000 });
+
+        // URL must still carry the graph param
+        const url = graph.getCurrentURL();
+        expect(url).toContain(`graph=${encodeURIComponent(graphName)}`);
+    });
+
+    test("URL with existing graph: URL graph wins over content-persistence saved graph", async () => {
+        const otherGraph = getRandomString("persist");
+        await apiCall.addGraph(otherGraph);
+
+        try {
+            // Land on a neutral page first so the init script runs and sets
+            // defaults, then override content-persistence settings before the
+            // actual /graph navigation.
+            const graph = await browser.createNewPage(GraphPage, urls.localHost);
+            const page = await browser.getPage();
+
+            const storagePrefix = "localhost:6379:default:";
+            await graph.setLocalStorageItem("contentPersistence", "true");
+            await graph.setLocalStorageItem(
+                `${storagePrefix}savedContent`,
+                JSON.stringify({ graphName: otherGraph, query: "MATCH (n) RETURN n" }),
+            );
+
+            // Navigate to /graph with the URL graph param
+            await page.goto(`${urls.graphUrl}?graph=${encodeURIComponent(graphName)}`, {
+                waitUntil: "networkidle",
+            });
+
+            // URL graph must win — wait for selector to reflect URL graph (auto-retries)
+            await expect(page.getByTestId("selectGraph")).toContainText(graphName, { timeout: 15000 });
+            await expect(page.getByTestId("selectGraph")).not.toContainText(otherGraph, { timeout: 5000 });
+
+            const url = graph.getCurrentURL();
+            expect(url).toContain(`graph=${encodeURIComponent(graphName)}`);
+            expect(url).not.toContain(encodeURIComponent(otherGraph));
+        } finally {
+            await apiCall.removeGraph(otherGraph);
+        }
+    });
+
+    test("URL with non-existing graph: param is stripped and selector stays empty", async () => {
+        // Use a name guaranteed not to exist
+        const nonExistentGraph = `nonexistent-${Date.now()}`;
+
+        const graph = await browser.createNewPage(
+            GraphPage,
+            `${urls.graphUrl}?graph=${encodeURIComponent(nonExistentGraph)}`
+        );
+        await graph.waitForPageIdle();
+
+        // URL param must be cleared by the validation logic
+        const url = graph.getCurrentURL();
+        expect(url).not.toContain(`graph=${encodeURIComponent(nonExistentGraph)}`);
+
+        // Selector must show the placeholder, not the invalid graph name
+        const selectedName = await graph.getSelectedGraphName();
+        expect(selectedName).not.toContain(nonExistentGraph);
+        expect(selectedName).toContain("Select Graph");
+    });
 });

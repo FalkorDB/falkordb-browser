@@ -295,3 +295,21 @@ input[type="color"]::-webkit-color-swatch {
 
 .markdown-body strong { font-weight: 600; }
 .markdown-body em { font-style: italic; }
+
+/* Monaco's overflow widgets (suggest, find, hover) are rendered as direct children
+   of .overflowingContentWidgets / .overflowingOverlayWidgets at document.body level
+   when fixedOverflowWidgets:true. Monaco sets position:fixed on each widget inline,
+   but their z-index comes from selectors like `.monaco-editor .suggest-widget` which
+   don't match when the widget lives outside .monaco-editor.
+   Set z-index on the widgets themselves so they paint above Radix UI overlays (z-30). */
+.overflowingContentWidgets > *,
+.overflowingOverlayWidgets > * {
+    z-index: 50;
+}
+
+/* Hide the Monaco suggest widget status bar ("Insert →" / "Show More Ctrl+Space").
+   These keyboard-hint buttons are unnecessary in the query panel context and the
+   "Show More" button causes the documentation panel to open over the graph view. */
+.suggest-widget .suggest-widget-status-bar {
+    display: none !important;
+}
