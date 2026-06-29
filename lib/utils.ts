@@ -109,6 +109,11 @@ export type LinkCell = {
   };
 };
 
+export type PathCell = {
+  nodes: NodeCell[];
+  edges: LinkCell[];
+};
+
 export type DataCell = NodeCell | LinkCell | NodeCell[] | LinkCell[] | number | string | null;
 
 export type DataRow = {

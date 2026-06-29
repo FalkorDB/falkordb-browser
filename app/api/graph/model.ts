@@ -2,7 +2,7 @@
 /* eslint-disable one-var */
 /* eslint-disable no-param-reassign */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Data, getMetaStats, GraphData, InfoLabel, InfoRelationship, Label, Link, LinkCell, MemoryValue, Node, NodeCell, Relationship, ToastFn, Value } from "@/lib/utils";
+import { Data, getMetaStats, GraphData, InfoLabel, InfoRelationship, Label, Link, LinkCell, MemoryValue, Node, NodeCell, PathCell, Relationship, ToastFn, Value } from "@/lib/utils";
 import { getConnectionItem } from "@/lib/connection-storage";
 
 // Color palette for node customization
@@ -673,14 +673,15 @@ export class Graph {
   }
 
   public async extendCell(cell: any, collapsed: boolean) {
-    if (cell.nodes) {
+    if (Array.isArray(cell.nodes)) {
+      const pathCell = cell as PathCell;
       const nodes = await Promise.all(
-        cell.nodes.map((node: any) =>
+        pathCell.nodes.map((node) =>
           this.extendNode(node, collapsed)
         )
       );
       const edges = await Promise.all(
-        (cell.edges ?? []).map((edge: any) =>
+        (pathCell.edges ?? []).map((edge) =>
           this.extendEdge(edge, collapsed)
         )
       );
