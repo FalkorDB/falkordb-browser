@@ -105,7 +105,7 @@ export function Toaster() {
           <Toast data-testid={variant === "destructive" ? "toast-destructive" : "toast"} variant={variant} key={id} {...props}>
             <div className="grid gap-1">
               {title && <ToastTitle data-testid="toast-title">{title}</ToastTitle>}
-              {description && (
+              {(description || hint || hintLink || rawMessage) && (
                 <ToastDescription data-testid="toast-description">
                   {description}
                   {hint && (

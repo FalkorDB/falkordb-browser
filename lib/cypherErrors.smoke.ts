@@ -22,6 +22,16 @@ import { DRIFT_CASES } from "./cypherErrorDriftCases.ts";
 
 const ENABLED = process.env.FALKORDB_SMOKE === "1";
 const URL = process.env.FALKORDB_URL ?? "redis://localhost:6379";
+const REDACTED_URL = (() => {
+  try {
+    const parsed = new globalThis.URL(URL);
+    if (parsed.username) parsed.username = "***";
+    if (parsed.password) parsed.password = "***";
+    return parsed.toString();
+  } catch {
+    return URL.replace(/\/\/[^@]+@/, "//***:***@");
+  }
+})();
 
 test(
   "every DRIFT_CASE still matches live FalkorDB error wording",
@@ -31,7 +41,7 @@ test(
     try {
       db = await FalkorDB.connect({ url: URL });
     } catch (error) {
-      assert.fail(`FALKORDB_SMOKE=1 but could not connect to ${URL}: ${(error as Error).message}`);
+      assert.fail(`FALKORDB_SMOKE=1 but could not connect to ${REDACTED_URL}: ${(error as Error).message}`);
     }
 
     const graphName = `smoke_cypher_errors_${Date.now()}`;

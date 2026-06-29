@@ -96,7 +96,7 @@ function wordRangeAt(lineText: string, column: number): { startColumn: number; e
   // Non-word, non-space (operator/punct): highlight the consecutive run of the same char
   // so that e.g. '==' at column N produces a 2-char underline on '==' rather than jumping
   // back to the preceding identifier.
-  if (!/\s/.test(lineText[idx] ?? "")) {
+  if (idx < lineText.length && !/\s/.test(lineText[idx] ?? "")) {
     const ch = lineText[idx];
     let runEnd = idx;
     while (runEnd + 1 < lineText.length && lineText[runEnd + 1] === ch) runEnd += 1;

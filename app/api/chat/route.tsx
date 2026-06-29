@@ -172,6 +172,7 @@ export async function POST(request: NextRequest) {
             model,
             apiKey: modelSource === "local" ? localProvider : key,
             udfs: safeUdfs,
+            llmEndpoint,
         });
 
         // Get the last user message
