@@ -50,9 +50,23 @@ export default function AiFixButton({ currentQuery }: { currentQuery: string }) 
         }
 
         if (chatModelSource === "api-key") {
+            // Check provider support first so unsupported providers (e.g. Anthropic, Gemini)
+            // get the correct "Provider not supported" message even when no key is configured.
+            const provider = detectProviderFromModel(model);
+            const supportedApiKeyProviders: ReturnType<typeof detectProviderFromModel>[] = ["openai", "groq", "xai"];
+            if (!supportedApiKeyProviders.includes(provider)) {
+                const providerName = getProviderDisplayName(provider);
+                toast({
+                    title: "Provider not supported",
+                    description: `Fix with AI requires an OpenAI, Groq, xAI, Ollama, or LM Studio model. "${providerName}" is not supported yet.`,
+                    variant: "destructive",
+                    action: goToSettings,
+                });
+                return;
+            }
+
             const resolvedKey = chatApiKeys.find(k => k.id === selectedChatApiKeyId)?.key || secretKey;
             if (!resolvedKey) {
-                const provider = detectProviderFromModel(model);
                 const providerName = getProviderDisplayName(provider);
                 toast({
                     title: "No API Key Provided",
@@ -63,16 +77,6 @@ export default function AiFixButton({ currentQuery }: { currentQuery: string }) 
                 return;
             }
         }
-
-        // Model present + key present but provider not supported (e.g. Anthropic/Gemini)
-        const provider = detectProviderFromModel(model);
-        const providerName = getProviderDisplayName(provider);
-        toast({
-            title: "Provider not supported",
-            description: `Fix with AI requires an OpenAI, Groq, xAI, Ollama, or LM Studio model. "${providerName}" is not supported yet.`,
-            variant: "destructive",
-            action: goToSettings,
-        });
     };
 
     return (

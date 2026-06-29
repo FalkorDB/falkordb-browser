@@ -207,11 +207,11 @@ export const chatRequest = z.object({
   udfs: z
     .array(
       z.object({
-        name: z.string().min(1).max(UDF_CHAT_MAX_NAME_LENGTH),
+        name: z.string().trim().min(1).max(UDF_CHAT_MAX_NAME_LENGTH).regex(/^[A-Za-z_][A-Za-z0-9_.]*$/, "Invalid UDF library name"),
         functions: z
           .array(
             z.object({
-              name: z.string().min(1).max(UDF_CHAT_MAX_NAME_LENGTH),
+              name: z.string().trim().min(1).max(UDF_CHAT_MAX_NAME_LENGTH).regex(/^[A-Za-z_][A-Za-z0-9_.]*$/, "Invalid UDF function name"),
             }),
           )
           .max(UDF_CHAT_MAX_FUNCTIONS_PER_LIBRARY),

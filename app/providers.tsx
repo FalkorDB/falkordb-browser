@@ -467,6 +467,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
           localEndpoint: localLlmEndpoint,
         }),
       });
+      if (res.status === 401 && res.headers.get("X-Session-Invalid") === "1") {
+        const { signOut } = await import("next-auth/react");
+        await signOut({ callbackUrl: "/login" });
+        setIndicator("offline");
+        setAiFixResult({ status: "idle" });
+        return;
+      }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setAiFixResult({ status: "error", error: data?.error || "Couldn't get a fix from the AI provider." });
@@ -1337,6 +1344,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setGraphInfo(GraphInfo.empty(toast, setIndicator));
     setGraphName("");
     setSelectedParam("");
+    setGraphNamesLoaded(false);
     setGraphNames([]);
     setNodesCount(undefined);
     setEdgesCount(undefined);
