@@ -150,7 +150,7 @@ export default function BrowserSettings() {
         const controller = new AbortController();
         modelFetchAbortRef.current = controller;
 
-        (async () => {
+        const fetchLocalModels = async () => {
             if (newChatModelSource === "api-key" && !selectedChatApiKey) {
                 setModelDisplayNames([]);
                 setModelsMessage("Enter your API key to load live models.");
@@ -202,13 +202,17 @@ export default function BrowserSettings() {
                     if (requestId !== modelFetchRequestIdRef.current) return;
 
                     setModelDisplayNames([]);
-                    setModelsMessage(error || "Could not load live models for this key. Check the key and try again.");
+                    setModelsMessage(error || (newChatModelSource === "local"
+                        ? "Could not connect to local server. Check the URL and click reload."
+                        : "Could not load live models for this key. Check the key and try again."));
                 }
             } catch (error) {
                 if (error instanceof DOMException && error.name === "AbortError") return;
                 if (requestId !== modelFetchRequestIdRef.current) return;
                 setModelDisplayNames([]);
-                setModelsMessage("Could not load live models for this key. Check the key and try again.");
+                setModelsMessage(newChatModelSource === "local"
+                    ? "Could not connect to local server. Check the URL and click reload."
+                    : "Could not load live models for this key. Check the key and try again.");
             } finally {
                 if (requestId === modelFetchRequestIdRef.current) {
                     setIsLoadingModels(false);
@@ -217,9 +221,12 @@ export default function BrowserSettings() {
                     modelFetchAbortRef.current = null;
                 }
             }
-        })();
+        };
+
+        const timeoutId = setTimeout(() => fetchLocalModels(), 300);
 
         return () => {
+            clearTimeout(timeoutId);
             controller.abort();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -385,11 +392,14 @@ export default function BrowserSettings() {
     const handleModelSourceChange = (source: ChatModelSource) => {
         if (source === newChatModelSource) return;
         setNewChatModelSource(source);
-        const targetKey = source === "local" ? newLocalLlmProvider : "api-key";
+        // Switching away from local — revert any unsaved provider/endpoint changes
+        if (source !== "local") {
+            setNewLocalLlmProvider(localLlmProvider);
+            setNewLocalLlmEndpoint(localLlmEndpoint);
+        }
+        const targetKey = source === "local" ? localLlmProvider : "api-key";
         const nextModel = perSourceModels[targetKey] ?? "";
         setNewModel(nextModel);
-        setModel(nextModel);
-        localStorage.setItem("model", nextModel);
         setModelDisplayNames([]);
         setModelsMessage(source === "local" ? "Loading local models..." : "Select a saved API key to load live models.");
         setModelLoadNonce(nonce => nonce + 1);
@@ -401,8 +411,6 @@ export default function BrowserSettings() {
         setModelDisplayNames([]);
         const nextModel = perSourceModels[provider] ?? "";
         setNewModel(nextModel);
-        setModel(nextModel);
-        localStorage.setItem("model", nextModel);
         setModelsMessage(`Loading local ${LOCAL_LLM_LABELS[provider]} models...`);
         setModelLoadNonce(nonce => nonce + 1);
     };
