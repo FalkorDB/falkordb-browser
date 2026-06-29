@@ -392,6 +392,20 @@ export class Graph {
     this.graphInfo = graphInfo;
   }
 
+  /** Returns a shallow copy of this Graph with the same references to all internal
+   *  collections. Use this to create a new object identity (for React state updates)
+   *  without re-parsing the graph data. */
+  public clone(): Graph {
+    const g = new Graph(
+      this.id, this.labels, this.relationships, this.elements,
+      this.labelsMap, this.relationshipsMap, this.nodesMap, this.linksMap,
+      this.showPropertyKeyPrefix, this.currentLimit, this.graphInfo
+    );
+    g.columns = this.columns;
+    g.data = this.data;
+    return g;
+  }
+
   get ShowPropertyKeyPrefix(): boolean {
     return this.showPropertyKeyPrefix;
   }

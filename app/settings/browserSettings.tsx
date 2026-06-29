@@ -2,6 +2,7 @@
 
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSettingsParams } from "@/lib/useUrlParams";
 import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2, Info, Eye, EyeOff, Pencil, KeyRound, CheckCircle2, Loader2, Cloud, Laptop, Server } from "lucide-react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
 import { areCaptionKeysEqual, cn, getDefaultQuery } from "@/lib/utils";
@@ -96,6 +97,34 @@ export default function BrowserSettings() {
     });
     const [newCaption, setNewCaption] = useState("");
 
+    // Deep-link support: arriving at /settings?tab=Browser&focus=timeout opens the
+    // (collapsed-by-default) Query Execution section and focuses the timeout field.
+    // Two effects keep this deterministic: first expand, then focus once the input mounts.
+    const { focus: focusParam, setFocus } = useSettingsParams();
+    const focusHandledRef = useRef(false);
+
+    useEffect(() => {
+        if (focusParam === "timeout" && !focusHandledRef.current) {
+            setExpandedSections(prev => ({ ...prev, queryExecution: true }));
+        }
+    }, [focusParam]);
+
+    useEffect(() => {
+        if (focusParam === "timeout" && expandedSections.queryExecution && !focusHandledRef.current) {
+            focusHandledRef.current = true;
+            const input = document.getElementById("timeoutInput") as HTMLInputElement | null;
+            input?.scrollIntoView({ block: "center" });
+            input?.focus();
+            setFocus(""); // consume the param (preserves tab) so it doesn't re-fire
+        }
+    }, [focusParam, expandedSections.queryExecution, setFocus]);
+
+    // Re-arm the guard once the param is consumed/cleared, so a later ?focus=timeout
+    // deep-link works even if the Settings page is still mounted (no remount).
+    useEffect(() => {
+        if (focusParam !== "timeout") focusHandledRef.current = false;
+    }, [focusParam]);
+
     const toggleSection = (section: keyof typeof expandedSections) => {
         setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
     };
@@ -121,7 +150,7 @@ export default function BrowserSettings() {
         const controller = new AbortController();
         modelFetchAbortRef.current = controller;
 
-        (async () => {
+        const fetchLocalModels = async () => {
             if (newChatModelSource === "api-key" && !selectedChatApiKey) {
                 setModelDisplayNames([]);
                 setModelsMessage("Enter your API key to load live models.");
@@ -173,13 +202,17 @@ export default function BrowserSettings() {
                     if (requestId !== modelFetchRequestIdRef.current) return;
 
                     setModelDisplayNames([]);
-                    setModelsMessage(error || "Could not load live models for this key. Check the key and try again.");
+                    setModelsMessage(error || (newChatModelSource === "local"
+                        ? "Could not connect to local server. Check the URL and click reload."
+                        : "Could not load live models for this key. Check the key and try again."));
                 }
             } catch (error) {
                 if (error instanceof DOMException && error.name === "AbortError") return;
                 if (requestId !== modelFetchRequestIdRef.current) return;
                 setModelDisplayNames([]);
-                setModelsMessage("Could not load live models for this key. Check the key and try again.");
+                setModelsMessage(newChatModelSource === "local"
+                    ? "Could not connect to local server. Check the URL and click reload."
+                    : "Could not load live models for this key. Check the key and try again.");
             } finally {
                 if (requestId === modelFetchRequestIdRef.current) {
                     setIsLoadingModels(false);
@@ -188,9 +221,12 @@ export default function BrowserSettings() {
                     modelFetchAbortRef.current = null;
                 }
             }
-        })();
+        };
+
+        const timeoutId = setTimeout(() => fetchLocalModels(), 300);
 
         return () => {
+            clearTimeout(timeoutId);
             controller.abort();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -356,11 +392,14 @@ export default function BrowserSettings() {
     const handleModelSourceChange = (source: ChatModelSource) => {
         if (source === newChatModelSource) return;
         setNewChatModelSource(source);
-        const targetKey = source === "local" ? newLocalLlmProvider : "api-key";
+        // Switching away from local — revert any unsaved provider/endpoint changes
+        if (source !== "local") {
+            setNewLocalLlmProvider(localLlmProvider);
+            setNewLocalLlmEndpoint(localLlmEndpoint);
+        }
+        const targetKey = source === "local" ? localLlmProvider : "api-key";
         const nextModel = perSourceModels[targetKey] ?? "";
         setNewModel(nextModel);
-        setModel(nextModel);
-        localStorage.setItem("model", nextModel);
         setModelDisplayNames([]);
         setModelsMessage(source === "local" ? "Loading local models..." : "Select a saved API key to load live models.");
         setModelLoadNonce(nonce => nonce + 1);
@@ -372,8 +411,6 @@ export default function BrowserSettings() {
         setModelDisplayNames([]);
         const nextModel = perSourceModels[provider] ?? "";
         setNewModel(nextModel);
-        setModel(nextModel);
-        localStorage.setItem("model", nextModel);
         setModelsMessage(`Loading local ${LOCAL_LLM_LABELS[provider]} models...`);
         setModelLoadNonce(nonce => nonce + 1);
     };
@@ -1068,6 +1105,7 @@ export default function BrowserSettings() {
                                             className="w-full"
                                             min={10}
                                             max={50}
+                                            type="items"
                                             value={[newMaxItemsForSearch]}
                                             onValueChange={(value) => createChangeHandler(setNewMaxItemsForSearch)(value[value.length - 1], "maxItemsForSearch")}
                                         />

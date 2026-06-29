@@ -1,5 +1,4 @@
 /** @type {import('next').NextConfig} */
-const path = require('path');
 
 const nextConfig = {
   allowedDevOrigins: ['127.0.0.1', '0.0.0.0'],
@@ -61,9 +60,6 @@ const nextConfig = {
   // Webpack config for production builds (next build --webpack)
   // SVG handling + local @falkordb/canvas alias
   webpack(config) {
-    // Alias local @falkordb/canvas to its built dist when using webpack
-    config.resolve.alias['@falkordb/canvas'] = path.resolve(__dirname, '../falkordb-canvas/dist/index.js');
-
     // Grab the existing rule that handles SVG imports
     const fileLoaderRule = config.module.rules.find((rule) =>
       rule.test?.test?.('.svg'),

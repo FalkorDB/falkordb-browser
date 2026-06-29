@@ -2,10 +2,10 @@
 
 /* eslint-disable react/require-default-props */
 
-import { ChevronDown, Circle, Pause, Pin, PinOff, Play, Shrink, ZoomIn, ZoomOut } from "lucide-react";
-import { useContext, useEffect, useRef, useState } from "react";
+import { ChevronDown, Circle, Pause, Pin, PinOff, Play, Shrink, Telescope, ZoomIn, ZoomOut } from "lucide-react";
+import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react";
 import type { HierarchyDirection, LayoutMode, RadialDirection } from "@falkordb/canvas";
-import { cn, GraphRef } from "@/lib/utils";
+import { cn, GraphRef, Node, Link } from "@/lib/utils";
 import { setUrlParam } from "@/lib/useUrlParams";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -48,12 +48,18 @@ interface Props {
     graph: Graph,
     disabled: boolean,
     canvasRef: GraphRef,
+    dimmed: boolean,
+    setDimmed: Dispatch<SetStateAction<boolean>>,
+    selectedElements: (Node | Link)[],
 }
 
 export default function Controls({
     graph,
     disabled,
     canvasRef,
+    dimmed,
+    setDimmed,
+    selectedElements,
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
@@ -85,7 +91,30 @@ export default function Controls({
     })();
 
     const handleZoomClick = (changeFactor: number) => {
-        canvasRef.current?.zoom(canvasRef.current.getZoom() * changeFactor);
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        // If elements are selected, pan to their centroid first, then zoom.
+        if (selectedElements.length > 0) {
+            const graphData = canvas.getGraphData();
+            const selectedNodeIds = new Set<number>();
+            for (const el of selectedElements) {
+                if ('source' in el) {
+                    selectedNodeIds.add(el.source as number);
+                    selectedNodeIds.add(el.target as number);
+                } else {
+                    selectedNodeIds.add(el.id);
+                }
+            }
+            const focusedNodes = graphData.nodes.filter(n => selectedNodeIds.has(n.id));
+            if (focusedNodes.length > 0) {
+                const cx = focusedNodes.reduce((s, n) => s + (n.x ?? 0), 0) / focusedNodes.length;
+                const cy = focusedNodes.reduce((s, n) => s + (n.y ?? 0), 0) / focusedNodes.length;
+                canvas.centerAt(cx, cy, 300);
+            }
+        }
+
+        canvas.zoom(canvas.getZoom() * changeFactor);
     };
 
     const handleCenterClick = () => {
@@ -96,6 +125,11 @@ export default function Controls({
         const next = !animation;
         setAnimation(next);
         canvasRef.current?.setAnimation(next);
+    };
+
+    const handleDimToggle = (checked: boolean) => {
+        setDimmed(checked);
+        canvasRef.current?.setDimmed(checked);
     };
 
     const handlePinToggle = () => {
@@ -167,6 +201,23 @@ export default function Controls({
                         </TooltipTrigger>
                         <TooltipContent>
                             <p>{animation ? "Pause animation" : "Resume animation"}</p>
+                        </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div data-testid="dimContainer" className="flex items-center gap-2">
+                                <Telescope size={18} />
+                                <Switch
+                                    data-testid="dimControl"
+                                    aria-label={dimmed ? "Disable focus mode" : "Enable focus mode"}
+                                    className="pointer-events-auto data-[state=unchecked]:bg-border"
+                                    checked={dimmed}
+                                    onCheckedChange={handleDimToggle}
+                                />
+                            </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>{dimmed ? "Disable focus mode" : "Enable focus mode"}</p>
                         </TooltipContent>
                     </Tooltip>
                     <Tooltip>

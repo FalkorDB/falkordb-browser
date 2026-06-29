@@ -3,19 +3,24 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, SyntaxErrorInfo, parseSyntaxError } from "@/lib/utils";
+import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue } from "@/lib/utils";
 import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import { usePathname, useRouter } from "next/navigation";
 import { useGraphParams, syncRouteUrlParams } from "@/lib/useUrlParams";
 import { useToast } from "@/components/ui/use-toast";
-import { detectProviderFromApiKey, getProviderDisplayName } from "@/lib/ai-provider-utils";
+import { detectProviderFromApiKey, getProviderDisplayName, detectProviderFromModel } from "@/lib/ai-provider-utils";
+import { setFunctionCandidates } from "@/lib/cypherSuggestions";
+import { udfFunctionNames } from "@/lib/cypherLang";
+import { computeEditorDiagnostics, type DiagnosticsResult } from "@/lib/cypherDiagnostics";
+import { isAiFixSupported } from "@/lib/aiFix";
 import { PanelImperativeHandle } from "react-resizable-panels";
 import type { Data as CanvasData, HierarchyDirection, LayoutMode, RadialDirection, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
+import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
-import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, SyntaxErrorContext, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
 
@@ -184,6 +189,15 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   const { graphName: urlGraphName, selected: urlSelected, query: urlQuery, layout: urlLayout, direction: urlDirection } = useGraphParams();
   const initialQueryRef = useRef(urlQuery);
+  // Capture the URL graph param at render time — before any effects (e.g.
+  // syncRouteUrlParams) can strip ?graph= from window.location. We cannot
+  // rely on urlGraphName (useSearchParams) because it returns "" during SSR
+  // and the URL is mutated by effects before content persistence can read it.
+  const initialUrlGraphNameRef = useRef(
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("graph") || ""
+      : ""
+  );
 
   const [indicator, setIndicator] = useState<"online" | "offline">("online");
   const [historyQuery, setHistoryQuery] = useState<HistoryQuery>(defaultQueryHistory);
@@ -191,13 +205,23 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [selectedParam, setSelectedParam] = useState<string>(urlSelected);
   const [runDefaultQuery, setRunDefaultQuery] = useState(false);
   const [graphNames, setGraphNames] = useState<string[]>([]);
+  const [graphNamesLoaded, setGraphNamesLoaded] = useState(false);
   const [graph, setGraph] = useState<Graph>(Graph.empty());
+  // setGraphInfo updates the GraphInfo inside the graph so there is one source of
+  // truth. Every graphInfo change produces a new Graph object reference, which
+  // triggers React re-renders for all consumers of the graph context.
+  const setGraphInfo = useCallback((gi: GraphInfo) => {
+    setGraph(prev => { const g = prev.clone(); g.GraphInfo = gi.clone(); return g; });
+  }, []);
   const [data, setData] = useState<GraphData>({ ...graph.Elements });
   const [graphData, setGraphData] = useState<CanvasData>();
   const [layout, setLayout] = useState<LayoutMode>(normalizeLayout(urlLayout));
   const [direction, setDirection] = useState(() => normalizeDirection(normalizeLayout(urlLayout), urlDirection));
-  const [graphInfo, setGraphInfo] = useState<GraphInfo>(GraphInfo.empty(toast, setIndicator));
-  const [graphName, setGraphName] = useState<string>(urlGraphName);
+  // Do NOT initialize from urlGraphName — start empty and let the gated URL sync
+  // below apply it only after the graph list is loaded and the name is validated.
+  // This prevents page.tsx from running queries (and FalkorDB from auto-creating
+  // graphs) before we know whether the URL graph actually exists.
+  const [graphName, setGraphName] = useState<string>("");
   const [contentPersistence, setContentPersistence] = useState(false);
   const [defaultQuery, setDefaultQuery] = useState("");
   const [timeout, setTimeout] = useState(0);
@@ -229,7 +253,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0);
   const [isQueryLoading, setIsQueryLoading] = useState(false);
-  const [syntaxError, setSyntaxError] = useState<SyntaxErrorInfo | null>(null);
+  const [diagnostics, setDiagnostics] = useState<DiagnosticsResult | null>(null);
   const [model, setModel] = useState("");
   const [newModel, setNewModel] = useState("");
   const [perSourceModels, setPerSourceModels] = useState<Record<string, string>>({});
@@ -404,10 +428,109 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setIsQueryLoading,
   }), [isQueryLoading]);
 
-  const syntaxErrorContext = useMemo(() => ({
-    syntaxError,
-    setSyntaxError,
-  }), [syntaxError]);
+  const diagnosticsContext = useMemo(() => ({
+    diagnostics,
+    setDiagnostics,
+  }), [diagnostics]);
+
+  // --- "Fix with AI" (Idea #3) -----------------------------------------------
+  const [lastFailure, setLastFailure] = useState<{ query: string; errorMessage: string } | null>(null);
+  const [aiFixResult, setAiFixResult] = useState<AiFixResult>({ status: "idle" });
+  const [pendingConsent, setPendingConsent] = useState<{ query: string; errorMessage: string; provider: ReturnType<typeof detectProviderFromModel> } | null>(null);
+
+  const resolvedChatKey = useMemo(
+    () => (chatApiKeys.find(k => k.id === selectedChatApiKeyId)?.key) || secretKey,
+    [chatApiKeys, selectedChatApiKeyId, secretKey]
+  );
+  const aiFixSupported = useMemo(
+    () => isAiFixSupported({ model, key: resolvedChatKey, source: chatModelSource, localProvider: localLlmProvider }),
+    [model, resolvedChatKey, chatModelSource, localLlmProvider]
+  );
+
+  const doAiFix = useCallback(async (query: string, errorMessage: string) => {
+    setAiFixResult({ status: "loading" });
+    try {
+      const headers = new Headers({ "Content-Type": "application/json" });
+      const connId = getActiveConnectionIdGlobal();
+      if (connId) headers.set("X-Connection-Id", connId);
+      const res = await fetch("/api/chat/fix", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          query,
+          errorMessage,
+          graphName,
+          model,
+          key: chatModelSource === "local" ? "" : resolvedChatKey,
+          modelSource: chatModelSource,
+          localProvider: localLlmProvider,
+          localEndpoint: localLlmEndpoint,
+        }),
+      });
+      if (res.status === 401 && res.headers.get("X-Session-Invalid") === "1") {
+        const { signOut } = await import("next-auth/react");
+        await signOut({ callbackUrl: "/login" });
+        setIndicator("offline");
+        setAiFixResult({ status: "idle" });
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAiFixResult({ status: "error", error: data?.error || "Couldn't get a fix from the AI provider." });
+        return;
+      }
+      setAiFixResult({ status: "done", explanation: data.explanation, correctedQuery: data.correctedQuery });
+    } catch {
+      setAiFixResult({ status: "error", error: "Couldn't reach the server. Please try again." });
+    }
+  }, [graphName, model, chatModelSource, localLlmProvider, localLlmEndpoint, resolvedChatKey]);
+
+  const requestAiFix = useCallback((query: string, errorMessage: string) => {
+    if (aiFixResult.status === "loading") return;
+    if (chatModelSource === "api-key") {
+      const provider = detectProviderFromModel(model);
+      const consented = typeof window !== "undefined" && localStorage.getItem(`aiFixConsent-${provider}`) === "true";
+      if (!consented) {
+        // Capture the provider now so a later model change doesn't alter what the user
+        // is consenting to (the dialog label, the localStorage key, and persistence).
+        setPendingConsent({ query, errorMessage, provider });
+        return;
+      }
+    }
+    doAiFix(query, errorMessage);
+  }, [aiFixResult.status, chatModelSource, model, doAiFix]);
+
+  const confirmConsent = useCallback((dontAskAgain: boolean) => {
+    if (!pendingConsent) return;
+    if (dontAskAgain && typeof window !== "undefined") {
+      localStorage.setItem(`aiFixConsent-${pendingConsent.provider}`, "true");
+    }
+    const { query, errorMessage } = pendingConsent;
+    setPendingConsent(null);
+    doAiFix(query, errorMessage);
+  }, [pendingConsent, doAiFix]);
+
+  const aiFixContext = useMemo(() => ({
+    aiFixSupported,
+    lastFailure,
+    result: aiFixResult,
+    pendingConsentProvider: pendingConsent ? getProviderDisplayName(pendingConsent.provider) : null,
+    requestAiFix,
+    confirmConsent,
+    cancelConsent: () => setPendingConsent(null),
+    dismissResult: () => setAiFixResult({ status: "idle" }),
+    insertCorrectedQuery: (q: string) => {
+      setHistoryQuery(prev => ({ ...prev, query: q }));
+      setUrlQueryText(q);
+      setAiFixResult({ status: "idle" });
+    },
+  }), [aiFixSupported, lastFailure, aiFixResult, pendingConsent, requestAiFix, confirmConsent]);
+
+  // Refs so runQuery can always call the latest requestAiFix without being in its
+  // eslint-disable-next-line dependency array (avoids recreating runQuery on every AI-state change).
+  const requestAiFixRef = useRef(requestAiFix);
+  requestAiFixRef.current = requestAiFix;
+  // ---------------------------------------------------------------------------
 
   const forceGraphContext = useMemo(() => ({
     canvasRef,
@@ -532,7 +655,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     };
 
     setIsQueryLoading(true);
-    setSyntaxError(null);
+    setDiagnostics(null);
+    setLastFailure(null);
 
     setHistoryQuery(prev => ({
       ...prev,
@@ -544,7 +668,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
     const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}${readOnlyParam}`;
     try {
-      const result = await getSSEGraphResult(url, toast, setIndicator) as { data: Data; metadata: string[] };
+      const result = await getSSEGraphResult(url, toast, setIndicator, {
+        query: q,
+      }) as { data: Data; metadata: string[] };
 
       if (!result) throw new Error("Failed to execute query");
 
@@ -556,7 +682,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         const newLabels = metaStats?.[0] || [];
         const newRelationships = metaStats?.[1] || [];
         const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
-        setGraphInfo(gi);
+        // setGraph(g) below already carries gi inside — no separate setGraphInfo needed.
         return gi;
       }).catch((error) => {
         console.error("Failed to fetch graph info:", error);
@@ -607,7 +733,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         currentQuery: newQuery,
         counter: 0
       }));
-      setUrlQueryText(newQuery.text);
       setViewport(undefined);
       setGraphData(undefined);
       setSearch("");
@@ -616,8 +741,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     } catch (err) {
       // Errors from getSSEGraphResult are already surfaced via toast
       const errorMessage = (err as Error).message || "";
-      const parsed = parseSyntaxError(errorMessage);
-      if (parsed) setSyntaxError(parsed);
+      setDiagnostics(computeEditorDiagnostics(newQuery.text, errorMessage));
+      setLastFailure({ query: newQuery.text, errorMessage });
 
       // Save failed query to history with the error message
       newQuery = { ...newQuery, errorMessage };
@@ -632,6 +757,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         counter: 0
       }));
     } finally {
+      setUrlQueryText(newQuery.text);
       setIsQueryLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -653,7 +779,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setViewport(undefined);
     setSearch("");
     setScrollPosition(0);
-    setSyntaxError(null);
+    setDiagnostics(null);
     setHistoryQuery(h => ({ ...h, query: "", currentQuery: defaultQueryHistory.currentQuery }));
     setUrlQueryText(null);
   }, [toast, setIndicator]);
@@ -663,7 +789,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setGraph,
     graphName,
     handleSetGraphName,
-    graphInfo,
     setGraphInfo,
     graphNames,
     setGraphNames,
@@ -688,7 +813,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     selectedParam,
     setSelectedParam,
     initialQuery: initialQueryRef.current,
-  }), [graph, graphName, handleSetGraphName, graphInfo, graphNames, labels, relationships, nodesCount, edgesCount, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, selectedParam]);
+  }), [graph, graphName, handleSetGraphName, graphNames, labels, relationships, nodesCount, edgesCount, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, selectedParam]);
 
   useEffect(() => {
     setRelationships([...graph.Relationships]);
@@ -700,6 +825,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // restoring _activeConnectionId even when Next.js HMR resets the module.
 
   useEffect(() => { setActiveConnectionIdGlobal(activeConnectionId); });
+
+  // Keep "Did you mean…?" function suggestions aware of the loaded UDFs.
+  useEffect(() => { setFunctionCandidates(udfFunctionNames(udfList)); }, [udfList]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -719,7 +847,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         setShowMemoryUsage(name === "graph" && version >= MEMORY_USAGE_VERSION_THRESHOLD);
       } catch { /* ignore */ }
     })();
-     
+
   }, [status, activeConnectionId]);
   useEffect(() => {
     if (status !== "authenticated") {
@@ -1054,12 +1182,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // Re-check UDF availability whenever the active connection changes so
   // switching back to an admin connection restores the UDF menu.
   useEffect(() => {
-    if (status === "unauthenticated") { setShowUDF(false); return; }
+    if (status === "unauthenticated") { setShowUDF(false); setUdfList([]); return; }
     if (status !== "authenticated") return;
     // Use plain fetch with no X-Connection-Id — server resolves via JWT.
     (async () => {
       const res = await fetch("/api/udf", { method: "GET" });
-      if (!res.ok) { setShowUDF(false); return; }
+      if (!res.ok) { setShowUDF(false); setUdfList([]); return; }
 
       const json = await res.json();
       setShowUDF(true);
@@ -1099,6 +1227,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (indicator === "offline" || tutorialOpen) return;
 
     await fetchOptions(toast, setIndicator, indicator, setGraphName, setGraphNames);
+    setGraphNamesLoaded(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast, tutorialOpen]);
 
@@ -1112,16 +1241,32 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     handleFetchOptions();
   }, [handleFetchOptions, status]);
 
-  // Sync URL → local state only when on /graph (consumers like graphInfo update URL directly)
+  // Unified URL→state sync for the graph name, gated on graphNamesLoaded.
+  // By waiting for the graph list before applying the URL value we prevent:
+  //   1. Page.tsx from running queries against a non-existent graph (which
+  //      FalkorDB would silently create on the first GRAPH.QUERY call).
+  //   2. The default-query fallback from firing before we know the URL graph
+  //      is valid (which would overwrite a failing URL query result).
   useEffect(() => {
-    // [URL] providers: urlGraphName sync effect
     if (pathname !== "/graph") return;
-    if (urlGraphName !== graphName) {
-      // [URL] providers: syncing URL→state
+    if (!graphNamesLoaded) return;
+
+    if (urlGraphName && !graphNames.includes(urlGraphName)) {
+      // URL graph does not exist in DB — strip all related URL params
+      setGraphName("");
+      setSelectedParam("");
+      setUrlQueryText(null);
+      return;
+    }
+
+    // Only override state when the URL explicitly names a graph.
+    // When urlGraphName is empty, fetchOptions may have already auto-selected
+    // a graph (e.g. single-graph DB) — don't clobber that with an empty string.
+    if (urlGraphName) {
       setGraphName(urlGraphName);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlGraphName]);
+  }, [urlGraphName, graphNamesLoaded, graphNames]);
 
   // One-way sync: context state → URL (only while on /graph)
   const prevPathnameRef = useRef(pathname);
@@ -1132,6 +1277,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Only write URL while on /graph and not during tutorial
     if (pathname !== "/graph" || tutorialOpen) return;
 
+    // Don't wipe URL params before the graph list has loaded. The URL→state
+    // sync is gated on graphNamesLoaded; if we write state→URL with
+    // graphName="" first, we strip ?graph= before URL sync can apply it,
+    // leaving urlGraphName="" permanently and the URL graph never loading.
+    if (!graphNamesLoaded) return;
+
     // Sync all context state to URL via centralized builder
     syncRouteUrlParams(pathname, {
       graph: graphName,
@@ -1140,7 +1291,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       layout,
       direction,
     });
-  }, [pathname, selectedParam, graphName, urlQueryText, graph.Id, layout, direction, tutorialOpen]);
+  }, [pathname, selectedParam, graphName, urlQueryText, graph.Id, layout, direction, tutorialOpen, graphNamesLoaded]);
 
   // Restore content persistence once on app mount (after auth + settings + graph names loaded)
   useEffect(() => {
@@ -1148,6 +1299,17 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     // If a graph is already loaded, mark as restored and skip
     if (graph.Id) {
+      contentRestoredRef.current = true;
+      return;
+    }
+
+    // URL takes priority over saved content. When the URL explicitly names an
+    // existing graph, the URL→state sync and the graph-loading effect handle
+    // everything — skip persistence so it doesn't overwrite the URL graph.
+    // Use the ref captured at render time: by the time this effect fires,
+    // syncRouteUrlParams may have already stripped ?graph= from window.location.
+    const urlGraph = initialUrlGraphNameRef.current;
+    if (urlGraph && graphNames.includes(urlGraph)) {
       contentRestoredRef.current = true;
       return;
     }
@@ -1165,6 +1327,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     } catch {
       // Invalid saved content, ignore
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefixReady, contentPersistence, graphNames, graph.Id, runQuery, handleSetGraphName]);
   // Reset all graph state when the active connection changes (user switch)
   useEffect(() => {
@@ -1181,6 +1344,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setGraphInfo(GraphInfo.empty(toast, setIndicator));
     setGraphName("");
     setSelectedParam("");
+    setGraphNamesLoaded(false);
     setGraphNames([]);
     setNodesCount(undefined);
     setEdgesCount(undefined);
@@ -1269,7 +1433,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setGraph(Graph.empty());
       setData({ nodes: [], links: [] });
     } catch (error) {
-       
+
       console.error("Failed to load demo graphs", error);
       toast({
         title: "Error",
@@ -1290,7 +1454,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         }, toast, setIndicator)
       ]);
     } catch (error) {
-       
+
       console.error("Failed to cleanup demo graphs", error);
     }
 
@@ -1337,26 +1501,29 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             <HistoryQueryContext.Provider value={historyQueryContext}>
               <IndicatorContext.Provider value={indicatorContext}>
                 <QueryLoadingContext.Provider value={queryLoadingContext}>
-                  <SyntaxErrorContext.Provider value={syntaxErrorContext}>
+                  <DiagnosticsContext.Provider value={diagnosticsContext}>
                     <ForceGraphContext.Provider value={forceGraphContext}>
                       <TableViewContext.Provider value={tableViewContext}>
                         <ConnectionContext.Provider value={connectionContext}>
                           <UDFContext.Provider value={udfContext}>
-                            <ProviderLayout
-                              panelRef={panelRef}
-                              tutorialOpen={tutorialOpen}
-                              onCloseTutorial={handleCloseTutorial}
-                              onLoadDemoGraphs={handleLoadDemoGraphs}
-                              onCleanupDemoGraphs={handleCleanupDemoGraphs}
-                              showUDF={showUDF}
-                            >
-                              {children}
-                            </ProviderLayout>
+                            <AiFixContext.Provider value={aiFixContext}>
+                              <ProviderLayout
+                                panelRef={panelRef}
+                                tutorialOpen={tutorialOpen}
+                                onCloseTutorial={handleCloseTutorial}
+                                onLoadDemoGraphs={handleLoadDemoGraphs}
+                                onCleanupDemoGraphs={handleCleanupDemoGraphs}
+                                showUDF={showUDF}
+                              >
+                                {children}
+                              </ProviderLayout>
+                              <AiFixDialogs />
+                            </AiFixContext.Provider>
                           </UDFContext.Provider>
                         </ConnectionContext.Provider>
                       </TableViewContext.Provider>
                     </ForceGraphContext.Provider>
-                  </SyntaxErrorContext.Provider>
+                  </DiagnosticsContext.Provider>
                 </QueryLoadingContext.Provider>
               </IndicatorContext.Provider>
             </HistoryQueryContext.Provider>

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { UDF_CHAT_MAX_LIBRARIES, UDF_CHAT_MAX_FUNCTIONS_PER_LIBRARY, UDF_CHAT_MAX_NAME_LENGTH } from "@/app/utils";
 
 export const createUser = z.object({
   username: z
@@ -196,6 +197,77 @@ export const chatRequest = z.object({
     .default("ollama"),
   localEndpoint: z
     .string()
+    .optional()
+    .default(""),
+  // Caller-supplied UDF catalog (from the already-discovered, capability-gated UDFContext). These
+  // `.max(...)` limits are a hard server-side contract: an oversized/untrusted payload is rejected
+  // (400) rather than inflating the prompt. The client clamps to the same limits (see app/utils.ts)
+  // before sending, so a legitimately large catalog degrades to a bounded subset instead of 400-ing.
+  // Names only — signatures/descriptions are intentionally not accepted from the client (prompt-injection surface).
+  udfs: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1).max(UDF_CHAT_MAX_NAME_LENGTH).regex(/^[A-Za-z_][A-Za-z0-9_.]*$/, "Invalid UDF library name"),
+        functions: z
+          .array(
+            z.object({
+              name: z.string().trim().min(1).max(UDF_CHAT_MAX_NAME_LENGTH).regex(/^[A-Za-z_][A-Za-z0-9_.]*$/, "Invalid UDF function name"),
+            }),
+          )
+          .max(UDF_CHAT_MAX_FUNCTIONS_PER_LIBRARY),
+      }),
+    )
+    .max(UDF_CHAT_MAX_LIBRARIES)
+    .optional(),
+});
+
+export const fixRequest = z.object({
+  query: z
+    .string({
+      error: (issue) => issue.input === undefined ? "Query is required" : "Invalid Query",
+    })
+    .trim()
+    .min(1, "Query cannot be empty")
+    .max(8192, "Query is too long"),
+  errorMessage: z
+    .string({
+      error: (issue) => issue.input === undefined ? "Error message is required" : "Invalid Error message",
+    })
+    .trim()
+    .min(1, "Error message cannot be empty")
+    .max(4096, "Error message is too long"),
+  graphName: z
+    .string({ error: "Invalid Graph name" })
+    .trim()
+    .max(255, "Graph name is too long")
+    .optional(),
+  hint: z
+    .string()
+    .max(1024, "Hint is too long")
+    .optional(),
+  key: z
+    .string({ error: "Invalid API key" })
+    .max(1024, "API key is too long")
+    .optional()
+    .default(""),
+  model: z
+    .string({
+      error: (issue) => issue.input === undefined ? "Model is required" : "Invalid Model",
+    })
+    .trim()
+    .min(1, "Model cannot be empty")
+    .max(256, "Model is too long"),
+  modelSource: z
+    .enum(["api-key", "local"])
+    .optional()
+    .default("api-key"),
+  localProvider: z
+    .enum(["ollama", "lmstudio"])
+    .optional()
+    .default("ollama"),
+  localEndpoint: z
+    .string()
+    .max(2048, "Local endpoint is too long")
     .optional()
     .default(""),
 });
