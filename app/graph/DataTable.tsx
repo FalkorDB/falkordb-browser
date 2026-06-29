@@ -31,7 +31,7 @@ interface Props {
 
 export default function DataTable({ object, type, lastObjId, canvasRef, className }: Props) {
 
-    const { graph, graphInfo, setGraphInfo } = useContext(GraphContext);
+    const { graph, setGraphInfo } = useContext(GraphContext);
     const { settings: { captionsKeysSettings: { captionsKeys }} } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
     const { toast } = useToast();
@@ -222,8 +222,8 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
 
                 graph.setProperty(key, val, id, type);
 
-                graphInfo.PropertyKeys = [...(graphInfo.PropertyKeys || []).filter((k) => k !== key), key];
-                const graphI = graphInfo.clone();
+                const graphI = graph.GraphInfo.clone();
+                graphI.PropertyKeys = [...(graphI.PropertyKeys || []).filter((k) => k !== key), key];
                 graph.GraphInfo = graphI;
                 setGraphInfo(graphI);
 

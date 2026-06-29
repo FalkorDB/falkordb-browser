@@ -88,10 +88,12 @@ export function buildGraphUrlParams(state: {
   layout: string;
   direction: string;
 }): Record<string, string | null> {
+  const hasGraph = Boolean(state.graph);
   return {
     graph: state.graph || null,
-    query: state.query,
-    selected: state.selected || null,
+    // Without an active graph, query and selected are meaningless — strip them.
+    query: hasGraph ? state.query : null,
+    selected: hasGraph ? (state.selected || null) : null,
     layout: state.layout && state.layout !== "force" ? state.layout : null,
     direction: state.direction || null,
   };
@@ -131,12 +133,14 @@ export function syncRouteUrlParams(pathname: string, state: Record<string, unkno
   setUrlParam(builder(state));
 }
 
-const SETTINGS_KEYS = ["tab"] as const;
+const SETTINGS_KEYS = ["tab", "focus"] as const;
 
 export function useSettingsParams() {
   const { params, setParam } = useUrlParams(SETTINGS_KEYS);
   return {
     tab: params.tab,
     setTab: useCallback((value: string) => setParam("tab", value), [setParam]),
+    focus: params.focus,
+    setFocus: useCallback((value: string) => setParam("focus", value), [setParam]),
   };
 }

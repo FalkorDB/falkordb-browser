@@ -54,6 +54,8 @@ function GraphView({
     const { setData, data, graphData, setGraphData, setViewport, viewport } = useContext(ForceGraphContext);
     const { tutorialOpen } = useContext(BrowserSettingsContext);
 
+    const [dimmed, setDimmed] = useState(false);
+
     const elementsLength = graph.getElements().length;
 
     useEffect(() => {
@@ -234,6 +236,9 @@ function GraphView({
                                     graph={graph}
                                     canvasRef={canvasRef}
                                     disabled={graph.getElements().length === 0}
+                                    dimmed={dimmed}
+                                    setDimmed={setDimmed}
+                                    selectedElements={selectedElements}
                                 />
                             </>
                         }
@@ -253,6 +258,7 @@ function GraphView({
                     setRelationships={setRelationships}
                     viewport={viewport}
                     setViewport={setViewport}
+                    dimmed={dimmed}
                 />
             </TabsContent>
             <TabsContent value="Table" className="h-1 grow w-full mt-0 overflow-hidden">

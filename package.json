@@ -12,10 +12,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "test": "node --test \"app/**/*.test.ts\" \"lib/**/*.test.ts\"",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=\"lib/cypherSuggestions.ts\" --test-coverage-include=\"lib/cypherDiagnostics.ts\" --test-coverage-include=\"lib/aiFix.ts\" --test-coverage-include=\"lib/cypherErrors.ts\" --test-coverage-include=\"lib/clipboard.ts\" --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=100 \"app/**/*.test.ts\" \"lib/**/*.test.ts\"",
+    "test:smoke": "node --test \"lib/**/*.smoke.ts\"",
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@falkordb/canvas": "v0.1.0",
+    "@falkordb/canvas": "^0.2.0",
     "@falkordb/text-to-cypher": "^0.2.1",
     "@hookform/resolvers": "^5.4.0",
     "@monaco-editor/react": "^4.6.0",

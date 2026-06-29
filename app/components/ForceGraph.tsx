@@ -11,6 +11,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { Graph } from "../api/graph/model";
 import { BrowserSettingsContext, IndicatorContext, ConnectionContext, ForceGraphContext } from "./provider";
 
+const DOUBLE_CLICK_MS = 300;
+
 interface Props {
     graph: Graph
     data: GraphData
@@ -23,6 +25,7 @@ interface Props {
     setRelationships: Dispatch<SetStateAction<Relationship[]>>
     viewport?: ViewportState
     setViewport?: Dispatch<SetStateAction<ViewportState>>
+    dimmed?: boolean
 }
 
 export default function ForceGraph({
@@ -36,6 +39,7 @@ export default function ForceGraph({
     setRelationships,
     viewport = undefined,
     setViewport = undefined,
+    dimmed = false,
 }: Props) {
 
     const { setIndicator } = useContext(IndicatorContext);
@@ -47,7 +51,7 @@ export default function ForceGraph({
     const { toast } = useToast();
     const { background, foreground } = getTheme(theme);
 
-    const lastClick = useRef<{ date: Date, id: number }>({ date: new Date(), id: -1 });
+    const lastClick = useRef<{ date: number, id: number }>({ date: 0, id: -1 });
 
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>();
     const [canvasLoaded, setCanvasLoaded] = useState(false);
@@ -162,28 +166,60 @@ export default function ForceGraph({
         canvas.setGraphData(convertToCanvasData(graph.Elements));
     }, [canvasRef, canvasLoaded, graph, setRelationships]);
 
-    const handleNodeClick = useCallback(async (node: GraphNode) => {
-        const fullNode = graph.NodesMap.get(node.id);
+    // When focus mode is on, pan the canvas to the centroid of the selected elements.
+    const centerOnSelection = useCallback((selection: (Node | Link)[]) => {
+        const canvas = canvasRef.current;
+        if (!dimmed || !canvas) return;
 
+        const nodeIds = new Set<number>();
+        for (const el of selection) {
+            if ('source' in el) {
+                nodeIds.add(el.source as number);
+                nodeIds.add(el.target as number);
+            } else {
+                nodeIds.add(el.id);
+            }
+        }
+
+        const focused = canvas.getGraphData().nodes.filter(n => nodeIds.has(n.id));
+        if (focused.length === 0) return;
+
+        const cx = focused.reduce((s, n) => s + (n.x ?? 0), 0) / focused.length;
+        const cy = focused.reduce((s, n) => s + (n.y ?? 0), 0) / focused.length;
+        canvas.centerAt(cx, cy, 300);
+    }, [dimmed, canvasRef]);
+
+    const handleNodeClick = useCallback((node: GraphNode, _event: MouseEvent) => {
+        const fullNode = graph.NodesMap.get(node.id);
         if (!fullNode) return;
 
-        const now = new Date();
-        const { date, id: name } = lastClick.current;
+        const now = Date.now();
+        const isDoubleClick = now - lastClick.current.date < DOUBLE_CLICK_MS && lastClick.current.id === node.id;
 
-        if (now.getTime() - date.getTime() < 1000 && name === node.id) {
+        // Always reset after acting so the next click starts fresh
+        lastClick.current = isDoubleClick ? { date: 0, id: -1 } : { date: now, id: node.id };
+
+        if (isDoubleClick) {
             fullNode.expand = !fullNode.expand;
-
             if (fullNode.expand) {
-                await onFetchNode(fullNode, node);
+                onFetchNode(fullNode, node);
             } else {
                 deleteNeighbors([fullNode]);
             }
-            
-            lastClick.current = { date: now, id: -1 };
-        } else {
-            lastClick.current = { date: now, id: node.id };
         }
     }, [graph.NodesMap, onFetchNode, deleteNeighbors]);
+
+    const handleLinkClick = useCallback((link: GraphLink, event: MouseEvent) => {
+        const fullLink = graph.LinksMap.get(link.id);
+        if (!fullLink) return;
+        if ((event.shiftKey || event.ctrlKey) && selectedElements.some(el => 'source' in el && el.id === fullLink.id)) return;
+
+        const nextSelection = (event.shiftKey || event.ctrlKey)
+            ? [...selectedElements, fullLink]
+            : [fullLink];
+        setSelectedElements(nextSelection);
+        centerOnSelection(nextSelection);
+    }, [graph.LinksMap, selectedElements, setSelectedElements, centerOnSelection]);
 
     const handleHover = useCallback((element: GraphNode | GraphLink | null) => {
         if (element === null) {
@@ -202,26 +238,28 @@ export default function ForceGraph({
     }, [graph]);
 
     const handleRightClick = useCallback((element: GraphNode | GraphLink, evt: MouseEvent) => {
-        // Find the full element from the graph
         let fullElement: Node | Link | undefined;
         if ('source' in element) {
             fullElement = graph.LinksMap.get(element.id);
         } else {
             fullElement = graph.NodesMap.get(element.id);
         }
-
         if (!fullElement) return;
 
+        let nextSelection: (Node | Link)[];
         if (evt.ctrlKey) {
-            if (selectedElements.find(e => (("source" in e && "source" in fullElement) || (!("source" in e) && !("source" in fullElement))) && e.id === fullElement.id)) {
-                setSelectedElements(selectedElements.filter((el) => el !== fullElement));
-            } else {
-                setSelectedElements([...selectedElements, fullElement]);
-            }
+            const alreadyIn = selectedElements.find(e =>
+                (('source' in e) === ('source' in fullElement)) && e.id === fullElement.id
+            );
+            nextSelection = alreadyIn
+                ? selectedElements.filter(el => el !== fullElement)
+                : [...selectedElements, fullElement];
         } else {
-            setSelectedElements([fullElement]);
+            nextSelection = [fullElement];
         }
-    }, [graph, selectedElements, setSelectedElements]);
+        setSelectedElements(nextSelection);
+        centerOnSelection(nextSelection);
+    }, [graph, selectedElements, setSelectedElements, centerOnSelection]);
 
     const handleUnselected = useCallback((evt?: MouseEvent) => {
         if (evt?.ctrlKey || selectedElements.length === 0) return;
@@ -237,6 +275,75 @@ export default function ForceGraph({
         selectedElements.some(el => el.id === link.id && 'source' in el) ||
         (!!hoverElement && 'source' in hoverElement && hoverElement.id === link.id)
         , [selectedElements, hoverElement]);
+
+    // Dim everything not in the selected/hovered neighbourhood.
+    // - Selected nodes: the node itself AND its direct neighbours are undimmed.
+    // - Selected/hovered links: only the two endpoints are undimmed (no neighbour expansion).
+    // - Toggle off: no dimming at all.
+    const buildDimSets = useCallback(() => {
+        // selectedNodeIds: directly selected nodes — neighbours are also shown.
+        const selectedNodeIds = new Set<number>();
+        // linkEndpointIds: endpoints of selected/hovered links — only the endpoints themselves are shown.
+        const linkEndpointIds = new Set<number>();
+
+        for (const el of selectedElements) {
+            if (!('source' in el)) selectedNodeIds.add(el.id);
+            else {
+                linkEndpointIds.add(el.source as number);
+                linkEndpointIds.add(el.target as number);
+            }
+        }
+        if (hoverElement) {
+            if (!('source' in hoverElement)) selectedNodeIds.add(hoverElement.id);
+            else {
+                linkEndpointIds.add(hoverElement.source as number);
+                linkEndpointIds.add(hoverElement.target as number);
+            }
+        }
+        return { selectedNodeIds, linkEndpointIds };
+    }, [selectedElements, hoverElement]);
+
+    const checkIsNodeDimmed = useCallback((node: GraphNode) => {
+        if (!dimmed) return false;
+        if (selectedElements.length === 0 && !hoverElement) return false;
+
+        const { selectedNodeIds, linkEndpointIds } = buildDimSets();
+        const allActiveIds = new Set([...selectedNodeIds, ...linkEndpointIds]);
+
+        if (allActiveIds.size === 0) return false;
+        if (allActiveIds.has(node.id)) return false;
+
+        // Expand neighbourhood only for directly selected nodes, not for link endpoints
+        for (const link of graph.Elements.links) {
+            if ((selectedNodeIds.has(link.source as number) && link.target === node.id) ||
+                (selectedNodeIds.has(link.target as number) && link.source === node.id)) {
+                return false;
+            }
+        }
+
+        return true;
+    }, [dimmed, selectedElements, hoverElement, buildDimSets, graph.Elements.links]);
+
+    const checkIsLinkDimmed = useCallback((link: GraphLink) => {
+        if (!dimmed) return false;
+        if (selectedElements.length === 0 && !hoverElement) return false;
+
+        // The hovered or directly selected link is never dimmed
+        if (hoverElement && 'source' in hoverElement && hoverElement.id === link.id) return false;
+        if (selectedElements.some(el => 'source' in el && el.id === link.id)) return false;
+
+        const { selectedNodeIds } = buildDimSets();
+
+        // Normalize endpoints: during simulation they may be numeric IDs or full objects
+        const srcId = typeof link.source === 'object' ? (link.source as { id: number }).id : link.source as number;
+        const tgtId = typeof link.target === 'object' ? (link.target as { id: number }).id : link.target as number;
+
+        // A link is undimmed only if one of its endpoints is a directly selected node
+        // (which expands its neighbourhood). Links touching only link-endpoints are dimmed.
+        if (selectedNodeIds.has(srcId) || selectedNodeIds.has(tgtId)) return false;
+
+        return true;
+    }, [dimmed, selectedElements, hoverElement, buildDimSets]);
 
     // Update colors
     useEffect(() => {
@@ -278,8 +385,11 @@ export default function ForceGraph({
             showPropertyKeyPrefix,
             isNodeSelected: checkIsNodeSelected,
             isLinkSelected: checkIsLinkSelected,
+            isNodeDimmed: checkIsNodeDimmed,
+            isLinkDimmed: checkIsLinkDimmed,
             eventHandlers: {
                 onNodeClick: handleNodeClick,
+                onLinkClick: handleLinkClick,
                 onNodeRightClick: handleRightClick,
                 onLinkRightClick: handleRightClick,
                 onNodeHover: handleHover,
@@ -287,7 +397,7 @@ export default function ForceGraph({
                 onBackgroundClick: handleUnselected,
             },
         });
-    }, [handleNodeClick, handleRightClick, handleHover, handleUnselected, checkIsNodeSelected, checkIsLinkSelected, canvasRef, canvasLoaded, captionsKeys, showPropertyKeyPrefix]);
+    }, [handleNodeClick, handleLinkClick, handleRightClick, handleHover, handleUnselected, checkIsNodeSelected, checkIsLinkSelected, checkIsNodeDimmed, checkIsLinkDimmed, canvasRef, canvasLoaded, captionsKeys, showPropertyKeyPrefix]);
 
     // Update canvas data
     useEffect(() => {
@@ -308,6 +418,13 @@ export default function ForceGraph({
     }, [canvasRef, data, setGraphData, canvasLoaded]);
 
     return (
-        <falkordb-canvas ref={canvasRef} />
+        <div
+            className="w-full h-full"
+            data-testid="graphCanvasWrapper"
+            data-focus-active={String(dimmed && selectedElements.length > 0)}
+            data-selection-count={String(selectedElements.length)}
+        >
+            <falkordb-canvas ref={canvasRef} className="w-full h-full" />
+        </div>
     );
 }

@@ -1,0 +1,213 @@
+// "Did you mean…?" suggestions for recognized FalkorDB Cypher errors.
+//
+// When a query fails with `Unknown function 'X'` or `'X' not defined`, this
+// finds the closest valid name and returns a ready-to-show hint such as
+// "Did you mean length()?". It is pure (no React/Monaco) so it can be unit-tested
+// to 100% and reused across the toast and the query-history tooltip.
+//
+// Conservative by design: if there is no sufficiently close candidate, it returns
+// `undefined` (no guess). The misspelled name is read from the error message, but the
+// suggested *correction* is drawn only from the built-in function list (+ any registered
+// UDF names) and from identifiers in the user's own query — never invented from, or
+// echoed out of, the raw error text.
+
+import { BUILTIN_FUNCTIONS, CYPHER_KEYWORDS } from "./cypherLang.ts";
+
+// Words that can appear in a capture position (e.g. right after `(`) but are not
+// variables, so they must never be offered as a "did you mean" candidate.
+const EXCLUDED_WORDS = new Set(
+  [
+    ...CYPHER_KEYWORDS,
+    "NOT", "AND", "OR", "XOR", "IN", "IS", "NULL", "TRUE", "FALSE",
+    "DISTINCT", "CONTAINS", "STARTS", "ENDS", "CASE", "WHEN", "THEN",
+    "ELSE", "END", "ON", "BY", "ORDER", "DESC", "ASC", "ALL", "ANY",
+    "NONE", "SINGLE", "EXISTS",
+  ].map(w => w.toLowerCase())
+);
+
+// Built-in functions plus any UDF names registered at runtime (see
+// setFunctionCandidates). Defaults to the built-ins so suggestions work before
+// any UDFs are loaded.
+let functionCandidates: string[] = [...BUILTIN_FUNCTIONS];
+
+/** Registers extra (e.g. UDF) function names as suggestion candidates, on top of
+ *  the always-present built-ins. */
+export function setFunctionCandidates(extra: string[]): void {
+  functionCandidates = Array.from(new Set([...BUILTIN_FUNCTIONS, ...extra]));
+}
+
+/** Classic Levenshtein edit distance between two strings. */
+export function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  for (let i = 1; i <= m; i += 1) {
+    const curr = [i];
+    for (let j = 1; j <= n; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
+    }
+    prev = curr;
+  }
+  return prev[n];
+}
+
+/** Returns the closest candidate to `target`, or `undefined` if none is close
+ *  enough. Comparison is case-insensitive; the candidate's original casing is
+ *  returned. The distance budget is based on the longer of the two strings
+ *  (`maxLen <= 4 ? 1 : 2`), so e.g. `prsn`→`person` (distance 2, maxLen 6) qualifies. */
+export function closestMatch(target: string, candidates: string[]): string | undefined {
+  const t = target.toLowerCase();
+  if (t.length < 3) return undefined;
+
+  const scored = candidates
+    .map(candidate => {
+      const c = candidate.toLowerCase();
+      const maxDistance = Math.max(t.length, c.length) <= 4 ? 1 : 2;
+      return { candidate, distance: levenshtein(t, c), maxDistance };
+    })
+    .filter(s => s.distance > 0 && s.distance <= s.maxDistance);
+
+  if (scored.length === 0) return undefined;
+
+  scored.sort((a, b) => a.distance - b.distance || a.candidate.localeCompare(b.candidate));
+  return scored[0].candidate;
+}
+
+/** Masks comments and quoted strings with spaces of the **same length** (newlines kept),
+ *  so character offsets and line structure are preserved. Used to avoid matching
+ *  identifiers inside comments/strings while keeping positions accurate. */
+export function maskCommentsAndStrings(query: string): string {
+  return query.replace(
+    /\/\*[\s\S]*?\*\/|\/\/[^\n]*|'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"/g,
+    match => match.replace(/[^\n]/g, " ")
+  );
+}
+
+/** Private helper: runs the three binding-position patterns on already-masked text
+ *  and returns the filtered list of identifiers. Used by both
+ *  `extractVariableCandidates` (which also adds function-arg identifiers) and
+ *  `findFuncArgTypo` (which needs binding-only candidates to detect typos). */
+function bindingVarsFrom(cleaned: string): string[] {
+  const found = new Set<string>();
+  const collect = (re: RegExp): void => {
+    let match = re.exec(cleaned);
+    while (match !== null) {
+      found.add(match[1]);
+      match = re.exec(cleaned);
+    }
+  };
+  collect(/(?:^|[-\s,><])\(\s*([A-Za-z_]\w*)/gm); // (node) at pattern boundary
+  collect(/\[\s*([A-Za-z_]\w*)/g);                  // [rel] variable
+  collect(/\bAS\s+([A-Za-z_]\w*)/gi);              // aliases (WITH/RETURN/UNWIND … AS x)
+  return Array.from(found).filter(v => !EXCLUDED_WORDS.has(v.toLowerCase()));
+}
+
+/** Extracts identifiers from binding positions and function-argument positions —
+ *  the name right after `(` or `[`, aliases after `AS`, and standalone identifiers
+ *  used as function-call arguments — after stripping comments and string literals.
+ *  This deliberately excludes labels/types (after `:`), property keys (after `.`),
+ *  and function-namespace pieces, so a mistyped variable is matched only against
+ *  real variables. Backtick-quoted identifiers are not supported (v1). */
+export function extractVariableCandidates(query: string): string[] {
+  const cleaned = maskCommentsAndStrings(query);
+  const found = new Set(bindingVarsFrom(cleaned));
+
+  // Also capture identifiers used as function arguments
+  // (e.g. euclideanDistance(x) → x is a variable reference).
+  // Match an identifier after '(' or ',' that is followed by ',' or ')'.
+  const re = /[,(]\s*([A-Za-z_]\w*)(?=\s*[,)])/g;
+  let m = re.exec(cleaned);
+  while (m !== null) {
+    found.add(m[1]);
+    m = re.exec(cleaned);
+  }
+
+  return Array.from(found).filter(v => !EXCLUDED_WORDS.has(v.toLowerCase()));
+}
+
+/** Returns the raw closest-name suggestion for a recognized error (function or variable),
+ *  or `undefined`. Used both for the hint text and for the quick-fix replacement. */
+export function suggestionNameForError(
+  rawError: string,
+  ctx?: { query?: string; functions?: string[] }
+): { kind: "function" | "variable"; name: string } | undefined {
+  const fnMatch = rawError.match(/unknown function '([^']+)'/i);
+  if (fnMatch) {
+    const name = closestMatch(fnMatch[1], ctx?.functions ?? functionCandidates);
+    return name ? { kind: "function", name } : undefined;
+  }
+
+  // "Procedure 'db.constraint' is not registered" — same distance logic as functions.
+  const procMatch = rawError.match(/procedure '([^']+)' is not registered/i);
+  if (procMatch) {
+    const name = closestMatch(procMatch[1], ctx?.functions ?? functionCandidates);
+    return name ? { kind: "function", name } : undefined;
+  }
+
+  const varMatch = rawError.match(/'([^']+)' not defined/i);
+  if (varMatch) {
+    const name = closestMatch(varMatch[1], extractVariableCandidates(ctx?.query ?? ""));
+    return name ? { kind: "variable", name } : undefined;
+  }
+
+  return undefined;
+}
+
+/** Returns a ready-to-show plain-text suggestion ("Did you mean length()?") for a
+ *  recognized error, or `undefined`. Function candidates default to the registered
+ *  built-in/UDF list; variable candidates are derived from `ctx.query`. */
+export function suggestForError(
+  rawError: string,
+  ctx?: { query?: string; functions?: string[] }
+): string | undefined {
+  const suggestion = suggestionNameForError(rawError, ctx);
+  if (!suggestion) return undefined;
+  return suggestion.kind === "function"
+    ? `Did you mean ${suggestion.name}()?`
+    : `Did you mean ${suggestion.name}?`;
+}
+
+/**
+ * Extracts identifiers used as function-call arguments (e.g. `id(nod)` → ["nod"]).
+ * Only captures the first identifier immediately after `(` preceded by a word char.
+ * Excludes keywords and known built-in function names.
+ */
+export function extractFunctionArgIdents(query: string): string[] {
+  const cleaned = maskCommentsAndStrings(query);
+  const found = new Set<string>();
+  const re = /\b[A-Za-z_]\w*\(\s*([A-Za-z_]\w*)/g;
+  let m = re.exec(cleaned);
+  while (m !== null) {
+    const ident = m[1];
+    if (
+      !EXCLUDED_WORDS.has(ident.toLowerCase()) &&
+      !functionCandidates.some(f => f.toLowerCase() === ident.toLowerCase())
+    ) {
+      found.add(ident);
+    }
+    m = re.exec(cleaned);
+  }
+  return Array.from(found);
+}
+
+/**
+ * Returns the first function-arg identifier that looks like a typo of a known
+ * bound variable in the query, or `undefined` if nothing suspicious is found.
+ * E.g. `MATCH (node) ... id(nod)` → "nod" (close to bound var "node").
+ */
+export function findFuncArgTypo(query: string): string | undefined {
+  // Use binding-only candidates (not function-arg candidates) so that a mistyped
+  // function argument like `id(nod)` is detected as differing from the bound variable
+  // `node` rather than matching itself as a "bound" variable.
+  const boundVars = bindingVarsFrom(maskCommentsAndStrings(query));
+  if (!boundVars.length) return undefined;
+  for (const ident of extractFunctionArgIdents(query)) {
+    if (boundVars.some(v => v.toLowerCase() === ident.toLowerCase())) continue;
+    if (closestMatch(ident, boundVars)) return ident;
+  }
+  return undefined;
+}

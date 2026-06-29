@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip"
 
 interface SliderProps extends React.ComponentProps<typeof SliderPrimitive.Root> {
-  type?: "seconds" | "%" | "px"
+  type?: "seconds" | "%" | "px" | "items"
 }
 
 const Slider = React.forwardRef<

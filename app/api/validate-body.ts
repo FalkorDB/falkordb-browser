@@ -221,6 +221,57 @@ export const chatRequest = z.object({
     .optional(),
 });
 
+export const fixRequest = z.object({
+  query: z
+    .string({
+      error: (issue) => issue.input === undefined ? "Query is required" : "Invalid Query",
+    })
+    .trim()
+    .min(1, "Query cannot be empty")
+    .max(8192, "Query is too long"),
+  errorMessage: z
+    .string({
+      error: (issue) => issue.input === undefined ? "Error message is required" : "Invalid Error message",
+    })
+    .trim()
+    .min(1, "Error message cannot be empty")
+    .max(4096, "Error message is too long"),
+  graphName: z
+    .string({ error: "Invalid Graph name" })
+    .trim()
+    .max(255, "Graph name is too long")
+    .optional(),
+  hint: z
+    .string()
+    .max(1024, "Hint is too long")
+    .optional(),
+  key: z
+    .string({ error: "Invalid API key" })
+    .max(1024, "API key is too long")
+    .optional()
+    .default(""),
+  model: z
+    .string({
+      error: (issue) => issue.input === undefined ? "Model is required" : "Invalid Model",
+    })
+    .trim()
+    .min(1, "Model cannot be empty")
+    .max(256, "Model is too long"),
+  modelSource: z
+    .enum(["api-key", "local"])
+    .optional()
+    .default("api-key"),
+  localProvider: z
+    .enum(["ollama", "lmstudio"])
+    .optional()
+    .default("ollama"),
+  localEndpoint: z
+    .string()
+    .max(2048, "Local endpoint is too long")
+    .optional()
+    .default(""),
+});
+
 // Auth schemas
 export const login = z.object({
   username: z

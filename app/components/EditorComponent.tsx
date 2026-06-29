@@ -35,6 +35,26 @@ if (typeof window !== 'undefined') {
 
 loader.config({ monaco });
 
+// ---------------------------------------------------------------------------
+// Singleton completion-provider registry.
+// Monaco calls ALL registered providers for a language — registering one per
+// EditorComponent instance causes duplicated suggestions when multiple editors
+// share the same language. This registry ensures at most ONE provider exists
+// per language at any time, while keeping the config ref always up-to-date.
+// ---------------------------------------------------------------------------
+interface ProviderEntry {
+    configRef: { current: LanguageConfig | undefined };
+    disposable: monaco.IDisposable;
+    count: number;
+}
+const completionProviderRegistry = new Map<string, ProviderEntry>();
+
+// Per-model config registry: maps model URI → LanguageConfig.
+// Allows multiple editors using the same language to each have their own
+// suggestions (e.g. query history vs. main editor) without registering
+// duplicate Monaco providers.
+const modelConfigRegistry = new Map<string, LanguageConfig>();
+
 export const LINE_HEIGHT = 22;
 
 export const DEFAULT_MONACO_OPTIONS: monaco.editor.IStandaloneEditorConstructionOptions = {
@@ -64,7 +84,6 @@ export const DEFAULT_MONACO_OPTIONS: monaco.editor.IStandaloneEditorConstruction
     hideCursorInOverviewRuler: true,
     scrollBeyondLastColumn: 0,
     scrollBeyondLastLine: false,
-    overflowWidgetsDomNode: undefined,
     scrollbar: {
         vertical: 'hidden',
         horizontal: 'hidden'
@@ -167,13 +186,23 @@ export default function EditorComponent({
     const monacoRef = useRef<Monaco | null>(null);
     const sugDisposableRef = useRef<monaco.IDisposable | null>(null);
     const languageConfigRef = useRef(languageConfig);
+    const participatesInRegistry = useRef(false);
     const onChangeRef = useRef(onChange);
     const onMountRef = useRef(onMount);
     const onMonacoReadyRef = useRef(onMonacoReady);
     const valueRef = useRef(value);
+    const overflowHostRef = useRef<HTMLDivElement | null>(null);
 
-    // Keep refs in sync
-    useEffect(() => { languageConfigRef.current = languageConfig; }, [languageConfig]);
+    // Keep refs in sync; also update model-specific and shared registry configs when languageConfig changes.
+    useEffect(() => {
+        languageConfigRef.current = languageConfig;
+        if (participatesInRegistry.current && languageConfig?.getSuggestions) {
+            const editorModel = editorRef.current?.getModel();
+            if (editorModel) modelConfigRegistry.set(editorModel.uri.toString(), languageConfig);
+            const entry = completionProviderRegistry.get(language);
+            if (entry) entry.configRef.current = languageConfig;
+        }
+    }, [languageConfig, language]);
     useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
     useEffect(() => { onMountRef.current = onMount; }, [onMount]);
     useEffect(() => { onMonacoReadyRef.current = onMonacoReady; }, [onMonacoReady]);
@@ -211,24 +240,60 @@ export default function EditorComponent({
                     monacoInstance.languages.setLanguageConfiguration(language, lc.languageConfiguration);
                 }
                 if (lc.getSuggestions) {
-                    const provider = monacoInstance.languages.registerCompletionItemProvider(language, {
-                        triggerCharacters: lc.triggerCharacters,
-                        provideCompletionItems: (async (model, position, context) => {
-                            const currentConfig = languageConfigRef.current;
-                            if (!currentConfig?.getSuggestions) return { suggestions: [] };
-                            const word = model.getWordUntilPosition(position);
-                            const range = new monacoInstance.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
-                            const suggestions = await currentConfig.getSuggestions(monacoInstance, context, model, position);
-                            return {
-                                suggestions: suggestions.map(s => ({ ...s, range }))
-                            };
-                        }) as monaco.languages.CompletionItemProvider["provideCompletionItems"],
-                    });
-                    sugDisposableRef.current = provider;
+                    const existingEntry = completionProviderRegistry.get(language);
+                    if (existingEntry) {
+                        // Another editor already owns the provider — update config and share it.
+                        existingEntry.configRef.current = lc;
+                        existingEntry.count += 1;
+                    } else {
+                        // First instance for this language — register the singleton provider.
+                        const sharedConfigRef: { current: LanguageConfig | undefined } = { current: lc };
+                        const disposable = monacoInstance.languages.registerCompletionItemProvider(language, {
+                            triggerCharacters: lc.triggerCharacters,
+                            provideCompletionItems: (async (model, position, context) => {
+                        const currentConfig = modelConfigRegistry.get(model.uri.toString()) ?? sharedConfigRef.current;
+                                if (!currentConfig?.getSuggestions) return { suggestions: [] };
+                                const word = model.getWordUntilPosition(position);
+                                const range = new monacoInstance.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
+                                const suggestions = await currentConfig.getSuggestions(monacoInstance, context, model, position);
+                                return { suggestions: suggestions.map(s => ({ ...s, range })) };
+                            }) as monaco.languages.CompletionItemProvider['provideCompletionItems'],
+                        });
+                        completionProviderRegistry.set(language, { configRef: sharedConfigRef, disposable, count: 1 });
+                    }
+                    participatesInRegistry.current = true;
                 }
             }
 
             onMonacoReadyRef.current?.(monacoInstance);
+
+            // Create a theme-aware host element at body level for Monaco's overflow widgets
+            // (suggest, hover, find). This solves the Radix UI transform trap:
+            //   • Radix positions PopoverContent via `transform: matrix(...)` which makes
+            //     it the CSS containing block for `position:fixed` descendants.
+            //   • Monaco computes suggest-widget positions in viewport coordinates, but the
+            //     browser interprets them relative to the transformed popper → off-screen.
+            // Placing the overflow widget container at body level (no ancestor transform)
+            // restores correct viewport-relative positioning.
+            // We give the host the `.monaco-editor` class so Monaco's own CSS rules
+            // (`.monaco-editor .suggest-widget { … }`) and CSS variables still apply.
+            const isDark = currentTheme === "dark";
+            const overflowHost = document.createElement('div');
+            overflowHost.className = `monaco-editor ${isDark ? 'vs-dark' : 'vs'}`;
+            Object.assign(overflowHost.style, {
+                position: 'fixed',
+                top: '0',
+                left: '0',
+                width: '0',
+                height: '0',
+                overflow: 'visible',
+                pointerEvents: 'none',
+                // Must be above the Radix popper (z-index: 30) so suggest/hover/find
+                // widgets are painted on top of any popover they overlap.
+                zIndex: '50',
+            });
+            document.body.appendChild(overflowHost);
+            overflowHostRef.current = overflowHost;
 
             //Claude Create the editor
             const editor = monacoInstance.editor.create(containerRef.current, {
@@ -236,12 +301,17 @@ export default function EditorComponent({
                 value: valueRef.current,
                 language,
                 theme: themeName,
+                overflowWidgetsDomNode: overflowHost,
             });
 
-            // Disable F1 (command palette)
-            editor.addCommand(monacoInstance.KeyCode.F1, () => {});
-
             editorRef.current = editor;
+
+            // Register this editor's model for per-model suggestion dispatch.
+            const currentLc = languageConfigRef.current;
+            if (currentLc?.getSuggestions) {
+                const editorModel = editor.getModel();
+                if (editorModel) modelConfigRegistry.set(editorModel.uri.toString(), currentLc);
+            }
 
             // Listen for content changes — skip callback when change is from our own setValue
             editor.onDidChangeModelContent(() => {
@@ -259,6 +329,23 @@ export default function EditorComponent({
     // Synchronous cleanup before DOM removal — prevents rAF callbacks
     // from accessing destroyed DOM nodes during HMR
     useLayoutEffect(() => () => {
+        // Release this instance's hold on the singleton provider.
+        if (participatesInRegistry.current) {
+            // Remove model-specific suggestion config.
+            const editorModel = editorRef.current?.getModel();
+            if (editorModel) modelConfigRegistry.delete(editorModel.uri.toString());
+
+            const entry = completionProviderRegistry.get(language);
+            if (entry) {
+                entry.count -= 1;
+                if (entry.count <= 0) {
+                    entry.disposable.dispose();
+                    completionProviderRegistry.delete(language);
+                }
+            }
+            participatesInRegistry.current = false;
+        }
+        // Legacy per-instance disposable (kept for safety).
         sugDisposableRef.current?.dispose();
         sugDisposableRef.current = null;
 
@@ -269,6 +356,11 @@ export default function EditorComponent({
             editorRef.current = null;
             // Dispose the model separately to avoid leaks
             model?.dispose();
+        }
+        // Remove the overflow widget host from body when the editor unmounts.
+        if (overflowHostRef.current?.parentNode) {
+            overflowHostRef.current.parentNode.removeChild(overflowHostRef.current);
+            overflowHostRef.current = null;
         }
     }, []);
 
@@ -310,6 +402,11 @@ export default function EditorComponent({
         if (monacoRef.current) {
             setEditorTheme(monacoRef.current, themeName, themeBackground || background, currentTheme === "dark");
             editorRef.current?.updateOptions({ theme: themeName });
+        }
+        // Keep the overflow host base-theme class in sync so Monaco's CSS variables
+        // resolve correctly when the user switches between light and dark mode.
+        if (overflowHostRef.current) {
+            overflowHostRef.current.className = `monaco-editor ${currentTheme === "dark" ? 'vs-dark' : 'vs'}`;
         }
     }, [currentTheme, themeName, themeBackground, background, editorKey]);
 
