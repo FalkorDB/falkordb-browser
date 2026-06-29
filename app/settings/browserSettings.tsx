@@ -368,7 +368,7 @@ export default function BrowserSettings() {
             setNewLocalLlmProvider(localLlmProvider);
             setNewLocalLlmEndpoint(localLlmEndpoint);
         }
-        const targetKey = source === "local" ? newLocalLlmProvider : "api-key";
+        const targetKey = source === "local" ? localLlmProvider : "api-key";
         const nextModel = perSourceModels[targetKey] ?? "";
         setNewModel(nextModel);
         setModelDisplayNames([]);
