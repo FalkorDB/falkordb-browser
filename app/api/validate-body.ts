@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { UDF_CHAT_MAX_LIBRARIES, UDF_CHAT_MAX_FUNCTIONS_PER_LIBRARY, UDF_CHAT_MAX_NAME_LENGTH } from "@/app/utils";
 
 export const createUser = z.object({
   username: z
@@ -219,6 +220,26 @@ export const chatRequest = z.object({
     .string()
     .optional()
     .default(""),
+  // Caller-supplied UDF catalog (from the already-discovered, capability-gated UDFContext). These
+  // `.max(...)` limits are a hard server-side contract: an oversized/untrusted payload is rejected
+  // (400) rather than inflating the prompt. The client clamps to the same limits (see app/utils.ts)
+  // before sending, so a legitimately large catalog degrades to a bounded subset instead of 400-ing.
+  // Names only — signatures/descriptions are intentionally not accepted from the client (prompt-injection surface).
+  udfs: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(UDF_CHAT_MAX_NAME_LENGTH),
+        functions: z
+          .array(
+            z.object({
+              name: z.string().min(1).max(UDF_CHAT_MAX_NAME_LENGTH),
+            }),
+          )
+          .max(UDF_CHAT_MAX_FUNCTIONS_PER_LIBRARY),
+      }),
+    )
+    .max(UDF_CHAT_MAX_LIBRARIES)
+    .optional(),
 });
 
 // Auth schemas
