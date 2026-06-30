@@ -140,7 +140,7 @@ export default function Header() {
                             let text = `${session.user.host}:${session.user.port}`;
                             if (connectionType === "Sentinel") {
                                 if (connectionInfo.sentinelRole === "master" && connectionInfo.sentinelReplicas !== undefined) text += `\nRole: Master (${connectionInfo.sentinelReplicas} replicas)`;
-                                if (connectionInfo.sentinelRole === "slave" && connectionInfo.sentinelMasterHost) text += `\nRole: Replica (master: ${connectionInfo.sentinelMasterHost}:${connectionInfo.sentinelMasterPort})`;
+                                if (connectionInfo.sentinelRole === "replica" && connectionInfo.sentinelMasterHost) text += `\nRole: Replica (master: ${connectionInfo.sentinelMasterHost}:${connectionInfo.sentinelMasterPort})`;
                             }
                             if (connectionType === "Cluster" && connectionInfo.clusterNodes) {
                                 text += `\nNodes: ${connectionInfo.clusterNodes.length}\n${connectionInfo.clusterNodes.map((node) => `${node.host}:${node.port} (${node.role}${node.slots ? ` ${node.slots}` : ""})`).join("\n")}`;
@@ -165,7 +165,7 @@ export default function Header() {
                                             {connectionInfo.sentinelRole === "master" && connectionInfo.sentinelReplicas !== undefined && (
                                                 <p>Role: Master ({connectionInfo.sentinelReplicas} replicas)</p>
                                             )}
-                                            {connectionInfo.sentinelRole === "slave" && connectionInfo.sentinelMasterHost && (
+                                            {connectionInfo.sentinelRole === "replica" && connectionInfo.sentinelMasterHost && (
                                                 <p>Role: Replica (master: {connectionInfo.sentinelMasterHost}:{connectionInfo.sentinelMasterPort})</p>
                                             )}
                                         </>

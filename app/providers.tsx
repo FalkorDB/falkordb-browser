@@ -557,7 +557,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   }), [scrollPosition, search, expand, dataHash]);
 
   const isReadOnly = useMemo(() =>
-    sessionData?.user?.role === "Read-Only" || connectionInfo.sentinelRole === "slave",
+    sessionData?.user?.role === "Read-Only" || connectionInfo.sentinelRole === "replica",
     [sessionData?.user?.role, connectionInfo.sentinelRole]
   );
   // Ref that always holds the latest isReadOnly value.
@@ -855,20 +855,22 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       return;
     }
 
+    let stale = false;
     (async () => {
       try {
         const result = await securedFetch("/api/info", {
           method: "GET",
         }, toast, setIndicator);
 
-        if (!result.ok) return;
+        if (!result.ok || stale) return;
 
         const json = await result.json();
 
+        if (stale) return;
         setConnectionType((() => {
           switch (true) {
             case json.result.includes("cluster_enabled:1"): return "Cluster";
-            case /role:slave/.test(json.result): return "Sentinel";
+            case /role:(slave|replica)/.test(json.result): return "Sentinel";
             case /connected_slaves:[1-9]/.test(json.result): return "Sentinel";
             default: return "Standalone";
           }
@@ -877,7 +879,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         console.error("Failed to fetch connection type:", err);
       }
     })();
-  }, [status, toast]);
+    return () => { stale = true; };
+  }, [status, toast, activeConnectionId]);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -885,23 +888,25 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       return;
     }
 
+    let stale = false;
     (async () => {
       try {
         const result = await securedFetch("/api/connection-info", {
           method: "GET",
         }, toast, setIndicator);
 
-        if (!result.ok) return;
+        if (!result.ok || stale) return;
 
         const json = await result.json();
-        if (json?.result) {
+        if (!stale && json?.result) {
           setConnectionInfo(json.result);
         }
       } catch (err) {
         console.error("Failed to fetch connection info:", err);
       }
     })();
-  }, [status, toast]);
+    return () => { stale = true; };
+  }, [status, toast, activeConnectionId]);
 
   // Fetch connections for this session and auto-select the active one
   useEffect(() => {

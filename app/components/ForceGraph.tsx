@@ -189,7 +189,7 @@ export default function ForceGraph({
         canvas.centerAt(cx, cy, 300);
     }, [dimmed, canvasRef]);
 
-    const handleNodeClick = useCallback((node: GraphNode, _event: MouseEvent) => {
+    const handleNodeClick = useCallback(async (node: GraphNode, _event: MouseEvent) => {
         const fullNode = graph.NodesMap.get(node.id);
         if (!fullNode) return;
 
@@ -202,7 +202,11 @@ export default function ForceGraph({
         if (isDoubleClick) {
             fullNode.expand = !fullNode.expand;
             if (fullNode.expand) {
-                onFetchNode(fullNode, node);
+                await onFetchNode(fullNode, node);
+                // Guard: if the node was collapsed while fetching, undo the expansion.
+                if (!fullNode.expand) {
+                    deleteNeighbors([fullNode]);
+                }
             } else {
                 deleteNeighbors([fullNode]);
             }

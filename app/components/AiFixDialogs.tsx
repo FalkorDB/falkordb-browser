@@ -15,9 +15,15 @@ export default function AiFixDialogs() {
     const { size: panelSize, onResize: onPanelResize } = useResizableSize("ai-fix-panel-size", 480, 400, 300, 250);
 
     const handleCopy = async (text: string) => {
-        await navigator.clipboard?.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        const writer = navigator.clipboard?.writeText?.bind(navigator.clipboard);
+        if (!writer) return;
+        try {
+            await writer(text);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch {
+            setCopied(false);
+        }
     };
 
     useEffect(() => {
