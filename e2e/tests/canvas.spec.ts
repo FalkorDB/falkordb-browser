@@ -472,4 +472,34 @@ test.describe('Canvas Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
+    test(`@admin PATH query result visualizes nodes and edges on the canvas`, async () => {
+        const graphName = getRandomString('path-canvas');
+        await apicalls.addGraph(graphName);
+        await apicalls.runQuery(graphName, "CREATE (:City {name:'A'})-[:ROAD]->(:City {name:'B'})");
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery("MATCH p=(a:City)-[:ROAD]->(b:City) RETURN p");
+        await graph.clickRunQuery();
+        const nodes = await graph.getNodesScreenPositions();
+        expect(nodes.length).toBeGreaterThanOrEqual(2);
+        const links = await graph.getLinksScreenPositions();
+        expect(links.length).toBeGreaterThanOrEqual(1);
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin algo.SPpaths query result visualizes nodes and edges on the canvas`, async () => {
+        const graphName = getRandomString('path-algo');
+        await apicalls.addGraph(graphName);
+        await apicalls.runQuery(graphName, "CREATE (:Station {name:'A'})-[:LINE]->(:Station {name:'B'})-[:LINE]->(:Station {name:'C'})");
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery("MATCH (src:Station {name:'A'}), (dest:Station {name:'C'}) CALL algo.SPpaths({sourceNode: src, targetNode: dest, pathCount: 1, weightProp: '', defaultWeight: 1}) YIELD path RETURN path");
+        await graph.clickRunQuery();
+        const nodes = await graph.getNodesScreenPositions();
+        expect(nodes.length).toBeGreaterThanOrEqual(2);
+        const links = await graph.getLinksScreenPositions();
+        expect(links.length).toBeGreaterThanOrEqual(1);
+        await apicalls.removeGraph(graphName);
+    });
+
 });
