@@ -557,7 +557,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   }), [scrollPosition, search, expand, dataHash]);
 
   const isReadOnly = useMemo(() =>
-    sessionData?.user?.role === "Read-Only" || connectionInfo.sentinelRole === "slave",
+    sessionData?.user?.role === "Read-Only" || connectionInfo.sentinelRole === "slave" || connectionInfo.sentinelRole === "replica",
     [sessionData?.user?.role, connectionInfo.sentinelRole]
   );
   // Ref that always holds the latest isReadOnly value.
@@ -868,7 +868,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         setConnectionType((() => {
           switch (true) {
             case json.result.includes("cluster_enabled:1"): return "Cluster";
-            case /role:slave/.test(json.result): return "Sentinel";
+            case /role:(slave|replica)/.test(json.result): return "Sentinel";
             case /connected_slaves:[1-9]/.test(json.result): return "Sentinel";
             default: return "Standalone";
           }
@@ -877,7 +877,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         console.error("Failed to fetch connection type:", err);
       }
     })();
-  }, [status, toast]);
+  }, [status, toast, activeConnectionId]);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -901,7 +901,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         console.error("Failed to fetch connection info:", err);
       }
     })();
-  }, [status, toast]);
+  }, [status, toast, activeConnectionId]);
 
   // Fetch connections for this session and auto-select the active one
   useEffect(() => {

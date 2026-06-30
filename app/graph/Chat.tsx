@@ -549,7 +549,7 @@ export default function Chat({ onClose }: Props) {
                             const isUser = message.role === "user";
                             const avatar = isUser
                                 ? <div className="h-8 w-8 rounded-full flex items-center justify-center bg-primary">
-                                    <p className="textthe-foreground text-sm truncate text-center">{message.role.charAt(0).toUpperCase()}</p>
+                                    <p className="text-foreground text-sm truncate text-center">{message.role.charAt(0).toUpperCase()}</p>
                                 </div>
                                 : <div className="h-8 w-8 relative">
                                     {mounted && currentTheme && <Image className="rounded-full" src={`/icons/F-${currentTheme}.svg`} alt="Assistant" fill />}
@@ -564,7 +564,7 @@ export default function Chat({ onClose }: Props) {
                                     {
                                         !isUser && avatar
                                     }
-                                    <div className={cn("max-w-[80%] p-2 rounded-lg overflow-hidden", isUser ? "bg-primary" : "bgassistantBg-secondary", message.type === "Error" && "border border-destructive")}>
+                                    <div className={cn("max-w-[80%] p-2 rounded-lg overflow-hidden", isUser ? "bg-primary" : "bg-secondary", message.type === "Error" && "border border-destructive")}>
                                         {getMessage(message)}
                                     </div>
                                     {
