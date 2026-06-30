@@ -60,4 +60,32 @@ test.describe('Table View Tests', () => {
         const isExportButtonVisible = await tableView.isExportButtonVisible();
         expect(isExportButtonVisible).toBe(true);
     });
+
+    test('@admin PATH query result appears as a single row in table view', async () => {
+        const graphName = getRandomString('path-table');
+        await apiCalls.addGraph(graphName);
+        await apiCalls.runQuery(graphName, "CREATE (:City {name:'start'})-[:ROAD]->(:City {name:'end'})");
+        const tableView = await browser.createNewPage(TableView, urls.graphUrl);
+        await tableView.selectGraphByName(graphName);
+        await tableView.insertQuery("MATCH p=(a:City {name:'start'})-[:ROAD]->(b:City {name:'end'}) RETURN p");
+        await tableView.clickRunQuery(false);
+        await tableView.clickTableTab();
+        const rowCount = await tableView.getRowsCount();
+        expect(rowCount).toBe(1);
+        await apiCalls.removeGraph(graphName);
+    });
+
+    test('@admin PATH cell renders path data (nodes key) in table view', async () => {
+        const graphName = getRandomString('path-cell');
+        await apiCalls.addGraph(graphName);
+        await apiCalls.runQuery(graphName, "CREATE (:City {name:'start'})-[:ROAD]->(:City {name:'end'})");
+        const tableView = await browser.createNewPage(TableView, urls.graphUrl);
+        await tableView.selectGraphByName(graphName);
+        await tableView.insertQuery("MATCH p=(a:City {name:'start'})-[:ROAD]->(b:City {name:'end'}) RETURN p");
+        await tableView.clickRunQuery(false);
+        await tableView.clickTableTab();
+        const cellContainsPathData = await tableView.getFirstCellContainsText('nodes');
+        expect(cellContainsPathData).toBe(true);
+        await apiCalls.removeGraph(graphName);
+    });
 });
