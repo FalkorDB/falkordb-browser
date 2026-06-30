@@ -1,5 +1,5 @@
 import type { Graph } from "falkordb";
-import { QueryOptions } from "falkordb/dist/src/commands";
+import type { QueryOptions } from "falkordb/dist/src/commands";
 import { NextResponse, type NextRequest } from "next/server";
 
 const AUTO_NEXTAUTH_URL = "auto";
@@ -11,19 +11,9 @@ const LOCALHOST_ORIGINS = new Set([
 ]);
 
 export const runQuery = async (graph: Graph, query: string, isReadOnly: boolean, options?: QueryOptions) => {
-    if (isReadOnly) {
-        return await graph.roQuery(query, options);
-    }
-    try {
-        return await graph.query(query);
-    } catch (error) {
-        // Replica returns "READONLY You can't write against a read only replica."
-        // Fall back to roQuery so reads still work when isReadOnly detection races.
-        if ((error as Error).message?.includes("READONLY")) {
-            return await graph.roQuery(query);
-        }
-        throw error;
-    }
+    return isReadOnly
+        ? await graph.roQuery(query, options)
+        : await graph.query(query, options);
 };
 
 /**

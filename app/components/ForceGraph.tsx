@@ -203,6 +203,10 @@ export default function ForceGraph({
             fullNode.expand = !fullNode.expand;
             if (fullNode.expand) {
                 await onFetchNode(fullNode, node);
+                // Guard: if the node was collapsed while fetching, undo the expansion.
+                if (!fullNode.expand) {
+                    deleteNeighbors([fullNode]);
+                }
             } else {
                 deleteNeighbors([fullNode]);
             }
