@@ -1,6 +1,5 @@
-import type { Graph } from "falkordb";
-import type { QueryOptions } from "falkordb/dist/src/commands";
 import { NextResponse, type NextRequest } from "next/server";
+export { runQuery } from "./run-query";
 
 const AUTO_NEXTAUTH_URL = "auto";
 const UNTRUSTED_REQUEST_ORIGIN_MESSAGE = "Untrusted request origin";
@@ -9,12 +8,6 @@ const LOCALHOST_ORIGINS = new Set([
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]);
-
-export const runQuery = async (graph: Graph, query: string, isReadOnly: boolean, options?: QueryOptions) => {
-    return isReadOnly
-        ? await graph.roQuery(query, options)
-        : await graph.query(query, options);
-};
 
 /**
  * Determine whether a request must use read-only queries.

@@ -1,19 +1,7 @@
 import { describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
 import type { Graph } from "falkordb";
-
-// ---------------------------------------------------------------------------
-// Local copy of runQuery — mirrors app/api/utils.ts exactly so the test
-// runner doesn't have to load Next.js (which it can't resolve in isolation).
-// If the production function changes, update this copy to match.
-// ---------------------------------------------------------------------------
-type QueryOptions = Parameters<Graph["query"]>[1];
-
-const runQuery = async (graph: Graph, query: string, isReadOnly: boolean, options?: QueryOptions) => {
-    return isReadOnly
-        ? await graph.roQuery(query, options)
-        : await graph.query(query, options);
-};
+import { runQuery } from "./run-query.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
