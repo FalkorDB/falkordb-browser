@@ -52,11 +52,11 @@ export default function ForceGraph({
     const { background, foreground } = getTheme(theme);
 
     const lastClick = useRef<{ date: number, id: number }>({ date: 0, id: -1 });
-    // Explicit boolean flag: set when a graphData restore is consumed so the
-    // immediately-following setGraphData(undefined) re-run can be skipped.
-    // Using a boolean (not object identity) avoids false skips when the upstream
-    // reuses/mutates the same data reference for a real refresh.
-    const skipNextDataRef = useRef(false);
+    // When non-null, holds the `data` snapshot at the moment a graphData restore
+    // was consumed. The immediately-following setGraphData(undefined) re-run is
+    // skipped only when data still matches — if React batches a real data refresh
+    // into the same render, the references differ and the canvas gets updated.
+    const pendingRestoreDataRef = useRef<typeof data | null>(null);
 
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>();
     const [canvasLoaded, setCanvasLoaded] = useState(false);
@@ -416,23 +416,23 @@ export default function ForceGraph({
 
         let nodeCount: number;
         if (graphData) {
-            // Restore a saved canvas layout (e.g. after switching back to a graph the
-            // user was already exploring). Mark the flag so the next effect run
-            // (triggered by setGraphData(undefined)) skips the data branch, preventing
-            // the restored viewport from being immediately overwritten by stale query data.
-            skipNextDataRef.current = true;
+            // Restore a saved canvas layout. Store the current data snapshot so
+            // the cleanup re-run can verify data hasn't changed before skipping.
+            pendingRestoreDataRef.current = data;
             canvas.setData(graphData);
             setGraphData(undefined);
             return undefined; // zoom correction not needed for a restored viewport
         }
 
-        // If this run was triggered solely by setGraphData(undefined) clearing the
-        // consumed restore (graphData dep changed to null), skip re-rendering so
-        // the restored layout is preserved.
-        if (skipNextDataRef.current) {
-            skipNextDataRef.current = false;
+        // Skip only when this re-run was triggered by setGraphData(undefined)
+        // AND data hasn't changed since the restore was consumed. A different
+        // data reference means a real query result arrived in the same batch —
+        // in that case fall through so the canvas gets the fresh data.
+        if (pendingRestoreDataRef.current !== null && pendingRestoreDataRef.current === data) {
+            pendingRestoreDataRef.current = null;
             return undefined;
         }
+        pendingRestoreDataRef.current = null;
 
         const canvasData = convertToCanvasData(data);
         nodeCount = canvasData.nodes.length;
