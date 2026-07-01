@@ -1258,9 +1258,15 @@ export class Graph {
           }
 
           // NodeCell[] / LinkCell[]: map to avoid mutating the original array.
+          // Apply the same type guard used for single cells so a node id that
+          // collides with an edge id (or vice versa) in the same row is not updated.
           if (Array.isArray(cell)) {
-            if (!cell.some(c => 'id' in c && c.id === id)) return [k, cell];
-            return [k, cell.map(c => 'id' in c && c.id === id ? { ...c, properties: { ...(c as NodeCell | LinkCell).properties, [key]: val } } : c)];
+            const matchFn = (c: NodeCell | LinkCell) =>
+              'id' in c && c.id === id && (type === !("labels" in c));
+            if (!cell.some(c => 'id' in c && matchFn(c as NodeCell | LinkCell))) return [k, cell];
+            return [k, cell.map(c => 'id' in c && matchFn(c as NodeCell | LinkCell)
+              ? { ...c, properties: { ...(c as NodeCell | LinkCell).properties, [key]: val } }
+              : c)];
           }
 
           // Single NodeCell / LinkCell
