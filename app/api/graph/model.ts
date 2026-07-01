@@ -2,7 +2,7 @@
 /* eslint-disable one-var */
 /* eslint-disable no-param-reassign */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Data, DataCell, getMetaStats, GraphData, InfoLabel, InfoRelationship, Label, Link, LinkCell, MemoryValue, Node, NodeCell, PathCell, Relationship, ToastFn, Value } from "@/lib/utils";
+import { Data, getMetaStats, GraphData, InfoLabel, InfoRelationship, Label, Link, LinkCell, MemoryValue, Node, NodeCell, PathCell, Relationship, ToastFn, Value } from "@/lib/utils";
 import { getConnectionItem } from "@/lib/connection-storage";
 
 // Color palette for node customization
@@ -264,22 +264,6 @@ export class GraphInfo {
 
     return newColor;
   }
-}
-
-/** Returns true when a DataCell contains an element with the given id.
- *  Handles NodeCell, LinkCell, PathCell, and homogeneous arrays of each.
- *  PathCell members live inside `.nodes[]` / `.edges[]` and have no top-level `id`. */
-function cellContainsElementId(cell: DataCell, elementId: number): boolean {
-  if (!cell || typeof cell !== "object") return false;
-  if (Array.isArray(cell)) return cell.some((c) => cellContainsElementId(c as DataCell, elementId));
-  if ("nodes" in cell && Array.isArray((cell as PathCell).nodes)) {
-    const path = cell as PathCell;
-    return (
-      path.nodes.some((n) => n.id === elementId) ||
-      (path.edges?.some((e) => e.id === elementId) ?? false)
-    );
-  }
-  return "id" in cell && (cell as NodeCell | LinkCell).id === elementId;
 }
 
 export class Graph {
@@ -1002,7 +986,7 @@ export class Graph {
           if (
             cell &&
             typeof cell === "object" &&
-            elements.some((element) => cellContainsElementId(cell, element.id))
+            elements.some((element) => Array.isArray(cell) ? cell.some(c => 'id' in c && c.id === element.id) : 'id' in cell && element.id === cell.id)
           ) {
             return [key, undefined];
           }
@@ -1023,37 +1007,25 @@ export class Graph {
       this.Data = this.Data.map((row) =>
         Object.fromEntries(
           Object.entries(row).map(([key, cell]) => {
-            if (!cell || typeof cell !== "object") return [key, cell];
-
-            // PathCell: update labels on the matching node within the path.
-            if (!Array.isArray(cell) && "nodes" in cell && Array.isArray((cell as PathCell).nodes)) {
-              const path = cell as PathCell;
-              if (!path.nodes.some((n) => n.id === selectedElement.id)) return [key, cell];
-              return [key, {
-                ...path,
-                nodes: path.nodes.map((n) =>
-                  n.id === selectedElement.id
-                    ? { ...n, labels: n.labels.filter((l) => l !== label) }
-                    : n
-                ),
-              }];
-            }
-
-            // NodeCell / NodeCell[] (label edits never apply to LinkCell)
             const cellToCheck = Array.isArray(cell) && cell.length > 0 ? cell[0] : cell;
             if (
+              cell &&
               cellToCheck &&
+              typeof cell === "object" &&
               typeof cellToCheck === "object" &&
-              cellContainsElementId(cell, selectedElement.id) &&
+              (Array.isArray(cell) ? cell.some(c => 'id' in c && c.id === selectedElement.id) : 'id' in cell && cell.id === selectedElement.id) &&
               "labels" in cellToCheck
             ) {
-              // Use map + spread so only the matching node is updated immutably;
-              // a plain forEach on a shallow copy would mutate all nodes' labels.
-              const newCell = Array.isArray(cell)
-                ? (cell as NodeCell[]).map(c => c.id === selectedElement.id
-                    ? { ...c, labels: c.labels.filter((l: string) => l !== label) }
-                    : { ...c })
-                : { ...cell as NodeCell, labels: (cell as NodeCell).labels.filter((l: string) => l !== label) };
+              const newCell = Array.isArray(cell) ? cell.map(c => ({ ...c }) as NodeCell) : { ...cell } as NodeCell;
+
+              if (Array.isArray(newCell)) {
+                newCell.forEach((c) => {
+                  c.labels = c.labels.filter((l) => l !== label);
+                });
+              } else {
+                newCell.labels = newCell.labels.filter((l) => l !== label);
+              }
+
               return [key, newCell];
             }
 
@@ -1115,37 +1087,25 @@ export class Graph {
       this.Data = this.Data.map((row) =>
         Object.fromEntries(
           Object.entries(row).map(([key, cell]) => {
-            if (!cell || typeof cell !== "object") return [key, cell];
-
-            // PathCell: push the new label onto the matching node within the path.
-            if (!Array.isArray(cell) && "nodes" in cell && Array.isArray((cell as PathCell).nodes)) {
-              const path = cell as PathCell;
-              if (!path.nodes.some((n) => n.id === selectedElement.id)) return [key, cell];
-              return [key, {
-                ...path,
-                nodes: path.nodes.map((n) =>
-                  n.id === selectedElement.id
-                    ? { ...n, labels: [...n.labels, label] }
-                    : n
-                ),
-              }];
-            }
-
-            // NodeCell / NodeCell[]
             const cellToCheck = Array.isArray(cell) && cell.length > 0 ? cell[0] : cell;
             if (
+              cell &&
               cellToCheck &&
+              typeof cell === "object" &&
               typeof cellToCheck === "object" &&
-              cellContainsElementId(cell, selectedElement.id) &&
+              (Array.isArray(cell) ? cell.some(c => 'id' in c && c.id === selectedElement.id) : 'id' in cell && cell.id === selectedElement.id) &&
               "labels" in cellToCheck
             ) {
-              // Spread labels to avoid mutating the original array (shallow copy
-              // of NodeCell keeps the reference); only apply to the matching node.
-              const newCell = Array.isArray(cell)
-                ? (cell as NodeCell[]).map(c => c.id === selectedElement.id
-                    ? { ...c, labels: [...c.labels, label] }
-                    : { ...c })
-                : { ...cell as NodeCell, labels: [...(cell as NodeCell).labels, label] };
+              const newCell = Array.isArray(cell) ? cell.map(c => ({ ...c }) as NodeCell) : { ...cell } as NodeCell;
+
+              if (Array.isArray(newCell)) {
+                newCell.forEach((c) => {
+                  c.labels.push(label);
+                });
+              } else {
+                newCell.labels.push(label);
+              }
+
               return [key, newCell];
             }
 
@@ -1198,32 +1158,13 @@ export class Graph {
   public removeProperty(key: string, id: number, type: boolean) {
     this.Data = this.Data.map((row) => {
       const newRow = Object.entries(row).map(([k, cell]) => {
-        if (!cell || typeof cell !== "object") return [k, cell];
-
-        // PathCell: delete the property from the matching node or edge inside the path.
-        if (!Array.isArray(cell) && "nodes" in cell && Array.isArray((cell as PathCell).nodes)) {
-          const path = cell as PathCell;
-          const nodeIdx = path.nodes.findIndex((n) => n.id === id);
-          if (nodeIdx !== -1) {
-            const updatedProps = { ...path.nodes[nodeIdx].properties };
-            delete updatedProps[key];
-            return [k, { ...path, nodes: path.nodes.map((n, i) => i === nodeIdx ? { ...n, properties: updatedProps } : n) }];
-          }
-          const edgeIdx = (path.edges ?? []).findIndex((e) => e.id === id);
-          if (edgeIdx !== -1) {
-            const updatedProps = { ...path.edges![edgeIdx].properties };
-            delete updatedProps[key];
-            return [k, { ...path, edges: path.edges!.map((e, i) => i === edgeIdx ? { ...e, properties: updatedProps } : e) }];
-          }
-          return [k, cell];
-        }
-
-        // NodeCell / NodeCell[] / LinkCell / LinkCell[]
         const cellToCheck = Array.isArray(cell) && cell.length > 0 ? cell[0] : cell;
         if (
+          cell &&
           cellToCheck &&
+          typeof cell === "object" &&
           typeof cellToCheck === "object" &&
-          cellContainsElementId(cell, id) &&
+          (Array.isArray(cell) ? cell.some(c => 'id' in c && c.id === id) : 'id' in cell && cell.id === id) &&
           (type === !("labels" in cellToCheck))
         ) {
           if (Array.isArray(cell)) {
@@ -1243,36 +1184,20 @@ export class Graph {
     this.Data = this.Data.map((row) =>
       Object.fromEntries(
         Object.entries(row).map(([k, cell]) => {
-          if (!cell || typeof cell !== "object") return [k, cell];
-
-          // PathCell: update the matching node or edge inside the path.
-          if (!Array.isArray(cell) && "nodes" in cell && Array.isArray((cell as PathCell).nodes)) {
-            const path = cell as PathCell;
-            if (path.nodes.some((n) => n.id === id)) {
-              return [k, { ...path, nodes: path.nodes.map((n) => n.id === id ? { ...n, properties: { ...n.properties, [key]: val } } : n) }];
-            }
-            if (path.edges?.some((e) => e.id === id)) {
-              return [k, { ...path, edges: path.edges!.map((e) => e.id === id ? { ...e, properties: { ...e.properties, [key]: val } } : e) }];
-            }
-            return [k, cell];
-          }
-
-          // NodeCell[] / LinkCell[]: map to avoid mutating the original array.
-          if (Array.isArray(cell)) {
-            if (!cell.some(c => 'id' in c && c.id === id)) return [k, cell];
-            return [k, cell.map(c => 'id' in c && c.id === id ? { ...c, properties: { ...(c as NodeCell | LinkCell).properties, [key]: val } } : c)];
-          }
-
-          // Single NodeCell / LinkCell
-          const cellToCheck = cell;
+          const cellToCheck = Array.isArray(cell) && cell.length > 0 ? cell[0] : cell;
           if (
+            cell &&
+            cellToCheck &&
+            typeof cell === "object" &&
             typeof cellToCheck === "object" &&
-            'id' in cell && (cell as NodeCell | LinkCell).id === id &&
+            (Array.isArray(cell) ? cell.some(c => 'id' in c && c.id === id) : 'id' in cell && cell.id === id) &&
             (type === !("labels" in cellToCheck))
           ) {
-            return [k, { ...(cell as NodeCell | LinkCell), properties: { ...(cell as NodeCell | LinkCell).properties, [key]: val } }];
+            return [
+              k,
+              { ...cell, properties: { ...((Array.isArray(cell) ? cell.find(c => 'id' in c && c.id === id) : cell) as NodeCell | LinkCell | undefined)?.properties, [key]: val } },
+            ];
           }
-
           return [k, cell];
         })
       )

@@ -263,12 +263,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             { method: 'GET' },
             toast,
             setIndicator
-        ).then(result => {
-            // Treat non-OK responses as errors so the catch block can apply
-            // FALLBACK_PROCEDURE_NAMES; a null-to-then chain would silently store [].
-            if (!result?.ok) throw new Error("Procedure info fetch failed");
-            return result.json();
-        }).then(json => {
+        ).then(result => result?.ok ? result.json() : null).then(json => {
             // Ignore the response if the component unmounted or the graph changed
             // while the request was in flight (prevents stale overwrites).
             if (cancelled || graphIdRef.current !== requestGraphId) return;
