@@ -64,10 +64,19 @@ export const STATIC_SUGGESTIONS: monaco.languages.CompletionItem[] = [
 
 const escapeRegExp = (str: string): string => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+// Converts a word into a regex pattern that matches it case-insensitively by replacing
+// each letter with a [Ll] character class. Used so we can be selective: Cypher keywords
+// and built-in function names are case-insensitive in FalkorDB, but labels, relationship
+// types, property keys and variable names are case-sensitive. Monarch only supports a
+// single language-wide `ignoreCase` flag, so we build the patterns explicitly instead.
+const toIgnoreCasePattern = (word: string): string =>
+    word.replace(/[a-zA-Z]/g, c => `[${c.toUpperCase()}${c.toLowerCase()}]`);
+
 const DEFAULT_MONARCH_TOKENIZER: monaco.languages.IMonarchLanguage = {
     tokenizer: {
         root: [
-            [new RegExp(`\\b(${KEYWORDS.join('|')})\\b`, 'i'), "keyword"],
+            // Keywords: explicit case-insensitive pattern (CREATE = create = Create)
+            [new RegExp(`\\b(${KEYWORDS.map(toIgnoreCasePattern).join('|')})\\b`), "keyword"],
             [/"([^"\\]|\\.)*"/, 'string'],
             [/'([^'\\]|\\.)*'/, 'string'],
             [/\d+/, 'number'],
@@ -175,6 +184,8 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const boundVarsRef = useRef<Set<string>>(new Set());
     // Cached full suggestion list so getSuggestions never calls updateTokenizer during typing.
     const cachedSuggestionsRef = useRef<monaco.languages.CompletionItem[]>([]);
+    // Procedures fetched once per graph (they don't change at runtime).
+    const procedureSuggestionsRef = useRef<monaco.languages.CompletionItem[]>([]);
 
     const [lineNumber, setLineNumber] = useState(1);
     const [blur, setBlur] = useState(false);
@@ -228,6 +239,43 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
     useEffect(() => {
         graphIdRef.current = graph.Id;
+    }, [graph.Id]);
+
+    // Fetch procedures once whenever the graph changes. Procedures are static
+    // (they don't change while the server is running), so there is no need to
+    // re-fetch them on every autocomplete trigger or polling interval.
+    useEffect(() => {
+        if (!graph.Id) {
+            procedureSuggestionsRef.current = [];
+            return;
+        }
+        const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
+        securedFetch(
+            `api/graph/${prepareArg(graph.Id)}/info?type=${prepareArg('(function)')}${readOnlyParam}`,
+            { method: 'GET' },
+            toast,
+            setIndicator
+        ).then(result => result?.json()).then(json => {
+            procedureSuggestionsRef.current = (json?.result?.data ?? []).map(({ info }: { info: string }) => ({
+                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                insertText: `${info}(\${0})`,
+                label: `${info}()`,
+                kind: monaco.languages.CompletionItemKind.Function,
+                range: new monaco.Range(1, 1, 1, 1),
+                detail: '(function)',
+            }));
+            // The suggestion cache was built before this fetch completed, so it
+            // has no procedure entries. Invalidate it and rebuild the tokenizer
+            // (which also repopulates the cache) so procedures appear immediately
+            // on the next autocomplete trigger.
+            cachedSuggestionsRef.current = [];
+            if (monacoRef.current) {
+                updateTokenizer(monacoRef.current);
+            }
+        }).catch(() => {
+            // Best-effort: leave procedureSuggestionsRef empty on error.
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [graph.Id]);
 
     useEffect(() => {
@@ -404,8 +452,11 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         }
     }, [historyQuery.query]);
 
-    // Build label, relationship, and property-key suggestions directly from the graph
-    // object (already in memory) — no extra network round-trips needed.
+    // Build label, relationship, property-key, and procedure suggestions.
+    // Labels/rels/prop-keys come from the in-memory graph object.
+    // Procedures come from procedureSuggestionsRef, which is populated once
+    // per graph load (see the useEffect above) so autocomplete is never blocked
+    // by a network round-trip.
     const getGraphInfoSuggestions = useCallback((): monaco.languages.CompletionItem[] => {
         const items: monaco.languages.CompletionItem[] = [];
         const range = new monaco.Range(1, 1, 1, 1);
@@ -427,33 +478,11 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             items.push({ insertText: key, label: key, kind: monaco.languages.CompletionItemKind.Property, range, detail: '(property key)' });
         });
 
+        // Procedures: read from ref populated once at graph load.
+        items.push(...procedureSuggestionsRef.current);
+
         return items;
     }, [graph.GraphInfo]);
-
-    // Fetch only functions from the server — everything else comes from graphInfo.
-    const fetchFunctions = async (): Promise<monaco.languages.CompletionItem[]> => {
-        if (indicatorRef.current === "offline") return [];
-
-        const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
-        const result = await securedFetch(`api/graph/${graphIdRef.current}/info?type=${prepareArg('(function)')}${readOnlyParam}`, {
-            method: 'GET',
-        }, toast, setIndicator);
-
-        if (!result) return [];
-
-        const json = await result.json();
-
-        if (json.result.data.length === 0) return [];
-
-        return json.result.data.map(({ info }: { info: string }) => ({
-            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-            insertText: `${info}(\${0})`,
-            label: `${info}()`,
-            kind: monaco.languages.CompletionItemKind.Function,
-            range: new monaco.Range(1, 1, 1, 1),
-            detail: '(function)',
-        }));
-    };
 
     const udfSuggestions = useMemo((): monaco.languages.CompletionItem[] =>
         udfList.flatMap(([, libName, , functions]) =>
@@ -470,11 +499,8 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
     // Returns ALL suggestions including full-path namespaced functions (for tokenizer & dot navigation)
     const getFullSuggestions = useCallback(async (): Promise<monaco.languages.CompletionItem[]> => {
-        // Labels, relationship types, and property keys come from the in-memory graph object.
-        // Only functions require a server fetch (they are not part of graph metadata).
-        const graphInfoSuggestions = getGraphInfoSuggestions();
-        const functionSuggestions = graphIdRef.current ? await fetchFunctions() : [];
-        const remoteSuggestions = [...graphInfoSuggestions, ...functionSuggestions];
+        // Labels, relationship types, property keys, and procedures all come from getGraphInfoSuggestions.
+        const remoteSuggestions = getGraphInfoSuggestions();
 
         // Add bound element variables as suggestions
         const varSuggestions: monaco.languages.CompletionItem[] = Array.from(boundVarsRef.current).map(v => ({
@@ -587,8 +613,6 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                 }).flat()
         ]);
 
-        const allKeywords = KEYWORDS.join('|');
-
         // Build bound variables rule from the ref
         const boundVarsArray = Array.from(boundVarsRef.current);
         const boundVarsRule: [RegExp, string][] = boundVarsArray.length > 0
@@ -599,17 +623,23 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             tokenizer: {
                 root: graphIdRef.current ? [
                     ...boundVarsRule,
-                    ...(namespaces.size > 0 ? [[new RegExp(`\\b(${Array.from(namespaces.keys()).map(escapeRegExp).join('|')})\\b`, 'i'), "keyword"] as [RegExp, string]] : []),
-                    [new RegExp(`\\b(${allKeywords})\\b`, 'i'), "keyword"],
+                    // Namespaces (labels, rel-types, UDF libs): exact-case — these are
+                    // case-sensitive identifiers in FalkorDB.
+                    ...(namespaces.size > 0 ? [[new RegExp(`\\b(${Array.from(namespaces.keys()).map(escapeRegExp).join('|')})\\b`), "keyword"] as [RegExp, string]] : []),
+                    // Keywords: explicit case-insensitive pattern (Cypher keywords are
+                    // case-insensitive in FalkorDB; Monarch strips RegExp 'i' flags).
+                    [new RegExp(`\\b(${KEYWORDS.map(toIgnoreCasePattern).join('|')})\\b`), "keyword"],
                     [
+                        // Built-in function names: case-insensitive (FalkorDB allows
+                        // length(), LENGTH(), Length() etc.).
                         new RegExp(`\\b(${functions.map(({ label }) => {
                             const labelStr = (label as string).replace(/\(\)$/, '');
                             if (labelStr.includes(".")) {
                                 const parts = labelStr.split(".");
-                                return escapeRegExp(parts[parts.length - 1]);
+                                return toIgnoreCasePattern(escapeRegExp(parts[parts.length - 1]));
                             }
-                            return escapeRegExp(labelStr);
-                        }).join('|')})\\b`, 'i'),
+                            return toIgnoreCasePattern(escapeRegExp(labelStr));
+                        }).join('|')})\\b`),
                         "function"
                     ],
                     [/[A-Za-z_]\w*/, ''],
@@ -622,7 +652,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                     [/\(/, { token: 'delimiter.parenthesis', next: '@bracketCounting' }],
                 ] : [
                     ...boundVarsRule,
-                    [new RegExp(`\\b(${KEYWORDS.join('|')})\\b`, 'i'), "keyword"],
+                    [new RegExp(`\\b(${KEYWORDS.map(toIgnoreCasePattern).join('|')})\\b`), "keyword"],
                     [/[A-Za-z_]\w*/, ''],
                     [/"([^"\\]|\\.)*"/, 'string'],
                     [/'([^'\\]|\\.)*'/, 'string'],
@@ -735,7 +765,10 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
                 fullSug.forEach(s => {
                     const rawLabel = (typeof s.label === 'string' ? s.label : s.label.label) as string;
-                    if (!rawLabel.startsWith(prefix)) return;
+                    // Case-insensitive: procedure/function namespaces are case-insensitive
+                    // in FalkorDB (algo.SPpaths = ALGO.SPPATHS). Slice uses length so the
+                    // remainder preserves the canonical casing from the suggestion list.
+                    if (!rawLabel.toLowerCase().startsWith(prefix.toLowerCase())) return;
                     const remainder = rawLabel.slice(prefix.length);
                     const parts = remainder.split('.');
                     const depth = parts.length;
@@ -752,9 +785,12 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                 });
 
                 // Cursor is right after the dot — use this as the insert position so Monaco
-                // knows completions replace nothing (pure insert). filterText="" bypasses
-                // Monaco's client-side prefix filter which would otherwise hide items whose
-                // labels (e.g. "idx.fulltext.queryNodes()") don't match the typed prefix.
+                // knows completions replace nothing (pure insert). filterText matches the
+                // label so Monaco can progressively narrow the list as the user types after
+                // the dot (whether the suggestion list was opened by the dot trigger or by
+                // Ctrl+Space). Labels here are already trimmed to local names (e.g.
+                // "allGraphs()", not "db.allGraphs()"), so using the label as filterText
+                // does not cause false negatives.
                 const insertRange = new monaco.Range(
                     position.lineNumber, position.column,
                     position.lineNumber, position.column,
@@ -764,7 +800,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                     insertText: isNamespace ? `${remainder}.` : remainder.replace(/\(\)$/, '(\${0})'),
                     insertTextRules: isNamespace ? undefined : monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
                     label: remainder,
-                    filterText: '',
+                    filterText: remainder,
                     sortText: isNamespace ? `0_${remainder.toLowerCase()}` : `1_${remainder.toLowerCase()}`,
                     kind: isNamespace
                         ? monaco.languages.CompletionItemKind.Module
@@ -775,8 +811,9 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                 }));
             }
 
-            // CALL context: show only procedure namespaces (e.g. "db", "algo").
-            // Dot-chaining after a namespace ("CALL db.") is handled by the hasDot branch above.
+            // CALL context: show namespaces when typing the top-level name (e.g. "CALL algo"),
+            // or filter namespace items when typing a dotted path (e.g. "CALL algo.sp").
+            // Dot-chaining after a trailing dot ("CALL db.") is handled by the hasDot branch above.
             if (model && position) {
                 const linePrefix = model.getValueInRange({
                     startLineNumber: position.lineNumber,
@@ -784,9 +821,68 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                     endLineNumber: position.lineNumber,
                     endColumn: position.column,
                 });
-                const callMatch = linePrefix.match(/\bCALL\s+(\w*)$/i);
+                // Extend the regex to capture dotted paths so "CALL algo.sp" is handled here
+                // instead of falling through to the general suggestions list.
+                const callMatch = linePrefix.match(/\bCALL\s+((?:\w+\.)*\w*)$/i);
                 if (callMatch) {
-                    const typedPrefix = callMatch[1];
+                    const typedPath = callMatch[1]; // e.g. 'algo.sp', 'algo', or ''
+                    const dotIdx = typedPath.lastIndexOf('.');
+
+                    if (dotIdx !== -1) {
+                        // 'CALL namespace.partial' → show functions in that namespace,
+                        // filtered case-insensitively against the partial text after the dot.
+                        const namespacePart = typedPath.slice(0, dotIdx + 1); // 'algo.'
+                        const partial = typedPath.slice(dotIdx + 1);           // 'sp'
+
+                        const items = fullSug.filter(s => {
+                            const lbl = typeof s.label === 'string' ? s.label : s.label.label;
+                            if (!lbl.toLowerCase().startsWith(namespacePart.toLowerCase())) return false;
+                            // Also require the remainder to start with the typed partial so
+                            // Monaco never receives items it can fuzzy-match against garbage text.
+                            const rem = lbl.slice(namespacePart.length).toLowerCase();
+                            return rem.startsWith(partial.toLowerCase());
+                        });
+
+                        // incomplete: true tells Monaco to re-invoke the provider on every
+                        // keystroke (including deletions) instead of caching and re-filtering
+                        // the current list. Without this, deleting a character would keep the
+                        // stale narrowed list and never re-add items that match the shorter partial.
+                        if (items.length === 0) return { suggestions: [], incomplete: true };
+
+                        return {
+                          suggestions: items.map(s => {
+                            const rawLabel = typeof s.label === 'string' ? s.label : s.label.label;
+                            const remainder = rawLabel.slice(namespacePart.length); // e.g. 'SPpaths()'
+                            const isNs = s.detail === '(namespace)';
+                            return {
+                                ...s,
+                                label: remainder,
+                                // filterText drives Monaco's client-side fuzzy filter.
+                                // Use the remainder so 'sp' matches 'SPpaths()' case-insensitively.
+                                filterText: remainder,
+                                sortText: `0_${remainder.toLowerCase()}`,
+                                insertText: isNs
+                                    ? `${remainder}.`
+                                    : remainder.replace(/\(\)$/, '(\${0})'),
+                                insertTextRules: isNs
+                                    ? undefined
+                                    : monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                                kind: isNs
+                                    ? monaco.languages.CompletionItemKind.Module
+                                    : monaco.languages.CompletionItemKind.Function,
+                                detail: isNs ? '(namespace)' : s.detail,
+                                range: new monaco.Range(
+                                    position.lineNumber, position.column - partial.length,
+                                    position.lineNumber, position.column,
+                                ),
+                            };
+                          }),
+                          incomplete: true,
+                        };
+                    }
+
+                    // No dot yet ('CALL algo') → show namespace items only.
+                    const typedPrefix = typedPath;
                     const namespaces = fullSug.filter(s => s.detail === '(namespace)');
                     return namespaces.map(s => {
                         const label = typeof s.label === 'string' ? s.label : s.label.label;

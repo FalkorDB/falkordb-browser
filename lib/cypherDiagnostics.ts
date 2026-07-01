@@ -47,7 +47,7 @@ export function offsetToPosition(text: string, index: number): { lineNumber: num
   return { lineNumber: line, column: index - lastNewline };
 }
 
-function collectMatches(masked: string, re: RegExp, tokenLength: number, accept: (index: number) => boolean): LocatedToken | undefined {
+function collectMatches(masked: string, re: RegExp, tokenLength: number, accept: (index: number) => boolean, useLastOccurrence = false): LocatedToken | undefined {
   const positions: { start: number; end: number }[] = [];
   let match = re.exec(masked);
   while (match !== null) {
@@ -57,7 +57,8 @@ function collectMatches(masked: string, re: RegExp, tokenLength: number, accept:
     match = re.exec(masked);
   }
   if (positions.length === 0) return undefined;
-  return { start: positions[0].start, end: positions[0].end, validOccurrenceCount: positions.length };
+  const idx = useLastOccurrence ? positions.length - 1 : 0;
+  return { start: positions[idx].start, end: positions[idx].end, validOccurrenceCount: positions.length };
 }
 
 /** Locates a function call: the token immediately before `(` (supports dotted names). */
@@ -68,14 +69,16 @@ export function locateFunctionToken(query: string, token: string): LocatedToken 
 }
 
 /** Locates a variable reference: `\btoken\b` not immediately preceded by `.` or `:`
- *  (so property keys and labels are skipped). */
-export function locateVariableToken(query: string, token: string): LocatedToken | undefined {
+ *  (so property keys and labels are skipped).
+ *  Pass `useLastOccurrence = true` for "not defined" errors: the last use is where
+ *  the variable fell out of scope, not the first (which is typically the binding site). */
+export function locateVariableToken(query: string, token: string, useLastOccurrence = false): LocatedToken | undefined {
   const masked = maskCommentsAndStrings(query);
   const re = new RegExp(`\\b${escapeRegExp(token)}\\b`, "g");
   return collectMatches(masked, re, token.length, index => {
     const before = index > 0 ? masked[index - 1] : "";
     return before !== "." && before !== ":";
-  });
+  }, useLastOccurrence);
 }
 
 /** Returns the word range (1-based, end-exclusive) at `column`.
@@ -187,7 +190,9 @@ export function computeEditorDiagnostics(query: string, errorMessage: string): D
 
   const varMatch = errorMessage.match(/'([^']+)' not defined/i);
   if (varMatch) {
-    const located = locateVariableToken(query, varMatch[1]);
+    // Use the last occurrence: when a variable is out of scope (e.g. dropped by WITH),
+    // the last use is where the error actually manifests, not the first (binding) site.
+    const located = locateVariableToken(query, varMatch[1], true);
     if (located) diagnostics.push(tokenDiagnostic(query, "undefined-variable", `'${varMatch[1]}' not defined`, errorMessage, located));
     return { sourceQuery: query, diagnostics };
   }
