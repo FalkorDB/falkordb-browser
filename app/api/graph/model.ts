@@ -1047,12 +1047,13 @@ export class Graph {
               cellContainsElementId(cell, selectedElement.id) &&
               "labels" in cellToCheck
             ) {
-              const newCell = Array.isArray(cell) ? cell.map(c => ({ ...c }) as NodeCell) : { ...cell } as NodeCell;
-              if (Array.isArray(newCell)) {
-                newCell.forEach((c) => { c.labels = c.labels.filter((l) => l !== label); });
-              } else {
-                newCell.labels = newCell.labels.filter((l) => l !== label);
-              }
+              // Use map + spread so only the matching node is updated immutably;
+              // a plain forEach on a shallow copy would mutate all nodes' labels.
+              const newCell = Array.isArray(cell)
+                ? (cell as NodeCell[]).map(c => c.id === selectedElement.id
+                    ? { ...c, labels: c.labels.filter((l: string) => l !== label) }
+                    : { ...c })
+                : { ...cell as NodeCell, labels: (cell as NodeCell).labels.filter((l: string) => l !== label) };
               return [key, newCell];
             }
 
@@ -1138,12 +1139,13 @@ export class Graph {
               cellContainsElementId(cell, selectedElement.id) &&
               "labels" in cellToCheck
             ) {
-              const newCell = Array.isArray(cell) ? cell.map(c => ({ ...c }) as NodeCell) : { ...cell } as NodeCell;
-              if (Array.isArray(newCell)) {
-                newCell.forEach((c) => { c.labels.push(label); });
-              } else {
-                newCell.labels.push(label);
-              }
+              // Spread labels to avoid mutating the original array (shallow copy
+              // of NodeCell keeps the reference); only apply to the matching node.
+              const newCell = Array.isArray(cell)
+                ? (cell as NodeCell[]).map(c => c.id === selectedElement.id
+                    ? { ...c, labels: [...c.labels, label] }
+                    : { ...c })
+                : { ...cell as NodeCell, labels: [...(cell as NodeCell).labels, label] };
               return [key, newCell];
             }
 
