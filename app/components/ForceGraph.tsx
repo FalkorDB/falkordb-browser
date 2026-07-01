@@ -52,6 +52,10 @@ export default function ForceGraph({
     const { background, foreground } = getTheme(theme);
 
     const lastClick = useRef<{ date: number, id: number }>({ date: 0, id: -1 });
+    // Tracks which `data` snapshot was present when the last saved viewport was
+    // restored. Lets the effect skip overwriting the canvas on the re-run that
+    // is triggered by setGraphData(undefined) clearing the consumed restore.
+    const restoredAtDataRef = useRef<typeof data | null>(null);
 
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>();
     const [canvasLoaded, setCanvasLoaded] = useState(false);
@@ -411,14 +415,29 @@ export default function ForceGraph({
 
         let nodeCount: number;
         if (graphData) {
-            nodeCount = graphData.nodes.length;
+            // Restore a saved canvas layout (e.g. after switching back to a graph the
+            // user was already exploring). Record which `data` snapshot was current so
+            // that the cleanup re-run triggered by setGraphData(undefined) below can
+            // skip the data branch, preventing the restored viewport from being
+            // immediately overwritten by stale query data.
+            restoredAtDataRef.current = data;
             canvas.setData(graphData);
             setGraphData(undefined);
-        } else {
-            const canvasData = convertToCanvasData(data);
-            nodeCount = canvasData.nodes.length;
-            canvas.setData(canvasData);
+            return undefined; // zoom correction not needed for a restored viewport
         }
+
+        // If this run was triggered solely by setGraphData(undefined) clearing the
+        // consumed restore (graphData dep changed to null), skip re-rendering so
+        // the restored layout is preserved.
+        if (restoredAtDataRef.current === data) {
+            restoredAtDataRef.current = null;
+            return undefined;
+        }
+        restoredAtDataRef.current = null;
+
+        const canvasData = convertToCanvasData(data);
+        nodeCount = canvasData.nodes.length;
+        canvas.setData(canvasData);
 
         // With the npm @falkordb/canvas package the canvas's zoomToFit fires asynchronously
         // via a requestAnimationFrame, so the min-zoom enforcement inside the canvas runs
@@ -444,9 +463,7 @@ export default function ForceGraph({
         }
 
         return undefined;
-
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [canvasRef, data, setGraphData, canvasLoaded]);
+    }, [canvasRef, data, graphData, setGraphData, canvasLoaded]);
 
     return (
         <div

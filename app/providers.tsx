@@ -557,8 +557,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   }), [scrollPosition, search, expand, dataHash]);
 
   const isReadOnly = useMemo(() =>
-    sessionData?.user?.role === "Read-Only" || connectionInfo.sentinelRole === "replica",
-    [sessionData?.user?.role, connectionInfo.sentinelRole]
+    sessionData?.user?.role === "Read-Only" || (connectionType === "Sentinel" && connectionInfo.sentinelRole === "replica"),
+    [sessionData?.user?.role, connectionInfo.sentinelRole, connectionType]
   );
   // Ref that always holds the latest isReadOnly value.
   // Callbacks read from the ref so they don't need isReadOnly in their
