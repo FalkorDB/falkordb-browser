@@ -282,6 +282,16 @@ function cellContainsElementId(cell: DataCell, elementId: number): boolean {
   return "id" in cell && (cell as NodeCell | LinkCell).id === elementId;
 }
 
+/** Type guard: a NodeCell always carries a `labels` array. */
+function isNodeCell(cell: NodeCell | LinkCell): cell is NodeCell {
+  return "labels" in cell;
+}
+
+/** Type guard: a LinkCell carries `relationshipType` but no `labels`. */
+function isLinkCell(cell: NodeCell | LinkCell): cell is LinkCell {
+  return !("labels" in cell);
+}
+
 export class Graph {
   private id: string;
 
@@ -1219,16 +1229,19 @@ export class Graph {
         }
 
         // NodeCell / NodeCell[] / LinkCell / LinkCell[]
+        // 'id' in cellToCheck narrows from DataCell to NodeCell | LinkCell so the
+        // type guards receive a correctly-typed argument without a pre-cast.
         const cellToCheck = Array.isArray(cell) && cell.length > 0 ? cell[0] : cell;
         if (
           cellToCheck &&
           typeof cellToCheck === "object" &&
+          'id' in cellToCheck &&
           cellContainsElementId(cell, id) &&
-          (type === !("labels" in cellToCheck))
+          (type ? isNodeCell(cellToCheck) : isLinkCell(cellToCheck))
         ) {
           if (Array.isArray(cell)) {
             cell.forEach(c => 'id' in c && c.id === id && delete (c as NodeCell | LinkCell).properties[key]);
-          } else delete (cell as NodeCell | LinkCell).properties[key];
+          } else delete cellToCheck.properties[key];
 
           return [k, cell];
         }
@@ -1260,23 +1273,19 @@ export class Graph {
           // NodeCell[] / LinkCell[]: map to avoid mutating the original array.
           // Apply the same type guard used for single cells so a node id that
           // collides with an edge id (or vice versa) in the same row is not updated.
+          // 'id' in c narrows from DataCell to NodeCell | LinkCell before matchFn.
           if (Array.isArray(cell)) {
             const matchFn = (c: NodeCell | LinkCell) =>
-              'id' in c && c.id === id && (type === !("labels" in c));
-            if (!cell.some(c => 'id' in c && matchFn(c as NodeCell | LinkCell))) return [k, cell];
-            return [k, cell.map(c => 'id' in c && matchFn(c as NodeCell | LinkCell)
-              ? { ...c, properties: { ...(c as NodeCell | LinkCell).properties, [key]: val } }
+              c.id === id && (type ? isNodeCell(c) : isLinkCell(c));
+            if (!cell.some(c => 'id' in c && matchFn(c))) return [k, cell];
+            return [k, cell.map(c => 'id' in c && matchFn(c)
+              ? { ...c, properties: { ...c.properties, [key]: val } }
               : c)];
           }
 
-          // Single NodeCell / LinkCell
-          const cellToCheck = cell;
-          if (
-            typeof cellToCheck === "object" &&
-            'id' in cell && (cell as NodeCell | LinkCell).id === id &&
-            (type === !("labels" in cellToCheck))
-          ) {
-            return [k, { ...(cell as NodeCell | LinkCell), properties: { ...(cell as NodeCell | LinkCell).properties, [key]: val } }];
+          // Single NodeCell / LinkCell: 'id' in narrows cell to NodeCell | LinkCell.
+          if ('id' in cell && cell.id === id && (type ? isNodeCell(cell) : isLinkCell(cell))) {
+            return [k, { ...cell, properties: { ...cell.properties, [key]: val } }];
           }
 
           return [k, cell];
