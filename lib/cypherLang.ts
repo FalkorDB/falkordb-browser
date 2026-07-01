@@ -122,6 +122,32 @@ export const BUILTIN_FUNCTIONS = [
   "vec.cosineDistance",
 ];
 
+/**
+ * Fallback list of well-known FalkorDB built-in procedure names (without parentheses).
+ * Used to populate CALL autocomplete when the server-side procedure fetch fails or is
+ * unavailable. This list matches the procedures shipped with FalkorDB 4.x.
+ */
+export const FALLBACK_PROCEDURE_NAMES: string[] = [
+  "db.constraints",
+  "db.indexes",
+  "db.labels",
+  "db.propertyKeys",
+  "db.relationshipTypes",
+  "db.meta.stats",
+  "db.idx.fulltext.createNodeIndex",
+  "db.idx.fulltext.drop",
+  "db.idx.fulltext.queryNodes",
+  "db.idx.vector.createNodeIndex",
+  "db.idx.vector.drop",
+  "db.idx.vector.queryNodes",
+  "algo.SPpaths",
+  "algo.SSpaths",
+  "algo.betweenness",
+  "algo.BFS",
+  "algo.pageRank",
+  "algo.degree",
+];
+
 // Derives the namespaced UDF function names (e.g. "myLib.myFunc") from the UDF
 // list, matching how they are presented in the editor's autocomplete.
 export function udfFunctionNames(udfList: UDFEntry[]): string[] {

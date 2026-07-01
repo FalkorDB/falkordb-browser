@@ -11,7 +11,7 @@ import * as monaco from "monaco-editor";
 import { Info, Maximize2, Minimize2, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { cn, HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
-import { BUILTIN_FUNCTIONS, CYPHER_KEYWORDS } from "@/lib/cypherLang";
+import { BUILTIN_FUNCTIONS, CYPHER_KEYWORDS, FALLBACK_PROCEDURE_NAMES } from "@/lib/cypherLang";
 import { codeActionEditsForMarkers, analyzeSchemaWarnings, type EditorDiagnostic } from "@/lib/cypherDiagnostics";
 import { extractVariableCandidates } from "@/lib/cypherSuggestions";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -241,21 +241,32 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         graphIdRef.current = graph.Id;
     }, [graph.Id]);
 
-    // Fetch procedures once whenever the graph changes. Procedures are static
-    // (they don't change while the server is running), so there is no need to
-    // re-fetch them on every autocomplete trigger or polling interval.
+    // Fetch procedures whenever the graph or read-only mode changes.
+    // Read-only mode is included because the server may return a different set
+    // of procedures depending on access level.
     useEffect(() => {
-        if (!graph.Id) {
-            procedureSuggestionsRef.current = [];
-            return;
-        }
-        const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
+        const requestGraphId = graph.Id;
+        let cancelled = false;
+
+        // Clear stale entries immediately so the previous graph's procedures
+        // are never shown while the new fetch is in flight.
+        procedureSuggestionsRef.current = [];
+        cachedSuggestionsRef.current = [];
+
+        if (!requestGraphId) return () => { cancelled = true; };
+
+        // Use the live `isReadOnly` value (not the ref) so this effect re-runs
+        // whenever read-only mode toggles on the same graph.
+        const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
         securedFetch(
-            `api/graph/${prepareArg(graph.Id)}/info?type=${prepareArg('(function)')}${readOnlyParam}`,
+            `api/graph/${prepareArg(requestGraphId)}/info?type=${prepareArg('(function)')}${readOnlyParam}`,
             { method: 'GET' },
             toast,
             setIndicator
-        ).then(result => result?.json()).then(json => {
+        ).then(result => result?.ok ? result.json() : null).then(json => {
+            // Ignore the response if the component unmounted or the graph changed
+            // while the request was in flight (prevents stale overwrites).
+            if (cancelled || graphIdRef.current !== requestGraphId) return;
             procedureSuggestionsRef.current = (json?.result?.data ?? []).map(({ info }: { info: string }) => ({
                 insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
                 insertText: `${info}(\${0})`,
@@ -273,10 +284,25 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                 updateTokenizer(monacoRef.current);
             }
         }).catch(() => {
-            // Best-effort: leave procedureSuggestionsRef empty on error.
+            if (cancelled || graphIdRef.current !== requestGraphId) return;
+            // On error, fall back to the well-known FalkorDB built-in procedures
+            // so users retain CALL autocomplete even when the server is temporarily
+            // unreachable or returns an unexpected response.
+            procedureSuggestionsRef.current = FALLBACK_PROCEDURE_NAMES.map(info => ({
+                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                insertText: `${info}(\${0})`,
+                label: `${info}()`,
+                kind: monaco.languages.CompletionItemKind.Function,
+                range: new monaco.Range(1, 1, 1, 1),
+                detail: '(function)',
+            }));
+            cachedSuggestionsRef.current = [];
+            if (monacoRef.current) updateTokenizer(monacoRef.current);
         });
+
+        return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [graph.Id]);
+    }, [graph.Id, isReadOnly]);
 
     useEffect(() => {
         isReadOnlyRef.current = isReadOnly;
@@ -632,6 +658,10 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                     [
                         // Built-in function names: case-insensitive (FalkorDB allows
                         // length(), LENGTH(), Length() etc.).
+                        // escapeRegExp runs first (to safely handle dots and parens in
+                        // dotted names like vec.cosineDistance), then toIgnoreCasePattern
+                        // converts only [a-zA-Z] characters — it never touches the
+                        // resulting backslash-escape sequences, so the order is safe.
                         new RegExp(`\\b(${functions.map(({ label }) => {
                             const labelStr = (label as string).replace(/\(\)$/, '');
                             if (labelStr.includes(".")) {

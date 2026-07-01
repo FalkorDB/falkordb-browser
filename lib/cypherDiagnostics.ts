@@ -71,7 +71,12 @@ export function locateFunctionToken(query: string, token: string): LocatedToken 
 /** Locates a variable reference: `\btoken\b` not immediately preceded by `.` or `:`
  *  (so property keys and labels are skipped).
  *  Pass `useLastOccurrence = true` for "not defined" errors: the last use is where
- *  the variable fell out of scope, not the first (which is typically the binding site). */
+ *  the variable fell out of scope, not the first (which is typically the binding site).
+ *
+ *  Known limitation: this is a purely lexical search — it has no understanding of
+ *  Cypher scope boundaries. When the same variable name is reintroduced in a nested
+ *  scope the last occurrence may refer to a valid inner-scope binding rather than the
+ *  actual out-of-scope reference. Full scope analysis would require building an AST. */
 export function locateVariableToken(query: string, token: string, useLastOccurrence = false): LocatedToken | undefined {
   const masked = maskCommentsAndStrings(query);
   const re = new RegExp(`\\b${escapeRegExp(token)}\\b`, "g");

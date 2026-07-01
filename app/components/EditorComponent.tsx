@@ -264,7 +264,10 @@ export default function EditorComponent({
                                 const result = await currentConfig.getSuggestions(monacoInstance, context, model, position);
                                 const items = Array.isArray(result) ? result : result.suggestions;
                                 const incomplete = Array.isArray(result) ? undefined : result.incomplete;
-                                return { suggestions: items.map(s => ({ ...s, range })), incomplete };
+                                // Spread `range` first so that a provider-set `s.range`
+                                // (e.g. a dotted-path replacement range) takes precedence
+                                // over the word-based fallback range computed above.
+                                return { suggestions: items.map(s => ({ range, ...s })), incomplete };
                             }) as monaco.languages.CompletionItemProvider['provideCompletionItems'],
                         });
                         completionProviderRegistry.set(language, { configRef: sharedConfigRef, disposable, count: 1 });

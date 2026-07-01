@@ -426,6 +426,11 @@ export default function ForceGraph({
         // simulation can push nodes far apart, producing a near-zero zoom that makes them
         // invisible. We use a 400 ms delay (longer than the canvas's internal ~50 ms delay)
         // so the canvas has finished its own zoomToFit before we check and correct.
+        //
+        // Stale-timer safety: React calls each effect's cleanup before the next run, so
+        // `clearTimeout(handle)` below always cancels the previous timer before a new one
+        // is scheduled. This means the correction only fires if the data has been stable
+        // for 400 ms, and rapid successive updates never accumulate stale callbacks.
         if (nodeCount > 0 && nodeCount <= 3) {
             const handle = setTimeout(() => {
                 const c = canvasRef.current;
