@@ -57,4 +57,17 @@ export default class TableView extends GraphPage {
             await el.click();
         }, 'Export Table View Button');
     }
+
+    /**
+     * Returns the text content of the first data cell in the first table row.
+     * For PATH results the JSONTree renders nodes/edges keys, so this text will
+     * include strings like "nodes" or "edges" when the cell holds a PATH value.
+     */
+    public async getFirstCellContainsText(text: string): Promise<boolean> {
+        await this.tableViewTabPanel.waitFor({ state: 'visible', timeout: 10000 });
+        const firstCell = this.tableViewTableRows.first().locator('td').first();
+        await firstCell.waitFor({ state: 'visible', timeout: 5000 });
+        const content = await firstCell.textContent();
+        return (content ?? '').includes(text);
+    }
 }

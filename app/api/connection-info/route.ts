@@ -61,8 +61,8 @@ export async function GET(request: Request) {
     } else if (role === "master" && connectedSlaves > 0) {
       result.sentinelRole = "master";
       result.sentinelReplicas = connectedSlaves;
-    } else if (role === "slave") {
-      result.sentinelRole = "slave";
+    } else if (role === "slave" || role === "replica") {
+      result.sentinelRole = "replica";
       result.sentinelMasterHost = parseInfoField(replicationInfo, "master_host");
       const parsedPort = Number(parseInfoField(replicationInfo, "master_port") ?? "0");
       result.sentinelMasterPort = Number.isFinite(parsedPort) ? parsedPort : 0;

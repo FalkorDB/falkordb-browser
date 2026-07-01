@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { renameGraph, validateBody } from "../../validate-body";
-import { getCorsHeaders, writeGetClientErrorAsSSE, resolveReadOnly } from "../../utils";
+import { getCorsHeaders, writeGetClientErrorAsSSE, resolveReadOnly, runQuery } from "../../utils";
 
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
@@ -180,9 +180,7 @@ export async function GET(
 
       const graph = client.selectGraph(graphId);
 
-      const result = isReadOnly
-          ? await graph.roQuery(query, { TIMEOUT: timeout })
-          : await graph.query(query, { TIMEOUT: timeout });
+      const result = await runQuery(graph, query, isReadOnly, { TIMEOUT: timeout });
 
       const writeDataLine = (chunk: string) => {
         writer.write(encoder.encode(`data: ${chunk}\n`));

@@ -2,7 +2,7 @@
 /* eslint-disable one-var */
 /* eslint-disable no-param-reassign */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Data, getMetaStats, GraphData, InfoLabel, InfoRelationship, Label, Link, LinkCell, MemoryValue, Node, NodeCell, Relationship, ToastFn, Value } from "@/lib/utils";
+import { Data, getMetaStats, GraphData, InfoLabel, InfoRelationship, Label, Link, LinkCell, MemoryValue, Node, NodeCell, PathCell, Relationship, ToastFn, Value } from "@/lib/utils";
 import { getConnectionItem } from "@/lib/connection-storage";
 
 // Color palette for node customization
@@ -673,14 +673,15 @@ export class Graph {
   }
 
   public async extendCell(cell: any, collapsed: boolean) {
-    if (cell.nodes) {
+    if (Array.isArray(cell.nodes)) {
+      const pathCell = cell as PathCell;
       const nodes = await Promise.all(
-        cell.nodes.map((node: any) =>
+        pathCell.nodes.map((node) =>
           this.extendNode(node, collapsed)
         )
       );
       const edges = await Promise.all(
-        (cell.edges ?? []).map((edge: any) =>
+        (pathCell.edges ?? []).map((edge) =>
           this.extendEdge(edge, collapsed)
         )
       );
@@ -985,7 +986,7 @@ export class Graph {
           if (
             cell &&
             typeof cell === "object" &&
-            elements.some((element) => Array.isArray(cell) ? cell.some(c => c.id === element.id) : element.id === cell.id)
+            elements.some((element) => Array.isArray(cell) ? cell.some(c => 'id' in c && c.id === element.id) : 'id' in cell && element.id === cell.id)
           ) {
             return [key, undefined];
           }
@@ -1012,7 +1013,7 @@ export class Graph {
               cellToCheck &&
               typeof cell === "object" &&
               typeof cellToCheck === "object" &&
-              (Array.isArray(cell) ? cell.some(c => c.id === selectedElement.id) : cell.id === selectedElement.id) &&
+              (Array.isArray(cell) ? cell.some(c => 'id' in c && c.id === selectedElement.id) : 'id' in cell && cell.id === selectedElement.id) &&
               "labels" in cellToCheck
             ) {
               const newCell = Array.isArray(cell) ? cell.map(c => ({ ...c }) as NodeCell) : { ...cell } as NodeCell;
@@ -1092,7 +1093,7 @@ export class Graph {
               cellToCheck &&
               typeof cell === "object" &&
               typeof cellToCheck === "object" &&
-              (Array.isArray(cell) ? cell.some(c => c.id === selectedElement.id) : cell.id === selectedElement.id) &&
+              (Array.isArray(cell) ? cell.some(c => 'id' in c && c.id === selectedElement.id) : 'id' in cell && cell.id === selectedElement.id) &&
               "labels" in cellToCheck
             ) {
               const newCell = Array.isArray(cell) ? cell.map(c => ({ ...c }) as NodeCell) : { ...cell } as NodeCell;
@@ -1163,12 +1164,12 @@ export class Graph {
           cellToCheck &&
           typeof cell === "object" &&
           typeof cellToCheck === "object" &&
-          (Array.isArray(cell) ? cell.some(c => c.id === id) : cell.id === id) &&
+          (Array.isArray(cell) ? cell.some(c => 'id' in c && c.id === id) : 'id' in cell && cell.id === id) &&
           (type === !("labels" in cellToCheck))
         ) {
           if (Array.isArray(cell)) {
-            cell.forEach(c => c.id === id && delete c.properties[key]);
-          } else delete cell.properties[key];
+            cell.forEach(c => 'id' in c && c.id === id && delete (c as NodeCell | LinkCell).properties[key]);
+          } else delete (cell as NodeCell | LinkCell).properties[key];
 
           return [k, cell];
         }
@@ -1189,12 +1190,12 @@ export class Graph {
             cellToCheck &&
             typeof cell === "object" &&
             typeof cellToCheck === "object" &&
-            (Array.isArray(cell) ? cell.some(c => c.id === id) : cell.id === id) &&
+            (Array.isArray(cell) ? cell.some(c => 'id' in c && c.id === id) : 'id' in cell && cell.id === id) &&
             (type === !("labels" in cellToCheck))
           ) {
             return [
               k,
-              { ...cell, properties: { ...(Array.isArray(cell) ? cell.find(c => c.id === id) : cell)?.properties, [key]: val } },
+              { ...cell, properties: { ...((Array.isArray(cell) ? cell.find(c => 'id' in c && c.id === id) : cell) as NodeCell | LinkCell | undefined)?.properties, [key]: val } },
             ];
           }
           return [k, cell];

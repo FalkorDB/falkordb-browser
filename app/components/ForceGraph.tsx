@@ -189,7 +189,7 @@ export default function ForceGraph({
         canvas.centerAt(cx, cy, 300);
     }, [dimmed, canvasRef]);
 
-    const handleNodeClick = useCallback((node: GraphNode, _event: MouseEvent) => {
+    const handleNodeClick = useCallback(async (node: GraphNode, _event: MouseEvent) => {
         const fullNode = graph.NodesMap.get(node.id);
         if (!fullNode) return;
 
@@ -202,7 +202,11 @@ export default function ForceGraph({
         if (isDoubleClick) {
             fullNode.expand = !fullNode.expand;
             if (fullNode.expand) {
-                onFetchNode(fullNode, node);
+                await onFetchNode(fullNode, node);
+                // Guard: if the node was collapsed while fetching, undo the expansion.
+                if (!fullNode.expand) {
+                    deleteNeighbors([fullNode]);
+                }
             } else {
                 deleteNeighbors([fullNode]);
             }
@@ -405,14 +409,41 @@ export default function ForceGraph({
 
         if (!canvas || !canvasLoaded) return;
 
+        let nodeCount: number;
         if (graphData) {
+            nodeCount = graphData.nodes.length;
             canvas.setData(graphData);
             setGraphData(undefined);
         } else {
             const canvasData = convertToCanvasData(data);
-
+            nodeCount = canvasData.nodes.length;
             canvas.setData(canvasData);
         }
+
+        // With the npm @falkordb/canvas package the canvas's zoomToFit fires asynchronously
+        // via a requestAnimationFrame, so the min-zoom enforcement inside the canvas runs
+        // before the new zoom is committed. For very sparse graphs (1–3 nodes) the force
+        // simulation can push nodes far apart, producing a near-zero zoom that makes them
+        // invisible. We use a 400 ms delay (longer than the canvas's internal ~50 ms delay)
+        // so the canvas has finished its own zoomToFit before we check and correct.
+        //
+        // Stale-timer safety: React calls each effect's cleanup before the next run, so
+        // `clearTimeout(handle)` below always cancels the previous timer before a new one
+        // is scheduled. This means the correction only fires if the data has been stable
+        // for 400 ms, and rapid successive updates never accumulate stale callbacks.
+        if (nodeCount > 0 && nodeCount <= 3) {
+            const handle = setTimeout(() => {
+                const c = canvasRef.current;
+                if (!c) return;
+                const vp = c.getViewport();
+                if (vp && vp.zoom < 1.0) {
+                    c.zoom(1.0);
+                }
+            }, 400);
+            return () => clearTimeout(handle);
+        }
+
+        return undefined;
 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [canvasRef, data, setGraphData, canvasLoaded]);
