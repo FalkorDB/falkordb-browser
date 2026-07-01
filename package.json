@@ -84,7 +84,7 @@
     "swagger-ui-react": "^5.32.8",
     "swr": "^2.4.2",
     "tailwind-merge": "^3.6.0",
-    "tailwindcss": "^4.3.1",
+    "tailwindcss": "^4.3.2",
     "uuid": "^14.0.1",
     "vaul": "^1.1.2",
     "yaml": "^2.9.0",
@@ -92,7 +92,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
-    "@tailwindcss/postcss": "^4.3.1",
+    "@tailwindcss/postcss": "^4.3.2",
     "@types/cytoscape-fcose": "^2.2.4",
     "@types/lodash": "^4.17.24",
     "@types/markdown-it": "^14.1.2",
