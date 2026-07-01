@@ -282,6 +282,16 @@ function cellContainsElementId(cell: DataCell, elementId: number): boolean {
   return "id" in cell && (cell as NodeCell | LinkCell).id === elementId;
 }
 
+/** Type guard: a NodeCell always carries a `labels` array. */
+function isNodeCell(cell: NodeCell | LinkCell): cell is NodeCell {
+  return "labels" in cell;
+}
+
+/** Type guard: a LinkCell carries `relationshipType` but no `labels`. */
+function isLinkCell(cell: NodeCell | LinkCell): cell is LinkCell {
+  return !("labels" in cell);
+}
+
 export class Graph {
   private id: string;
 
@@ -1224,7 +1234,7 @@ export class Graph {
           cellToCheck &&
           typeof cellToCheck === "object" &&
           cellContainsElementId(cell, id) &&
-          (type === !("labels" in cellToCheck))
+          (type ? isNodeCell(cellToCheck as NodeCell | LinkCell) : isLinkCell(cellToCheck as NodeCell | LinkCell))
         ) {
           if (Array.isArray(cell)) {
             cell.forEach(c => 'id' in c && c.id === id && delete (c as NodeCell | LinkCell).properties[key]);
@@ -1262,7 +1272,7 @@ export class Graph {
           // collides with an edge id (or vice versa) in the same row is not updated.
           if (Array.isArray(cell)) {
             const matchFn = (c: NodeCell | LinkCell) =>
-              'id' in c && c.id === id && (type === !("labels" in c));
+              c.id === id && (type ? isNodeCell(c) : isLinkCell(c));
             if (!cell.some(c => 'id' in c && matchFn(c as NodeCell | LinkCell))) return [k, cell];
             return [k, cell.map(c => 'id' in c && matchFn(c as NodeCell | LinkCell)
               ? { ...c, properties: { ...(c as NodeCell | LinkCell).properties, [key]: val } }
@@ -1274,7 +1284,7 @@ export class Graph {
           if (
             typeof cellToCheck === "object" &&
             'id' in cell && (cell as NodeCell | LinkCell).id === id &&
-            (type === !("labels" in cellToCheck))
+            (type ? isNodeCell(cell as NodeCell | LinkCell) : isLinkCell(cell as NodeCell | LinkCell))
           ) {
             return [k, { ...(cell as NodeCell | LinkCell), properties: { ...(cell as NodeCell | LinkCell).properties, [key]: val } }];
           }
