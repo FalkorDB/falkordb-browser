@@ -934,7 +934,11 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             }
 
             // Default (non-dot, non-CALL) case.
-            return getAllSuggestions(fullSug);
+            // Strip the placeholder (1,1)-(1,1) range from every item so that
+            // EditorComponent's word-based fallback range is used instead.
+            // The CALL and dot branches above already carry position-correct ranges
+            // and are unaffected.
+            return (await getAllSuggestions(fullSug)).map(({ range: _r, ...rest }) => rest);
         },
         // updateTokenizer intentionally excluded: getSuggestions no longer calls it.
     }), [getFullSuggestions, getAllSuggestions]);
