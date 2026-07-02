@@ -70,16 +70,6 @@ function GraphView({
         return true;
     }, [graph, historyQuery.currentQuery]);
 
-    useEffect(() => {
-        // During tutorial, track setups control the active tab directly
-        if (tutorialOpen) return;
-
-        let defaultChecked: Tab = "Graph";
-        if (elementsLength === 0 && graph.Data.length !== 0) defaultChecked = "Table";
-
-        setCurrentTab(defaultChecked);
-    }, [graph, graph.getElements().length, graph.Data.length, setCurrentTab, tutorialOpen]);
-
     const onLabelClick = (label: Label) => {
         const canvas = canvasRef.current;
 

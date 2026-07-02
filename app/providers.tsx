@@ -715,6 +715,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setGraph(g);
       setData({ ...g.Elements });
       fetchCount(n);
+      if (!tutorialOpen) {
+        setCurrentTab(g.getElements().length === 0 && g.Data.length !== 0 ? "Table" : "Graph");
+      }
       setLastLimit(limit);
 
       if (!tutorialOpen && prefixReady) {

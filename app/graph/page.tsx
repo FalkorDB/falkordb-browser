@@ -240,6 +240,11 @@ export default function Page() {
                 initialUrlQueryRef.current = "";
                 urlQueryFiredRef.current = graphName;
                 runQuery(pendingUrlQuery, graphName);
+            } else {
+                // Data is already loaded for this graph (e.g. navigating back from
+                // another route while providers stay mounted). Clear the pending ref
+                // so it doesn't re-fire on later dep changes.
+                initialUrlQueryRef.current = "";
             }
             return;
         }
