@@ -9,7 +9,6 @@ import { IndicatorContext } from "../provider";
 
 interface Props {
   rows: Row[]
-  handleSetRows: (rows: string[]) => void
   setOpenMenage: (openMenage: boolean) => void
   selectedValue: string
   setGraphName: (graphName: string) => void
@@ -20,7 +19,6 @@ interface Props {
 
 export default function DeleteGraph({
   rows,
-  handleSetRows,
   setOpenMenage,
   selectedValue,
   setGraphName,
@@ -73,10 +71,14 @@ export default function DeleteGraph({
         setGraph(Graph.empty());
       }
 
-      handleSetRows(successDeletedGraphs);
+      // Rows update is handled automatically by useEffect([options, handleSetRows])
+      // in selectGraph.tsx when graphNames changes — no manual call needed here.
+
       toast({
         title: "Graph(s) deleted successfully",
-        description: successDeletedGraphs.length > 0 && `The graph(s) ${successDeletedGraphs.join(", ")} have been deleted successfully${failedDeletedGraphs.length > 0 && `The graph(s) ${failedDeletedGraphs.join(", ")} have not been deleted`}`,
+        description: successDeletedGraphs.length > 0
+          ? `The graph(s) ${successDeletedGraphs.join(", ")} have been deleted successfully.${failedDeletedGraphs.length > 0 ? ` The graph(s) ${failedDeletedGraphs.join(", ")} could not be deleted.` : ""}`
+          : undefined,
       });
     } finally {
       setIsLoading(false);
