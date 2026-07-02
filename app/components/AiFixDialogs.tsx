@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { Check, Copy, Sparkles, X } from "lucide-react";
 import { AiFixContext } from "./provider";
 import DialogComponent from "./DialogComponent";
@@ -12,6 +12,7 @@ export default function AiFixDialogs() {
     const { result, pendingConsentProvider, confirmConsent, cancelConsent, dismissResult, insertCorrectedQuery } = useContext(AiFixContext);
     const [dontAskAgain, setDontAskAgain] = useState(false);
     const [copied, setCopied] = useState(false);
+    const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const { size: panelSize, onResize: onPanelResize } = useResizableSize("ai-fix-panel-size", 480, 400, 300, 250);
 
     const handleCopy = async (text: string) => {
@@ -20,7 +21,10 @@ export default function AiFixDialogs() {
         try {
             await writer(text);
             setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+            // Cancel any in-flight reset timer (e.g. rapid double-click) before
+            // scheduling a new one so the icon never flips back prematurely.
+            if (copyTimeoutRef.current !== null) clearTimeout(copyTimeoutRef.current);
+            copyTimeoutRef.current = setTimeout(() => { setCopied(false); copyTimeoutRef.current = null; }, 2000);
         } catch {
             setCopied(false);
         }

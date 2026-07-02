@@ -52,6 +52,11 @@ export default function ForceGraph({
     const { background, foreground } = getTheme(theme);
 
     const lastClick = useRef<{ date: number, id: number }>({ date: 0, id: -1 });
+    // When non-null, holds the `data` snapshot at the moment a graphData restore
+    // was consumed. The immediately-following setGraphData(undefined) re-run is
+    // skipped only when data still matches — if React batches a real data refresh
+    // into the same render, the references differ and the canvas gets updated.
+    const pendingRestoreDataRef = useRef<typeof data | null>(null);
 
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>();
     const [canvasLoaded, setCanvasLoaded] = useState(false);
@@ -409,17 +414,55 @@ export default function ForceGraph({
 
         if (!canvas || !canvasLoaded) return;
 
+        let nodeCount: number;
         if (graphData) {
+            // Restore a saved canvas layout. Store the current data snapshot so
+            // the cleanup re-run can verify data hasn't changed before skipping.
+            pendingRestoreDataRef.current = data;
             canvas.setData(graphData);
             setGraphData(undefined);
-        } else {
-            const canvasData = convertToCanvasData(data);
-
-            canvas.setData(canvasData);
+            return undefined; // zoom correction not needed for a restored viewport
         }
 
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [canvasRef, data, setGraphData, canvasLoaded]);
+        // Skip only when this re-run was triggered by setGraphData(undefined)
+        // AND data hasn't changed since the restore was consumed. A different
+        // data reference means a real query result arrived in the same batch —
+        // in that case fall through so the canvas gets the fresh data.
+        if (pendingRestoreDataRef.current !== null && pendingRestoreDataRef.current === data) {
+            pendingRestoreDataRef.current = null;
+            return undefined;
+        }
+        pendingRestoreDataRef.current = null;
+
+        const canvasData = convertToCanvasData(data);
+        nodeCount = canvasData.nodes.length;
+        canvas.setData(canvasData);
+
+        // With the npm @falkordb/canvas package the canvas's zoomToFit fires asynchronously
+        // via a requestAnimationFrame, so the min-zoom enforcement inside the canvas runs
+        // before the new zoom is committed. For very sparse graphs (1–3 nodes) the force
+        // simulation can push nodes far apart, producing a near-zero zoom that makes them
+        // invisible. We use a 400 ms delay (longer than the canvas's internal ~50 ms delay)
+        // so the canvas has finished its own zoomToFit before we check and correct.
+        //
+        // Stale-timer safety: React calls each effect's cleanup before the next run, so
+        // `clearTimeout(handle)` below always cancels the previous timer before a new one
+        // is scheduled. This means the correction only fires if the data has been stable
+        // for 400 ms, and rapid successive updates never accumulate stale callbacks.
+        if (nodeCount > 0 && nodeCount <= 3) {
+            const handle = setTimeout(() => {
+                const c = canvasRef.current;
+                if (!c) return;
+                const vp = c.getViewport();
+                if (vp && vp.zoom < 1.0) {
+                    c.zoom(1.0);
+                }
+            }, 400);
+            return () => clearTimeout(handle);
+        }
+
+        return undefined;
+    }, [canvasRef, data, graphData, setGraphData, canvasLoaded]);
 
     return (
         <div

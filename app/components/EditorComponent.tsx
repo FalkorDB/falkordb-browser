@@ -132,13 +132,19 @@ export interface LanguageConfig {
      * Async function that returns completion suggestions. 
      * Called once on mount and whenever the completion provider triggers.
      * The `range` property is optional since EditorComponent always overwrites it.
+     * May return a plain array OR a `{ suggestions, incomplete? }` object.
+     * `incomplete: true` tells Monaco to re-invoke the provider on every keystroke
+     * instead of caching and re-filtering the existing list client-side.
      */
     getSuggestions?: (
         monacoInstance: Monaco,
         context?: monaco.languages.CompletionContext,
         model?: monaco.editor.ITextModel,
         position?: monaco.Position
-    ) => Promise<(Omit<monaco.languages.CompletionItem, 'range'> & { range?: monaco.languages.CompletionItem['range'] })[]>;
+    ) => Promise<
+        | (Omit<monaco.languages.CompletionItem, 'range'> & { range?: monaco.languages.CompletionItem['range'] })[]
+        | { suggestions: (Omit<monaco.languages.CompletionItem, 'range'> & { range?: monaco.languages.CompletionItem['range'] })[]; incomplete?: boolean }
+    >;
     /** Characters that trigger the completion provider in addition to typing identifier characters. */
     triggerCharacters?: string[];
 }
@@ -255,8 +261,13 @@ export default function EditorComponent({
                                 if (!currentConfig?.getSuggestions) return { suggestions: [] };
                                 const word = model.getWordUntilPosition(position);
                                 const range = new monacoInstance.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
-                                const suggestions = await currentConfig.getSuggestions(monacoInstance, context, model, position);
-                                return { suggestions: suggestions.map(s => ({ ...s, range })) };
+                                const result = await currentConfig.getSuggestions(monacoInstance, context, model, position);
+                                const items = Array.isArray(result) ? result : result.suggestions;
+                                const incomplete = Array.isArray(result) ? undefined : result.incomplete;
+                                // Spread `range` first so that a provider-set `s.range`
+                                // (e.g. a dotted-path replacement range) takes precedence
+                                // over the word-based fallback range computed above.
+                                return { suggestions: items.map(s => ({ range, ...s })), incomplete };
                             }) as monaco.languages.CompletionItemProvider['provideCompletionItems'],
                         });
                         completionProviderRegistry.set(language, { configRef: sharedConfigRef, disposable, count: 1 });
