@@ -62,6 +62,10 @@ It allows a developer to interact with graphs loaded to FaklorDB, explore how sp
   - Download a `.dump` file via the Browser (`/api/graph/:graph/export`).
 - **Upload data**
   - “Upload Data” dialog supports drag-and-drop file selection (Dropzone UI).
+  - Supports three ingestion modes:
+    - restore graph from `.rdb` / `.dump` (replace contents),
+    - process `.csv` rows with a user-provided Cypher query,
+    - execute Cypher batch files (`.txt` / `.cql` / `.cypher`) statement-by-statement.
 
 ### Graph Info panel
 - **Memory Usage tracking** Exposes current memory utilization of the graph in MB.
@@ -135,4 +139,3 @@ If enabled, the Browser includes a **Chat panel** that streams responses from a 
 1. Open graph management.
 2. Select a graph.
 3. Click **Export Data** to download a `.dump`.
-

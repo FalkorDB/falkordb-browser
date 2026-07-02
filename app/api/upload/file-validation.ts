@@ -66,6 +66,10 @@ async function hasPdfSignature(file: File) {
   return matchesAscii(await readFilePrefix(file, 5), "%PDF-");
 }
 
+async function isNonEmptyBinaryFile(file: File) {
+  return file.size > 0;
+}
+
 async function isUtf8TextFile(file: File) {
   const bytes = new Uint8Array(await file.arrayBuffer());
 
@@ -122,6 +126,26 @@ export const ALLOWED_FILE_TYPES: Record<string, AllowedFileType> = {
     mimeTypes: ["text/csv", "application/csv", "text/plain"],
     contentType: "text/csv",
     validateContent: isUtf8TextFile,
+  },
+  ".cql": {
+    mimeTypes: ["text/plain", "application/octet-stream"],
+    contentType: "text/plain",
+    validateContent: isUtf8TextFile,
+  },
+  ".cypher": {
+    mimeTypes: ["text/plain", "application/octet-stream"],
+    contentType: "text/plain",
+    validateContent: isUtf8TextFile,
+  },
+  ".dump": {
+    mimeTypes: ["application/octet-stream"],
+    contentType: "application/octet-stream",
+    validateContent: isNonEmptyBinaryFile,
+  },
+  ".rdb": {
+    mimeTypes: ["application/octet-stream"],
+    contentType: "application/octet-stream",
+    validateContent: isNonEmptyBinaryFile,
   },
 };
 
