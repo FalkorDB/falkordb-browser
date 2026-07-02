@@ -40,3 +40,41 @@ test("splitCypherStatements ignores empty statements", () => {
 
   assert.deepEqual(statements, ["CREATE (:A)", "MATCH (n) RETURN n"]);
 });
+
+test("splitCypherStatements returns a single statement when there is no trailing semicolon", () => {
+  const statements = splitCypherStatements("MATCH (n) RETURN n");
+
+  assert.deepEqual(statements, ["MATCH (n) RETURN n"]);
+});
+
+test("splitCypherStatements returns empty array for blank input", () => {
+  assert.deepEqual(splitCypherStatements(""), []);
+  assert.deepEqual(splitCypherStatements("   \n  "), []);
+});
+
+test("splitCypherStatements ignores semicolons inside backtick-quoted identifiers", () => {
+  const statements = splitCypherStatements("MATCH (n:`weird;label`) RETURN n;");
+
+  assert.deepEqual(statements, ["MATCH (n:`weird;label`) RETURN n"]);
+});
+
+test("parseCsvRows returns empty array for empty input", () => {
+  assert.deepEqual(parseCsvRows(""), []);
+});
+
+test("parseCsvRows returns empty array for whitespace-only input", () => {
+  assert.deepEqual(parseCsvRows("\n\n"), []);
+});
+
+test("parseCsvRows returns empty array when there are only headers and no data rows", () => {
+  assert.deepEqual(parseCsvRows("name,age"), []);
+});
+
+test("parseCsvRows handles CRLF line endings", () => {
+  const rows = parseCsvRows("name,age\r\nAlice,30\r\nBob,41");
+
+  assert.deepEqual(rows, [
+    { name: "Alice", age: "30" },
+    { name: "Bob", age: "41" },
+  ]);
+});

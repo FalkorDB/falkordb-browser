@@ -60,6 +60,32 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("exportGraphCancel");
   }
 
+  // UPLOAD
+  public get uploadBtn(): Locator {
+    return this.page.getByTestId("uploadGraph");
+  }
+
+  public get uploadConfirm(): Locator {
+    return this.page.getByTestId("uploadGraphConfirm");
+  }
+
+  public get uploadCancel(): Locator {
+    return this.page.getByTestId("uploadGraphCancel");
+  }
+
+  public get uploadFileInput(): Locator {
+    return this.page.locator('input[type="file"]');
+  }
+
+  public get uploadCsvQueryTextarea(): Locator {
+    return this.page.locator('textarea[placeholder*="UNWIND"]');
+  }
+
+  public uploadTabTrigger(mode: "rdb" | "csv" | "cypher"): Locator {
+    const labels: Record<string, string> = { rdb: "RDB / dump", csv: "CSV + query", cypher: "Cypher batch" };
+    return this.page.getByRole("tab", { name: labels[mode] });
+  }
+
   // RELOAD
   public get reloadList(): Locator {
     return this.page.getByTestId("reloadGraphsList");
@@ -1298,6 +1324,74 @@ export default class GraphPage extends BasePage {
       this.clickExportConfirm(),
     ]);
     return download;
+  }
+
+  /** Open the Upload Data dialog for the given graph (already in Manage panel). */
+  async openUploadDialog(graphName: string): Promise<void> {
+    await this.clickSelect();
+    await this.clickManage();
+    await this.clickTableCheckboxByName(graphName);
+    await interactWhenVisible(
+      this.uploadBtn,
+      (el) => el.click(),
+      "Upload Graph Button"
+    );
+    await waitForElementToBeVisible(this.uploadConfirm);
+  }
+
+  /** Switch to the given upload tab (rdb / csv / cypher). */
+  async selectUploadTab(mode: "rdb" | "csv" | "cypher"): Promise<void> {
+    await interactWhenVisible(
+      this.uploadTabTrigger(mode),
+      (el) => el.click(),
+      `Upload Tab ${mode}`
+    );
+  }
+
+  /** Attach a file to the Dropzone file input. */
+  async setUploadFile(absoluteFilePath: string): Promise<void> {
+    await this.uploadFileInput.setInputFiles(absoluteFilePath);
+  }
+
+  /** Fill the CSV query textarea. */
+  async setUploadCsvQuery(query: string): Promise<void> {
+    await interactWhenVisible(
+      this.uploadCsvQueryTextarea,
+      (el) => el.fill(query),
+      "Upload CSV Query"
+    );
+  }
+
+  /** Submit the upload form and wait for the dialog to close. */
+  async clickUploadConfirm(): Promise<void> {
+    await interactWhenVisible(
+      this.uploadConfirm,
+      (el) => el.click(),
+      "Upload Confirm"
+    );
+    await waitForElementToNotBeVisible(this.uploadConfirm);
+  }
+
+  /**
+   * Full upload flow: open Manage, select graph, open dialog, switch tab,
+   * attach file (+ optional CSV query), submit and wait for success toast.
+   */
+  async uploadGraphData(
+    graphName: string,
+    mode: "rdb" | "csv" | "cypher",
+    absoluteFilePath: string,
+    csvQuery?: string
+  ): Promise<void> {
+    await this.openUploadDialog(graphName);
+    if (mode !== "rdb") {
+      await this.selectUploadTab(mode);
+    }
+    await this.setUploadFile(absoluteFilePath);
+    if (mode === "csv" && csvQuery) {
+      await this.setUploadCsvQuery(csvQuery);
+    }
+    await this.clickUploadConfirm();
+    await waitForElementToBeVisible(this.toast);
   }
 
   async isModifyGraphNameButtonVisible(graphName: string): Promise<boolean> {
