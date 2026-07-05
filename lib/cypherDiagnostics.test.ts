@@ -69,6 +69,11 @@ describe("computeEditorDiagnostics — syntax errors", () => {
     const d = computeEditorDiagnostics("MATCH (n) LIM 100", syntaxError(14)).diagnostics[0];
     assert.deepEqual([d.startColumn, d.endColumn], [11, 14]); // "LIM"
   });
+  it("highlights the word before multiple consecutive spaces at the error position", () => {
+    // 'MATCH' occupies cols 1-5; col 7 = second consecutive space → walks back through spaces to 'MATCH'
+    const d = computeEditorDiagnostics("MATCH  (n)", syntaxError(7)).diagnostics[0];
+    assert.deepEqual([d.startColumn, d.endColumn], [1, 6]); // "MATCH"
+  });
   it("falls back to a single-character range when the space is not preceded by a word", () => {
     // column 2 = space after '(' — non-word predecessor → single-char fallback
     const d = computeEditorDiagnostics("( n)", syntaxError(2)).diagnostics[0];
