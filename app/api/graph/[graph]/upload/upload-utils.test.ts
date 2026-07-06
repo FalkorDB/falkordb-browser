@@ -570,3 +570,20 @@ test("splitCypherStatements treats a backslash outside quotes as a literal char"
     ["CREATE (n)\\", "MATCH (n) RETURN n"]
   );
 });
+
+test("parseCsvRows stores a __proto__ header as an own property (no prototype pollution)", () => {
+  const rows = parseCsvRows("__proto__,name\nx,Alice");
+  assert.equal(rows.length, 1);
+  assert.ok(Object.prototype.hasOwnProperty.call(rows[0], "__proto__"));
+  assert.equal(rows[0]["__proto__"], "x");
+  assert.equal(rows[0].name, "Alice");
+  assert.equal(Object.getPrototypeOf(rows[0]), Object.prototype);
+});
+
+test("coerceRow stores a __proto__ column as an own property", () => {
+  const [row] = parseCsvRows("__proto__,age\n5,30");
+  const coerced = coerceRow(row, { age: "integer" });
+  assert.ok(Object.prototype.hasOwnProperty.call(coerced, "__proto__"));
+  assert.equal(coerced["__proto__"], "5");
+  assert.equal(coerced.age, 30);
+});

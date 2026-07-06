@@ -129,7 +129,14 @@ export function parseCsvRows(csvText: string): Record<string, string>[] {
   return dataRows.map((dataRow) => {
     const record: Record<string, string> = {};
     headers.forEach((header, index) => {
-      record[header] = dataRow[index] ?? "";
+      // defineProperty (not record[header]=…) so a header like "__proto__"
+      // becomes an own enumerable property instead of hitting the prototype setter.
+      Object.defineProperty(record, header, {
+        value: dataRow[index] ?? "",
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
     });
     return record;
   });
@@ -306,7 +313,13 @@ export function coerceRow(
   const result: Record<string, CsvParamValue> = {};
   for (const [key, raw] of Object.entries(row)) {
     try {
-      result[key] = coerceValue(raw, columnTypes[key] ?? "string");
+      // defineProperty guards against special keys like "__proto__".
+      Object.defineProperty(result, key, {
+        value: coerceValue(raw, columnTypes[key] ?? "string"),
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
     } catch (error) {
       throw new Error(`Column "${key}": ${(error as Error).message}`);
     }
