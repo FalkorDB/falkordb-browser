@@ -395,6 +395,32 @@ test("executeCsvIngestion annotates failures with the failing chunk's row range"
   );
 });
 
+test("executeCsvIngestion rejects CSV headers that are not valid identifiers", async () => {
+  const { graph, querySpy } = makeGraph();
+
+  await assert.rejects(
+    () => executeCsvIngestion(graph, "first name\nAlice", "CREATE (:P {n: row.name})"),
+    /CSV column "first name" is not a valid identifier/
+  );
+  assert.equal(querySpy.mock.callCount(), 0);
+});
+
+test("executeCsvIngestion annotates transformRow errors with the row number", async () => {
+  const { graph, querySpy } = makeGraph();
+
+  await assert.rejects(
+    () =>
+      executeCsvIngestion(graph, "n\nA\nB", "CREATE (:P {n: row.n})", {
+        transformRow: (row) => {
+          if (row.n === "B") throw new Error('Column "n": bad');
+          return row;
+        },
+      }),
+    /Failed to process CSV row 2: Column "n": bad/
+  );
+  assert.equal(querySpy.mock.callCount(), 0);
+});
+
 // ---------------------------------------------------------------------------
 // executeCypherBatch
 // ---------------------------------------------------------------------------

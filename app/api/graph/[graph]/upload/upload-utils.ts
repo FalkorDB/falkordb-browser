@@ -294,6 +294,25 @@ export function chunkCsvItems(
   return chunks;
 }
 
+const CSV_HEADER_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
+ * Reject CSV headers that aren't valid Cypher identifiers. The FalkorDB param
+ * serializer emits map keys verbatim (`{key:value}`), so a header with spaces or
+ * special characters would produce an invalid — and potentially injectable — map
+ * literal when bound as `$rows`.
+ */
+function assertSafeCsvHeaders(rows: Record<string, string>[]): void {
+  if (rows.length === 0) return;
+  for (const key of Object.keys(rows[0])) {
+    if (!CSV_HEADER_IDENTIFIER.test(key)) {
+      throw new Error(
+        `CSV column "${key}" is not a valid identifier; rename it using letters, digits, or underscore.`
+      );
+    }
+  }
+}
+
 /**
  * Parse CSV text and execute the user's row body over the rows in batches, each
  * batch a single `UNWIND $rows` query (atomic per chunk; earlier chunks stay
@@ -323,10 +342,14 @@ export async function executeCsvIngestion(
   }
 
   const rows = parseCsvRows(csvText);
-  const items: CsvRowItem[] = rows.map((row, index) => ({
-    index,
-    data: transformRow ? transformRow(row) : row,
-  }));
+  assertSafeCsvHeaders(rows);
+  const items: CsvRowItem[] = rows.map((row, index) => {
+    try {
+      return { index, data: transformRow ? transformRow(row) : row };
+    } catch (error) {
+      throw new Error(`Failed to process CSV row ${index + 1}: ${(error as Error).message}`);
+    }
+  });
   const chunks = chunkCsvItems(items, chunkSize, maxChunkBytes);
   const query = buildBatchCsvQuery(statement);
 
