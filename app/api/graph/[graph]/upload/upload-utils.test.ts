@@ -363,6 +363,27 @@ test("executeCsvIngestion rejects a multi-statement body before running anything
   assert.equal(querySpy.mock.callCount(), 0);
 });
 
+test("executeCsvIngestion uses the normalized statement (drops a trailing comment/semicolon)", async () => {
+  const { graph, querySpy } = makeGraph();
+
+  await executeCsvIngestion(graph, "n\n1", "CREATE (:A {n: row.n}); // trailing");
+
+  assert.match(
+    querySpy.mock.calls[0].arguments[0] as string,
+    /AS row\nCREATE \(:A \{n: row\.n\}\)$/
+  );
+});
+
+test("executeCsvIngestion rejects an empty/comment-only body", async () => {
+  const { graph, querySpy } = makeGraph();
+
+  await assert.rejects(
+    () => executeCsvIngestion(graph, "n\n1", "// just a comment"),
+    /CSV query is empty/
+  );
+  assert.equal(querySpy.mock.callCount(), 0);
+});
+
 test("executeCsvIngestion annotates failures with the failing chunk's row range", async () => {
   const { graph } = makeGraph(async () => {
     throw new Error("boom");

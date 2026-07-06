@@ -228,15 +228,23 @@ export function splitCypherStatements(cypherBatch: string): string[] {
 export const DEFAULT_CSV_CHUNK_SIZE = 1000;
 export const DEFAULT_CSV_CHUNK_BYTES = 512 * 1024;
 
+export type CsvParamValue =
+  | null
+  | string
+  | number
+  | boolean
+  | CsvParamValue[]
+  | { [key: string]: CsvParamValue };
+
 export interface CsvRowItem {
   index: number;
-  data: Record<string, unknown>;
+  data: Record<string, CsvParamValue>;
 }
 
 export interface CsvIngestionOptions {
   chunkSize?: number;
   maxChunkBytes?: number;
-  transformRow?: (row: Record<string, string>) => Record<string, unknown>;
+  transformRow?: (row: Record<string, string>) => Record<string, CsvParamValue>;
 }
 
 export interface CsvIngestionResult {
@@ -305,8 +313,13 @@ export async function executeCsvIngestion(
     transformRow,
   } = options;
 
-  if (splitCypherStatements(body).length > 1) {
+  const statements = splitCypherStatements(body);
+  if (statements.length > 1) {
     throw new Error("The CSV query must be a single Cypher statement.");
+  }
+  const [statement] = statements;
+  if (!statement) {
+    throw new Error("The CSV query is empty.");
   }
 
   const rows = parseCsvRows(csvText);
@@ -315,7 +328,7 @@ export async function executeCsvIngestion(
     data: transformRow ? transformRow(row) : row,
   }));
   const chunks = chunkCsvItems(items, chunkSize, maxChunkBytes);
-  const query = buildBatchCsvQuery(body);
+  const query = buildBatchCsvQuery(statement);
 
   for (let c = 0; c < chunks.length; c += 1) {
     const chunk = chunks[c];
