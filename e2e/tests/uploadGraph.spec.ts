@@ -1,6 +1,7 @@
 /* eslint-disable no-await-in-loop */
 import { expect, test } from "@playwright/test";
 import path from "path";
+import os from "os";
 import fs from "fs";
 import { getRandomString } from "../infra/utils";
 import BrowserWrapper from "../infra/ui/browserWrapper";
@@ -172,11 +173,12 @@ test.describe("Upload Graph – Dump restore", () => {
       "UNWIND range(1, 5) AS i CREATE (:Item {id: i})"
     );
 
-    // Export → download the .dump file
+    // Export → save the download with its suggested ".dump" filename so the
+    // upload endpoint (which derives the extension from file.name) accepts it.
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
     const download = await graph.exportGraphByName(sourceGraph);
-    const dumpPath = await download.path();
-    if (!dumpPath) throw new Error("Expected a download path for the exported dump");
+    const dumpPath = path.join(os.tmpdir(), `${getRandomString("dump")}-${download.suggestedFilename()}`);
+    await download.saveAs(dumpPath);
     expect(fs.existsSync(dumpPath)).toBe(true);
 
     // Create an empty destination graph
@@ -200,5 +202,6 @@ test.describe("Upload Graph – Dump restore", () => {
 
     await apiCall.removeGraph(sourceGraph);
     await apiCall.removeGraph(destGraph);
+    fs.rmSync(dumpPath, { force: true });
   });
 });
