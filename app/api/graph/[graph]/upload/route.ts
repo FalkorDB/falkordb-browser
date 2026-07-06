@@ -35,13 +35,6 @@ export async function POST(
       return session;
     }
 
-    if (resolveReadOnly(request, session.user.role)) {
-      return NextResponse.json(
-        { message: "You do not have permission to modify this graph." },
-        { status: 403, headers: getCorsHeaders(request) }
-      );
-    }
-
     const { graph: graphId } = await params;
 
     let body: UploadBody;
@@ -73,7 +66,16 @@ export async function POST(
       );
     }
 
+    // Resolve the file before the read-only check so the finally block cleans up
+    // the already-uploaded temp file even when a read-only user is rejected.
     filePathToDelete = storedUpload.filePath;
+
+    if (resolveReadOnly(request, session.user.role)) {
+      return NextResponse.json(
+        { message: "You do not have permission to modify this graph." },
+        { status: 403, headers: getCorsHeaders(request) }
+      );
+    }
 
     const validation = validateUploadInput({
       mode,

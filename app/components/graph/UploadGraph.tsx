@@ -185,7 +185,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
             className="max-h-[90dvh] max-w-[60dvw]"
         >
             <form onSubmit={onUploadData} className="grow p-2 flex flex-col gap-4 overflow-hidden">
-                <Tabs value={mode} onValueChange={(value) => { setMode(value as UploadMode); setFiles([]); }} className="w-full">
+                <Tabs value={mode} onValueChange={(value) => { setMode(value as UploadMode); setFiles([]); setCsvQuery(""); setNodeLabel("Row"); }} className="w-full">
                     <TabsList className="h-fit bg-background gap-1">
                         <TabsTrigger value="dump">Dump restore</TabsTrigger>
                         <TabsTrigger value="csv">CSV + query</TabsTrigger>
