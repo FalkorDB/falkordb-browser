@@ -2,7 +2,7 @@ import type { Graph } from "falkordb";
 
 export type UploadMode = "rdb" | "csv" | "cypher";
 
-export const RDB_UPLOAD_EXTENSIONS: readonly string[] = [".rdb", ".dump"];
+export const RESTORE_UPLOAD_EXTENSIONS: readonly string[] = [".dump"];
 export const CSV_UPLOAD_EXTENSIONS: readonly string[] = [".csv"];
 export const CYPHER_UPLOAD_EXTENSIONS: readonly string[] = [".txt", ".cypher", ".cql"];
 
@@ -36,8 +36,8 @@ export function validateUploadInput({
   }
 
   if (mode === "rdb") {
-    if (!hasExtension(RDB_UPLOAD_EXTENSIONS, extension)) {
-      return { ok: false, status: 400, message: "RDB upload requires a .rdb or .dump file." };
+    if (!hasExtension(RESTORE_UPLOAD_EXTENSIONS, extension)) {
+      return { ok: false, status: 400, message: "Restore requires a .dump file." };
     }
     return { ok: true, mode };
   }

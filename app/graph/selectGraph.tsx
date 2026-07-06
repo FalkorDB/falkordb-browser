@@ -335,7 +335,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                              
                                         />
                                         <UploadGraph
-                                            graphName={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)[0]}
+                                            graphName={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)[0] ?? ""}
                                             disabled={rows.filter(opt => opt.checked).length !== 1}
                                         />
                                         <DuplicateGraph

@@ -171,19 +171,24 @@ test("validateUploadInput requires mode and fileId", () => {
   }
 });
 
-test("validateUploadInput accepts rdb with a .rdb or .dump file", () => {
-  for (const extension of [".rdb", ".dump"]) {
-    const result = validateUploadInput({ mode: "rdb", fileId: "x", extension });
-    if (!result.ok) assert.fail(`expected rdb ${extension} to be valid`);
-    assert.equal(result.mode, "rdb");
-  }
+test("validateUploadInput accepts rdb restore with a .dump file", () => {
+  const result = validateUploadInput({ mode: "rdb", fileId: "x", extension: ".dump" });
+  if (!result.ok) assert.fail("expected .dump restore to be valid");
+  assert.equal(result.mode, "rdb");
 });
 
-test("validateUploadInput rejects rdb with an unsupported extension", () => {
+test("validateUploadInput rejects rdb restore with a .rdb file", () => {
+  const result = validateUploadInput({ mode: "rdb", fileId: "x", extension: ".rdb" });
+  if (result.ok) assert.fail("expected .rdb to be rejected (RESTORE needs a DUMP payload)");
+  assert.equal(result.status, 400);
+  assert.match(result.message, /Restore requires a \.dump file/);
+});
+
+test("validateUploadInput rejects rdb restore with an unsupported extension", () => {
   const result = validateUploadInput({ mode: "rdb", fileId: "x", extension: ".csv" });
   if (result.ok) assert.fail("expected validation failure");
   assert.equal(result.status, 400);
-  assert.match(result.message, /RDB upload requires a \.rdb or \.dump file/);
+  assert.match(result.message, /Restore requires a \.dump file/);
 });
 
 test("validateUploadInput accepts csv with a .csv file and a query", () => {

@@ -142,13 +142,13 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
             <form onSubmit={onUploadData} className="grow p-2 flex flex-col gap-4 overflow-hidden">
                 <Tabs value={mode} onValueChange={(value) => { setMode(value as UploadMode); setFiles([]); }} className="w-full">
                     <TabsList className="h-fit bg-background gap-1">
-                        <TabsTrigger value="rdb">RDB / dump</TabsTrigger>
+                        <TabsTrigger value="rdb">Dump restore</TabsTrigger>
                         <TabsTrigger value="csv">CSV + query</TabsTrigger>
                         <TabsTrigger value="cypher">Cypher batch</TabsTrigger>
                     </TabsList>
                     <TabsContent value="rdb" className="mt-2">
                         <p className="text-sm text-muted-foreground">
-                            Upload a .rdb or .dump file to replace the selected graph contents.
+                            Upload a .dump file (from Export Data) to replace the selected graph contents.
                         </p>
                     </TabsContent>
                     <TabsContent value="csv" className="mt-2 flex flex-col gap-2">
@@ -176,7 +176,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
                     onFileDrop={setFiles}
                     accept={
                         mode === "rdb"
-                            ? { "application/octet-stream": [".rdb", ".dump"] }
+                            ? { "application/octet-stream": [".dump"] }
                             : mode === "csv"
                                 ? { "text/csv": [".csv"], "application/csv": [".csv"], "text/plain": [".csv"] }
                                 : { "text/plain": [".txt", ".cql", ".cypher"], "application/octet-stream": [".cql", ".cypher"] }
