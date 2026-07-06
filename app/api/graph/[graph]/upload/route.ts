@@ -93,20 +93,32 @@ export async function POST(
 
     const graph = session.client.selectGraph(graphId);
 
-    try {
-      if (validation.mode === "dump") {
-        const buffer = await fs.promises.readFile(storedUpload.filePath);
-        const connection = await session.client.connection;
-        await connection.restore(graphId, 0, buffer, { REPLACE: true });
+    // Read the file outside the per-mode handlers so filesystem errors fall
+    // through to the generic 500 rather than leaking via a 422 message.
+    if (validation.mode === "dump") {
+      const buffer = await fs.promises.readFile(storedUpload.filePath);
+      const connection = await session.client.connection;
 
+      try {
+        await connection.restore(graphId, 0, buffer, { REPLACE: true });
+      } catch (restoreError) {
+        console.error(restoreError);
         return NextResponse.json(
-          { message: "Graph restored successfully." },
-          { status: 200, headers: getCorsHeaders(request) }
+          { message: "Failed to restore the graph dump. Make sure the file is a FalkorDB .dump export." },
+          { status: 422, headers: getCorsHeaders(request) }
         );
       }
 
-      if (validation.mode === "csv") {
-        const csvText = await fs.promises.readFile(storedUpload.filePath, "utf-8");
+      return NextResponse.json(
+        { message: "Graph restored successfully." },
+        { status: 200, headers: getCorsHeaders(request) }
+      );
+    }
+
+    if (validation.mode === "csv") {
+      const csvText = await fs.promises.readFile(storedUpload.filePath, "utf-8");
+
+      try {
         const result = await executeCsvIngestion(graph, csvText, query ?? "", {
           transformRow:
             columnTypes && Object.keys(columnTypes).length > 0
@@ -122,22 +134,28 @@ export async function POST(
           },
           { status: 200, headers: getCorsHeaders(request) }
         );
+      } catch (ingestError) {
+        console.error(ingestError);
+        return NextResponse.json(
+          { message: (ingestError as Error).message || "Failed to process the CSV file." },
+          { status: 422, headers: getCorsHeaders(request) }
+        );
       }
+    }
 
-      const batchText = await fs.promises.readFile(storedUpload.filePath, "utf-8");
+    const batchText = await fs.promises.readFile(storedUpload.filePath, "utf-8");
+
+    try {
       const count = await executeCypherBatch(graph, batchText);
 
       return NextResponse.json(
         { message: `Executed ${count} Cypher statement(s).` },
         { status: 200, headers: getCorsHeaders(request) }
       );
-    } catch (processingError) {
-      console.error(processingError);
+    } catch (batchError) {
+      console.error(batchError);
       return NextResponse.json(
-        {
-          message:
-            (processingError as Error).message || "Failed to process the uploaded file.",
-        },
+        { message: (batchError as Error).message || "Failed to execute the Cypher batch." },
         { status: 422, headers: getCorsHeaders(request) }
       );
     }

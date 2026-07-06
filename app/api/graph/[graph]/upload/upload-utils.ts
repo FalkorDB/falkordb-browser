@@ -118,6 +118,14 @@ export function parseCsvRows(csvText: string): Record<string, string>[] {
     return value.length > 0 ? value : `column${index + 1}`;
   });
 
+  const seenHeaders = new Set<string>();
+  for (const header of headers) {
+    if (seenHeaders.has(header)) {
+      throw new Error(`Duplicate CSV column "${header}"; column names must be unique.`);
+    }
+    seenHeaders.add(header);
+  }
+
   return dataRows.map((dataRow) => {
     const record: Record<string, string> = {};
     headers.forEach((header, index) => {
@@ -166,7 +174,7 @@ export function splitCypherStatements(cypherBatch: string): string[] {
       continue;
     }
 
-    if (char === "\\" && quote !== "`") {
+    if (char === "\\" && (quote === "'" || quote === "\"")) {
       current += char;
       escaped = true;
       continue;

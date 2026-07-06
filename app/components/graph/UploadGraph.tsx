@@ -159,6 +159,12 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
 
             setFiles([]);
             handleOpenChange(false);
+        } catch {
+            toast({
+                title: "Error",
+                description: "Upload failed unexpectedly. Please try again.",
+                variant: "destructive"
+            });
         } finally {
             uploadInFlightRef.current = false;
             setIsLoading(false);

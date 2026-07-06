@@ -559,3 +559,14 @@ test("generateCsvQuery defaults the label and handles no columns", () => {
   assert.equal(generateCsvQuery("", []), "CREATE (:Row)");
   assert.equal(generateCsvQuery("  ", ["a"]), "CREATE (:Row {a: row.a})");
 });
+
+test("parseCsvRows rejects duplicate column headers", () => {
+  assert.throws(() => parseCsvRows("name,name\nA,B"), /Duplicate CSV column "name"/);
+});
+
+test("splitCypherStatements treats a backslash outside quotes as a literal char", () => {
+  assert.deepEqual(
+    splitCypherStatements("CREATE (n)\\;MATCH (n) RETURN n;"),
+    ["CREATE (n)\\", "MATCH (n) RETURN n"]
+  );
+});
