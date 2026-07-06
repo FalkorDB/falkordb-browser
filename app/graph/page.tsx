@@ -91,6 +91,9 @@ export default function Page() {
     const prevGraphNameRef = useRef<string | undefined>(undefined);
 
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
+    // Ref that always mirrors selectedElements so the graph-change restore effect
+    // can read the current full selection without adding it as a dependency.
+    const selectedElementsRef = useRef<(Node | Link)[]>([]);
     const [chatOpen, setChatOpen] = useState(false);
     const { size: chatSize, onResize: onChatResize } = useResizableSize("chat-size", 400, 500, 300, 300);
     const [queriesOpen, setQueriesOpen] = useState(false);
@@ -240,6 +243,11 @@ export default function Page() {
                 initialUrlQueryRef.current = "";
                 urlQueryFiredRef.current = graphName;
                 runQuery(pendingUrlQuery, graphName);
+            } else {
+                // Data is already loaded for this graph (e.g. navigating back from
+                // another route while providers stay mounted). Clear the pending ref
+                // so it doesn't re-fire on later dep changes.
+                initialUrlQueryRef.current = "";
             }
             return;
         }
@@ -294,10 +302,34 @@ export default function Page() {
         }
     }, [setPanel, setChatOpen, setSelectedParam]);
 
+    // Keep selectedElementsRef in sync so the restore effect below can read the
+    // full multi-selection without adding selectedElements as a dependency.
+    useEffect(() => {
+        selectedElementsRef.current = selectedElements;
+    }, [selectedElements]);
+
     // Restore selected element from context when graph data loads, otherwise clear selection
     useEffect(() => {
         if (!graph.Id) return;
         if (graph.NodesMap.size === 0 && graph.LinksMap.size === 0) return;
+
+        // When graph info updates (setGraphInfo creates a new Graph clone that shares
+        // the same NodesMap/LinksMap), preserve the full multi-selection by re-resolving
+        // every previously selected element from the new graph's maps.
+        const prev = selectedElementsRef.current;
+        if (prev.length > 0) {
+            const restored = prev.flatMap(el => {
+                const found = 'source' in el
+                    ? graph.LinksMap.get(el.id)
+                    : graph.NodesMap.get(el.id);
+                return found ? [found] : [];
+            });
+            if (restored.length > 0) {
+                setSelectedElements(restored);
+                setPanel("data");
+                return;
+            }
+        }
 
         if (selectedParam) {
             const parts = selectedParam.split(":");

@@ -49,6 +49,8 @@ export default function Toolbar({
 
 
     const suggestionRef = useRef<HTMLDivElement>(null);
+    const graphRef = useRef(graph);
+    graphRef.current = graph;
 
     const [suggestions, setSuggestions] = useState<(Node | Link)[]>([]);
     const [suggestionIndex, setSuggestionIndex] = useState(0);
@@ -89,7 +91,7 @@ export default function Toolbar({
             return;
         }
 
-        const elements = graph.getElements().filter(el =>
+        const elements = graphRef.current.getElements().filter(el =>
             Object.values(el.data).some(value => value != null && value.toString().toLowerCase().startsWith(searchElement.toLowerCase()))
             || el.id.toString().toLowerCase().includes(searchElement.toLowerCase())
             || ("relationship" in el && (el as Link).relationship.toLowerCase().includes(searchElement.toLowerCase()))
@@ -97,7 +99,7 @@ export default function Toolbar({
         );
 
         setSuggestions(elements);
-    }, [graph, searchElement]);
+    }, [searchElement]);
 
     useEffect(() => {
         const timeout = setTimeout(handleOnChange, 300);
@@ -105,7 +107,7 @@ export default function Toolbar({
         return () => {
             clearTimeout(timeout);
         };
-    }, [graph, handleOnChange, searchElement]);
+    }, [handleOnChange, searchElement]);
 
     const handleSearchElement = (element: Node | Link) => {
         canvasRef.current?.zoomToFit(4, (node) => "labels" in element ? element.id === node.id : node.id === element.source || node.id === element.target);
@@ -283,8 +285,8 @@ export default function Toolbar({
                                                                         <div className="rounded-full h-3 w-3" style={{ backgroundColor: suggestion.color }} />
                                                                     )}
                                                                 </div>
-                                                                <p className="overflow-hidden text-sm">{type ? (suggestion as Link).relationship : (suggestion as Node).labels[0]}</p>
-                                                                <div className={cn("text-center overflow-hidden", actualIndex === suggestionIndex ? "text-accent-foreground" : "text-foreground")}>
+                                                                <p className="truncate text-sm">{type ? (suggestion as Link).relationship : (suggestion as Node).labels[0]}</p>
+                                                                <div className={cn("text-center truncate", actualIndex === suggestionIndex ? "text-accent-foreground" : "text-foreground")}>
                                                                     {type ? suggestion.relationship : getNodeDisplayText(suggestion as Node, captionsKeys, showPropertyKeyPrefix)}
                                                                 </div>
                                                                 <p className="text-xs text-muted-foreground text-right truncate">

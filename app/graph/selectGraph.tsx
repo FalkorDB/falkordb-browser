@@ -322,9 +322,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                     !isReadOnly &&
                                     <>
                                         <DeleteGraph
-                                            
                                             rows={rows.filter(opt => opt.checked)}
-                                            handleSetRows={handleSetRows}
                                             selectedValue={selectedValue}
                                             setGraphName={setSelectedValue}
                                             setGraph={setGraph}

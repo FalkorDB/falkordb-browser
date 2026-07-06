@@ -20,7 +20,7 @@ import type { Data as CanvasData, HierarchyDirection, LayoutMode, RadialDirectio
 import LoginVerification from "./loginVerification";
 import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
-import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
+import { GraphContext, GraphInfoContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
 
@@ -205,13 +205,25 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [selectedParam, setSelectedParam] = useState<string>(urlSelected);
   const [runDefaultQuery, setRunDefaultQuery] = useState(false);
   const [graphNames, setGraphNames] = useState<string[]>([]);
+  // Always-current ref so effects can validate graph names without re-running
+  // on every graphNames mutation (prevents spurious URL→state rollbacks).
+  const graphNamesRef = useRef<string[]>([]);
+  graphNamesRef.current = graphNames;
   const [graphNamesLoaded, setGraphNamesLoaded] = useState(false);
   const [graph, setGraph] = useState<Graph>(Graph.empty());
-  // setGraphInfo updates the GraphInfo inside the graph so there is one source of
-  // truth. Every graphInfo change produces a new Graph object reference, which
-  // triggers React re-renders for all consumers of the graph context.
+  // graphRef always points to the current graph so setGraphInfo can mutate
+  // graph.GraphInfo in-place without triggering a graph state change.
+  const graphRef = useRef<Graph>(graph);
+  graphRef.current = graph;
+  // graphInfo and nodesCount/edgesCount are owned by GraphInfoContext so that
+  // only GraphInfoPanel re-renders on periodic info polls, not the whole tree.
+  const [graphInfo, setGraphInfoState] = useState<GraphInfo>(graph.GraphInfo);
   const setGraphInfo = useCallback((gi: GraphInfo) => {
-    setGraph(prev => { const g = prev.clone(); g.GraphInfo = gi.clone(); return g; });
+    // Mutate graph.GraphInfo in-place — no graph state change, so GraphContext
+    // consumers (canvas, toolbar, …) are not disturbed.
+    graphRef.current.GraphInfo = gi;
+    // Update GraphInfoContext so only its consumers re-render.
+    setGraphInfoState(gi);
   }, []);
   const [data, setData] = useState<GraphData>({ ...graph.Elements });
   const [graphData, setGraphData] = useState<CanvasData>();
@@ -593,9 +605,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     if (!n || status === "unauthenticated") return;
 
-    setEdgesCount(undefined);
-    setNodesCount(undefined);
-
     try {
       const readOnlyParam = isReadOnlyRef.current ? '?readOnly=true' : '';
       const result = await getSSEGraphResult(`api/graph/${prepareArg(n)}/count${readOnlyParam}`, toast, setIndicator) as { nodes?: number; edges?: number };
@@ -715,6 +724,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setGraph(g);
       setData({ ...g.Elements });
       fetchCount(n);
+      if (!tutorialOpen) {
+        setCurrentTab(g.getElements().length === 0 && g.Data.length !== 0 ? "Table" : "Graph");
+      }
       setLastLimit(limit);
 
       if (!tutorialOpen && prefixReady) {
@@ -796,10 +808,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setLabels,
     relationships,
     setRelationships,
-    nodesCount,
-    setNodesCount,
-    edgesCount,
-    setEdgesCount,
     currentTab,
     setCurrentTab,
     runQuery,
@@ -813,7 +821,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     selectedParam,
     setSelectedParam,
     initialQuery: initialQueryRef.current,
-  }), [graph, graphName, handleSetGraphName, graphNames, labels, relationships, nodesCount, edgesCount, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, selectedParam]);
+  }), [graph, graphName, handleSetGraphName, graphNames, labels, relationships, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, selectedParam]);
+
+  const graphInfoContextValue = useMemo(() => ({
+    graphInfo,
+    nodesCount,
+    edgesCount,
+  }), [graphInfo, nodesCount, edgesCount]);
 
   useEffect(() => {
     setRelationships([...graph.Relationships]);
@@ -1256,7 +1270,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (pathname !== "/graph") return;
     if (!graphNamesLoaded) return;
 
-    if (urlGraphName && !graphNames.includes(urlGraphName)) {
+    if (urlGraphName && !graphNamesRef.current.includes(urlGraphName)) {
       // URL graph does not exist in DB — strip all related URL params
       setGraphName("");
       setSelectedParam("");
@@ -1271,7 +1285,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setGraphName(urlGraphName);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlGraphName, graphNamesLoaded, graphNames]);
+  }, [urlGraphName, graphNamesLoaded]);
 
   // One-way sync: context state → URL (only while on /graph)
   const prevPathnameRef = useRef(pathname);
@@ -1503,7 +1517,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       <LoginVerification>
         <BrowserSettingsContext.Provider value={browserSettingsContext}>
           <GraphContext.Provider value={graphContext}>
-            <HistoryQueryContext.Provider value={historyQueryContext}>
+            <GraphInfoContext.Provider value={graphInfoContextValue}>
+              <HistoryQueryContext.Provider value={historyQueryContext}>
               <IndicatorContext.Provider value={indicatorContext}>
                 <QueryLoadingContext.Provider value={queryLoadingContext}>
                   <DiagnosticsContext.Provider value={diagnosticsContext}>
@@ -1532,6 +1547,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                 </QueryLoadingContext.Provider>
               </IndicatorContext.Provider>
             </HistoryQueryContext.Provider>
+            </GraphInfoContext.Provider>
           </GraphContext.Provider>
         </BrowserSettingsContext.Provider>
       </LoginVerification>

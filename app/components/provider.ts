@@ -167,10 +167,6 @@ type GraphContextType = {
   setLabels: Dispatch<SetStateAction<Label[]>>;
   relationships: Relationship[];
   setRelationships: Dispatch<SetStateAction<Relationship[]>>;
-  nodesCount: number | undefined;
-  setNodesCount: Dispatch<SetStateAction<number | undefined>>;
-  edgesCount: number | undefined;
-  setEdgesCount: Dispatch<SetStateAction<number | undefined>>;
   currentTab: Tab;
   setCurrentTab: Dispatch<SetStateAction<Tab>>;
   runQuery: (query: string, name?: string) => Promise<void>;
@@ -398,10 +394,6 @@ export const GraphContext = createContext<GraphContextType>({
   setLabels: () => { },
   relationships: [],
   setRelationships: () => { },
-  nodesCount: undefined,
-  setNodesCount: () => { },
-  edgesCount: undefined,
-  setEdgesCount: () => { },
   currentTab: "Graph",
   setCurrentTab: () => { },
   runQuery: async () => { },
@@ -415,6 +407,18 @@ export const GraphContext = createContext<GraphContextType>({
   selectedParam: "",
   setSelectedParam: () => { },
   initialQuery: "",
+});
+
+type GraphInfoContextType = {
+  graphInfo: GraphInfo;
+  nodesCount: number | undefined;
+  edgesCount: number | undefined;
+};
+
+export const GraphInfoContext = createContext<GraphInfoContextType>({
+  graphInfo: Graph.empty().GraphInfo,
+  nodesCount: undefined,
+  edgesCount: undefined,
 });
 
 export const HistoryQueryContext = createContext<HistoryQueryContextType>({
