@@ -85,6 +85,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
                 if (cancelled) return;
                 setCsvColumns([]);
                 setCsvPreview([]);
+                setColumnTypes({});
             });
 
         return () => { cancelled = true; };
