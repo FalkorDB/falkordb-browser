@@ -1383,9 +1383,7 @@ export default class GraphPage extends BasePage {
     csvQuery?: string
   ): Promise<void> {
     await this.openUploadDialog(graphName);
-    if (mode !== "rdb") {
-      await this.selectUploadTab(mode);
-    }
+    await this.selectUploadTab(mode);
     await this.setUploadFile(absoluteFilePath);
     if (mode === "csv" && csvQuery) {
       await this.setUploadCsvQuery(csvQuery);

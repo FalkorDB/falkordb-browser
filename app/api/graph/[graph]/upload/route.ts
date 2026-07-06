@@ -70,6 +70,8 @@ export async function POST(
       );
     }
 
+    filePathToDelete = storedUpload.filePath;
+
     const validation = validateUploadInput({
       mode,
       fileId,
@@ -84,7 +86,6 @@ export async function POST(
       );
     }
 
-    filePathToDelete = storedUpload.filePath;
     const graph = session.client.selectGraph(graphId);
 
     try {
