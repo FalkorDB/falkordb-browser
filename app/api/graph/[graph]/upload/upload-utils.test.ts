@@ -496,6 +496,10 @@ test("coerceValue rejects non-integers", () => {
   assert.throws(() => coerceValue("abc", "integer"), /not an integer/);
 });
 
+test("coerceValue rejects integers outside the safe range", () => {
+  assert.throws(() => coerceValue("9007199254740993", "integer"), /safe integer range/);
+});
+
 test("coerceValue parses floats and rejects invalid", () => {
   assert.equal(coerceValue("3.14", "float"), 3.14);
   assert.equal(coerceValue("", "float"), null);

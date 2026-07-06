@@ -263,7 +263,11 @@ export function coerceValue(value: string, type: CsvColumnType): CsvParamValue {
       if (!/^[+-]?\d+$/.test(trimmed)) {
         throw new Error(`"${value}" is not an integer`);
       }
-      return Number.parseInt(trimmed, 10);
+      const parsed = Number.parseInt(trimmed, 10);
+      if (!Number.isSafeInteger(parsed)) {
+        throw new Error(`"${value}" is out of the safe integer range`);
+      }
+      return parsed;
     }
 
     if (type === "float") {

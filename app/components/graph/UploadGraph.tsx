@@ -66,7 +66,9 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
         }
 
         let cancelled = false;
-        files[0].text()
+        // Read only a bounded prefix — enough for headers + preview rows —
+        // rather than the whole (up to 5 MB) file into browser memory.
+        files[0].slice(0, 64 * 1024).text()
             .then((text) => {
                 if (cancelled) return;
                 const rows = parseCsvRows(text);
@@ -228,6 +230,11 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
                                 <p className="text-xs text-muted-foreground">
                                     Preview & column types (values are coerced server-side before binding):
                                 </p>
+                                {csvColumns.some((col) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(col)) && (
+                                    <p className="text-xs text-red-500">
+                                        Some column names aren&apos;t valid identifiers (letters, digits, underscore; not starting with a digit). Rename them in your CSV before uploading.
+                                    </p>
+                                )}
                                 <div className="overflow-auto max-h-[30dvh] border border-input rounded-md">
                                     <table className="w-full text-sm">
                                         <thead>
