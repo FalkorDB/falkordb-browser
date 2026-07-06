@@ -9,7 +9,7 @@
 
 > 🎉 JUNE 2025 NEW UPDATE: Improved UI & Experience 
 
-## Visualize, manipulate and manage FalkorDB graph data interactively to monitor and explore data changes. The latest version introcused the following improvements
+## Visualize, manipulate and manage FalkorDB graph data interactively to monitor and explore data changes. The latest version introduced the following improvements
 ![FalkorDB browser 06-25](https://github.com/user-attachments/assets/bc0060d0-1b55-484a-8e88-9c72b5085e55)
 
 #### Faster Graph Creation & Querying  
