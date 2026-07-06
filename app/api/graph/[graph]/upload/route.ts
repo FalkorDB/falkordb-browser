@@ -92,7 +92,7 @@ export async function POST(
     const graph = session.client.selectGraph(graphId);
 
     try {
-      if (validation.mode === "rdb") {
+      if (validation.mode === "dump") {
         const buffer = await fs.promises.readFile(storedUpload.filePath);
         const connection = await session.client.connection;
         await connection.restore(graphId, 0, buffer, { REPLACE: true });

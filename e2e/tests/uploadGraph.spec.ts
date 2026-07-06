@@ -146,9 +146,9 @@ test.describe("Upload Graph – Cypher batch", () => {
 });
 
 // ---------------------------------------------------------------------------
-// RDB upload: export a populated graph, restore it into a new empty graph
+// Dump restore: export a populated graph, restore it into a new empty graph
 // ---------------------------------------------------------------------------
-test.describe("Upload Graph – RDB restore", () => {
+test.describe("Upload Graph – Dump restore", () => {
   let browser: BrowserWrapper;
   let apiCall: ApiCalls;
 
@@ -161,9 +161,9 @@ test.describe("Upload Graph – RDB restore", () => {
     await browser.closeBrowser();
   });
 
-  test(`@admin Export a graph as RDB then restore it into a new graph via upload`, async () => {
-    const sourceGraph = getRandomString("rdbSource");
-    const destGraph = getRandomString("rdbDest");
+  test(`@admin Export a graph as a dump then restore it into a new graph via upload`, async () => {
+    const sourceGraph = getRandomString("dumpSource");
+    const destGraph = getRandomString("dumpDest");
 
     // Create the source graph with 5 nodes
     await apiCall.addGraph(sourceGraph);
@@ -172,12 +172,12 @@ test.describe("Upload Graph – RDB restore", () => {
       "UNWIND range(1, 5) AS i CREATE (:Item {id: i})"
     );
 
-    // Export → download the RDB file
+    // Export → download the .dump file
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
     const download = await graph.exportGraphByName(sourceGraph);
-    const rdbPath = await download.path();
-    if (!rdbPath) throw new Error("Expected a download path for the exported dump");
-    expect(fs.existsSync(rdbPath)).toBe(true);
+    const dumpPath = await download.path();
+    if (!dumpPath) throw new Error("Expected a download path for the exported dump");
+    expect(fs.existsSync(dumpPath)).toBe(true);
 
     // Create an empty destination graph
     await apiCall.addGraph(destGraph);
@@ -185,8 +185,8 @@ test.describe("Upload Graph – RDB restore", () => {
     // Navigate back to the graph page (manage panel is closed after export)
     await graph.refreshPage();
 
-    // Upload the RDB into the destination graph
-    await graph.uploadGraphData(destGraph, "rdb", rdbPath);
+    // Restore the dump into the destination graph
+    await graph.uploadGraphData(destGraph, "dump", dumpPath);
 
     expect(await graph.toast.textContent()).toContain("Upload completed");
 

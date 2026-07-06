@@ -81,8 +81,8 @@ export default class GraphPage extends BasePage {
     return this.page.getByLabel("CSV ingestion Cypher query");
   }
 
-  public uploadTabTrigger(mode: "rdb" | "csv" | "cypher"): Locator {
-    const labels: Record<string, string> = { rdb: "Dump restore", csv: "CSV + query", cypher: "Cypher batch" };
+  public uploadTabTrigger(mode: "dump" | "csv" | "cypher"): Locator {
+    const labels: Record<string, string> = { dump: "Dump restore", csv: "CSV + query", cypher: "Cypher batch" };
     return this.page.getByRole("tab", { name: labels[mode] });
   }
 
@@ -1339,8 +1339,8 @@ export default class GraphPage extends BasePage {
     await waitForElementToBeVisible(this.uploadConfirm);
   }
 
-  /** Switch to the given upload tab (rdb / csv / cypher). */
-  async selectUploadTab(mode: "rdb" | "csv" | "cypher"): Promise<void> {
+  /** Switch to the given upload tab (dump / csv / cypher). */
+  async selectUploadTab(mode: "dump" | "csv" | "cypher"): Promise<void> {
     await interactWhenVisible(
       this.uploadTabTrigger(mode),
       (el) => el.click(),
@@ -1389,7 +1389,7 @@ export default class GraphPage extends BasePage {
    */
   async uploadGraphData(
     graphName: string,
-    mode: "rdb" | "csv" | "cypher",
+    mode: "dump" | "csv" | "cypher",
     absoluteFilePath: string,
     csvQuery?: string
   ): Promise<void> {

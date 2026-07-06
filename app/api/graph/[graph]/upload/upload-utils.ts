@@ -1,7 +1,7 @@
 import type { Graph } from "falkordb";
 import type { QueryOptions } from "falkordb/dist/src/commands";
 
-export type UploadMode = "rdb" | "csv" | "cypher";
+export type UploadMode = "dump" | "csv" | "cypher";
 
 export const RESTORE_UPLOAD_EXTENSIONS: readonly string[] = [".dump"];
 export const CSV_UPLOAD_EXTENSIONS: readonly string[] = [".csv"];
@@ -36,7 +36,7 @@ export function validateUploadInput({
     return { ok: false, status: 400, message: "mode and fileId are required." };
   }
 
-  if (mode === "rdb") {
+  if (mode === "dump") {
     if (!hasExtension(RESTORE_UPLOAD_EXTENSIONS, extension)) {
       return { ok: false, status: 400, message: "Restore requires a .dump file." };
     }

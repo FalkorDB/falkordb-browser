@@ -63,7 +63,6 @@ describe("getAllowedFileType", () => {
       [".cql", "text/plain"],
       [".cypher", "text/plain"],
       [".dump", "application/octet-stream"],
-      [".rdb", "application/octet-stream"],
     ];
 
     for (const [ext, expectedContentType] of cases) {
@@ -74,7 +73,7 @@ describe("getAllowedFileType", () => {
   });
 
   it("includes the contentType in the mimeTypes list for each extension", () => {
-    for (const ext of [".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".txt", ".csv", ".cql", ".cypher", ".dump", ".rdb"]) {
+    for (const ext of [".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".txt", ".csv", ".cql", ".cypher", ".dump"]) {
       const fileType = getAllowedFileType(ext);
       assert.ok(fileType, `expected config for ${ext}`);
       assert.ok(
@@ -85,7 +84,7 @@ describe("getAllowedFileType", () => {
   });
 
   it("returns a validateContent function for every allowed extension", () => {
-    for (const ext of [".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".txt", ".csv", ".cql", ".cypher", ".dump", ".rdb"]) {
+    for (const ext of [".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".txt", ".csv", ".cql", ".cypher", ".dump"]) {
       const fileType = getAllowedFileType(ext);
       assert.ok(fileType, `expected config for ${ext}`);
       assert.equal(typeof fileType.validateContent, "function");
@@ -215,18 +214,6 @@ describe("getAllowedFileType validateContent — document/text signatures", () =
 });
 
 describe("getAllowedFileType validateContent — binary formats", () => {
-  it("accepts a non-empty binary file for .rdb", async () => {
-    const file = makeFile([0x52, 0x45, 0x44, 0x49, 0x53], "test.rdb", "application/octet-stream");
-    const { validateContent } = getAllowedFileType(".rdb")!;
-    assert.equal(await validateContent(file), true);
-  });
-
-  it("rejects an empty file for .rdb", async () => {
-    const file = makeFile([], "test.rdb", "application/octet-stream");
-    const { validateContent } = getAllowedFileType(".rdb")!;
-    assert.equal(await validateContent(file), false);
-  });
-
   it("accepts a non-empty binary file for .dump", async () => {
     const file = makeFile([0x00, 0x01, 0x02], "test.dump", "application/octet-stream");
     const { validateContent } = getAllowedFileType(".dump")!;
@@ -313,10 +300,9 @@ describe("getStoredUpload", () => {
     assert.equal(result.extension, ".cql");
   });
 
-  it("returns the stored upload for .rdb", () => {
-    const result = getStoredUpload(`${VALID_UUID}.rdb`, TEST_USER);
-    assert.ok(result);
-    assert.equal(result.extension, ".rdb");
+  it("no longer allows .rdb — restore is dump-only (RESTORE needs a DUMP payload)", () => {
+    assert.equal(getAllowedFileType(".rdb"), undefined);
+    assert.equal(getStoredUpload(`${VALID_UUID}.rdb`, TEST_USER), null);
   });
 
   it("returns the stored upload for .dump", () => {

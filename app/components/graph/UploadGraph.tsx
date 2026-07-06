@@ -9,7 +9,7 @@ import DialogComponent from "../DialogComponent";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { parseCsvRows, generateCsvQuery, type CsvColumnType } from "@/app/api/graph/[graph]/upload/upload-utils";
 
-type UploadMode = "rdb" | "csv" | "cypher";
+type UploadMode = "dump" | "csv" | "cypher";
 
 export default function UploadGraph({ graphName, disabled, open, onOpenChange }: {
     /* eslint-disable react/require-default-props */
@@ -20,7 +20,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
 }) {
 
     const [files, setFiles] = useState<File[]>([]);
-    const [mode, setMode] = useState<UploadMode>("rdb");
+    const [mode, setMode] = useState<UploadMode>("dump");
     const [csvQuery, setCsvQuery] = useState("");
     const [csvColumns, setCsvColumns] = useState<string[]>([]);
     const [csvPreview, setCsvPreview] = useState<Record<string, string>[]>([]);
@@ -50,7 +50,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
         if (!dialogOpen) {
             setFiles([]);
             setCsvQuery("");
-            setMode("rdb");
+            setMode("dump");
             setIsLoading(false);
             setNodeLabel("Row");
             uploadInFlightRef.current = false;
@@ -187,11 +187,11 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
             <form onSubmit={onUploadData} className="grow p-2 flex flex-col gap-4 overflow-hidden">
                 <Tabs value={mode} onValueChange={(value) => { setMode(value as UploadMode); setFiles([]); }} className="w-full">
                     <TabsList className="h-fit bg-background gap-1">
-                        <TabsTrigger value="rdb">Dump restore</TabsTrigger>
+                        <TabsTrigger value="dump">Dump restore</TabsTrigger>
                         <TabsTrigger value="csv">CSV + query</TabsTrigger>
                         <TabsTrigger value="cypher">Cypher batch</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="rdb" className="mt-2">
+                    <TabsContent value="dump" className="mt-2">
                         <p className="text-sm text-muted-foreground">
                             Upload a .dump file (from Export Data) to replace the selected graph contents.
                         </p>
@@ -284,7 +284,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
                     withTable
                     onFileDrop={setFiles}
                     accept={
-                        mode === "rdb"
+                        mode === "dump"
                             ? { "application/octet-stream": [".dump"] }
                             : mode === "csv"
                                 ? { "text/csv": [".csv"], "application/csv": [".csv"], "text/plain": [".csv"] }

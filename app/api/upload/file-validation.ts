@@ -142,11 +142,6 @@ export const ALLOWED_FILE_TYPES: Record<string, AllowedFileType> = {
     contentType: "application/octet-stream",
     validateContent: isNonEmptyBinaryFile,
   },
-  ".rdb": {
-    mimeTypes: ["application/octet-stream"],
-    contentType: "application/octet-stream",
-    validateContent: isNonEmptyBinaryFile,
-  },
 };
 
 export function getAllowedFileType(extension: string) {
