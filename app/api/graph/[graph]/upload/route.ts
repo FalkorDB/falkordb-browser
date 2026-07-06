@@ -2,18 +2,23 @@ import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { getStoredUpload } from "@/app/api/upload/file-validation";
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
-import { getCorsHeaders } from "../../../utils";
-import { parseCsvRows, splitCypherStatements } from "./upload-utils";
-
-type UploadMode = "rdb" | "csv" | "cypher";
+import { getCorsHeaders, resolveReadOnly } from "../../../utils";
+import {
+  validateUploadInput,
+  executeCsvIngestion,
+  executeCypherBatch,
+} from "./upload-utils";
 
 interface UploadBody {
-  mode?: UploadMode;
+  mode?: string;
   fileId?: string;
   query?: string;
 }
 
-// eslint-disable-next-line import/prefer-default-export
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ graph: string }> }
@@ -27,10 +32,16 @@ export async function POST(
       return session;
     }
 
+    if (resolveReadOnly(request, session.user.role)) {
+      return NextResponse.json(
+        { message: "You do not have permission to modify this graph." },
+        { status: 403, headers: getCorsHeaders(request) }
+      );
+    }
+
     const { graph: graphId } = await params;
     const body = (await request.json()) as UploadBody;
-    const mode = body.mode;
-    const fileId = body.fileId;
+    const { mode, fileId, query } = body;
 
     if (!mode || !fileId) {
       return NextResponse.json(
@@ -48,18 +59,24 @@ export async function POST(
       );
     }
 
+    const validation = validateUploadInput({
+      mode,
+      fileId,
+      extension: storedUpload.extension,
+      query,
+    });
+
+    if (!validation.ok) {
+      return NextResponse.json(
+        { message: validation.message },
+        { status: validation.status, headers: getCorsHeaders(request) }
+      );
+    }
+
     filePathToDelete = storedUpload.filePath;
-    const extension = storedUpload.extension;
     const graph = session.client.selectGraph(graphId);
 
-    if (mode === "rdb") {
-      if (extension !== ".rdb" && extension !== ".dump") {
-        return NextResponse.json(
-          { message: "RDB upload requires a .rdb or .dump file." },
-          { status: 400, headers: getCorsHeaders(request) }
-        );
-      }
-
+    if (validation.mode === "rdb") {
       const buffer = await fs.promises.readFile(storedUpload.filePath);
       const connection = await session.client.connection;
       await connection.restore(graphId, 0, buffer, { REPLACE: true });
@@ -70,58 +87,22 @@ export async function POST(
       );
     }
 
-    if (mode === "csv") {
-      if (extension !== ".csv") {
-        return NextResponse.json(
-          { message: "CSV upload requires a .csv file." },
-          { status: 400, headers: getCorsHeaders(request) }
-        );
-      }
-
-      if (!body.query?.trim()) {
-        return NextResponse.json(
-          { message: "CSV upload requires a query." },
-          { status: 400, headers: getCorsHeaders(request) }
-        );
-      }
-
+    if (validation.mode === "csv") {
       const csvText = await fs.promises.readFile(storedUpload.filePath, "utf-8");
-      const rows = parseCsvRows(csvText);
-
-      for (let index = 0; index < rows.length; index += 1) {
-        await graph.query(body.query, { params: { row: rows[index], index } });
-      }
+      const count = await executeCsvIngestion(graph, csvText, query ?? "");
 
       return NextResponse.json(
-        { message: `Processed ${rows.length} CSV row(s).` },
+        { message: `Processed ${count} CSV row(s).` },
         { status: 200, headers: getCorsHeaders(request) }
       );
     }
 
-    if (mode === "cypher") {
-      if (extension !== ".txt" && extension !== ".cypher" && extension !== ".cql") {
-        return NextResponse.json(
-          { message: "Cypher upload requires a .txt, .cypher, or .cql file." },
-          { status: 400, headers: getCorsHeaders(request) }
-        );
-      }
-
-      const batchText = await fs.promises.readFile(storedUpload.filePath, "utf-8");
-      const statements = splitCypherStatements(batchText);
-
-      for (const statement of statements) {
-        await graph.query(statement);
-      }
-
-      return NextResponse.json(
-        { message: `Executed ${statements.length} Cypher statement(s).` },
-        { status: 200, headers: getCorsHeaders(request) }
-      );
-    }
+    const batchText = await fs.promises.readFile(storedUpload.filePath, "utf-8");
+    const count = await executeCypherBatch(graph, batchText);
 
     return NextResponse.json(
-      { message: "Invalid upload mode." },
-      { status: 400, headers: getCorsHeaders(request) }
+      { message: `Executed ${count} Cypher statement(s).` },
+      { status: 200, headers: getCorsHeaders(request) }
     );
   } catch (error) {
     console.error(error);

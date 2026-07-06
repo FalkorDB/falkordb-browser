@@ -51,7 +51,14 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
 
     const onUploadData = async (e: FormEvent) => {
         e.preventDefault();
-        if (!files.length) return;
+        if (files.length !== 1) {
+            toast({
+                title: "Error",
+                description: "Please select exactly one file.",
+                variant: "destructive"
+            });
+            return;
+        }
 
         if (mode === "csv" && !csvQuery.trim()) {
             toast({
@@ -69,7 +76,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
             uploadFormData.append("file", files[0]);
 
             const uploadResult = await securedFetch(
-                "/api/upload",
+                "api/upload",
                 {
                     method: "POST",
                     body: uploadFormData
@@ -133,7 +140,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
             className="max-h-[90dvh] max-w-[60dvw]"
         >
             <form onSubmit={onUploadData} className="grow p-2 flex flex-col gap-4 overflow-hidden">
-                <Tabs value={mode} onValueChange={(value) => setMode(value as UploadMode)} className="w-full">
+                <Tabs value={mode} onValueChange={(value) => { setMode(value as UploadMode); setFiles([]); }} className="w-full">
                     <TabsList className="h-fit bg-background gap-1">
                         <TabsTrigger value="rdb">RDB / dump</TabsTrigger>
                         <TabsTrigger value="csv">CSV + query</TabsTrigger>
