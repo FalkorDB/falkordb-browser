@@ -149,7 +149,8 @@ test.describe("Upload Graph – RDB restore", () => {
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
     const download = await graph.exportGraphByName(sourceGraph);
     const rdbPath = await download.path();
-    expect(fs.existsSync(rdbPath!)).toBe(true);
+    if (!rdbPath) throw new Error("Expected a download path for the exported dump");
+    expect(fs.existsSync(rdbPath)).toBe(true);
 
     // Create an empty destination graph
     await apiCall.addGraph(destGraph);
@@ -158,7 +159,7 @@ test.describe("Upload Graph – RDB restore", () => {
     await graph.refreshPage();
 
     // Upload the RDB into the destination graph
-    await graph.uploadGraphData(destGraph, "rdb", rdbPath!);
+    await graph.uploadGraphData(destGraph, "rdb", rdbPath);
 
     expect(await graph.toast.textContent()).toContain("Upload completed");
 

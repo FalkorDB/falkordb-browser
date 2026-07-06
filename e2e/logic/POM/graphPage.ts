@@ -82,7 +82,7 @@ export default class GraphPage extends BasePage {
   }
 
   public uploadTabTrigger(mode: "rdb" | "csv" | "cypher"): Locator {
-    const labels: Record<string, string> = { rdb: "RDB / dump", csv: "CSV + query", cypher: "Cypher batch" };
+    const labels: Record<string, string> = { rdb: "Dump restore", csv: "CSV + query", cypher: "Cypher batch" };
     return this.page.getByRole("tab", { name: labels[mode] });
   }
 
