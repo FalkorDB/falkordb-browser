@@ -321,3 +321,8 @@ test("executeCypherBatch annotates failures with the statement number and stops"
   );
   assert.equal(querySpy.mock.callCount(), 2);
 });
+
+test("splitCypherStatements replaces block comments with a boundary (no token merge)", () => {
+  assert.deepEqual(splitCypherStatements("RETURN 1/*x*/2;"), ["RETURN 1 2"]);
+  assert.deepEqual(splitCypherStatements("MATCH (a)/*c*/RETURN a;"), ["MATCH (a) RETURN a"]);
+});

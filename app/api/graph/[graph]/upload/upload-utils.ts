@@ -149,6 +149,7 @@ export function splitCypherStatements(cypherBatch: string): string[] {
     if (blockComment) {
       if (char === "*" && next === "/") {
         blockComment = false;
+        current += " ";
         i += 1;
       }
       continue;
