@@ -9,6 +9,10 @@ import {
   executeCypherBatch,
   buildBatchCsvQuery,
   chunkCsvItems,
+  coerceValue,
+  coerceRow,
+  escapeCypherIdentifier,
+  generateCsvQuery,
   type CsvRowItem,
 } from "./upload-utils.ts";
 
@@ -470,4 +474,84 @@ test("splitCypherStatements replaces block comments with a boundary (no token me
 
 test("splitCypherStatements retains an unterminated block comment so it surfaces downstream", () => {
   assert.deepEqual(splitCypherStatements("CREATE (:A); /* oops"), ["CREATE (:A)", "/* oops"]);
+});
+
+// ---------------------------------------------------------------------------
+// coerceValue / coerceRow
+// ---------------------------------------------------------------------------
+
+test("coerceValue returns strings unchanged", () => {
+  assert.equal(coerceValue("hello", "string"), "hello");
+  assert.equal(coerceValue("", "string"), "");
+});
+
+test("coerceValue parses integers and maps empty to null", () => {
+  assert.equal(coerceValue("42", "integer"), 42);
+  assert.equal(coerceValue("-7", "integer"), -7);
+  assert.equal(coerceValue("  ", "integer"), null);
+});
+
+test("coerceValue rejects non-integers", () => {
+  assert.throws(() => coerceValue("4.5", "integer"), /not an integer/);
+  assert.throws(() => coerceValue("abc", "integer"), /not an integer/);
+});
+
+test("coerceValue parses floats and rejects invalid", () => {
+  assert.equal(coerceValue("3.14", "float"), 3.14);
+  assert.equal(coerceValue("", "float"), null);
+  assert.throws(() => coerceValue("x", "float"), /not a number/);
+});
+
+test("coerceValue parses booleans (true/false/1/0, case-insensitive)", () => {
+  assert.equal(coerceValue("true", "boolean"), true);
+  assert.equal(coerceValue("FALSE", "boolean"), false);
+  assert.equal(coerceValue("1", "boolean"), true);
+  assert.equal(coerceValue("0", "boolean"), false);
+  assert.equal(coerceValue("", "boolean"), null);
+  assert.throws(() => coerceValue("maybe", "boolean"), /not a boolean/);
+});
+
+test("coerceRow applies per-column types and defaults unlisted columns to string", () => {
+  assert.deepEqual(
+    coerceRow({ name: "Alice", age: "30", vip: "true" }, { age: "integer", vip: "boolean" }),
+    { name: "Alice", age: 30, vip: true }
+  );
+});
+
+test("coerceRow annotates conversion errors with the column name", () => {
+  assert.throws(() => coerceRow({ age: "old" }, { age: "integer" }), /Column "age": .*not an integer/);
+});
+
+// ---------------------------------------------------------------------------
+// escapeCypherIdentifier / generateCsvQuery
+// ---------------------------------------------------------------------------
+
+test("escapeCypherIdentifier leaves valid identifiers bare", () => {
+  assert.equal(escapeCypherIdentifier("name"), "name");
+  assert.equal(escapeCypherIdentifier("_x1"), "_x1");
+});
+
+test("escapeCypherIdentifier backtick-quotes and doubles embedded backticks", () => {
+  assert.equal(escapeCypherIdentifier("first name"), "`first name`");
+  assert.equal(escapeCypherIdentifier("a`b"), "`a``b`");
+  assert.equal(escapeCypherIdentifier("1col"), "`1col`");
+});
+
+test("generateCsvQuery builds a CREATE with escaped label and props", () => {
+  assert.equal(
+    generateCsvQuery("Person", ["name", "age"]),
+    "CREATE (:Person {name: row.name, age: row.age})"
+  );
+});
+
+test("generateCsvQuery escapes unsafe headers/label so they cannot inject Cypher", () => {
+  const q = generateCsvQuery("La bel", ["first name", "x`) DETACH DELETE n //"]);
+  assert.match(q, /^CREATE \(:`La bel` \{/);
+  assert.ok(q.includes("`first name`: row.`first name`"));
+  assert.ok(q.includes("`x``) DETACH DELETE n //`: row.`x``) DETACH DELETE n //`"));
+});
+
+test("generateCsvQuery defaults the label and handles no columns", () => {
+  assert.equal(generateCsvQuery("", []), "CREATE (:Row)");
+  assert.equal(generateCsvQuery("  ", ["a"]), "CREATE (:Row {a: row.a})");
 });

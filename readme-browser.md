@@ -64,7 +64,7 @@ It allows a developer to interact with graphs loaded to FaklorDB, explore how sp
   - “Upload Data” dialog supports drag-and-drop file selection (Dropzone UI).
   - Supports three ingestion modes:
     - restore graph from a `.dump` export (replace contents),
-    - process `.csv` rows with a user-provided Cypher query (runs per `row` in UNWIND batches),
+    - process `.csv` rows with a user-provided Cypher query (runs per `row` in UNWIND batches, with a preview, per-column type coercion, and a generated starter query),
     - execute Cypher batch files (`.txt` / `.cql` / `.cypher`) statement-by-statement.
 
 ### Graph Info panel

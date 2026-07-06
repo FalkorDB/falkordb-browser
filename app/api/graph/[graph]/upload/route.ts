@@ -7,12 +7,15 @@ import {
   validateUploadInput,
   executeCsvIngestion,
   executeCypherBatch,
+  coerceRow,
+  type CsvColumnType,
 } from "./upload-utils";
 
 interface UploadBody {
   mode?: string;
   fileId?: string;
   query?: string;
+  columnTypes?: Record<string, CsvColumnType>;
 }
 
 export async function OPTIONS(request: Request) {
@@ -52,7 +55,7 @@ export async function POST(
       );
     }
 
-    const { mode, fileId, query } = body;
+    const { mode, fileId, query, columnTypes } = body;
 
     if (!mode || !fileId) {
       return NextResponse.json(
@@ -102,7 +105,12 @@ export async function POST(
 
       if (validation.mode === "csv") {
         const csvText = await fs.promises.readFile(storedUpload.filePath, "utf-8");
-        const result = await executeCsvIngestion(graph, csvText, query ?? "");
+        const result = await executeCsvIngestion(graph, csvText, query ?? "", {
+          transformRow:
+            columnTypes && Object.keys(columnTypes).length > 0
+              ? (row) => coerceRow(row, columnTypes)
+              : undefined,
+        });
 
         return NextResponse.json(
           {

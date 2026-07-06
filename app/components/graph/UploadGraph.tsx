@@ -7,6 +7,7 @@ import CloseDialog from "../CloseDialog";
 import { IndicatorContext } from "../provider";
 import DialogComponent from "../DialogComponent";
 import { prepareArg, securedFetch } from "@/lib/utils";
+import { parseCsvRows, generateCsvQuery, type CsvColumnType } from "@/app/api/graph/[graph]/upload/upload-utils";
 
 type UploadMode = "rdb" | "csv" | "cypher";
 
@@ -21,6 +22,10 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
     const [files, setFiles] = useState<File[]>([]);
     const [mode, setMode] = useState<UploadMode>("rdb");
     const [csvQuery, setCsvQuery] = useState("");
+    const [csvColumns, setCsvColumns] = useState<string[]>([]);
+    const [csvPreview, setCsvPreview] = useState<Record<string, string>[]>([]);
+    const [columnTypes, setColumnTypes] = useState<Record<string, CsvColumnType>>({});
+    const [nodeLabel, setNodeLabel] = useState("Row");
     const [isLoading, setIsLoading] = useState(false);
     const uploadInFlightRef = useRef(false);
     const isControlled = typeof open === "boolean" && typeof onOpenChange === "function";
@@ -47,9 +52,41 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
             setCsvQuery("");
             setMode("rdb");
             setIsLoading(false);
+            setNodeLabel("Row");
             uploadInFlightRef.current = false;
         }
     }, [dialogOpen]);
+
+    useEffect(() => {
+        if (mode !== "csv" || files.length !== 1) {
+            setCsvColumns([]);
+            setCsvPreview([]);
+            setColumnTypes({});
+            return undefined;
+        }
+
+        let cancelled = false;
+        files[0].text()
+            .then((text) => {
+                if (cancelled) return;
+                const rows = parseCsvRows(text);
+                const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
+                setCsvColumns(columns);
+                setCsvPreview(rows.slice(0, 5));
+                setColumnTypes((prev) => {
+                    const next: Record<string, CsvColumnType> = {};
+                    columns.forEach((col) => { next[col] = prev[col] ?? "string"; });
+                    return next;
+                });
+            })
+            .catch(() => {
+                if (cancelled) return;
+                setCsvColumns([]);
+                setCsvPreview([]);
+            });
+
+        return () => { cancelled = true; };
+    }, [files, mode]);
 
     const onUploadData = async (e: FormEvent) => {
         e.preventDefault();
@@ -101,7 +138,8 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
                     body: JSON.stringify({
                         mode,
                         fileId: id,
-                        query: mode === "csv" ? csvQuery : undefined
+                        query: mode === "csv" ? csvQuery : undefined,
+                        columnTypes: mode === "csv" ? columnTypes : undefined
                     })
                 },
                 toast,
@@ -167,6 +205,65 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
                             placeholder="CREATE (:Person {name: row.name, age: toInteger(row.age)})"
                             onChange={(e) => setCsvQuery(e.target.value)}
                         />
+                        {csvColumns.length > 0 && (
+                            <div className="flex flex-col gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <label className="text-sm text-muted-foreground" htmlFor="csvNodeLabel">Node label</label>
+                                    <input
+                                        id="csvNodeLabel"
+                                        className="rounded-md border border-input bg-background px-2 py-1 text-sm"
+                                        value={nodeLabel}
+                                        onChange={(e) => setNodeLabel(e.target.value)}
+                                        aria-label="Generated node label"
+                                    />
+                                    <button
+                                        type="button"
+                                        className="rounded-md border border-input bg-background px-2 py-1 text-sm hover:bg-accent"
+                                        onClick={() => setCsvQuery(generateCsvQuery(nodeLabel, csvColumns))}
+                                        data-testid="uploadGenerateQuery"
+                                    >
+                                        Generate query
+                                    </button>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Preview & column types (values are coerced server-side before binding):
+                                </p>
+                                <div className="overflow-auto max-h-[30dvh] border border-input rounded-md">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr>
+                                                {csvColumns.map((col) => (
+                                                    <th key={col} className="px-2 py-1 text-left align-top">
+                                                        <div className="font-medium">{col}</div>
+                                                        <select
+                                                            className="mt-1 rounded-md border border-input bg-background px-1 py-0.5 text-xs"
+                                                            aria-label={`Type for column ${col}`}
+                                                            value={columnTypes[col] ?? "string"}
+                                                            onChange={(e) => setColumnTypes((prev) => ({ ...prev, [col]: e.target.value as CsvColumnType }))}
+                                                        >
+                                                            <option value="string">string</option>
+                                                            <option value="integer">integer</option>
+                                                            <option value="float">float</option>
+                                                            <option value="boolean">boolean</option>
+                                                        </select>
+                                                    </th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {csvPreview.map((previewRow, rowIndex) => (
+                                                // eslint-disable-next-line react/no-array-index-key
+                                                <tr key={rowIndex} className="border-t border-input">
+                                                    {csvColumns.map((col) => (
+                                                        <td key={col} className="px-2 py-1 align-top">{previewRow[col]}</td>
+                                                    ))}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
                     </TabsContent>
                     <TabsContent value="cypher" className="mt-2">
                         <p className="text-sm text-muted-foreground">

@@ -1362,6 +1362,17 @@ export default class GraphPage extends BasePage {
     );
   }
 
+  /** Set the coercion type for a CSV column in the preview table. */
+  async setUploadColumnType(column: string, type: "string" | "integer" | "float" | "boolean"): Promise<void> {
+    await this.page.getByLabel(`Type for column ${column}`).selectOption(type);
+  }
+
+  /** Fill the generated-node label and click "Generate query". */
+  async generateCsvQuery(nodeLabel: string): Promise<void> {
+    await this.page.getByLabel("Generated node label").fill(nodeLabel);
+    await this.page.getByTestId("uploadGenerateQuery").click();
+  }
+
   /** Submit the upload form and wait for the dialog to close. */
   async clickUploadConfirm(): Promise<void> {
     await interactWhenVisible(

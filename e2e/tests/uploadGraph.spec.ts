@@ -67,6 +67,33 @@ test.describe("Upload Graph – CSV", () => {
 
     await apiCall.removeGraph(graphName);
   });
+
+  test(`@admin CSV upload with a typed column + generated query coerces values`, async () => {
+    const graphName = getRandomString("uploadCsvTyped");
+    await apiCall.addGraph(graphName);
+
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    await graph.openUploadDialog(graphName);
+    await graph.selectUploadTab("csv");
+    await graph.setUploadFile(CSV_FIXTURE);
+    // Mark age as an integer and let the dialog generate the query (no toInteger)
+    await graph.setUploadColumnType("age", "integer");
+    await graph.generateCsvQuery("Person");
+    await graph.clickUploadConfirm();
+    await graph.toast.waitFor();
+
+    expect(await graph.toast.textContent()).toContain("Upload completed");
+
+    // age was coerced to an integer server-side, so an integer match works
+    const result = await apiCall.runQuery(
+      graphName,
+      "MATCH (n:Person) WHERE n.age = 30 RETURN count(n) AS cnt"
+    );
+    const cnt = result.data[0]?.cnt ?? result.data[0]?.["count(n)"];
+    expect(Number(cnt)).toBe(1);
+
+    await apiCall.removeGraph(graphName);
+  });
 });
 
 // ---------------------------------------------------------------------------

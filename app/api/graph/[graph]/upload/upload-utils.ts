@@ -247,6 +247,86 @@ export interface CsvIngestionResult {
   chunks: number;
 }
 
+export type CsvColumnType = "string" | "integer" | "float" | "boolean";
+
+/**
+ * Coerce a raw CSV cell (always a string) to the target column type.
+ * Empty values become null for non-string types. Invalid values throw so the
+ * caller can surface an actionable error. Unknown types fall back to string.
+ */
+export function coerceValue(value: string, type: CsvColumnType): CsvParamValue {
+  if (type === "integer" || type === "float" || type === "boolean") {
+    const trimmed = value.trim();
+    if (trimmed === "") return null;
+
+    if (type === "integer") {
+      if (!/^[+-]?\d+$/.test(trimmed)) {
+        throw new Error(`"${value}" is not an integer`);
+      }
+      return Number.parseInt(trimmed, 10);
+    }
+
+    if (type === "float") {
+      const parsed = Number(trimmed);
+      if (!Number.isFinite(parsed)) {
+        throw new Error(`"${value}" is not a number`);
+      }
+      return parsed;
+    }
+
+    const lower = trimmed.toLowerCase();
+    if (lower === "true" || lower === "1") return true;
+    if (lower === "false" || lower === "0") return false;
+    throw new Error(`"${value}" is not a boolean`);
+  }
+
+  return value;
+}
+
+/**
+ * Coerce every cell of a row using a per-column type map (default string).
+ * Errors are annotated with the column name.
+ */
+export function coerceRow(
+  row: Record<string, string>,
+  columnTypes: Record<string, CsvColumnType>
+): Record<string, CsvParamValue> {
+  const result: Record<string, CsvParamValue> = {};
+  for (const [key, raw] of Object.entries(row)) {
+    try {
+      result[key] = coerceValue(raw, columnTypes[key] ?? "string");
+    } catch (error) {
+      throw new Error(`Column "${key}": ${(error as Error).message}`);
+    }
+  }
+  return result;
+}
+
+const CYPHER_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
+ * Return a name usable as a Cypher label/property key: bare when it is a valid
+ * identifier, otherwise backtick-quoted with embedded backticks doubled.
+ */
+export function escapeCypherIdentifier(name: string): string {
+  if (CYPHER_IDENTIFIER.test(name)) return name;
+  return `\`${name.replace(/`/g, "``")}\``;
+}
+
+/**
+ * Build a safe starter `CREATE` statement from a node label and CSV headers.
+ * Labels and property keys are escaped so arbitrary header text cannot inject
+ * Cypher.
+ */
+export function generateCsvQuery(label: string, columns: string[]): string {
+  const safeLabel = escapeCypherIdentifier(label.trim() || "Row");
+  const props = columns
+    .filter((col) => col.trim() !== "")
+    .map((col) => `${escapeCypherIdentifier(col)}: row.${escapeCypherIdentifier(col)}`)
+    .join(", ");
+  return props ? `CREATE (:${safeLabel} {${props}})` : `CREATE (:${safeLabel})`;
+}
+
 /**
  * Wrap a user-provided per-row Cypher body so it runs over a batch of rows.
  * Each row is exposed as `row` (a map) and its zero-based position as `index`.
