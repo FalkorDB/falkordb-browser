@@ -40,7 +40,18 @@ export async function POST(
     }
 
     const { graph: graphId } = await params;
-    const body = (await request.json()) as UploadBody;
+
+    let body: UploadBody;
+
+    try {
+      body = (await request.json()) as UploadBody;
+    } catch {
+      return NextResponse.json(
+        { message: "Invalid request body." },
+        { status: 400, headers: getCorsHeaders(request) }
+      );
+    }
+
     const { mode, fileId, query } = body;
 
     if (!mode || !fileId) {
@@ -76,38 +87,49 @@ export async function POST(
     filePathToDelete = storedUpload.filePath;
     const graph = session.client.selectGraph(graphId);
 
-    if (validation.mode === "rdb") {
-      const buffer = await fs.promises.readFile(storedUpload.filePath);
-      const connection = await session.client.connection;
-      await connection.restore(graphId, 0, buffer, { REPLACE: true });
+    try {
+      if (validation.mode === "rdb") {
+        const buffer = await fs.promises.readFile(storedUpload.filePath);
+        const connection = await session.client.connection;
+        await connection.restore(graphId, 0, buffer, { REPLACE: true });
+
+        return NextResponse.json(
+          { message: "Graph restored successfully." },
+          { status: 200, headers: getCorsHeaders(request) }
+        );
+      }
+
+      if (validation.mode === "csv") {
+        const csvText = await fs.promises.readFile(storedUpload.filePath, "utf-8");
+        const count = await executeCsvIngestion(graph, csvText, query ?? "");
+
+        return NextResponse.json(
+          { message: `Processed ${count} CSV row(s).` },
+          { status: 200, headers: getCorsHeaders(request) }
+        );
+      }
+
+      const batchText = await fs.promises.readFile(storedUpload.filePath, "utf-8");
+      const count = await executeCypherBatch(graph, batchText);
 
       return NextResponse.json(
-        { message: "Graph restored successfully." },
+        { message: `Executed ${count} Cypher statement(s).` },
         { status: 200, headers: getCorsHeaders(request) }
       );
-    }
-
-    if (validation.mode === "csv") {
-      const csvText = await fs.promises.readFile(storedUpload.filePath, "utf-8");
-      const count = await executeCsvIngestion(graph, csvText, query ?? "");
-
+    } catch (processingError) {
+      console.error(processingError);
       return NextResponse.json(
-        { message: `Processed ${count} CSV row(s).` },
-        { status: 200, headers: getCorsHeaders(request) }
+        {
+          message:
+            (processingError as Error).message || "Failed to process the uploaded file.",
+        },
+        { status: 422, headers: getCorsHeaders(request) }
       );
     }
-
-    const batchText = await fs.promises.readFile(storedUpload.filePath, "utf-8");
-    const count = await executeCypherBatch(graph, batchText);
-
-    return NextResponse.json(
-      { message: `Executed ${count} Cypher statement(s).` },
-      { status: 200, headers: getCorsHeaders(request) }
-    );
   } catch (error) {
     console.error(error);
     return NextResponse.json(
-      { message: (error as Error).message || "Failed to upload graph data." },
+      { message: "Failed to upload graph data." },
       { status: 500, headers: getCorsHeaders(request) }
     );
   } finally {

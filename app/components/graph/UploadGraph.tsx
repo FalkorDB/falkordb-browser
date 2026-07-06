@@ -157,6 +157,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
                         </p>
                         <textarea
                             className="flex min-h-[90px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            aria-label="CSV ingestion Cypher query"
                             value={csvQuery}
                             placeholder="UNWIND [$row] AS row CREATE (:Person {name: row.name, age: toInteger(row.age)})"
                             onChange={(e) => setCsvQuery(e.target.value)}
@@ -177,7 +178,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
                         mode === "rdb"
                             ? { "application/octet-stream": [".rdb", ".dump"] }
                             : mode === "csv"
-                                ? { "text/csv": [".csv"], "text/plain": [".csv"] }
+                                ? { "text/csv": [".csv"], "application/csv": [".csv"], "text/plain": [".csv"] }
                                 : { "text/plain": [".txt", ".cql", ".cypher"], "application/octet-stream": [".cql", ".cypher"] }
                     }
                 />
