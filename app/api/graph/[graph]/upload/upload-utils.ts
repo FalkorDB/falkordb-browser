@@ -133,6 +133,7 @@ export function splitCypherStatements(cypherBatch: string): string[] {
   let escaped = false;
   let lineComment = false;
   let blockComment = false;
+  let blockCommentText = "";
 
   for (let i = 0; i < cypherBatch.length; i += 1) {
     const char = cypherBatch[i];
@@ -149,8 +150,11 @@ export function splitCypherStatements(cypherBatch: string): string[] {
     if (blockComment) {
       if (char === "*" && next === "/") {
         blockComment = false;
+        blockCommentText = "";
         current += " ";
         i += 1;
+      } else {
+        blockCommentText += char;
       }
       continue;
     }
@@ -183,6 +187,7 @@ export function splitCypherStatements(cypherBatch: string): string[] {
 
     if (char === "/" && next === "*") {
       blockComment = true;
+      blockCommentText = "/*";
       i += 1;
       continue;
     }
@@ -201,6 +206,10 @@ export function splitCypherStatements(cypherBatch: string): string[] {
     }
 
     current += char;
+  }
+
+  if (blockComment && blockCommentText) {
+    current += blockCommentText;
   }
 
   const finalQuery = current.trim();

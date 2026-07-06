@@ -334,10 +334,15 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                             selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
                                              
                                         />
-                                        <UploadGraph
-                                            graphName={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)[0] ?? ""}
-                                            disabled={rows.filter(opt => opt.checked).length !== 1}
-                                        />
+                                        {(() => {
+                                            const selectedGraphNames = rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string);
+                                            return (
+                                                <UploadGraph
+                                                    graphName={selectedGraphNames.length === 1 ? selectedGraphNames[0] : ""}
+                                                    disabled={selectedGraphNames.length !== 1}
+                                                />
+                                            );
+                                        })()}
                                         <DuplicateGraph
                                             selectedValue={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)[0]}
                                              

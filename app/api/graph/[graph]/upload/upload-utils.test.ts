@@ -331,3 +331,7 @@ test("splitCypherStatements replaces block comments with a boundary (no token me
   assert.deepEqual(splitCypherStatements("RETURN 1/*x*/2;"), ["RETURN 1 2"]);
   assert.deepEqual(splitCypherStatements("MATCH (a)/*c*/RETURN a;"), ["MATCH (a) RETURN a"]);
 });
+
+test("splitCypherStatements retains an unterminated block comment so it surfaces downstream", () => {
+  assert.deepEqual(splitCypherStatements("CREATE (:A); /* oops"), ["CREATE (:A)", "/* oops"]);
+});

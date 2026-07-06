@@ -1,6 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
-import { type FormEvent, useContext, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useContext, useEffect, useMemo, useRef, useState } from "react";
 import Dropzone from "../ui/Dropzone";
 import Button from "../ui/Button";
 import CloseDialog from "../CloseDialog";
@@ -22,6 +22,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
     const [mode, setMode] = useState<UploadMode>("rdb");
     const [csvQuery, setCsvQuery] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+    const uploadInFlightRef = useRef(false);
     const isControlled = typeof open === "boolean" && typeof onOpenChange === "function";
     const [internalOpen, setInternalOpen] = useState(false);
     const { toast } = useToast();
@@ -46,11 +47,13 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
             setCsvQuery("");
             setMode("rdb");
             setIsLoading(false);
+            uploadInFlightRef.current = false;
         }
     }, [dialogOpen]);
 
     const onUploadData = async (e: FormEvent) => {
         e.preventDefault();
+        if (uploadInFlightRef.current) return;
         if (files.length !== 1) {
             toast({
                 title: "Error",
@@ -70,6 +73,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
         }
 
         try {
+            uploadInFlightRef.current = true;
             setIsLoading(true);
 
             const uploadFormData = new FormData();
@@ -116,6 +120,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
             setFiles([]);
             handleOpenChange(false);
         } finally {
+            uploadInFlightRef.current = false;
             setIsLoading(false);
         }
     };
@@ -190,7 +195,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
                         variant="Primary"
                         isLoading={isLoading}
                         indicator={indicator}
-                        disabled={files.length !== 1}
+                        disabled={files.length !== 1 || isLoading}
                         data-testid="uploadGraphConfirm"
                     />
                     <CloseDialog data-testid="uploadGraphCancel" />
