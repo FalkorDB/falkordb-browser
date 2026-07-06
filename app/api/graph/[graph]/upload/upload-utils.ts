@@ -219,12 +219,7 @@ export function splitCypherStatements(cypherBatch: string): string[] {
   return queries;
 }
 
-/**
- * Parse CSV text and execute the user-provided query once per row, passing the
- * row object and its zero-based index as `$row` / `$index` query parameters.
- * Returns the number of rows processed. Failures are annotated with the row
- * number so partial-batch errors are actionable.
- */
+/** Default batching bounds for CSV ingestion: rows per chunk and bytes per chunk. */
 export const DEFAULT_CSV_CHUNK_SIZE = 1000;
 export const DEFAULT_CSV_CHUNK_BYTES = 512 * 1024;
 
@@ -265,6 +260,13 @@ export function buildBatchCsvQuery(body: string): string {
   return `UNWIND $rows AS __r WITH __r.index AS index, __r.data AS row\n${normalized}`;
 }
 
+const csvByteEncoder = new TextEncoder();
+
+/** Approximate the serialized UTF-8 byte size of a row item. */
+function approximateItemBytes(item: CsvRowItem): number {
+  return csvByteEncoder.encode(JSON.stringify(item)).length;
+}
+
 /**
  * Split row items into chunks bounded by both a row count and an approximate
  * serialized byte size, so wide rows don't produce oversized query params.
@@ -279,7 +281,7 @@ export function chunkCsvItems(
   let currentBytes = 0;
 
   for (const item of items) {
-    const size = JSON.stringify(item).length;
+    const size = approximateItemBytes(item);
     if (current.length > 0 && (current.length >= maxRows || currentBytes + size > maxBytes)) {
       chunks.push(current);
       current = [];
@@ -358,9 +360,9 @@ export async function executeCsvIngestion(
     try {
       // Row items carry coerced (possibly non-string) values; FalkorDB accepts
       // the list-of-maps shape at runtime, so bind it as query params.
-      const options = { params: { rows: chunk } } as unknown as QueryOptions;
+      const queryOptions = { params: { rows: chunk } } as unknown as QueryOptions;
       // eslint-disable-next-line no-await-in-loop
-      await graph.query(query, options);
+      await graph.query(query, queryOptions);
     } catch (error) {
       const first = chunk[0].index + 1;
       const last = chunk[chunk.length - 1].index + 1;

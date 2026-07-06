@@ -105,7 +105,11 @@ export async function POST(
         const result = await executeCsvIngestion(graph, csvText, query ?? "");
 
         return NextResponse.json(
-          { message: `Processed ${result.processedRows} CSV row(s) in ${result.chunks} batch(es).` },
+          {
+            message: `Processed ${result.processedRows} CSV row(s) in ${result.chunks} batch(es).`,
+            processedRows: result.processedRows,
+            chunks: result.chunks,
+          },
           { status: 200, headers: getCorsHeaders(request) }
         );
       }
