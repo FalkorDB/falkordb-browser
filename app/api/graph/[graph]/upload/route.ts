@@ -102,10 +102,10 @@ export async function POST(
 
       if (validation.mode === "csv") {
         const csvText = await fs.promises.readFile(storedUpload.filePath, "utf-8");
-        const count = await executeCsvIngestion(graph, csvText, query ?? "");
+        const result = await executeCsvIngestion(graph, csvText, query ?? "");
 
         return NextResponse.json(
-          { message: `Processed ${count} CSV row(s).` },
+          { message: `Processed ${result.processedRows} CSV row(s) in ${result.chunks} batch(es).` },
           { status: 200, headers: getCorsHeaders(request) }
         );
       }

@@ -158,13 +158,13 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
                     </TabsContent>
                     <TabsContent value="csv" className="mt-2 flex flex-col gap-2">
                         <p className="text-sm text-muted-foreground">
-                            Upload a .csv file and execute the query once per row using params: $row, $index.
+                            Upload a .csv file. Your query runs for each row (available as <code>row</code>, plus <code>index</code>); rows are executed in batches with UNWIND.
                         </p>
                         <textarea
                             className="flex min-h-[90px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                             aria-label="CSV ingestion Cypher query"
                             value={csvQuery}
-                            placeholder="UNWIND [$row] AS row CREATE (:Person {name: row.name, age: toInteger(row.age)})"
+                            placeholder="CREATE (:Person {name: row.name, age: toInteger(row.age)})"
                             onChange={(e) => setCsvQuery(e.target.value)}
                         />
                     </TabsContent>

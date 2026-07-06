@@ -7,6 +7,9 @@ import {
   validateUploadInput,
   executeCsvIngestion,
   executeCypherBatch,
+  buildBatchCsvQuery,
+  chunkCsvItems,
+  type CsvRowItem,
 } from "./upload-utils.ts";
 
 function makeGraph(
@@ -241,48 +244,134 @@ test("validateUploadInput rejects an unknown mode", () => {
 });
 
 // ---------------------------------------------------------------------------
-// executeCsvIngestion
+// buildBatchCsvQuery
 // ---------------------------------------------------------------------------
 
-test("executeCsvIngestion runs the query once per row with row and index params", async () => {
+test("buildBatchCsvQuery wraps the body in an UNWIND exposing row and index", () => {
+  assert.equal(
+    buildBatchCsvQuery("CREATE (:Person {name: row.name})"),
+    "UNWIND $rows AS __r WITH __r.index AS index, __r.data AS row\nCREATE (:Person {name: row.name})"
+  );
+});
+
+test("buildBatchCsvQuery trims and strips a trailing semicolon", () => {
+  assert.match(buildBatchCsvQuery("  CREATE (:A) ;  "), /AS row\nCREATE \(:A\)$/);
+});
+
+// ---------------------------------------------------------------------------
+// chunkCsvItems
+// ---------------------------------------------------------------------------
+
+function makeItems(n: number): CsvRowItem[] {
+  return Array.from({ length: n }, (_, i) => ({ index: i, data: { v: String(i) } }));
+}
+
+test("chunkCsvItems splits by row count", () => {
+  const chunks = chunkCsvItems(makeItems(5), 2, 1_000_000);
+  assert.deepEqual(chunks.map((c) => c.length), [2, 2, 1]);
+  assert.deepEqual(chunks[2][0], { index: 4, data: { v: "4" } });
+});
+
+test("chunkCsvItems returns a single chunk when everything fits", () => {
+  const chunks = chunkCsvItems(makeItems(3), 1000, 1_000_000);
+  assert.equal(chunks.length, 1);
+  assert.equal(chunks[0].length, 3);
+});
+
+test("chunkCsvItems splits by approximate byte size for wide rows", () => {
+  const wide: CsvRowItem[] = Array.from({ length: 4 }, (_, i) => ({
+    index: i,
+    data: { blob: "x".repeat(100) },
+  }));
+  const chunks = chunkCsvItems(wide, 1000, 80);
+  assert.equal(chunks.length, 4);
+});
+
+test("chunkCsvItems returns no chunks for an empty list", () => {
+  assert.deepEqual(chunkCsvItems([], 1000, 1000), []);
+});
+
+// ---------------------------------------------------------------------------
+// executeCsvIngestion (batched)
+// ---------------------------------------------------------------------------
+
+test("executeCsvIngestion runs one batched UNWIND query per chunk with row items", async () => {
   const { graph, querySpy } = makeGraph();
-  const query = "CREATE (:Person {name: $row.name})";
 
-  const count = await executeCsvIngestion(graph, "name,age\nAlice,30\nBob,41", query);
+  const result = await executeCsvIngestion(
+    graph,
+    "name,age\nAlice,30\nBob,41",
+    "CREATE (:Person {name: row.name})"
+  );
 
-  assert.equal(count, 2);
-  assert.equal(querySpy.mock.callCount(), 2);
-  assert.equal(querySpy.mock.calls[0].arguments[0], query);
+  assert.deepEqual(result, { processedRows: 2, chunks: 1 });
+  assert.equal(querySpy.mock.callCount(), 1);
+  assert.match(
+    querySpy.mock.calls[0].arguments[0] as string,
+    /^UNWIND \$rows AS __r WITH __r\.index AS index, __r\.data AS row\n/
+  );
   assert.deepEqual(querySpy.mock.calls[0].arguments[1], {
-    params: { row: { name: "Alice", age: "30" }, index: 0 },
+    params: {
+      rows: [
+        { index: 0, data: { name: "Alice", age: "30" } },
+        { index: 1, data: { name: "Bob", age: "41" } },
+      ],
+    },
   });
-  assert.deepEqual(querySpy.mock.calls[1].arguments[1], {
-    params: { row: { name: "Bob", age: "41" }, index: 1 },
+});
+
+test("executeCsvIngestion splits large inputs into multiple chunk queries", async () => {
+  const { graph, querySpy } = makeGraph();
+  const csv = ["name", "n0", "n1", "n2", "n3", "n4"].join("\n");
+
+  const result = await executeCsvIngestion(graph, csv, "CREATE (:P {n: row.name})", {
+    chunkSize: 2,
+  });
+
+  assert.deepEqual(result, { processedRows: 5, chunks: 3 });
+  assert.equal(querySpy.mock.callCount(), 3);
+});
+
+test("executeCsvIngestion applies the transformRow hook before binding params", async () => {
+  const { graph, querySpy } = makeGraph();
+
+  await executeCsvIngestion(graph, "age\n30", "CREATE (:P {age: row.age})", {
+    transformRow: (row) => ({ age: Number(row.age) }),
+  });
+
+  assert.deepEqual(querySpy.mock.calls[0].arguments[1], {
+    params: { rows: [{ index: 0, data: { age: 30 } }] },
   });
 });
 
 test("executeCsvIngestion runs no query and returns 0 for an empty CSV", async () => {
   const { graph, querySpy } = makeGraph();
 
-  const count = await executeCsvIngestion(graph, "", "CREATE (:P)");
+  const result = await executeCsvIngestion(graph, "", "CREATE (:P {n: row.name})");
 
-  assert.equal(count, 0);
+  assert.deepEqual(result, { processedRows: 0, chunks: 0 });
   assert.equal(querySpy.mock.callCount(), 0);
 });
 
-test("executeCsvIngestion annotates failures with the row number and stops", async () => {
-  let calls = 0;
-  const { graph, querySpy } = makeGraph(async () => {
-    calls += 1;
-    if (calls === 2) throw new Error("boom");
-    return { data: [] };
+test("executeCsvIngestion rejects a multi-statement body before running anything", async () => {
+  const { graph, querySpy } = makeGraph();
+
+  await assert.rejects(
+    () => executeCsvIngestion(graph, "n\n1", "CREATE (:A); CREATE (:B)"),
+    /must be a single Cypher statement/
+  );
+  assert.equal(querySpy.mock.callCount(), 0);
+});
+
+test("executeCsvIngestion annotates failures with the failing chunk's row range", async () => {
+  const { graph } = makeGraph(async () => {
+    throw new Error("boom");
   });
 
   await assert.rejects(
-    () => executeCsvIngestion(graph, "name\nA\nB\nC", "CREATE (:P {n: $row.name})"),
-    /Failed to process CSV row 2: boom/
+    () => executeCsvIngestion(graph, "n\nA\nB\nC", "CREATE (:P {n: row.name})", { chunkSize: 2 }),
+    /Failed to process CSV rows 1-2: boom/
   );
-  assert.equal(querySpy.mock.callCount(), 2);
 });
 
 // ---------------------------------------------------------------------------

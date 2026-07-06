@@ -1,4 +1,5 @@
 import type { Graph } from "falkordb";
+import type { QueryOptions } from "falkordb/dist/src/commands";
 
 export type UploadMode = "rdb" | "csv" | "cypher";
 
@@ -224,23 +225,116 @@ export function splitCypherStatements(cypherBatch: string): string[] {
  * Returns the number of rows processed. Failures are annotated with the row
  * number so partial-batch errors are actionable.
  */
+export const DEFAULT_CSV_CHUNK_SIZE = 1000;
+export const DEFAULT_CSV_CHUNK_BYTES = 512 * 1024;
+
+export interface CsvRowItem {
+  index: number;
+  data: Record<string, unknown>;
+}
+
+export interface CsvIngestionOptions {
+  chunkSize?: number;
+  maxChunkBytes?: number;
+  transformRow?: (row: Record<string, string>) => Record<string, unknown>;
+}
+
+export interface CsvIngestionResult {
+  processedRows: number;
+  chunks: number;
+}
+
+/**
+ * Wrap a user-provided per-row Cypher body so it runs over a batch of rows.
+ * Each row is exposed as `row` (a map) and its zero-based position as `index`.
+ * A trailing semicolon is stripped so the result is a single statement.
+ *
+ * Note: cardinality-changing clauses in the body (aggregating `WITH`, `LIMIT`,
+ * a nested `UNWIND`, etc.) operate over the whole chunk, not a single row.
+ */
+export function buildBatchCsvQuery(body: string): string {
+  const normalized = body.replace(/[;\s]+$/, "").trim();
+  return `UNWIND $rows AS __r WITH __r.index AS index, __r.data AS row\n${normalized}`;
+}
+
+/**
+ * Split row items into chunks bounded by both a row count and an approximate
+ * serialized byte size, so wide rows don't produce oversized query params.
+ */
+export function chunkCsvItems(
+  items: CsvRowItem[],
+  maxRows: number,
+  maxBytes: number
+): CsvRowItem[][] {
+  const chunks: CsvRowItem[][] = [];
+  let current: CsvRowItem[] = [];
+  let currentBytes = 0;
+
+  for (const item of items) {
+    const size = JSON.stringify(item).length;
+    if (current.length > 0 && (current.length >= maxRows || currentBytes + size > maxBytes)) {
+      chunks.push(current);
+      current = [];
+      currentBytes = 0;
+    }
+    current.push(item);
+    currentBytes += size;
+  }
+
+  if (current.length > 0) chunks.push(current);
+
+  return chunks;
+}
+
+/**
+ * Parse CSV text and execute the user's row body over the rows in batches, each
+ * batch a single `UNWIND $rows` query (atomic per chunk; earlier chunks stay
+ * committed if a later one fails). Returns the number of rows and chunks
+ * processed. The optional `transformRow` hook lets callers coerce raw string
+ * cells before they are bound as query params.
+ */
 export async function executeCsvIngestion(
   graph: Graph,
   csvText: string,
-  query: string
-): Promise<number> {
-  const rows = parseCsvRows(csvText);
+  body: string,
+  options: CsvIngestionOptions = {}
+): Promise<CsvIngestionResult> {
+  const {
+    chunkSize = DEFAULT_CSV_CHUNK_SIZE,
+    maxChunkBytes = DEFAULT_CSV_CHUNK_BYTES,
+    transformRow,
+  } = options;
 
-  for (let index = 0; index < rows.length; index += 1) {
+  if (splitCypherStatements(body).length > 1) {
+    throw new Error("The CSV query must be a single Cypher statement.");
+  }
+
+  const rows = parseCsvRows(csvText);
+  const items: CsvRowItem[] = rows.map((row, index) => ({
+    index,
+    data: transformRow ? transformRow(row) : row,
+  }));
+  const chunks = chunkCsvItems(items, chunkSize, maxChunkBytes);
+  const query = buildBatchCsvQuery(body);
+
+  for (let c = 0; c < chunks.length; c += 1) {
+    const chunk = chunks[c];
     try {
+      // Row items carry coerced (possibly non-string) values; FalkorDB accepts
+      // the list-of-maps shape at runtime, so bind it as query params.
+      const options = { params: { rows: chunk } } as unknown as QueryOptions;
       // eslint-disable-next-line no-await-in-loop
-      await graph.query(query, { params: { row: rows[index], index } });
+      await graph.query(query, options);
     } catch (error) {
-      throw new Error(`Failed to process CSV row ${index + 1}: ${(error as Error).message}`);
+      const first = chunk[0].index + 1;
+      const last = chunk[chunk.length - 1].index + 1;
+      throw new Error(
+        `Failed to process CSV rows ${first}-${last}: ${(error as Error).message}`
+      );
     }
   }
 
-  return rows.length;
+  return { processedRows: rows.length, chunks: chunks.length };
 }
 
 /**

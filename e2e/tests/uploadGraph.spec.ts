@@ -16,7 +16,7 @@ const CYPHER_FIXTURE = path.join(FIXTURES_DIR, "upload-people.cypher");
 // CSV upload: 3 data rows → 3 Person nodes created
 // ---------------------------------------------------------------------------
 const CSV_QUERY =
-  "UNWIND [$row] AS row CREATE (:Person {name: row.name, age: toInteger(row.age), city: row.city})";
+  "CREATE (:Person {name: row.name, age: toInteger(row.age), city: row.city})";
 
 test.describe("Upload Graph – CSV", () => {
   let browser: BrowserWrapper;
