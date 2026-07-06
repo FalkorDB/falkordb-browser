@@ -26,6 +26,8 @@ export const CYPHER_KEYWORDS = [
   "FOREACH",
   "CALL",
   "YIELD",
+  "OR", 
+  "AND"
 ];
 
 export const BUILTIN_FUNCTIONS = [
