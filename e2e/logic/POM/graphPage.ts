@@ -78,7 +78,7 @@ export default class GraphPage extends BasePage {
   }
 
   public get uploadCsvQueryTextarea(): Locator {
-    return this.page.locator('textarea[placeholder*="UNWIND"]');
+    return this.page.getByLabel("CSV ingestion Cypher query");
   }
 
   public uploadTabTrigger(mode: "rdb" | "csv" | "cypher"): Locator {
