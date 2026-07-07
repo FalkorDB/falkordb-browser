@@ -7,27 +7,70 @@
 
 import type { UDFEntry } from "./utils.ts";
 
+// Multi-word keywords are listed before any single-word keyword that shares a prefix
+// so that the Monarch tokenizer regex alternation tries the longer pattern first and
+// avoids a shorter prefix consuming characters that belong to the full keyword.
+// e.g. "OPTIONAL MATCH" before "OPTIONAL", "IS NOT NULL" before "IS NULL" before "IS".
 export const CYPHER_KEYWORDS = [
-  "CREATE",
+  // Reading clauses
+  "OPTIONAL MATCH",
   "MATCH",
   "OPTIONAL",
-  "AS",
   "WHERE",
   "RETURN",
+  "DISTINCT",
   "ORDER BY",
   "SKIP",
   "LIMIT",
-  "MERGE",
-  "DELETE",
-  "SET",
+  // Combining / flow clauses
   "WITH",
+  "UNION ALL",
   "UNION",
   "UNWIND",
   "FOREACH",
+  // Write clauses
+  "CREATE",
+  "MERGE",
+  "ON CREATE SET",
+  "ON MATCH SET",
+  "DELETE",
+  "DETACH DELETE",
+  "DETACH",
+  "SET",
+  "REMOVE",
+  // Procedural
   "CALL",
   "YIELD",
-  "OR", 
-  "AND"
+  // Boolean / logical operators
+  "NOT",
+  "AND",
+  "OR",
+  "XOR",
+  // Predicate keywords (multi-word before single-word prefix)
+  "IS NOT NULL",
+  "IS NULL",
+  "IS",
+  "IN",
+  "CONTAINS",
+  "STARTS WITH",
+  "ENDS WITH",
+  // CASE expression
+  "CASE",
+  "WHEN",
+  "THEN",
+  "ELSE",
+  "END",
+  // Literal keywords
+  "NULL",
+  "TRUE",
+  "FALSE",
+  // Sort direction
+  "ASC",
+  "ASCENDING",
+  "DESC",
+  "DESCENDING",
+  // Aliasing
+  "AS",
 ];
 
 export const BUILTIN_FUNCTIONS = [
@@ -55,6 +98,7 @@ export const BUILTIN_FUNCTIONS = [
   "min",
   "percentileCont",
   "percentileDisc",
+  "stDev",
   "stDevP",
   "sum",
   "head",
