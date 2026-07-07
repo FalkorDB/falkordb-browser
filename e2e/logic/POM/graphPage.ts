@@ -81,8 +81,8 @@ export default class GraphPage extends BasePage {
     return this.page.getByLabel("CSV ingestion Cypher query");
   }
 
-  public uploadTabTrigger(mode: "dump" | "csv" | "cypher"): Locator {
-    const labels: Record<string, string> = { dump: "Dump restore", csv: "CSV + query", cypher: "Cypher batch" };
+  public uploadTabTrigger(mode: "rdb" | "csv" | "cypher"): Locator {
+    const labels: Record<string, string> = { rdb: "RDB / dump", csv: "CSV + query", cypher: "Cypher batch" };
     return this.page.getByRole("tab", { name: labels[mode] });
   }
 
@@ -1339,8 +1339,8 @@ export default class GraphPage extends BasePage {
     await waitForElementToBeVisible(this.uploadConfirm);
   }
 
-  /** Switch to the given upload tab (dump / csv / cypher). */
-  async selectUploadTab(mode: "dump" | "csv" | "cypher"): Promise<void> {
+  /** Switch to the given upload tab (rdb / cypher). */
+  async selectUploadTab(mode: "rdb" | "cypher"): Promise<void> {
     await interactWhenVisible(
       this.uploadTabTrigger(mode),
       (el) => el.click(),
@@ -1362,17 +1362,6 @@ export default class GraphPage extends BasePage {
     );
   }
 
-  /** Set the coercion type for a CSV column in the preview table. */
-  async setUploadColumnType(column: string, type: "string" | "integer" | "float" | "boolean"): Promise<void> {
-    await this.page.getByLabel(`Type for column ${column}`).selectOption(type);
-  }
-
-  /** Fill the generated-node label and click "Generate query". */
-  async generateCsvQuery(nodeLabel: string): Promise<void> {
-    await this.page.getByLabel("Generated node label").fill(nodeLabel);
-    await this.page.getByTestId("uploadGenerateQuery").click();
-  }
-
   /** Submit the upload form and wait for the dialog to close. */
   async clickUploadConfirm(): Promise<void> {
     await interactWhenVisible(
@@ -1385,20 +1374,16 @@ export default class GraphPage extends BasePage {
 
   /**
    * Full upload flow: open Manage, select graph, open dialog, switch tab,
-   * attach file (+ optional CSV query), submit and wait for success toast.
+   * attach file, submit and wait for success toast.
    */
   async uploadGraphData(
     graphName: string,
-    mode: "dump" | "csv" | "cypher",
-    absoluteFilePath: string,
-    csvQuery?: string
+    mode: "rdb" | "cypher",
+    absoluteFilePath: string
   ): Promise<void> {
     await this.openUploadDialog(graphName);
     await this.selectUploadTab(mode);
     await this.setUploadFile(absoluteFilePath);
-    if (mode === "csv" && csvQuery) {
-      await this.setUploadCsvQuery(csvQuery);
-    }
     await this.clickUploadConfirm();
     await waitForElementToBeVisible(this.toast);
   }

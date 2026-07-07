@@ -3,7 +3,7 @@
 "use client";
 
 import React, { useState, useContext, useEffect } from "react";
-import { InfoIcon, Plus } from "lucide-react";
+import { InfoIcon, Plus, File, X } from "lucide-react";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -11,6 +11,7 @@ import DialogComponent from "./DialogComponent";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
 import Input from "./ui/Input";
+import Dropzone from "./ui/Dropzone";
 import { IndicatorContext, ConnectionContext } from "./provider";
 
 interface Props {
@@ -44,11 +45,13 @@ export default function CreateGraph({
     const [isLoading, setIsLoading] = useState(false);
     const [graphName, setGraphName] = useState("");
     const [open, setOpen] = useState(false);
+    const [files, setFiles] = useState<File[]>([]);
 
     useEffect(() => {
         if (!open) {
             setGraphName("");
             setIsLoading(false);
+            setFiles([]);
         }
     }, [open]);
 
@@ -65,26 +68,60 @@ export default function CreateGraph({
                 });
                 return;
             }
-            if (graphNames.includes(name)) {
-                toast({
-                    title: "Error",
-                    description: "Graph name already exists",
-                    variant: "destructive"
-                });
-                return;
-            }
-            const result = await securedFetch(`api/graph/${prepareArg(name)}${isReadOnly ? '?readOnly=true' : ''}`, {
-                method: "POST",
-            }, toast, setIndicator);
 
-            if (!result.ok) return;
+            const hasDump = files.length === 1;
+
+            if (!hasDump) {
+                if (graphNames.includes(name)) {
+                    toast({
+                        title: "Error",
+                        description: "Graph name already exists",
+                        variant: "destructive"
+                    });
+                    return;
+                }
+                const result = await securedFetch(`api/graph/${prepareArg(name)}${isReadOnly ? '?readOnly=true' : ''}`, {
+                    method: "POST",
+                }, toast, setIndicator);
+
+                if (!result.ok) return;
+            } else {
+                const uploadFormData = new FormData();
+                uploadFormData.append("file", files[0]);
+
+                const uploadResult = await securedFetch(
+                    "/api/upload",
+                    { method: "POST", body: uploadFormData },
+                    toast,
+                    setIndicator
+                );
+
+                if (!uploadResult.ok) return;
+
+                const { id } = await uploadResult.json() as { id: string };
+
+                const processResult = await securedFetch(
+                    `api/graph/${prepareArg(name)}/upload`,
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ mode: "rdb", fileId: id })
+                    },
+                    toast,
+                    setIndicator
+                );
+
+                if (!processResult.ok) return;
+            }
 
             onSetGraphName(name);
             setGraphName("");
             setOpen(false);
             toast({
-                title: "Graph created successfully",
-                description: "The graph has been created successfully",
+                title: hasDump ? "Graph restored successfully" : "Graph created successfully",
+                description: hasDump
+                    ? "The graph data has been restored from the dump file"
+                    : "The graph has been created successfully",
             });
         } finally {
             setIsLoading(false);
@@ -116,13 +153,37 @@ export default function CreateGraph({
                         onChange={(e) => setGraphName(e.target.value)}
                     />
                 </div>
+                <div className="flex flex-col gap-2">
+                    <p className="text-sm text-muted-foreground">
+                        Optionally drop a .dump file exported via the Export button to restore a graph. Leave empty to create a new empty graph.
+                    </p>
+                    <Dropzone
+                        className="flex-col"
+                        onFileDrop={setFiles}
+                        accept={{ "application/octet-stream": [".rdb", ".dump"] }}
+                    />
+                    {files.length === 1 && (
+                        <div className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm">
+                            <File size={14} className="shrink-0 text-muted-foreground" />
+                            <span className="truncate flex-1">{files[0].name}</span>
+                            <button
+                                type="button"
+                                onClick={() => setFiles([])}
+                                className="shrink-0 text-muted-foreground hover:text-foreground"
+                                title="Remove file"
+                            >
+                                <X size={14} />
+                            </button>
+                        </div>
+                    )}
+                </div>
                 <div className="flex gap-4 justify-end">
                     <Button
                         data-testid={"createGraphConfirm"}
                         indicator={indicator}
                         variant="Primary"
-                        label={"Create your Graph"}
-                        title={"Build and customize your Graph"}
+                        label={files.length === 1 ? "Restore Graph" : "Create your Graph"}
+                        title={files.length === 1 ? "Restore graph from dump file" : "Build and customize your Graph"}
                         type="submit"
                         isLoading={isLoading}
                     />

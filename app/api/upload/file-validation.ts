@@ -1,8 +1,8 @@
 import path from "path";
 import crypto from "crypto";
+import fs from "fs";
 
 export const MAX_FILE_SIZE = 5 * 1024 * 1024;
-export const MAX_MULTIPART_SIZE = MAX_FILE_SIZE + 1024 * 1024;
 
 type AllowedFileType = {
   mimeTypes: readonly string[];
@@ -143,6 +143,26 @@ export const ALLOWED_FILE_TYPES: Record<string, AllowedFileType> = {
     validateContent: isNonEmptyBinaryFile,
   },
 };
+
+/** Validate a file that has already been written to disk, without buffering it as a File object. */
+export async function validateContentFromPath(extension: string, filePath: string): Promise<boolean> {
+  const fileType = getAllowedFileType(extension);
+  if (!fileType) return false;
+
+  const stat = await fs.promises.stat(filePath);
+
+  // Binary files — only require non-empty.
+  if (extension === ".dump" || extension === ".rdb") {
+    return stat.size > 0;
+  }
+
+  // Read the saved file back into a File-like object so the existing validators work.
+  // These are always text/image files and are already capped at MAX_FILE_SIZE.
+  const buffer = await fs.promises.readFile(filePath);
+  const blob = new Blob([buffer]);
+  const file = new File([blob], `file${extension}`);
+  return fileType.validateContent(file);
+}
 
 export function getAllowedFileType(extension: string) {
   return ALLOWED_FILE_TYPES[extension];

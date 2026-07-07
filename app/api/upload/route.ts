@@ -5,72 +5,113 @@ import type { ReadableStream as NodeReadableStream } from "stream/web";
 import { pipeline } from "stream/promises";
 import fs from "fs";
 import { randomUUID } from "crypto";
+import Busboy from "busboy";
 import { getCorsHeaders } from "../utils";
 import { getClient } from "../auth/[...nextauth]/options";
 import {
   getAllowedFileType,
   getUploadFilePath,
   getUploadsDirectory,
+  validateContentFromPath,
   MAX_FILE_SIZE,
-  MAX_MULTIPART_SIZE,
 } from "./file-validation";
 
-class PayloadTooLargeError extends Error {
-  constructor() {
-    super("Payload too large.");
-    this.name = "PayloadTooLargeError";
-  }
-}
+// Binary extensions (e.g. .dump, .rdb) stream freely — no size cap beyond disk.
+const BINARY_EXTENSIONS = new Set([".dump", ".rdb"]);
 
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
 
-function createSizeLimitedStream(body: ReadableStream<Uint8Array>, maxBytes: number) {
-  const reader = body.getReader();
-  let bytesRead = 0;
+// Route segment config — disable Next.js body buffering so busboy can read the
+// raw stream directly. Without this the framework buffers the whole body first.
+export const config = {
+  api: { bodyParser: false },
+};
 
-  return new ReadableStream<Uint8Array>({
-    async pull(controller) {
-      const { done, value } = await reader.read();
+type StreamResult =
+  | { ok: true; filename: string }
+  | { ok: false; error: string; status: number };
 
-      if (done) {
-        controller.close();
+/** Stream the multipart body through busboy directly to disk. */
+async function streamToDisk(
+  request: NextRequest,
+  userId: string
+): Promise<StreamResult> {
+  const contentType = request.headers.get("content-type") ?? "";
+
+  return new Promise((resolve) => {
+    const busboy = Busboy({ headers: { "content-type": contentType } });
+    let settled = false;
+
+    const done = (result: StreamResult) => {
+      if (!settled) {
+        settled = true;
+        resolve(result);
+      }
+    };
+
+    busboy.on("file", (fieldname, fileStream, info) => {
+      const { filename: originalName, mimeType } = info;
+      const extension = path.extname(originalName).toLowerCase();
+      const allowedFileType = getAllowedFileType(extension);
+
+      if (!allowedFileType || !allowedFileType.mimeTypes.includes(mimeType)) {
+        fileStream.resume(); // drain so busboy can finish cleanly
+        done({ ok: false, error: "Invalid file type.", status: 400 });
         return;
       }
 
-      bytesRead += value.byteLength;
+      const filename = `${randomUUID()}${extension}`;
+      const uploadsDir = getUploadsDirectory(userId);
+      const filePath = getUploadFilePath(filename, userId);
 
-      if (bytesRead > maxBytes) {
-        const error = new PayloadTooLargeError();
-        await reader.cancel(error);
-        throw error;
+      if (!filePath) {
+        fileStream.resume();
+        done({ ok: false, error: "Invalid file name.", status: 400 });
+        return;
       }
 
-      controller.enqueue(value);
-    },
-    cancel(reason) {
-      return reader.cancel(reason);
-    },
+      const tempFilePath = `${filePath}.tmp`;
+      fs.mkdirSync(uploadsDir, { recursive: true });
+      const writeStream = fs.createWriteStream(tempFilePath);
+
+      const isBinary = BINARY_EXTENSIONS.has(extension);
+      let bytesWritten = 0;
+      let sizeLimitHit = false;
+
+      fileStream.on("data", (chunk: Buffer) => {
+        bytesWritten += chunk.length;
+        if (!isBinary && bytesWritten > MAX_FILE_SIZE) {
+          sizeLimitHit = true;
+          fileStream.destroy();
+          writeStream.destroy();
+          fs.unlink(tempFilePath, () => {});
+          done({ ok: false, error: "File is too large.", status: 413 });
+        }
+      });
+
+      pipeline(fileStream, writeStream)
+        .then(async () => {
+          if (sizeLimitHit) return;
+          await fs.promises.rename(tempFilePath, filePath);
+          done({ ok: true, filename });
+        })
+        .catch((err: unknown) => {
+          fs.unlink(tempFilePath, () => {});
+          console.error("Stream pipeline error:", err);
+          done({ ok: false, error: "Failed to store uploaded file.", status: 500 });
+        });
+    });
+
+    busboy.on("error", (err) => {
+      console.error("Busboy error:", err);
+      done({ ok: false, error: "Failed to parse upload.", status: 500 });
+    });
+
+    // Pipe request.body → busboy without buffering the full body in memory.
+    Readable.fromWeb(request.body as NodeReadableStream<Uint8Array>).pipe(busboy);
   });
-}
-
-async function getSizeLimitedFormData(request: NextRequest) {
-  if (!request.body) {
-    return request.formData();
-  }
-
-  const headers = new Headers(request.headers);
-  headers.delete("content-length");
-
-  const requestInit: RequestInit & { duplex: "half" } = {
-    body: createSizeLimitedStream(request.body, MAX_MULTIPART_SIZE),
-    duplex: "half",
-    headers,
-    method: request.method,
-  };
-
-  return new Request(request.url, requestInit).formData();
 }
 
 export async function POST(request: NextRequest) {
@@ -82,73 +123,31 @@ export async function POST(request: NextRequest) {
       return session;
     }
 
-    const contentLength = Number(request.headers.get("content-length") ?? 0);
+    const result = await streamToDisk(request, session.user.id);
 
-    if (contentLength > MAX_MULTIPART_SIZE) {
-      return NextResponse.json({ error: "Payload too large." }, { status: 413, headers: corsHeaders });
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: result.status, headers: corsHeaders });
     }
 
-    let formData;
-
-    try {
-      formData = await getSizeLimitedFormData(request);
-    } catch (error) {
-      if (error instanceof PayloadTooLargeError) {
-        return NextResponse.json({ error: "Payload too large." }, { status: 413, headers: corsHeaders });
-      }
-
-      throw error;
-    }
-
-    const file = formData.get("file");
-
-    if (!(file instanceof File)) {
-      return NextResponse.json({ error: "No files received." }, { status: 400, headers: corsHeaders });
-    }
-
-    if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ error: "File is too large." }, { status: 413, headers: corsHeaders });
-    }
-
-    const extension = path.extname(file.name).toLowerCase();
-    const allowedFileType = getAllowedFileType(extension);
-
-    if (!allowedFileType || !allowedFileType.mimeTypes.includes(file.type)) {
-      return NextResponse.json({ error: "Invalid file type." }, { status: 400, headers: corsHeaders });
-    }
-
-    if (!(await allowedFileType.validateContent(file))) {
-      return NextResponse.json({ error: "Invalid file contents." }, { status: 400, headers: corsHeaders });
-    }
-
-    const filename = `${randomUUID()}${extension}`;
-    const uploadsDir = getUploadsDirectory(session.user.id);
+    const { filename } = result;
+    const extension = path.extname(filename).toLowerCase();
     const filePath = getUploadFilePath(filename, session.user.id);
 
     if (!filePath) {
       return NextResponse.json({ error: "Invalid file name." }, { status: 400, headers: corsHeaders });
     }
 
-    try {
-      const tempFilePath = `${filePath}.tmp`;
-
-      await fs.promises.mkdir(uploadsDir, { recursive: true });
-      await pipeline(
-        Readable.fromWeb(file.stream() as NodeReadableStream<Uint8Array>),
-        fs.createWriteStream(tempFilePath)
-      );
-      await fs.promises.rename(tempFilePath, filePath);
-      return NextResponse.json({ id: filename, path: `/api/upload/${filename}`, status: 200 }, { headers: corsHeaders });
-    } catch (error) {
-      console.error(error);
-      await fs.promises.unlink(`${filePath}.tmp`).catch((cleanupError) => {
-        console.warn("Failed to clean up partial upload:", cleanupError);
-      });
-      return NextResponse.json(
-        { message: "Failed to store uploaded file." },
-        { status: 500, headers: corsHeaders }
-      );
+    // Post-write content validation (reads from disk — never buffers the upload).
+    const valid = await validateContentFromPath(extension, filePath);
+    if (!valid) {
+      await fs.promises.unlink(filePath).catch(() => {});
+      return NextResponse.json({ error: "Invalid file contents." }, { status: 400, headers: corsHeaders });
     }
+
+    return NextResponse.json(
+      { id: filename, path: `/api/upload/${filename}`, status: 200 },
+      { headers: corsHeaders }
+    );
   } catch (err) {
     console.error(err);
     return NextResponse.json(
@@ -157,3 +156,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
