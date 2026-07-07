@@ -129,6 +129,13 @@ test("parseCsvRows trims surrounding whitespace from header names", () => {
   assert.deepEqual(rows, [{ name: "Alice", age: "30" }]);
 });
 
+test("parseCsvRows strips a leading UTF-8 BOM from the first header", () => {
+  const rows = parseCsvRows("\uFEFFname,age\nAlice,30");
+
+  assert.deepEqual(rows, [{ name: "Alice", age: "30" }]);
+  assert.deepEqual(Object.keys(rows[0]), ["name", "age"]);
+});
+
 // ---------------------------------------------------------------------------
 // splitCypherStatements — comment handling
 // ---------------------------------------------------------------------------

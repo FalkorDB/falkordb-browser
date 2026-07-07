@@ -94,6 +94,14 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
     const onUploadData = async (e: FormEvent) => {
         e.preventDefault();
         if (uploadInFlightRef.current) return;
+        if (!graphName.trim()) {
+            toast({
+                title: "Error",
+                description: "Please select a graph before uploading.",
+                variant: "destructive"
+            });
+            return;
+        }
         if (files.length !== 1) {
             toast({
                 title: "Error",

@@ -64,14 +64,17 @@ export function validateUploadInput({
 }
 
 export function parseCsvRows(csvText: string): Record<string, string>[] {
+  // Strip a leading UTF-8 BOM (common in CSVs exported from Excel) so the first
+  // header isn't prefixed with \uFEFF, which would break identifier validation.
+  const text = csvText.charCodeAt(0) === 0xfeff ? csvText.slice(1) : csvText;
   const rows: string[][] = [];
   let currentField = "";
   let currentRow: string[] = [];
   let inQuotes = false;
 
-  for (let i = 0; i < csvText.length; i += 1) {
-    const char = csvText[i];
-    const next = csvText[i + 1];
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    const next = text[i + 1];
 
     if (char === "\"") {
       if (inQuotes && next === "\"") {
