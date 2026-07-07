@@ -20,7 +20,8 @@ import type { Data as CanvasData, HierarchyDirection, LayoutMode, RadialDirectio
 import LoginVerification from "./loginVerification";
 import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
-import { GraphContext, GraphInfoContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
+import GraphInfoProvider, { type GraphInfoSync } from "./components/GraphInfoProvider";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
 
@@ -215,15 +216,22 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // graph.GraphInfo in-place without triggering a graph state change.
   const graphRef = useRef<Graph>(graph);
   graphRef.current = graph;
-  // graphInfo and nodesCount/edgesCount are owned by GraphInfoContext so that
-  // only GraphInfoPanel re-renders on periodic info polls, not the whole tree.
-  const [graphInfo, setGraphInfoState] = useState<GraphInfo>(graph.GraphInfo);
+  // graphInfo / nodesCount / edgesCount state is owned by GraphInfoProvider so
+  // that periodic info polls only re-render that isolated subtree, not the
+  // whole providers tree.  We communicate with it via a stable ref of setters.
+  const graphInfoSyncRef = useRef<GraphInfoSync>({
+    bumpVersion: () => {},
+    setNodesCount: () => {},
+    setEdgesCount: () => {},
+  });
+
   const setGraphInfo = useCallback((gi: GraphInfo) => {
     // Mutate graph.GraphInfo in-place — no graph state change, so GraphContext
     // consumers (canvas, toolbar, …) are not disturbed.
     graphRef.current.GraphInfo = gi;
-    // Update GraphInfoContext so only its consumers re-render.
-    setGraphInfoState(gi);
+    // Bump the version counter in GraphInfoProvider so its consumers
+    // re-render and read the fresh data from graph.GraphInfo.
+    graphInfoSyncRef.current.bumpVersion();
   }, []);
   const [data, setData] = useState<GraphData>({ ...graph.Elements });
   const [graphData, setGraphData] = useState<CanvasData>();
@@ -250,8 +258,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [newSecretKey, setNewSecretKey] = useState("");
   const [secretKey, setSecretKey] = useState("");
   const [hasChanges, setHasChanges] = useState(false);
-  const [nodesCount, setNodesCount] = useState<number>();
-  const [edgesCount, setEdgesCount] = useState<number>();
   const [newMaxSavedMessages, setNewMaxSavedMessages] = useState(0);
   const [maxSavedMessages, setMaxSavedMessages] = useState(0);
   const [chatApiKeys, setChatApiKeys] = useState<ChatApiKey[]>([]);
@@ -613,8 +619,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
       const { nodes, edges } = result;
 
-      setEdgesCount(edges);
-      setNodesCount(nodes);
+      graphInfoSyncRef.current.setEdgesCount(edges);
+      graphInfoSyncRef.current.setNodesCount(nodes);
     } catch (error) {
       console.error(error);
     }
@@ -784,8 +790,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setGraphName(name);
     setSelectedParam("");
     setGraphInfo(GraphInfo.empty(toast, setIndicator));
-    setNodesCount(undefined);
-    setEdgesCount(undefined);
+    graphInfoSyncRef.current.setNodesCount(undefined);
+    graphInfoSyncRef.current.setEdgesCount(undefined);
     setData({ nodes: [], links: [] });
     setGraphData(undefined);
     setViewport(undefined);
@@ -822,12 +828,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setSelectedParam,
     initialQuery: initialQueryRef.current,
   }), [graph, graphName, handleSetGraphName, graphNames, labels, relationships, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, selectedParam]);
-
-  const graphInfoContextValue = useMemo(() => ({
-    graphInfo,
-    nodesCount,
-    edgesCount,
-  }), [graphInfo, nodesCount, edgesCount]);
 
   useEffect(() => {
     setRelationships([...graph.Relationships]);
@@ -1365,8 +1365,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setSelectedParam("");
     setGraphNamesLoaded(false);
     setGraphNames([]);
-    setNodesCount(undefined);
-    setEdgesCount(undefined);
+    graphInfoSyncRef.current.setNodesCount(undefined);
+    graphInfoSyncRef.current.setEdgesCount(undefined);
     setHistoryQuery(h => ({ ...h, query: "", currentQuery: defaultQueryHistory.currentQuery }));
     setLabels([]);
     setRelationships([]);
@@ -1517,7 +1517,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       <LoginVerification>
         <BrowserSettingsContext.Provider value={browserSettingsContext}>
           <GraphContext.Provider value={graphContext}>
-            <GraphInfoContext.Provider value={graphInfoContextValue}>
+            <GraphInfoProvider syncRef={graphInfoSyncRef}>
               <HistoryQueryContext.Provider value={historyQueryContext}>
               <IndicatorContext.Provider value={indicatorContext}>
                 <QueryLoadingContext.Provider value={queryLoadingContext}>
@@ -1547,7 +1547,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                 </QueryLoadingContext.Provider>
               </IndicatorContext.Provider>
             </HistoryQueryContext.Provider>
-            </GraphInfoContext.Provider>
+            </GraphInfoProvider>
           </GraphContext.Provider>
         </BrowserSettingsContext.Provider>
       </LoginVerification>

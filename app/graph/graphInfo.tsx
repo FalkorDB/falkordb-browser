@@ -1,4 +1,4 @@
-import { Dispatch, SetStateAction, useContext, useEffect, useState } from "react";
+import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useState } from "react";
 import { Loader2, X, Palette, Play, Plus, Network, Search } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger, PopoverClose } from "@/components/ui/popover";
@@ -23,9 +23,9 @@ function escapeIdentifier(id: string): string {
  * @returns The Graph Info panel React element containing graph name, memory usage, node/edge counts, property keys, and query buttons
  */
 export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizingLabel }: { onClose: () => void, customizingLabel: InfoLabel | null, setCustomizingLabel: Dispatch<SetStateAction<InfoLabel | null>> }) {
-    const { runQuery, graphName, handleSetGraphName, graphNames, setGraphNames, setGraph } = useContext(GraphContext);
-    const { graphInfo, nodesCount, edgesCount } = useContext(GraphInfoContext);
-    const { Labels, Relationships, PropertyKeys, MemoryUsage } = graphInfo;
+    const { graph, runQuery, graphName, handleSetGraphName, graphNames, setGraphNames, setGraph } = useContext(GraphContext);
+    const { nodesCount, edgesCount } = useContext(GraphInfoContext);
+    const { Labels, Relationships, PropertyKeys, MemoryUsage } = graph.GraphInfo;
     const { isQueryLoading } = useContext(QueryLoadingContext);
     const { settings: { graphInfo: { showMemoryUsage, maxItemsForSearch } } } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
@@ -34,9 +34,28 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     const [edgesSearch, setEdgesSearch] = useState("");
     const [propertyKeysSearch, setPropertyKeysSearch] = useState("");
 
-    useEffect(() => { setNodesSearch(""); }, [Labels, maxItemsForSearch]);
-    useEffect(() => { setEdgesSearch(""); }, [Relationships, maxItemsForSearch]);
-    useEffect(() => { setPropertyKeysSearch(""); }, [PropertyKeys, maxItemsForSearch]);
+    // Reset searches only when the active graph changes or the display limit
+    // changes — not on every periodic poll that refreshes GraphInfoContext.
+    useEffect(() => {
+        setNodesSearch("");
+        setEdgesSearch("");
+        setPropertyKeysSearch("");
+    }, [graphName, maxItemsForSearch]);
+
+    // Stable callbacks so SelectGraph's handleSetRows useCallback is not
+    // invalidated on every GraphInfoContext poll update, which would trigger
+    // its useEffect([options, handleSetRows]) and reset checked rows.
+    const handleSetOptions = useCallback((opts: string[]) => {
+        setGraphNames(opts as unknown as string[]);
+    }, [setGraphNames]);
+
+    const handleSetSelectedValue = useCallback((name: string) => {
+        handleSetGraphName(formatName(name));
+    }, [handleSetGraphName]);
+
+    const handleSetGraphFromSelect = useCallback((g: Graph) => {
+        setGraph(g);
+    }, [setGraph]);
 
     return (
         <div data-testid="graphInfoPanel" className={cn("relative h-full w-full p-3 grid gap-3", showMemoryUsage ? "grid-rows-[max-content_max-content_max-content_1fr_1fr_1fr]" : "grid-rows-[max-content_max-content_1fr_1fr_1fr]")}>
@@ -57,13 +76,10 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                         <div className="w-full flex gap-2 items-center overflow-hidden">
                             <SelectGraph
                                 options={graphNames}
-                                setOptions={(opts) => setGraphNames(opts as unknown as string[])}
+                                setOptions={handleSetOptions}
                                 selectedValue={graphName}
-                                setSelectedValue={(name) => {
-                                    handleSetGraphName(formatName(name));
-
-                                }}
-                                setGraph={(g) => setGraph(g as Graph)}
+                                setSelectedValue={handleSetSelectedValue}
+                                setGraph={handleSetGraphFromSelect}
                             />
                             {
                                 !isReadOnly &&
