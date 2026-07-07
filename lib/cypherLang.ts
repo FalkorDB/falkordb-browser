@@ -11,6 +11,10 @@ import type { UDFEntry } from "./utils.ts";
 // so that the Monarch tokenizer regex alternation tries the longer pattern first and
 // avoids a shorter prefix consuming characters that belong to the full keyword.
 // e.g. "OPTIONAL MATCH" before "OPTIONAL", "IS NOT NULL" before "IS NULL" before "IS".
+//
+// Source: OpenCypher BNF grammar <non-reserved word> list
+// (https://github.com/opencypher/openCypher/blob/master/grammar/openCypher.bnf)
+// extended with FalkorDB-specific clauses (FOREACH).
 export const CYPHER_KEYWORDS = [
   // Reading clauses
   "OPTIONAL MATCH",
@@ -20,19 +24,23 @@ export const CYPHER_KEYWORDS = [
   "RETURN",
   "DISTINCT",
   "ORDER BY",
+  "ORDER",
+  "BY",
   "SKIP",
+  "OFFSET",   // openCypher synonym for SKIP
   "LIMIT",
   // Combining / flow clauses
   "WITH",
   "UNION ALL",
   "UNION",
   "UNWIND",
-  "FOREACH",
+  "FOREACH",  // FalkorDB extension (not in openCypher BNF)
   // Write clauses
   "CREATE",
   "MERGE",
   "ON CREATE SET",
   "ON MATCH SET",
+  "ON",
   "DELETE",
   "DETACH DELETE",
   "DETACH",
@@ -53,7 +61,9 @@ export const CYPHER_KEYWORDS = [
   "IN",
   "CONTAINS",
   "STARTS WITH",
+  "STARTS",
   "ENDS WITH",
+  "ENDS",
   // CASE expression
   "CASE",
   "WHEN",
@@ -64,6 +74,9 @@ export const CYPHER_KEYWORDS = [
   "NULL",
   "TRUE",
   "FALSE",
+  "NAN",       // openCypher numeric literal
+  "INF",       // openCypher numeric literal
+  "INFINITY",  // openCypher numeric literal
   // Sort direction
   "ASC",
   "ASCENDING",
@@ -71,16 +84,35 @@ export const CYPHER_KEYWORDS = [
   "DESCENDING",
   // Aliasing
   "AS",
+  // Path keywords (from openCypher BNF)
+  "ALL SHORTEST",
+  "ANY SHORTEST",
+  "ALLSHORTESTPATHS",
+  "SHORTESTPATH",
+  "SHORTEST",
+  "PATH",
+  "PATHS",
+  // Path result set quantifiers (openCypher)
+  "GROUP",
+  "GROUPS",
 ];
 
+// Built-in functions derived from FalkorDB's src/arithmetic/builtin_funcs.gperf
+// (https://github.com/FalkorDB/FalkorDB/blob/master/src/arithmetic/builtin_funcs.gperf)
+// cross-referenced against the OpenCypher specification.
+// Internal operator entries (add, sub, eq, gt, etc.) and non-callable internals
+// (case, list_comprehension, intern, nop, prev, path_filter, …) are excluded.
 export const BUILTIN_FUNCTIONS = [
+  // Predicate functions (openCypher)
   "all",
   "any",
   "exists",
   "isEmpty",
   "none",
   "single",
+  // Conditional / general
   "coalesce",
+  // Graph entity functions (openCypher + FalkorDB)
   "endNode",
   "hasLabels",
   "id",
@@ -90,7 +122,8 @@ export const BUILTIN_FUNCTIONS = [
   "startNode",
   "timestamp",
   "type",
-  "typeOf",
+  "typeOf",     // FalkorDB extension
+  // Aggregate functions
   "avg",
   "collect",
   "count",
@@ -101,13 +134,22 @@ export const BUILTIN_FUNCTIONS = [
   "stDev",
   "stDevP",
   "sum",
+  // List functions (openCypher)
   "head",
   "keys",
   "last",
   "range",
+  "reduce",
   "size",
   "tail",
-  "reduce",
+  "slice",
+  // FalkorDB list extensions
+  "list.dedup",
+  "list.insert",
+  "list.insertlistelements",
+  "list.remove",
+  "list.sort",
+  // Math functions (openCypher)
   "abs",
   "ceil",
   "e",
@@ -120,7 +162,9 @@ export const BUILTIN_FUNCTIONS = [
   "round",
   "sign",
   "sqrt",
+  // Trigonometric functions (openCypher)
   "acos",
+  "asin",
   "atan",
   "atan2",
   "cos",
@@ -131,6 +175,7 @@ export const BUILTIN_FUNCTIONS = [
   "radians",
   "sin",
   "tan",
+  // String functions (openCypher)
   "left",
   "lTrim",
   "replace",
@@ -140,11 +185,25 @@ export const BUILTIN_FUNCTIONS = [
   "split",
   "substring",
   "toLower",
-  "toJSON",
   "toUpper",
   "trim",
+  // String functions (FalkorDB extensions)
+  "toJSON",
+  "string.join",
+  "string.matchregex",
+  "string.replaceregex",
+  // Spatial functions (openCypher)
   "point",
   "distance",
+  // Temporal functions (openCypher)
+  "date",
+  "date.transaction",
+  "duration",
+  "localtime",
+  "localtime.transaction",
+  "localdatetime",
+  "localdatetime.transaction",
+  // Type-conversion functions (openCypher)
   "toBoolean",
   "toBooleanList",
   "toBooleanOrNull",
@@ -157,12 +216,17 @@ export const BUILTIN_FUNCTIONS = [
   "toString",
   "toStringList",
   "toStringOrNull",
+  // Type-conversion functions (FalkorDB extensions)
+  "tolist",
+  "tomap",
+  // Graph traversal / path functions
   "indegree",
   "outdegree",
   "nodes",
   "relationships",
   "length",
   "shortestPath",
+  // Vector functions (FalkorDB extensions)
   "vecf32",
   "vec.euclideanDistance",
   "vec.cosineDistance",
