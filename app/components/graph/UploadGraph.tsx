@@ -7,7 +7,7 @@ import CloseDialog from "../CloseDialog";
 import { IndicatorContext } from "../provider";
 import DialogComponent from "../DialogComponent";
 import { prepareArg, securedFetch } from "@/lib/utils";
-import { parseCsvRows, generateCsvQuery, type CsvColumnType } from "@/app/api/graph/[graph]/upload/upload-utils";
+import { parseCsvRows, generateCsvQuery, type CsvColumnType } from "@/lib/graphUpload";
 
 type UploadMode = "dump" | "csv" | "cypher";
 

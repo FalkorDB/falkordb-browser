@@ -5,11 +5,10 @@ import fs from "fs";
 import { getCorsHeaders, resolveReadOnly } from "../../../utils";
 import {
   validateUploadInput,
-  executeCsvIngestion,
-  executeCypherBatch,
   coerceRow,
   type CsvColumnType,
-} from "./upload-utils";
+} from "@/lib/graphUpload";
+import { executeCsvIngestion, executeCypherBatch } from "./upload-utils";
 
 interface UploadBody {
   mode?: string;
