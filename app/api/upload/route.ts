@@ -109,8 +109,17 @@ async function streamToDisk(
       done({ ok: false, error: "Failed to parse upload.", status: 500 });
     });
 
-    // Pipe request.body → busboy without buffering the full body in memory.
-    Readable.fromWeb(request.body as NodeReadableStream<Uint8Array>).pipe(busboy);
+    // Stream request.body → busboy without buffering the full body in memory.
+    // Use pipeline (not a bare .pipe) so errors on the source stream — e.g. a
+    // client disconnect mid-upload — are handled instead of being silently
+    // dropped or surfacing as an unhandled 'error' event.
+    pipeline(
+      Readable.fromWeb(request.body as NodeReadableStream<Uint8Array>),
+      busboy
+    ).catch((err: unknown) => {
+      console.error("Upload stream error:", err);
+      done({ ok: false, error: "Failed to parse upload.", status: 500 });
+    });
   });
 }
 

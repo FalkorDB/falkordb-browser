@@ -149,19 +149,27 @@ export async function validateContentFromPath(extension: string, filePath: strin
   const fileType = getAllowedFileType(extension);
   if (!fileType) return false;
 
-  const stat = await fs.promises.stat(filePath);
+  // Open the file once and operate on the descriptor so the size check and the
+  // read target the same inode. Re-resolving `filePath` for a separate stat and
+  // readFile would be a time-of-check/time-of-use race (the path could be
+  // swapped between the two calls).
+  const handle = await fs.promises.open(filePath, "r");
+  try {
+    // Binary files — only require non-empty.
+    if (extension === ".dump" || extension === ".rdb") {
+      const stat = await handle.stat();
+      return stat.size > 0;
+    }
 
-  // Binary files — only require non-empty.
-  if (extension === ".dump" || extension === ".rdb") {
-    return stat.size > 0;
+    // Read the saved file back into a File-like object so the existing validators work.
+    // These are always text/image files and are already capped at MAX_FILE_SIZE.
+    const buffer = await handle.readFile();
+    const blob = new Blob([buffer]);
+    const file = new File([blob], `file${extension}`);
+    return fileType.validateContent(file);
+  } finally {
+    await handle.close();
   }
-
-  // Read the saved file back into a File-like object so the existing validators work.
-  // These are always text/image files and are already capped at MAX_FILE_SIZE.
-  const buffer = await fs.promises.readFile(filePath);
-  const blob = new Blob([buffer]);
-  const file = new File([blob], `file${extension}`);
-  return fileType.validateContent(file);
 }
 
 export function getAllowedFileType(extension: string) {

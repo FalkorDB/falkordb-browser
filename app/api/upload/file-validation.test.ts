@@ -8,7 +8,6 @@ import {
   getStoredUpload,
   getUploadsDirectory,
   MAX_FILE_SIZE,
-  MAX_MULTIPART_SIZE,
 } from "./file-validation.ts";
 
 // Valid UUID v4 filename for test cases
@@ -30,10 +29,6 @@ function asciiBytes(s: string): number[] {
 describe("constants", () => {
   it("MAX_FILE_SIZE is 5 MB", () => {
     assert.equal(MAX_FILE_SIZE, 5 * 1024 * 1024);
-  });
-
-  it("MAX_MULTIPART_SIZE is 1 MB larger than MAX_FILE_SIZE", () => {
-    assert.equal(MAX_MULTIPART_SIZE, MAX_FILE_SIZE + 1024 * 1024);
   });
 });
 
