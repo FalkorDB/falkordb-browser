@@ -71,15 +71,18 @@ export default function CreateGraph({
 
             const hasDump = files.length === 1;
 
+            if (graphNames.includes(name)) {
+                toast({
+                    title: "Error",
+                    description: hasDump
+                        ? `A graph named "${name}" already exists. Choose a different name, or use Upload Data → Restore to replace it.`
+                        : "Graph name already exists",
+                    variant: "destructive"
+                });
+                return;
+            }
+
             if (!hasDump) {
-                if (graphNames.includes(name)) {
-                    toast({
-                        title: "Error",
-                        description: "Graph name already exists",
-                        variant: "destructive"
-                    });
-                    return;
-                }
                 const result = await securedFetch(`api/graph/${prepareArg(name)}${isReadOnly ? '?readOnly=true' : ''}`, {
                     method: "POST",
                 }, toast, setIndicator);
@@ -159,7 +162,13 @@ export default function CreateGraph({
                     </p>
                     <Dropzone
                         className="flex-col"
+                        maxFiles={1}
                         onFileDrop={setFiles}
+                        onDropRejected={() => toast({
+                            title: "Couldn't add file",
+                            description: "Please drop a single .dump file.",
+                            variant: "destructive"
+                        })}
                         accept={{ "application/octet-stream": [".dump"] }}
                     />
                     {files.length === 1 && (

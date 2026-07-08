@@ -56,7 +56,13 @@ async function streamToDisk(
 
     let busboy: ReturnType<typeof Busboy>;
     try {
-      busboy = Busboy({ headers: { "content-type": contentType } });
+      // Conservative limits make the single-file upload contract explicit and cap
+      // the DoS surface: at most one file part, no text fields, and a small ceiling
+      // on total parts so a flood of parts can't tie up the parser.
+      busboy = Busboy({
+        headers: { "content-type": contentType },
+        limits: { files: 1, fields: 0, parts: 10 },
+      });
     } catch (err) {
       // A malformed/missing multipart content-type makes the parser throw on
       // construction — that's a bad request, not a server error.
