@@ -5,22 +5,16 @@ import type { CsvStorageProvider } from "./csv-storage";
 const UUID_PATTERN =
     /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function assertValidCsvKey(key: string): void {
-    if (!UUID_PATTERN.test(key)) {
+function buildSafeCsvFilePath(key: string): string {
+    // Use the regex match result — not the original string — so static analysis
+    // tools can confirm the value that reaches path.join cannot contain
+    // path-traversal sequences.  UUID v4 chars are [0-9a-f-] only.
+    const match = UUID_PATTERN.exec(key);
+    if (!match) {
         throw new Error("Invalid CSV key.");
     }
-}
-
-function buildSafeCsvFilePath(key: string): string {
-    assertValidCsvKey(key);
-    const rootDir = path.resolve(getCsvTempDir());
-    const filePath = path.resolve(rootDir, `${key}.csv`);
-
-    if (filePath !== rootDir && !filePath.startsWith(`${rootDir}${path.sep}`)) {
-        throw new Error("Invalid CSV file path.");
-    }
-
-    return filePath;
+    const safeKey = match[0].toLowerCase();
+    return path.join(path.resolve(getCsvTempDir()), `${safeKey}.csv`);
 }
 
 export function getCsvTempDir(): string {
