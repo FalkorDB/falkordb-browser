@@ -112,11 +112,11 @@ jobs:
 
     services:
       falkordb:
-        image: falkordb/falkordb:latest
+        image: falkordb/falkordb:v4.18.10
         ports:
           - 6379:6379
       falkordb-pat:
-        image: falkordb/falkordb:latest
+        image: falkordb/falkordb:v4.18.10
         ports:
           - 6380:6379
 
@@ -235,7 +235,7 @@ jobs:
         run: |
           mkdir -p tls
           # Start container in background and wait for certificate generation
-          CONTAINER_ID=$(docker run --rm -d -e TLS=1 -v $(pwd)/tls:/var/lib/falkordb/tls falkordb/falkordb:latest)
+          CONTAINER_ID=$(docker run --rm -d -e TLS=1 -v $(pwd)/tls:/var/lib/falkordb/tls falkordb/falkordb:v4.18.10)
           echo "Started certificate generation container: $CONTAINER_ID"
           
           # Wait for certificates to be generated (look for "Ready to accept connections tls")
@@ -270,7 +270,7 @@ jobs:
             -v $(pwd)/redis.conf:/var/lib/falkordb/data/redis.conf \
             -e REDIS_ARGS="/var/lib/falkordb/data/redis.conf" \
             -v $(pwd)/tls:/var/lib/falkordb/tls \
-            falkordb/falkordb:latest
+            falkordb/falkordb:v4.18.10
           echo "Container started with ID: $(docker ps -q -f name=falkordb-tls)"
       - name: Wait for FalkorDB TLS to be ready
         run: |
@@ -380,7 +380,7 @@ jobs:
             -p 6380:6379 \
             -e BROWSER=0 \
             -e "REDIS_ARGS=--protected-mode no" \
-            falkordb/falkordb
+            falkordb/falkordb:v4.18.10
           
           # Start node2 on port 6381  
           docker run -d \
@@ -388,7 +388,7 @@ jobs:
             -p 6381:6379 \
             -e BROWSER=0 \
             -e "REDIS_ARGS=--protected-mode no" \
-            falkordb/falkordb
+            falkordb/falkordb:v4.18.10
           
           # Start node3 on port 6382
           docker run -d \
@@ -396,7 +396,7 @@ jobs:
             -p 6382:6379 \
             -e BROWSER=0 \
             -e "REDIS_ARGS=--protected-mode no" \
-            falkordb/falkordb
+            falkordb/falkordb:v4.18.10
             
           echo "All cluster nodes started"
       - name: Wait for cluster nodes to be ready
@@ -520,7 +520,7 @@ jobs:
         run: |
           docker run -d --name falkordb-core -p 6379:6379 \
             -e "REDIS_ARGS=--protected-mode no" \
-            falkordb/falkordb:latest
+            falkordb/falkordb:v4.18.10
       - name: Start locally-built browser container
         run: |
           docker run -d --name falkordb-browser --network=host \
