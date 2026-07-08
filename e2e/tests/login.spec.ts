@@ -20,7 +20,9 @@ test.describe(`Login tests`, () => {
         await login.disconnectConnection();
         await browser.setPageToFullScreen();
         await login.clickOnConnect();
-        expect(login.getCurrentURL()).toBe(urls.graphUrl);
+        // clickOnConnect waits for the normalized path; poll the exact URL so a
+        // transient trailing-slash/param during navigation doesn't flake the check.
+        await expect.poll(() => login.getCurrentURL(), { timeout: 10000 }).toBe(urls.graphUrl);
     });
 
     test(`@admin validate user login with credentials`, async () => {

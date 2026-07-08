@@ -42,14 +42,16 @@ export default class QueryHistory extends GraphPage {
         return this.page.locator('.find-widget').first();
     }
 
-    /** The Monaco suggest/autocomplete widget. */
+    /** The Monaco suggest/autocomplete widget. Multiple editors on the page each
+     * have their own `.suggest-widget`; only the active one gets the `visible`
+     * class, so match that to avoid latching onto another editor's hidden widget. */
     public get monacoSuggestWidget(): Locator {
-        return this.page.locator('.suggest-widget').first();
+        return this.page.locator('.suggest-widget.visible').first();
     }
 
-    /** Rows inside the Monaco suggest/autocomplete widget. */
+    /** Rows inside the visible Monaco suggest/autocomplete widget. */
     public get monacoSuggestRows(): Locator {
-        return this.page.locator('.suggest-widget .monaco-list-row');
+        return this.page.locator('.suggest-widget.visible .monaco-list-row');
     }
     
     async clickQueryHistoryButton(): Promise<void> {   

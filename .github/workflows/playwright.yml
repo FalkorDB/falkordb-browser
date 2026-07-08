@@ -173,7 +173,7 @@ jobs:
             --project="[Read-Only] - Chromium" \
             --project="[Admin: Settings - Chromium]" \
             --shard=${{ matrix.shard }}/6 \
-            --workers=4 \
+            --workers=2 \
             --reporter=dot,list
       - name: Upload test results
         if: always()
