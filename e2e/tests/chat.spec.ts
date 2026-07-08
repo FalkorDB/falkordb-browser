@@ -683,7 +683,7 @@ test.describe("Chat Feature Tests", () => {
           cypherQuery: "MATCH (a:Person)-[:KNOWS]->(b) RETURN b.name",
           cypherResult: null,
           answer: "Bob is Alice's friend.",
-          confidence: 0.9,
+          confidence: 90,
           tokenUsage: { totalTokens: 150 },
         }),
       });
