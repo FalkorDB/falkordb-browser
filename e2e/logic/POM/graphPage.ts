@@ -1384,8 +1384,9 @@ export default class GraphPage extends BasePage {
     absoluteFilePath: string,
     csvQuery?: string
   ): Promise<void> {
+    // The Manage upload dialog is Cypher-batch-only (no tabs) after commit
+    // 47aa4930, so there is no tab to select before uploading.
     await this.openUploadDialog(graphName);
-    await this.selectUploadTab(mode);
     await this.setUploadFile(absoluteFilePath);
     if (mode === "csv" && csvQuery !== undefined) {
       await this.setUploadCsvQuery(csvQuery);

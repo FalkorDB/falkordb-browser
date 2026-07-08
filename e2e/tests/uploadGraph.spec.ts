@@ -54,8 +54,7 @@ test.describe("Upload Graph – Cypher batch", () => {
 
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
     await graph.openUploadDialog(graphName);
-    await graph.selectUploadTab("cypher");
-    // No file attached — confirm button should be disabled
+    // No file attached — confirm button should be disabled (Cypher-only dialog)
     expect(await graph.uploadConfirm.isDisabled()).toBe(true);
 
     await apiCall.removeGraph(graphName);
@@ -64,8 +63,11 @@ test.describe("Upload Graph – Cypher batch", () => {
 
 // ---------------------------------------------------------------------------
 // CSV upload: run a per-row Cypher statement over each CSV row
+// Temporarily skipped — the Manage upload dialog was simplified to Cypher-batch
+// only (commit 47aa4930), so the CSV tab no longer exists in the UI. Re-enable
+// if the CSV upload UI is restored.
 // ---------------------------------------------------------------------------
-test.describe("Upload Graph – CSV", () => {
+test.describe.skip("Upload Graph – CSV", () => {
   let browser: BrowserWrapper;
   let apiCall: ApiCalls;
 
@@ -111,35 +113,6 @@ test.describe("Upload Graph – CSV", () => {
     await graph.selectUploadTab("csv");
     // No file and no query — confirm button should be disabled
     expect(await graph.uploadConfirm.isDisabled()).toBe(true);
-
-    await apiCall.removeGraph(graphName);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Dump restore disabled: the Restore tab must be hidden while the feature is off
-// ---------------------------------------------------------------------------
-test.describe("Upload Graph – dump restore disabled", () => {
-  let browser: BrowserWrapper;
-  let apiCall: ApiCalls;
-
-  test.beforeEach(async () => {
-    browser = new BrowserWrapper();
-    apiCall = new ApiCalls();
-  });
-
-  test.afterEach(async () => {
-    await browser.closeBrowser();
-  });
-
-  test(`@admin the Restore tab is not shown while dump restore is disabled`, async () => {
-    const graphName = getRandomString("dumpDisabled");
-    await apiCall.addGraph(graphName);
-
-    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-    await graph.openUploadDialog(graphName);
-    await expect(graph.uploadTabTrigger("dump")).toHaveCount(0);
-    await expect(graph.uploadTabTrigger("csv")).toBeVisible();
 
     await apiCall.removeGraph(graphName);
   });
