@@ -300,12 +300,21 @@ test("chunkCsvItems returns a single chunk when everything fits", () => {
 });
 
 test("chunkCsvItems splits by approximate byte size for wide rows", () => {
+  // Each row is ~50 bytes serialized; maxChunkBytes=80 forces one row per chunk.
   const wide: CsvRowItem[] = Array.from({ length: 4 }, (_, i) => ({
     index: i,
-    data: { blob: "x".repeat(100) },
+    data: { blob: "x".repeat(30) },
   }));
   const chunks = chunkCsvItems(wide, 1000, 80);
   assert.equal(chunks.length, 4);
+});
+
+test("chunkCsvItems throws when a single row exceeds maxChunkBytes", () => {
+  const oversized: CsvRowItem[] = [{ index: 0, data: { blob: "x".repeat(100) } }];
+  assert.throws(
+    () => chunkCsvItems(oversized, 1000, 80),
+    /row is too large to fit in maxChunkBytes/
+  );
 });
 
 test("chunkCsvItems returns no chunks for an empty list", () => {
