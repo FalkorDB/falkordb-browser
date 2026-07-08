@@ -1,6 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
-import { type FormEvent, useContext, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { TriangleAlert } from "lucide-react";
 import Dropzone from "../ui/Dropzone";
 import Button from "../ui/Button";
@@ -8,8 +8,23 @@ import CloseDialog from "../CloseDialog";
 import { IndicatorContext } from "../provider";
 import DialogComponent from "../DialogComponent";
 import { prepareArg, securedFetch } from "@/lib/utils";
+import { Textarea } from "@/components/ui/textarea";
+import { assertSafeCsvHeaders, generateCsvQuery, parseCsvRows } from "@/lib/graphUpload";
+import type { Accept, FileRejection } from "react-dropzone";
 
-type UploadMode = "rdb" | "cypher";
+type UploadMode = "dump" | "csv" | "cypher";
+
+const ACCEPTED_FILES: Record<UploadMode, Accept> = {
+    dump: { "application/octet-stream": [".dump"] },
+    csv: { "text/csv": [".csv"], "application/vnd.ms-excel": [".csv"] },
+    cypher: { "text/plain": [".txt", ".cql", ".cypher"], "application/octet-stream": [".cql", ".cypher"] },
+};
+
+const ACCEPTED_HINT: Record<UploadMode, string> = {
+    dump: "a .dump file",
+    csv: "a .csv file",
+    cypher: "a .txt, .cql, or .cypher file",
+};
 
 export default function UploadGraph({ graphName, disabled, open, onOpenChange }: {
     /* eslint-disable react/require-default-props */
@@ -20,8 +35,13 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
 }) {
 
     const [files, setFiles] = useState<File[]>([]);
-    const [mode, setMode] = useState<UploadMode>("rdb");
+    const [mode, setMode] = useState<UploadMode>("dump");
+    const [csvQuery, setCsvQuery] = useState("");
+    const [csvQueryEdited, setCsvQueryEdited] = useState(false);
+    const [csvColumns, setCsvColumns] = useState<string[]>([]);
+    const [csvError, setCsvError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const csvReadToken = useRef(0);
     const isControlled = typeof open === "boolean" && typeof onOpenChange === "function";
     const [internalOpen, setInternalOpen] = useState(false);
     const { toast } = useToast();
@@ -42,18 +62,105 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
 
     useEffect(() => {
         if (!dialogOpen) {
+            csvReadToken.current += 1;
             setFiles([]);
-            setMode("rdb");
+            setMode("dump");
+            setCsvQuery("");
+            setCsvQueryEdited(false);
+            setCsvColumns([]);
+            setCsvError(null);
             setIsLoading(false);
         }
     }, [dialogOpen]);
 
+    const resetSelection = () => {
+        csvReadToken.current += 1;
+        setFiles([]);
+        setCsvQuery("");
+        setCsvQueryEdited(false);
+        setCsvColumns([]);
+        setCsvError(null);
+    };
+
+    // When a CSV is chosen, read its header row (client-side, browser-safe helpers)
+    // to show the detected columns and prefill a ready-to-run starter query so the
+    // common case is a one-click ingest. Only the first 64KB is read to stay snappy.
+    // A token guards against a slow read landing after the dialog has moved on.
+    const handleFileDrop = (accepted: File[]) => {
+        setFiles(accepted);
+        setCsvColumns([]);
+        setCsvError(null);
+        if (mode !== "csv" || accepted.length !== 1) return;
+
+        csvReadToken.current += 1;
+        const token = csvReadToken.current;
+
+        accepted[0]
+            .slice(0, 64 * 1024)
+            .text()
+            .then((sample) => {
+                if (token !== csvReadToken.current) return;
+                const rows = parseCsvRows(sample);
+                const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
+                setCsvColumns(columns);
+                if (columns.length === 0) return;
+                // Headers must be valid Cypher identifiers (the server enforces this
+                // too); surfacing it here avoids handing the user a query that fails.
+                assertSafeCsvHeaders(rows);
+                // Prefill a starter query, but never clobber one the user has edited.
+                setCsvQuery((current) => (csvQueryEdited && current.trim() ? current : generateCsvQuery("Row", columns)));
+            })
+            .catch((error: unknown) => {
+                if (token !== csvReadToken.current) return;
+                setCsvError((error as Error).message);
+            });
+    };
+
+    const handleDropRejected = (rejections: FileRejection[]) => {
+        const tooMany = rejections.some((rejection) =>
+            rejection.errors.some((err) => err.code === "too-many-files")
+        );
+        toast({
+            title: "Couldn't add file",
+            description: tooMany ? "Please drop a single file." : `Please choose ${ACCEPTED_HINT[mode]}.`,
+            variant: "destructive",
+        });
+    };
+
     const onUploadData = async (e: FormEvent) => {
         e.preventDefault();
+
+        if (!graphName) {
+            toast({
+                title: "Error",
+                description: "Select a single graph before uploading.",
+                variant: "destructive"
+            });
+            return;
+        }
+
         if (files.length !== 1) {
             toast({
                 title: "Error",
                 description: "Please select exactly one file.",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        if (mode === "csv" && !csvQuery.trim()) {
+            toast({
+                title: "Error",
+                description: "Enter a Cypher query to run for each CSV row.",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        if (mode === "csv" && csvError) {
+            toast({
+                title: "Error",
+                description: csvError,
                 variant: "destructive"
             });
             return;
@@ -76,12 +183,15 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
 
             const { id } = await uploadResult.json() as { id: string };
 
+            const payload: { mode: UploadMode; fileId: string; query?: string } = { mode, fileId: id };
+            if (mode === "csv") payload.query = csvQuery;
+
             const processResult = await securedFetch(
                 `api/graph/${prepareArg(graphName)}/upload`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ mode, fileId: id })
+                    body: JSON.stringify(payload)
                 },
                 toast,
                 setIndicator
@@ -92,11 +202,11 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
             const data = await processResult.json() as { message?: string };
 
             toast({
-                title: mode === "rdb" ? "Graph restored successfully" : "Upload completed",
+                title: mode === "dump" ? "Graph restored successfully" : "Upload completed",
                 description: data.message || "Graph data uploaded successfully."
             });
 
-            setFiles([]);
+            resetSelection();
             handleOpenChange(false);
         } finally {
             setIsLoading(false);
@@ -123,12 +233,13 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
             className="max-h-[90dvh] max-w-[60dvw]"
         >
             <form onSubmit={onUploadData} className="grow p-2 flex flex-col gap-4 overflow-hidden">
-                <Tabs value={mode} onValueChange={(value) => { setMode(value as UploadMode); setFiles([]); }} className="w-full">
+                <Tabs value={mode} onValueChange={(value) => { setMode(value as UploadMode); resetSelection(); }} className="w-full">
                     <TabsList className="h-fit bg-background gap-1">
-                        <TabsTrigger value="rdb">Restore</TabsTrigger>
+                        <TabsTrigger value="dump">Restore</TabsTrigger>
+                        <TabsTrigger value="csv">CSV</TabsTrigger>
                         <TabsTrigger value="cypher">Cypher batch</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="rdb" className="mt-2 flex flex-col gap-2">
+                    <TabsContent value="dump" className="mt-2 flex flex-col gap-2">
                         <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                             <TriangleAlert size={16} className="mt-0.5 shrink-0" />
                             <span>
@@ -139,6 +250,12 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
                             Upload a .dump file previously exported via the Export button to restore this graph.
                         </p>
                     </TabsContent>
+                    <TabsContent value="csv" className="mt-2">
+                        <p className="text-sm text-muted-foreground">
+                            Upload a .csv file and run one Cypher statement for every row. Each row&apos;s
+                            columns are available as <code className="rounded bg-muted px-1 py-0.5 text-xs">row.column</code>.
+                        </p>
+                    </TabsContent>
                     <TabsContent value="cypher" className="mt-2">
                         <p className="text-sm text-muted-foreground">
                             Upload a .txt, .cql, or .cypher file and execute each statement sequentially into the existing graph.
@@ -146,25 +263,58 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
                     </TabsContent>
                 </Tabs>
                 <Dropzone
+                    key={mode}
                     filesCount
                     className="flex-col"
                     withTable
-                    onFileDrop={setFiles}
-                    accept={
-                        mode === "rdb"
-                            ? { "application/octet-stream": [".rdb", ".dump"] }
-                            : { "text/plain": [".txt", ".cql", ".cypher"], "application/octet-stream": [".cql", ".cypher"] }
-                    }
+                    maxFiles={1}
+                    onFileDrop={handleFileDrop}
+                    onDropRejected={handleDropRejected}
+                    accept={ACCEPTED_FILES[mode]}
                 />
+                {mode === "csv" && (
+                    <div className="flex flex-col gap-2">
+                        {csvColumns.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                                <span className="text-muted-foreground">Detected columns:</span>
+                                {csvColumns.map((col) => (
+                                    <span key={col} className="rounded bg-muted px-1.5 py-0.5 font-mono">{col}</span>
+                                ))}
+                            </div>
+                        )}
+                        {csvError && (
+                            <p className="text-xs text-destructive" data-testid="uploadCsvError">{csvError}</p>
+                        )}
+                        <label htmlFor="csvUploadQuery" className="text-sm font-medium">Cypher query</label>
+                        <Textarea
+                            id="csvUploadQuery"
+                            value={csvQuery}
+                            onChange={(e) => { setCsvQuery(e.target.value); setCsvQueryEdited(true); }}
+                            placeholder="CREATE (:Person {name: row.name, age: row.age})"
+                            className="min-h-[96px] font-mono text-xs"
+                            data-testid="uploadCsvQuery"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Runs once per row. Dropping a .csv prefills a starter query — rename the
+                            {" "}<code className="rounded bg-muted px-1 py-0.5">:Row</code> label to your node type.
+                        </p>
+                    </div>
+                )}
                 <div className="flex gap-3 justify-end">
                     <Button
                         type="submit"
-                        label={mode === "rdb" ? "Restore" : "Upload"}
-                        title={mode === "rdb" ? "Restore graph from dump file" : "Execute Cypher statements into the graph"}
+                        label={mode === "dump" ? "Restore" : "Upload"}
+                        title={
+                            mode === "dump"
+                                ? "Restore graph from dump file"
+                                : mode === "csv"
+                                    ? "Ingest CSV rows into the graph"
+                                    : "Execute Cypher statements into the graph"
+                        }
                         variant="Primary"
                         isLoading={isLoading}
                         indicator={indicator}
-                        disabled={files.length !== 1}
+                        disabled={files.length !== 1 || (mode === "csv" && (!csvQuery.trim() || Boolean(csvError)))}
                         data-testid="uploadGraphConfirm"
                     />
                     <CloseDialog data-testid="uploadGraphCancel" />

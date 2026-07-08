@@ -16,18 +16,16 @@ import {
   MAX_FILE_SIZE,
 } from "./file-validation";
 
-// Binary extensions (e.g. .dump, .rdb) stream freely — no size cap beyond disk.
-const BINARY_EXTENSIONS = new Set([".dump", ".rdb"]);
+// Small text/CSV/Cypher uploads are capped tightly (MAX_FILE_SIZE). A .dump is a
+// binary blob that streams straight to disk and can legitimately be large, so it
+// gets a separate, larger cap instead of being uncapped — an uncapped stream
+// would let an authenticated user fill the disk.
+const BINARY_EXTENSIONS = new Set([".dump"]);
+const MAX_DUMP_SIZE = 1024 * 1024 * 1024; // 1 GiB
 
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
-
-// Route segment config — disable Next.js body buffering so busboy can read the
-// raw stream directly. Without this the framework buffers the whole body first.
-export const config = {
-  api: { bodyParser: false },
-};
 
 type StreamResult =
   | { ok: true; filename: string }
@@ -38,11 +36,16 @@ async function streamToDisk(
   request: NextRequest,
   userId: string
 ): Promise<StreamResult> {
+  const { body } = request;
+  if (!body) {
+    return { ok: false, error: "Request body is missing.", status: 400 };
+  }
+
   const contentType = request.headers.get("content-type") ?? "";
 
   return new Promise((resolve) => {
-    const busboy = Busboy({ headers: { "content-type": contentType } });
     let settled = false;
+    let fileSeen = false;
 
     const done = (result: StreamResult) => {
       if (!settled) {
@@ -51,7 +54,27 @@ async function streamToDisk(
       }
     };
 
+    let busboy: ReturnType<typeof Busboy>;
+    try {
+      busboy = Busboy({ headers: { "content-type": contentType } });
+    } catch (err) {
+      // A malformed/missing multipart content-type makes the parser throw on
+      // construction — that's a bad request, not a server error.
+      console.error("Busboy init error:", err);
+      done({ ok: false, error: "Failed to parse upload.", status: 400 });
+      return;
+    }
+
     busboy.on("file", (fieldname, fileStream, info) => {
+      // Ignore unexpected field names and any file after the first, so a crafted
+      // multipart body can't write extra files or stall the parser. Draining the
+      // stream lets busboy finish parsing cleanly.
+      if (fieldname !== "file" || fileSeen) {
+        fileStream.resume();
+        return;
+      }
+      fileSeen = true;
+
       const { filename: originalName, mimeType } = info;
       const extension = path.extname(originalName).toLowerCase();
       const allowedFileType = getAllowedFileType(extension);
@@ -76,13 +99,13 @@ async function streamToDisk(
       fs.mkdirSync(uploadsDir, { recursive: true });
       const writeStream = fs.createWriteStream(tempFilePath);
 
-      const isBinary = BINARY_EXTENSIONS.has(extension);
+      const sizeLimit = BINARY_EXTENSIONS.has(extension) ? MAX_DUMP_SIZE : MAX_FILE_SIZE;
       let bytesWritten = 0;
       let sizeLimitHit = false;
 
       fileStream.on("data", (chunk: Buffer) => {
         bytesWritten += chunk.length;
-        if (!isBinary && bytesWritten > MAX_FILE_SIZE) {
+        if (bytesWritten > sizeLimit) {
           sizeLimitHit = true;
           fileStream.destroy();
           writeStream.destroy();
@@ -104,6 +127,15 @@ async function streamToDisk(
         });
     });
 
+    // Fires once the whole multipart body has been parsed. If no acceptable file
+    // part was received, resolve with a 400 instead of leaving the request to
+    // hang forever.
+    busboy.on("close", () => {
+      if (!fileSeen) {
+        done({ ok: false, error: "No file uploaded.", status: 400 });
+      }
+    });
+
     busboy.on("error", (err) => {
       console.error("Busboy error:", err);
       done({ ok: false, error: "Failed to parse upload.", status: 500 });
@@ -114,7 +146,7 @@ async function streamToDisk(
     // client disconnect mid-upload — are handled instead of being silently
     // dropped or surfacing as an unhandled 'error' event.
     pipeline(
-      Readable.fromWeb(request.body as NodeReadableStream<Uint8Array>),
+      Readable.fromWeb(body as NodeReadableStream<Uint8Array>),
       busboy
     ).catch((err: unknown) => {
       console.error("Upload stream error:", err);

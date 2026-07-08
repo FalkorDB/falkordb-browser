@@ -16,6 +16,8 @@ export type ElementLabel = "Relationships" | "Labels";
 
 export type Type = "Graph" | "Role" | "Type" | "Model" | "Theme" | "Query";
 
+export type UploadMode = "dump" | "csv" | "cypher";
+
 export default class GraphPage extends BasePage {
   // CREATE
   public get create(): Locator {
@@ -78,11 +80,11 @@ export default class GraphPage extends BasePage {
   }
 
   public get uploadCsvQueryTextarea(): Locator {
-    return this.page.getByLabel("CSV ingestion Cypher query");
+    return this.page.getByTestId("uploadCsvQuery");
   }
 
-  public uploadTabTrigger(mode: "rdb" | "csv" | "cypher"): Locator {
-    const labels: Record<string, string> = { rdb: "RDB / dump", csv: "CSV + query", cypher: "Cypher batch" };
+  public uploadTabTrigger(mode: UploadMode): Locator {
+    const labels: Record<UploadMode, string> = { dump: "Restore", csv: "CSV", cypher: "Cypher batch" };
     return this.page.getByRole("tab", { name: labels[mode] });
   }
 
@@ -1339,8 +1341,8 @@ export default class GraphPage extends BasePage {
     await waitForElementToBeVisible(this.uploadConfirm);
   }
 
-  /** Switch to the given upload tab (rdb / cypher). */
-  async selectUploadTab(mode: "rdb" | "cypher"): Promise<void> {
+  /** Switch to the given upload tab (dump / csv / cypher). */
+  async selectUploadTab(mode: UploadMode): Promise<void> {
     await interactWhenVisible(
       this.uploadTabTrigger(mode),
       (el) => el.click(),
@@ -1378,12 +1380,16 @@ export default class GraphPage extends BasePage {
    */
   async uploadGraphData(
     graphName: string,
-    mode: "rdb" | "cypher",
-    absoluteFilePath: string
+    mode: UploadMode,
+    absoluteFilePath: string,
+    csvQuery?: string
   ): Promise<void> {
     await this.openUploadDialog(graphName);
     await this.selectUploadTab(mode);
     await this.setUploadFile(absoluteFilePath);
+    if (mode === "csv" && csvQuery !== undefined) {
+      await this.setUploadCsvQuery(csvQuery);
+    }
     await this.clickUploadConfirm();
     await waitForElementToBeVisible(this.toast);
   }

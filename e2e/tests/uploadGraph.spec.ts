@@ -2,6 +2,7 @@
 import { expect, test } from "@playwright/test";
 import path from "path";
 import fs from "fs";
+import os from "os";
 import { getRandomString } from "../infra/utils";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
@@ -10,6 +11,7 @@ import urls from "../config/urls.json";
 
 const FIXTURES_DIR = path.join(__dirname, "../config/fixtures");
 const CYPHER_FIXTURE = path.join(FIXTURES_DIR, "upload-people.cypher");
+const CSV_FIXTURE = path.join(FIXTURES_DIR, "upload-people.csv");
 
 // ---------------------------------------------------------------------------
 // Cypher batch upload: 3 CREATE statements → 3 City nodes
@@ -61,9 +63,9 @@ test.describe("Upload Graph – Cypher batch", () => {
 });
 
 // ---------------------------------------------------------------------------
-// RDB restore: export a populated graph, restore it into an existing graph
+// CSV upload: run a per-row Cypher statement over each CSV row
 // ---------------------------------------------------------------------------
-test.describe("Upload Graph – RDB restore", () => {
+test.describe("Upload Graph – CSV", () => {
   let browser: BrowserWrapper;
   let apiCall: ApiCalls;
 
@@ -76,9 +78,63 @@ test.describe("Upload Graph – RDB restore", () => {
     await browser.closeBrowser();
   });
 
-  test(`@admin Export a graph as RDB then restore it into another graph via Upload Data`, async () => {
-    const sourceGraph = getRandomString("rdbSource");
-    const destGraph = getRandomString("rdbDest");
+  test(`@admin Upload a CSV file with a per-row query and verify nodes are created`, async () => {
+    const graphName = getRandomString("uploadCsv");
+    await apiCall.addGraph(graphName);
+
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    await graph.uploadGraphData(
+      graphName,
+      "csv",
+      CSV_FIXTURE,
+      "CREATE (:Person {name: row.name, age: row.age, city: row.city})"
+    );
+
+    expect(await graph.toast.textContent()).toContain("Upload completed");
+
+    const result = await apiCall.runQuery(
+      graphName,
+      "MATCH (n:Person) RETURN count(n) AS cnt"
+    );
+    const cnt = result.data[0]?.cnt ?? result.data[0]?.["count(n)"];
+    expect(Number(cnt)).toBe(3);
+
+    await apiCall.removeGraph(graphName);
+  });
+
+  test(`@admin Upload button is disabled until a CSV file and query are provided`, async () => {
+    const graphName = getRandomString("csvNoInput");
+    await apiCall.addGraph(graphName);
+
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    await graph.openUploadDialog(graphName);
+    await graph.selectUploadTab("csv");
+    // No file and no query — confirm button should be disabled
+    expect(await graph.uploadConfirm.isDisabled()).toBe(true);
+
+    await apiCall.removeGraph(graphName);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dump restore: export a populated graph, restore it into an existing graph
+// ---------------------------------------------------------------------------
+test.describe("Upload Graph – Dump restore", () => {
+  let browser: BrowserWrapper;
+  let apiCall: ApiCalls;
+
+  test.beforeEach(async () => {
+    browser = new BrowserWrapper();
+    apiCall = new ApiCalls();
+  });
+
+  test.afterEach(async () => {
+    await browser.closeBrowser();
+  });
+
+  test(`@admin Export a graph as a dump then restore it into another graph via Upload Data`, async () => {
+    const sourceGraph = getRandomString("dumpSource");
+    const destGraph = getRandomString("dumpDest");
 
     // Create source graph with 5 nodes
     await apiCall.addGraph(sourceGraph);
@@ -87,11 +143,13 @@ test.describe("Upload Graph – RDB restore", () => {
       "UNWIND range(1, 5) AS i CREATE (:Item {id: i})"
     );
 
-    // Export → download the RDB file
+    // Export → download the .dump file, saving it with its real filename so the
+    // extension is preserved (the upload API validates by file extension).
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
     const download = await graph.exportGraphByName(sourceGraph);
-    const rdbPath = await download.path();
-    expect(fs.existsSync(rdbPath!)).toBe(true);
+    const dumpPath = path.join(os.tmpdir(), download.suggestedFilename());
+    await download.saveAs(dumpPath);
+    expect(fs.existsSync(dumpPath)).toBe(true);
 
     // Create an empty destination graph
     await apiCall.addGraph(destGraph);
@@ -100,7 +158,7 @@ test.describe("Upload Graph – RDB restore", () => {
     await graph.refreshPage();
 
     // Restore into the destination graph via Upload Data → Restore tab
-    await graph.uploadGraphData(destGraph, "rdb", rdbPath!);
+    await graph.uploadGraphData(destGraph, "dump", dumpPath);
 
     expect(await graph.toast.textContent()).toContain("Graph restored successfully");
 
@@ -112,12 +170,13 @@ test.describe("Upload Graph – RDB restore", () => {
     const cnt = result.data[0]?.cnt ?? result.data[0]?.["count(n)"];
     expect(Number(cnt)).toBe(5);
 
+    await fs.promises.unlink(dumpPath).catch(() => {});
     await apiCall.removeGraph(sourceGraph);
     await apiCall.removeGraph(destGraph);
   });
 
   test(`@admin Restore button is disabled when no file is selected`, async () => {
-    const graphName = getRandomString("rdbNoFile");
+    const graphName = getRandomString("dumpNoFile");
     await apiCall.addGraph(graphName);
 
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);

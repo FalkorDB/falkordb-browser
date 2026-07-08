@@ -123,7 +123,7 @@ export const ALLOWED_FILE_TYPES: Record<string, AllowedFileType> = {
     validateContent: isUtf8TextFile,
   },
   ".csv": {
-    mimeTypes: ["text/csv", "application/csv", "text/plain"],
+    mimeTypes: ["text/csv", "application/csv", "text/plain", "application/vnd.ms-excel"],
     contentType: "text/csv",
     validateContent: isUtf8TextFile,
   },
@@ -156,7 +156,7 @@ export async function validateContentFromPath(extension: string, filePath: strin
   const handle = await fs.promises.open(filePath, "r");
   try {
     // Binary files — only require non-empty.
-    if (extension === ".dump" || extension === ".rdb") {
+    if (extension === ".dump") {
       const stat = await handle.stat();
       return stat.size > 0;
     }

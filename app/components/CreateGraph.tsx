@@ -90,7 +90,7 @@ export default function CreateGraph({
                 uploadFormData.append("file", files[0]);
 
                 const uploadResult = await securedFetch(
-                    "/api/upload",
+                    "api/upload",
                     { method: "POST", body: uploadFormData },
                     toast,
                     setIndicator
@@ -105,7 +105,7 @@ export default function CreateGraph({
                     {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ mode: "rdb", fileId: id })
+                        body: JSON.stringify({ mode: "dump", fileId: id })
                     },
                     toast,
                     setIndicator
@@ -160,7 +160,7 @@ export default function CreateGraph({
                     <Dropzone
                         className="flex-col"
                         onFileDrop={setFiles}
-                        accept={{ "application/octet-stream": [".rdb", ".dump"] }}
+                        accept={{ "application/octet-stream": [".dump"] }}
                     />
                     {files.length === 1 && (
                         <div className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm">

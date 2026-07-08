@@ -243,6 +243,15 @@ test("validateUploadInput rejects an unknown mode", () => {
   assert.equal(result.message, "Invalid upload mode.");
 });
 
+test("validateUploadInput rejects the legacy \"rdb\" mode (clients must send \"dump\")", () => {
+  for (const extension of [".dump", ".rdb"]) {
+    const result = validateUploadInput({ mode: "rdb", fileId: "x", extension });
+    if (result.ok) assert.fail("expected legacy rdb mode to be rejected");
+    assert.equal(result.status, 400);
+    assert.equal(result.message, "Invalid upload mode.");
+  }
+});
+
 // ---------------------------------------------------------------------------
 // buildBatchCsvQuery
 // ---------------------------------------------------------------------------
