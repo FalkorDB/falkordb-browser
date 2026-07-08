@@ -412,6 +412,13 @@ export function chunkCsvItems(
 
   for (const item of items) {
     const size = approximateItemBytes(item);
+
+    if (size > maxBytes) {
+      throw new Error(
+        `Failed to process CSV row ${item.index + 1}: row is too large to fit in maxChunkBytes (${maxBytes} bytes).`
+      );
+    }
+
     if (current.length > 0 && (current.length >= maxRows || currentBytes + size > maxBytes)) {
       chunks.push(current);
       current = [];
