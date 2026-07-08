@@ -7,8 +7,9 @@ import Button from "../ui/Button";
 import CloseDialog from "../CloseDialog";
 import { IndicatorContext } from "../provider";
 import DialogComponent from "../DialogComponent";
-import { prepareArg, securedFetch } from "@/lib/utils";
+import { prepareArg, securedFetch, uploadFileWithProgress } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import { assertSafeCsvHeaders, generateCsvQuery, parseCsvRows } from "@/lib/graphUpload";
 import type { Accept, FileRejection } from "react-dropzone";
 
@@ -41,6 +42,8 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
     const [csvColumns, setCsvColumns] = useState<string[]>([]);
     const [csvError, setCsvError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [phase, setPhase] = useState<"uploading" | "processing" | null>(null);
+    const [uploadPct, setUploadPct] = useState(0);
     const csvReadToken = useRef(0);
     const isControlled = typeof open === "boolean" && typeof onOpenChange === "function";
     const [internalOpen, setInternalOpen] = useState(false);
@@ -52,7 +55,10 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
         [isControlled, open, internalOpen]
     );
 
-    const handleOpenChange = (nextOpen: boolean) => {
+    const handleOpenChange = (nextOpen: boolean, force = false) => {
+        // Don't let an outside click / Escape dismiss the dialog mid-upload, but
+        // allow programmatic closes (e.g. on success) via force.
+        if (!nextOpen && isLoading && !force) return;
         if (onOpenChange) {
             onOpenChange(nextOpen);
         } else {
@@ -70,6 +76,8 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
             setCsvColumns([]);
             setCsvError(null);
             setIsLoading(false);
+            setPhase(null);
+            setUploadPct(0);
         }
     }, [dialogOpen]);
 
@@ -168,20 +176,22 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
 
         try {
             setIsLoading(true);
+            setPhase("uploading");
+            setUploadPct(0);
 
-            const uploadFormData = new FormData();
-            uploadFormData.append("file", files[0]);
-
-            const uploadResult = await securedFetch(
+            const uploadResult = await uploadFileWithProgress(
                 "api/upload",
-                { method: "POST", body: uploadFormData },
+                files[0],
                 toast,
-                setIndicator
+                setIndicator,
+                setUploadPct
             );
 
             if (!uploadResult.ok) return;
 
-            const { id } = await uploadResult.json() as { id: string };
+            const { id } = JSON.parse(uploadResult.body) as { id: string };
+
+            setPhase("processing");
 
             const payload: { mode: UploadMode; fileId: string; query?: string } = { mode, fileId: id };
             if (mode === "csv") payload.query = csvQuery;
@@ -207,9 +217,11 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
             });
 
             resetSelection();
-            handleOpenChange(false);
+            handleOpenChange(false, true);
         } finally {
             setIsLoading(false);
+            setPhase(null);
+            setUploadPct(0);
         }
     };
 
@@ -235,9 +247,9 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
             <form onSubmit={onUploadData} className="grow p-2 flex flex-col gap-4 overflow-hidden">
                 <Tabs value={mode} onValueChange={(value) => { setMode(value as UploadMode); resetSelection(); }} className="w-full">
                     <TabsList className="h-fit bg-background gap-1">
-                        <TabsTrigger value="dump">Restore</TabsTrigger>
-                        <TabsTrigger value="csv">CSV</TabsTrigger>
-                        <TabsTrigger value="cypher">Cypher batch</TabsTrigger>
+                        <TabsTrigger value="dump" disabled={isLoading}>Restore</TabsTrigger>
+                        <TabsTrigger value="csv" disabled={isLoading}>CSV</TabsTrigger>
+                        <TabsTrigger value="cypher" disabled={isLoading}>Cypher batch</TabsTrigger>
                     </TabsList>
                     <TabsContent value="dump" className="mt-2 flex flex-col gap-2">
                         <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -268,6 +280,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
                     className="flex-col"
                     withTable
                     maxFiles={1}
+                    disabled={isLoading}
                     onFileDrop={handleFileDrop}
                     onDropRejected={handleDropRejected}
                     accept={ACCEPTED_FILES[mode]}
@@ -292,12 +305,25 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
                             onChange={(e) => { setCsvQuery(e.target.value); setCsvQueryEdited(true); }}
                             placeholder="CREATE (:Person {name: row.name, age: row.age})"
                             className="min-h-[96px] font-mono text-xs"
+                            disabled={isLoading}
                             data-testid="uploadCsvQuery"
                         />
                         <p className="text-xs text-muted-foreground">
                             Runs once per row. Dropping a .csv prefills a starter query — rename the
                             {" "}<code className="rounded bg-muted px-1 py-0.5">:Row</code> label to your node type.
                         </p>
+                    </div>
+                )}
+                {phase && (
+                    <div className="flex flex-col gap-1" data-testid="uploadProgress">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>{phase === "uploading" ? "Uploading file…" : "Processing…"}</span>
+                            {phase === "uploading" && <span>{uploadPct}%</span>}
+                        </div>
+                        <Progress
+                            value={phase === "uploading" ? uploadPct : 100}
+                            className={phase === "processing" ? "animate-pulse" : undefined}
+                        />
                     </div>
                 )}
                 <div className="flex gap-3 justify-end">
@@ -317,7 +343,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
                         disabled={files.length !== 1 || (mode === "csv" && (!csvQuery.trim() || Boolean(csvError)))}
                         data-testid="uploadGraphConfirm"
                     />
-                    <CloseDialog data-testid="uploadGraphCancel" />
+                    <CloseDialog data-testid="uploadGraphCancel" disabled={isLoading} />
                 </div>
             </form>
         </DialogComponent>

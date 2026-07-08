@@ -4,7 +4,7 @@
 
 import React, { useState, useContext, useEffect } from "react";
 import { InfoIcon, Plus, File, X } from "lucide-react";
-import { prepareArg, securedFetch } from "@/lib/utils";
+import { prepareArg, securedFetch, uploadFileWithProgress } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import DialogComponent from "./DialogComponent";
@@ -12,6 +12,7 @@ import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
 import Input from "./ui/Input";
 import Dropzone from "./ui/Dropzone";
+import { Progress } from "@/components/ui/progress";
 import { IndicatorContext, ConnectionContext } from "./provider";
 
 interface Props {
@@ -46,12 +47,16 @@ export default function CreateGraph({
     const [graphName, setGraphName] = useState("");
     const [open, setOpen] = useState(false);
     const [files, setFiles] = useState<File[]>([]);
+    const [phase, setPhase] = useState<"uploading" | "processing" | null>(null);
+    const [uploadPct, setUploadPct] = useState(0);
 
     useEffect(() => {
         if (!open) {
             setGraphName("");
             setIsLoading(false);
             setFiles([]);
+            setPhase(null);
+            setUploadPct(0);
         }
     }, [open]);
 
@@ -89,19 +94,22 @@ export default function CreateGraph({
 
                 if (!result.ok) return;
             } else {
-                const uploadFormData = new FormData();
-                uploadFormData.append("file", files[0]);
+                setPhase("uploading");
+                setUploadPct(0);
 
-                const uploadResult = await securedFetch(
+                const uploadResult = await uploadFileWithProgress(
                     "api/upload",
-                    { method: "POST", body: uploadFormData },
+                    files[0],
                     toast,
-                    setIndicator
+                    setIndicator,
+                    setUploadPct
                 );
 
                 if (!uploadResult.ok) return;
 
-                const { id } = await uploadResult.json() as { id: string };
+                const { id } = JSON.parse(uploadResult.body) as { id: string };
+
+                setPhase("processing");
 
                 const processResult = await securedFetch(
                     `api/graph/${prepareArg(name)}/upload`,
@@ -128,13 +136,15 @@ export default function CreateGraph({
             });
         } finally {
             setIsLoading(false);
+            setPhase(null);
+            setUploadPct(0);
         }
     };
 
     return (
         <DialogComponent
             open={open}
-            onOpenChange={setOpen}
+            onOpenChange={(next) => { if (next || !isLoading) setOpen(next); }}
             trigger={trigger}
             title={"Create New Graph"}
         >
@@ -163,6 +173,7 @@ export default function CreateGraph({
                     <Dropzone
                         className="flex-col"
                         maxFiles={1}
+                        disabled={isLoading}
                         onFileDrop={setFiles}
                         onDropRejected={() => toast({
                             title: "Couldn't add file",
@@ -186,6 +197,18 @@ export default function CreateGraph({
                         </div>
                     )}
                 </div>
+                {phase && (
+                    <div className="flex flex-col gap-1" data-testid="createGraphProgress">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>{phase === "uploading" ? "Uploading file…" : "Restoring…"}</span>
+                            {phase === "uploading" && <span>{uploadPct}%</span>}
+                        </div>
+                        <Progress
+                            value={phase === "uploading" ? uploadPct : 100}
+                            className={phase === "processing" ? "animate-pulse" : undefined}
+                        />
+                    </div>
+                )}
                 <div className="flex gap-4 justify-end">
                     <Button
                         data-testid={"createGraphConfirm"}
@@ -201,6 +224,7 @@ export default function CreateGraph({
                         variant="Cancel"
                         label="Cancel"
                         type="button"
+                        disabled={isLoading}
                     />
                 </div>
             </form>
