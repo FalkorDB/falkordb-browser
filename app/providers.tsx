@@ -691,7 +691,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         const newLabels = metaStats?.[0] || [];
         const newRelationships = metaStats?.[1] || [];
         const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
-        // setGraph(g) below already carries gi inside — no separate setGraphInfo needed.
+        // gi is embedded in the graph via Graph.create below and also pushed to
+        // GraphInfoContext through setGraphInfo(g.GraphInfo) after setGraph.
         return gi;
       }).catch((error) => {
         console.error("Failed to fetch graph info:", error);
@@ -722,6 +723,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       };
 
       setGraph(g);
+      // setGraph only updates GraphContext; the GraphInfo panel reads labels,
+      // relationships and property keys from the separate GraphInfoContext, so
+      // sync it here too — otherwise the panel shows stale info until the next
+      // periodic refresh (up to refreshInterval seconds later).
+      setGraphInfo(g.GraphInfo);
       setData({ ...g.Elements });
       fetchCount(n);
       if (!tutorialOpen) {
@@ -773,7 +779,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setIsQueryLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graphName, limit, timeout, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries, showMemoryUsage, captionsKeys, showPropertyKeyPrefix, tutorialOpen, prefixReady]);
+  }, [graphName, limit, timeout, fetchInfo, fetchCount, setGraphInfo, handleCooldown, handelGetNewQueries, showMemoryUsage, captionsKeys, showPropertyKeyPrefix, tutorialOpen, prefixReady]);
 
   const graphNameRef = useRef(graphName);
   graphNameRef.current = graphName;
