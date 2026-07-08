@@ -10,6 +10,15 @@
 
 export type UploadMode = "dump" | "csv" | "cypher";
 
+/**
+ * Dump restore is temporarily disabled: a FalkorDB server-side bug can corrupt
+ * the target graph on RESTORE. Both the API (validateUploadInput) and the UI
+ * (UploadGraph / CreateGraph) read this flag, which makes the feature
+ * non-accessible without removing any of the restore code. Set it back to
+ * `true` to re-enable dump restore once the database issue is fixed.
+ */
+export const DUMP_RESTORE_ENABLED: boolean = false;
+
 export const RESTORE_UPLOAD_EXTENSIONS: readonly string[] = [".dump"];
 export const CSV_UPLOAD_EXTENSIONS: readonly string[] = [".csv"];
 export const CYPHER_UPLOAD_EXTENSIONS: readonly string[] = [".txt", ".cypher", ".cql"];
@@ -44,6 +53,9 @@ export function validateUploadInput({
   }
 
   if (mode === "dump") {
+    if (!DUMP_RESTORE_ENABLED) {
+      return { ok: false, status: 403, message: "Dump restore is temporarily disabled." };
+    }
     if (!hasExtension(RESTORE_UPLOAD_EXTENSIONS, extension)) {
       return { ok: false, status: 400, message: "Restore requires a .dump file." };
     }

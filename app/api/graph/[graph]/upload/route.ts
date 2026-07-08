@@ -6,6 +6,7 @@ import { getCorsHeaders, resolveReadOnly } from "../../../utils";
 import {
   validateUploadInput,
   coerceRow,
+  DUMP_RESTORE_ENABLED,
   type CsvColumnType,
 } from "@/lib/graphUpload";
 import { executeCsvIngestion, executeCypherBatch } from "./upload-utils";
@@ -95,6 +96,16 @@ export async function POST(
     // Read the file outside the per-mode handlers so filesystem errors fall
     // through to the generic 500 rather than leaking via a 422 message.
     if (validation.mode === "dump") {
+      // Defense-in-depth: validateUploadInput already rejects dump while
+      // DUMP_RESTORE_ENABLED is false, but guard the destructive RESTORE call
+      // itself so it can never run while the feature is disabled.
+      if (!DUMP_RESTORE_ENABLED) {
+        return NextResponse.json(
+          { message: "Dump restore is temporarily disabled." },
+          { status: 403, headers: getCorsHeaders(request) }
+        );
+      }
+
       const buffer = await fs.promises.readFile(storedUpload.filePath);
       const connection = await session.client.connection;
 

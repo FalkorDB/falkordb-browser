@@ -117,9 +117,40 @@ test.describe("Upload Graph – CSV", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Dump restore: export a populated graph, restore it into an existing graph
+// Dump restore disabled: the Restore tab must be hidden while the feature is off
 // ---------------------------------------------------------------------------
-test.describe("Upload Graph – Dump restore", () => {
+test.describe("Upload Graph – dump restore disabled", () => {
+  let browser: BrowserWrapper;
+  let apiCall: ApiCalls;
+
+  test.beforeEach(async () => {
+    browser = new BrowserWrapper();
+    apiCall = new ApiCalls();
+  });
+
+  test.afterEach(async () => {
+    await browser.closeBrowser();
+  });
+
+  test(`@admin the Restore tab is not shown while dump restore is disabled`, async () => {
+    const graphName = getRandomString("dumpDisabled");
+    await apiCall.addGraph(graphName);
+
+    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    await graph.openUploadDialog(graphName);
+    await expect(graph.uploadTabTrigger("dump")).toHaveCount(0);
+    await expect(graph.uploadTabTrigger("csv")).toBeVisible();
+
+    await apiCall.removeGraph(graphName);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dump restore: export a populated graph, restore it into an existing graph
+// Temporarily skipped — dump restore is disabled (DUMP_RESTORE_ENABLED=false)
+// due to a FalkorDB RESTORE bug. Re-enable this suite when the flag is flipped.
+// ---------------------------------------------------------------------------
+test.describe.skip("Upload Graph – Dump restore", () => {
   let browser: BrowserWrapper;
   let apiCall: ApiCalls;
 

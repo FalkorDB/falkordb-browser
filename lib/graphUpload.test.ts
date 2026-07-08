@@ -10,6 +10,7 @@ import {
   coerceRow,
   escapeCypherIdentifier,
   generateCsvQuery,
+  DUMP_RESTORE_ENABLED,
   type CsvRowItem,
 } from "./graphUpload.ts";
 
@@ -174,24 +175,36 @@ test("validateUploadInput requires mode and fileId", () => {
   }
 });
 
-test("validateUploadInput accepts dump restore with a .dump file", () => {
+test("validateUploadInput gates dump restore behind DUMP_RESTORE_ENABLED", () => {
+  for (const extension of [".dump", ".rdb", ".csv", undefined]) {
+    const result = validateUploadInput({ mode: "dump", fileId: "x", extension });
+    if (DUMP_RESTORE_ENABLED) {
+      // When enabled, only a .dump file is accepted.
+      if (extension === ".dump") {
+        if (!result.ok) assert.fail("expected .dump restore to be valid when enabled");
+        assert.equal(result.mode, "dump");
+      } else {
+        if (result.ok) assert.fail("expected a non-.dump file to be rejected");
+        assert.equal(result.status, 400);
+        assert.match(result.message, /Restore requires a \.dump file/);
+      }
+    } else {
+      // While disabled, every dump request is rejected regardless of extension.
+      if (result.ok) assert.fail("expected dump restore to be rejected while disabled");
+      assert.equal(result.status, 403);
+      assert.match(result.message, /temporarily disabled/i);
+    }
+  }
+});
+
+test("dump restore is currently disabled (guard against accidental re-enable)", () => {
+  // This locks the shipped state. If dump restore is intentionally re-enabled,
+  // flip DUMP_RESTORE_ENABLED and update this test deliberately.
+  assert.equal(DUMP_RESTORE_ENABLED, false);
   const result = validateUploadInput({ mode: "dump", fileId: "x", extension: ".dump" });
-  if (!result.ok) assert.fail("expected .dump restore to be valid");
-  assert.equal(result.mode, "dump");
-});
-
-test("validateUploadInput rejects dump restore with a .rdb file", () => {
-  const result = validateUploadInput({ mode: "dump", fileId: "x", extension: ".rdb" });
-  if (result.ok) assert.fail("expected .rdb to be rejected (RESTORE needs a DUMP payload)");
-  assert.equal(result.status, 400);
-  assert.match(result.message, /Restore requires a \.dump file/);
-});
-
-test("validateUploadInput rejects dump restore with an unsupported extension", () => {
-  const result = validateUploadInput({ mode: "dump", fileId: "x", extension: ".csv" });
-  if (result.ok) assert.fail("expected validation failure");
-  assert.equal(result.status, 400);
-  assert.match(result.message, /Restore requires a \.dump file/);
+  if (result.ok) assert.fail("dump restore must be rejected while disabled");
+  assert.equal(result.status, 403);
+  assert.match(result.message, /temporarily disabled/i);
 });
 
 test("validateUploadInput accepts csv with a .csv file and a query", () => {

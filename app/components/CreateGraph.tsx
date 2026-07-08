@@ -5,6 +5,7 @@
 import React, { useState, useContext, useEffect } from "react";
 import { InfoIcon, Plus, File, X } from "lucide-react";
 import { prepareArg, securedFetch, uploadFileWithProgress } from "@/lib/utils";
+import { DUMP_RESTORE_ENABLED } from "@/lib/graphUpload";
 import { useToast } from "@/components/ui/use-toast";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import DialogComponent from "./DialogComponent";
@@ -74,7 +75,7 @@ export default function CreateGraph({
                 return;
             }
 
-            const hasDump = files.length === 1;
+            const hasDump = DUMP_RESTORE_ENABLED && files.length === 1;
 
             if (graphNames.includes(name)) {
                 toast({
@@ -166,6 +167,7 @@ export default function CreateGraph({
                         onChange={(e) => setGraphName(e.target.value)}
                     />
                 </div>
+                {DUMP_RESTORE_ENABLED && (
                 <div className="flex flex-col gap-2">
                     <p className="text-sm text-muted-foreground">
                         Optionally drop a .dump file exported via the Export button to restore a graph. Leave empty to create a new empty graph.
@@ -197,6 +199,7 @@ export default function CreateGraph({
                         </div>
                     )}
                 </div>
+                )}
                 {phase && (
                     <div className="flex flex-col gap-1" data-testid="createGraphProgress">
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
