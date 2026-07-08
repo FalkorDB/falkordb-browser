@@ -757,9 +757,17 @@ export default class GraphPage extends BasePage {
   }
 
   async clickCanvasElement(x: number, y: number): Promise<void> {
+    // getNodesScreenPositions/getLinksScreenPositions return absolute page
+    // coordinates (they add the canvas rect's left/top). Playwright's
+    // click({ position }) is relative to the element's top-left, so convert
+    // absolute -> element-relative using the canvas rect.
+    const offset = await this.canvasElement.evaluate((el: HTMLElement) => {
+      const rect = el.getBoundingClientRect();
+      return { left: rect.left, top: rect.top };
+    });
     await interactWhenVisible(
       this.canvasElement,
-      (el) => el.click({ position: { x, y } }),
+      (el) => el.click({ position: { x: x - offset.left, y: y - offset.top } }),
       "Canvas Element"
     );
   }
