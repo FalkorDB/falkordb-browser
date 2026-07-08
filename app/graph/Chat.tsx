@@ -61,6 +61,29 @@ const getErrorStatus = (error: unknown) => {
     return 0;
 };
 
+// Confidence badge tiers: calm, low-saturation tints that stay readable in light and dark themes.
+const getConfidenceStyle = (value: number) => {
+    if (value >= 90) {
+        return {
+            label: "High confidence",
+            wrap: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-emerald-500/20",
+            dot: "bg-emerald-500",
+        };
+    }
+    if (value >= 70) {
+        return {
+            label: "Medium confidence",
+            wrap: "bg-amber-500/10 text-amber-700 dark:text-amber-300 ring-amber-500/25",
+            dot: "bg-amber-500",
+        };
+    }
+    return {
+        label: "Low confidence",
+        wrap: "bg-rose-500/10 text-rose-700 dark:text-rose-300 ring-rose-500/25",
+        dot: "bg-rose-500",
+    };
+};
+
 export default function Chat({ onClose }: Props) {
     const { resolvedTheme } = useTheme();
     const { currentTheme } = getTheme(resolvedTheme);
@@ -469,16 +492,23 @@ export default function Chat({ onClose }: Props) {
                 return (
                     <div className="flex flex-col gap-1">
                         <MarkdownMessage content={message.content} />
-                        {message.type === "Result" && message.confidence != null && (
-                            <span className={cn(
-                                "text-xs px-1.5 py-0.5 rounded w-fit",
-                                message.confidence >= 0.9 ? "bg-green-500/20 text-green-400" :
-                                    message.confidence >= 0.7 ? "bg-yellow-500/20 text-yellow-400" :
-                                        "bg-red-500/20 text-red-400"
-                            )}>
-                                Confidence: {Math.round(message.confidence * 100)}%
-                            </span>
-                        )}
+                        {message.type === "Result" && message.confidence != null && (() => {
+                            const style = getConfidenceStyle(message.confidence);
+                            return (
+                                <span
+                                    className={cn(
+                                        "mt-1 inline-flex w-fit items-center gap-1.5 rounded-full px-2 py-0.5",
+                                        "text-[11px] font-medium leading-none ring-1 ring-inset",
+                                        style.wrap
+                                    )}
+                                    title={`${style.label}: the model's self-reported certainty in this answer`}
+                                >
+                                    <span className={cn("h-1.5 w-1.5 rounded-full", style.dot)} aria-hidden />
+                                    <span className="text-muted-foreground">Confidence</span>
+                                    <span className="tabular-nums">{Math.round(message.confidence)}%</span>
+                                </span>
+                            );
+                        })()}
                     </div>
                 );
         }
