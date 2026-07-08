@@ -18,6 +18,8 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1081.0",
+    "@aws-sdk/s3-request-presigner": "^3.1081.0",
     "@falkordb/canvas": "^0.2.1",
     "@falkordb/text-to-cypher": "^0.2.2",
     "@hookform/resolvers": "^5.4.0",
