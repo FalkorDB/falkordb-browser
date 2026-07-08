@@ -408,6 +408,12 @@ export default function ForceGraph({
         });
     }, [handleNodeClick, handleLinkClick, handleRightClick, handleHover, handleUnselected, checkIsNodeSelected, checkIsLinkSelected, checkIsNodeDimmed, checkIsLinkDimmed, canvasRef, canvasLoaded, captionsKeys, showPropertyKeyPrefix]);
 
+    // Initialize canvas dimmed state when component mounts or dimmed prop changes
+    useEffect(() => {
+        if (!canvasRef.current || !canvasLoaded) return;
+        canvasRef.current.setDimmed(dimmed);
+    }, [dimmed, canvasRef, canvasLoaded]);
+
     // Update canvas data
     useEffect(() => {
         const canvas = canvasRef.current;
