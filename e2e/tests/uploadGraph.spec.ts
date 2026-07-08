@@ -54,8 +54,7 @@ test.describe("Upload Graph – Cypher batch", () => {
 
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
     await graph.openUploadDialog(graphName);
-    await graph.selectUploadTab("cypher");
-    // No file attached — confirm button should be disabled
+    // No file attached — confirm button should be disabled (Cypher-only dialog)
     expect(await graph.uploadConfirm.isDisabled()).toBe(true);
 
     await apiCall.removeGraph(graphName);
@@ -64,8 +63,11 @@ test.describe("Upload Graph – Cypher batch", () => {
 
 // ---------------------------------------------------------------------------
 // CSV upload: run a per-row Cypher statement over each CSV row
+// Temporarily skipped — the Manage upload dialog was simplified to Cypher-batch
+// only (commit 47aa4930), so the CSV tab no longer exists in the UI. Re-enable
+// if the CSV upload UI is restored.
 // ---------------------------------------------------------------------------
-test.describe("Upload Graph – CSV", () => {
+test.describe.skip("Upload Graph – CSV", () => {
   let browser: BrowserWrapper;
   let apiCall: ApiCalls;
 
@@ -118,8 +120,10 @@ test.describe("Upload Graph – CSV", () => {
 
 // ---------------------------------------------------------------------------
 // Dump restore: export a populated graph, restore it into an existing graph
+// Temporarily skipped — dump restore is disabled (DUMP_RESTORE_ENABLED=false)
+// due to a FalkorDB RESTORE bug. Re-enable this suite when the flag is flipped.
 // ---------------------------------------------------------------------------
-test.describe("Upload Graph – Dump restore", () => {
+test.describe.skip("Upload Graph – Dump restore", () => {
   let browser: BrowserWrapper;
   let apiCall: ApiCalls;
 

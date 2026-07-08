@@ -15,6 +15,7 @@ import {
   validateContentFromPath,
   MAX_FILE_SIZE,
 } from "./file-validation";
+import { DUMP_RESTORE_ENABLED } from "@/lib/graphUpload";
 
 // Small text/CSV/Cypher uploads are capped tightly (MAX_FILE_SIZE). A .dump is a
 // binary blob that streams straight to disk and can legitimately be large, so it
@@ -83,6 +84,15 @@ async function streamToDisk(
 
       const { filename: originalName, mimeType } = info;
       const extension = path.extname(originalName).toLowerCase();
+
+      // Don't even stage a .dump while dump restore is disabled — there is no
+      // consumer for it and it would otherwise allow large files onto disk.
+      if (extension === ".dump" && !DUMP_RESTORE_ENABLED) {
+        fileStream.resume();
+        done({ ok: false, error: "Dump restore is temporarily disabled.", status: 403 });
+        return;
+      }
+
       const allowedFileType = getAllowedFileType(extension);
 
       if (!allowedFileType || !allowedFileType.mimeTypes.includes(mimeType)) {

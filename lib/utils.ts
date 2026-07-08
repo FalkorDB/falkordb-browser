@@ -458,6 +458,7 @@ const USER_READABLE_ERROR_PATTERNS = [
   /\brequires a (?:\.dump|\.csv|\.txt)\b/i,
   /\brequires a query\b/i,
   /^invalid upload mode\b/i,
+  /\btemporarily disabled\b/i,
   /^invalid request body\b/i,
   /^(?:invalid|unsupported) file (?:type|name|contents)\b/i,
   /^file is too large\b/i,

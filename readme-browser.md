@@ -62,8 +62,8 @@ It allows a developer to interact with graphs loaded to FaklorDB, explore how sp
   - Download a `.dump` file via the Browser (`/api/graph/:graph/export`).
 - **Upload data**
   - “Upload Data” dialog supports drag-and-drop file selection (Dropzone UI).
-  - Supports three ingestion modes:
-    - restore graph from a `.dump` export (replace contents),
+  - Supports these ingestion modes:
+    - restore graph from a `.dump` export (replace contents) — **temporarily disabled** because of a FalkorDB `RESTORE` bug that can corrupt the target graph. The code is retained and gated by the `DUMP_RESTORE_ENABLED` flag (`lib/graphUpload.ts`); the Restore tab and the create-from-dump option are hidden, and the API rejects both `.dump` uploads and `mode: "dump"` restore requests with a 403 while it is off. Set the flag back to `true` to re-enable.
     - process `.csv` rows with a user-provided Cypher query (each CSV row is exposed as `row` and executed in batched `UNWIND` statements; the dialog detects the file's columns and prefills an editable starter query),
     - execute Cypher batch files (`.txt` / `.cql` / `.cypher`) statement-by-statement.
 

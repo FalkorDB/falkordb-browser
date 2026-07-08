@@ -10,6 +10,15 @@
 
 export type UploadMode = "dump" | "csv" | "cypher";
 
+/**
+ * Dump restore is temporarily disabled: a FalkorDB server-side bug can corrupt
+ * the target graph on RESTORE. Both the API (validateUploadInput) and the UI
+ * (UploadGraph / CreateGraph) read this flag, which makes the feature
+ * non-accessible without removing any of the restore code. Set it back to
+ * `true` to re-enable dump restore once the database issue is fixed.
+ */
+export const DUMP_RESTORE_ENABLED: boolean = false;
+
 export const RESTORE_UPLOAD_EXTENSIONS: readonly string[] = [".dump"];
 export const CSV_UPLOAD_EXTENSIONS: readonly string[] = [".csv"];
 export const CYPHER_UPLOAD_EXTENSIONS: readonly string[] = [".txt", ".cypher", ".cql"];
@@ -44,6 +53,9 @@ export function validateUploadInput({
   }
 
   if (mode === "dump") {
+    if (!DUMP_RESTORE_ENABLED) {
+      return { ok: false, status: 403, message: "Dump restore is temporarily disabled." };
+    }
     if (!hasExtension(RESTORE_UPLOAD_EXTENSIONS, extension)) {
       return { ok: false, status: 400, message: "Restore requires a .dump file." };
     }
@@ -116,7 +128,10 @@ export function parseCsvRows(csvText: string): Record<string, string>[] {
     rows.push(currentRow);
   }
 
-  const normalizedRows = rows.filter((row) => row.some((cell) => cell.trim() !== ""));
+  // Drop only truly blank lines (a single empty field with no separators). A row
+  // like `,` parses to multiple empty fields and is a legitimate all-empty record,
+  // so it must be preserved rather than silently dropped.
+  const normalizedRows = rows.filter((row) => !(row.length === 1 && row[0].trim() === ""));
 
   if (normalizedRows.length === 0) {
     return [];
@@ -424,7 +439,7 @@ export function assertSafeCsvHeaders(rows: Record<string, string>[]): void {
   for (const key of Object.keys(rows[0])) {
     if (!CSV_HEADER_IDENTIFIER.test(key)) {
       throw new Error(
-        `CSV column "${key}" is not a valid identifier; rename it using letters, digits, or underscore.`
+        `CSV column "${key}" is not a valid identifier; it must start with a letter or underscore and use only letters, digits, and underscores.`
       );
     }
   }
