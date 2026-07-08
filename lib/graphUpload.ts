@@ -128,7 +128,10 @@ export function parseCsvRows(csvText: string): Record<string, string>[] {
     rows.push(currentRow);
   }
 
-  const normalizedRows = rows.filter((row) => row.some((cell) => cell.trim() !== ""));
+  // Drop only truly blank lines (a single empty field with no separators). A row
+  // like `,` parses to multiple empty fields and is a legitimate all-empty record,
+  // so it must be preserved rather than silently dropped.
+  const normalizedRows = rows.filter((row) => !(row.length === 1 && row[0].trim() === ""));
 
   if (normalizedRows.length === 0) {
     return [];
@@ -436,7 +439,7 @@ export function assertSafeCsvHeaders(rows: Record<string, string>[]): void {
   for (const key of Object.keys(rows[0])) {
     if (!CSV_HEADER_IDENTIFIER.test(key)) {
       throw new Error(
-        `CSV column "${key}" is not a valid identifier; rename it using letters, digits, or underscore.`
+        `CSV column "${key}" is not a valid identifier; it must start with a letter or underscore and use only letters, digits, and underscores.`
       );
     }
   }

@@ -106,6 +106,9 @@ export async function POST(
         );
       }
 
+      // NOTE: Redis RESTORE takes the serialized value as a single argument, so the
+      // dump is read fully into memory. Revisit memory pressure for very large dumps
+      // when re-enabling this feature.
       const buffer = await fs.promises.readFile(storedUpload.filePath);
       const connection = await session.client.connection;
 
