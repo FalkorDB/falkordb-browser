@@ -656,19 +656,53 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   }, []);
 
   const fetchInfo = useCallback(async (type: string, name: string) => {
-    if (!graphName) return [];
+    if (!name) return [];
+
+    if (type === "(property key)") {
+      const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
+      const query = "CALL db.propertyKeys() YIELD propertyKey as info";
+      const sse = await getSSEGraphResult(
+        `/api/graph/${prepareArg(name)}?query=${prepareArg(query)}${readOnlyParam}`,
+        toast,
+        setIndicator,
+      ) as { data?: Array<{ info?: unknown }> };
+
+      if (!sse || !Array.isArray(sse.data)) return [];
+
+      return sse.data
+        .map((entry) => (typeof entry?.info === "string" ? entry.info : undefined))
+        .filter((value): value is string => typeof value === "string");
+    }
 
     const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
-    const result = await securedFetch(`/api/graph/${name}/info?type=${type}${readOnlyParam}`, {
+    const result = await securedFetch(`/api/graph/${prepareArg(name)}/info?type=${prepareArg(type)}${readOnlyParam}`, {
       method: "GET",
     }, toast, setIndicator);
 
     if (!result.ok) return [];
 
-    const json = await result.json();
+    const bodyText = await result.text();
+    let json: unknown;
 
-    return json.result.data.map(({ info }: { info: string }) => info);
-  }, [graphName, toast, setIndicator]);
+    try {
+      json = JSON.parse(bodyText);
+    } catch (error) {
+      console.error("Failed to parse graph info response", {
+        error,
+        responseUrl: result.url,
+        contentType: result.headers.get("content-type"),
+        preview: bodyText.slice(0, 200),
+      });
+      return [];
+    }
+
+    const data = (json as { result?: { data?: Array<{ info?: unknown }> } })?.result?.data;
+    if (!Array.isArray(data)) return [];
+
+    return data
+      .map((entry) => (typeof entry?.info === "string" ? entry.info : undefined))
+      .filter((value): value is string => typeof value === "string");
+  }, [toast, setIndicator]);
 
   const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator, isReadOnlyRef.current), [toast, setIndicator]);
 

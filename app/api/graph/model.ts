@@ -469,13 +469,12 @@ export class Graph {
     graphInfo?: GraphInfo,
   ): Promise<Graph> {
     const graph = Graph.empty(
-      undefined,
+      id,
       showPropertyKeyPrefix,
       currentLimit,
       graphInfo
     );
     await graph.extend(results);
-    graph.id = id;
     return graph;
   }
 
