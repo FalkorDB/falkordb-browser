@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type MutableRefObject } from "react";
+import { useEffect, useMemo, useState, type MutableRefObject } from "react";
 import { GraphInfoContext } from "./provider";
 
 export type GraphInfoSync = {
@@ -10,6 +10,14 @@ export type GraphInfoSync = {
   bumpVersion: () => void;
   setNodesCount: (n: number | undefined) => void;
   setEdgesCount: (e: number | undefined) => void;
+};
+
+export type GraphInfoPendingUpdates = {
+  versionBumps: number;
+  hasNodesCount: boolean;
+  nodesCount: number | undefined;
+  hasEdgesCount: boolean;
+  edgesCount: number | undefined;
 };
 
 /**
@@ -27,21 +35,42 @@ export type GraphInfoSync = {
 export default function GraphInfoProvider({
   children,
   syncRef,
+  pendingRef,
 }: {
   children: React.ReactNode;
   syncRef: MutableRefObject<GraphInfoSync>;
+  pendingRef: MutableRefObject<GraphInfoPendingUpdates>;
 }) {
   const [graphInfoVersion, setGraphInfoVersion] = useState(0);
   const [nodesCount, setNodesCount] = useState<number | undefined>();
   const [edgesCount, setEdgesCount] = useState<number | undefined>();
 
-  // Expose setters to the parent without the parent subscribing to this state.
-  // Called on every render so the ref always holds the latest stable setters.
-  syncRef.current = {
+  const sync = useMemo<GraphInfoSync>(() => ({
     bumpVersion: () => setGraphInfoVersion(v => v + 1),
     setNodesCount,
     setEdgesCount,
-  };
+  }), []);
+
+  useEffect(() => {
+    syncRef.current = sync;
+
+    const pending = pendingRef.current;
+
+    if (pending.versionBumps > 0) {
+      setGraphInfoVersion(v => v + pending.versionBumps);
+      pending.versionBumps = 0;
+    }
+
+    if (pending.hasNodesCount) {
+      setNodesCount(pending.nodesCount);
+      pending.hasNodesCount = false;
+    }
+
+    if (pending.hasEdgesCount) {
+      setEdgesCount(pending.edgesCount);
+      pending.hasEdgesCount = false;
+    }
+  }, [syncRef, sync, pendingRef]);
 
   const value = useMemo(
     () => ({ graphInfoVersion, nodesCount, edgesCount }),

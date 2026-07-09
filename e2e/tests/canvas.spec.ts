@@ -374,16 +374,16 @@ test.describe('Canvas Tests', () => {
         await graph.insertQuery(CREATE_TWO_NODES_QUERY);
         await graph.clickRunQuery();
 
-        // Initially off
-        expect(await graph.isDimControlChecked()).toBe(false);
-
-        // Turn on
-        await graph.clickDimControl();
+        // Initially on
         expect(await graph.isDimControlChecked()).toBe(true);
 
         // Turn off
         await graph.clickDimControl();
         expect(await graph.isDimControlChecked()).toBe(false);
+
+        // Turn on
+        await graph.clickDimControl();
+        expect(await graph.isDimControlChecked()).toBe(true);
 
         await apicalls.removeGraph(graphName);
     });
@@ -400,8 +400,10 @@ test.describe('Canvas Tests', () => {
         await graph.clickCenterControl();
         await graph.waitForScaleToStabilize();
 
-        // Enable focus mode
-        await graph.clickDimControl();
+        // Ensure focus mode is enabled
+        if (!(await graph.isDimControlChecked())) {
+            await graph.clickDimControl();
+        }
         expect(await graph.isDimControlChecked()).toBe(true);
 
         // Right-click a node to select it (right-click triggers handleRightClick → setSelectedElements)
@@ -428,8 +430,10 @@ test.describe('Canvas Tests', () => {
         await graph.clickCenterControl();
         await graph.waitForScaleToStabilize();
 
-        // Enable focus mode and right-click a node to select it
-        await graph.clickDimControl();
+        // Ensure focus mode is enabled and then right-click a node to select it
+        if (!(await graph.isDimControlChecked())) {
+            await graph.clickDimControl();
+        }
         const nodes = await graph.getNodesScreenPositions();
         await graph.elementClick(nodes[0].screenX, nodes[0].screenY);
         await graph.waitForTimeout(300);
@@ -455,8 +459,10 @@ test.describe('Canvas Tests', () => {
         await graph.clickCenterControl();
         await graph.waitForScaleToStabilize();
 
-        // Enable focus mode
-        await graph.clickDimControl();
+        // Ensure focus mode is enabled
+        if (!(await graph.isDimControlChecked())) {
+            await graph.clickDimControl();
+        }
         expect(await graph.isDimControlChecked()).toBe(true);
 
         // Left-click a link to select it (handleLinkClick sets selectedElements)

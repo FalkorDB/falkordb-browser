@@ -24,7 +24,7 @@ function escapeIdentifier(id: string): string {
  */
 export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizingLabel }: { onClose: () => void, customizingLabel: InfoLabel | null, setCustomizingLabel: Dispatch<SetStateAction<InfoLabel | null>> }) {
     const { graph, runQuery, graphName, handleSetGraphName, graphNames, setGraphNames, setGraph } = useContext(GraphContext);
-    const { nodesCount, edgesCount } = useContext(GraphInfoContext);
+    const { graphInfoVersion, nodesCount, edgesCount } = useContext(GraphInfoContext);
     const { Labels, Relationships, PropertyKeys, MemoryUsage } = graph.GraphInfo;
     const { isQueryLoading } = useContext(QueryLoadingContext);
     const { settings: { graphInfo: { showMemoryUsage, maxItemsForSearch } } } = useContext(BrowserSettingsContext);
@@ -46,7 +46,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     // invalidated on every GraphInfoContext poll update, which would trigger
     // its useEffect([options, handleSetRows]) and reset checked rows.
     const handleSetOptions = useCallback((opts: string[]) => {
-        setGraphNames(opts as unknown as string[]);
+        setGraphNames(opts);
     }, [setGraphNames]);
 
     const handleSetSelectedValue = useCallback((name: string) => {
@@ -58,7 +58,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     }, [setGraph]);
 
     return (
-        <div data-testid="graphInfoPanel" className={cn("relative h-full w-full p-3 grid gap-3", showMemoryUsage ? "grid-rows-[max-content_max-content_max-content_1fr_1fr_1fr]" : "grid-rows-[max-content_max-content_1fr_1fr_1fr]")}>
+        <div data-testid="graphInfoPanel" data-graph-info-version={graphInfoVersion} className={cn("relative h-full w-full p-3 grid gap-3", showMemoryUsage ? "grid-rows-[max-content_max-content_max-content_1fr_1fr_1fr]" : "grid-rows-[max-content_max-content_1fr_1fr_1fr]")}>
             {
                 !customizingLabel ? (
                     <>

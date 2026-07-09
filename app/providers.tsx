@@ -21,7 +21,7 @@ import LoginVerification from "./loginVerification";
 import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
 import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
-import GraphInfoProvider, { type GraphInfoSync } from "./components/GraphInfoProvider";
+import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
 
@@ -219,16 +219,35 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // graphInfo / nodesCount / edgesCount state is owned by GraphInfoProvider so
   // that periodic info polls only re-render that isolated subtree, not the
   // whole providers tree.  We communicate with it via a stable ref of setters.
+  const graphInfoPendingRef = useRef<GraphInfoPendingUpdates>({
+    versionBumps: 0,
+    hasNodesCount: false,
+    nodesCount: undefined,
+    hasEdgesCount: false,
+    edgesCount: undefined,
+  });
   const graphInfoSyncRef = useRef<GraphInfoSync>({
-    bumpVersion: () => {},
-    setNodesCount: () => {},
-    setEdgesCount: () => {},
+    bumpVersion: () => {
+      graphInfoPendingRef.current.versionBumps += 1;
+    },
+    setNodesCount: n => {
+      graphInfoPendingRef.current.nodesCount = n;
+      graphInfoPendingRef.current.hasNodesCount = true;
+    },
+    setEdgesCount: e => {
+      graphInfoPendingRef.current.edgesCount = e;
+      graphInfoPendingRef.current.hasEdgesCount = true;
+    },
   });
 
   const setGraphInfo = useCallback((gi: GraphInfo) => {
     // Mutate graph.GraphInfo in-place — no graph state change, so GraphContext
     // consumers (canvas, toolbar, …) are not disturbed.
-    graphRef.current.GraphInfo = gi;
+    setGraph(current => {
+      current.GraphInfo = gi;
+      graphRef.current = current;
+      return current;
+    });
     // Bump the version counter in GraphInfoProvider so its consumers
     // re-render and read the fresh data from graph.GraphInfo.
     graphInfoSyncRef.current.bumpVersion();
@@ -583,6 +602,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // dependency arrays, which avoids cascading effect re-fires.
   const isReadOnlyRef = useRef(isReadOnly);
   isReadOnlyRef.current = isReadOnly;
+  const activeGraphNameRef = useRef(graphName);
+  activeGraphNameRef.current = graphName;
 
   const connectionContext = useMemo(() => ({
     connectionType,
@@ -616,6 +637,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       const result = await getSSEGraphResult(`api/graph/${prepareArg(n)}/count${readOnlyParam}`, toast, setIndicator) as { nodes?: number; edges?: number };
 
       if (!result) return;
+
+      if (n !== activeGraphNameRef.current) return;
 
       const { nodes, edges } = result;
 
@@ -1517,7 +1540,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       <LoginVerification>
         <BrowserSettingsContext.Provider value={browserSettingsContext}>
           <GraphContext.Provider value={graphContext}>
-            <GraphInfoProvider syncRef={graphInfoSyncRef}>
+            <GraphInfoProvider syncRef={graphInfoSyncRef} pendingRef={graphInfoPendingRef}>
               <HistoryQueryContext.Provider value={historyQueryContext}>
               <IndicatorContext.Provider value={indicatorContext}>
                 <QueryLoadingContext.Provider value={queryLoadingContext}>
