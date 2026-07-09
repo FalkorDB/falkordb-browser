@@ -6,11 +6,11 @@
 
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import React, { RefObject } from "react";
+import React, { type RefObject } from "react";
 import type { FalkorDBCanvas, Data as CanvasData } from "@falkordb/canvas";
 import { signOut } from "next-auth/react";
-import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, enrichSyntaxMessage, type SyntaxErrorInfo, type HintLink } from "./cypherErrors";
-import { suggestForError, findFuncArgTypo } from "./cypherSuggestions";
+import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, enrichSyntaxMessage, type SyntaxErrorInfo, type HintLink } from "./cypherErrors.ts";
+import { suggestForError, findFuncArgTypo } from "./cypherSuggestions.ts";
 
 export { parseSyntaxError };
 export type { SyntaxErrorInfo };
@@ -265,7 +265,7 @@ export async function getSSEGraphResult(
     let handled = false;
 
     // EventSource doesn't support headers — inject connectionId as a query param.
-    let effectiveUrl = url;
+    let effectiveUrl = normalizeApiUrl(url);
     if (_activeConnectionId) {
       const sep = effectiveUrl.includes("?") ? "&" : "?";
       effectiveUrl += `${sep}connectionId=${encodeURIComponent(_activeConnectionId)}`;
@@ -273,29 +273,48 @@ export async function getSSEGraphResult(
 
     const evtSource = new EventSource(effectiveUrl);
     evtSource.addEventListener("result", (event: MessageEvent) => {
-      const result = JSON.parse(event.data);
-      evtSource.close();
-      setIndicator("online");
-      resolve(result);
+      const payloadText = typeof event.data === "string" ? event.data : "";
+
+      try {
+        const result = JSON.parse(payloadText);
+        evtSource.close();
+        setIndicator("online");
+        resolve(result);
+      } catch (error) {
+        console.error("Failed to parse SSE result event:", error);
+        evtSource.close();
+        setIndicator("offline");
+        reject(new Error("Invalid server response"));
+      }
     });
 
     evtSource.addEventListener("error", (event: MessageEvent) => {
       handled = true;
-      let rawMessage: unknown = "Request failed";
+      let rawMessage: unknown = "";
       let rawStatus: unknown = 0;
       let code: string | undefined;
+      const eventData = typeof (event as { data?: unknown }).data === "string"
+        ? (event as { data?: string }).data
+        : "";
 
-      try {
-        const payload = JSON.parse(event.data) as {
-          message?: unknown;
-          status?: unknown;
-          code?: string;
-        };
-        rawMessage = payload.message;
-        rawStatus = payload.status;
-        code = payload.code;
-      } catch (error) {
-        console.error("Failed to parse SSE error event:", error);
+      if (eventData) {
+        try {
+          const payload = JSON.parse(eventData) as {
+            message?: unknown;
+            status?: unknown;
+            code?: string;
+          };
+          rawMessage = payload.message;
+          rawStatus = payload.status;
+          code = payload.code;
+        } catch (error) {
+          rawMessage = extractResponseErrorMessage(eventData);
+          console.error("Failed to parse SSE error event:", error);
+        }
+      }
+
+      if (!rawMessage) {
+        rawMessage = (event as { message?: unknown }).message;
       }
 
       const message = normalizeErrorMessage(rawMessage) || "Request failed";
@@ -576,6 +595,14 @@ export function getActiveConnectionIdGlobal(): string | null {
   return _activeConnectionId;
 }
 
+function normalizeApiUrl(input: string): string {
+  if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(input) || input.startsWith("//") || input.startsWith("/")) {
+    return input;
+  }
+
+  return `/${input}`;
+}
+
 export async function securedFetch(
   input: string,
   init: RequestInit,
@@ -590,7 +617,7 @@ export async function securedFetch(
   }
   effectiveInit.headers = existingHeaders;
 
-  const response = await fetch(input, effectiveInit);
+  const response = await fetch(normalizeApiUrl(input), effectiveInit);
   const { status } = response;
 
   // Sign out only on an explicit X-Session-Invalid signal, not on all 401s.
@@ -707,6 +734,8 @@ export const getDefaultQuery = (q?: string) =>
   q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN * LIMIT 100";
 
 export const getMetaStats = async (name: string, toast: ToastFn, setIndicator: (indicator: "online" | "offline") => void, isReadOnly?: boolean) => {
+  if (!name) return undefined;
+
   const q = "CALL db.meta.stats() YIELD labels, relTypes RETURN labels, relTypes as relationships";
   const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
 
@@ -716,11 +745,13 @@ export const getMetaStats = async (name: string, toast: ToastFn, setIndicator: (
     if (!result) return undefined;
 
     const row = result.data?.[0];
+    if (!row || typeof row !== "object") return undefined;
 
-    if (!row) return undefined;
+    const labels = row.labels && typeof row.labels === "object" ? row.labels : {};
+    const relationships = row.relationships && typeof row.relationships === "object" ? row.relationships : {};
 
-    const l = Object.entries(row.labels);
-    const r = Object.entries(row.relationships);
+    const l = Object.entries(labels);
+    const r = Object.entries(relationships);
 
     return [l, r];
   } catch (error) {
