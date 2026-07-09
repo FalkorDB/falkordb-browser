@@ -410,13 +410,14 @@ export const GraphContext = createContext<GraphContextType>({
 });
 
 type GraphInfoContextType = {
-  graphInfo: GraphInfo;
+  /** Increments each time graph info is refreshed — subscribe to trigger re-renders. */
+  graphInfoVersion: number;
   nodesCount: number | undefined;
   edgesCount: number | undefined;
 };
 
 export const GraphInfoContext = createContext<GraphInfoContextType>({
-  graphInfo: Graph.empty().GraphInfo,
+  graphInfoVersion: 0,
   nodesCount: undefined,
   edgesCount: undefined,
 });
