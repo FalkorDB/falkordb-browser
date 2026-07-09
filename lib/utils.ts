@@ -6,11 +6,11 @@
 
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import React, { RefObject } from "react";
+import React, { type RefObject } from "react";
 import type { FalkorDBCanvas, Data as CanvasData } from "@falkordb/canvas";
 import { signOut } from "next-auth/react";
-import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, enrichSyntaxMessage, type SyntaxErrorInfo, type HintLink } from "./cypherErrors";
-import { suggestForError, findFuncArgTypo } from "./cypherSuggestions";
+import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, enrichSyntaxMessage, type SyntaxErrorInfo, type HintLink } from "./cypherErrors.ts";
+import { suggestForError, findFuncArgTypo } from "./cypherSuggestions.ts";
 
 export { parseSyntaxError };
 export type { SyntaxErrorInfo };
