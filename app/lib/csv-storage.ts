@@ -1,14 +1,16 @@
 /**
  * Abstract interface for CSV temp storage used by LOAD CSV imports.
  *
- * Two implementations:
+ * Three implementations:
  *   - LocalCsvStorage  — dev/same-machine; files served via /api/csv-temp/[id]
  *   - S3CsvStorage     — production; private S3 bucket + presigned GET URL
+ *   - VercelBlobCsvStorage — Vercel Blob public URL (for LOAD CSV reachability)
  *
  * Selection logic (checked once per request, process.env is stable):
- *   1. CSV_STORAGE=local          → always local
- *   2. S3_ACCESS_KEY_ID is set    → S3
- *   3. otherwise                  → local (dev fallback, no credentials needed)
+ *   1. CSV_STORAGE=local|s3|blob  → explicit provider
+ *   2. S3 env vars present         → S3
+ *   3. BLOB_READ_WRITE_TOKEN set   → Vercel Blob
+ *   4. otherwise                   → local (dev fallback)
  */
 
 export interface CsvStorageProvider {
@@ -25,22 +27,44 @@ export interface CsvStorageProvider {
 
 let _provider: CsvStorageProvider | undefined;
 
+function hasS3Config(): boolean {
+    return Boolean(
+        process.env.S3_ACCESS_KEY_ID
+        && process.env.S3_SECRET_ACCESS_KEY
+        && process.env.S3_BUCKET
+    );
+}
+
+function hasBlobConfig(): boolean {
+    return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+}
+
 /** Returns the singleton storage provider for this process. */
 export function getCsvStorageProvider(): CsvStorageProvider {
     if (_provider) return _provider;
 
-    const forceLocal =
-        process.env.CSV_STORAGE === "local" || !process.env.S3_ACCESS_KEY_ID;
+    const storageMode = process.env.CSV_STORAGE?.toLowerCase();
 
-    if (forceLocal) {
+    if (storageMode && !["local", "s3", "blob"].includes(storageMode)) {
+        throw new Error(`Invalid CSV_STORAGE value \"${process.env.CSV_STORAGE}\". Expected one of: local, s3, blob.`);
+    }
+
+    const resolvedMode = storageMode
+        ?? (hasS3Config() ? "s3" : hasBlobConfig() ? "blob" : "local");
+
+    if (resolvedMode === "local") {
         // Lazy-require to keep S3 SDK out of the local bundle.
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { LocalCsvStorage } = require("./csv-storage-local") as typeof import("./csv-storage-local");
         _provider = new LocalCsvStorage();
-    } else {
+    } else if (resolvedMode === "s3") {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { S3CsvStorage } = require("./csv-storage-s3") as typeof import("./csv-storage-s3");
         _provider = new S3CsvStorage();
+    } else {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { VercelBlobCsvStorage } = require("./csv-storage-vercel-blob") as typeof import("./csv-storage-vercel-blob");
+        _provider = new VercelBlobCsvStorage();
     }
 
     return _provider;

@@ -35,7 +35,10 @@ export class LocalCsvStorage implements CsvStorageProvider {
         await fs.promises.writeFile(buildSafeCsvFilePath(key), bytes);
 
         const base =
-            (process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000")
+            (process.env.CSV_SERVE_BASE_URL
+                ?? process.env.AUTH_URL
+                ?? process.env.NEXTAUTH_URL
+                ?? "http://localhost:3000")
                 .replace(/\/$/, "");
         return `${base}/api/csv-temp/${key}`;
     }

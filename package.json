@@ -48,6 +48,7 @@
     "@types/d3": "^7.4.3",
     "@types/date-fns": "^2.6.3",
     "@types/node-cache": "^4.2.5",
+    "@vercel/blob": "^2.6.1",
     "autoprefixer": "^10.5.2",
     "busboy": "^1.6.0",
     "class-variance-authority": "^0.7.1",
