@@ -68,6 +68,24 @@ For reverse-proxy deployments using `NEXTAUTH_URL=auto`, set `TRUST_PROXY_HEADER
 docker run -p 6379:6379 -it --rm falkordb/falkordb:latest
 ```
 
+### Run browser-only Docker image (with local LOAD CSV defaults)
+
+If you run the browser separately from FalkorDB, use the browser image and set
+the same CSV temp defaults used by compose:
+
+```bash
+docker run -p 3000:3000 --rm \
+  -e CSV_STORAGE=local \
+  -e CSV_LOCAL_TEMP_DIR=/var/lib/FalkorDB/import \
+  -e CSV_LOCAL_LOAD_URI_MODE=file \
+  -v falkordb-import:/var/lib/FalkorDB/import \
+  falkordb/falkordb-browser:latest
+```
+
+When FalkorDB runs in a different container, mount the same `falkordb-import`
+volume to `/var/lib/FalkorDB/import` there as well and configure
+`IMPORT_FOLDER /var/lib/FalkorDB/import` on the DB side.
+
 ### Deploy to Kubernetes with Helm
 
 Deploy the FalkorDB Browser to your Kubernetes cluster using Helm:

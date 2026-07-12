@@ -4,6 +4,7 @@ import { getCorsHeaders } from "../utils";
 import { getClient } from "../auth/[...nextauth]/options";
 import { MAX_FILE_SIZE } from "../upload/file-validation";
 import { getCsvStorageProvider } from "@/app/lib/csv-storage";
+import { getCsvTempCleanupCutoffMs } from "@/app/lib/csv-temp-config";
 
 export async function OPTIONS(request: Request) {
     return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
@@ -69,8 +70,9 @@ export async function POST(request: NextRequest) {
         );
     }
 
+    let decoded: string;
     try {
-        new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+        decoded = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
     } catch {
         return NextResponse.json(
             { message: "The file is not valid UTF-8." },
@@ -78,9 +80,28 @@ export async function POST(request: NextRequest) {
         );
     }
 
+    // Normalize CSV text to reduce FalkorDB header parsing failures:
+    // - strip UTF-8 BOM if present
+    // - drop leading blank lines before the header row
+    const normalized = decoded
+        .replace(/^\uFEFF/, "")
+        .replace(/^(?:[ \t]*\r?\n)+/, "");
+
+    const normalizedBytes = new TextEncoder().encode(normalized);
+
     const key = randomUUID();
     const provider = getCsvStorageProvider();
-    const readUrl = await provider.store(key, bytes);
+
+    // Opportunistic best-effort cleanup to avoid stale files when scheduled
+    // cron runs are delayed or temporarily fail.
+    try {
+        const olderThanMs = getCsvTempCleanupCutoffMs();
+        await provider.cleanupExpired(olderThanMs);
+    } catch {
+        // Keep uploads unaffected by cleanup issues.
+    }
+
+    const readUrl = await provider.store(key, normalizedBytes);
 
     return NextResponse.json(
         { key, readUrl },

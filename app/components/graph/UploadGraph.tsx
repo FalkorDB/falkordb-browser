@@ -1,16 +1,21 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
-import { type FormEvent, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { Copy, Check } from "lucide-react";
+import { type FormEvent, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Copy, Check, FileSpreadsheet, X } from "lucide-react";
+import { Monaco } from "@monaco-editor/react";
+import * as monaco from "monaco-editor";
 import Dropzone from "../ui/Dropzone";
 import Button from "../ui/Button";
 import CloseDialog from "../CloseDialog";
-import { IndicatorContext } from "../provider";
+import { BrowserSettingsContext, ConnectionContext, CypherLanguageContext, ForceGraphContext, GraphContext, HistoryQueryContext, IndicatorContext, TableViewContext, UDFContext } from "../provider";
 import DialogComponent from "../DialogComponent";
-import { prepareArg, securedFetch, uploadFileWithProgress } from "@/lib/utils";
+import { cn, Data, getActiveConnectionIdGlobal, getMemoryUsage, getMetaStats, MemoryValue, prepareArg, securedFetch, uploadFileWithProgress } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
-import { Textarea } from "@/components/ui/textarea";
 import type { FileRejection } from "react-dropzone";
+import EditorComponent, { LanguageConfig } from "../EditorComponent";
+import { CYPHER_LANGUAGE_CONFIGURATION, CYPHER_LANGUAGE_NAME, DEFAULT_MONARCH_TOKENIZER, STATIC_SUGGESTIONS } from "../CypherEditor";
+import { buildCypherCompletionItems, buildUdfFunctionSuggestions } from "../cypherLanguageSuggestions";
+import { Graph, GraphInfo } from "../../api/graph/model";
 
 type UploadMode = "cypher" | "load-csv";
 
@@ -25,16 +30,40 @@ const ACCEPTED_CSV = {
     "text/plain": [".csv"],
 };
 
-function buildLoadCsvStarter(url: string): string {
-    return `LOAD CSV FROM '${url}' AS row\n`;
+function buildLoadCsvPrefix(url: string, withHeaders: boolean): string {
+    const loadPrefix = withHeaders ? "LOAD CSV WITH HEADERS" : "LOAD CSV";
+    return `${loadPrefix} FROM '${url}' AS row`;
 }
 
-export default function UploadGraph({ graphName, disabled, open, onOpenChange }: {
+function buildLoadCsvBodyStarter(): string {
+    return "WITH row\nRETURN count(*) AS rows_loaded\n";
+}
+
+function buildLoadCsvQuery(url: string, withHeaders: boolean, body: string): string {
+    const prefix = buildLoadCsvPrefix(url, withHeaders);
+    const normalizedBody = body.trim();
+    return normalizedBody ? `${prefix}\n${normalizedBody}` : prefix;
+}
+
+function buildShortLoadCsvUrl(url: string): string {
+    const MAX_LEN = 96;
+    if (url.length <= MAX_LEN) return url;
+    return `${url.slice(0, 52)}...${url.slice(-28)}`;
+}
+
+function formatFileSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export default function UploadGraph({ graphName, disabled, open, onOpenChange, onSuccess }: {
     /* eslint-disable react/require-default-props */
     graphName: string
     disabled?: boolean
     open?: boolean
     onOpenChange?: (open: boolean) => void
+    onSuccess?: () => void
 }) {
     // ── shared ──────────────────────────────────────────────────────────────
     const [mode, setMode] = useState<UploadMode>("cypher");
@@ -44,6 +73,14 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
     const isControlled = typeof open === "boolean" && typeof onOpenChange === "function";
     const [internalOpen, setInternalOpen] = useState(false);
     const { toast } = useToast();
+    const { settings: { showPropertyKeyPrefixSettings: { showPropertyKeyPrefix }, graphInfo: { showMemoryUsage } }, tutorialOpen } = useContext(BrowserSettingsContext);
+    const { isReadOnly } = useContext(ConnectionContext);
+    const { setData, setViewport, setGraphData } = useContext(ForceGraphContext);
+    const { setSearch, setScrollPosition } = useContext(TableViewContext);
+    const { graph, setGraph, setGraphInfo, fetchCount, setCurrentTab } = useContext(GraphContext);
+    const { setHistoryQuery } = useContext(HistoryQueryContext);
+    const { udfList } = useContext(UDFContext);
+    const { cypherLanguageConfig } = useContext(CypherLanguageContext);
     const { indicator, setIndicator } = useContext(IndicatorContext);
 
     // ── cypher batch ─────────────────────────────────────────────────────────
@@ -55,7 +92,47 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
     const [csvKey, setCsvKey] = useState<string | null>(null);
     const [csvUrl, setCsvUrl] = useState("");
     const [csvQuery, setCsvQuery] = useState("");
+    const [csvWithHeaders, setCsvWithHeaders] = useState(true);
     const [csvUrlCopied, setCsvUrlCopied] = useState(false);
+    const loadCsvFormRef = useRef<HTMLFormElement>(null);
+
+    const udfSuggestions = useMemo(() => buildUdfFunctionSuggestions(udfList), [udfList]);
+
+    const loadCsvLanguageConfig = useMemo((): LanguageConfig => ({
+        monarchTokensProvider: DEFAULT_MONARCH_TOKENIZER,
+        languageConfiguration: CYPHER_LANGUAGE_CONFIGURATION,
+        triggerCharacters: ["."],
+        getSuggestions: async (monacoInstance: Monaco, context, model) => {
+            return buildCypherCompletionItems({
+                monacoInstance,
+                context,
+                graphInfo: graph.GraphInfo,
+                queryText: model?.getValue() ?? "",
+                udfSuggestions,
+                staticSuggestions: STATIC_SUGGESTIONS,
+                includeGraphMetadata: true,
+            });
+        },
+    }), [graph, udfSuggestions]);
+
+    const editorLanguageConfig = useMemo((): LanguageConfig => {
+        if (!cypherLanguageConfig) return loadCsvLanguageConfig;
+
+        // Keep tokenizer ownership in the main Cypher editor so all Cypher
+        // editors share the same highlighting state.
+        const { monarchTokensProvider: _ignored, ...rest } = cypherLanguageConfig;
+        return rest;
+    }, [cypherLanguageConfig, loadCsvLanguageConfig]);
+
+    const loadCsvPrefix = useMemo(
+        () => (csvUrl ? buildLoadCsvPrefix(buildShortLoadCsvUrl(csvUrl), csvWithHeaders) : ""),
+        [csvUrl, csvWithHeaders]
+    );
+
+    const fullCsvQuery = useMemo(
+        () => (csvUrl ? buildLoadCsvQuery(csvUrl, csvWithHeaders, csvQuery) : ""),
+        [csvUrl, csvWithHeaders, csvQuery]
+    );
 
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -64,8 +141,23 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
         [isControlled, open, internalOpen]
     );
 
+    const cleanupUploadedCsv = useCallback((key: string) => {
+        // Best-effort cleanup for cancel/exit paths.
+        void fetch(`api/csv-temp/${encodeURIComponent(key)}`, {
+            method: "DELETE",
+            credentials: "same-origin",
+        }).catch(() => undefined);
+    }, []);
+
     const handleOpenChange = (nextOpen: boolean, force = false) => {
         if (!nextOpen && isLoading && !force) return;
+
+        // If user closes/cancels after uploading a CSV (but before execution),
+        // try deleting the temp file immediately as a best-effort cleanup.
+        if (!nextOpen && !force && csvKey) {
+            cleanupUploadedCsv(csvKey);
+        }
+
         if (onOpenChange) {
             onOpenChange(nextOpen);
         } else {
@@ -80,6 +172,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
             setCsvKey(null);
             setCsvUrl("");
             setCsvQuery("");
+            setCsvWithHeaders(true);
             setCsvUrlCopied(false);
             setIsLoading(false);
             setPhase(null);
@@ -88,15 +181,19 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
     }, [dialogOpen]);
 
     const resetMode = useCallback(() => {
+        if (csvKey) {
+            cleanupUploadedCsv(csvKey);
+        }
         setCypherFiles([]);
         setCsvFiles([]);
         setCsvKey(null);
         setCsvUrl("");
         setCsvQuery("");
+        setCsvWithHeaders(true);
         setCsvUrlCopied(false);
         setPhase(null);
         setUploadPct(0);
-    }, []);
+    }, [csvKey, cleanupUploadedCsv]);
 
     // ── cypher batch handlers ─────────────────────────────────────────────────
 
@@ -143,6 +240,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
             const data = await processResult.json() as { message?: string };
             toast({ title: "Upload completed", description: data.message || "Graph data uploaded successfully." });
             setCypherFiles([]);
+            onSuccess?.();
             handleOpenChange(false, true);
         } finally {
             setIsLoading(false);
@@ -186,7 +284,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
             const { key, readUrl } = JSON.parse(uploadResult.body) as { key: string; readUrl: string };
             setCsvKey(key);
             setCsvUrl(readUrl);
-            setCsvQuery(buildLoadCsvStarter(readUrl));
+            setCsvQuery(buildLoadCsvBodyStarter());
         } finally {
             setIsLoading(false);
             setPhase(null);
@@ -197,7 +295,12 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
     const onRunLoadCsv = async (e: FormEvent) => {
         e.preventDefault();
 
-        if (!csvKey || !csvQuery.trim()) return;
+        if (!graphName) {
+            toast({ title: "Error", description: "Select a single graph before running LOAD CSV.", variant: "destructive" });
+            return;
+        }
+
+        if (!csvKey || !fullCsvQuery.trim()) return;
 
         try {
             setIsLoading(true);
@@ -205,14 +308,84 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
 
             const result = await securedFetch(
                 `api/graph/${prepareArg(graphName)}/load-csv`,
-                { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: csvKey, query: csvQuery }) },
+                { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: csvKey, query: fullCsvQuery }) },
                 toast,
                 setIndicator
             );
             if (!result.ok) return;
 
-            const data = await result.json() as { message?: string };
+            const data = await result.json() as { message?: string; result?: { data?: Data; metadata?: unknown[] } };
+
+            if (data.result?.data && Array.isArray(data.result.metadata)) {
+                let graphInfo: GraphInfo | undefined;
+                try {
+                    const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
+                    const metaStats = await getMetaStats(graphName, toast, setIndicator, isReadOnly);
+                    const propertyInfo = await securedFetch(
+                        `api/graph/${prepareArg(graphName)}/info?type=${prepareArg("(property key)")}${readOnlyParam}`,
+                        { method: "GET" },
+                        toast,
+                        setIndicator
+                    );
+                    const propertyJson = propertyInfo.ok
+                        ? await propertyInfo.json() as { result?: { data?: Array<{ info?: unknown }> } }
+                        : undefined;
+                    const propertyKeys = (propertyJson?.result?.data ?? [])
+                        .map((entry) => (typeof entry?.info === "string" ? entry.info : undefined))
+                        .filter((value): value is string => typeof value === "string");
+                    const memoryUsage = showMemoryUsage
+                        ? await getMemoryUsage(graphName, toast, setIndicator, getActiveConnectionIdGlobal())
+                        : new Map<string, MemoryValue>();
+
+                    graphInfo = await GraphInfo.create(
+                        propertyKeys,
+                        metaStats?.[0] ?? [],
+                        metaStats?.[1] ?? [],
+                        memoryUsage,
+                        toast,
+                        setIndicator
+                    );
+                } catch {
+                    graphInfo = graph.GraphInfo;
+                }
+
+                const nextGraph = await Graph.create(
+                    graphName,
+                    { data: data.result.data, metadata: data.result.metadata },
+                    showPropertyKeyPrefix,
+                    0,
+                    graphInfo
+                );
+
+                setGraph(nextGraph);
+                setGraphInfo(nextGraph.GraphInfo);
+                setData({ ...nextGraph.Elements });
+                setViewport(undefined);
+                setGraphData(undefined);
+                setSearch("");
+                setScrollPosition(0);
+                await fetchCount(graphName);
+                if (!tutorialOpen) {
+                    setCurrentTab(nextGraph.getElements().length === 0 && nextGraph.Data.length !== 0 ? "Table" : "Graph");
+                }
+            }
+
             toast({ title: "LOAD CSV completed", description: data.message || "Data imported successfully." });
+
+            // Reflect the executed LOAD CSV query in the main editor state
+            // without appending anything to query history.
+            setHistoryQuery((prev) => ({
+                ...prev,
+                counter: 0,
+                query: fullCsvQuery,
+                currentQuery: {
+                    ...prev.currentQuery,
+                    text: fullCsvQuery,
+                    graphName,
+                },
+            }));
+
+            onSuccess?.();
             handleOpenChange(false, true);
         } finally {
             setIsLoading(false);
@@ -229,6 +402,34 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
             // ignore clipboard errors
         }
     };
+
+    const handleLoadCsvEditorDidMount = useCallback((editor: monaco.editor.IStandaloneCodeEditor) => {
+        editor.addAction({
+            id: "upload-load-csv-submit",
+            label: "Run LOAD CSV query",
+            keybindings: [monaco.KeyCode.Enter],
+            precondition: "!suggestWidgetVisible",
+            run: () => {
+                loadCsvFormRef.current?.requestSubmit();
+            },
+        });
+
+        // Ctrl/Cmd+Enter inserts a raw newline in the Upload editor.
+        // eslint-disable-next-line no-bitwise
+        editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+            editor.trigger("keyboard", "type", { text: "\n" });
+        });
+
+        editor.addAction({
+            id: "upload-load-csv-escape",
+            label: "Blur upload editor",
+            keybindings: [monaco.KeyCode.Escape],
+            precondition: "!suggestWidgetVisible",
+            run: () => {
+                (document.activeElement as HTMLElement | null)?.blur();
+            },
+        });
+    }, []);
 
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -271,8 +472,20 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
                     className="w-full"
                 >
                     <TabsList className="h-fit bg-background gap-1">
-                        <TabsTrigger value="cypher" disabled={isLoading}>Cypher batch</TabsTrigger>
-                        <TabsTrigger value="load-csv" disabled={isLoading}>Load CSV</TabsTrigger>
+                        <TabsTrigger
+                            className={cn("px-2 py-0.5 text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")}
+                            value="cypher"
+                            disabled={isLoading}
+                        >
+                            Cypher batch
+                        </TabsTrigger>
+                        <TabsTrigger
+                            className={cn("px-2 py-0.5 text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")}
+                            value="load-csv"
+                            disabled={isLoading}
+                        >
+                            Load CSV
+                        </TabsTrigger>
                     </TabsList>
 
                     {/* ── Cypher batch ─────────────────────────────────── */}
@@ -284,13 +497,39 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
                             <Dropzone
                                 filesCount
                                 className="flex-col"
-                                withTable
                                 maxFiles={1}
                                 disabled={isLoading}
                                 onFileDrop={setCypherFiles}
                                 onDropRejected={handleCypherDropRejected}
                                 accept={ACCEPTED_CYPHER}
                             />
+                            {cypherFiles.length === 1 && (
+                                <div className="rounded-lg border border-border bg-secondary/30 px-3 py-2">
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                                            <FileSpreadsheet size={16} />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="truncate text-sm font-medium" title={cypherFiles[0].name}>
+                                                {cypherFiles[0].name}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {formatFileSize(cypherFiles[0].size)} · Cypher file ready to upload
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setCypherFiles([])}
+                                            className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-background/60 hover:text-foreground"
+                                            title="Remove file"
+                                            aria-label="Remove selected Cypher file"
+                                            disabled={isLoading}
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                             {progressBar}
                             <div className="flex gap-3 justify-end">
                                 <Button
@@ -321,13 +560,39 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
                                 <Dropzone
                                     filesCount
                                     className="flex-col"
-                                    withTable
                                     maxFiles={1}
                                     disabled={isLoading}
                                     onFileDrop={setCsvFiles}
                                     onDropRejected={handleCsvDropRejected}
                                     accept={ACCEPTED_CSV}
                                 />
+                                {csvFiles.length === 1 && (
+                                    <div className="rounded-lg border border-border bg-secondary/30 px-3 py-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                                                <FileSpreadsheet size={16} />
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="truncate text-sm font-medium" title={csvFiles[0].name}>
+                                                    {csvFiles[0].name}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {formatFileSize(csvFiles[0].size)} · CSV file ready to upload
+                                                </p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setCsvFiles([])}
+                                                className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-background/60 hover:text-foreground"
+                                                title="Remove file"
+                                                aria-label="Remove selected CSV file"
+                                                disabled={isLoading}
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                                 {progressBar}
                                 <div className="flex gap-3 justify-end">
                                     <Button
@@ -347,7 +612,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
 
                         {/* Step 2: edit query and run */}
                         {csvKey && (
-                            <form onSubmit={onRunLoadCsv} className="flex flex-col gap-4 mt-2">
+                            <form ref={loadCsvFormRef} onSubmit={onRunLoadCsv} className="flex flex-col gap-4 mt-2">
                                 <p className="text-sm text-muted-foreground">
                                     CSV uploaded. Complete the query below and click <strong>Run</strong>.
                                     The file will be deleted after the query finishes.
@@ -372,19 +637,59 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
                                     <label htmlFor="loadCsvQuery" className="text-sm font-medium">
                                         Cypher query
                                     </label>
-                                    <Textarea
-                                        id="loadCsvQuery"
-                                        value={csvQuery}
-                                        onChange={(e) => setCsvQuery(e.target.value)}
-                                        className="min-h-[120px] font-mono text-xs"
-                                        disabled={isLoading}
-                                        data-testid="loadCsvQuery"
-                                        placeholder={`LOAD CSV FROM '${csvUrl}' AS row\nCREATE (:Node {name: row.name})`}
-                                        spellCheck={false}
-                                    />
+                                    <label
+                                        htmlFor="loadCsvWithHeaders"
+                                        className="inline-flex items-center gap-2 text-xs text-muted-foreground"
+                                    >
+                                        <input
+                                            id="loadCsvWithHeaders"
+                                            type="checkbox"
+                                            checked={csvWithHeaders}
+                                            onChange={(e) => setCsvWithHeaders(e.target.checked)}
+                                            disabled={isLoading}
+                                            className="h-4 w-4 rounded border border-border bg-background align-middle"
+                                        />
+                                        Use CSV headers
+                                    </label>
+                                    <div className="rounded-md border bg-muted/40 px-3 py-2">
+                                        <code className="font-mono text-xs">{loadCsvPrefix}</code>
+                                    </div>
+                                    <div className="h-36 w-full rounded-lg border border-border overflow-hidden" data-testid="loadCsvQuery">
+                                        <EditorComponent
+                                            className="SofiaSans"
+                                            height="100%"
+                                            language={CYPHER_LANGUAGE_NAME}
+                                            languageConfig={editorLanguageConfig}
+                                            themeName="selector-theme"
+                                            options={{
+                                                lineHeight: 22,
+                                                fontSize: 14,
+                                                lineNumbersMinChars: 3,
+                                                quickSuggestions: true,
+                                                suggestOnTriggerCharacters: true,
+                                                scrollBeyondLastLine: false,
+                                                wordWrap: "on",
+                                                renderWhitespace: "none"
+                                            }}
+                                            value={csvQuery}
+                                            onChange={(value) => setCsvQuery(value ?? "")}
+                                            onMount={handleLoadCsvEditorDidMount}
+                                            readOnly={isLoading}
+                                        />
+                                    </div>
                                     <p className="text-xs text-muted-foreground">
-                                        Each CSV column is available as{" "}
-                                        <code className="rounded bg-muted px-1 py-0.5">row.columnName</code>.
+                                        {csvWithHeaders ? (
+                                            <>
+                                                Each CSV column is available as{" "}
+                                                <code className="rounded bg-muted px-1 py-0.5">row.columnName</code>.
+                                            </>
+                                        ) : (
+                                            <>
+                                                Without headers, columns are available as{" "}
+                                                <code className="rounded bg-muted px-1 py-0.5">row[0]</code>,{" "}
+                                                <code className="rounded bg-muted px-1 py-0.5">row[1]</code>, ...
+                                            </>
+                                        )}
                                     </p>
                                 </div>
 
@@ -398,7 +703,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange }:
                                         variant="Primary"
                                         isLoading={isLoading}
                                         indicator={indicator}
-                                        disabled={!csvQuery.trim()}
+                                        disabled={!graphName || !fullCsvQuery.trim()}
                                         data-testid="loadCsvRunConfirm"
                                     />
                                     <CloseDialog data-testid="uploadGraphCancel" disabled={isLoading} />

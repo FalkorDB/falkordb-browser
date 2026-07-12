@@ -8,9 +8,8 @@ import { History, Info, Network, Sparkles } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Button from "../components/ui/Button";
-import { BrowserSettingsContext, ConnectionContext, IndicatorContext, PanelContext } from "../components/provider";
+import { BrowserSettingsContext, ConnectionContext, CypherLanguageContext, IndicatorContext, PanelContext } from "../components/provider";
 import CypherEditor from "../components/CypherEditor";
-import { type LanguageConfig } from "../components/EditorComponent";
 import { Graph } from "../api/graph/model";
 import QueryHistoryPanel from "./QueryHistoryPanel";
 import ResizableBox from "@/components/ui/ResizableBox";
@@ -53,11 +52,13 @@ export default function Selector({
     const { indicator } = useContext(IndicatorContext);
     const { settings: { limitSettings: { limit, lastLimit }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } }, tutorialOpen } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
+    const { cypherLanguageConfig, setCypherLanguageConfig } = useContext(CypherLanguageContext);
     const { panelOpen, onTogglePanel } = useContext(PanelContext);
 
     const [maximize, setMaximize] = useState(false);
-    const [cypherLanguageConfig, setCypherLanguageConfig] = useState<LanguageConfig | null>(null);
-    const handleLanguageConfig = useCallback((config: LanguageConfig) => { setCypherLanguageConfig(config); }, []);
+    const handleLanguageConfig = useCallback((config: NonNullable<typeof cypherLanguageConfig>) => {
+        setCypherLanguageConfig(config);
+    }, [setCypherLanguageConfig]);
 
     const { size: historySize, onResize: onHistoryResize } = useResizableSize("queryHistory-size", 560, 600, 350, 300);
 

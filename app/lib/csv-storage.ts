@@ -7,10 +7,16 @@
  *   - VercelBlobCsvStorage — Vercel Blob public URL (for LOAD CSV reachability)
  *
  * Selection logic (checked once per request, process.env is stable):
- *   1. CSV_STORAGE=local|s3|blob  → explicit provider
- *   2. S3 env vars present         → S3
- *   3. BLOB_READ_WRITE_TOKEN set   → Vercel Blob
- *   4. otherwise                   → local (dev fallback)
+ *   1. CSV_STORAGE=local|s3|blob  → explicit provider (always wins)
+ *   2. both S3 + Blob present     → S3 (preferred)
+ *   3. only S3 creds present      → S3
+ *   4. only Blob creds present    → Blob
+ *   5. otherwise                  → local (default)
+ *
+ * Notes:
+ *   - Local is the default when no cloud credentials are configured.
+ *   - A single configured cloud provider is selected automatically.
+ *   - If both cloud providers are configured, S3 is preferred.
  */
 
 export interface CsvStorageProvider {
@@ -23,6 +29,13 @@ export interface CsvStorageProvider {
 
     /** Delete the stored object. Called in `finally` after the LOAD CSV query. */
     delete(key: string): Promise<void>;
+
+    /**
+     * Best-effort cleanup for stale temp files/objects.
+     * Removes entries older than the provided unix timestamp in milliseconds.
+     * Returns the number of deleted entries.
+     */
+    cleanupExpired(olderThanMs: number): Promise<number>;
 }
 
 let _provider: CsvStorageProvider | undefined;
@@ -49,8 +62,21 @@ export function getCsvStorageProvider(): CsvStorageProvider {
         throw new Error(`Invalid CSV_STORAGE value \"${process.env.CSV_STORAGE}\". Expected one of: local, s3, blob.`);
     }
 
-    const resolvedMode = storageMode
-        ?? (hasS3Config() ? "s3" : hasBlobConfig() ? "blob" : "local");
+    const s3Configured = hasS3Config();
+    const blobConfigured = hasBlobConfig();
+
+    let resolvedMode: "local" | "s3" | "blob";
+    if (storageMode) {
+        resolvedMode = storageMode as "local" | "s3" | "blob";
+    } else if (s3Configured && blobConfigured) {
+        resolvedMode = "s3";
+    } else if (s3Configured) {
+        resolvedMode = "s3";
+    } else if (blobConfigured) {
+        resolvedMode = "blob";
+    } else {
+        resolvedMode = "local";
+    }
 
     if (resolvedMode === "local") {
         // Lazy-require to keep S3 SDK out of the local bundle.

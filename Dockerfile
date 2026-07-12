@@ -44,6 +44,9 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV CSV_STORAGE=local
+ENV CSV_LOCAL_TEMP_DIR=/var/lib/FalkorDB/import
+ENV CSV_LOCAL_LOAD_URI_MODE=file
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -64,6 +67,10 @@ RUN chown nextjs:nodejs .next
 # Create data directory for token storage
 RUN mkdir .data
 RUN chown nextjs:nodejs .data
+
+# Default local CSV temp directory used for LOAD CSV file:// imports.
+RUN mkdir -p /var/lib/FalkorDB/import
+RUN chown nextjs:nodejs /var/lib/FalkorDB/import
 
 # Automatically leverage output traces to reduce image size
 # https://nextjs.org/docs/advanced-features/output-file-tracing

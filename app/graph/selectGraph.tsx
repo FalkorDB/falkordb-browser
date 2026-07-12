@@ -340,6 +340,10 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                                 <UploadGraph
                                                     graphName={selectedGraphNames.length === 1 ? selectedGraphNames[0] : ""}
                                                     disabled={selectedGraphNames.length !== 1}
+                                                    onSuccess={() => {
+                                                        setOpenMenage(false);
+                                                        setOpen(false);
+                                                    }}
                                                 />
                                             );
                                         })()}

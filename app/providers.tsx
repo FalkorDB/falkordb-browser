@@ -20,7 +20,8 @@ import type { Data as CanvasData, HierarchyDirection, LayoutMode, RadialDirectio
 import LoginVerification from "./loginVerification";
 import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
-import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
+import type { LanguageConfig } from "./components/EditorComponent";
+import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, CypherLanguageContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
 import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
@@ -290,6 +291,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0);
   const [isQueryLoading, setIsQueryLoading] = useState(false);
+  const [cypherLanguageConfig, setCypherLanguageConfig] = useState<LanguageConfig | null>(null);
   const [diagnostics, setDiagnostics] = useState<DiagnosticsResult | null>(null);
   const [model, setModel] = useState("");
   const [newModel, setNewModel] = useState("");
@@ -626,6 +628,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     selectedUdf,
     setSelectedUdf
   }), [selectedUdf, udfList]);
+
+  const cypherLanguageContext = useMemo(() => ({
+    cypherLanguageConfig,
+    setCypherLanguageConfig,
+  }), [cypherLanguageConfig]);
 
   const fetchCount = useCallback(async (name?: string) => {
     const n = name || graphName;
@@ -1589,19 +1596,21 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                       <TableViewContext.Provider value={tableViewContext}>
                         <ConnectionContext.Provider value={connectionContext}>
                           <UDFContext.Provider value={udfContext}>
-                            <AiFixContext.Provider value={aiFixContext}>
-                              <ProviderLayout
-                                panelRef={panelRef}
-                                tutorialOpen={tutorialOpen}
-                                onCloseTutorial={handleCloseTutorial}
-                                onLoadDemoGraphs={handleLoadDemoGraphs}
-                                onCleanupDemoGraphs={handleCleanupDemoGraphs}
-                                showUDF={showUDF}
-                              >
-                                {children}
-                              </ProviderLayout>
-                              <AiFixDialogs />
-                            </AiFixContext.Provider>
+                            <CypherLanguageContext.Provider value={cypherLanguageContext}>
+                              <AiFixContext.Provider value={aiFixContext}>
+                                <ProviderLayout
+                                  panelRef={panelRef}
+                                  tutorialOpen={tutorialOpen}
+                                  onCloseTutorial={handleCloseTutorial}
+                                  onLoadDemoGraphs={handleLoadDemoGraphs}
+                                  onCleanupDemoGraphs={handleCleanupDemoGraphs}
+                                  showUDF={showUDF}
+                                >
+                                  {children}
+                                </ProviderLayout>
+                                <AiFixDialogs />
+                              </AiFixContext.Provider>
+                            </CypherLanguageContext.Provider>
                           </UDFContext.Provider>
                         </ConnectionContext.Provider>
                       </TableViewContext.Provider>

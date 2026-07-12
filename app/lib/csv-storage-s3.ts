@@ -2,6 +2,8 @@ import {
     S3Client,
     PutObjectCommand,
     DeleteObjectCommand,
+    DeleteObjectsCommand,
+    ListObjectsV2Command,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { CsvStorageProvider } from "./csv-storage";
@@ -83,5 +85,40 @@ export class S3CsvStorage implements CsvStorageProvider {
                 // Log but never throw — delete is best-effort cleanup.
                 console.error("[S3CsvStorage] delete failed:", err);
             });
+    }
+
+    async cleanupExpired(olderThanMs: number): Promise<number> {
+        const b = bucket();
+        const prefix = (process.env.S3_KEY_PREFIX ?? "csv-temp/").replace(/\/?$/, "/");
+        let continuationToken: string | undefined;
+        let deleted = 0;
+
+        do {
+            const listed = await this.client.send(
+                new ListObjectsV2Command({
+                    Bucket: b,
+                    Prefix: prefix,
+                    ContinuationToken: continuationToken,
+                })
+            );
+
+            const staleKeys = (listed.Contents ?? [])
+                .filter((obj) => obj.Key && obj.LastModified && obj.LastModified.getTime() <= olderThanMs)
+                .map((obj) => ({ Key: obj.Key as string }));
+
+            if (staleKeys.length > 0) {
+                const result = await this.client.send(
+                    new DeleteObjectsCommand({
+                        Bucket: b,
+                        Delete: { Objects: staleKeys, Quiet: true },
+                    })
+                );
+                deleted += result.Deleted?.length ?? 0;
+            }
+
+            continuationToken = listed.IsTruncated ? listed.NextContinuationToken : undefined;
+        } while (continuationToken);
+
+        return deleted;
     }
 }

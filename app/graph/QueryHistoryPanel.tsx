@@ -14,7 +14,7 @@ import Button from "../components/ui/Button";
 import EditorComponent from "../components/EditorComponent";
 import { LanguageConfig } from "../components/EditorComponent";
 import { CYPHER_LANGUAGE_NAME, STATIC_SUGGESTIONS } from "../components/CypherEditor";
-import { extractVariableCandidates } from "@/lib/cypherSuggestions";
+import { buildCypherCompletionItems, buildUdfFunctionSuggestions } from "../components/cypherLanguageSuggestions";
 import PaginationList from "../components/PaginationList";
 import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, UDFContext } from "../components/provider";
 import { Explain, Metadata, Profile } from "./MetadataView";
@@ -71,16 +71,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     useEffect(() => { graphRef.current = graph; }, [graph]);
     useEffect(() => { graphNameRef.current = graphName; }, [graphName]);
 
-    const udfSuggestions = useMemo(() =>
-        udfList.flatMap(([, libName, , functions]) =>
-            functions.map((fn: string) => ({
-                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-                insertText: `${libName}.${fn}(\${0})`,
-                label: `${libName}.${fn}()`,
-                kind: monaco.languages.CompletionItemKind.Function,
-                detail: '(udf function)',
-            }))
-        ), [udfList]);
+    const udfSuggestions = useMemo(() => buildUdfFunctionSuggestions(udfList), [udfList]);
     const udfSuggestionsRef = useRef(udfSuggestions);
     useEffect(() => { udfSuggestionsRef.current = udfSuggestions; }, [udfSuggestions]);
 
@@ -94,52 +85,29 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
             const g = graphRef.current;
             const graphMatches = currentQueryRef.current?.graphName === graphNameRef.current;
             const udfs = udfSuggestionsRef.current;
-
-            // Dot-triggered: property keys only (when graph matches)
-            if (context?.triggerCharacter === '.') {
-                if (!graphMatches) return [];
-                return (g.GraphInfo.PropertyKeys ?? []).map(key => ({
-                    insertText: key,
-                    label: key,
-                    kind: monacoInstance.languages.CompletionItemKind.Property,
-                    detail: '(property key)',
-                }));
-            }
-
-            // EditorComponent always overwrites `range`; use a loose type to avoid
-            // the strict `range` requirement on every push.
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const items: any[] = [...STATIC_SUGGESTIONS, ...udfs];
-
-            // Bound variables from the currently displayed query
-            const queryText = currentQueryRef.current?.text ?? "";
-            extractVariableCandidates(queryText).forEach(v => {
-                items.push({
-                    insertText: v,
-                    label: v,
-                    kind: monacoInstance.languages.CompletionItemKind.Variable,
-                    detail: '(variable)',
-                });
+            return buildCypherCompletionItems({
+                monacoInstance,
+                context,
+                graphInfo: g.GraphInfo,
+                queryText: currentQueryRef.current?.text ?? "",
+                udfSuggestions: udfs,
+                staticSuggestions: STATIC_SUGGESTIONS,
+                includeGraphMetadata: graphMatches,
             });
-
-            if (graphMatches) {
-                g.GraphInfo.Labels.forEach((_, name) => {
-                    if (!name) return;
-                    items.push({ insertText: name, label: name, kind: monacoInstance.languages.CompletionItemKind.Class, detail: '(label)' });
-                });
-                g.GraphInfo.Relationships.forEach((_, name) => {
-                    if (!name) return;
-                    items.push({ insertText: name, label: name, kind: monacoInstance.languages.CompletionItemKind.Interface, detail: '(relationship type)' });
-                });
-                (g.GraphInfo.PropertyKeys ?? []).forEach(key => {
-                    items.push({ insertText: key, label: key, kind: monacoInstance.languages.CompletionItemKind.Property, detail: '(property key)' });
-                });
-            }
-
-            return items;
         },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }), []);
+
+    const editorLanguageConfig = useMemo((): LanguageConfig => {
+        if (!sharedLanguageConfig) return historyLanguageConfig;
+
+        // Do not reset the global Cypher tokenizer on history-editor mount.
+        // The main editor maintains a dynamic tokenizer (bound vars, namespaces),
+        // and overriding it here with the default provider causes temporary
+        // de-highlighting until the next query-change retokenization.
+        const { monarchTokensProvider: _ignored, ...rest } = sharedLanguageConfig;
+        return rest;
+    }, [sharedLanguageConfig, historyLanguageConfig]);
 
     const afterSearchCallback = useCallback((newFilteredList: Query[]) => {
         const selectedQuery = historyQuery.counter === 0
@@ -239,7 +207,9 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     };
 
     const isTabEnabled = useCallback((tabName: Tab) => {
-        if (tabName === "text") return !!currentQuery?.text;
+        // Text editor should stay accessible even when the current query is empty,
+        // so users can type a new query from the Current Query state.
+        if (tabName === "text") return !!currentQuery;
         if (tabName === "metadata") return !!currentQuery && currentQuery.metadata.length > 0;
         if (tabName === "explain") return !!currentQuery && currentQuery.explain.length > 0;
         return true;
@@ -250,7 +220,9 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
 
         const currentValue = currentQuery?.[tab];
 
-        if (!currentValue || currentValue.length === 0) {
+        // For the text tab, an empty string is expected and should not force
+        // fallback to another tab.
+        if (tab !== "text" && (!currentValue || currentValue.length === 0)) {
             const fallbackTab = (Object.keys(currentQuery) as Tab[]).find(isTabEnabled);
 
             if (fallbackTab && fallbackTab !== tab) {
@@ -572,7 +544,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                                     className="SofiaSans"
                                     height="100%"
                                     language={CYPHER_LANGUAGE_NAME}
-                                    languageConfig={sharedLanguageConfig ?? historyLanguageConfig}
+                                    languageConfig={editorLanguageConfig}
                                     themeName="selector-theme"
                                     options={{
                                         lineHeight: 22,
