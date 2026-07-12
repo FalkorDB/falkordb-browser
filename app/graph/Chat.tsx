@@ -16,6 +16,7 @@ import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayNa
 import ToastButton from "../components/ToastButton";
 import { ShineBorder } from "@/components/ui/shine-border";
 import { getConnectionItem, setConnectionItem, getConnectionPrefix } from "@/lib/connection-storage";
+import { getConfidenceStyle, normalizeConfidence, migrateLegacyConfidence } from "./confidence";
 
 const mdInstance = new MarkdownIt({
     html: false,
@@ -61,27 +62,39 @@ const getErrorStatus = (error: unknown) => {
     return 0;
 };
 
-// Confidence badge tiers: calm, low-saturation tints that stay readable in light and dark themes.
-const getConfidenceStyle = (value: number) => {
-    if (value >= 90) {
-        return {
-            label: "High confidence",
-            wrap: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-emerald-500/20",
-            dot: "bg-emerald-500",
-        };
+// Confidence badge tiers moved to ./confidence for unit testing.
+
+// Bump when the persisted chat payload shape or value scales change.
+// v1 (legacy) was a bare Message[] whose `confidence` used the old 0-1 scale;
+// v2 wraps the array and stores confidence on the current 0-100 scale.
+const CHAT_HISTORY_VERSION = 2;
+
+// Restore persisted chat history, migrating pre-0-100 confidence values so a
+// cached 0-1 fraction (e.g. 0.9) no longer renders as a red "1%" badge.
+const parseStoredMessages = (raw: string | null): Message[] => {
+    if (!raw) return [];
+
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(raw);
+    } catch {
+        return [];
     }
-    if (value >= 70) {
-        return {
-            label: "Medium confidence",
-            wrap: "bg-amber-500/10 text-amber-700 dark:text-amber-300 ring-amber-500/25",
-            dot: "bg-amber-500",
-        };
+
+    if (Array.isArray(parsed)) {
+        // Legacy (unversioned): confidence was persisted on the 0-1 scale.
+        return (parsed as Message[]).map(message =>
+            message.confidence != null
+                ? { ...message, confidence: migrateLegacyConfidence(message.confidence) }
+                : message
+        );
     }
-    return {
-        label: "Low confidence",
-        wrap: "bg-rose-500/10 text-rose-700 dark:text-rose-300 ring-rose-500/25",
-        dot: "bg-rose-500",
-    };
+
+    if (parsed && typeof parsed === "object" && Array.isArray((parsed as { messages?: unknown }).messages)) {
+        return (parsed as { messages: Message[] }).messages;
+    }
+
+    return [];
 };
 
 export default function Chat({ onClose }: Props) {
@@ -170,8 +183,7 @@ export default function Chat({ onClose }: Props) {
     useEffect(() => {
         if (!getConnectionPrefix()) return;
         const savedMessages = getConnectionItem(`chat-${graphName}`);
-        const currentMessages = JSON.parse(savedMessages || "[]");
-        setMessages(currentMessages);
+        setMessages(parseStoredMessages(savedMessages));
 
         const savedCypherOnly = getConnectionItem(`cypherOnly-${graphName}`);
         setCypherOnly(savedCypherOnly === "true");
@@ -181,7 +193,10 @@ export default function Chat({ onClose }: Props) {
         let statusGroup: Message[];
 
         if (messages.length > 0) {
-            setConnectionItem(`chat-${graphName}`, JSON.stringify(getLastUserMessagesWithContext(messages, maxSavedMessages)));
+            setConnectionItem(`chat-${graphName}`, JSON.stringify({
+                version: CHAT_HISTORY_VERSION,
+                messages: getLastUserMessagesWithContext(messages, maxSavedMessages),
+            }));
         }
 
         const newMessagesList = messages.map((message, i): Message | [Message[], boolean] | undefined => {
@@ -492,20 +507,24 @@ export default function Chat({ onClose }: Props) {
                 return (
                     <div className="flex flex-col gap-1">
                         <MarkdownMessage content={message.content} />
-                        {message.type === "Result" && message.confidence != null && (() => {
-                            const style = getConfidenceStyle(message.confidence);
+                        {message.type === "Result" && (() => {
+                            const confidence = normalizeConfidence(message.confidence);
+                            if (confidence == null) return null;
+                            const style = getConfidenceStyle(confidence);
                             return (
                                 <span
+                                    data-testid="chatConfidenceBadge"
                                     className={cn(
                                         "mt-1 inline-flex w-fit items-center gap-1.5 rounded-full px-2 py-0.5",
                                         "text-[11px] font-medium leading-none ring-1 ring-inset",
                                         style.wrap
                                     )}
-                                    title={`${style.label}: the model's self-reported certainty in this answer`}
+                                    title={`${style.label}: how confident the model is that this answer is correct given the graph data`}
+                                    aria-label={`${style.label}, ${confidence}%`}
                                 >
                                     <span className={cn("h-1.5 w-1.5 rounded-full", style.dot)} aria-hidden />
                                     <span className="text-muted-foreground">Confidence</span>
-                                    <span className="tabular-nums">{Math.round(message.confidence)}%</span>
+                                    <span className="tabular-nums">{confidence}%</span>
                                 </span>
                             );
                         })()}

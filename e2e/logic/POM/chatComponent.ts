@@ -35,6 +35,10 @@ export default class ChatComponent extends GraphPage {
     return this.page.getByTestId(`chatAssistantMessage-${type}`);
   }
 
+  private get chatConfidenceBadge(): Locator {
+    return this.page.getByTestId("chatConfidenceBadge");
+  }
+
   // Input and Send
   private get chatForm(): Locator {
     return this.page.getByTestId("chatForm");
@@ -396,6 +400,31 @@ export default class ChatComponent extends GraphPage {
       this.chatFooterModel,
       (el) => el.textContent(),
       "Chat Footer Model"
+    );
+  }
+
+  async waitForChatConfidenceBadge(): Promise<boolean> {
+    try {
+      await this.chatConfidenceBadge.first().waitFor({ state: "visible", timeout: 10000 });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async getChatConfidenceBadgeText(): Promise<string | null> {
+    return interactWhenVisible(
+      this.chatConfidenceBadge.first(),
+      (el) => el.textContent(),
+      "Chat Confidence Badge"
+    );
+  }
+
+  async getChatConfidenceBadgeLabel(): Promise<string | null> {
+    return interactWhenVisible(
+      this.chatConfidenceBadge.first(),
+      (el) => el.getAttribute("aria-label"),
+      "Chat Confidence Badge Label"
     );
   }
 }

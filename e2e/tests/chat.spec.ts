@@ -697,6 +697,18 @@ test.describe("Chat Feature Tests", () => {
     await chat.clickChatSendButton();
     await chat.waitForAssistantResponse("Result");
 
+    // Confidence badge should render the 0-100 value directly (not as a 0-1 fraction)
+    const hasConfidenceBadge = await chat.waitForChatConfidenceBadge();
+    expect(hasConfidenceBadge).toBe(true);
+
+    const confidenceText = await chat.getChatConfidenceBadgeText();
+    expect(confidenceText).toContain("90%");
+
+    // 90 falls in the high-confidence tier
+    const confidenceLabel = await chat.getChatConfidenceBadgeLabel();
+    expect(confidenceLabel).toContain("High confidence");
+    expect(confidenceLabel).toContain("90%");
+
     // Footer should now display token data
     const hasTokens = await chat.waitForChatFooterTokens();
     expect(hasTokens).toBe(true);
