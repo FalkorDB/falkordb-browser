@@ -31,8 +31,8 @@ export function normalizeUrl(url: string | null | undefined): string {
  * Global user preferences use plain keys. Per-connection data (e.g. query history)
  * is prefixed with host:port: to match the runtime connection-scoped storage.
  */
-export const initializeLocalStorage = (host = "localhost", port = 6379) => {
-    const prefix = `${host}:${port}:`;
+export const initializeLocalStorage = (host = "localhost", port = 6379, username = "default") => {
+    const prefix = `${host}:${port}:${username}:`;
     return `
         if (!localStorage.getItem("timeout")) localStorage.setItem("timeout", "0");
         if (!localStorage.getItem("limit")) localStorage.setItem("limit", "300");
@@ -138,7 +138,9 @@ export async function waitForURL(
 
   while (elapsed < timeout) {
     const currentURL = page.url();
-    if (currentURL === expectedURL) {
+    const currentPath = new URL(currentURL).origin + new URL(currentURL).pathname;
+    const expectedPath = new URL(expectedURL).origin + new URL(expectedURL).pathname;
+    if (currentPath === expectedPath) {
       return;
     }
     await new Promise((resolve) => {
@@ -172,9 +174,9 @@ export async function getAdminToken(): Promise<
     }
 
     const requiredCookies = [
-      "next-auth.callback-url",
-      "next-auth.csrf-token",
-      "next-auth.session-token",
+      "authjs.callback-url",
+      "authjs.csrf-token",
+      "authjs.session-token",
     ];
     const cookieString = authState.cookies
       .filter((cookie: { name: string }) =>
@@ -209,16 +211,13 @@ export function getRandomString(prefix = "", delimiter = "_"): string {
 export async function interactWhenVisible<T>(
   element: Locator,
   action: (el: Locator) => Promise<T>,
-  name: string
+  name: string,
+  time?: number,
+  retry?: number
 ): Promise<T> {
-  const isVisible = await waitForElementToBeVisible(element);
+  const isVisible = await waitForElementToBeVisible(element, time, retry);
   if (!isVisible) throw new Error(`${name} is not visible!`);
   return action(element);
-}
-
-export function inferLabelFromGraph(graph: string): string {
-  if (graph.toLowerCase().includes("schema")) return "Schema";
-  return "Graph";
 }
 
 export async function pollForElementContent(

@@ -12,10 +12,6 @@ export default class HeaderComponent extends BasePage {
         return this.page.getByTestId("GraphsButton");
     }
 
-    private get schemaButton(): Locator {
-        return this.page.getByTestId("SchemasButton");
-    }
-
     private get helpButton(): Locator {
         return this.page.getByRole("button", { name: "Help" })
     }
@@ -44,6 +40,10 @@ export default class HeaderComponent extends BasePage {
         return this.page.getByTestId("logoutButton")
     }
 
+    private get LogoutConfirmButton(): Locator {
+        return this.page.getByTestId("logoutConfirm")
+    }
+
     private get aboutPopUp(): Locator {
         return this.page.locator('//div[@id="about"]');
     }
@@ -53,13 +53,8 @@ export default class HeaderComponent extends BasePage {
     }
 
     async clickOnGraphsButton(): Promise<void> {
-        await interactWhenVisible(this.graphsButton, (el) => el.click(), "Click Graphs Button");
+        await interactWhenVisible(this.graphsButton, (el) => el.click(), "Click Graphs Button", 1000, 15);
         await waitForURL(this.page, urls.graphUrl);
-    }
-
-    async clickOnSchemasButton(): Promise<void> {
-        await interactWhenVisible(this.schemaButton, (el) => el.click(), "Click Schemas Button");
-        await waitForURL(this.page, urls.schemaUrl);
     }
 
     async clickOnHelpBtn(): Promise<void> {
@@ -93,9 +88,32 @@ export default class HeaderComponent extends BasePage {
     }
 
     async Logout(): Promise<void> {
+        // If we're on the login page with valid auth, wait for the client-side
+        // redirect to the graph page before looking for the logout button.
+        if (this.page.url().includes('/login')) {
+            await this.page.waitForURL(urls.graphUrl, { timeout: 20000 }).catch(() => {});
+            // If still on the login page after the timeout, the user is not
+            // authenticated — nothing to log out from.
+            if (this.page.url().includes('/login')) return;
+        }
         await this.waitForPageIdle();
         await interactWhenVisible(this.LogoutButton, (el) => el.click(), "Click Logout Button");
+        await interactWhenVisible(this.LogoutConfirmButton, (el) => el.click(), "Confirm Logout");
         await waitForURL(this.page, urls.loginUrl);
+    }
+
+    /**
+     * Clears the session cookie from the browser without triggering the
+     * server-side signOut event. This leaves Token DB entries intact so
+     * parallel tests sharing the same session are not affected.
+     * Use this when you need to reach the login page without destroying
+     * the server-side session state.
+     */
+    async disconnectConnection(): Promise<void> {
+        const context = this.page.context();
+        await context.clearCookies();
+        await this.page.goto(urls.loginUrl);
+        await this.page.waitForLoadState('networkidle');
     }
 
     async getFalkorDBLogoHref(): Promise<string | null> {

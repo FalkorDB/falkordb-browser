@@ -40,6 +40,9 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
 
         expect(token).not.toBeNull();
         expect(token?.length).toBeGreaterThan(0);
+
+        // Dismiss the token display dialog before verifying the token in the list
+        await settingsTokensPage.dismissTokenDisplay();
         expect(await settingsTokensPage.verifyTokenExists(tokenName)).toBe(true);
 
         // Verify expiration if applicable
@@ -49,7 +52,6 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
         }
 
         // Cleanup
-        await settingsTokensPage.dismissTokenDisplay();
         await settingsTokensPage.revokeToken(tokenName);
       });
     });

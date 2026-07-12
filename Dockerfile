@@ -1,6 +1,6 @@
 ARG CYPHER_VERSION=latest
 
-FROM node:24-alpine3.22 AS base
+FROM node:24-alpine3.23@sha256:2bdb65ed1dab192432bc31c95f94155ca5ad7fc1392fb7eb7526ab682fa5bf14 AS base
 
 # Cache-bust arg to ensure apk upgrade always runs with latest packages
 ARG CACHEBUST=1
@@ -31,10 +31,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Next.js collects completely anonymous telemetry data about general usage.
-# Learn more here: https://nextjs.org/telemetry
-# Uncomment the following line in case you want to disable telemetry during the build.
-# ENV NEXT_TELEMETRY_DISABLED 1
+# Disable Next.js telemetry during build and runtime.
+ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN \
   if [ -f yarn.lock ]; then yarn run build; \
@@ -47,21 +45,28 @@ RUN \
 FROM base AS runner
 WORKDIR /app
 
-ENV NODE_ENV production
-# Uncomment the following line in case you want to disable telemetry during runtime.
-# ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-RUN npm cache clean --force && \
+RUN apk add --no-cache su-exec && \
+    npm cache clean --force && \
     rm -rf /usr/local/lib/node_modules/npm
+
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
     
 COPY --from=builder /app/public ./public
 
 # Set the correct permission for prerender cache
 RUN mkdir .next
 RUN chown nextjs:nodejs .next
+
+# Create data directory for token storage
+RUN mkdir .data
+RUN chown nextjs:nodejs .data
 
 # Automatically leverage output traces to reduce image size
 # https://nextjs.org/docs/advanced-features/output-file-tracing
@@ -70,13 +75,14 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/.env.local.template ./.env.local
 
 
-USER nextjs
-
 EXPOSE 3000
 
-ENV PORT 3000
+ENV PORT=3000
 
-ENV HOSTNAME "0.0.0.0"
+ENV HOSTNAME="0.0.0.0"
+
+USER nextjs
+ENTRYPOINT ["docker-entrypoint.sh"]
 
 # server.js is created by next build from the standalone output
 # https://nextjs.org/docs/pages/api-reference/next-config-js/output

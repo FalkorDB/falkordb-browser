@@ -1,0 +1,159 @@
+// Shared Cypher language data: built-in keyword and function names.
+//
+// These lists are the single source of truth for both the Monaco editor
+// (autocomplete / tokenizer in app/components/CypherEditor.tsx) and the
+// "Did you mean…?" error suggestions (lib/cypherSuggestions.ts). Keeping them
+// here avoids duplicating the lists in two places.
+
+import type { UDFEntry } from "./utils.ts";
+
+export const CYPHER_KEYWORDS = [
+  "CREATE",
+  "MATCH",
+  "OPTIONAL",
+  "AS",
+  "WHERE",
+  "RETURN",
+  "ORDER BY",
+  "SKIP",
+  "LIMIT",
+  "MERGE",
+  "DELETE",
+  "SET",
+  "WITH",
+  "UNION",
+  "UNWIND",
+  "FOREACH",
+  "CALL",
+  "YIELD",
+  "OR",
+  "AND"
+];
+
+export const BUILTIN_FUNCTIONS = [
+  "all",
+  "any",
+  "exists",
+  "isEmpty",
+  "none",
+  "single",
+  "coalesce",
+  "endNode",
+  "hasLabels",
+  "id",
+  "labels",
+  "properties",
+  "randomUUID",
+  "startNode",
+  "timestamp",
+  "type",
+  "typeOf",
+  "avg",
+  "collect",
+  "count",
+  "max",
+  "min",
+  "percentileCont",
+  "percentileDisc",
+  "stDevP",
+  "sum",
+  "head",
+  "keys",
+  "last",
+  "range",
+  "size",
+  "tail",
+  "reduce",
+  "abs",
+  "ceil",
+  "e",
+  "exp",
+  "floor",
+  "log",
+  "log10",
+  "pow",
+  "rand",
+  "round",
+  "sign",
+  "sqrt",
+  "acos",
+  "atan",
+  "atan2",
+  "cos",
+  "cot",
+  "degrees",
+  "haversin",
+  "pi",
+  "radians",
+  "sin",
+  "tan",
+  "left",
+  "lTrim",
+  "replace",
+  "reverse",
+  "right",
+  "rTrim",
+  "split",
+  "substring",
+  "toLower",
+  "toJSON",
+  "toUpper",
+  "trim",
+  "point",
+  "distance",
+  "toBoolean",
+  "toBooleanList",
+  "toBooleanOrNull",
+  "toFloat",
+  "toFloatList",
+  "toFloatOrNull",
+  "toInteger",
+  "toIntegerList",
+  "toIntegerOrNull",
+  "toString",
+  "toStringList",
+  "toStringOrNull",
+  "indegree",
+  "outdegree",
+  "nodes",
+  "relationships",
+  "length",
+  "shortestPath",
+  "vecf32",
+  "vec.euclideanDistance",
+  "vec.cosineDistance",
+];
+
+/**
+ * Fallback list of well-known FalkorDB built-in procedure names (without parentheses).
+ * Used to populate CALL autocomplete when the server-side procedure fetch fails or is
+ * unavailable. This list matches the procedures shipped with FalkorDB 4.x.
+ */
+export const FALLBACK_PROCEDURE_NAMES: string[] = [
+  "db.constraints",
+  "db.indexes",
+  "db.labels",
+  "db.propertyKeys",
+  "db.relationshipTypes",
+  "db.meta.stats",
+  "db.idx.fulltext.createNodeIndex",
+  "db.idx.fulltext.drop",
+  "db.idx.fulltext.queryNodes",
+  "db.idx.vector.createNodeIndex",
+  "db.idx.vector.drop",
+  "db.idx.vector.queryNodes",
+  "algo.SPpaths",
+  "algo.SSpaths",
+  "algo.betweenness",
+  "algo.BFS",
+  "algo.pageRank",
+  "algo.degree",
+];
+
+// Derives the namespaced UDF function names (e.g. "myLib.myFunc") from the UDF
+// list, matching how they are presented in the editor's autocomplete.
+export function udfFunctionNames(udfList: UDFEntry[]): string[] {
+  return udfList.flatMap(([, libName, , functions]) =>
+    functions.map(fn => `${libName}.${fn}`)
+  );
+}

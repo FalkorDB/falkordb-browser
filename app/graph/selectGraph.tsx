@@ -1,54 +1,49 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
 
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
-import { DialogHeader, DialogDescription, DialogTrigger, DialogTitle, DialogContent, Dialog } from "@/components/ui/dialog";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { createPortal } from "react-dom";
 import { fetchOptions, getMemoryUsage, getSSEGraphResult, prepareArg, Row, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
-import { ChevronDown, ChevronUp, PlusCircle, Settings } from "lucide-react";
+import { ChevronDown, ChevronUp, Settings, X } from "lucide-react";
 import Button from "../components/ui/Button";
-import { IndicatorContext, BrowserSettingsContext } from "../components/provider";
+import { IndicatorContext, BrowserSettingsContext, ConnectionContext } from "../components/provider";
 import PaginationList from "../components/PaginationList";
 import TableComponent from "../components/TableComponent";
 import ExportGraph from "../components/ExportGraph";
 import DeleteGraph from "../components/graph/DeleteGraph";
-import CloseDialog from "../components/CloseDialog";
 import DuplicateGraph from "../components/graph/DuplicateGraph";
-import CreateGraph from "../components/CreateGraph";
 import { Graph } from "../api/graph/model";
+import ResizableBox from "@/components/ui/ResizableBox";
+import { useResizableSize } from "@/lib/useResizableSize";
 
 interface Props {
     options: string[],
     setOptions: (options: string[]) => void
     selectedValue: string
     setSelectedValue: (value: string) => void
-    type: "Graph" | "Schema"
     setGraph: (graph: Graph) => void
 }
 
 /**
- * Renders a selectable and manageable list of Graph or Schema entities with creation, export, duplicate and delete controls.
+ * Renders a selectable and manageable list of Graph entities with creation, export, duplicate and delete controls.
  *
- * Renders a dropdown for selecting an existing graph/schema and a management dialog that lists entries with memory, node, and edge metrics (admin users see editable names). Handles loading of options and per-row metric loaders, selection state, and CRUD interactions.
+ * Renders a dropdown for selecting an existing graph and a management dialog that lists entries with memory, node, and edge metrics (admin users see editable names). Handles loading of options and per-row metric loaders, selection state, and CRUD interactions.
  *
- * @param props.options - Array of graph/schema names shown in the list.
+ * @param props.options - Array of graph names shown in the list.
  * @param props.setOptions - Callback to replace the options array.
- * @param props.selectedValue - Currently selected graph/schema name.
- * @param props.setSelectedValue - Callback to update the selected graph/schema name.
- * @param props.type - Either `"Graph"` or `"Schema"`, used to label UI and API paths.
+ * @param props.selectedValue - Currently selected graph name.
+ * @param props.setSelectedValue - Callback to update the selected graph name.
  * @param props.setGraph - Callback to set the active Graph model instance when selection changes.
  * @returns The component's rendered JSX element.
  */
-export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, type, setGraph }: Props) {
+export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, setGraph }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext);
+    const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
     const {
         settings: {
-            contentPersistenceSettings: {
-                contentPersistence
-            },
             graphInfo: { showMemoryUsage }
         },
         tutorialOpen
@@ -66,26 +61,31 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const [openDuplicate, setOpenDuplicate] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
+    const { size: manageSize, onResize: onManageResize } = useResizableSize("manageGraphs-size", 750, 493, 400, 300);
+
     useEffect(() => {
         setOpen(false);
     }, [selectedValue]);
 
+
+
     const getOptions = useCallback(async () =>
-        fetchOptions(type, toast, setIndicator, indicator, setSelectedValue, setOptions, contentPersistence)
-        , [type, toast, setIndicator, indicator, setSelectedValue, setOptions, contentPersistence]);
+        fetchOptions(toast, setIndicator, indicator, setSelectedValue, setOptions)
+        , [toast, setIndicator, indicator, setSelectedValue, setOptions]);
 
     const loadMemory = useCallback((opt: string) =>
         async () => {
-            const memoryMap = await getMemoryUsage(opt, toast, setIndicator);
+            const memoryMap = await getMemoryUsage(opt, toast, setIndicator, activeConnectionId);
             const memoryValue = memoryMap.get("total_graph_sz_mb") || '<1';
 
             return `${memoryValue} MB`;
-        }, [toast, setIndicator]);
+        }, [toast, setIndicator, activeConnectionId]);
 
     const loadNodesCount = useCallback((opt: string) =>
         async () => {
             try {
-                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes`, toast, setIndicator) as { nodes?: number };
+                const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
+                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes${readOnlyParam}`, toast, setIndicator) as { nodes?: number };
 
                 if (result.nodes == null || !Number.isFinite(Number(result.nodes))) return "";
 
@@ -93,12 +93,13 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             } catch {
                 return "";
             }
-        }, [toast, setIndicator]);
+        }, [toast, setIndicator, isReadOnly]);
 
     const loadEdgesCount = useCallback((opt: string) =>
         async () => {
             try {
-                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges`, toast, setIndicator) as { edges?: number };
+                const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
+                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges${readOnlyParam}`, toast, setIndicator) as { edges?: number };
 
                 if (result.edges == null || !Number.isFinite(Number(result.edges))) return "";
 
@@ -106,11 +107,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             } catch {
                 return "";
             }
-        }, [toast, setIndicator]);
+        }, [toast, setIndicator, isReadOnly]);
 
     const handleSetOption = useCallback(async (option: string, optionName: string) => {
         const result = await securedFetch(
-            `api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(option)}`,
+            `api/graph/${prepareArg(option)}`,
             {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
@@ -152,7 +153,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         }
 
         return result.ok;
-    }, [type, toast, setIndicator, options, setOptions, setSelectedValue, selectedValue, sessionRole, showMemoryUsage, loadNodesCount, loadEdgesCount, loadMemory]);
+    }, [toast, setIndicator, options, setOptions, setSelectedValue, selectedValue, sessionRole, showMemoryUsage, loadNodesCount, loadEdgesCount, loadMemory]);
 
     const handleSetRows = useCallback((opts: string[]) => {
         setRows(opts.map((opt) => {
@@ -177,7 +178,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 cells
             };
         }));
-    }, [sessionRole, handleSetOption, loadMemory, loadNodesCount, loadEdgesCount, showMemoryUsage]);
+    }, [sessionRole, handleSetOption, loadMemory, loadNodesCount, loadEdgesCount, showMemoryUsage, isReadOnly]);
 
     useEffect(() => {
         if (!openMenage) {
@@ -208,16 +209,31 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         setOpen(false);
     };
 
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => { setMounted(true); }, []);
+
+    useEffect(() => {
+        if (!openMenage) return undefined;
+        const handler = (e: KeyboardEvent) => {
+            if (e.key !== "Escape") return;
+            if (inputRef.current === document.activeElement) return;
+            setOpenMenage(false);
+        };
+        window.addEventListener("keydown", handler);
+        return () => window.removeEventListener("keydown", handler);
+    }, [openMenage]);
+
     return (
-        <Dialog open={openMenage} onOpenChange={setOpenMenage}>
-            <DropdownMenu open={open} onOpenChange={handleOpenChange}>
-                <DropdownMenuTrigger disabled={options.length === 0 || indicator === "offline"} asChild>
+        <>
+            <Popover open={open} onOpenChange={handleOpenChange}>
+                <PopoverTrigger disabled={options.length === 0 || indicator === "offline"} asChild>
                     <Button
-                        className="h-full w-[230px] bg-background rounded-lg border border-border p-2 justify-left disabled:text-gray-400 disabled:opacity-100 SofiaSans"
-                        label={selectedValue || `Select ${type}`}
-                        title={options.length === 0 ? `There are no ${type}` : undefined}
+                        className="min-w-0 basis-0 grow bg-background rounded-lg border border-border p-2 justify-left disabled:text-gray-400 disabled:opacity-100 p-1 text-sm"
+                        label={selectedValue || "Select Graph"}
+                        title={options.length === 0 ? "There are no Graphs" : undefined}
                         indicator={indicator}
-                        data-testid={`select${type}`}
+                        data-testid="selectGraph"
                     >
                         {
                             open ?
@@ -226,119 +242,116 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                 <ChevronDown className="min-w-4 min-h-4" />
                         }
                     </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                    className="h-[40dvh] min-h-fit w-[350px] mt-2 overflow-hidden border border-border rounded-lg flex flex-col items-center p-2"
-                    preventOutsideClose={tutorialOpen}
+                </PopoverTrigger>
+                <PopoverContent
+                    className="z-20 h-[40dvh] min-h-fit w-[350px] mt-2 overflow-hidden border border-border rounded-lg flex flex-col items-center p-2"
+                    onInteractOutside={(e) => { if (openMenage || tutorialOpen) e.preventDefault(); }}
+                    onEscapeKeyDown={(e) => { if (openMenage || tutorialOpen) e.preventDefault(); }}
                 >
                     <PaginationList
                         className="basis-0 grow min-h-fit p-0"
                         list={options}
                         onClick={handleClick}
-                        dataTestId={`select${type}`}
-                        label={type}
+                        dataTestId="selectGraph"
+                        label="Graph"
                         afterSearchCallback={() => { }}
                         isSelected={(value) => selectedValue === value}
                         isLoading={isLoading}
                         searchRef={inputRef}
                     />
                     <div className="flex gap-2">
-                        <CreateGraph
-                            type={type}
-                            graphNames={options}
-                            onSetGraphName={(newGraphName) => {
-                                setSelectedValue(newGraphName);
-                                setOptions([...options, newGraphName]);
-                            }}
-                            trigger={
-                                <Button
-                                    className="w-fit"
-                                    variant="Primary"
-                                    label="Create"
-                                >
-                                    <PlusCircle size={20} />
-                                </Button>
-                            }
-                        />
-                        <DialogTrigger asChild>
-                            <Button
-                                className="w-fit"
-                                variant="Primary"
-                                label="Manage"
-                                data-testid={`manage${type}s`}
-                            >
-                                <Settings size={20} />
-                            </Button>
-                        </DialogTrigger>
+                        <Button
+                            className="w-fit px-2 py-1 text-xs"
+                            variant="Primary"
+                            label="Manage"
+                            data-testid="manageGraphs"
+                            onClick={() => { setOpenMenage(true); }}
+                        >
+                            <Settings size={16} />
+                        </Button>
                     </div>
-                </DropdownMenuContent>
-            </DropdownMenu>
-            <DialogContent
-                data-testid="manageContent"
-                onEscapeKeyDown={(e) => {
-                    if (inputRef.current === document.activeElement) {
-                        e.preventDefault();
-                    }
-                }}
-                hideClose
-                preventOutsideClose={tutorialOpen}
-                className="flex flex-col border-none rounded-lg max-w-none h-[90dvh] w-[80dvw] p-2"
-            >
-                <DialogHeader className="flex-row justify-between items-center border-b border-border pb-4">
-                    <DialogTitle className="text-2xl font-medium">Manage Graphs</DialogTitle>
-                    <CloseDialog data-testid="closeManage" />
-                </DialogHeader>
-                <VisuallyHidden>
-                    <DialogDescription />
-                </VisuallyHidden>
-                <TableComponent
-                    className="grow overflow-hidden"
-                    label={`${type}s`}
-                    entityName={type}
-                    headers={[
-                        "Name",
-                        ...(showMemoryUsage ? ["Memory Usage"] : []),
-                        "Nodes #",
-                        "Edges #"
-                    ]}
-                    rows={rows}
-                    setRows={setRows}
-                    inputRef={inputRef}
-                    itemHeight={36}
-                >
-                    {
-                        session?.user.role !== "Read-Only" &&
-                        <>
-                            <DeleteGraph
-                                type={type}
-                                rows={rows.filter(opt => opt.checked)}
-                                handleSetRows={handleSetRows}
-                                selectedValue={selectedValue}
-                                setGraphName={setSelectedValue}
-                                setGraph={setGraph}
-                                setOpenMenage={setOpenMenage}
-                                graphNames={options}
-                                setGraphNames={setOptions}
-                            />
-                            <ExportGraph
-                                selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
-                                type={type}
-                            />
-                            <DuplicateGraph
-                                selectedValue={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)[0]}
-                                type={type}
-                                open={openDuplicate}
-                                onOpenChange={setOpenDuplicate}
-                                onDuplicate={(duplicateName) => {
-                                    setSelectedValue(duplicateName);
-                                    setOptions!([...options, duplicateName]);
-                                }}
-                                disabled={rows.filter(opt => opt.checked).length !== 1}
-                            />
-                        </>
-                    }
-                </TableComponent>
-            </DialogContent>
-        </Dialog>
+                </PopoverContent>
+            </Popover>
+            {
+                mounted && openMenage && createPortal(
+                    <ResizableBox
+                        width={manageSize.width}
+                        height={manageSize.height}
+                        minWidth={400}
+                        minHeight={300}
+                        direction="bottom-right"
+                        onResizeEnd={(w, h) => onManageResize(w, h)}
+                        className="fixed top-16 left-3 z-30 flex flex-col gap-2 border border-border rounded-lg shadow-lg p-2 bg-background"
+                        data-testid="manageContent"
+                    >
+                        <div
+                            role="dialog"
+                            aria-label="Manage Graphs"
+                            className="h-full w-full flex flex-col gap-2"
+                        >
+                            <div className="flex flex-row justify-between items-center border-b border-border pb-1">
+                                <h2 className="text-2xl font-medium flex items-center gap-2">
+                                    Manage Graphs
+                                    <Settings size={22} className="text-foreground/60" />
+                                </h2>
+                                <Button
+                                    aria-label="Close"
+                                    data-testid="closeManage"
+                                    onClick={() => setOpenMenage(false)}
+                                >
+                                    <X />
+                                </Button>
+                            </div>
+                            <TableComponent
+                                className="grow overflow-hidden gap-2"
+                                label="Graphs"
+                                entityName="Graph"
+                                headers={[
+                                    "Name",
+                                    ...(showMemoryUsage ? [{ name: "Memory Usage", width: "20%" }] : []),
+                                    { name: "Nodes #", width: "10%" },
+                                    { name: "Edges #", width: "10%" }
+                                ]}
+                                rows={rows}
+                                setRows={setRows}
+                                inputRef={inputRef}
+                                itemHeight={24}
+                            >
+                                {
+                                    !isReadOnly &&
+                                    <>
+                                        <DeleteGraph
+                                            rows={rows.filter(opt => opt.checked)}
+                                            selectedValue={selectedValue}
+                                            setGraphName={setSelectedValue}
+                                            setGraph={setGraph}
+                                            setOpenMenage={setOpenMenage}
+                                            graphNames={options}
+                                            setGraphNames={setOptions}
+                                        />
+                                        <ExportGraph
+                                            selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
+                                            
+                                        />
+                                        <DuplicateGraph
+                                            selectedValue={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)[0]}
+                                            
+                                            open={openDuplicate}
+                                            onOpenChange={setOpenDuplicate}
+                                            onDuplicate={(duplicateName) => {
+                                                setSelectedValue(duplicateName);
+                                                setOptions!([...options, duplicateName]);
+                                            }}
+                                            disabled={rows.filter(opt => opt.checked).length !== 1}
+                                        />
+                                    </>
+                                }
+                            </TableComponent>
+                        </div>
+                    </ResizableBox>,
+                    document.body
+                )
+            }
+        </>
     );
 }

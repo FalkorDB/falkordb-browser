@@ -10,6 +10,11 @@ import ApiCalls from "../logic/api/apiCalls";
 const adminAuthFile = 'playwright/.auth/admin.json';
 const readWriteAuthFile = 'playwright/.auth/readwriteuser.json';
 const readOnlyAuthFile = 'playwright/.auth/readonlyuser.json';
+const queryParamsAuthFile = 'playwright/.auth/queryparams.json';
+// Dedicated auth files for sign-out tests — these are invalidated by the
+// sign-out test itself and must not be shared with any other project.
+const signOutReadWriteAuthFile = 'playwright/.auth/signout-readwriteuser.json';
+const signOutReadOnlyAuthFile = 'playwright/.auth/signout-readonlyuser.json';
 
 setup("setup authentication", async () => {
     try {
@@ -40,7 +45,45 @@ setup("setup authentication", async () => {
             await userContext!.storageState({ path: file });
         }
 
+        // Create and authenticate dedicated sign-out users.
+        // These are separate accounts whose sessions can be safely invalidated
+        // by the sign-out test without affecting any other test's auth state.
+        await apiCall.createUsers({ username: 'signoutreadwriteuser', role: user.ReadWrite, password: user.password }, adminContext);
+        await apiCall.createUsers({ username: 'signoutreadonlyuser', role: user.ReadOnly, password: user.password }, adminContext);
+
+        const signOutUserRoles = [
+            { file: signOutReadWriteAuthFile, userName: 'signoutreadwriteuser' },
+            { file: signOutReadOnlyAuthFile, userName: 'signoutreadonlyuser' },
+        ];
+
+        for (const { file, userName } of signOutUserRoles) {
+            const userBrowserWrapper = new BrowserWrapper();
+            const userLoginPage = await userBrowserWrapper.createNewPage(LoginPage, urls.loginUrl);
+            await userBrowserWrapper.setPageToFullScreen();
+            await userLoginPage.connectWithCredentials(userName, user.password);
+            await userLoginPage.handleSkipTutorial();
+            const userContext = userBrowserWrapper.getContext();
+            await userContext!.storageState({ path: file });
+        }
+
+        // Authenticate using query parameters to pre-fill the login form.
+        // This tests the flow where connection params are passed via URL.
+        await apiCall.createUsers({ username: 'queryparamsuser', role: user.ReadWrite, password: user.password }, adminContext);
+        const queryParamsBrowserWrapper = new BrowserWrapper();
+        const queryParamsLoginPage = await queryParamsBrowserWrapper.createNewPage(LoginPage, urls.loginUrl);
+        await queryParamsBrowserWrapper.setPageToFullScreen();
+        await queryParamsLoginPage.connectWithQueryParams({
+            username: 'queryparamsuser',
+            password: user.password,
+            host: 'localhost',
+            port: '6379',
+        });
+        await queryParamsLoginPage.handleSkipTutorial();
+        const queryParamsContext = queryParamsBrowserWrapper.getContext();
+        await queryParamsContext!.storageState({ path: queryParamsAuthFile });
+
     } catch (error) {
         console.error("Error during authentication setup:", error);
+        throw error;
     }
 });

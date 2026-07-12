@@ -5,7 +5,7 @@ import {
   removeGraphElementLabel,
   validateBody,
 } from "../../../../validate-body";
-import { getCorsHeaders } from "../../../../utils";
+import { getCorsHeaders, resolveReadOnly } from "../../../../utils";
 
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
@@ -25,6 +25,7 @@ export async function DELETE(
     const { client, user } = session;
     const { graph: graphId, element } = await params;
     const elementId = Number(element);
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       const body = await request.json();
@@ -36,13 +37,18 @@ export async function DELETE(
         return NextResponse.json({ message: validation.error }, { status: 400, headers: getCorsHeaders(request) });
       }
 
+      if (isReadOnly) {
+        return NextResponse.json(
+          { message: "Forbidden: read-only connection" },
+          { status: 403, headers: getCorsHeaders(request) }
+        );
+      }
+
       const { label } = validation.data;
       const query = `MATCH (n) WHERE ID(n) = $id REMOVE n:${label}`;
       const graph = client.selectGraph(graphId);
 
-      if (user.role === "Read-Only")
-        await graph.roQuery(query, { params: { id: elementId } });
-      else await graph.query(query, { params: { id: elementId } });
+      await graph.query(query, { params: { id: elementId } });
 
       return NextResponse.json(
         { message: "Label removed successfully" },
@@ -58,7 +64,7 @@ export async function DELETE(
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500, headers: getCorsHeaders(request) }
     );
   }
@@ -78,6 +84,7 @@ export async function POST(
     const { client, user } = session;
     const { graph: graphId, element } = await params;
     const elementId = Number(element);
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       const body = await request.json();
@@ -89,14 +96,18 @@ export async function POST(
         return NextResponse.json({ message: validation.error }, { status: 400, headers: getCorsHeaders(request) });
       }
 
+      if (isReadOnly) {
+        return NextResponse.json(
+          { message: "Forbidden: read-only connection" },
+          { status: 403, headers: getCorsHeaders(request) }
+        );
+      }
+
       const { label } = validation.data;
       const query = `MATCH (n) WHERE ID(n) = $id SET n:${label}`;
       const graph = client.selectGraph(graphId);
 
-      if (user.role === "Read-Only")
-        await graph.roQuery(query, { params: { id: elementId } });
-      else
-        await graph.query(query, { params: { id: elementId } });
+      await graph.query(query, { params: { id: elementId } });
       
 
       return NextResponse.json(
@@ -113,7 +124,7 @@ export async function POST(
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500, headers: getCorsHeaders(request) }
     );
   }

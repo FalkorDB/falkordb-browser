@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { formatModelDisplayName } from "@/lib/ai-provider-utils";
-import { Search, Check, Sparkles, Zap, Brain, Globe, Server, Cpu, MessageSquare, ChevronRight } from "lucide-react";
+import { formatModelDisplayName, detectProviderFromModel, getProviderDisplayName, type AIProvider } from "@/lib/ai-provider-utils";
+import { Search, Check, Sparkles, Zap, Brain, Globe, Server, Cpu, MessageSquare, ChevronRight, Rocket } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Input from "../components/ui/Input";
 
@@ -9,19 +9,10 @@ interface ModelSelectorProps {
     models: string[];
     selectedModel: string;
     onModelSelect: (model: string) => void;
+    provider?: AIProvider;
     disabled?: boolean;
     isLoading?: boolean;
 }
-
-// Map provider prefix to display category name
-const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
-    openai: "OpenAI",
-    anthropic: "Anthropic",
-    gemini: "Google",
-    ollama: "Ollama",
-    groq: "Groq",
-    cohere: "Cohere",
-};
 
 // Get icon for provider category
 const getCategoryIcon = (category: string) => {
@@ -31,7 +22,7 @@ const getCategoryIcon = (category: string) => {
             return <Zap className={className} />;
         case "Anthropic":
             return <Brain className={className} />;
-        case "Google":
+        case "Google Gemini":
             return <Globe className={className} />;
         case "Ollama":
             return <Server className={className} />;
@@ -39,55 +30,27 @@ const getCategoryIcon = (category: string) => {
             return <Cpu className={className} />;
         case "Cohere":
             return <MessageSquare className={className} />;
+        case "xAI":
+            return <Rocket className={className} />;
         default:
             return <Sparkles className={className} />;
     }
 };
 
 // Categorize models by provider prefix or name heuristics
-const categorizeModels = (models: string[]) => {
+const getCategoryName = (provider: AIProvider) => provider === "unknown" ? "Other" : getProviderDisplayName(provider);
+
+const categorizeModels = (models: string[], provider?: AIProvider) => {
     const uniqueModels = [...new Set(models)];
+
+    if (provider && provider !== "unknown") {
+        return [[getCategoryName(provider), uniqueModels.sort((a, b) => a.localeCompare(b))]] as [string, string[]][];
+    }
+
     const categories: Record<string, string[]> = {};
 
     uniqueModels.forEach((model) => {
-        let categoryName: string | undefined;
-
-        // New format: double-colon prefix (e.g., "anthropic::claude-sonnet-4-5")
-        const doubleSepIndex = model.indexOf("::");
-        if (doubleSepIndex !== -1) {
-            const prefix = model.substring(0, doubleSepIndex);
-            categoryName = PROVIDER_DISPLAY_NAMES[prefix] || prefix.charAt(0).toUpperCase() + prefix.slice(1);
-        }
-
-        // Legacy format: single-colon prefix (e.g., "anthropic:claude-3-5-sonnet")
-        if (!categoryName) {
-            const singleSepIndex = model.indexOf(":");
-            if (singleSepIndex !== -1) {
-                const prefix = model.substring(0, singleSepIndex);
-                if (PROVIDER_DISPLAY_NAMES[prefix]) {
-                    categoryName = PROVIDER_DISPLAY_NAMES[prefix];
-                }
-            }
-        }
-
-        // Fallback: substring heuristics for unprefixed model names
-        if (!categoryName) {
-            if (model.startsWith("gpt") || model.startsWith("o1") || model.startsWith("o3")) {
-                categoryName = "OpenAI";
-            } else if (model.includes("claude")) {
-                categoryName = "Anthropic";
-            } else if (model.includes("gemini")) {
-                categoryName = "Google";
-            } else if (model.includes("llama") || model.includes("mixtral") || model.includes("phi") || model.includes("deepseek")) {
-                categoryName = "Ollama";
-            } else if (model.includes("groq")) {
-                categoryName = "Groq";
-            } else if (model.includes("command") || model.includes("cohere")) {
-                categoryName = "Cohere";
-            } else {
-                categoryName = "Other";
-            }
-        }
+        const categoryName = getCategoryName(detectProviderFromModel(model));
 
         if (!categories[categoryName]) {
             categories[categoryName] = [];
@@ -105,6 +68,7 @@ export default function ModelSelector({
     models,
     selectedModel,
     onModelSelect,
+    provider,
     disabled = false,
     isLoading = false
 }: ModelSelectorProps) {
@@ -123,14 +87,14 @@ export default function ModelSelector({
     }, []);
 
     useEffect(() => {
-        const timeout = setTimeout(() => {
+        const updateModels = () => {
             const filtered = !search
                 ? models
                 : models.filter((model) =>
                     model.toLowerCase().includes(search.toLowerCase())
                 );
             setFilteredModels(filtered);
-            const categorized = categorizeModels(filtered);
+            const categorized = categorizeModels(filtered, provider);
             setCategorizedModels(categorized);
 
             // Auto-expand all matching categories when searching
@@ -144,10 +108,17 @@ export default function ModelSelector({
                     if (selectedCategory) categoryRefs.current.get(selectedCategory[0])?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 }, 0);
             }
-        }, 200);
+        };
+
+        if (!search) {
+            updateModels();
+            return undefined;
+        }
+
+        const timeout = setTimeout(updateModels, 200);
 
         return () => clearTimeout(timeout);
-    }, [search, models, selectedModel]);
+    }, [search, models, selectedModel, provider]);
 
     const handleModelClick = (model: string) => {
         if (!disabled) {
@@ -204,7 +175,7 @@ export default function ModelSelector({
 
                 {
                     !isLoading && filteredModels.length === 0 &&
-                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                    <div data-testid="noModelsFoundMessage" className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                         <Search className="h-6 w-6 mb-2 opacity-50" />
                         <p className="text-sm">No models found</p>
                         {
@@ -303,6 +274,7 @@ export default function ModelSelector({
 }
 
 ModelSelector.defaultProps = {
+    provider: undefined,
     disabled: false,
     isLoading: false,
 };

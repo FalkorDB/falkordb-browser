@@ -15,6 +15,7 @@ export interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttribute
     side?: "down" | "left" | "right"
     children?: React.ReactNode
     isLoading?: boolean
+    loaderSize?: number
     indicator?: "offline" | "online"
     tooltipVariant?: Variant
     tooltipSide?: "top" | "bottom" | "left" | "right"
@@ -52,7 +53,7 @@ const getClassName = (variant: Variant, disable: boolean | undefined, open: bool
     return className;
 };
 
-const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button", open, className, title, type = "button", disabled, children, isLoading = false, indicator, tooltipVariant = variant, tooltipSide, ...props }, ref) =>
+const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button", open, className, title, type = "button", disabled, children, isLoading = false, loaderSize = 16, indicator, tooltipVariant = variant, tooltipSide, ...props }, ref) =>
     title !== "" && (title || label || indicator === "offline") && variant !== "Cancel" ? (
         <Tooltip>
             <TooltipTrigger asChild>
@@ -66,7 +67,7 @@ const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button"
                 >
                     {
                         isLoading ?
-                            <Loader2 className="animate-spin" />
+                            <Loader2 size={loaderSize} className="animate-spin" />
                             : <>
                                 {children}
                                 {

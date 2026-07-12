@@ -7,6 +7,7 @@ import { X, Palette } from "lucide-react";
 import { LabelStyle, InfoLabel, Label, cn } from "@/lib/utils";
 import { GraphContext, ForceGraphContext, BrowserSettingsContext } from "@/app/components/provider";
 import { STYLE_COLORS, getLabelWithFewestElements } from "@/app/api/graph/model";
+import { setConnectionItem } from "@/lib/connection-storage";
 import Button from "@/app/components/ui/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { NODE_SIZE } from "@falkordb/canvas";
@@ -44,7 +45,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
 
     const saveStyleToStorage = useCallback((labelName: string, style: LabelStyle) => {
         const storageKey = `labelStyle_${labelName}`;
-        localStorage.setItem(storageKey, JSON.stringify(style));
+        setConnectionItem(storageKey, JSON.stringify(style));
     }, []);
 
     const applyStylesToGraph = useCallback((color: string, size: number) => {
@@ -78,20 +79,19 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
         const canvas = canvasRef.current;
 
         if (canvas) {
-            const currentData = canvas.getGraphData();
+            const graphData = canvas.getGraphData();
 
-            currentData.nodes.forEach(node => {
+            graphData.nodes.forEach(node => {
                 if (getLabelWithFewestElements(node.labels.map(l => graph.LabelsMap.get(l)).filter(Boolean) as Label[])?.name === label.name) {
                     node.color = color;
 
                     if (node.size !== size) {
                         node.size = size;
-                        node.displayName = ["", ""]; // Force re-render by clearing displayName (it will be recalculated in canvas)
                     }
                 }
             });
 
-            canvas.setGraphData(currentData);
+            canvas.refresh();
         }
     }, [canvasRef, graph.Labels, graph.LabelsMap, label, setLabels]);
 
@@ -169,7 +169,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
             >
                 <X className="h-4 w-4" />
             </Button>
-            <div className="flex justify-between items-center pr-8">
+            <div className="flex justify-between items-center pr-5">
                 <h1 className="text-2xl">Customize Style</h1>
                 <Palette size={25} />
             </div>

@@ -16,6 +16,42 @@ export default class SettingsBrowserPage extends BasePage {
     return this.page.getByTestId("chatApiKeyInput");
   }
 
+  private get chatModelSourceApiKeyButton(): Locator {
+    return this.page.getByTestId("chatModelSourceApiKey");
+  }
+
+  private get chatModelSourceLocalButton(): Locator {
+    return this.page.getByTestId("chatModelSourceLocal");
+  }
+
+  private get chatApiKeyProvidersInfoButton(): Locator {
+    return this.page.getByTestId("chatApiKeyProvidersInfo");
+  }
+
+  private get addChatApiKeyButton(): Locator {
+    return this.page.getByTestId("addChatApiKeyButton");
+  }
+
+  private get chatApiKeyCards(): Locator {
+    return this.page.getByTestId("chatApiKeyCard");
+  }
+
+  private get localLlmProviderOllamaButton(): Locator {
+    return this.page.getByTestId("localLlmProviderOllama");
+  }
+
+  private get localLlmProviderLmStudioButton(): Locator {
+    return this.page.getByTestId("localLlmProviderLmStudio");
+  }
+
+  private get localLlmEndpointInput(): Locator {
+    return this.page.getByTestId("localLlmEndpointInput");
+  }
+
+  private get localLlmLoadButton(): Locator {
+    return this.page.getByTestId("localLlmLoadButton");
+  }
+
   private get maxSaveMessagesInput(): Locator {
     return this.page.getByTestId("maxSaveMessagesInput");
   }
@@ -48,7 +84,7 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   private get noModelsFoundMessage(): Locator {
-    return this.page.locator('p:has-text("No models found")');
+    return this.page.getByTestId("noModelsFoundMessage");
   }
 
   // Wait for Interactive Methods
@@ -79,6 +115,15 @@ export default class SettingsBrowserPage extends BasePage {
       (el) => el.click(),
       "Save Settings Button"
     );
+    await this.saveSettingsButton.waitFor({ state: "hidden", timeout: 30000 });
+  }
+
+  async clickSaveSettingsButtonWithoutWait(): Promise<void> {
+    await interactWhenVisible(
+      this.saveSettingsButton,
+      (el) => el.click(),
+      "Save Settings Button (no wait)"
+    );
   }
 
   async clickCancelSettingsButton(): Promise<void> {
@@ -104,6 +149,239 @@ export default class SettingsBrowserPage extends BasePage {
       (el) => el.clear(),
       "Chat API Key Input Clear"
     );
+  }
+
+  async selectApiKeyModelSource(): Promise<void> {
+    await interactWhenVisible(
+      this.chatModelSourceApiKeyButton,
+      (el) => el.click(),
+      "API Key Model Source"
+    );
+    await this.chatApiKeyInput.waitFor({ state: "visible", timeout: 5000 });
+  }
+
+  async selectLocalLlmModelSource(): Promise<void> {
+    await interactWhenVisible(
+      this.chatModelSourceLocalButton,
+      (el) => el.click(),
+      "Local LLM Model Source"
+    );
+    await this.localLlmEndpointInput.waitFor({ state: "visible", timeout: 5000 });
+  }
+
+  async selectLmStudioProvider(): Promise<void> {
+    await interactWhenVisible(
+      this.localLlmProviderLmStudioButton,
+      (el) => el.click(),
+      "LM Studio Provider"
+    );
+  }
+
+  async isLocalLlmModelSourceSelected(): Promise<boolean> {
+    return (await this.chatModelSourceLocalButton.getAttribute("aria-pressed")) === "true";
+  }
+
+  async waitForLocalLlmModelSourceSelected(): Promise<void> {
+    await this.page.waitForFunction(
+      () => {
+        const btn = document.querySelector('[data-testid="chatModelSourceLocal"]');
+        return btn?.getAttribute("aria-pressed") === "true";
+      },
+      null,
+      { timeout: 10000 }
+    );
+  }
+
+  /**
+   * Remove chatModelSource from localStorage so we can reliably detect
+   * when the async encrypted save has completed.  Call this before saving.
+   */
+  async clearChatModelSourceFromLocalStorage(): Promise<void> {
+    await this.page.evaluate(() => localStorage.removeItem("chatModelSource"));
+  }
+
+  /**
+   * Wait until the async saveEncryptedSetting call has written the
+   * chatModelSource key back into localStorage.
+   */
+  async waitForChatModelSourceSaved(): Promise<void> {
+    await this.page.waitForFunction(
+      () => localStorage.getItem("chatModelSource") !== null,
+      null,
+      { timeout: 10000 }
+    );
+  }
+
+  async isLmStudioProviderSelected(): Promise<boolean> {
+    return (await this.localLlmProviderLmStudioButton.getAttribute("aria-pressed")) === "true";
+  }
+
+  async isOllamaProviderVisible(): Promise<boolean> {
+    return this.localLlmProviderOllamaButton.isVisible();
+  }
+
+  async isLmStudioProviderVisible(): Promise<boolean> {
+    return this.localLlmProviderLmStudioButton.isVisible();
+  }
+
+  async getLocalLlmEndpointValue(): Promise<string> {
+    return interactWhenVisible(
+      this.localLlmEndpointInput,
+      (el) => el.inputValue(),
+      "Local LLM Endpoint Value"
+    );
+  }
+
+  async fillLocalLlmEndpoint(endpoint: string): Promise<void> {
+    await interactWhenVisible(
+      this.localLlmEndpointInput,
+      async (el) => {
+        await el.clear();
+        await el.fill(endpoint);
+      },
+      "Local LLM Endpoint Input"
+    );
+  }
+
+  async getLocalLlmLoadButtonText(): Promise<string> {
+    const text = await this.localLlmLoadButton.textContent();
+    return text?.trim() ?? "";
+  }
+
+  async hoverLocalLlmLoadButton(): Promise<void> {
+    await this.localLlmLoadButton.waitFor({ state: "visible", timeout: 5000 });
+    await this.page.waitForFunction(
+      () => {
+        const button = document.querySelector('[data-testid="localLlmLoadButton"]') as HTMLButtonElement | null;
+        return button && !button.disabled;
+      },
+      { timeout: 10000 }
+    );
+
+    await interactWhenVisible(
+      this.localLlmLoadButton,
+      (el) => el.hover(),
+      "Local LLM Load Button"
+    );
+  }
+
+  async isLocalLlmLoadTooltipVisible(): Promise<boolean> {
+    return waitForElementToBeVisible(this.page.getByText("Load", { exact: true }));
+  }
+
+  async hoverApiKeyProvidersInfo(): Promise<void> {
+    await interactWhenVisible(
+      this.chatApiKeyProvidersInfoButton,
+      (el) => el.hover(),
+      "API Key Providers Info"
+    );
+  }
+
+  async getApiKeyProvidersTooltipText(): Promise<string> {
+    const tooltip = this.page.getByText("Supported hosted keys:", { exact: false });
+    await tooltip.waitFor({ state: "visible", timeout: 5000 });
+    return (await tooltip.textContent()) ?? "";
+  }
+
+  private getMaskedApiKey(apiKey: string): string {
+    if (apiKey.length <= 10) return "••••••••";
+    return `${apiKey.slice(0, 6)}••••••••${apiKey.slice(-4)}`;
+  }
+
+  private getChatApiKeyCard(apiKey: string): Locator {
+    return this.chatApiKeyCards.filter({ hasText: new RegExp(`^${apiKey}$`) }).first();
+  }
+
+  private getMaskedChatApiKeyCard(apiKey: string): Locator {
+    return this.chatApiKeyCards.filter({ hasText: new RegExp(`^${this.getMaskedApiKey(apiKey)}$`) }).first();
+  }
+
+  async addChatApiKey(apiKey: string): Promise<void> {
+    await this.fillChatApiKey(apiKey);
+    await interactWhenVisible(
+      this.addChatApiKeyButton,
+      (el) => el.click(),
+      "Add Chat API Key Button"
+    );
+    await this.getMaskedChatApiKeyCard(apiKey).waitFor({ state: "visible", timeout: 5000 });
+  }
+
+  async selectChatApiKey(apiKey: string): Promise<void> {
+    const card = this.getMaskedChatApiKeyCard(apiKey);
+    await interactWhenVisible(
+      card,
+      (el) => el.click(),
+      "Select Chat API Key Card"
+    );
+  }
+
+  async getMaskedChatApiKeyText(apiKey: string): Promise<string> {
+    const keyText = this.getMaskedChatApiKeyCard(apiKey).getByTestId("chatApiKeyValue");
+    await keyText.waitFor({ state: "visible", timeout: 5000 });
+    return (await keyText.textContent()) ?? "";
+  }
+
+  async showChatApiKey(apiKey: string): Promise<void> {
+    const card = this.getMaskedChatApiKeyCard(apiKey);
+    await interactWhenVisible(
+      card.getByTestId("toggleChatApiKeyVisibilityButton"),
+      (el) => el.click(),
+      "Show Chat API Key Button"
+    );
+    await this.getChatApiKeyCard(apiKey).waitFor({ state: "visible", timeout: 5000 });
+  }
+
+  async getVisibleChatApiKeyText(apiKey: string): Promise<string> {
+    const keyText = this.getChatApiKeyCard(apiKey).getByTestId("chatApiKeyValue");
+    await keyText.waitFor({ state: "visible", timeout: 5000 });
+    return (await keyText.textContent()) ?? "";
+  }
+
+  async editChatApiKey(currentApiKey: string, nextApiKey: string): Promise<void> {
+    const card = this.getChatApiKeyCard(currentApiKey);
+    await interactWhenVisible(
+      card.getByTestId("editChatApiKeyButton"),
+      (el) => el.click(),
+      "Edit Chat API Key Button"
+    );
+
+    const editInput = this.page.getByTestId("chatApiKeyEditInput");
+    await interactWhenVisible(
+      editInput,
+      async (el) => {
+        await el.clear();
+        await el.fill(nextApiKey);
+      },
+      "Chat API Key Edit Input"
+    );
+
+    await interactWhenVisible(
+      this.page.getByTestId("saveEditedChatApiKeyButton"),
+      (el) => el.click(),
+      "Save Edited Chat API Key Button"
+    );
+    await this.getChatApiKeyCard(nextApiKey).waitFor({ state: "visible", timeout: 5000 });
+  }
+
+  async deleteChatApiKey(apiKey: string): Promise<void> {
+    const card = this.getChatApiKeyCard(apiKey);
+    await interactWhenVisible(
+      card.getByTestId("deleteChatApiKeyButton"),
+      (el) => el.click(),
+      "Delete Chat API Key Button"
+    );
+    const dialog = this.page.getByTestId("deleteChatApiKeyDialog");
+    await dialog.waitFor({ state: "visible", timeout: 5000 });
+    await interactWhenVisible(
+      this.page.getByTestId("confirmDeleteChatApiKeyButton"),
+      (el) => el.click(),
+      "Confirm Delete Chat API Key Button"
+    );
+    await card.waitFor({ state: "detached", timeout: 5000 });
+  }
+
+  async isChatApiKeyPresent(apiKey: string): Promise<boolean> {
+    return this.getChatApiKeyCard(apiKey).isVisible();
   }
 
   async fillMaxSavedMessages(value: number): Promise<void> {
@@ -163,11 +441,21 @@ export default class SettingsBrowserPage extends BasePage {
 
   // Combined Actions
   async expandChatSection(): Promise<void> {
-    const isInputVisible = await this.chatApiKeyInput.isVisible();
-    if (!isInputVisible) {
+    await this.chatSectionHeader.waitFor({ state: "visible" });
+    const isApiKeyInputVisible = await this.chatApiKeyInput.isVisible();
+    const isLocalEndpointVisible = await this.localLlmEndpointInput.isVisible();
+    if (!isApiKeyInputVisible && !isLocalEndpointVisible) {
       await this.clickChatSectionHeader();
-      await this.waitForChatApiKeyInput();
+      await this.page.waitForFunction(
+        () => document.querySelector('[data-testid="chatApiKeyInput"]') ||
+          document.querySelector('[data-testid="localLlmEndpointInput"]'),
+        { timeout: 10000 }
+      );
     }
+  }
+
+  async waitForMaxSavedMessagesInput(): Promise<void> {
+    await this.maxSaveMessagesInput.waitFor({ state: "visible", timeout: 10000 });
   }
 
   async setChatApiKey(apiKey: string): Promise<void> {
@@ -253,6 +541,14 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   async searchModels(searchText: string): Promise<void> {
+    await this.modelSearchInput.waitFor({ state: "visible", timeout: 10000 });
+    await this.page.waitForFunction(
+      () => {
+        const input = document.querySelector('[data-testid="modelSearch"]') as HTMLInputElement;
+        return input && !input.disabled;
+      },
+      { timeout: 30000 }
+    );
     await interactWhenVisible(
       this.modelSearchInput,
       (el) => el.fill(searchText),
@@ -421,5 +717,160 @@ export default class SettingsBrowserPage extends BasePage {
       !model.toLowerCase().includes(searchTerm.toLowerCase())
     );
     return nonMatchingModel || null;
+  }
+
+  // ===== Graph Info Section =====
+
+  private get graphInfoSectionHeader(): Locator {
+    return this.page.locator('[data-testid="graphInfoSectionHeader"]');
+  }
+
+  private get refreshIntervalSlider(): Locator {
+    return this.page.locator('#refreshInterval');
+  }
+
+  private get maxItemsForSearchSlider(): Locator {
+    return this.page.locator('#maxItemsForSearch');
+  }
+
+  async expandGraphInfoSection(): Promise<void> {
+    const isExpanded = await this.graphInfoSectionHeader.getAttribute('aria-expanded');
+    if (isExpanded !== 'true') {
+      await this.graphInfoSectionHeader.click();
+      await this.refreshIntervalSlider.waitFor({ state: 'visible', timeout: 5000 });
+    }
+  }
+
+  async setRefreshIntervalSlider(value: number): Promise<void> {
+    await this.setSliderByStep(this.refreshIntervalSlider, value, 1);
+  }
+
+  async getRefreshIntervalValue(): Promise<number> {
+    return this.getSliderValue(this.refreshIntervalSlider);
+  }
+
+  async setMaxItemsForSearchSlider(value: number): Promise<void> {
+    await this.setSliderByStep(this.maxItemsForSearchSlider, value, 1);
+  }
+
+  async getMaxItemsForSearchValue(): Promise<number> {
+    return this.getSliderValue(this.maxItemsForSearchSlider);
+  }
+
+  // ===== User Experience Section =====
+
+  private get userExperienceSectionHeader(): Locator {
+    return this.page.locator('[data-testid="userExperienceSectionHeader"]');
+  }
+
+  private get showPropertyKeyPrefixSwitch(): Locator {
+    return this.page.locator('#showPropertyKeyPrefixSwitch');
+  }
+
+  private get captionKeyInput(): Locator {
+    return this.page.locator('#captionKeyInput');
+  }
+
+  private get addCaptionKeyBtn(): Locator {
+    return this.page.locator('#addCaptionKeyBtn');
+  }
+
+  async expandUserExperienceSection(): Promise<void> {
+    const isExpanded = await this.userExperienceSectionHeader.getAttribute('aria-expanded');
+    if (isExpanded !== 'true') {
+      await this.userExperienceSectionHeader.click();
+      await this.showPropertyKeyPrefixSwitch.waitFor({ state: 'visible', timeout: 5000 });
+    }
+  }
+
+  async getShowPropertyKeyPrefixState(): Promise<boolean> {
+    return (await this.showPropertyKeyPrefixSwitch.getAttribute('data-state')) === 'checked';
+  }
+
+  async clickShowPropertyKeyPrefixSwitch(): Promise<void> {
+    await this.showPropertyKeyPrefixSwitch.click();
+  }
+
+  async addCaptionKey(key: string): Promise<void> {
+    await this.captionKeyInput.fill(key);
+    await this.addCaptionKeyBtn.click();
+  }
+
+  async getCaptionKeys(): Promise<string[]> {
+    // The caption keys list (ul) is in the same container as the captionKeyInput form
+    // Navigate: captionKeyInput -> form -> captions container div -> ul li p
+    const captionsContainer = this.captionKeyInput.locator('..').locator('..');
+    const items = captionsContainer.locator('ul li p');
+    const count = await items.count();
+    const keys: string[] = [];
+    for (let i = 0; i < count; i += 1) {
+      const text = await items.nth(i).textContent();
+      if (text) keys.push(text);
+    }
+    return keys;
+  }
+
+  async removeCaptionKey(key: string): Promise<void> {
+    // Scope to the caption list container to avoid matching unrelated <li> elements
+    const captionsContainer = this.captionKeyInput.locator('..').locator('..');
+    const listItem = captionsContainer.locator('li').filter({ hasText: new RegExp(`^${key}$`) });
+    const deleteBtn = listItem.getByRole('button', { name: 'Remove Caption' });
+    await deleteBtn.click();
+  }
+
+  // ===== Table View Section (within User Experience) =====
+
+  private get columnWidthSlider(): Locator {
+    return this.page.locator('#columnWidth');
+  }
+
+  private get rowHeightSlider(): Locator {
+    return this.page.locator('#rowHeight');
+  }
+
+  private get rowHeightExpandMultipleSlider(): Locator {
+    return this.page.locator('#rowHeightExpandMultiple');
+  }
+
+  private async getSliderValue(slider: Locator): Promise<number> {
+    const thumb = slider.locator('[role="slider"]');
+    const raw = await thumb.getAttribute('aria-valuenow');
+    return Number(raw ?? 0);
+  }
+
+  private async setSliderByStep(slider: Locator, targetValue: number, step: number): Promise<void> {
+    const thumb = slider.locator('[role="slider"]');
+    await thumb.focus();
+    const raw = await thumb.getAttribute('aria-valuenow');
+    const current = Number(raw ?? 0);
+    const steps = Math.round((targetValue - current) / step);
+    const key = steps > 0 ? 'ArrowRight' : 'ArrowLeft';
+    for (let i = 0; i < Math.abs(steps); i += 1) {
+      await thumb.press(key);
+    }
+  }
+
+  async getColumnWidthValue(): Promise<number> {
+    return this.getSliderValue(this.columnWidthSlider);
+  }
+
+  async setColumnWidthSlider(value: number): Promise<void> {
+    await this.setSliderByStep(this.columnWidthSlider, value, 5);
+  }
+
+  async getRowHeightValue(): Promise<number> {
+    return this.getSliderValue(this.rowHeightSlider);
+  }
+
+  async setRowHeightSlider(value: number): Promise<void> {
+    await this.setSliderByStep(this.rowHeightSlider, value, 1);
+  }
+
+  async getRowHeightExpandMultipleValue(): Promise<number> {
+    return this.getSliderValue(this.rowHeightExpandMultipleSlider);
+  }
+
+  async setRowHeightExpandMultipleSlider(value: number): Promise<void> {
+    await this.setSliderByStep(this.rowHeightExpandMultipleSlider, value, 1);
   }
 }

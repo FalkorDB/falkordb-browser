@@ -1,5 +1,5 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { runQuery, getCorsHeaders } from "@/app/api/utils";
+import { runQuery, getCorsHeaders, writeGetClientErrorAsSSE, resolveReadOnly } from "@/app/api/utils";
 import { NextResponse, NextRequest } from "next/server";
 
 /**
@@ -20,18 +20,27 @@ export async function GET(
     const session = await getClient(request);
 
     if (session instanceof NextResponse) {
-      throw new Error(await session.text());
+      await writeGetClientErrorAsSSE(session, writer, encoder);
+      return new Response(readable, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+          ...getCorsHeaders(request),
+        },
+      });
     }
 
     const { client, user } = session;
     const { graph: graphId } = await params;
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       const graph = client.selectGraph(graphId);
 
       // Execute edges count query
       const edgesQuery = "MATCH ()-[e]->() RETURN count(e) as edges";
-      const edgesResult = await runQuery(graph, edgesQuery, user.role);
+      const edgesResult = await runQuery(graph, edgesQuery, isReadOnly);
 
       if (!edgesResult) throw new Error("Something went wrong");
 
@@ -47,7 +56,7 @@ export async function GET(
       writer.write(
         encoder.encode(
           `event: error\ndata: ${JSON.stringify({
-            message: (error as Error).message,
+            message: (error as Error).message || "Internal server error",
             status: 400,
           })}\n\n`
         )
@@ -59,7 +68,7 @@ export async function GET(
     writer.write(
       encoder.encode(
         `event: error\ndata: ${JSON.stringify({
-          message: (error as Error).message,
+          message: "Internal server error",
           status: 500,
         })}\n\n`
       )

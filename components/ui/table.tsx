@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 
 interface TableProps extends React.HTMLAttributes<HTMLTableElement> {
   parentClassName?: string
-  parentRef?: React.RefObject<HTMLDivElement>
+  parentRef?: React.RefObject<HTMLDivElement | null>
   parentOnScroll?: (e: React.UIEvent<HTMLTableElement>) => void
 }
 
@@ -13,7 +13,7 @@ const Table = React.forwardRef<
   HTMLTableElement,
   TableProps
 >(({ className, parentClassName, parentRef, parentOnScroll, ...props }, ref) => (
-  <div ref={parentRef} className={cn("relative w-full overflow-auto", parentClassName)} id="tableContent" onScroll={parentOnScroll}>
+  <div ref={parentRef as React.RefObject<HTMLDivElement>} className={cn("relative w-full overflow-auto", parentClassName)} id="tableContent" onScroll={parentOnScroll}>
     <table
       ref={ref}
       className={cn("w-full caption-bottom", className)}

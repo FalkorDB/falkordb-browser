@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
+
 const nextConfig = {
+  allowedDevOrigins: ['127.0.0.1', '0.0.0.0'],
   output: 'standalone',
   reactStrictMode: true,
   // Keep falkordb server-only to avoid bundling BigInt in client/runtime
@@ -32,10 +34,6 @@ const nextConfig = {
         source: '/(.*)',
         headers: [
           {
-            key: 'Content-Security-Policy',
-            value: "frame-ancestors 'none';"
-          },
-          {
             key: 'Strict-Transport-Security',
             value: 'max-age=63072000; includeSubDomains; preload'
           },
@@ -59,8 +57,8 @@ const nextConfig = {
       }
     ];
   },
-  // Webpack config (only used when NOT using Turbopack, i.e., webpack build mode)
-  // The SVG handling has been migrated to turbopack.rules above for Turbopack mode
+  // Webpack config for production builds (next build --webpack)
+  // SVG handling + local @falkordb/canvas alias
   webpack(config) {
     // Grab the existing rule that handles SVG imports
     const fileLoaderRule = config.module.rules.find((rule) =>

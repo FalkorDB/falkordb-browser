@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { SignJWT } from "jose";
 import crypto from "crypto";
-import StorageFactory from "@/lib/token-storage/StorageFactory";
 import { newClient, generateTimeUUID } from "../../[...nextauth]/options";
-import { encrypt } from "../../encryption";
+import { storeEncryptedCredential } from "../../tokenUtils";
 import { login, validateBody } from "../../../validate-body";
 
 // Typed shape for the validated login request body
@@ -33,13 +32,14 @@ type LoginInput = {
 export async function POST(request: NextRequest) {
   try {
     // 1. Validate JWT secret
-    if (!process.env.NEXTAUTH_SECRET) {
+    const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+    if (!authSecret) {
       return NextResponse.json(
-        { message: "Server configuration error: NEXTAUTH_SECRET not set" },
+        { message: "Server configuration error: AUTH_SECRET or NEXTAUTH_SECRET not set" },
         { status: 500 }
       );
     }
-    const jwtSecret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
+    const jwtSecret = new TextEncoder().encode(authSecret);
 
     // 2. Parse and validate request body
     let body;
@@ -163,35 +163,22 @@ export async function POST(request: NextRequest) {
 
     const token = await signer.sign(jwtSecret);
 
-    // 7. Encrypt password and store token using storage abstraction
+    // 7. Encrypt password and store token using shared helper
     try {
-      const storage = StorageFactory.getStorage();
-
-      const encryptedPassword = encrypt(userPassword);
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-      const nowUnix = Math.floor(Date.now() / 1000);
-      const expiresAtUnix = expiresAtDate ? Math.floor(expiresAtDate.getTime() / 1000) : -1;
+      const expiresAtUnix = expirationTime ?? -1;
 
-      // Normalize host and port with defaults
-      const tokenUsername = authenticatedUser.username || "default";
-      const tokenHost = authenticatedUser.host || "localhost";
-      const tokenPort = authenticatedUser.port || 6379;
-      const { role: tokenRole } = authenticatedUser;
-
-      await storage.createToken({
-        token_hash: tokenHash,
-        token_id: tokenId,
-        user_id: authenticatedUser.id,
-        username: tokenUsername,
+      await storeEncryptedCredential({
+        tokenHash,
+        tokenId,
+        userId: authenticatedUser.id,
+        username: authenticatedUser.username || "default",
         name,
-        role: tokenRole,
-        host: tokenHost,
-        port: tokenPort,
-        created_at: nowUnix,
-        expires_at: expiresAtUnix,
-        last_used: -1,
-        is_active: true,
-        encrypted_password: encryptedPassword,
+        role: authenticatedUser.role,
+        host: authenticatedUser.host || "localhost",
+        port: authenticatedUser.port || 6379,
+        password: userPassword,
+        expiresAtUnix,
       });
 
       // eslint-disable-next-line no-console
@@ -200,7 +187,7 @@ export async function POST(request: NextRequest) {
       // eslint-disable-next-line no-console
       console.error('Failed to store token for user:', authenticatedUser.username, storageError);
       return NextResponse.json(
-        { message: storageError instanceof Error ? storageError.message : "Failed to store token" },
+        { message: "Failed to store token" },
         { status: 500 }
       );
     }

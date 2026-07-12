@@ -104,7 +104,11 @@ test.describe('@config Settings config tests', () => {
         });
     });
 
-    Data.inputDataAcceptsZero.forEach(({ input, description, expected }, index) => {
+    // Filter out "0" for VKEY_MAX_ENTITY_COUNT: setting it to 0 is a
+    // server-wide FalkorDB config that also affects the token_management
+    // graph (shared instance in CI), breaking auth on subsequent requests.
+    const vkeyData = Data.inputDataAcceptsZero.filter(d => d.input !== "0");
+    vkeyData.forEach(({ input, description, expected }, index) => {
         test(`@admin Modify ${roles.vKeyMaxEntityCount} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             await apiCall.modifySettingsRole(roles.vKeyMaxEntityCount, input);
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
@@ -112,7 +116,7 @@ test.describe('@config Settings config tests', () => {
             await settingsConfigPage.fillSearchForConfigInput(roles.vKeyMaxEntityCount);
             const value = await settingsConfigPage.getRoleContentValue(roles.vKeyMaxEntityCount);
             expect(value === input).toBe(expected);
-            if (index === Data.inputDataAcceptsZero.length - 1) {
+            if (index === vkeyData.length - 1) {
                 await apiCall.modifySettingsRole(roles.vKeyMaxEntityCount, "100000");
             }
         });
@@ -251,6 +255,136 @@ test.describe('@config Settings config tests', () => {
         const value = String((await apiCall.getSettingsRoleValue(roles.maxInfoQueries)).config[1]);
         expect(value).toBe(Data.roleModificationData[8].input);
         await apiCall.modifySettingsRole(roles.maxInfoQueries, "1000");
+    });
+
+    // ===== EFFECTS_THRESHOLD tests =====
+
+    Data.inputDataNoZeroCheck.forEach(({ input, description, expected }, index) => {
+        test(`@admin Modify ${roles.effectsThreshold} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
+            const originalValue = String((await apiCall.getSettingsRoleValue(roles.effectsThreshold)).config[1]);
+            try {
+                await apiCall.modifySettingsRole(roles.effectsThreshold, input);
+                const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
+                await settingsConfigPage.navigateToDBConfigurationTab();
+                await settingsConfigPage.fillSearchForConfigInput(roles.effectsThreshold);
+                const value = await settingsConfigPage.getRoleContentValue(roles.effectsThreshold);
+                expect(value === input).toBe(expected);
+            } finally {
+                await apiCall.modifySettingsRole(roles.effectsThreshold, originalValue);
+            }
+        });
+    });
+
+    // ===== DELTA_MAX_PENDING_CHANGES tests =====
+
+    Data.inputDataNoZeroCheck.forEach(({ input, description, expected }, index) => {
+        test(`@admin Modify ${roles.deltaMaxPendingChanges} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
+            const originalValue = String((await apiCall.getSettingsRoleValue(roles.deltaMaxPendingChanges)).config[1]);
+            try {
+                await apiCall.modifySettingsRole(roles.deltaMaxPendingChanges, input);
+                const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
+                await settingsConfigPage.navigateToDBConfigurationTab();
+                await settingsConfigPage.fillSearchForConfigInput(roles.deltaMaxPendingChanges);
+                const value = await settingsConfigPage.getRoleContentValue(roles.deltaMaxPendingChanges);
+                expect(value === input).toBe(expected);
+            } finally {
+                await apiCall.modifySettingsRole(roles.deltaMaxPendingChanges, originalValue);
+            }
+        });
+    });
+
+    // ===== JS_HEAP_SIZE tests =====
+
+    Data.jsMemoryData.forEach(({ input, description, expected }, index) => {
+        test(`@admin Modify ${roles.jsHeapSize} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
+            const originalValue = String((await apiCall.getSettingsRoleValue(roles.jsHeapSize)).config[1]);
+            try {
+                await apiCall.modifySettingsRole(roles.jsHeapSize, input);
+                const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
+                await settingsConfigPage.navigateToDBConfigurationTab();
+                await settingsConfigPage.fillSearchForConfigInput(roles.jsHeapSize);
+                const value = await settingsConfigPage.getRoleContentValue(roles.jsHeapSize);
+                expect(value === input).toBe(expected);
+            } finally {
+                await apiCall.modifySettingsRole(roles.jsHeapSize, originalValue);
+            }
+        });
+    });
+
+    // ===== JS_STACK_SIZE tests =====
+
+    Data.jsMemoryData.forEach(({ input, description, expected }, index) => {
+        test(`@admin Modify ${roles.jsStackSize} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
+            const originalValue = String((await apiCall.getSettingsRoleValue(roles.jsStackSize)).config[1]);
+            try {
+                await apiCall.modifySettingsRole(roles.jsStackSize, input);
+                const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
+                await settingsConfigPage.navigateToDBConfigurationTab();
+                await settingsConfigPage.fillSearchForConfigInput(roles.jsStackSize);
+                const value = await settingsConfigPage.getRoleContentValue(roles.jsStackSize);
+                expect(value === input).toBe(expected);
+            } finally {
+                await apiCall.modifySettingsRole(roles.jsStackSize, originalValue);
+            }
+        });
+    });
+
+    // ===== UI modification tests for new configs =====
+
+    test(`@admin Modify effectsThreshold via UI validation via API: Input value: ${Data.roleModificationData[9].input}`, async () => {
+        const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
+        try {
+            await settingsConfigPage.navigateToDBConfigurationTab();
+            await settingsConfigPage.modifyRoleValue(roles.effectsThreshold, Data.roleModificationData[9].input);
+            await settingsConfigPage.isUndoBtnInToastMsg();
+            await settingsConfigPage.waitForPageIdle();
+            const value = String((await apiCall.getSettingsRoleValue(roles.effectsThreshold)).config[1]);
+            expect(value).toBe(Data.roleModificationData[9].input);
+        } finally {
+            await apiCall.modifySettingsRole(roles.effectsThreshold, "100");
+        }
+    });
+
+    test(`@admin Modify deltaMaxPendingChanges via UI validation via API: Input value: ${Data.roleModificationData[10].input}`, async () => {
+        const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
+        try {
+            await settingsConfigPage.navigateToDBConfigurationTab();
+            await settingsConfigPage.modifyRoleValue(roles.deltaMaxPendingChanges, Data.roleModificationData[10].input);
+            await settingsConfigPage.isUndoBtnInToastMsg();
+            await settingsConfigPage.waitForPageIdle();
+            const value = String((await apiCall.getSettingsRoleValue(roles.deltaMaxPendingChanges)).config[1]);
+            expect(value).toBe(Data.roleModificationData[10].input);
+        } finally {
+            await apiCall.modifySettingsRole(roles.deltaMaxPendingChanges, "10000");
+        }
+    });
+
+    test(`@admin Modify jsHeapSize via UI validation via API: Input value: ${Data.roleModificationData[11].input}`, async () => {
+        const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
+        try {
+            await settingsConfigPage.navigateToDBConfigurationTab();
+            await settingsConfigPage.modifyRoleValue(roles.jsHeapSize, Data.roleModificationData[11].input);
+            await settingsConfigPage.isUndoBtnInToastMsg();
+            await settingsConfigPage.waitForPageIdle();
+            const value = String((await apiCall.getSettingsRoleValue(roles.jsHeapSize)).config[1]);
+            expect(value).toBe(Data.roleModificationData[11].input);
+        } finally {
+            await apiCall.modifySettingsRole(roles.jsHeapSize, "1048576");
+        }
+    });
+
+    test(`@admin Modify jsStackSize via UI validation via API: Input value: ${Data.roleModificationData[12].input}`, async () => {
+        const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
+        try {
+            await settingsConfigPage.navigateToDBConfigurationTab();
+            await settingsConfigPage.modifyRoleValue(roles.jsStackSize, Data.roleModificationData[12].input);
+            await settingsConfigPage.isUndoBtnInToastMsg();
+            await settingsConfigPage.waitForPageIdle();
+            const value = String((await apiCall.getSettingsRoleValue(roles.jsStackSize)).config[1]);
+            expect(value).toBe(Data.roleModificationData[12].input);
+        } finally {
+            await apiCall.modifySettingsRole(roles.jsStackSize, "1048576");
+        }
     });
 
     Data.searchElements.forEach(({ input, expected }) => {

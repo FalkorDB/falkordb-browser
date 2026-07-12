@@ -6,13 +6,23 @@
 
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { MutableRefObject } from "react";
-import type { FalkorDBCanvas } from "@falkordb/canvas";
+import React, { type RefObject } from "react";
+import type { FalkorDBCanvas, Data as CanvasData } from "@falkordb/canvas";
+import { signOut } from "next-auth/react";
+import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, enrichSyntaxMessage, type SyntaxErrorInfo, type HintLink } from "./cypherErrors.ts";
+import { suggestForError, findFuncArgTypo } from "./cypherSuggestions.ts";
+
+export { parseSyntaxError };
+export type { SyntaxErrorInfo };
 
 export type ToastArguments = {
   title: string;
-  description: string;
+  description: React.ReactNode;
   variant: "destructive" | "default";
+  rawMessage?: string;
+  hint?: string;
+  hintLink?: HintLink;
+  query?: string;
 };
 
 export type ToastFn = (args: ToastArguments) => void;
@@ -46,6 +56,7 @@ export type Query = {
   elementsCount: number;
   fav: boolean;
   name?: string;
+  errorMessage?: string;
 };
 
 export type Node = {
@@ -98,7 +109,12 @@ export type LinkCell = {
   };
 };
 
-export type DataCell = NodeCell | LinkCell | NodeCell[] | LinkCell[] | number | string | null;
+export type PathCell = {
+  nodes: NodeCell[];
+  edges?: LinkCell[];
+};
+
+export type DataCell = NodeCell | LinkCell | PathCell | NodeCell[] | LinkCell[] | PathCell[] | number | string | null;
 
 export type DataRow = {
   [key: string]: DataCell;
@@ -145,9 +161,9 @@ export interface Relationship extends Omit<InfoRelationship, "count"> {
   textDescent?: number;
 }
 
-export type GraphRef = MutableRefObject<FalkorDBCanvas | null>;
+export type GraphRef = RefObject<FalkorDBCanvas | null>;
 
-export type Panel = "chat" | "data" | "add" | undefined;
+export type Panel = "data" | "add" | undefined;
 
 export type SelectCell = {
   value: string;
@@ -190,8 +206,9 @@ export type Message = {
   | "Error"
   | "Status"
   | "CypherQuery"
-  | "CypherResult"
-  | "Schema";
+  | "CypherResult";
+  confidence?: number;
+  tokenUsage?: number;
 };
 
 // [library_name, type, 'functions', function_names[]]
@@ -199,6 +216,15 @@ export type UDFEntry = [string, string, string, string[]];
 
 // [...UDFEntry, library_code, code]
 export type UDFEntryWithCode = [...UDFEntry, string, string];
+
+export type UserFriendlyMessage = {
+  title: string;
+  description: React.ReactNode;
+  rawMessage?: string;
+  hint?: string;
+  hintLink?: HintLink;
+  syntaxError?: SyntaxErrorInfo;
+};
 
 export type ConnectionType = "Standalone" | "Cluster" | "Sentinel";
 
@@ -232,25 +258,84 @@ export function cn(...inputs: ClassValue[]) {
 export async function getSSEGraphResult(
   url: string,
   toast: ToastFn,
-  setIndicator: (indicator: "online" | "offline") => void
+  setIndicator: (indicator: "online" | "offline") => void,
+  errorContext?: { query?: string }
 ): Promise<unknown> {
   return new Promise((resolve, reject) => {
     let handled = false;
 
-    const evtSource = new EventSource(url);
+    // EventSource doesn't support headers — inject connectionId as a query param.
+    let effectiveUrl = normalizeApiUrl(url);
+    if (_activeConnectionId) {
+      const sep = effectiveUrl.includes("?") ? "&" : "?";
+      effectiveUrl += `${sep}connectionId=${encodeURIComponent(_activeConnectionId)}`;
+    }
+
+    const evtSource = new EventSource(effectiveUrl);
     evtSource.addEventListener("result", (event: MessageEvent) => {
-      const result = JSON.parse(event.data);
-      evtSource.close();
-      setIndicator("online");
-      resolve(result);
+      const payloadText = typeof event.data === "string" ? event.data : "";
+
+      try {
+        const result = JSON.parse(payloadText);
+        evtSource.close();
+        setIndicator("online");
+        resolve(result);
+      } catch (error) {
+        console.error("Failed to parse SSE result event:", error);
+        evtSource.close();
+        setIndicator("offline");
+        reject(new Error("Invalid server response"));
+      }
     });
 
     evtSource.addEventListener("error", (event: MessageEvent) => {
+      const eventData = typeof (event as { data?: unknown }).data === "string"
+        ? (event as { data?: string }).data
+        : "";
+
+      // A native EventSource "error" (network/connection failure) carries no
+      // data — leave it for evtSource.onerror below so it surfaces as an
+      // offline/network error instead of a generic "Request failed".
+      if (!eventData) return;
+
       handled = true;
-      const { message, status } = JSON.parse(event.data);
+      let rawMessage: unknown = "";
+      let rawStatus: unknown = 0;
+      let code: string | undefined;
+
+      try {
+        const payload = JSON.parse(eventData) as {
+          message?: unknown;
+          status?: unknown;
+          code?: string;
+        };
+        rawMessage = payload.message;
+        rawStatus = payload.status;
+        code = payload.code;
+      } catch (error) {
+        rawMessage = extractResponseErrorMessage(eventData);
+        console.error("Failed to parse SSE error event:", error);
+      }
+
+      if (!rawMessage) {
+        rawMessage = (event as { message?: unknown }).message;
+      }
+
+      const message = normalizeErrorMessage(rawMessage) || "Request failed";
+      const parsedStatus = Number(rawStatus);
+      const status = Number.isFinite(parsedStatus) ? parsedStatus : 0;
 
       evtSource.close();
-      toast({ title: "Error", description: message, variant: "destructive" });
+
+      if (status === 401 && code === "SESSION_INVALID") {
+        triggerSessionInvalidationSignOut();
+        setIndicator("offline");
+        reject(new Error(message));
+        return;
+      }
+
+      const friendly = toUserFriendlyMessage(message, status, errorContext);
+      toast({ title: friendly.title, description: friendly.description, variant: "destructive", rawMessage: friendly.rawMessage, hint: friendly.hint, hintLink: friendly.hintLink, query: errorContext?.query });
 
       if (status === 401 || status >= 500) setIndicator("offline");
 
@@ -272,27 +357,272 @@ export async function getSSEGraphResult(
   });
 }
 
+// Builds a React element that highlights the error position in the query snippet.
+// Clamps contextOffset to valid range to prevent blank/incorrect highlights.
+export function formatSyntaxError(
+  message: string,
+  context: string,
+  contextOffset: number
+): React.ReactNode {
+  const safeOffset = context.length > 0
+    ? Math.max(0, Math.min(contextOffset, context.length - 1))
+    : 0;
+  const before = context.slice(0, safeOffset);
+  const errorChar = context[safeOffset] || "";
+  const after = context.slice(safeOffset + 1);
+
+  const enriched = enrichSyntaxMessage(message, context, contextOffset);
+
+  // When the error char is whitespace, step back and highlight the preceding word.
+  let wordStart = safeOffset;
+  while (wordStart > 0 && !/\s/.test(context[wordStart - 1])) wordStart -= 1;
+  let wordEnd = safeOffset;
+  while (wordEnd < context.length && !/\s/.test(context[wordEnd])) wordEnd += 1;
+  const errorWord = context.slice(wordStart, wordEnd);
+
+  const isWhitespaceError = !errorChar || /\s/.test(errorChar);
+  if (isWhitespaceError && errorWord.length > 1) {
+    return React.createElement("div", { className: "flex flex-col gap-1" },
+      React.createElement("span", null, enriched),
+      React.createElement("code", {
+        className: "mt-1 block rounded px-2 py-1 text-xs font-mono whitespace-pre-wrap break-words"
+      },
+        context.slice(0, wordStart),
+        React.createElement("span", {
+          className: "font-bold text-xl underline mx-1"
+        }, errorWord),
+        context.slice(safeOffset) // space + rest
+      )
+    );
+  }
+
+  return React.createElement("div", { className: "flex flex-col gap-1" },
+    React.createElement("span", null, enriched),
+    React.createElement("code", {
+      className: "mt-1 block rounded px-2 py-1 text-xs font-mono whitespace-pre-wrap break-words"
+    },
+      before,
+      React.createElement("span", {
+        className: "font-bold text-xl underline mx-1"
+      }, errorChar || " "),
+      after
+    )
+  );
+}
+
+export function normalizeErrorMessage(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  if (raw instanceof Error) return raw.message;
+  if (raw == null) return "";
+
+  try {
+    return JSON.stringify(raw);
+  } catch {
+    return String(raw);
+  }
+}
+
+function extractResponseErrorMessage(bodyText: string): string {
+  if (!bodyText) return "";
+
+  try {
+    const parsed = JSON.parse(bodyText) as unknown;
+
+    if (typeof parsed === "string") return parsed;
+
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const body = parsed as Record<string, unknown>;
+      const message = normalizeErrorMessage(body.message || body.error || body.detail);
+
+      if (message) return message;
+
+      if (body.status === "offline") return "Database is offline.";
+    }
+  } catch {
+    // bodyText is already plain text
+  }
+
+  return bodyText;
+}
+
+const USER_READABLE_ERROR_PATTERNS = [
+  /\bunknown function\b/i,
+  /\bnot defined\b/i,
+  /\balready exists\b/i,
+  /\bmissing parameter\b/i,
+  /\bempty query\b/i,
+  /\btype mismatch\b/i,
+  /\bdivision by zero\b/i,
+  /\binvalid (?:cypher only|entity|graph name|host|input|json|messages|model|password|port|replace|role|type|url|username|value)\b/i,
+  /\b(?:api key|attribute name|attribute value|code|graph name|key|label|messages|model|name|password|role|source name|type|username|value) (?:is required|cannot be empty)\b/i,
+  /\bselected nodes are required\b/i,
+  /^validation failed$/i,
+  /^database is offline\.$/i,
+  /^graph not found\b/i,
+  /^your graph is empty\b/i,
+  /^model\/api key mismatch\b/i,
+  /^model ".+" not found\b/i,
+  /^ollama model ".+" not found\b/i,
+  /^invalid .*api key\b/i,
+  /^api key error\b/i,
+  /^cannot connect to ollama\b/i,
+  /^network error\b/i,
+  /^request timed out\b/i,
+  /^could not generate\b/i,
+  /^unable to generate\b/i,
+  /^no messages provided$/i,
+  /^no user messages found$/i,
+  // Connection errors from /api/connections
+  /^cannot connect to falkordb\b/i,
+  /^authentication failed\b/i,
+  /^connection timed out\b/i,
+];
+
+function isAllowlistedUserError(message: string): boolean {
+  return USER_READABLE_ERROR_PATTERNS.some(pattern => pattern.test(message));
+}
+
+// Maps raw server/Redis/FalkorDB error messages to user-friendly descriptions.
+// Syntax errors are parsed and displayed with the error position highlighted.
+export function toUserFriendlyMessage(raw: unknown, status: number, ctx?: { query?: string }): UserFriendlyMessage {
+  const rawMessage = normalizeErrorMessage(raw).trim();
+  if (!rawMessage) {
+    if (status === 401) return { title: "Error", description: "Your session has expired. Please sign in again." };
+    if (status >= 500) return { title: "Error", description: "Something went wrong on the server. Please try again later." };
+    return { title: "Error", description: "An unexpected error occurred. Please try again." };
+  }
+
+  const parsed = parseSyntaxError(rawMessage);
+  if (parsed) {
+    let { message, context, contextOffset } = parsed;
+    // If a function-arg typo is the root cause, point the toast highlight at the typo.
+    const typo = ctx?.query ? findFuncArgTypo(ctx.query) : undefined;
+    if (typo) {
+      const re = new RegExp(`\\b${typo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+      const m = re.exec(context);
+      if (m) {
+        contextOffset = m.index;
+        message = `'${typo}' not defined`;
+      }
+    }
+    return { title: "Syntax Error", description: formatSyntaxError(message, context, contextOffset), syntaxError: parsed, rawMessage, hint: SYNTAX_ERROR_HINT };
+  }
+
+  // "Did you mean…?" is more specific than the catalog tip, so it takes precedence.
+  const catalog = getCypherErrorHint(rawMessage);
+  const hint = suggestForError(rawMessage, { query: ctx?.query }) ?? catalog?.hint;
+  const hintLink = catalog?.link;
+
+  // For user-readable errors, description IS the raw message — skip rawMessage
+  // to avoid a duplicate "See more" section.
+  if (isAllowlistedUserError(rawMessage) || hint) {
+    return { title: "Error", description: rawMessage, hint, hintLink };
+  }
+
+  const lower = rawMessage.toLowerCase();
+
+  if (lower.includes("connection refused") || lower.includes("econnrefused")) {
+    return { title: "Error", description: "Unable to connect to the database. Please check your connection settings.", rawMessage, hint, hintLink };
+  }
+
+  if (lower.includes("noauth") || lower.includes("wrongpass")) {
+    return { title: "Error", description: "Database authentication failed. Please check your credentials.", rawMessage, hint, hintLink };
+  }
+
+  if (lower.includes("loading") && lower.includes("dataset")) {
+    return { title: "Error", description: "The database is still loading. Please wait a moment and try again.", rawMessage, hint, hintLink };
+  }
+
+  if (lower.includes("oom") || lower.includes("out of memory")) {
+    return { title: "Error", description: "The server is running low on memory. Please try again later.", rawMessage, hint, hintLink };
+  }
+
+  if (lower.includes("timeout") || lower.includes("timed out")) {
+    return { title: "Error", description: "The request timed out. Please try a simpler query or try again later.", rawMessage, hint, hintLink };
+  }
+
+  if (lower.includes("readonly") && lower.includes("replica")) {
+    return { title: "Error", description: "This operation cannot be performed on a read-only replica.", rawMessage, hint, hintLink };
+  }
+
+  if (status === 401) {
+    return { title: "Error", description: "Your session has expired. Please sign in again.", rawMessage, hint, hintLink };
+  }
+
+  if (status >= 500) {
+    return { title: "Error", description: "Something went wrong on the server. Please try again later.", rawMessage, hint, hintLink };
+  }
+
+  return { title: "Error", description: "An unexpected error occurred. Please try again.", rawMessage, hint, hintLink };
+}
+
+// Guards against concurrent signOut calls when multiple in-flight requests hit an invalidated session.
+let sessionInvalidationInFlight = false;
+
+function triggerSessionInvalidationSignOut(): void {
+  if (sessionInvalidationInFlight) return;
+  sessionInvalidationInFlight = true;
+  signOut({ callbackUrl: "/login" }).catch(() => {
+    sessionInvalidationInFlight = false;
+  });
+}
+
+// Active connection ID — injected into every outgoing request as X-Connection-Id.
+// Not initialised from localStorage to avoid overriding restricted-user sessions.
+// providers.tsx keeps it in sync after every render.
+let _activeConnectionId: string | null = null;
+
+export function setActiveConnectionIdGlobal(id: string | null) {
+  _activeConnectionId = id;
+}
+
+export function getActiveConnectionIdGlobal(): string | null {
+  return _activeConnectionId;
+}
+
+function normalizeApiUrl(input: string): string {
+  if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(input) || input.startsWith("//") || input.startsWith("/")) {
+    return input;
+  }
+
+  return `/${input}`;
+}
+
 export async function securedFetch(
   input: string,
   init: RequestInit,
   toast: ToastFn,
-  setIndicator: (indicator: "online" | "offline") => void
+  setIndicator: (indicator: "online" | "offline") => void,
 ): Promise<Response> {
-  const response = await fetch(input, init);
+  // Callers that set X-Connection-Id explicitly take priority over the global.
+  const effectiveInit = { ...init };
+  const existingHeaders = new Headers(effectiveInit.headers);
+  if (_activeConnectionId && !existingHeaders.has("X-Connection-Id")) {
+    existingHeaders.set("X-Connection-Id", _activeConnectionId);
+  }
+  effectiveInit.headers = existingHeaders;
+
+  const response = await fetch(normalizeApiUrl(input), effectiveInit);
   const { status } = response;
+
+  // Sign out only on an explicit X-Session-Invalid signal, not on all 401s.
+  if (status === 401 && response.headers.get("X-Session-Invalid") === "1") {
+    triggerSessionInvalidationSignOut();
+    setIndicator("offline");
+    return response;
+  }
+
   if (status >= 300) {
-    let message = await response.text();
+    const message = extractResponseErrorMessage(await response.text());
 
-    try {
-      message = JSON.parse(message).message;
-    } catch {
-      // message is already text
-    }
-
+    const friendly = toUserFriendlyMessage(message, status);
     toast({
-      title: "Error",
-      description: message,
+      title: friendly.title,
+      description: friendly.description,
       variant: "destructive",
+      rawMessage: friendly.rawMessage,
+      hint: friendly.hint,
+      hintLink: friendly.hintLink,
     });
 
     if (status === 401 || status >= 500) {
@@ -316,20 +646,28 @@ export const between = (hash: number, from: number, to: number) => {
 export const getDefaultQuery = (q?: string) =>
   q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN * LIMIT 100";
 
-export const getMetaStats = async (name: string, toast: ToastFn, setIndicator: (indicator: "online" | "offline") => void) => {
+export const getMetaStats = async (name: string, toast: ToastFn, setIndicator: (indicator: "online" | "offline") => void, isReadOnly?: boolean) => {
+  if (!name) return undefined;
+
   const q = "CALL db.meta.stats() YIELD labels, relTypes RETURN labels, relTypes as relationships";
+  const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
 
   try {
-    const result = await getSSEGraphResult(`/api/graph/${prepareArg(name)}?query=${encodeURIComponent(q)}`, toast, setIndicator) as { data: { labels: { [key: string]: number }, relationships: { [key: string]: number } }[] };
+    const result = await getSSEGraphResult(`/api/graph/${prepareArg(name)}?query=${encodeURIComponent(q)}${readOnlyParam}`, toast, setIndicator) as { data: { labels: { [key: string]: number }, relationships: { [key: string]: number } }[] };
 
     if (!result) return undefined;
 
     const row = result.data?.[0];
+    if (!row || typeof row !== "object" || Array.isArray(row)) return undefined;
 
-    if (!row) return undefined;
+    const { labels, relationships } = row;
+    if (
+      !labels || typeof labels !== "object" || Array.isArray(labels) ||
+      !relationships || typeof relationships !== "object" || Array.isArray(relationships)
+    ) return undefined;
 
-    const l = Object.entries(row.labels);
-    const r = Object.entries(row.relationships);
+    const l = Object.entries(labels);
+    const r = Object.entries(relationships);
 
     return [l, r];
   } catch (error) {
@@ -405,22 +743,28 @@ const processEntries = (arr: MemoryValueType): Map<string, MemoryValue> => {
 export const getMemoryUsage = async (
   name: string,
   toast: ToastFn,
-  setIndicator: (indicator: "online" | "offline") => void
+  setIndicator: (indicator: "online" | "offline") => void,
+  // Pass activeConnectionId explicitly from React context/closure.
+  // This avoids relying on the module-level global _activeConnectionId
+  // which can be reset to null by Next.js HMR between renders.
+  connectionId?: string | null
 ): Promise<Map<string, MemoryValue>> => {
-  const result = await securedFetch(
-    `api/graph/${prepareArg(name)}/memory`,
-    {
-      method: "GET",
-    },
-    toast,
-    setIndicator
-  );
-
-  if (!result.ok) return new Map();
-
-  const json = await result.json();
-
-  return processEntries(json.result);
+  // Use plain fetch (not securedFetch) so NOPERM / version-too-low 400 errors
+  // from restricted users don't produce error toasts — memory usage is an
+  // optional admin-only feature and missing it is not an error worth surfacing.
+  try {
+    const effectiveConnId = connectionId !== undefined ? connectionId : _activeConnectionId;
+    const headers = new Headers();
+    if (effectiveConnId) {
+      headers.set("X-Connection-Id", effectiveConnId);
+    }
+    const result = await fetch(`/api/graph/${prepareArg(name)}/memory`, { headers });
+    if (!result.ok) return new Map();
+    const json = await result.json();
+    return processEntries(json.result);
+  } catch {
+    return new Map();
+  }
 };
 
 /**
@@ -554,22 +898,41 @@ export function getQueryWithLimit(
   return [query, existingLimit];
 }
 
+export const convertToCanvasData = (graphData: GraphData): CanvasData => ({
+    nodes: graphData.nodes.map(({ id, labels, color, visible, size, data, expand }) => ({
+        id,
+        labels,
+        color,
+        visible,
+        size,
+        expand,
+        data
+    })),
+    links: graphData.links.map(({ id, relationship, color, visible, source, target, data }) => ({
+        id,
+        relationship,
+        color,
+        visible,
+        source,
+        target,
+        data
+    }))
+});
+
 export const formatName = (newGraphName: string) =>
   newGraphName === '""' ? "" : newGraphName;
 
 export async function fetchOptions(
-  type: "Graph" | "Schema",
   toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void,
   indicator: "online" | "offline",
   setSelectedValue: (value: string) => void,
   setOptions: (options: string[]) => void,
-  contentPersistence: boolean
 ) {
   if (indicator === "offline") return;
 
   const result = await securedFetch(
-    `api/${type === "Graph" ? "graph" : "schema"}`,
+    `/api/graph`,
     {
       method: "GET",
     },
@@ -584,12 +947,7 @@ export async function fetchOptions(
 
   setOptions(opts);
 
-  if (
-    setSelectedValue &&
-    opts.length === 1 &&
-    (!contentPersistence || type === "Graph")
-  )
-    setSelectedValue(formatName(opts[0]));
+  if (opts.length === 1) setSelectedValue(formatName(opts[0]));
 }
 
 export const areCaptionKeysEqual = (left: [string, boolean][], right: [string, boolean][]) =>

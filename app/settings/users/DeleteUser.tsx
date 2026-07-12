@@ -11,9 +11,10 @@ interface DeleteUserProps {
     users: User[]
     setUsers: Dispatch<SetStateAction<User[]>>
     setRows: Dispatch<SetStateAction<Row[]>>
+    onSave: () => Promise<void>
 }
 
-export default function DeleteUser({ users, setUsers, setRows }: DeleteUserProps) {
+export default function DeleteUser({ users, setUsers, setRows, onSave }: DeleteUserProps) {
     const { toast } = useToast();
     const { setIndicator } = useContext(IndicatorContext);
     
@@ -35,6 +36,7 @@ export default function DeleteUser({ users, setUsers, setRows }: DeleteUserProps
             });
             setUsers(prev => prev.filter(user => !users.find(u => user.username === u.username)));
             setRows(prev => prev.filter(row => !users.find(u => row.cells[0].value === u.username)));
+            await onSave();
         }
     };
 

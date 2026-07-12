@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { renameGraph, validateBody } from "../../validate-body";
-import { getCorsHeaders } from "../../utils";
+import { getCorsHeaders, writeGetClientErrorAsSSE, resolveReadOnly, runQuery } from "../../utils";
 
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
@@ -43,7 +43,7 @@ export async function DELETE(
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500, headers: getCorsHeaders(request) }
     );
   }
@@ -63,11 +63,12 @@ export async function POST(
     const { client, user } = session;
 
     const { graph: graphId } = await params;
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       const graph = client.selectGraph(graphId);
 
-      if (user.role === "Read-Only") await graph.roQuery("RETURN 1");
+      if (isReadOnly) await graph.roQuery("RETURN 1");
       else await graph.query("RETURN 1");
 
       return NextResponse.json(
@@ -84,7 +85,7 @@ export async function POST(
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500, headers: getCorsHeaders(request) }
     );
   }
@@ -136,7 +137,7 @@ export async function PATCH(
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500, headers: getCorsHeaders(request)  }
     );
   }
@@ -156,13 +157,22 @@ export async function GET(
     const session = await getClient(request);
 
     if (session instanceof NextResponse) {
-      throw new Error(await session.text());
+      await writeGetClientErrorAsSSE(session, writer, encoder);
+      return new Response(readable, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+          ...getCorsHeaders(request),
+        },
+      });
     }
 
     const { client, user } = session;
     const { graph: graphId } = await params;
     const query = request.nextUrl.searchParams.get("query");
     const timeout = Number(request.nextUrl.searchParams.get("timeout")) * 1000;
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       if (!query) throw new Error("Missing parameter query");
@@ -170,10 +180,7 @@ export async function GET(
 
       const graph = client.selectGraph(graphId);
 
-      const result =
-        user.role === "Read-Only"
-          ? await graph.roQuery(query, { TIMEOUT: timeout })
-          : await graph.query(query, { TIMEOUT: timeout });
+      const result = await runQuery(graph, query, isReadOnly, { TIMEOUT: timeout });
 
       const writeDataLine = (chunk: string) => {
         writer.write(encoder.encode(`data: ${chunk}\n`));
@@ -222,7 +229,7 @@ export async function GET(
       writer.write(
         encoder.encode(
           `event: error\ndata: ${JSON.stringify({
-            message: (error as Error).message,
+            message: (error as Error).message || "Internal server error",
             status: 400,
           })}\n\n`
         )
@@ -234,7 +241,7 @@ export async function GET(
     writer.write(
       encoder.encode(
         `event: error\ndata: ${JSON.stringify({
-          message: (error as Error).message,
+          message: "Internal server error",
           status: 500,
         })}\n\n`
       )

@@ -6,11 +6,10 @@ import DialogComponent from "../DialogComponent";
 import Button from "../ui/Button";
 import CloseDialog from "../CloseDialog";
 import { IndicatorContext } from "../provider";
+import { buildDeleteGraphToast } from "./deleteGraph-utils";
 
 interface Props {
-  type: "Schema" | "Graph"
   rows: Row[]
-  handleSetRows: (rows: string[]) => void
   setOpenMenage: (openMenage: boolean) => void
   selectedValue: string
   setGraphName: (graphName: string) => void
@@ -20,9 +19,7 @@ interface Props {
 }
 
 export default function DeleteGraph({
-  type,
   rows,
-  handleSetRows,
   setOpenMenage,
   selectedValue,
   setGraphName,
@@ -56,7 +53,7 @@ export default function DeleteGraph({
     try {
       const [failedDeletedGraphs, successDeletedGraphs] = await Promise.all(deleteGraphNames
         .map(async (name) => {
-          const result = await securedFetch(`api/${type === "Schema" ? "schema" : "graph"}/${prepareArg(name)}`, {
+          const result = await securedFetch(`api/graph/${prepareArg(name)}`, {
             method: "DELETE"
           }, toast, setIndicator);
 
@@ -75,11 +72,15 @@ export default function DeleteGraph({
         setGraph(Graph.empty());
       }
 
-      handleSetRows(successDeletedGraphs);
-      toast({
-        title: "Graph(s) deleted successfully",
-        description: successDeletedGraphs.length > 0 && `The graph(s) ${successDeletedGraphs.join(", ")} have been deleted successfully${failedDeletedGraphs.length > 0 && `The graph(s) ${failedDeletedGraphs.join(", ")} have not been deleted`}`,
-      });
+      // Rows update is handled automatically by useEffect([options, handleSetRows])
+      // in selectGraph.tsx when graphNames changes — no manual call needed here.
+
+      // Only show a success toast when at least one graph was actually deleted;
+      // per-graph failures are already surfaced by securedFetch's destructive toasts.
+      const deleteToast = buildDeleteGraphToast(successDeletedGraphs, failedDeletedGraphs);
+      if (deleteToast) {
+        toast(deleteToast);
+      }
     } finally {
       setIsLoading(false);
       setOpen(false);
@@ -97,6 +98,7 @@ export default function DeleteGraph({
       title="Delete Graph"
       trigger={
         <Button
+          className="p-1 text-xs"
           data-testid="deleteGraph"
           variant="Delete"
           disabled={rows.filter(opt => opt.checked).length === 0}

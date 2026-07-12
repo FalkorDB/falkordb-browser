@@ -123,6 +123,10 @@ export default class ChatComponent extends GraphPage {
     return this.chatToggleButton.isVisible();
   }
 
+  async isChatToggleButtonDisabled(): Promise<boolean> {
+    return this.chatToggleButton.isDisabled();
+  }
+
   async isChatPanelVisible(): Promise<boolean> {
     return this.chatPanel.isVisible();
   }
@@ -263,8 +267,8 @@ export default class ChatComponent extends GraphPage {
     await this.clickChatSendButton();
   }
 
-  async waitForAssistantResponse(type: string = "Result"): Promise<void> {
-    await this.waitForChatAssistantMessage(type);
+  async waitForAssistantResponse(type: string = "Result"): Promise<boolean> {
+    return this.waitForChatAssistantMessage(type);
   }
 
   async sendMessageAndWaitForResponse(
@@ -335,5 +339,63 @@ export default class ChatComponent extends GraphPage {
     const nodeElement = this.page.locator(`[data-tooltip*="${nodeName}"], text="${nodeName}"`).first();
     const visible = await nodeElement.isVisible().catch(() => false);
     return visible;
+  }
+
+  // Footer Locators
+  private get chatFooter(): Locator {
+    return this.page.getByTestId("chatFooter");
+  }
+
+  private get chatFooterLastTokens(): Locator {
+    return this.page.getByTestId("chatFooterLastTokens");
+  }
+
+  private get chatFooterTotalTokens(): Locator {
+    return this.page.getByTestId("chatFooterTotalTokens");
+  }
+
+  private get chatFooterModel(): Locator {
+    return this.page.getByTestId("chatFooterModel");
+  }
+
+  async waitForChatFooter(): Promise<boolean> {
+    return waitForElementToBeVisible(this.chatFooter);
+  }
+
+  async isChatFooterVisible(): Promise<boolean> {
+    return this.chatFooter.isVisible();
+  }
+
+  async waitForChatFooterTokens(): Promise<boolean> {
+    try {
+      await this.chatFooterTotalTokens.waitFor({ state: "visible", timeout: 10000 });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async getChatFooterLastTokens(): Promise<string | null> {
+    return interactWhenVisible(
+      this.chatFooterLastTokens,
+      (el) => el.textContent(),
+      "Chat Footer Last Tokens"
+    );
+  }
+
+  async getChatFooterTotalTokens(): Promise<string | null> {
+    return interactWhenVisible(
+      this.chatFooterTotalTokens,
+      (el) => el.textContent(),
+      "Chat Footer Total Tokens"
+    );
+  }
+
+  async getChatFooterModel(): Promise<string | null> {
+    return interactWhenVisible(
+      this.chatFooterModel,
+      (el) => el.textContent(),
+      "Chat Footer Model"
+    );
   }
 }

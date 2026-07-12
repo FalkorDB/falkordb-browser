@@ -8,10 +8,9 @@ import { IndicatorContext } from "./provider";
 
 interface Props {
     selectedValues: string[]
-    type: "Graph" | "Schema"
 }
 
-export default function ExportGraph({ selectedValues, type }: Props) {
+export default function ExportGraph({ selectedValues }: Props) {
 
     const [open, setOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -28,7 +27,7 @@ export default function ExportGraph({ selectedValues, type }: Props) {
         try {
             setIsLoading(true);
             await Promise.all(selectedValues.map(async value => {
-                const name = `${value}${type === "Schema" ? "_schema" : ""}`;
+                const name = value;
                 const result = await securedFetch(`api/graph/${prepareArg(name)}/export`, {
                     method: "GET"
                 }, toast, setIndicator);
@@ -66,6 +65,7 @@ export default function ExportGraph({ selectedValues, type }: Props) {
             onOpenChange={setOpen}
             trigger={
                 <Button
+                    className="p-1 text-xs"
                     data-testid="exportGraph"
                     variant="Primary"
                     label="Export Data"

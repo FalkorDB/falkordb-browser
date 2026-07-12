@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { User, ROLE } from "./model";
+import { User, ROLE, extractKeysFromACL, getRoleWithKeys } from "./model";
 import { createUser, deleteUsers, validateBody } from "../validate-body";
 import { getCorsHeaders } from "../utils";
 
@@ -39,6 +39,7 @@ export async function GET(request: Request) {
           return {
             username: userDetails[1],
             role: role ? role[0] : "Unknown",
+            keys: extractKeysFromACL(userDetails),
             selected: false,
           };
         });
@@ -54,7 +55,7 @@ export async function GET(request: Request) {
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500, headers: getCorsHeaders(request) }
     );
   }
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const { username, password, role } = validation.data;
+      const { username, password, role, keys } = validation.data;
       const roleValue = ROLE.get(role);
       if (!roleValue)
         throw new Error("Invalid role");
@@ -102,7 +103,8 @@ export async function POST(request: NextRequest) {
         // Just a workaround for https://github.com/redis/node-redis/issues/2745
       }
 
-      await connection.aclSetUser(username, roleValue.concat(`>${password}`));
+      const finalRole = getRoleWithKeys(roleValue, keys);
+      await connection.aclSetUser(username, finalRole.concat(`>${password}`));
       return NextResponse.json(
         { message: "Success" },
         {
@@ -123,7 +125,7 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500, headers: getCorsHeaders(request) }
     );
   }
@@ -171,7 +173,7 @@ export async function DELETE(request: NextRequest) {
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500, headers: getCorsHeaders(request) }
     );
   }

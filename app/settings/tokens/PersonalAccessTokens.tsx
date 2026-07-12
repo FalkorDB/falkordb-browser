@@ -40,12 +40,12 @@ export default function PersonalAccessTokens() {
   const [isRevoking, setIsRevoking] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [userRole, setUserRole] = useState<string>("");
-  
+
   // Form state
   const [tokenName, setTokenName] = useState("");
   const [expiresIn, setExpiresIn] = useState("never");
   const [customExpirationDate, setCustomExpirationDate] = useState("");
-  
+
   const { toast } = useToast();
   const { setIndicator } = useContext(IndicatorContext);
 
@@ -98,7 +98,7 @@ export default function PersonalAccessTokens() {
       // Calculate expiration date based on selection
       let expiresAt: string | null = null;
       let ttlSeconds: number | undefined;
-      
+
       switch (expiresIn) {
         case "30d":
           expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -126,7 +126,7 @@ export default function PersonalAccessTokens() {
           // Set to end of day (23:59:59) for better UX
           customDate.setHours(23, 59, 59, 999);
           const now = new Date();
-          
+
           if (customDate <= now) {
             toast({
               title: "Error",
@@ -136,7 +136,7 @@ export default function PersonalAccessTokens() {
             setIsGenerating(false);
             return;
           }
-          
+
           expiresAt = customDate.toISOString();
           ttlSeconds = Math.floor((customDate.getTime() - now.getTime()) / 1000);
           break;
@@ -147,7 +147,7 @@ export default function PersonalAccessTokens() {
           ttlSeconds = undefined;
           break;
       }
-      
+
       const result = await securedFetch("/api/auth/tokens", {
         method: "POST",
         headers: {
@@ -168,16 +168,16 @@ export default function PersonalAccessTokens() {
           expiresIn,
           customExpirationDate: expiresIn === "custom" ? customExpirationDate : undefined,
         });
-        
+
         // Reset form
         setTokenName("");
         setExpiresIn("never");
         setCustomExpirationDate("");
         setGenerateDialogOpen(false);
-        
+
         // Refresh token list
         await fetchTokens();
-        
+
         toast({
           title: "Success",
           description: "Personal access token generated successfully",
@@ -200,7 +200,7 @@ export default function PersonalAccessTokens() {
         setTokens(prev => prev.filter(t => t.token_id !== tokenId));
         setDeleteDialogOpen(false);
         setSelectedToken(null);
-        
+
         toast({
           title: "Success",
           description: "Token revoked successfully",
@@ -230,13 +230,13 @@ export default function PersonalAccessTokens() {
       case "30d": return "30 days";
       case "60d": return "60 days";
       case "90d": return "90 days";
-      case "custom": 
-        return customDate 
+      case "custom":
+        return customDate
           ? new Date(customDate).toLocaleDateString(undefined, {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric'
-            })
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+          })
           : "Custom";
       case "never": return "No expiration";
       default: return expires;
@@ -274,7 +274,7 @@ export default function PersonalAccessTokens() {
                   </p>
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label className="text-sm font-semibold text-green-900 dark:text-green-100">
                   Your new token:
@@ -287,6 +287,7 @@ export default function PersonalAccessTokens() {
                     onClick={(e) => (e.target as HTMLInputElement).select()}
                   />
                   <Button
+                    data-testid="copyGeneratedTokenButton"
                     size="sm"
                     variant="outline"
                     onClick={() => copyToClipboard(generatedToken.token)}
@@ -403,7 +404,7 @@ export default function PersonalAccessTokens() {
           <div className="space-y-6 py-4">
             <div className="space-y-3">
               <Label htmlFor="token-name" className="text-base font-semibold flex items-center gap-1">
-                Token name 
+                Token name
                 <span className="text-destructive text-lg">*</span>
               </Label>
               <Input
@@ -500,8 +501,8 @@ export default function PersonalAccessTokens() {
             </div>
           </div>
           <div className="flex justify-end gap-3 pt-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 setGenerateDialogOpen(false);
                 setTokenName("");
@@ -512,7 +513,7 @@ export default function PersonalAccessTokens() {
             >
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={generateToken}
               disabled={isGenerating || !tokenName.trim()}
             >
@@ -528,13 +529,13 @@ export default function PersonalAccessTokens() {
           <DialogHeader>
             <DialogTitle>Revoke Token</DialogTitle>
             <DialogDescription>
-              Are you sure you want to revoke the token &quot;{selectedToken?.name}&quot;? 
+              Are you sure you want to revoke the token &quot;{selectedToken?.name}&quot;?
               This action cannot be undone and any applications using this token will no longer be able to access the API.
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setDeleteDialogOpen(false)}
               disabled={isRevoking}
             >

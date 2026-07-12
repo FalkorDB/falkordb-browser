@@ -62,7 +62,7 @@ test.describe.serial("Query Settings", () => {
       await querySettings.selectGraphByName(graphName);
       await querySettings.insertQuery(query);
       await querySettings.clickRunQuery();
-      const res = await querySettings.getNodesScreenPositions("graph");
+      const res = await querySettings.getNodesScreenPositions();
       expect(res.length).toBe(5);
       await apiCall.removeGraph(graphName);
     });

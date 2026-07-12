@@ -4,8 +4,9 @@ import { SignJWT } from "jose";
 import crypto from "crypto";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
 import { getClient, generateTimeUUID } from "../[...nextauth]/options";
-import { encrypt } from "../encryption";
+import { storeEncryptedCredential } from "../tokenUtils";
 import { getCorsHeaders } from "../../utils";
+import { createToken, validateBody } from "../../validate-body";
 
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
@@ -116,13 +117,14 @@ export async function GET(request: Request) {
 export async function POST(request: NextRequest) {
   try {
     // 1. Validate JWT secret
-    if (!process.env.NEXTAUTH_SECRET) {
+    const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+    if (!authSecret) {
       return NextResponse.json(
         { message: "Server configuration error" },
         { status: 500, headers: getCorsHeaders(request) }
       );
     }
-    const jwtSecret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
+    const jwtSecret = new TextEncoder().encode(authSecret);
 
     // 2. Get authenticated user from session
     const session = await getClient(request);
@@ -131,10 +133,10 @@ export async function POST(request: NextRequest) {
     }
     const { user } = session;
 
-    // 3. Parse request body for token metadata
-    let body;
+    // 3. Parse and validate request body
+    let rawBody: unknown;
     try {
-      body = await request.json();
+      rawBody = await request.json();
     } catch {
       return NextResponse.json(
         { message: "Invalid JSON in request body" },
@@ -142,13 +144,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const {
-      name = "API Token",
-      expiresAt = null,
-      ttlSeconds = undefined,
-    } = body;
+    const result = validateBody(createToken, rawBody);
+    if (!result.success) {
+      return NextResponse.json(
+        { message: result.error },
+        { status: 400, headers: getCorsHeaders(request) }
+      );
+    }
 
-    // 4. Validate expiration parameters
+    const {
+      name,
+      expiresAt,
+      ttlSeconds,
+    } = result.data;
+
+    // 4. Validate expiration date is in the future
     let expiresAtDate: Date | null = null;
     if (expiresAt) {
       expiresAtDate = new Date(expiresAt);
@@ -158,12 +168,6 @@ export async function POST(request: NextRequest) {
           { status: 400, headers: getCorsHeaders(request) }
         );
       }
-    }
-    if (ttlSeconds !== undefined && (ttlSeconds > 31622400 || ttlSeconds < 1)) {
-      return NextResponse.json(
-        { message: "Invalid TTL value" },
-        { status: 400, headers: getCorsHeaders(request) }
-      );
     }
 
     // 5. Generate random token ID (jti)
@@ -200,37 +204,27 @@ export async function POST(request: NextRequest) {
 
     const token = await signer.sign(jwtSecret);
 
-    // 7. Store token using storage abstraction
+    // 7. Store token using shared helper
     try {
-      const storage = StorageFactory.getStorage();
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const password = (user as any).password || '';
-      const encryptedPassword = encrypt(password);
-
+      // At this point getClient() has either (a) resolved the password from
+      // the Token DB successfully, or (b) confirmed the session has no
+      // credentialRef (no-auth FalkorDB). An empty password here therefore
+      // corresponds to a legitimate no-auth setup, not a resolution failure.
+      const password = user.password ?? '';
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-      const nowUnix = Math.floor(Date.now() / 1000);
-      const expiresAtUnix = expiresAtDate ? Math.floor(expiresAtDate.getTime() / 1000) : -1;
+      const expiresAtUnix = expirationTime ?? -1;
 
-      const username = user.username || "default";
-      const host = user.host || "localhost";
-      const port = user.port || 6379;
-      const role = user.role || "Unknown";
-
-      await storage.createToken({
-        token_hash: tokenHash,
-        token_id: tokenId,
-        user_id: user.id,
-        username,
+      await storeEncryptedCredential({
+        tokenHash,
+        tokenId,
+        userId: user.id,
+        username: user.username || "default",
         name,
-        role,
-        host,
-        port,
-        created_at: nowUnix,
-        expires_at: expiresAtUnix,
-        last_used: -1,
-        is_active: true,
-        encrypted_password: encryptedPassword,
+        role: user.role || "Unknown",
+        host: user.host || "localhost",
+        port: user.port || 6379,
+        password,
+        expiresAtUnix,
       });
     } catch (storageError) {
       // eslint-disable-next-line no-console

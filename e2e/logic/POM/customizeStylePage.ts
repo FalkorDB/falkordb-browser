@@ -61,10 +61,24 @@ export default class CustomizeStylePage extends GraphInfoPage {
   }
 
   async isCustomizeStyleButtonVisible(label: string): Promise<boolean> {
-    return waitForElementToBeVisible(this.customizeStyleButton(label));
+    await interactWhenVisible(
+      this.labelButton(label),
+      (el) => el.click(),
+      `Label Button ${label}`
+    );
+    const visible = await waitForElementToBeVisible(this.customizeStyleButton(label));
+    // Close the popover by pressing Escape
+    await this.page.keyboard.press("Escape");
+    await waitForElementToNotBeVisible(this.customizeStyleButton(label));
+    return visible;
   }
 
   async clickCustomizeStyleButton(label: string): Promise<void> {
+    await interactWhenVisible(
+      this.labelButton(label),
+      (el) => el.click(),
+      `Label Button ${label}`
+    );
     await interactWhenVisible(
       this.customizeStyleButton(label),
       (el) => el.click(),
@@ -136,10 +150,20 @@ export default class CustomizeStylePage extends GraphInfoPage {
     // Wait for the button to be visible first
     await waitForElementToBeVisible(this.labelButton(label));
 
-    // Get the color from the inline style attribute which is the source of truth
-    const color = await this.labelButton(label).evaluate((el: HTMLElement) =>
-      el.style.backgroundColor || window.getComputedStyle(el).backgroundColor
-    );
+    // Get the color from the inner color dot span or background
+    const color = await this.labelButton(label).evaluate((el: HTMLElement) => {
+      // Check inner color dot element
+      const dotSpan = el.querySelector('[class*="rounded-full"]');
+      if (dotSpan) {
+        const dotBg = window.getComputedStyle(dotSpan).backgroundColor;
+        if (dotBg && dotBg !== 'rgba(0, 0, 0, 0)' && dotBg !== 'transparent') {
+          return dotBg;
+        }
+      }
+      // Fall back to inline or computed background color
+      const computedStyle = window.getComputedStyle(el);
+      return el.style.backgroundColor || computedStyle.backgroundColor;
+    });
     return color;
   }
 
@@ -148,8 +172,19 @@ export default class CustomizeStylePage extends GraphInfoPage {
     size?: number;
   } | null> {
     const style = await this.page.evaluate((labelName) => {
-      const stored = localStorage.getItem(`labelStyle_${labelName}`);
-      return stored ? JSON.parse(stored) : null;
+      // labelStyle_ is now connection-scoped, so find the key that ends with `labelStyle_{label}`
+      const suffix = `labelStyle_${labelName}`;
+      const matches: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key || !key.endsWith(suffix)) continue;
+        const value = localStorage.getItem(key);
+        if (value !== null) matches.push(value);
+      }
+      if (matches.length > 1) {
+        throw new Error(`Ambiguous scoped label style for ${suffix}`);
+      }
+      return matches.length === 1 ? JSON.parse(matches[0]) : null;
     }, label);
     return style;
   }
@@ -179,7 +214,7 @@ export default class CustomizeStylePage extends GraphInfoPage {
   }
 
   async getNodeDisplayName(nodeId: number): Promise<string> {
-    const nodes = await this.getNodesScreenPositions("graph");
+    const nodes = await this.getNodesScreenPositions();
     const node = nodes.find((n) => n.id === nodeId);
     if (!node) {
       throw new Error(`Node with id ${nodeId} not found`);

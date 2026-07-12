@@ -35,7 +35,9 @@ export default defineConfig({
 
   /* Configure projects for major browsers */
   projects: [
-    {name: 'setup', testMatch: /.*\.setup\.ts/},
+    // The setup test logs in 5 users (admin + readwrite + readonly + 2 sign-out
+    // dedicated users). 30 s is not enough; use 120 s.
+    {name: 'setup', testMatch: /.*\.setup\.ts/, timeout: 120000},
     
     // Cluster tests (new project for cluster functionality)
     {
@@ -55,7 +57,9 @@ export default defineConfig({
       testMatch: /.*cluster\.spec\.ts$/,
     },
     
-    // Regular projects for sharding (exclude TLS and settings)
+    // Regular projects for sharding (exclude TLS, settings, and tests that
+    // call Logout() — those destroy shared Token DB entries and break other
+    // parallel tests using the same admin session).
     {
       name: '[Admin] Chromium',
       use: { 
@@ -64,7 +68,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@admin/,
-      testIgnore: /.*settingsConfig\.spec\.ts$|.*settingsUsers\.spec\.ts$|.*tls\.spec\.ts$|.*cluster\.spec\.ts$/,
+      testIgnore: /.*settingsConfig\.spec\.ts$|.*settingsUsers\.spec\.ts$|.*tls\.spec\.ts$|.*cluster\.spec\.ts$|.*signOut\.spec\.ts$/,
     },
     {
       name: '[Admin] Firefox',
@@ -75,7 +79,7 @@ export default defineConfig({
       timeout: 40000,
       dependencies: ['setup'],
       grep: /@admin/,
-      testIgnore: /.*settingsConfig\.spec\.ts$|.*settingsUsers\.spec\.ts$|.*tls\.spec\.ts$|.*cluster\.spec\.ts$/,
+      testIgnore: /.*settingsConfig\.spec\.ts$|.*settingsUsers\.spec\.ts$|.*tls\.spec\.ts$|.*cluster\.spec\.ts$|.*signOut\.spec\.ts$/,
     },
     {
       name: '[Read-Write] - Chromium',
@@ -85,7 +89,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@readwrite/,
-      testIgnore: /.*tls\.spec\.ts$|.*cluster\.spec\.ts$/,
+      testIgnore: /.*tls\.spec\.ts$|.*cluster\.spec\.ts$|.*signOut\.spec\.ts$/,
     },
     {
       name: '[Read-Write] - Firefox',
@@ -96,7 +100,7 @@ export default defineConfig({
       timeout: 40000,
       dependencies: ['setup'],
       grep: /@readwrite/,
-      testIgnore: /.*tls\.spec\.ts$|.*cluster\.spec\.ts$/,
+      testIgnore: /.*tls\.spec\.ts$|.*cluster\.spec\.ts$|.*signOut\.spec\.ts$/,
     },
     {
       name: '[Read-Only] - Chromium',
@@ -106,7 +110,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@readonly/,
-      testIgnore: /.*tls\.spec\.ts$|.*cluster\.spec\.ts$/,
+      testIgnore: /.*tls\.spec\.ts$|.*cluster\.spec\.ts$|.*signOut\.spec\.ts$/,
     },
     {
       name: '[Read-Only] - Firefox',
@@ -117,7 +121,41 @@ export default defineConfig({
       timeout: 40000,
       dependencies: ['setup'],
       grep: /@readonly/,
-      testIgnore: /.*tls\.spec\.ts$|.*cluster\.spec\.ts$/,
+      testIgnore: /.*tls\.spec\.ts$|.*cluster\.spec\.ts$|.*signOut\.spec\.ts$/,
+    },
+
+    // Sign-out tests (dedicated projects with isolated auth state).
+    // Each project uses a SEPARATE auth file that is safe to invalidate;
+    // the shared readwriteuser / readonlyuser sessions are never touched.
+    {
+      name: '[Admin: Sign-Out] Chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'playwright/.auth/admin.json',
+      },
+      dependencies: ['setup'],
+      grep: /@admin/,
+      testMatch: /.*signOut\.spec\.ts$/,
+    },
+    {
+      name: '[Read-Write: Sign-Out] Chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'playwright/.auth/signout-readwriteuser.json',
+      },
+      dependencies: ['setup'],
+      grep: /@readwrite/,
+      testMatch: /.*signOut\.spec\.ts$/,
+    },
+    {
+      name: '[Read-Only: Sign-Out] Chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'playwright/.auth/signout-readonlyuser.json',
+      },
+      dependencies: ['setup'],
+      grep: /@readonly/,
+      testMatch: /.*signOut\.spec\.ts$/,
     },
 
     // Settings tests (run separately)
@@ -140,6 +178,25 @@ export default defineConfig({
       grep: /@admin|@config/,
       dependencies: ['setup'],
       testMatch: /.*(settingsConfig|settingsUsers)\.spec\.ts$/,
+    },
+
+    // Smoke tests (run separately against the dockers - browser + core).
+    // Self-contained: no setup dependency, no stored auth state.
+    {
+      name: '[Smoke] - Chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+      grep: /@smoke/,
+      testMatch: /.*smoke\.spec\.ts$/,
+    },
+    {
+      name: '[Smoke] - Firefox',
+      use: {
+        ...devices['Desktop Firefox'],
+      },
+      grep: /@smoke/,
+      testMatch: /.*smoke\.spec\.ts$/,
     },
 
     // TLS tests (run separately)

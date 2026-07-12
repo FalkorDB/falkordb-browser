@@ -2,14 +2,16 @@ import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import crypto from "crypto";
 import StorageFactory from "@/lib/token-storage/StorageFactory";
+import { encrypt } from "./encryption";
 
 /**
  * Validates JWT secret exists in environment
  */
 export function validateJWTSecret(): { valid: boolean; secret?: Uint8Array; error?: NextResponse } {
-  if (!process.env.NEXTAUTH_SECRET) {
+  const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+  if (!authSecret) {
     // eslint-disable-next-line no-console
-    console.error("NEXTAUTH_SECRET environment variable is required");
+    console.error("AUTH_SECRET environment variable is required");
     return {
       valid: false,
       error: NextResponse.json(
@@ -20,7 +22,7 @@ export function validateJWTSecret(): { valid: boolean; secret?: Uint8Array; erro
   }
   return {
     valid: true,
-    secret: new TextEncoder().encode(process.env.NEXTAUTH_SECRET),
+    secret: new TextEncoder().encode(authSecret),
   };
 }
 
@@ -35,11 +37,12 @@ export async function isTokenActive(
   token: string
 ): Promise<boolean> {
   try {
-    if (!process.env.NEXTAUTH_SECRET) {
+    const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+    if (!authSecret) {
       return false; // Fail-closed: cannot validate without secret
     }
 
-    const JWT_SECRET = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
+    const JWT_SECRET = new TextEncoder().encode(authSecret);
     
     // Verify the JWT is valid
     await jwtVerify(token, JWT_SECRET);
@@ -102,4 +105,47 @@ export async function getPasswordFromTokenDB(tokenId: string): Promise<string> {
     }
     throw new Error(`Failed to retrieve password for token: ${tokenId}`);
   }
+}
+
+/**
+ * Persist an encrypted credential entry in the Token DB.
+ * Shared helper used by the NextAuth session flow (bound to a session credentialRef)
+ * and the personal-access-token flows (bound to a JWT).
+ */
+export async function storeEncryptedCredential(params: {
+  tokenHash: string;
+  tokenId: string;
+  userId: string;
+  username: string;
+  name: string;
+  role: string;
+  host: string;
+  port: number;
+  password: string;
+  expiresAtUnix?: number;
+  kind?: 'session' | 'pat';
+  tls?: boolean;
+  ca?: string;
+}): Promise<void> {
+  const storage = StorageFactory.getStorage();
+  const nowUnix = Math.floor(Date.now() / 1000);
+
+  await storage.createToken({
+    token_hash: params.tokenHash,
+    token_id: params.tokenId,
+    user_id: params.userId,
+    username: params.username,
+    name: params.name,
+    role: params.role,
+    host: params.host,
+    port: params.port,
+    created_at: nowUnix,
+    expires_at: params.expiresAtUnix ?? -1,
+    last_used: -1,
+    is_active: true,
+    encrypted_password: encrypt(params.password),
+    kind: params.kind ?? 'pat',
+    tls: params.tls ?? false,
+    ca: params.ca,
+  });
 }

@@ -58,7 +58,7 @@ export default function Export({
         onClick={handleExport}
         variant={variant}
         >
-            <Download size={20} />
+            <Download size={16} />
         </Button>
     );
 }
