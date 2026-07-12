@@ -405,7 +405,7 @@ export default class ChatComponent extends GraphPage {
 
   async waitForChatConfidenceBadge(): Promise<boolean> {
     try {
-      await this.chatConfidenceBadge.first().waitFor({ state: "visible", timeout: 10000 });
+      await this.chatConfidenceBadge.last().waitFor({ state: "visible", timeout: 10000 });
       return true;
     } catch {
       return false;
@@ -414,7 +414,7 @@ export default class ChatComponent extends GraphPage {
 
   async getChatConfidenceBadgeText(): Promise<string | null> {
     return interactWhenVisible(
-      this.chatConfidenceBadge.first(),
+      this.chatConfidenceBadge.last(),
       (el) => el.textContent(),
       "Chat Confidence Badge"
     );
@@ -422,9 +422,13 @@ export default class ChatComponent extends GraphPage {
 
   async getChatConfidenceBadgeLabel(): Promise<string | null> {
     return interactWhenVisible(
-      this.chatConfidenceBadge.first(),
+      this.chatConfidenceBadge.last(),
       (el) => el.getAttribute("aria-label"),
       "Chat Confidence Badge Label"
     );
+  }
+
+  async getChatConfidenceBadgeCount(): Promise<number> {
+    return this.chatConfidenceBadge.count();
   }
 }

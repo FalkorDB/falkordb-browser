@@ -16,7 +16,8 @@ import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayNa
 import ToastButton from "../components/ToastButton";
 import { ShineBorder } from "@/components/ui/shine-border";
 import { getConnectionItem, setConnectionItem, getConnectionPrefix } from "@/lib/connection-storage";
-import { getConfidenceStyle, normalizeConfidence, migrateLegacyConfidence } from "./confidence";
+import { getConfidenceStyle, normalizeConfidence } from "./confidence";
+import { parseStoredMessages, serializeChatHistory } from "./chatHistory";
 
 const mdInstance = new MarkdownIt({
     html: false,
@@ -63,39 +64,7 @@ const getErrorStatus = (error: unknown) => {
 };
 
 // Confidence badge tiers moved to ./confidence for unit testing.
-
-// Bump when the persisted chat payload shape or value scales change.
-// v1 (legacy) was a bare Message[] whose `confidence` used the old 0-1 scale;
-// v2 wraps the array and stores confidence on the current 0-100 scale.
-const CHAT_HISTORY_VERSION = 2;
-
-// Restore persisted chat history, migrating pre-0-100 confidence values so a
-// cached 0-1 fraction (e.g. 0.9) no longer renders as a red "1%" badge.
-const parseStoredMessages = (raw: string | null): Message[] => {
-    if (!raw) return [];
-
-    let parsed: unknown;
-    try {
-        parsed = JSON.parse(raw);
-    } catch {
-        return [];
-    }
-
-    if (Array.isArray(parsed)) {
-        // Legacy (unversioned): confidence was persisted on the 0-1 scale.
-        return (parsed as Message[]).map(message =>
-            message.confidence != null
-                ? { ...message, confidence: migrateLegacyConfidence(message.confidence) }
-                : message
-        );
-    }
-
-    if (parsed && typeof parsed === "object" && Array.isArray((parsed as { messages?: unknown }).messages)) {
-        return (parsed as { messages: Message[] }).messages;
-    }
-
-    return [];
-};
+// Chat history persistence/migration moved to ./chatHistory for unit testing.
 
 export default function Chat({ onClose }: Props) {
     const { resolvedTheme } = useTheme();
@@ -193,10 +162,7 @@ export default function Chat({ onClose }: Props) {
         let statusGroup: Message[];
 
         if (messages.length > 0) {
-            setConnectionItem(`chat-${graphName}`, JSON.stringify({
-                version: CHAT_HISTORY_VERSION,
-                messages: getLastUserMessagesWithContext(messages, maxSavedMessages),
-            }));
+            setConnectionItem(`chat-${graphName}`, serializeChatHistory(getLastUserMessagesWithContext(messages, maxSavedMessages)));
         }
 
         const newMessagesList = messages.map((message, i): Message | [Message[], boolean] | undefined => {

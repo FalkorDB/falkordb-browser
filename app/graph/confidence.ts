@@ -25,16 +25,24 @@ export function normalizeConfidence(value: unknown): number | undefined {
 }
 
 /**
- * Rescale a confidence value read from legacy (unversioned) chat history.
+ * Reconcile a confidence value read from legacy (unversioned) chat history,
+ * whose scale is not recorded per value.
  *
- * Older history stored confidence as a 0-1 fraction, so the whole payload is
- * known to be on that scale — a stored `1` unambiguously means 100%, not 1%.
- * Multiply into the 0-100 range and reuse {@link normalizeConfidence} for the
- * clamp/round/finite handling.
+ * Bare-array histories can contain values from two eras: older builds stored a
+ * 0-1 fraction, while newer builds (still writing bare arrays) already stored a
+ * 0-100 value. Disambiguate by magnitude since a 0-1 fraction can never exceed
+ * 1:
+ *   - `value > 1`     -> already on the 0-100 scale, normalize as-is
+ *   - `0 < value < 1` -> a 0-1 fraction, rescaled to 0-100
+ *   - `value <= 0`    -> 0 on either scale
+ *   - `value === 1`   -> ambiguous (1% vs 100%); omitted so it is never
+ *                        mislabelled in either direction
  */
 export function migrateLegacyConfidence(value: unknown): number | undefined {
     if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
-    return normalizeConfidence(value * 100);
+    if (value === 1) return undefined;
+    if (value > 0 && value < 1) return normalizeConfidence(value * 100);
+    return normalizeConfidence(value);
 }
 
 // Confidence badge tiers: calm, low-saturation tints that stay readable in light and dark themes.

@@ -35,12 +35,24 @@ describe("migrateLegacyConfidence", () => {
         assert.equal(migrateLegacyConfidence(0.856), 86);
     });
 
-    it("treats a stored 1 as 100% (legacy payloads are wholly 0-1)", () => {
-        assert.equal(migrateLegacyConfidence(1), 100);
+    it("leaves already-0-100 values untouched (they cannot be fractions)", () => {
+        assert.equal(migrateLegacyConfidence(10), 10);
+        assert.equal(migrateLegacyConfidence(90), 90);
+        assert.equal(migrateLegacyConfidence(100), 100);
+    });
+
+    it("clamps out-of-range legacy values", () => {
+        assert.equal(migrateLegacyConfidence(150), 100);
+        assert.equal(migrateLegacyConfidence(-5), 0);
+    });
+
+    it("omits the ambiguous value 1 (1% vs 100%)", () => {
+        assert.equal(migrateLegacyConfidence(1), undefined);
     });
 
     it("returns undefined for non-finite or non-numeric input", () => {
         assert.equal(migrateLegacyConfidence(NaN), undefined);
+        assert.equal(migrateLegacyConfidence(Infinity), undefined);
         assert.equal(migrateLegacyConfidence(undefined), undefined);
         assert.equal(migrateLegacyConfidence(null), undefined);
     });
