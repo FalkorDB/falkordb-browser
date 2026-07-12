@@ -241,13 +241,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   });
 
   const setGraphInfo = useCallback((gi: GraphInfo) => {
-    // Mutate graph.GraphInfo in-place — no graph state change, so GraphContext
-    // consumers (canvas, toolbar, …) are not disturbed.
-    setGraph(current => {
-      current.GraphInfo = gi;
-      graphRef.current = current;
-      return current;
-    });
+    // Mutate graphRef.current.GraphInfo in-place — no graph state change, so
+    // GraphContext consumers (canvas, toolbar, …) are not disturbed. graphRef
+    // always points at the current graph (kept in sync on every render), so we
+    // avoid a redundant setGraph call that would bail out anyway (same object).
+    graphRef.current.GraphInfo = gi;
     // Bump the version counter in GraphInfoProvider so its consumers
     // re-render and read the fresh data from graph.GraphInfo.
     graphInfoSyncRef.current.bumpVersion();
@@ -1415,9 +1413,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Skip if unchanged
     if (prev === activeConnectionId) return;
 
-    // Clear graph data so stale results from the old connection are gone
-    setGraph(Graph.empty());
-    setGraphInfo(GraphInfo.empty(toast, setIndicator));
+    // Clear graph data so stale results from the old connection are gone.
+    // Build the empty graph with the real toast/setIndicator callbacks up front
+    // so its GraphInfo isn't left with Graph.empty()'s console.error fallbacks
+    // (setGraphInfo only mutates the current graph, not this newly queued one).
+    setGraph(Graph.empty(undefined, undefined, undefined, GraphInfo.empty(toast, setIndicator)));
     setGraphName("");
     setSelectedParam("");
     setGraphNamesLoaded(false);
@@ -1534,9 +1534,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       console.error("Failed to cleanup demo graphs", error);
     }
 
-    // Clear current graph to avoid showing deleted demo graph
-    setGraph(Graph.empty());
-    setGraphInfo(GraphInfo.empty(toast, setIndicator));
+    // Clear current graph to avoid showing deleted demo graph. Build the empty
+    // graph with the real toast/setIndicator callbacks up front so its GraphInfo
+    // isn't left with Graph.empty()'s console.error fallbacks (setGraphInfo only
+    // mutates the current graph, not this newly queued one).
+    setGraph(Graph.empty(undefined, undefined, undefined, GraphInfo.empty(toast, setIndicator)));
     setData({ nodes: [], links: [] });
 
     if (userGraphBeforeTutorial && userGraphsBeforeTutorial.includes(userGraphBeforeTutorial)) {

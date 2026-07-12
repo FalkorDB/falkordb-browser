@@ -347,9 +347,10 @@ export default function Page() {
         if (!graph.Id) return;
         if (graph.NodesMap.size === 0 && graph.LinksMap.size === 0) return;
 
-        // When graph info updates (setGraphInfo creates a new Graph clone that shares
-        // the same NodesMap/LinksMap), preserve the full multi-selection by re-resolving
-        // every previously selected element from the new graph's maps.
+        // When new query results load a fresh Graph object (setGraphInfo mutates
+        // GraphInfo in-place and does NOT trigger this effect), preserve the full
+        // multi-selection by re-resolving every previously selected element from
+        // the new graph's NodesMap/LinksMap.
         const prev = selectedElementsRef.current;
         if (prev.length > 0) {
             const restored = prev.flatMap(el => {
