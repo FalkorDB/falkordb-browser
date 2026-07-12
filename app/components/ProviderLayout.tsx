@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, RefObject, useCallback, useEffect, useMemo, useState } from "react";
+import { ReactNode, RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import { cn, InfoLabel, Panel } from "@/lib/utils";
@@ -44,20 +44,34 @@ export default function ProviderLayout({
   const [panel, setPanel] = useState<Panel>();
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [customizingLabel, setCustomizingLabel] = useState<InfoLabel | null>(null);
+  const isRestoringSize = useRef(false);
 
   const onPanelResize = useCallback((size: PanelSize) => {
     setIsCollapsed(size.asPercentage === 0);
-  }, []);
+    if (!isRestoringSize.current && size.asPercentage > 0 && (pathname === "/graph" || pathname === "/udf")) {
+      localStorage.setItem(`panel-size-${pathname}`, JSON.stringify(size.asPercentage));
+    }
+  }, [pathname]);
 
   const onExpand = useCallback(() => {
     const currentPanel = panelRef.current;
     if (!currentPanel) return;
     if (currentPanel.isCollapsed()) {
       currentPanel.expand();
+      const stored = localStorage.getItem(`panel-size-${pathname}`);
+      if (stored) {
+        isRestoringSize.current = true;
+        requestAnimationFrame(() => {
+          currentPanel.resize(`${JSON.parse(stored)}%`);
+          requestAnimationFrame(() => {
+            isRestoringSize.current = false;
+          });
+        });
+      }
     } else {
       currentPanel.collapse();
     }
-  }, [panelRef]);
+  }, [panelRef, pathname]);
 
   // Auto-expand panel on /graph and /udf, collapse on other routes
   useEffect(() => {
@@ -68,6 +82,17 @@ export default function ProviderLayout({
 
     if (pathname === "/graph" || pathname === "/udf") {
       if (currentPanel.isCollapsed()) currentPanel.expand();
+      const stored = localStorage.getItem(`panel-size-${pathname}`);
+      if (stored) {
+        isRestoringSize.current = true;
+        rafId = requestAnimationFrame(() => {
+          currentPanel.resize(`${JSON.parse(stored)}%`);
+          // Allow saves again after the restore settles
+          requestAnimationFrame(() => {
+            isRestoringSize.current = false;
+          });
+        });
+      }
     } else if (!currentPanel.isCollapsed()) {
       rafId = requestAnimationFrame(() => {
         if (!currentPanel.isCollapsed()) currentPanel.collapse();

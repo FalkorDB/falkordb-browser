@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { cn, getMemoryUsage, getMetaStats, isTwoNodes, Link, MemoryValue, Node, prepareArg, securedFetch, Value } from "@/lib/utils";
+import { cn, convertToCanvasData, getMemoryUsage, getMetaStats, getSSEGraphResult, isTwoNodes, Link, MemoryValue, Node, prepareArg, securedFetch, Value } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamicImport from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -10,6 +10,8 @@ import { Graph, GraphInfo } from "../api/graph/model";
 import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ForceGraphContext, ConnectionContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
+import ResizableBox from "@/components/ui/ResizableBox";
+import { useResizableSize } from "@/lib/useResizableSize";
 
 const DataPanel = dynamicImport(() => import("./DataPanel"), {
     ssr: false,
@@ -48,7 +50,7 @@ export default function Page() {
     const { panel, setPanel } = useContext(PanelContext);
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext);
-    const { setData, canvasRef, graphData, setViewport } = useContext(ForceGraphContext);
+    const { canvasRef, graphData, setViewport } = useContext(ForceGraphContext);
     const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
     const isReadOnlyRef = useRef(isReadOnly);
     isReadOnlyRef.current = isReadOnly;
@@ -57,7 +59,6 @@ export default function Page() {
         setGraph,
         graphName,
         handleSetGraphName,
-        graphInfo,
         setGraphInfo,
         graphNames,
         setGraphNames,
@@ -67,8 +68,6 @@ export default function Page() {
         setRelationships,
         runQuery,
         fetchCount,
-        handleCooldown,
-        cooldownTicks,
         selectedParam,
         setSelectedParam,
         isLoading,
@@ -92,7 +91,16 @@ export default function Page() {
     const prevGraphNameRef = useRef<string | undefined>(undefined);
 
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
+    // Ref that mirrors selectedElements tagged with the graph it belongs to, so the
+    // graph-change restore effect can read the current full selection without adding
+    // it as a dependency — and skip restoring a selection made in a different graph.
+    const selectedElementsRef = useRef<{ graphId: string; elements: (Node | Link)[] }>({ graphId: "", elements: [] });
+    // Mirror the current graph id at render time so the sync effect can tag the
+    // selection with the graph it was made in.
+    const currentGraphIdRef = useRef(graph.Id);
+    currentGraphIdRef.current = graph.Id;
     const [chatOpen, setChatOpen] = useState(false);
+    const { size: chatSize, onResize: onChatResize } = useResizableSize("chat-size", 400, 500, 300, 300);
     const [queriesOpen, setQueriesOpen] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(true);
     const [isAddNode, setIsAddNode] = useState(false);
@@ -105,22 +113,29 @@ export default function Page() {
 
     const onPanelResize = useCallback((size: PanelSize) => {
         setIsCollapsed(size.asPercentage === 0);
-    }, []);
+        if (size.asPercentage > 0 && panel) {
+            localStorage.setItem(`panel-size-${panel}`, JSON.stringify(size.asPercentage));
+        }
+    }, [panel]);
 
-    const panelSizes: Record<string, { size: string; min: string }> = {
+    const panelSizes: Record<string, { size: string; min: string }> = useMemo(() => ({
         data: { size: "200px", min: "200px" },
         add: { size: "30%", min: "25%" },
-    };
+    }), []);
 
     const getPanelSize = useCallback(() => {
         if (!panel) return "0%";
+        const stored = localStorage.getItem(`panel-size-${panel}`);
+        if (stored) {
+            return `${JSON.parse(stored)}%`;
+        }
         return panelSizes[panel]?.size ?? "0%";
-    }, [panel]);
+    }, [panel, panelSizes]);
 
     const panelMinSize = useMemo(() => {
         if (!panel) return "0%";
         return panelSizes[panel]?.min ?? "0%";
-    }, [panel]);
+    }, [panel, panelSizes]);
 
     useEffect(() => {
         const currentPanel = panelRef.current;
@@ -158,16 +173,50 @@ export default function Page() {
     const fetchInfo = useCallback(async (type: string) => {
         if (!graphName) return [];
 
+        if (type === "(property key)") {
+            const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
+            const query = "CALL db.propertyKeys() YIELD propertyKey as info";
+            const sse = await getSSEGraphResult(
+                `/api/graph/${prepareArg(graphName)}?query=${prepareArg(query)}${readOnlyParam}`,
+                toast,
+                setIndicator,
+            ) as { data?: Array<{ info?: unknown }> };
+
+            if (!sse || !Array.isArray(sse.data)) return [];
+
+            return sse.data
+                .map((entry) => (typeof entry?.info === "string" ? entry.info : undefined))
+                .filter((value): value is string => typeof value === "string");
+        }
+
         const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
-        const result = await securedFetch(`/api/graph/${graphName}/info?type=${type}${readOnlyParam}`, {
+        const result = await securedFetch(`/api/graph/${prepareArg(graphName)}/info?type=${prepareArg(type)}${readOnlyParam}`, {
             method: "GET",
         }, toast, setIndicator);
 
         if (!result.ok) return [];
 
-        const json = await result.json();
+        const bodyText = await result.text();
+        let json: unknown;
 
-        return json.result.data.map(({ info }: { info: string }) => info);
+        try {
+            json = JSON.parse(bodyText);
+        } catch (error) {
+            console.error("Failed to parse graph info response", {
+                error,
+                responseUrl: result.url,
+                contentType: result.headers.get("content-type"),
+                preview: bodyText.slice(0, 200),
+            });
+            return [];
+        }
+
+        const data = (json as { result?: { data?: Array<{ info?: unknown }> } })?.result?.data;
+        if (!Array.isArray(data)) return [];
+
+        return data
+            .map((entry) => (typeof entry?.info === "string" ? entry.info : undefined))
+            .filter((value): value is string => typeof value === "string");
     }, [graphName, setIndicator, toast]);
 
     const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator, isReadOnlyRef.current), [setIndicator, toast]);
@@ -226,8 +275,6 @@ export default function Page() {
     }, [graphName]);
 
     useEffect(() => {
-        if (!graphInfo) return;
-
         // Priority 1: URL params (graph + query)
         const pendingUrlQuery = initialUrlQueryRef.current;
         if (pendingUrlQuery && graphName) {
@@ -235,6 +282,11 @@ export default function Page() {
                 initialUrlQueryRef.current = "";
                 urlQueryFiredRef.current = graphName;
                 runQuery(pendingUrlQuery, graphName);
+            } else {
+                // Data is already loaded for this graph (e.g. navigating back from
+                // another route while providers stay mounted). Clear the pending ref
+                // so it doesn't re-fire on later dep changes.
+                initialUrlQueryRef.current = "";
             }
             return;
         }
@@ -255,7 +307,7 @@ export default function Page() {
 
         // Priority 2: Default query / empty graph
         if (graphName && graphName !== graph.Id) {
-            if (runDefaultQuery) {
+            if (runDefaultQuery && !tutorialOpen) {
                 runQuery(defaultQuery, graphName);
                 return;
             }
@@ -289,10 +341,46 @@ export default function Page() {
         }
     }, [setPanel, setChatOpen, setSelectedParam]);
 
+    // Keep selectedElementsRef in sync so the restore effect below can read the
+    // full multi-selection without adding selectedElements as a dependency.
+    useEffect(() => {
+        selectedElementsRef.current = { graphId: currentGraphIdRef.current, elements: selectedElements };
+    }, [selectedElements]);
+
     // Restore selected element from context when graph data loads, otherwise clear selection
     useEffect(() => {
         if (!graph.Id) return;
-        if (graph.NodesMap.size === 0 && graph.LinksMap.size === 0) return;
+
+        const { graphId: selectionGraphId, elements: prev } = selectedElementsRef.current;
+        const canRestore = selectionGraphId === graph.Id && prev.length > 0;
+
+        if (graph.NodesMap.size === 0 && graph.LinksMap.size === 0) {
+            // Empty graph (e.g. a query returned no rows). Drop a selection carried
+            // over from a *different* graph so a stale element panel doesn't linger;
+            // keep a same-graph selection untouched (the graph may be mid-reload).
+            if (!canRestore && selectedElements.length > 0) handleSetSelectedElements();
+            return;
+        }
+
+        // When new query results load a fresh Graph object (setGraphInfo mutates
+        // GraphInfo in-place and does NOT trigger this effect), preserve the full
+        // multi-selection by re-resolving every previously selected element from
+        // the new graph's NodesMap/LinksMap. Only restore a selection made in THIS
+        // graph — FalkorDB node/edge ids are per-graph, so restoring across a graph
+        // switch could resolve unrelated same-id elements.
+        if (canRestore) {
+            const restored = prev.flatMap(el => {
+                const found = 'source' in el
+                    ? graph.LinksMap.get(el.id)
+                    : graph.NodesMap.get(el.id);
+                return found ? [found] : [];
+            });
+            if (restored.length > 0) {
+                setSelectedElements(restored);
+                setPanel("data");
+                return;
+            }
+        }
 
         if (selectedParam) {
             const parts = selectedParam.split(":");
@@ -353,6 +441,8 @@ export default function Page() {
     }, [setPanel]);
 
     const handleCreateElement = useCallback(async (attributes: [string, Value][], label: string[]) => {
+        if (!canvasRef.current) return false;
+
         const fakeId = "-1";
         const readOnlyParam = isReadOnlyRef.current ? '?readOnly=true' : '';
         const result = await securedFetch(`api/graph/${prepareArg(graphName)}/${fakeId}${readOnlyParam}`, {
@@ -369,14 +459,14 @@ export default function Page() {
             const json = await result.json();
 
             if (isAddNode) {
-                const node = await graph.extendNode(json.result.data[0].n, false, false);
+                const node = await graph.extendNode(json.result.data[0].n, false, true);
 
                 if (node) {
                     setLabels(prev => [...prev, ...node.labels.filter(c => !prev.some(p => p.name === c)).map(c => graph.LabelsMap.get(c)!)]);
                     handleSetIsAdd(setIsAddNode, setIsAddEdge)(false);
                 }
             } else {
-                const link = await graph.extendEdge(json.result.data[0].e, false, false);
+                const link = await graph.extendEdge(json.result.data[0].e, false, true);
 
                 if (link) {
                     setRelationships(prev => [...prev.filter(p => p.name !== link.relationship), graph.RelationshipsMap.get(link.relationship)!]);
@@ -389,12 +479,14 @@ export default function Page() {
             setSelectedElements([]);
         }
 
-        setData({ ...graph.Elements });
+        canvasRef.current?.setGraphData(convertToCanvasData(graph.Elements));
 
         return result.ok;
-    }, [fetchCount, graph, graphName, handleSetIsAdd, isAddNode, selectedElements, setData, setIndicator, setLabels, setRelationships, toast]);
+    }, [fetchCount, graph, graphName, handleSetIsAdd, isAddNode, selectedElements, canvasRef, setIndicator, setLabels, setRelationships, toast]);
 
     const handleDeleteElement = useCallback(async () => {
+        if (!canvasRef.current) return;
+
         const deletedElements = (await Promise.all(selectedElements.map(async (element) => {
             const type = !('source' in element);
             const readOnlyParam = isReadOnlyRef.current ? '?readOnly=true' : '';
@@ -439,7 +531,7 @@ export default function Page() {
         graph.removeElements(deletedElements);
 
         setRelationships(graph.removeLinks(deletedElements.map((element) => element.id)));
-        setData({ ...graph.Elements });
+        canvasRef.current.setGraphData(convertToCanvasData(graph.Elements));
         fetchCount(graphName);
         setSelectedElements([]);
 
@@ -451,7 +543,7 @@ export default function Page() {
             description: `${deletedElements.length > 1 ? "Elements" : "Element"} deleted
             ${selectedElements.length > deletedElements.length ? `, ${selectedElements.length - deletedElements.length} failed` : ""}.`,
         });
-    }, [selectedElements, graph, setRelationships, setData, fetchCount, panel, handleSetSelectedElements, toast, setIndicator]);
+    }, [selectedElements, graph, setRelationships, canvasRef, fetchCount, panel, handleSetSelectedElements, toast, setIndicator]);
 
     const getCurrentPanel = useCallback(() => {
         if (!graphName) return undefined;
@@ -533,8 +625,6 @@ export default function Page() {
                         setRelationships={setRelationships}
                         labels={labels}
                         relationships={relationships}
-                        handleCooldown={handleCooldown}
-                        cooldownTicks={cooldownTicks}
                         fetchCount={fetchCount}
                         historyQuery={historyQuery}
                         setHistoryQuery={setHistoryQuery}
@@ -561,8 +651,17 @@ export default function Page() {
                 </ResizablePanel>
                 {
                     chatOpen && graphName &&
-                    <div className="absolute bottom-3 right-3 w-[400px] max-w-[95dvw] h-[500px] max-h-[80dvh] z-30">
-                        <Chat onClose={() => setChatOpen(false)} />
+                    <div className="absolute bottom-3 right-3 z-30">
+                        <ResizableBox
+                            width={chatSize.width}
+                            height={chatSize.height}
+                            minWidth={300}
+                            minHeight={300}
+                            onResizeEnd={(w, h) => onChatResize(w, h)}
+                            direction="top-left"
+                        >
+                            <Chat onClose={() => setChatOpen(false)} />
+                        </ResizableBox>
                     </div>
                 }
             </ResizablePanelGroup>

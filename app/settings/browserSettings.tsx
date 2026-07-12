@@ -2,19 +2,33 @@
 
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2, Info } from "lucide-react";
+import { useSettingsParams } from "@/lib/useUrlParams";
+import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2, Info, Eye, EyeOff, Pencil, KeyRound, CheckCircle2, Loader2, Cloud, Laptop, Server } from "lucide-react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
-import { areCaptionKeysEqual, cn, getDefaultQuery, securedFetch } from "@/lib/utils";
+import { areCaptionKeysEqual, cn, getDefaultQuery } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { detectProviderFromApiKey } from "@/lib/ai-provider-utils";
-import { BrowserSettingsContext, IndicatorContext } from "../components/provider";
+import { detectProviderFromApiKey, getProviderDisplayName } from "@/lib/ai-provider-utils";
+import { serverEncrypt } from "@/lib/server-encryption";
+import { CHAT_API_KEYS_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
+import { BrowserSettingsContext, type ChatModelSource, type LocalLlmProvider } from "../components/provider";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import ModelSelector from "./ModelSelector";
+
+const LOCAL_LLM_ENDPOINTS: Record<LocalLlmProvider, string> = {
+    ollama: "http://localhost:11434",
+    lmstudio: "http://localhost:1234/v1",
+};
+
+const LOCAL_LLM_LABELS: Record<LocalLlmProvider, string> = {
+    ollama: "Ollama",
+    lmstudio: "LM Studio",
+};
 
 export default function BrowserSettings() {
     const {
@@ -26,7 +40,7 @@ export default function BrowserSettings() {
             limitSettings: { newLimit, setNewLimit },
             captionsKeysSettings: { newCaptionsKeys, setNewCaptionsKeys },
             showPropertyKeyPrefixSettings: { newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
-            chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly },
+            chatSettings: { setNewSecretKey, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly, newChatModelSource, setNewChatModelSource, newLocalLlmProvider, setNewLocalLlmProvider, newLocalLlmEndpoint, setNewLocalLlmEndpoint, newModel, setNewModel },
             graphInfo: { newRefreshInterval, setNewRefreshInterval, newMaxItemsForSearch, setNewMaxItemsForSearch },
             tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple }
         },
@@ -38,7 +52,7 @@ export default function BrowserSettings() {
             limitSettings: { limit },
             captionsKeysSettings: { captionsKeys },
             showPropertyKeyPrefixSettings: { showPropertyKeyPrefix },
-            chatSettings: { secretKey, model, setModel, maxSavedMessages, cypherOnly },
+            chatSettings: { secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, model, setModel, setSecretKey, setSelectedChatApiKeyId, setChatApiKeys, maxSavedMessages, cypherOnly, perSourceModels, setPerSourceModels },
             graphInfo: { refreshInterval, maxItemsForSearch },
             tableViewSettings: { columnWidth, rowHeight, rowHeightExpandMultiple }
         },
@@ -49,7 +63,6 @@ export default function BrowserSettings() {
         replayTutorial,
     } = useContext(BrowserSettingsContext);
 
-    const { setIndicator } = useContext(IndicatorContext);
     const scrollableContainerRef = useRef<HTMLDivElement>(null);
 
     const { toast } = useToast();
@@ -58,6 +71,24 @@ export default function BrowserSettings() {
     const [isResetting, setIsResetting] = useState(false);
     const [modelDisplayNames, setModelDisplayNames] = useState<string[]>([]);
     const [isLoadingModels, setIsLoadingModels] = useState(false);
+    const [isManualLocalModelLoad, setIsManualLocalModelLoad] = useState(false);
+    const [modelsMessage, setModelsMessage] = useState("Enter an API key to load live models.");
+    const [keyInput, setKeyInput] = useState("");
+    const [isAddingKey, setIsAddingKey] = useState(false);
+    const [showNewKeyInput, setShowNewKeyInput] = useState(false);
+    const [editingKeyId, setEditingKeyId] = useState<string | null>(null);
+    const [editingKeyValue, setEditingKeyValue] = useState("");
+    const [visibleKeyIds, setVisibleKeyIds] = useState<Set<string>>(new Set());
+    const [activeSelectedChatApiKeyId, setActiveSelectedChatApiKeyId] = useState("");
+    const [modelLoadNonce, setModelLoadNonce] = useState(0);
+    const [loadingChatApiKeyId, setLoadingChatApiKeyId] = useState("");
+    const [deleteKeyDialogOpen, setDeleteKeyDialogOpen] = useState(false);
+    const [pendingDeleteKeyId, setPendingDeleteKeyId] = useState<string | null>(null);
+    const [isDeletingKey, setIsDeletingKey] = useState(false);
+    const modelFetchRequestIdRef = useRef(0);
+    const modelFetchAbortRef = useRef<AbortController | null>(null);
+    const latestModelRef = useRef(newModel);
+    latestModelRef.current = newModel;
     const [expandedSections, setExpandedSections] = useState({
         queryExecution: false,
         chat: false,
@@ -66,54 +97,160 @@ export default function BrowserSettings() {
     });
     const [newCaption, setNewCaption] = useState("");
 
+    // Deep-link support: arriving at /settings?tab=Browser&focus=timeout opens the
+    // (collapsed-by-default) Query Execution section and focuses the timeout field.
+    // Two effects keep this deterministic: first expand, then focus once the input mounts.
+    const { focus: focusParam, setFocus } = useSettingsParams();
+    const focusHandledRef = useRef(false);
+
+    useEffect(() => {
+        if (focusParam === "timeout" && !focusHandledRef.current) {
+            setExpandedSections(prev => ({ ...prev, queryExecution: true }));
+        }
+    }, [focusParam]);
+
+    useEffect(() => {
+        if (focusParam === "timeout" && expandedSections.queryExecution && !focusHandledRef.current) {
+            focusHandledRef.current = true;
+            const input = document.getElementById("timeoutInput") as HTMLInputElement | null;
+            input?.scrollIntoView({ block: "center" });
+            input?.focus();
+            setFocus(""); // consume the param (preserves tab) so it doesn't re-fire
+        }
+    }, [focusParam, expandedSections.queryExecution, setFocus]);
+
+    // Re-arm the guard once the param is consumed/cleared, so a later ?focus=timeout
+    // deep-link works even if the Settings page is still mounted (no remount).
+    useEffect(() => {
+        if (focusParam !== "timeout") focusHandledRef.current = false;
+    }, [focusParam]);
+
     const toggleSection = (section: keyof typeof expandedSections) => {
         setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
     };
 
-    // Fetch all available models once on mount
+    const selectedChatApiKey = chatApiKeys.find(({ id }) => id === activeSelectedChatApiKeyId) ?? chatApiKeys[0];
+    const pendingDeleteKey = chatApiKeys.find(({ id }) => id === pendingDeleteKeyId);
+    const uiSelectedChatApiKeyId = selectedChatApiKey?.id ?? "";
+    const modelProviderForDisplay = newChatModelSource === "local"
+        ? newLocalLlmProvider === "ollama" ? "ollama" : "openai"
+        : selectedChatApiKey?.provider;
+
     useEffect(() => {
-        (async () => {
+        const nextSelectedId = chatApiKeys.some(({ id }) => id === selectedChatApiKeyId)
+            ? selectedChatApiKeyId
+            : chatApiKeys[0]?.id ?? "";
+        setActiveSelectedChatApiKeyId(nextSelectedId);
+    }, [chatApiKeys, selectedChatApiKeyId]);
+
+    // Fetch live models whenever the selected key changes.
+    useEffect(() => {
+        const requestId = modelFetchRequestIdRef.current + 1;
+        modelFetchRequestIdRef.current = requestId;
+        const controller = new AbortController();
+        modelFetchAbortRef.current = controller;
+
+        const fetchLocalModels = async () => {
+            if (newChatModelSource === "api-key" && !selectedChatApiKey) {
+                setModelDisplayNames([]);
+                setModelsMessage("Enter your API key to load live models.");
+                setIsLoadingModels(false);
+                setLoadingChatApiKeyId("");
+                modelFetchAbortRef.current = null;
+                return;
+            }
+
             setIsLoadingModels(true);
+            setLoadingChatApiKeyId(newChatModelSource === "api-key" ? selectedChatApiKey?.id ?? "" : "");
+            setModelsMessage(newChatModelSource === "local"
+                ? `Loading local ${LOCAL_LLM_LABELS[newLocalLlmProvider]} models...`
+                : "Loading live models for the selected key...");
 
-            const result = await securedFetch(
-                "/api/chat/models",
-                { method: "GET" },
-                toast,
-                setIndicator
-            );
+            try {
+                const result = await fetch("/api/chat/models", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(newChatModelSource === "local"
+                        ? {
+                            source: "local",
+                            localProvider: newLocalLlmProvider,
+                            endpoint: newLocalLlmEndpoint,
+                        }
+                        : {
+                            source: "api-key",
+                            key: selectedChatApiKey?.key,
+                        }),
+                    signal: controller.signal,
+                });
 
-            if (result.ok) {
-                const { models } = await result.json();
-                setModelDisplayNames(models);
+                if (requestId !== modelFetchRequestIdRef.current) return;
+
+                if (result.ok) {
+                    const { models } = await result.json();
+                    if (requestId !== modelFetchRequestIdRef.current) return;
+
+                    setModelDisplayNames(models);
+                    setModelsMessage(models.length > 0
+                        ? newChatModelSource === "local"
+                            ? `${models.length} local ${LOCAL_LLM_LABELS[newLocalLlmProvider]} models loaded.`
+                            : `${models.length} live models loaded for ${selectedChatApiKey ? getProviderDisplayName(selectedChatApiKey.provider) : "selected provider"}.`
+                        : newChatModelSource === "local"
+                            ? `No local ${LOCAL_LLM_LABELS[newLocalLlmProvider]} models were returned.`
+                            : "No live models were returned for this key.");
+                } else {
+                    const { error } = await result.json().catch(() => ({ error: "" }));
+                    if (requestId !== modelFetchRequestIdRef.current) return;
+
+                    setModelDisplayNames([]);
+                    setModelsMessage(error || (newChatModelSource === "local"
+                        ? "Could not connect to local server. Check the URL and click reload."
+                        : "Could not load live models for this key. Check the key and try again."));
+                }
+            } catch (error) {
+                if (error instanceof DOMException && error.name === "AbortError") return;
+                if (requestId !== modelFetchRequestIdRef.current) return;
+                setModelDisplayNames([]);
+                setModelsMessage(newChatModelSource === "local"
+                    ? "Could not connect to local server. Check the URL and click reload."
+                    : "Could not load live models for this key. Check the key and try again.");
+            } finally {
+                if (requestId === modelFetchRequestIdRef.current) {
+                    setIsLoadingModels(false);
+                    setIsManualLocalModelLoad(false);
+                    setLoadingChatApiKeyId("");
+                    modelFetchAbortRef.current = null;
+                }
             }
+        };
 
-            setIsLoadingModels(false);
-        })();
-    }, [toast, setIndicator]);
+        const timeoutId = setTimeout(() => fetchLocalModels(), 300);
 
+        return () => {
+            clearTimeout(timeoutId);
+            controller.abort();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedChatApiKey, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, modelLoadNonce]);
+
+    // Auto-select the best model once the list loads after a key/source change.
     useEffect(() => {
-        (async () => {
-            const detectedProvider = detectProviderFromApiKey(secretKey);
-            if (!model && detectedProvider !== "unknown") {
-                const res = await securedFetch(
-                    `/api/chat/models?provider=${detectedProvider}`,
-                    { method: "GET" },
-                    toast,
-                    setIndicator
-                );
-
-                if (!res.ok) return;
-
-                const defaultModel = (await res.json()).models[0];
-
-                if (!defaultModel) return;
-
-                setNewModel(defaultModel);
-                setModel(defaultModel);
-                localStorage.setItem("model", defaultModel);
-            }
-        })();
-    }, [secretKey, model, toast, setIndicator, setNewModel, setModel]);
+        if (modelDisplayNames.length === 0) return;
+        const currentSourceKey = newChatModelSource === "local" ? newLocalLlmProvider : "api-key";
+        // Prefer the stored preference for this source; fall back to first available model.
+        const storedModel = perSourceModels[currentSourceKey] ?? "";
+        const nextModel = modelDisplayNames.includes(storedModel) ? storedModel : modelDisplayNames[0];
+        if (nextModel !== latestModelRef.current) {
+            setNewModel(nextModel);
+            setModel(nextModel);
+            const next = { ...perSourceModels, [currentSourceKey]: nextModel };
+            setPerSourceModels(next);
+            localStorage.setItem("perSourceModels", JSON.stringify(next));
+            localStorage.setItem("model", nextModel);
+        }
+        // chatModelSource / localLlmProvider / selectedChatApiKey are stable by the time
+        // modelDisplayNames is populated — no need to add them as deps.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [modelDisplayNames]);
 
     useEffect(() => {
         setNewContentPersistence(contentPersistence);
@@ -122,7 +259,9 @@ export default function BrowserSettings() {
         setNewTimeout(timeoutValue);
         setNewLimit(limit);
         setNewSecretKey(secretKey);
-        setNewModel(model);
+        setKeyInput("");
+        setEditingKeyId(null);
+        setEditingKeyValue("");
         setNewRefreshInterval(refreshInterval);
         setNewMaxSavedMessages(maxSavedMessages);
         setNewCaptionsKeys(captionsKeys);
@@ -132,7 +271,11 @@ export default function BrowserSettings() {
         setNewRowHeight(rowHeight);
         setNewRowHeightExpandMultiple(rowHeightExpandMultiple);
         setNewMaxItemsForSearch(maxItemsForSearch);
-    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, model, setNewModel, setNewRefreshInterval, refreshInterval, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, rowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch]);
+        setNewChatModelSource(chatModelSource);
+        setNewLocalLlmProvider(localLlmProvider);
+        setNewLocalLlmEndpoint(localLlmEndpoint);
+        setNewModel(model);
+    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewRefreshInterval, refreshInterval, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch, chatModelSource, localLlmProvider, localLlmEndpoint, model, setNewChatModelSource, setNewLocalLlmProvider, setNewLocalLlmEndpoint, setNewModel]);
 
     useEffect(() => {
         setHasChanges(
@@ -141,8 +284,6 @@ export default function BrowserSettings() {
             newLimit !== limit ||
             newDefaultQuery !== defaultQuery ||
             newRunDefaultQuery !== runDefaultQuery ||
-            newSecretKey !== secretKey ||
-            newModel !== model ||
             refreshInterval !== newRefreshInterval ||
             newMaxSavedMessages !== maxSavedMessages ||
             !areCaptionKeysEqual(newCaptionsKeys, captionsKeys) ||
@@ -151,9 +292,13 @@ export default function BrowserSettings() {
             newColumnWidth !== columnWidth ||
             newRowHeight !== rowHeight ||
             newRowHeightExpandMultiple !== rowHeightExpandMultiple ||
-            newMaxItemsForSearch !== maxItemsForSearch
+            newMaxItemsForSearch !== maxItemsForSearch ||
+            newChatModelSource !== chatModelSource ||
+            newLocalLlmProvider !== localLlmProvider ||
+            newLocalLlmEndpoint !== localLlmEndpoint ||
+            newModel !== model
         );
-    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey, newModel, model, refreshInterval, newRefreshInterval, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch]);
+    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, refreshInterval, newRefreshInterval, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, newChatModelSource, chatModelSource, newLocalLlmProvider, localLlmProvider, newLocalLlmEndpoint, localLlmEndpoint, newModel, model]);
 
     const handleSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
         e?.preventDefault();
@@ -240,10 +385,231 @@ export default function BrowserSettings() {
         createChangeHandler(setter)(value, elementId);
     };
 
-    // Wrapper for model combobox to handle scroll and mapping
     const handleModelChange = (modelValue: string) => {
-        // Model value is already the raw model name from the API
-        createChangeHandler(setNewModel)(modelValue, 'secretKeyInput');
+        setNewModel(modelValue);
+    };
+
+    const handleModelSourceChange = (source: ChatModelSource) => {
+        if (source === newChatModelSource) return;
+        setNewChatModelSource(source);
+        // Switching away from local — revert any unsaved provider/endpoint changes
+        if (source !== "local") {
+            setNewLocalLlmProvider(localLlmProvider);
+            setNewLocalLlmEndpoint(localLlmEndpoint);
+        }
+        const targetKey = source === "local" ? localLlmProvider : "api-key";
+        const nextModel = perSourceModels[targetKey] ?? "";
+        setNewModel(nextModel);
+        setModelDisplayNames([]);
+        setModelsMessage(source === "local" ? "Loading local models..." : "Select a saved API key to load live models.");
+        setModelLoadNonce(nonce => nonce + 1);
+    };
+
+    const handleLocalProviderChange = (provider: LocalLlmProvider) => {
+        setNewLocalLlmProvider(provider);
+        setNewLocalLlmEndpoint(LOCAL_LLM_ENDPOINTS[provider]);
+        setModelDisplayNames([]);
+        const nextModel = perSourceModels[provider] ?? "";
+        setNewModel(nextModel);
+        setModelsMessage(`Loading local ${LOCAL_LLM_LABELS[provider]} models...`);
+        setModelLoadNonce(nonce => nonce + 1);
+    };
+
+    const handleLocalEndpointChange = (endpoint: string) => {
+        setNewLocalLlmEndpoint(endpoint);
+        setModelDisplayNames([]);
+        setIsManualLocalModelLoad(false);
+        setModelsMessage("Update the endpoint to reload local models.");
+    };
+
+    const reloadLocalModels = () => {
+        setIsManualLocalModelLoad(true);
+        setModelLoadNonce(nonce => nonce + 1);
+    };
+
+    const maskKey = (key: string) => {
+        if (key.length <= 10) return "••••••••";
+        return `${key.slice(0, 6)}••••••••${key.slice(-4)}`;
+    };
+
+    const persistChatApiKeys = async (keys: typeof chatApiKeys, selectedId: string): Promise<boolean> => {
+        const selectedApiKey = getSelectedChatApiKey(keys, selectedId);
+        const nextSelectedId = selectedApiKey?.id ?? "";
+
+        try {
+            if (keys.length > 0) {
+                const encryptedKeys = await serverEncrypt(JSON.stringify(keys));
+                if (!encryptedKeys) {
+                    toast({
+                        title: "Error",
+                        description: "Could not encrypt API keys. Please try again.",
+                        variant: "destructive",
+                    });
+                    return false;
+                }
+                localStorage.setItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
+            } else {
+                localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
+            }
+            localStorage.removeItem("secretKey");
+
+            persistSelectedChatApiKeyId(nextSelectedId);
+        } catch (error) {
+            console.error('Failed to encrypt API keys:', error);
+            toast({
+                title: "Error",
+                description: "Could not encrypt API keys. Please try again.",
+                variant: "destructive",
+            });
+            return false;
+        }
+
+        setChatApiKeys(keys);
+        setSelectedChatApiKeyId(nextSelectedId);
+        setSecretKey(selectedApiKey?.key ?? "");
+        return true;
+    };
+
+    const handleSaveKey = async () => {
+        if (isAddingKey) return;
+
+        const trimmedKey = keyInput.trim();
+        if (!trimmedKey) return;
+
+        setIsAddingKey(true);
+        try {
+            const provider = detectProviderFromApiKey(trimmedKey);
+            const providerName = provider === "unknown" ? "LLM" : getProviderDisplayName(provider);
+            const id = crypto.randomUUID();
+            const nextKeys = [
+                ...chatApiKeys,
+                {
+                    id,
+                    label: `${providerName} key ${chatApiKeys.filter(item => item.provider === provider).length + 1}`,
+                    key: trimmedKey,
+                    provider,
+                    createdAt: Date.now(),
+                },
+            ];
+            const saved = await persistChatApiKeys(nextKeys, id);
+            if (saved) {
+                setKeyInput("");
+            }
+        } finally {
+            setIsAddingKey(false);
+        }
+    };
+
+    const handleSelectKey = (id: string) => {
+        if (isLoadingModels && id === loadingChatApiKeyId) return;
+        modelFetchRequestIdRef.current += 1;
+        modelFetchAbortRef.current?.abort();
+        setActiveSelectedChatApiKeyId(id);
+        const selectedApiKey = getSelectedChatApiKey(chatApiKeys, id);
+        const nextSelectedId = selectedApiKey?.id ?? "";
+        setSelectedChatApiKeyId(nextSelectedId);
+        setSecretKey(selectedApiKey?.key ?? "");
+        const restoredKeyModel = perSourceModels["api-key"] ?? "";
+        setModel(restoredKeyModel);
+        setNewModel(restoredKeyModel);
+        // Validate model name before persisting — avoids storing accidentally-tainted values
+        const safeModel = /^[a-zA-Z0-9._:\-/]{1,128}$/.test(restoredKeyModel) ? restoredKeyModel : "";
+        if (safeModel) {
+            localStorage.setItem("model", safeModel);
+        } else {
+            localStorage.removeItem("model");
+        }
+        persistSelectedChatApiKeyId(nextSelectedId);
+        setModelDisplayNames([]);
+        setIsLoadingModels(true);
+        setLoadingChatApiKeyId(id);
+        setModelsMessage("Loading live models for the selected key...");
+        setModelLoadNonce(nonce => nonce + 1);
+    };
+
+    const handleEditKey = (id: string) => {
+        const keyToEdit = chatApiKeys.find(item => item.id === id);
+        if (!keyToEdit) return;
+        setEditingKeyId(id);
+        setEditingKeyValue(keyToEdit.key);
+        setVisibleKeyIds(prev => new Set(prev).add(id));
+    };
+
+    const handleSaveEditedKey = async (id: string) => {
+        const trimmedKey = editingKeyValue.trim();
+        if (!trimmedKey) return;
+
+        const provider = detectProviderFromApiKey(trimmedKey);
+        const providerName = provider === "unknown" ? "LLM" : getProviderDisplayName(provider);
+        const nextKeys = chatApiKeys.map(item => item.id === id
+            ? {
+                ...item,
+                key: trimmedKey,
+                provider,
+                label: item.label || `${providerName} key`,
+            }
+            : item);
+        const saved = await persistChatApiKeys(nextKeys, id);
+        if (saved) {
+            setEditingKeyId(null);
+            setEditingKeyValue("");
+        }
+    };
+
+    const handleCancelEditKey = () => {
+        setEditingKeyId(null);
+        setEditingKeyValue("");
+    };
+
+    const handleDeleteKey = async (id: string) => {
+        const nextKeys = chatApiKeys.filter(item => item.id !== id);
+        const nextSelectedId = selectedChatApiKeyId === id ? nextKeys[0]?.id ?? "" : selectedChatApiKeyId;
+        const saved = await persistChatApiKeys(nextKeys, nextSelectedId);
+        if (!saved) return;
+
+        if (selectedChatApiKeyId === id) {
+            setModel("");
+            setNewModel("");
+            localStorage.setItem("model", "");
+        }
+        if (editingKeyId === id) {
+            setEditingKeyId(null);
+            setEditingKeyValue("");
+        }
+        setVisibleKeyIds(prev => {
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+        });
+    };
+
+    const requestDeleteKey = (id: string) => {
+        setPendingDeleteKeyId(id);
+        setDeleteKeyDialogOpen(true);
+    };
+
+    const confirmDeleteKey = async () => {
+        if (!pendingDeleteKeyId) return;
+        setIsDeletingKey(true);
+        try {
+            await handleDeleteKey(pendingDeleteKeyId);
+            setDeleteKeyDialogOpen(false);
+            setPendingDeleteKeyId(null);
+        } finally {
+            setIsDeletingKey(false);
+        }
+    };
+
+    const toggleKeyVisibility = (id: string) => {
+        setVisibleKeyIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
     };
 
     const handleAddCaptionKey = (e: React.FormEvent<HTMLFormElement>) => {
@@ -260,7 +626,7 @@ export default function BrowserSettings() {
     return (
         <div className="grow basis-0 w-full flex flex-col gap-2 overflow-hidden">
             <div className="flex items-start justify-between gap-2 px-2">
-                <div className="flex flex-col gap-2">
+                <div className="flex max-h-[18.5rem] flex-col gap-2 overflow-y-auto pr-1 custom-scrollbar">
                     <h1 className="text-3xl font-semibold">Browser Settings</h1>
                     <p className="text-base text-muted-foreground">Customize your browser experience and manage configurations</p>
                 </div>
@@ -303,8 +669,8 @@ export default function BrowserSettings() {
                     </CardHeader>
                     {expandedSections.chat && (
                         <CardContent>
-                            <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-                                <div className="flex flex-col gap-2 p-2 bg-muted/10 rounded-lg">
+                            <div className="flex flex-col gap-2">
+                                <form onSubmit={handleSubmit} className="flex flex-col gap-2 p-2 bg-muted/10 rounded-lg">
                                     {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                                     <label htmlFor="maxSaveMessagesInput" className="text-sm font-medium whitespace-nowrap">Store latest interactions (per graph) [5..10]</label>
                                     <Input
@@ -320,32 +686,358 @@ export default function BrowserSettings() {
                                             createChangeHandler(setNewMaxSavedMessages)(Number(e.target.value), 'maxSaveMessagesInput');
                                         }}
                                     />
+                                    <button type="submit" className="hidden" aria-hidden="true" tabIndex={-1} />
+                                </form>
+                                <div className="overflow-hidden rounded-2xl border border-border">
+                                    <div className="border-b border-border/70 p-2">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <h2 className="text-lg font-semibold tracking-tight">LLM connection</h2>
+                                                <p className="text-sm text-muted-foreground">
+                                                    Choose hosted models with saved keys or connect to a local model server.
+                                                </p>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2 justify-end">
+                                                <div className="bg-primary/60 border border-primary/80 rounded-full px-3 py-1 text-xs font-medium text-background max-w-[18rem] truncate">
+                                                    {newChatModelSource === "local"
+                                                        ? `Local · ${LOCAL_LLM_LABELS[newLocalLlmProvider]}${newModel ? ` · ${newModel}` : ""}`
+                                                        : `Hosted · ${selectedChatApiKey ? getProviderDisplayName(selectedChatApiKey.provider) : "No key"}${newModel ? ` · ${newModel}` : ""}`}
+                                                </div>
+                                                <div className="hidden rounded-full border border-border/80 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground sm:block">
+                                                    {chatApiKeys.length} saved
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-col gap-4 p-2">
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            {([
+                                                {
+                                                    value: "api-key" as const,
+                                                    title: "Cloud/API key",
+                                                    description: "Use OpenAI, Anthropic, Gemini, Groq, or xAI with a saved key.",
+                                                    icon: Cloud,
+                                                },
+                                                {
+                                                    value: "local" as const,
+                                                    title: "Local LLM",
+                                                    description: "Use a locally running Ollama or LM Studio server.",
+                                                    icon: Laptop,
+                                                },
+                                            ]).map(({ value, title, description, icon: Icon }) => {
+                                                const isSelected = newChatModelSource === value;
+
+                                                return (
+                                                    <button
+                                                        key={value}
+                                                        type="button"
+                                                        data-testid={`chatModelSource${value === "api-key" ? "ApiKey" : "Local"}`}
+                                                        aria-pressed={isSelected}
+                                                        className={cn(
+                                                            "rounded-xl border p-2 text-left transition-all",
+                                                            isSelected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border/70 bg-background/80 hover:border-primary/40"
+                                                        )}
+                                                        onClick={() => handleModelSourceChange(value)}
+                                                    >
+                                                        <span className="flex items-center gap-2 text-sm font-semibold">
+                                                            <span className={cn(
+                                                                "flex h-8 w-8 items-center justify-center rounded-full border",
+                                                                isSelected ? "border-primary bg-primary text-background" : "border-border bg-muted/40 text-muted-foreground"
+                                                            )}>
+                                                                <Icon className="h-4 w-4" />
+                                                            </span>
+                                                            {title}
+                                                        </span>
+                                                        <span className="mt-2 block text-xs text-muted-foreground">{description}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        <div className="flex flex-col gap-3">
+                                            {newChatModelSource === "api-key" ? (
+                                                <>
+                                                    <div className="rounded-xl border border-border/70 bg-background/80 p-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <label htmlFor="secretKeyInput" className="text-sm font-medium">Add an API key</label>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <button
+                                                                        type="button"
+                                                                        data-testid="chatApiKeyProvidersInfo"
+                                                                        className="inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                                                        aria-label="Supported API key providers"
+                                                                    >
+                                                                        <Info className="h-3.5 w-3.5" />
+                                                                    </button>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent className="max-w-64 text-xs leading-relaxed">
+                                                                    Supported hosted keys: OpenAI, Anthropic, Gemini, Groq, Cohere, xAI, and DeepSeek.
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        </div>
+                                                        <div className="mt-2 flex gap-2">
+                                                            <div className="flex-1 relative">
+                                                                <Input
+                                                                    data-testid="chatApiKeyInput"
+                                                                    className="w-full h-full font-mono text-xs"
+                                                                    id="secretKeyInput"
+                                                                    type={showNewKeyInput ? "text" : "password"}
+                                                                    placeholder="Paste one provider key..."
+                                                                    value={keyInput}
+                                                                    onChange={(e) => setKeyInput(e.target.value)}
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    data-testid="toggleNewKeyVisibilityButton"
+                                                                    className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                                                                    onClick={() => setShowNewKeyInput(!showNewKeyInput)}
+                                                                    title={showNewKeyInput ? "Hide" : "Show"}
+                                                                >
+                                                                    {showNewKeyInput ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                                                </button>
+                                                            </div>
+                                                            <Button
+                                                                type="button"
+                                                                variant="Primary"
+                                                                className="p-2"
+                                                                data-testid="addChatApiKeyButton"
+                                                                onClick={handleSaveKey}
+                                                                disabled={isAddingKey}
+                                                                label="Add"
+                                                            >
+                                                                {isAddingKey
+                                                                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                                                                    : <PlusCircle className="h-4 w-4" />}
+                                                            </Button>
+                                                        </div>
+                                                        <p className="mt-2 text-xs text-muted-foreground">
+                                                            One input, many keys. Pick a saved key below to refresh the model list.
+                                                        </p>
+                                                    </div>
+
+                                                    <div className={cn(
+                                                        "flex flex-col gap-2",
+                                                        chatApiKeys.length > 3 && "max-h-[15rem] overflow-y-scroll pr-1 custom-scrollbar"
+                                                    )}>
+                                                        {chatApiKeys.length === 0 && (
+                                                            <div className="rounded-xl border border-dashed border-border bg-background/60 p-4 text-sm text-muted-foreground">
+                                                                Enter your key to load the models.
+                                                            </div>
+                                                        )}
+
+                                                        {chatApiKeys.map((apiKey) => {
+                                                            const isSelected = apiKey.id === uiSelectedChatApiKeyId;
+                                                            const isVisible = visibleKeyIds.has(apiKey.id);
+                                                            const providerName = apiKey.provider === "unknown" ? "Unknown provider" : getProviderDisplayName(apiKey.provider);
+                                                            const isEditing = editingKeyId === apiKey.id;
+                                                            const isLoadingKey = loadingChatApiKeyId === apiKey.id;
+
+                                                            return (
+                                                                <div
+                                                                    key={apiKey.id}
+                                                                    data-testid="chatApiKeyCard"
+                                                                    className={cn(
+                                                                        "group rounded-xl border bg-background/80 p-2 text-left transition-all",
+                                                                        isLoadingKey ? "cursor-wait" : "cursor-pointer",
+                                                                        isSelected ? "border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20" : "border-border/70 hover:border-primary/40"
+                                                                    )}
+                                                                >
+                                                                    <div className="flex w-full items-start gap-2 text-left">
+                                                                        <button
+                                                                            type="button"
+                                                                            data-testid="selectChatApiKeyButton"
+                                                                            aria-label={`Select ${providerName} API key`}
+                                                                            className={cn(
+                                                                                "mt-0.5 flex h-8 w-8 items-center justify-center rounded-full border transition-colors",
+                                                                                isSelected ? "border-primary bg-primary text-background" : "border-border bg-muted/40 text-muted-foreground hover:border-primary/40"
+                                                                            )}
+                                                                            onClick={() => handleSelectKey(apiKey.id)}
+                                                                            disabled={isLoadingKey}
+                                                                        >
+                                                                            {isLoadingKey ? <Loader2 className="h-4 w-4 animate-spin" /> : isSelected ? <CheckCircle2 className="h-4 w-4" /> : <KeyRound className="h-4 w-4" />}
+                                                                        </button>
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <div className="block w-full text-left">
+                                                                                <div className="flex justify-between items-center gap-1">
+                                                                                    <span className="block text-sm font-semibold">{providerName}</span>
+                                                                                    <div className="flex gap-2 pl-11">
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            data-testid="toggleChatApiKeyVisibilityButton"
+                                                                                            className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                                                            onClick={(event) => {
+                                                                                                event.stopPropagation();
+                                                                                                toggleKeyVisibility(apiKey.id);
+                                                                                            }}
+                                                                                        >
+                                                                                            {isVisible ? <EyeOff className="mr-1 inline h-3.5 w-3.5" /> : <Eye className="mr-1 inline h-3.5 w-3.5" />}
+                                                                                            {isVisible ? "Hide" : "Show"}
+                                                                                        </button>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            data-testid="editChatApiKeyButton"
+                                                                                            className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                                                            onClick={(event) => {
+                                                                                                event.stopPropagation();
+                                                                                                if (isEditing) {
+                                                                                                    handleCancelEditKey();
+                                                                                                } else {
+                                                                                                    handleEditKey(apiKey.id);
+                                                                                                }
+                                                                                            }}
+                                                                                        >
+                                                                                            <Pencil className="mr-1 inline h-3.5 w-3.5" />
+                                                                                            {isEditing ? "Cancel edit" : "Edit"}
+                                                                                        </button>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            data-testid="deleteChatApiKeyButton"
+                                                                                            className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive transition-colors hover:bg-destructive/10"
+                                                                                            onClick={(event) => {
+                                                                                                event.stopPropagation();
+                                                                                                requestDeleteKey(apiKey.id);
+                                                                                            }}
+                                                                                        >
+                                                                                            <Trash2 className="mr-1 inline h-3.5 w-3.5" />
+                                                                                            Delete
+                                                                                        </button>
+                                                                                    </div>
+                                                                                </div>
+                                                                                {apiKey.id === uiSelectedChatApiKeyId && perSourceModels["api-key"] && (
+                                                                                    <span className="mt-0.5 block truncate text-xs font-medium text-primary/80">
+                                                                                        {perSourceModels["api-key"]}
+                                                                                    </span>
+                                                                                )}
+                                                                                {isEditing ? (
+                                                                                    <form
+                                                                                        onSubmit={(event) => {
+                                                                                            event.preventDefault();
+                                                                                            event.stopPropagation();
+                                                                                            void handleSaveEditedKey(apiKey.id);
+                                                                                        }}
+                                                                                        className="mt-1 flex gap-2"
+                                                                                        onClick={(event) => event.stopPropagation()}
+                                                                                        onKeyDown={(event) => event.stopPropagation()}
+                                                                                    >
+                                                                                        <Input
+                                                                                            data-testid="chatApiKeyEditInput"
+                                                                                            className="flex-1 font-mono text-xs"
+                                                                                            type={isVisible ? "text" : "password"}
+                                                                                            value={editingKeyValue}
+                                                                                            onChange={(e) => setEditingKeyValue(e.target.value)}
+                                                                                        />
+                                                                                        <button
+                                                                                            type="submit"
+                                                                                            data-testid="saveEditedChatApiKeyButton"
+                                                                                            className="rounded-md border border-primary bg-primary px-2 py-1 text-xs font-medium text-background transition-colors hover:bg-primary/90"
+                                                                                        >
+                                                                                            Save
+                                                                                        </button>
+                                                                                    </form>
+                                                                                ) : (
+                                                                                    <span data-testid="chatApiKeyValue" className="block truncate font-mono text-xs text-muted-foreground">
+                                                                                        {isVisible ? apiKey.key : maskKey(apiKey.key)}
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div className="rounded-xl border border-border/70 bg-background/80 p-3">
+                                                    <div className="grid gap-3 sm:grid-cols-2">
+                                                        {(["ollama", "lmstudio"] as const).map(provider => {
+                                                            const isSelected = newLocalLlmProvider === provider;
+
+                                                            return (
+                                                                <button
+                                                                    key={provider}
+                                                                    type="button"
+                                                                    data-testid={`localLlmProvider${provider === "ollama" ? "Ollama" : "LmStudio"}`}
+                                                                    aria-pressed={isSelected}
+                                                                    className={cn(
+                                                                        "rounded-lg border p-3 text-left transition-all",
+                                                                        isSelected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border/70 hover:border-primary/40"
+                                                                    )}
+                                                                    onClick={() => handleLocalProviderChange(provider)}
+                                                                >
+                                                                    <span className="flex items-center gap-2 text-sm font-semibold">
+                                                                        <Server className="h-4 w-4" />
+                                                                        {LOCAL_LLM_LABELS[provider]}
+                                                                    </span>
+                                                                    <span className="mt-1 block text-xs text-muted-foreground">
+                                                                        {provider === "ollama"
+                                                                            ? "Reads models from /api/tags on your Ollama server."
+                                                                            : "Reads models from the OpenAI-compatible /v1/models endpoint."}
+                                                                    </span>
+                                                                    {perSourceModels[provider] && (
+                                                                        <span className="mt-1 block truncate text-xs font-medium text-primary/80">
+                                                                            {perSourceModels[provider]}
+                                                                        </span>
+                                                                    )}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                    <label htmlFor="localLlmEndpoint" className="mt-4 block text-sm font-medium">Local server URL</label>
+                                                    <div className="mt-2 flex gap-2">
+                                                        <Input
+                                                            id="localLlmEndpoint"
+                                                            data-testid="localLlmEndpointInput"
+                                                            className="flex-1 font-mono text-xs"
+                                                            value={newLocalLlmEndpoint}
+                                                            placeholder={LOCAL_LLM_ENDPOINTS[newLocalLlmProvider]}
+                                                            onChange={(event) => handleLocalEndpointChange(event.target.value)}
+                                                        />
+                                                        <Button
+                                                            type="button"
+                                                            variant="Primary"
+                                                            data-testid="localLlmLoadButton"
+                                                            className="h-10 w-10 shrink-0 justify-center p-0"
+                                                            onClick={reloadLocalModels}
+                                                            title="Load"
+                                                            isLoading={isManualLocalModelLoad && isLoadingModels}
+                                                        >
+                                                            <RotateCcw className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                    <p className="mt-2 text-xs text-muted-foreground">
+                                                        Ollama defaults to http://localhost:11434. LM Studio defaults to http://localhost:1234/v1.
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="flex min-w-0 flex-col gap-3">
+                                            <div className="rounded-xl border border-border/70 bg-background/80 p-3">
+                                                <div className="mb-2 flex items-center justify-between gap-2">
+                                                    <label className="text-sm font-medium">
+                                                        {isLoadingModels ? "Live models" : "Model"}
+                                                    </label>
+                                                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                        {isLoadingModels && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                                                        {modelsMessage}
+                                                    </span>
+                                                </div>
+                                                <ModelSelector
+                                                    models={modelDisplayNames}
+                                                    selectedModel={newModel}
+                                                    onModelSelect={handleModelChange}
+                                                    provider={modelProviderForDisplay}
+                                                    isLoading={isLoadingModels}
+                                                    disabled={newChatModelSource === "api-key" && !selectedChatApiKey}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="flex flex-col gap-2 p-2 bg-muted/10 rounded-lg">
-                                    <h2 className="font-medium">Configure LLM access for chat functionality</h2>
-                                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                                    <label className="text-sm font-medium">
-                                        {isLoadingModels ? "Model (Loading...)" : "Model"}
-                                    </label>
-                                    <ModelSelector
-                                        models={modelDisplayNames}
-                                        selectedModel={newModel}
-                                        onModelSelect={handleModelChange}
-                                        isLoading={isLoadingModels}
-                                    />
-                                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                                    <label htmlFor="secretKeyInput" className="text-sm font-medium whitespace-nowrap">Secret Key</label>
-                                    <Input
-                                        data-testid="chatApiKeyInput"
-                                        className="flex-1"
-                                        id="secretKeyInput"
-                                        placeholder="Enter your API secret key..."
-                                        value={newSecretKey}
-                                        onChange={(e) => createChangeHandler(setNewSecretKey)(e.target.value, 'secretKeyInput')}
-                                    />
-                                </div>
-                                <button type="submit" className="hidden" aria-hidden="true" tabIndex={-1} />
-                            </form>
+                            </div>
                         </CardContent>
                     )}
                 </Card>
@@ -353,6 +1045,7 @@ export default function BrowserSettings() {
                 {/* Graph Info Section */}
                 <Card className="border-border shadow-sm">
                     <CardHeader
+                        data-testid="graphInfoSectionHeader"
                         className="cursor-pointer hover:bg-muted/50 transition-colors p-2"
                         role="button"
                         tabIndex={0}
@@ -412,6 +1105,7 @@ export default function BrowserSettings() {
                                             className="w-full"
                                             min={10}
                                             max={50}
+                                            type="items"
                                             value={[newMaxItemsForSearch]}
                                             onValueChange={(value) => createChangeHandler(setNewMaxItemsForSearch)(value[value.length - 1], "maxItemsForSearch")}
                                         />
@@ -429,6 +1123,7 @@ export default function BrowserSettings() {
                 {/* Query Execution Section */}
                 <Card className="border-border shadow-sm">
                     <CardHeader
+                        data-testid="queryExecutionSectionHeader"
                         className="cursor-pointer hover:bg-muted/50 transition-colors p-2"
                         role="button"
                         tabIndex={0}
@@ -568,6 +1263,7 @@ export default function BrowserSettings() {
                 {/* User Experience Section */}
                 <Card className="border-border shadow-sm">
                     <CardHeader
+                        data-testid="userExperienceSectionHeader"
                         className="cursor-pointer hover:bg-muted/50 transition-colors p-2"
                         role="button"
                         tabIndex={0}
@@ -797,6 +1493,47 @@ export default function BrowserSettings() {
                     </div>
                 }
             </div>
+            <Dialog
+                open={deleteKeyDialogOpen}
+                onOpenChange={(open) => {
+                    setDeleteKeyDialogOpen(open);
+                    if (!open && !isDeletingKey) {
+                        setPendingDeleteKeyId(null);
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-md rounded-lg" data-testid="deleteChatApiKeyDialog">
+                    <DialogHeader>
+                        <DialogTitle>Delete API key</DialogTitle>
+                        <DialogDescription>
+                            {`Are you sure you want to delete ${pendingDeleteKey?.label ?? "this API key"}? This action cannot be undone.`}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="Secondary"
+                            onClick={() => {
+                                setDeleteKeyDialogOpen(false);
+                                setPendingDeleteKeyId(null);
+                            }}
+                            disabled={isDeletingKey}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="Delete"
+                            data-testid="confirmDeleteChatApiKeyButton"
+                            onClick={confirmDeleteKey}
+                            disabled={isDeletingKey || !pendingDeleteKeyId}
+                        >
+                            {isDeletingKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                            <span>{isDeletingKey ? "Deleting..." : "Delete"}</span>
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div >
     );
 }

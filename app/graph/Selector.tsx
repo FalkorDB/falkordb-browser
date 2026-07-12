@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, useContext, Dispatch, SetStateAction } from "react";
+import { useState, useCallback, useContext, Dispatch, SetStateAction } from "react";
 import { cn, formatName, HistoryQuery } from "@/lib/utils";
 import { History, Info, Network, Sparkles } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -10,8 +10,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import Button from "../components/ui/Button";
 import { BrowserSettingsContext, ConnectionContext, IndicatorContext, PanelContext } from "../components/provider";
 import CypherEditor from "../components/CypherEditor";
+import { type LanguageConfig } from "../components/EditorComponent";
 import { Graph } from "../api/graph/model";
 import QueryHistoryPanel from "./QueryHistoryPanel";
+import ResizableBox from "@/components/ui/ResizableBox";
+import { useResizableSize } from "@/lib/useResizableSize";
 
 interface Props {
     graph: Graph
@@ -48,11 +51,15 @@ export default function Selector({
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
-    const { settings: { limitSettings: { limit, lastLimit }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
+    const { settings: { limitSettings: { limit, lastLimit }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } }, tutorialOpen } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
     const { panelOpen, onTogglePanel } = useContext(PanelContext);
 
     const [maximize, setMaximize] = useState(false);
+    const [cypherLanguageConfig, setCypherLanguageConfig] = useState<LanguageConfig | null>(null);
+    const handleLanguageConfig = useCallback((config: LanguageConfig) => { setCypherLanguageConfig(config); }, []);
+
+    const { size: historySize, onResize: onHistoryResize } = useResizableSize("queryHistory-size", 560, 600, 350, 300);
 
     const separator = <div className="h-[80%] w-0.5 bg-border rounded-full" />;
 
@@ -89,6 +96,7 @@ export default function Selector({
                     historyQuery={historyQuery}
                     setHistoryQuery={setHistoryQuery}
                     editorKey={queriesOpen ? "selector-theme" : "editor-theme"}
+                    onLanguageConfig={handleLanguageConfig}
                 />
             </div>
             <div className="h-full w-fit flex gap-3 items-center p-2 border border-border rounded-lg bg-background">
@@ -108,20 +116,41 @@ export default function Selector({
                     <PopoverContent
                         align="start"
                         sideOffset={20}
-                        className="z-30 w-[560px] h-[600px] p-0 border-none bg-transparent shadow-none"
+                        className="z-30 p-0 border-none bg-transparent shadow-none w-auto h-auto overflow-visible"
                         onOpenAutoFocus={(e) => e.preventDefault()}
                         onInteractOutside={(e) => {
+                            if (tutorialOpen) {
+                                e.preventDefault();
+                                return;
+                            }
                             if ((e.target as Element)?.closest?.('[data-tutorial-overlay]')) {
+                                e.preventDefault();
+                            }
+                            if ((e.target as Element)?.closest?.('[role="separator"]')) {
                                 e.preventDefault();
                             }
                         }}
                         onEscapeKeyDown={(e) => {
+                            // When Monaco has focus, let it handle Escape (closes suggestions).
+                            if ((e.target as HTMLElement)?.closest?.('.monaco-editor')) {
+                                e.preventDefault();
+                                return;
+                            }
                             if ((e.target as Element)?.closest?.('[data-tutorial-overlay]')) {
                                 e.preventDefault();
                             }
                         }}
                     >
-                        <QueryHistoryPanel graphName={graphName} onClose={() => setQueriesOpen?.(false)} />
+                        <ResizableBox
+                            width={historySize.width}
+                            height={historySize.height}
+                            minWidth={350}
+                            minHeight={300}
+                            onResizeEnd={(w, h) => onHistoryResize(w, h)}
+                            direction="bottom-left"
+                        >
+                            <QueryHistoryPanel graphName={graphName} onClose={() => setQueriesOpen?.(false)} languageConfig={cypherLanguageConfig ?? undefined} />
+                        </ResizableBox>
                     </PopoverContent>
                 </Popover>
                 {

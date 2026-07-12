@@ -6,10 +6,10 @@ import DialogComponent from "../DialogComponent";
 import Button from "../ui/Button";
 import CloseDialog from "../CloseDialog";
 import { IndicatorContext } from "../provider";
+import { buildDeleteGraphToast } from "./deleteGraph-utils";
 
 interface Props {
   rows: Row[]
-  handleSetRows: (rows: string[]) => void
   setOpenMenage: (openMenage: boolean) => void
   selectedValue: string
   setGraphName: (graphName: string) => void
@@ -20,7 +20,6 @@ interface Props {
 
 export default function DeleteGraph({
   rows,
-  handleSetRows,
   setOpenMenage,
   selectedValue,
   setGraphName,
@@ -73,11 +72,15 @@ export default function DeleteGraph({
         setGraph(Graph.empty());
       }
 
-      handleSetRows(successDeletedGraphs);
-      toast({
-        title: "Graph(s) deleted successfully",
-        description: successDeletedGraphs.length > 0 && `The graph(s) ${successDeletedGraphs.join(", ")} have been deleted successfully${failedDeletedGraphs.length > 0 && `The graph(s) ${failedDeletedGraphs.join(", ")} have not been deleted`}`,
-      });
+      // Rows update is handled automatically by useEffect([options, handleSetRows])
+      // in selectGraph.tsx when graphNames changes — no manual call needed here.
+
+      // Only show a success toast when at least one graph was actually deleted;
+      // per-graph failures are already surfaced by securedFetch's destructive toasts.
+      const deleteToast = buildDeleteGraphToast(successDeletedGraphs, failedDeletedGraphs);
+      if (deleteToast) {
+        toast(deleteToast);
+      }
     } finally {
       setIsLoading(false);
       setOpen(false);

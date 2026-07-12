@@ -15,6 +15,8 @@ import ExportGraph from "../components/ExportGraph";
 import DeleteGraph from "../components/graph/DeleteGraph";
 import DuplicateGraph from "../components/graph/DuplicateGraph";
 import { Graph } from "../api/graph/model";
+import ResizableBox from "@/components/ui/ResizableBox";
+import { useResizableSize } from "@/lib/useResizableSize";
 
 interface Props {
     options: string[],
@@ -58,6 +60,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const [openMenage, setOpenMenage] = useState(false);
     const [openDuplicate, setOpenDuplicate] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+
+    const { size: manageSize, onResize: onManageResize } = useResizableSize("manageGraphs-size", 750, 493, 400, 300);
 
     useEffect(() => {
         setOpen(false);
@@ -270,73 +274,81 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             </Popover>
             {
                 mounted && openMenage && createPortal(
-                    <div
+                    <ResizableBox
+                        width={manageSize.width}
+                        height={manageSize.height}
+                        minWidth={400}
+                        minHeight={300}
+                        direction="bottom-right"
+                        onResizeEnd={(w, h) => onManageResize(w, h)}
+                        className="fixed top-16 left-3 z-30 flex flex-col gap-2 border border-border rounded-lg shadow-lg p-2 bg-background"
                         data-testid="manageContent"
-                        role="dialog"
-                        aria-label="Manage Graphs"
-                        className="fixed top-16 left-3 z-30 flex flex-col gap-2 border border-border rounded-lg shadow-lg h-[493px] w-[750px] p-2 bg-background"
                     >
-                        <div className="flex flex-row justify-between items-center border-b border-border pb-1">
-                            <h2 className="text-2xl font-medium flex items-center gap-2">
-                                Manage Graphs
-                                <Settings size={22} className="text-foreground/60" />
-                            </h2>
-                            <Button
-                                aria-label="Close"
-                                data-testid="closeManage"
-                                onClick={() => setOpenMenage(false)}
-                            >
-                                <X />
-                            </Button>
-                        </div>
-                        <TableComponent
-                            className="grow overflow-hidden gap-2"
-                            label="Graphs"
-                            entityName="Graph"
-                            headers={[
-                                "Name",
-                                ...(showMemoryUsage ? [{ name: "Memory Usage", width: "20%" }] : []),
-                                { name: "Nodes #", width: "10%" },
-                                { name: "Edges #", width: "10%" }
-                            ]}
-                            rows={rows}
-                            setRows={setRows}
-                            inputRef={inputRef}
-                            itemHeight={24}
+                        <div
+                            role="dialog"
+                            aria-label="Manage Graphs"
+                            className="h-full w-full flex flex-col gap-2"
                         >
-                            {
-                                !isReadOnly &&
-                                <>
-                                    <DeleteGraph
-                                        
-                                        rows={rows.filter(opt => opt.checked)}
-                                        handleSetRows={handleSetRows}
-                                        selectedValue={selectedValue}
-                                        setGraphName={setSelectedValue}
-                                        setGraph={setGraph}
-                                        setOpenMenage={setOpenMenage}
-                                        graphNames={options}
-                                        setGraphNames={setOptions}
-                                    />
-                                    <ExportGraph
-                                        selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
-                                        
-                                    />
-                                    <DuplicateGraph
-                                        selectedValue={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)[0]}
-                                        
-                                        open={openDuplicate}
-                                        onOpenChange={setOpenDuplicate}
-                                        onDuplicate={(duplicateName) => {
-                                            setSelectedValue(duplicateName);
-                                            setOptions!([...options, duplicateName]);
-                                        }}
-                                        disabled={rows.filter(opt => opt.checked).length !== 1}
-                                    />
-                                </>
-                            }
-                        </TableComponent>
-                    </div>,
+                            <div className="flex flex-row justify-between items-center border-b border-border pb-1">
+                                <h2 className="text-2xl font-medium flex items-center gap-2">
+                                    Manage Graphs
+                                    <Settings size={22} className="text-foreground/60" />
+                                </h2>
+                                <Button
+                                    aria-label="Close"
+                                    data-testid="closeManage"
+                                    onClick={() => setOpenMenage(false)}
+                                >
+                                    <X />
+                                </Button>
+                            </div>
+                            <TableComponent
+                                className="grow overflow-hidden gap-2"
+                                label="Graphs"
+                                entityName="Graph"
+                                headers={[
+                                    "Name",
+                                    ...(showMemoryUsage ? [{ name: "Memory Usage", width: "20%" }] : []),
+                                    { name: "Nodes #", width: "10%" },
+                                    { name: "Edges #", width: "10%" }
+                                ]}
+                                rows={rows}
+                                setRows={setRows}
+                                inputRef={inputRef}
+                                itemHeight={24}
+                            >
+                                {
+                                    !isReadOnly &&
+                                    <>
+                                        <DeleteGraph
+                                            rows={rows.filter(opt => opt.checked)}
+                                            selectedValue={selectedValue}
+                                            setGraphName={setSelectedValue}
+                                            setGraph={setGraph}
+                                            setOpenMenage={setOpenMenage}
+                                            graphNames={options}
+                                            setGraphNames={setOptions}
+                                        />
+                                        <ExportGraph
+                                            selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
+                                            
+                                        />
+                                        <DuplicateGraph
+                                            selectedValue={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)[0]}
+                                            
+                                            open={openDuplicate}
+                                            onOpenChange={setOpenDuplicate}
+                                            onDuplicate={(duplicateName) => {
+                                                setSelectedValue(duplicateName);
+                                                setOptions!([...options, duplicateName]);
+                                            }}
+                                            disabled={rows.filter(opt => opt.checked).length !== 1}
+                                        />
+                                    </>
+                                }
+                            </TableComponent>
+                        </div>
+                    </ResizableBox>,
                     document.body
                 )
             }

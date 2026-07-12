@@ -168,6 +168,22 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("animationControl");
   }
 
+  public get dimControl(): Locator {
+    return this.page.getByTestId("dimControl");
+  }
+
+  public get dimContainer(): Locator {
+    return this.page.getByTestId("dimContainer");
+  }
+
+  public get graphCanvasWrapper(): Locator {
+    return this.page.getByTestId("graphCanvasWrapper");
+  }
+
+  public get pinControl(): Locator {
+    return this.page.getByTestId("pinControl");
+  }
+
   public get zoomInControl(): Locator {
     return this.page.getByTestId("zoomInControl");
   }
@@ -413,6 +429,30 @@ export default class GraphPage extends BasePage {
     if (!isVisible) return "";
     const title = this.errorToast.getByTestId("toast-title");
     return (await title.textContent()) || "";
+  }
+
+  async clickErrorToastCopy(): Promise<void> {
+    await interactWhenVisible(
+      this.errorToast.getByTestId("toast-copy-raw"),
+      (el) => el.click(),
+      "Error toast Copy"
+    );
+  }
+
+  // Monaco renders a diagnostic marker as a `.squiggly-error` decoration in the editor.
+  async hasEditorErrorMarker(): Promise<boolean> {
+    return waitForElementToBeVisible(this.page.locator(".squiggly-error:visible").first());
+  }
+
+  async fixWithAiButtonCount(): Promise<number> {
+    return this.page.getByTestId("fix-with-ai").count();
+  }
+
+  async getLatestErrorToastText(): Promise<string> {
+    const toasts = this.page.getByTestId("toast-destructive");
+    const count = await toasts.count();
+    if (count === 0) return "";
+    return (await toasts.nth(count - 1).textContent()) || "";
   }
 
   async isOfflineIndicatorVisible(): Promise<boolean> {
@@ -892,6 +932,36 @@ export default class GraphPage extends BasePage {
     );
   }
 
+  async clickDimControl(): Promise<void> {
+    await interactWhenVisible(
+      this.dimControl,
+      (el) => el.click(),
+      "Dim Control"
+    );
+  }
+
+  async isDimControlChecked(): Promise<boolean> {
+    await waitForElementToBeVisible(this.dimControl);
+    const state = await this.dimControl.getAttribute("data-state");
+    return state === "checked";
+  }
+
+  async isDimContainerVisible(): Promise<boolean> {
+    return waitForElementToBeVisible(this.dimContainer);
+  }
+
+  async getSelectionCount(): Promise<number> {
+    await waitForElementToBeVisible(this.graphCanvasWrapper);
+    const count = await this.graphCanvasWrapper.getAttribute("data-selection-count");
+    return count ? parseInt(count, 10) : 0;
+  }
+
+  async isFocusActive(): Promise<boolean> {
+    await waitForElementToBeVisible(this.graphCanvasWrapper);
+    const active = await this.graphCanvasWrapper.getAttribute("data-focus-active");
+    return active === "true";
+  }
+
   async clickZoomInControl(): Promise<void> {
     await interactWhenVisible(
       this.zoomInControl,
@@ -1251,8 +1321,18 @@ export default class GraphPage extends BasePage {
   }
 
   async selectGraphByName(graphName: string): Promise<void> {
+    await this.ensureGraphInfoPanelOpen();
     // Wait for graph selector to be enabled (graphs loaded from API)
-    await waitForElementToBeEnabled(this.select("Graph"), 1000, 15);
+    let isEnabled = await waitForElementToBeEnabled(this.select("Graph"), 1000, 15);
+    if (!isEnabled) {
+      await interactWhenVisible(
+        this.reloadList,
+        (el) => el.click(),
+        "Reload Graphs List"
+      );
+      isEnabled = await waitForElementToBeEnabled(this.select("Graph"), 1000, 30);
+    }
+    if (!isEnabled) throw new Error("Graph selector is not enabled after reloading the graph list");
     await this.clickSelect();
     await this.fillSearch(graphName);
     await this.page.waitForTimeout(500); // wait for the search results to be populated
@@ -1375,5 +1455,25 @@ export default class GraphPage extends BasePage {
   async rightClickElement(x: number, y: number): Promise<void> {
     await this.page.mouse.click(x, y, { button: "right" });
     await this.page.waitForTimeout(500);
+  }
+
+  /**
+   * Returns the text currently shown in the graph selector button, e.g.
+   * the selected graph name or "Select Graph" when nothing is selected.
+   */
+  async getSelectedGraphName(): Promise<string> {
+    const text = await this.page.getByTestId("selectGraph").textContent();
+    return (text ?? "").trim();
+  }
+
+  /**
+   * Set a localStorage item directly via page.evaluate.
+   * Useful for pre-seeding connection-scoped keys before navigation.
+   */
+  async setLocalStorageItem(key: string, value: string): Promise<void> {
+    await this.page.evaluate(
+      ([k, v]) => localStorage.setItem(k, v),
+      [key, value],
+    );
   }
 }

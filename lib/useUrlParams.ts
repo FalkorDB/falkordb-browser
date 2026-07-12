@@ -58,7 +58,7 @@ export default function useUrlParams<K extends string>(keys: readonly K[]) {
 // ---- Route-specific hooks ----
 // Add one per route so consumers don't need to specify param keys.
 
-const GRAPH_KEYS = ["graph", "query", "selected"] as const;
+const GRAPH_KEYS = ["graph", "query", "selected", "layout", "direction"] as const;
 
 export function useGraphParams() {
   const { params, setParam } = useUrlParams(GRAPH_KEYS);
@@ -69,15 +69,78 @@ export function useGraphParams() {
     setQuery: useCallback((value: string) => setParam("query", value), [setParam]),
     selected: params.selected,
     setSelected: useCallback((value: string) => setParam("selected", value), [setParam]),
+    layout: params.layout,
+    setLayout: useCallback((value: string) => setParam("layout", value), [setParam]),
+    direction: params.direction,
+    setDirection: useCallback((value: string) => setParam("direction", value), [setParam]),
   };
 }
 
-const SETTINGS_KEYS = ["tab"] as const;
+/**
+ * Build the full URL param record for the /graph route from current state.
+ * Add new graph-page params here — the sync effect in providers.tsx
+ * calls this so you never need to update the effect itself.
+ */
+export function buildGraphUrlParams(state: {
+  graph: string;
+  query: string | null;
+  selected: string;
+  layout: string;
+  direction: string;
+}): Record<string, string | null> {
+  const hasGraph = Boolean(state.graph);
+  return {
+    graph: state.graph || null,
+    // Without an active graph, query and selected are meaningless — strip them.
+    query: hasGraph ? state.query : null,
+    selected: hasGraph ? (state.selected || null) : null,
+    layout: state.layout && state.layout !== "force" ? state.layout : null,
+    direction: state.direction || null,
+  };
+}
+
+/**
+ * Build the full URL param record for the /settings route.
+ */
+export function buildSettingsUrlParams(state: {
+  tab: string;
+}): Record<string, string | null> {
+  return {
+    tab: state.tab || null,
+  };
+}
+
+/**
+ * Registry mapping pathname → param builder.
+ * When adding a new route with URL params:
+ * 1. Add a `buildXxxUrlParams` function above
+ * 2. Register it here
+ * 3. Pass the matching state slice from providers.tsx
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const URL_PARAM_BUILDERS: Record<string, (state: any) => Record<string, string | null>> = {
+  "/graph": buildGraphUrlParams,
+  "/settings": buildSettingsUrlParams,
+};
+
+/**
+ * Sync current state to URL for the given pathname.
+ * No-op if the pathname has no registered builder.
+ */
+export function syncRouteUrlParams(pathname: string, state: Record<string, unknown>) {
+  const builder = URL_PARAM_BUILDERS[pathname];
+  if (!builder) return;
+  setUrlParam(builder(state));
+}
+
+const SETTINGS_KEYS = ["tab", "focus"] as const;
 
 export function useSettingsParams() {
   const { params, setParam } = useUrlParams(SETTINGS_KEYS);
   return {
     tab: params.tab,
     setTab: useCallback((value: string) => setParam("tab", value), [setParam]),
+    focus: params.focus,
+    setFocus: useCallback((value: string) => setParam("focus", value), [setParam]),
   };
 }

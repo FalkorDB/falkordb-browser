@@ -24,8 +24,22 @@ export async function serverEncrypt(value: string): Promise<string> {
   return data.value;
 }
 
+/**
+ * Returns true if the value looks like it was produced by the server's encrypt() function.
+ * Format: iv(hex):authTag(hex):encryptedData(hex) — three colon-separated hex strings.
+ * Avoids sending plain-text values to the decrypt API (which would result in a 400).
+ */
+export function looksServerEncrypted(value: string): boolean {
+  const parts = value.split(':');
+  return parts.length === 3 && parts.every(p => p.length > 0 && /^[0-9a-fA-F]+$/.test(p));
+}
+
 export async function serverDecrypt(encryptedValue: string): Promise<string> {
   if (!encryptedValue) return '';
+
+  if (!looksServerEncrypted(encryptedValue)) {
+    throw new Error('Value is not in server-encrypted format');
+  }
 
   const res = await fetch('/api/encrypt', {
     method: 'POST',

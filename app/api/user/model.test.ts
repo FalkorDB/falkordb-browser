@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { getRoleWithKeys, extractKeysFromACL, ROLE } from "./model";
+import { getRoleWithKeys, extractKeysFromACL, ROLE } from "./model.ts";
 
 // ---------------------------------------------------------------------------
 // getRoleWithKeys

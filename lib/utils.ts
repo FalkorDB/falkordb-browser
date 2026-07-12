@@ -6,14 +6,23 @@
 
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import React, { RefObject } from "react";
-import type { FalkorDBCanvas } from "@falkordb/canvas";
+import React, { type RefObject } from "react";
+import type { FalkorDBCanvas, Data as CanvasData } from "@falkordb/canvas";
 import { signOut } from "next-auth/react";
+import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, enrichSyntaxMessage, type SyntaxErrorInfo, type HintLink } from "./cypherErrors.ts";
+import { suggestForError, findFuncArgTypo } from "./cypherSuggestions.ts";
+
+export { parseSyntaxError };
+export type { SyntaxErrorInfo };
 
 export type ToastArguments = {
   title: string;
   description: React.ReactNode;
   variant: "destructive" | "default";
+  rawMessage?: string;
+  hint?: string;
+  hintLink?: HintLink;
+  query?: string;
 };
 
 export type ToastFn = (args: ToastArguments) => void;
@@ -47,6 +56,7 @@ export type Query = {
   elementsCount: number;
   fav: boolean;
   name?: string;
+  errorMessage?: string;
 };
 
 export type Node = {
@@ -99,7 +109,12 @@ export type LinkCell = {
   };
 };
 
-export type DataCell = NodeCell | LinkCell | NodeCell[] | LinkCell[] | number | string | null;
+export type PathCell = {
+  nodes: NodeCell[];
+  edges?: LinkCell[];
+};
+
+export type DataCell = NodeCell | LinkCell | PathCell | NodeCell[] | LinkCell[] | PathCell[] | number | string | null;
 
 export type DataRow = {
   [key: string]: DataCell;
@@ -192,6 +207,8 @@ export type Message = {
   | "Status"
   | "CypherQuery"
   | "CypherResult";
+  confidence?: number;
+  tokenUsage?: number;
 };
 
 // [library_name, type, 'functions', function_names[]]
@@ -200,17 +217,12 @@ export type UDFEntry = [string, string, string, string[]];
 // [...UDFEntry, library_code, code]
 export type UDFEntryWithCode = [...UDFEntry, string, string];
 
-export type SyntaxErrorInfo = {
-  message: string;
-  context: string;
-  contextOffset: number;
-  line: number;
-  column: number;
-};
-
 export type UserFriendlyMessage = {
   title: string;
   description: React.ReactNode;
+  rawMessage?: string;
+  hint?: string;
+  hintLink?: HintLink;
   syntaxError?: SyntaxErrorInfo;
 };
 
@@ -246,13 +258,14 @@ export function cn(...inputs: ClassValue[]) {
 export async function getSSEGraphResult(
   url: string,
   toast: ToastFn,
-  setIndicator: (indicator: "online" | "offline") => void
+  setIndicator: (indicator: "online" | "offline") => void,
+  errorContext?: { query?: string }
 ): Promise<unknown> {
   return new Promise((resolve, reject) => {
     let handled = false;
 
-    // Inject connectionId as a query param for SSE (EventSource doesn't support headers)
-    let effectiveUrl = url;
+    // EventSource doesn't support headers — inject connectionId as a query param.
+    let effectiveUrl = normalizeApiUrl(url);
     if (_activeConnectionId) {
       const sep = effectiveUrl.includes("?") ? "&" : "?";
       effectiveUrl += `${sep}connectionId=${encodeURIComponent(_activeConnectionId)}`;
@@ -260,20 +273,38 @@ export async function getSSEGraphResult(
 
     const evtSource = new EventSource(effectiveUrl);
     evtSource.addEventListener("result", (event: MessageEvent) => {
-      const result = JSON.parse(event.data);
-      evtSource.close();
-      setIndicator("online");
-      resolve(result);
+      const payloadText = typeof event.data === "string" ? event.data : "";
+
+      try {
+        const result = JSON.parse(payloadText);
+        evtSource.close();
+        setIndicator("online");
+        resolve(result);
+      } catch (error) {
+        console.error("Failed to parse SSE result event:", error);
+        evtSource.close();
+        setIndicator("offline");
+        reject(new Error("Invalid server response"));
+      }
     });
 
     evtSource.addEventListener("error", (event: MessageEvent) => {
+      const eventData = typeof (event as { data?: unknown }).data === "string"
+        ? (event as { data?: string }).data
+        : "";
+
+      // A native EventSource "error" (network/connection failure) carries no
+      // data — leave it for evtSource.onerror below so it surfaces as an
+      // offline/network error instead of a generic "Request failed".
+      if (!eventData) return;
+
       handled = true;
-      let rawMessage: unknown = "Request failed";
+      let rawMessage: unknown = "";
       let rawStatus: unknown = 0;
       let code: string | undefined;
 
       try {
-        const payload = JSON.parse(event.data) as {
+        const payload = JSON.parse(eventData) as {
           message?: unknown;
           status?: unknown;
           code?: string;
@@ -282,7 +313,12 @@ export async function getSSEGraphResult(
         rawStatus = payload.status;
         code = payload.code;
       } catch (error) {
+        rawMessage = extractResponseErrorMessage(eventData);
         console.error("Failed to parse SSE error event:", error);
+      }
+
+      if (!rawMessage) {
+        rawMessage = (event as { message?: unknown }).message;
       }
 
       const message = normalizeErrorMessage(rawMessage) || "Request failed";
@@ -298,8 +334,8 @@ export async function getSSEGraphResult(
         return;
       }
 
-      const friendly = toUserFriendlyMessage(message, status);
-      toast({ title: friendly.title, description: friendly.description, variant: "destructive" });
+      const friendly = toUserFriendlyMessage(message, status, errorContext);
+      toast({ title: friendly.title, description: friendly.description, variant: "destructive", rawMessage: friendly.rawMessage, hint: friendly.hint, hintLink: friendly.hintLink, query: errorContext?.query });
 
       if (status === 401 || status >= 500) setIndicator("offline");
 
@@ -321,23 +357,6 @@ export async function getSSEGraphResult(
   });
 }
 
-// Parses FalkorDB parser error format:
-// "errMsg: <message> line: <N>, column: <N>, offset: <N> errCtx: <snippet> errCtxOffset: <N>"
-// Uses [\s\S] for multiline tolerance and avoids strict end-of-string anchoring.
-export function parseSyntaxError(raw: string): SyntaxErrorInfo | null {
-  const match = raw.match(
-    /errMsg:\s*([\s\S]+?)\s+line:\s*(\d+),\s*column:\s*(\d+),\s*offset:\s*\d+\s+errCtx:\s?([\s\S]+?)\s+errCtxOffset:\s*(\d+)/
-  );
-  if (!match) return null;
-  return {
-    message: match[1].trim(),
-    line: Math.max(1, Number(match[2])),
-    column: Math.max(1, Number(match[3])),
-    context: match[4],
-    contextOffset: Number(match[5]),
-  };
-}
-
 // Builds a React element that highlights the error position in the query snippet.
 // Clamps contextOffset to valid range to prevent blank/incorrect highlights.
 export function formatSyntaxError(
@@ -352,18 +371,30 @@ export function formatSyntaxError(
   const errorChar = context[safeOffset] || "";
   const after = context.slice(safeOffset + 1);
 
-  // Extract the token containing the error character and enrich the message.
-  // e.g. "Invalid input 's': expected RETURN" → "Invalid input 's' in RETsURN: expected RETURN"
+  const enriched = enrichSyntaxMessage(message, context, contextOffset);
+
+  // When the error char is whitespace, step back and highlight the preceding word.
   let wordStart = safeOffset;
   while (wordStart > 0 && !/\s/.test(context[wordStart - 1])) wordStart -= 1;
   let wordEnd = safeOffset;
   while (wordEnd < context.length && !/\s/.test(context[wordEnd])) wordEnd += 1;
   const errorWord = context.slice(wordStart, wordEnd);
 
-  // Insert "in <word>" after the quoted character, before the colon
-  const enriched = errorWord.length > 1
-    ? message.replace(/^(Invalid input '[^']*')(:)/, `$1 in ${errorWord}$2`)
-    : message;
+  const isWhitespaceError = !errorChar || /\s/.test(errorChar);
+  if (isWhitespaceError && errorWord.length > 1) {
+    return React.createElement("div", { className: "flex flex-col gap-1" },
+      React.createElement("span", null, enriched),
+      React.createElement("code", {
+        className: "mt-1 block rounded px-2 py-1 text-xs font-mono whitespace-pre-wrap break-words"
+      },
+        context.slice(0, wordStart),
+        React.createElement("span", {
+          className: "font-bold text-xl underline mx-1"
+        }, errorWord),
+        context.slice(safeOffset) // space + rest
+      )
+    );
+  }
 
   return React.createElement("div", { className: "flex flex-col gap-1" },
     React.createElement("span", null, enriched),
@@ -453,7 +484,7 @@ function isAllowlistedUserError(message: string): boolean {
 
 // Maps raw server/Redis/FalkorDB error messages to user-friendly descriptions.
 // Syntax errors are parsed and displayed with the error position highlighted.
-export function toUserFriendlyMessage(raw: unknown, status: number): UserFriendlyMessage {
+export function toUserFriendlyMessage(raw: unknown, status: number, ctx?: { query?: string }): UserFriendlyMessage {
   const rawMessage = normalizeErrorMessage(raw).trim();
   if (!rawMessage) {
     if (status === 401) return { title: "Error", description: "Your session has expired. Please sign in again." };
@@ -463,55 +494,69 @@ export function toUserFriendlyMessage(raw: unknown, status: number): UserFriendl
 
   const parsed = parseSyntaxError(rawMessage);
   if (parsed) {
-    return { title: "Syntax Error", description: formatSyntaxError(parsed.message, parsed.context, parsed.contextOffset), syntaxError: parsed };
+    let { message, context, contextOffset } = parsed;
+    // If a function-arg typo is the root cause, point the toast highlight at the typo.
+    const typo = ctx?.query ? findFuncArgTypo(ctx.query) : undefined;
+    if (typo) {
+      const re = new RegExp(`\\b${typo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+      const m = re.exec(context);
+      if (m) {
+        contextOffset = m.index;
+        message = `'${typo}' not defined`;
+      }
+    }
+    return { title: "Syntax Error", description: formatSyntaxError(message, context, contextOffset), syntaxError: parsed, rawMessage, hint: SYNTAX_ERROR_HINT };
   }
 
-  // Check the allowlist FIRST so that server-provided specific messages
-  // (e.g. "Connection timed out. Please check the host…") are shown as-is
-  // and are not overridden by the generic pattern handlers below.
-  if (isAllowlistedUserError(rawMessage)) {
-    return { title: "Error", description: rawMessage };
+  // "Did you mean…?" is more specific than the catalog tip, so it takes precedence.
+  const catalog = getCypherErrorHint(rawMessage);
+  const hint = suggestForError(rawMessage, { query: ctx?.query }) ?? catalog?.hint;
+  const hintLink = catalog?.link;
+
+  // For user-readable errors, description IS the raw message — skip rawMessage
+  // to avoid a duplicate "See more" section.
+  if (isAllowlistedUserError(rawMessage) || hint) {
+    return { title: "Error", description: rawMessage, hint, hintLink };
   }
 
   const lower = rawMessage.toLowerCase();
 
   if (lower.includes("connection refused") || lower.includes("econnrefused")) {
-    return { title: "Error", description: "Unable to connect to the database. Please check your connection settings." };
+    return { title: "Error", description: "Unable to connect to the database. Please check your connection settings.", rawMessage, hint, hintLink };
   }
 
   if (lower.includes("noauth") || lower.includes("wrongpass")) {
-    return { title: "Error", description: "Database authentication failed. Please check your credentials." };
+    return { title: "Error", description: "Database authentication failed. Please check your credentials.", rawMessage, hint, hintLink };
   }
 
   if (lower.includes("loading") && lower.includes("dataset")) {
-    return { title: "Error", description: "The database is still loading. Please wait a moment and try again." };
+    return { title: "Error", description: "The database is still loading. Please wait a moment and try again.", rawMessage, hint, hintLink };
   }
 
   if (lower.includes("oom") || lower.includes("out of memory")) {
-    return { title: "Error", description: "The server is running low on memory. Please try again later." };
+    return { title: "Error", description: "The server is running low on memory. Please try again later.", rawMessage, hint, hintLink };
   }
 
   if (lower.includes("timeout") || lower.includes("timed out")) {
-    return { title: "Error", description: "The request timed out. Please try a simpler query or try again later." };
+    return { title: "Error", description: "The request timed out. Please try a simpler query or try again later.", rawMessage, hint, hintLink };
   }
 
   if (lower.includes("readonly") && lower.includes("replica")) {
-    return { title: "Error", description: "This operation cannot be performed on a read-only replica." };
+    return { title: "Error", description: "This operation cannot be performed on a read-only replica.", rawMessage, hint, hintLink };
   }
 
   if (status === 401) {
-    return { title: "Error", description: "Your session has expired. Please sign in again." };
+    return { title: "Error", description: "Your session has expired. Please sign in again.", rawMessage, hint, hintLink };
   }
 
   if (status >= 500) {
-    return { title: "Error", description: "Something went wrong on the server. Please try again later." };
+    return { title: "Error", description: "Something went wrong on the server. Please try again later.", rawMessage, hint, hintLink };
   }
 
-  return { title: "Error", description: "An unexpected error occurred. Please try again." };
+  return { title: "Error", description: "An unexpected error occurred. Please try again.", rawMessage, hint, hintLink };
 }
 
-// Guards against triggering multiple concurrent signOut calls when many
-// in-flight requests hit a newly-invalidated session at the same time.
+// Guards against concurrent signOut calls when multiple in-flight requests hit an invalidated session.
 let sessionInvalidationInFlight = false;
 
 function triggerSessionInvalidationSignOut(): void {
@@ -522,18 +567,9 @@ function triggerSessionInvalidationSignOut(): void {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Active connection ID for multi-connection support.
-// When set, securedFetch automatically injects an X-Connection-Id header so
-// the backend routes requests to the correct FalkorDB client.
-//
-// NOTE: do NOT initialise from localStorage here. If the user's last
-// explicit connection was a restricted user (e.g. shahar), initialising
-// _activeConnectionId to that ID would cause securedFetch to overwrite
-// any explicitly-passed X-Connection-Id headers (set by settings components)
-// with the restricted ID. The dep-free effect in providers.tsx keeps this
-// global in sync with the React activeConnectionId state after every render.
-// ---------------------------------------------------------------------------
+// Active connection ID — injected into every outgoing request as X-Connection-Id.
+// Not initialised from localStorage to avoid overriding restricted-user sessions.
+// providers.tsx keeps it in sync after every render.
 let _activeConnectionId: string | null = null;
 
 export function setActiveConnectionIdGlobal(id: string | null) {
@@ -544,16 +580,21 @@ export function getActiveConnectionIdGlobal(): string | null {
   return _activeConnectionId;
 }
 
+function normalizeApiUrl(input: string): string {
+  if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(input) || input.startsWith("//") || input.startsWith("/")) {
+    return input;
+  }
+
+  return `/${input}`;
+}
+
 export async function securedFetch(
   input: string,
   init: RequestInit,
   toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void,
 ): Promise<Response> {
-  // Inject X-Connection-Id header when an additional connection is active.
-  // Callers that already set the header explicitly take priority — the global
-  // is only used as a fallback so stale module state can't override a
-  // deliberately-chosen connection ID.
+  // Callers that set X-Connection-Id explicitly take priority over the global.
   const effectiveInit = { ...init };
   const existingHeaders = new Headers(effectiveInit.headers);
   if (_activeConnectionId && !existingHeaders.has("X-Connection-Id")) {
@@ -561,12 +602,10 @@ export async function securedFetch(
   }
   effectiveInit.headers = existingHeaders;
 
-  const response = await fetch(input, effectiveInit);
+  const response = await fetch(normalizeApiUrl(input), effectiveInit);
   const { status } = response;
 
-  // The server signals "your session is orphaned, sign out now" via this
-  // header. We only sign out on this explicit signal so that ordinary 401s
-  // (e.g. login form with wrong password) don't log out unrelated users.
+  // Sign out only on an explicit X-Session-Invalid signal, not on all 401s.
   if (status === 401 && response.headers.get("X-Session-Invalid") === "1") {
     triggerSessionInvalidationSignOut();
     setIndicator("offline");
@@ -581,6 +620,9 @@ export async function securedFetch(
       title: friendly.title,
       description: friendly.description,
       variant: "destructive",
+      rawMessage: friendly.rawMessage,
+      hint: friendly.hint,
+      hintLink: friendly.hintLink,
     });
 
     if (status === 401 || status >= 500) {
@@ -605,6 +647,8 @@ export const getDefaultQuery = (q?: string) =>
   q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN * LIMIT 100";
 
 export const getMetaStats = async (name: string, toast: ToastFn, setIndicator: (indicator: "online" | "offline") => void, isReadOnly?: boolean) => {
+  if (!name) return undefined;
+
   const q = "CALL db.meta.stats() YIELD labels, relTypes RETURN labels, relTypes as relationships";
   const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
 
@@ -614,11 +658,16 @@ export const getMetaStats = async (name: string, toast: ToastFn, setIndicator: (
     if (!result) return undefined;
 
     const row = result.data?.[0];
+    if (!row || typeof row !== "object" || Array.isArray(row)) return undefined;
 
-    if (!row) return undefined;
+    const { labels, relationships } = row;
+    if (
+      !labels || typeof labels !== "object" || Array.isArray(labels) ||
+      !relationships || typeof relationships !== "object" || Array.isArray(relationships)
+    ) return undefined;
 
-    const l = Object.entries(row.labels);
-    const r = Object.entries(row.relationships);
+    const l = Object.entries(labels);
+    const r = Object.entries(relationships);
 
     return [l, r];
   } catch (error) {
@@ -848,6 +897,27 @@ export function getQueryWithLimit(
 
   return [query, existingLimit];
 }
+
+export const convertToCanvasData = (graphData: GraphData): CanvasData => ({
+    nodes: graphData.nodes.map(({ id, labels, color, visible, size, data, expand }) => ({
+        id,
+        labels,
+        color,
+        visible,
+        size,
+        expand,
+        data
+    })),
+    links: graphData.links.map(({ id, relationship, color, visible, source, target, data }) => ({
+        id,
+        relationship,
+        color,
+        visible,
+        source,
+        target,
+        data
+    }))
+});
 
 export const formatName = (newGraphName: string) =>
   newGraphName === '""' ? "" : newGraphName;

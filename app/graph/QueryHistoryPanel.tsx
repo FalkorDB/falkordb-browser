@@ -2,6 +2,7 @@
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import * as monaco from "monaco-editor";
+import { Monaco } from "@monaco-editor/react";
 import { useTheme } from "next-themes";
 import { History, Info, Star, Trash2, X } from "lucide-react";
 import { cn, getTheme, Query } from "@/lib/utils";
@@ -11,9 +12,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { setConnectionItem, removeConnectionItem } from "@/lib/connection-storage";
 import Button from "../components/ui/Button";
 import EditorComponent from "../components/EditorComponent";
-import { CYPHER_LANGUAGE_NAME } from "../components/CypherEditor";
+import { LanguageConfig } from "../components/EditorComponent";
+import { CYPHER_LANGUAGE_NAME, STATIC_SUGGESTIONS } from "../components/CypherEditor";
+import { extractVariableCandidates } from "@/lib/cypherSuggestions";
 import PaginationList from "../components/PaginationList";
-import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext } from "../components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, UDFContext } from "../components/provider";
 import { Explain, Metadata, Profile } from "./MetadataView";
 
 type Tab = "text" | "metadata" | "explain" | "profile";
@@ -21,11 +24,15 @@ type Tab = "text" | "metadata" | "explain" | "profile";
 interface Props {
     onClose: () => void;
     graphName: string;
+    /** Optional: language config from the main Cypher editor. When provided, the
+     *  history editor shares the same suggestion logic (same schema, same sorting). */
+    languageConfig?: LanguageConfig;
 }
 
-export default function QueryHistoryPanel({ onClose, graphName }: Props) {
+export default function QueryHistoryPanel({ onClose, graphName, languageConfig: sharedLanguageConfig }: Props) {
     const { historyQuery, setHistoryQuery } = useContext(HistoryQueryContext);
-    const { graphNames, runQuery, fetchCount } = useContext(GraphContext);
+    const { graph, graphNames, runQuery, fetchCount } = useContext(GraphContext);
+    const { udfList } = useContext(UDFContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
     const { indicator } = useContext(IndicatorContext);
 
@@ -55,6 +62,84 @@ export default function QueryHistoryPanel({ onClose, graphName }: Props) {
     const currentQuery = historyQuery?.counter === 0
         ? historyQuery.currentQuery
         : historyQuery?.queries[historyQuery.counter - 1];
+
+    // Refs so getSuggestions closure always reads fresh values without recreating the config
+    const currentQueryRef = useRef(currentQuery);
+    const graphRef = useRef(graph);
+    const graphNameRef = useRef(graphName);
+    useEffect(() => { currentQueryRef.current = currentQuery; }, [currentQuery]);
+    useEffect(() => { graphRef.current = graph; }, [graph]);
+    useEffect(() => { graphNameRef.current = graphName; }, [graphName]);
+
+    const udfSuggestions = useMemo(() =>
+        udfList.flatMap(([, libName, , functions]) =>
+            functions.map((fn: string) => ({
+                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                insertText: `${libName}.${fn}(\${0})`,
+                label: `${libName}.${fn}()`,
+                kind: monaco.languages.CompletionItemKind.Function,
+                detail: '(udf function)',
+            }))
+        ), [udfList]);
+    const udfSuggestionsRef = useRef(udfSuggestions);
+    useEffect(() => { udfSuggestionsRef.current = udfSuggestions; }, [udfSuggestions]);
+
+    // Stable language config — getSuggestions reads from refs so it never needs recreation.
+    // Shows graph-based suggestions (labels, relationships, property keys) only when the
+    // query’s graph name matches the currently selected graph.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const historyLanguageConfig = useMemo((): LanguageConfig => ({
+        triggerCharacters: ['.'],
+        getSuggestions: async (monacoInstance: Monaco, context) => {
+            const g = graphRef.current;
+            const graphMatches = currentQueryRef.current?.graphName === graphNameRef.current;
+            const udfs = udfSuggestionsRef.current;
+
+            // Dot-triggered: property keys only (when graph matches)
+            if (context?.triggerCharacter === '.') {
+                if (!graphMatches) return [];
+                return (g.GraphInfo.PropertyKeys ?? []).map(key => ({
+                    insertText: key,
+                    label: key,
+                    kind: monacoInstance.languages.CompletionItemKind.Property,
+                    detail: '(property key)',
+                }));
+            }
+
+            // EditorComponent always overwrites `range`; use a loose type to avoid
+            // the strict `range` requirement on every push.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const items: any[] = [...STATIC_SUGGESTIONS, ...udfs];
+
+            // Bound variables from the currently displayed query
+            const queryText = currentQueryRef.current?.text ?? "";
+            extractVariableCandidates(queryText).forEach(v => {
+                items.push({
+                    insertText: v,
+                    label: v,
+                    kind: monacoInstance.languages.CompletionItemKind.Variable,
+                    detail: '(variable)',
+                });
+            });
+
+            if (graphMatches) {
+                g.GraphInfo.Labels.forEach((_, name) => {
+                    if (!name) return;
+                    items.push({ insertText: name, label: name, kind: monacoInstance.languages.CompletionItemKind.Class, detail: '(label)' });
+                });
+                g.GraphInfo.Relationships.forEach((_, name) => {
+                    if (!name) return;
+                    items.push({ insertText: name, label: name, kind: monacoInstance.languages.CompletionItemKind.Interface, detail: '(relationship type)' });
+                });
+                (g.GraphInfo.PropertyKeys ?? []).forEach(key => {
+                    items.push({ insertText: key, label: key, kind: monacoInstance.languages.CompletionItemKind.Property, detail: '(property key)' });
+                });
+            }
+
+            return items;
+        },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }), []);
 
     const afterSearchCallback = useCallback((newFilteredList: Query[]) => {
         const selectedQuery = historyQuery.counter === 0
@@ -188,8 +273,14 @@ export default function QueryHistoryPanel({ onClose, graphName }: Props) {
             submitQuery.current?.click();
         });
 
-        e.addCommand(monaco.KeyCode.Escape, () => {
-            searchQueryRef.current?.focus();
+        e.addAction({
+            id: 'escape-focus-search',
+            label: 'Focus search',
+            keybindings: [monaco.KeyCode.Escape],
+            precondition: '!suggestWidgetVisible',
+            run: () => {
+                searchQueryRef.current?.focus();
+            },
         });
 
         // eslint-disable-next-line no-bitwise
@@ -207,6 +298,20 @@ export default function QueryHistoryPanel({ onClose, graphName }: Props) {
             },
             precondition: '!suggestWidgetVisible',
         });
+
+        /* eslint-disable no-bitwise */
+        // Enable the Monaco find widget in the history editor.
+        e.addAction({
+            id: 'open-find-history',
+            label: 'Find',
+            keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF],
+            run: (editor) => { editor.getAction('actions.find')?.run(); },
+        });
+        // Prevent browser reload shortcuts from reloading the page inside the history editor.
+        // Users can press Escape to leave the editor, then reload normally.
+        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyR, () => { });
+        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyR, () => { });
+        /* eslint-enable no-bitwise */
     };
 
     const handleSubmit = async () => {
@@ -428,7 +533,7 @@ export default function QueryHistoryPanel({ onClose, graphName }: Props) {
                         }
                     </ul>
                 </PaginationList>
-                <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="w-full flex flex-col items-center basis-0 grow">
+                <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="w-full flex flex-col items-center basis-0 grow min-h-0 overflow-hidden">
                     <TabsList className="h-fit bg-background gap-1">
                         <TabsTrigger className={cn("px-2 py-0.5 text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
                         <TabsTrigger className={cn("px-2 py-0.5 text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>
@@ -467,11 +572,14 @@ export default function QueryHistoryPanel({ onClose, graphName }: Props) {
                                     className="SofiaSans"
                                     height="100%"
                                     language={CYPHER_LANGUAGE_NAME}
+                                    languageConfig={sharedLanguageConfig ?? historyLanguageConfig}
                                     themeName="selector-theme"
                                     options={{
                                         lineHeight: 22,
                                         fontSize: 14,
                                         lineNumbersMinChars: 3,
+                                        quickSuggestions: true,
+                                        suggestOnTriggerCharacters: true,
                                         scrollbar: {
                                             horizontal: wrapLines ? "hidden" : "auto"
                                         },

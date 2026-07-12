@@ -24,6 +24,10 @@ export default class SettingsTabsPage extends BasePage {
         return this.page.getByTestId("settingsCurrentTab");
     }
 
+    get timeoutInput(): Locator {
+        return this.page.locator("#timeoutInput");
+    }
+
     async clickBrowserTab(): Promise<void> {
         await interactWhenVisible(this.browserTab, (el) => el.click(), "Click Browser tab");
     }

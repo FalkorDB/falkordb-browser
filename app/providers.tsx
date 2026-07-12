@@ -3,17 +3,25 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, SyntaxErrorInfo, parseSyntaxError } from "@/lib/utils";
-import { serverEncrypt, serverDecrypt, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
+import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue } from "@/lib/utils";
+import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
+import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import { usePathname, useRouter } from "next/navigation";
-import { setUrlParam, useGraphParams } from "@/lib/useUrlParams";
+import { useGraphParams, syncRouteUrlParams } from "@/lib/useUrlParams";
 import { useToast } from "@/components/ui/use-toast";
+import { detectProviderFromApiKey, getProviderDisplayName, detectProviderFromModel } from "@/lib/ai-provider-utils";
+import { setFunctionCandidates } from "@/lib/cypherSuggestions";
+import { udfFunctionNames } from "@/lib/cypherLang";
+import { computeEditorDiagnostics, type DiagnosticsResult } from "@/lib/cypherDiagnostics";
+import { isAiFixSupported } from "@/lib/aiFix";
 import { PanelImperativeHandle } from "react-resizable-panels";
-import type { GraphData as CanvasData, ViewportState } from "@falkordb/canvas";
+import type { Data as CanvasData, HierarchyDirection, LayoutMode, RadialDirection, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
+import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
-import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, SyntaxErrorContext, SessionConnection } from "./components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
+import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
 
@@ -32,6 +40,110 @@ const defaultQueryHistory: HistoryQuery = {
     fav: false
   },
   counter: 0
+};
+
+const VALID_LAYOUTS: LayoutMode[] = ['force', 'tree', 'radial'];
+const HIERARCHY_DIRECTION_VALUES: HierarchyDirection[] = ['td', 'bu', 'lr', 'rl'];
+const RADIAL_DIRECTION_VALUES: RadialDirection[] = ['out', 'in'];
+
+const normalizeLayout = (value: string | null | undefined): LayoutMode =>
+  value && VALID_LAYOUTS.includes(value as LayoutMode) ? (value as LayoutMode) : 'force';
+
+// Normalize the URL direction against the resolved layout so an incompatible
+// combination (e.g. layout=radial&direction=td) falls back to a safe default.
+const normalizeDirection = (layout: LayoutMode, value: string | null | undefined): string => {
+  if (layout === 'tree') {
+    return value && HIERARCHY_DIRECTION_VALUES.includes(value as HierarchyDirection) ? value : 'td';
+  }
+  if (layout === 'radial') {
+    return value && RADIAL_DIRECTION_VALUES.includes(value as RadialDirection) ? value : 'out';
+  }
+  return '';
+};
+
+const CHAT_MODEL_SOURCE_STORAGE_KEY = "chatModelSource";
+const LOCAL_LLM_PROVIDER_STORAGE_KEY = "localLlmProvider";
+const LOCAL_LLM_ENDPOINT_STORAGE_KEY = "localLlmEndpoint";
+const DEFAULT_LOCAL_LLM_ENDPOINTS: Record<LocalLlmProvider, string> = {
+  ollama: "http://localhost:11434",
+  lmstudio: "http://localhost:1234/v1",
+};
+
+const normalizeChatModelSource = (value: string | null | undefined): ChatModelSource =>
+  value === "local" ? "local" : "api-key";
+
+const normalizeLocalLlmProvider = (value: string | null | undefined): LocalLlmProvider =>
+  value === "lmstudio" ? "lmstudio" : "ollama";
+
+const normalizeLocalLlmEndpoint = (
+  provider: LocalLlmProvider,
+  endpoint: string | null | undefined
+) => endpoint?.trim() || DEFAULT_LOCAL_LLM_ENDPOINTS[provider];
+
+const createChatApiKey = (key: string): ChatApiKey => {
+  const provider = detectProviderFromApiKey(key);
+  const providerName = provider === "unknown" ? "LLM" : getProviderDisplayName(provider);
+
+  return {
+    id: crypto.randomUUID(),
+    label: `${providerName} key`,
+    key,
+    provider,
+    createdAt: Date.now(),
+  };
+};
+
+const parseChatApiKeys = (value: string): ChatApiKey[] => {
+  const validProviders = new Set(["openai", "anthropic", "gemini", "ollama", "groq", "cohere", "xai"]);
+  const parsed = JSON.parse(value) as unknown;
+  if (!Array.isArray(parsed)) return [];
+
+  return parsed
+    .filter((item): item is ChatApiKey => {
+      if (!item || typeof item !== "object") return false;
+      const candidate = item as Partial<ChatApiKey>;
+      return typeof candidate.id === "string" &&
+        typeof candidate.label === "string" &&
+        typeof candidate.key === "string" &&
+        typeof candidate.provider === "string" &&
+        validProviders.has(candidate.provider);
+    })
+    .map(item => ({
+      ...item,
+      createdAt: typeof item.createdAt === "number" ? item.createdAt : Date.now(),
+    }));
+};
+
+const loadSelectedChatApiKeyId = () =>
+  localStorage.getItem(SELECTED_CHAT_API_KEY_ID_STORAGE_KEY) || "";
+
+/**
+ * Validates and normalises a model identifier before it is persisted.
+ * Only allows characters that appear in real model names (e.g. "gpt-4o",
+ * "llama3.1:8b-instruct") and blocks common API-key prefixes, ensuring that
+ * an accidentally-tainted value never reaches localStorage as a secret.
+ * Returns an empty string for anything that does not look like a model name.
+ */
+const sanitizeModelName = (value: string): string => {
+  const normalized = String(value ?? "").trim().slice(0, 128);
+  if (!normalized) return "";
+  // Block common secret-like prefixes
+  if (/^(sk-|rk-|pk-|api[_-]?key)/i.test(normalized)) return "";
+  // Allow only characters that appear in model identifiers
+  return /^[a-zA-Z0-9._:\-/]+$/.test(normalized) ? normalized : "";
+};
+
+/**
+ * Validates all values in a perSourceModels map through sanitizeModelName.
+ */
+const sanitizePerSourceModels = (value: unknown): Record<string, string> => {
+  if (!value || typeof value !== "object") return {};
+  const result: Record<string, string> = {};
+  for (const [key, modelValue] of Object.entries(value as Record<string, unknown>)) {
+    const safeModel = sanitizeModelName(String(modelValue ?? ""));
+    if (safeModel) result[String(key)] = safeModel;
+  }
+  return result;
 };
 
 /**
@@ -61,9 +173,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setConnectionPrefix(sessionData.user.host, sessionData.user.port, sessionData.user.username || "default");
       migrateToScopedStorage();
       setPrefixReady(true);
-    } else {
+    } else if (status === "unauthenticated") {
       // Clean up scoped data before clearing the prefix,
       // so removeConnectionItem can still resolve the scoped key.
+      // Only do this on explicit unauthenticated — not during "loading" —
+      // so savedContent isn't removed before content persistence can restore it.
       removeConnectionItem("savedContent");
       clearConnectionPrefix();
       setPrefixReady(false);
@@ -74,19 +188,77 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const canvasRef = useRef<GraphRef["current"]>(null);
   const contentRestoredRef = useRef(false);
 
-  const { graphName: urlGraphName, selected: urlSelected, query: urlQuery } = useGraphParams();
+  const { graphName: urlGraphName, selected: urlSelected, query: urlQuery, layout: urlLayout, direction: urlDirection } = useGraphParams();
   const initialQueryRef = useRef(urlQuery);
+  // Capture the URL graph param at render time — before any effects (e.g.
+  // syncRouteUrlParams) can strip ?graph= from window.location. We cannot
+  // rely on urlGraphName (useSearchParams) because it returns "" during SSR
+  // and the URL is mutated by effects before content persistence can read it.
+  const initialUrlGraphNameRef = useRef(
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("graph") || ""
+      : ""
+  );
 
   const [indicator, setIndicator] = useState<"online" | "offline">("online");
   const [historyQuery, setHistoryQuery] = useState<HistoryQuery>(defaultQueryHistory);
+  const [urlQueryText, setUrlQueryText] = useState<string | null>(null);
   const [selectedParam, setSelectedParam] = useState<string>(urlSelected);
   const [runDefaultQuery, setRunDefaultQuery] = useState(false);
   const [graphNames, setGraphNames] = useState<string[]>([]);
+  // Always-current ref so effects can validate graph names without re-running
+  // on every graphNames mutation (prevents spurious URL→state rollbacks).
+  const graphNamesRef = useRef<string[]>([]);
+  graphNamesRef.current = graphNames;
+  const [graphNamesLoaded, setGraphNamesLoaded] = useState(false);
   const [graph, setGraph] = useState<Graph>(Graph.empty());
+  // graphRef always points to the current graph so setGraphInfo can mutate
+  // graph.GraphInfo in-place without triggering a graph state change.
+  const graphRef = useRef<Graph>(graph);
+  graphRef.current = graph;
+  // graphInfo / nodesCount / edgesCount state is owned by GraphInfoProvider so
+  // that periodic info polls only re-render that isolated subtree, not the
+  // whole providers tree.  We communicate with it via a stable ref of setters.
+  const graphInfoPendingRef = useRef<GraphInfoPendingUpdates>({
+    versionBumps: 0,
+    hasNodesCount: false,
+    nodesCount: undefined,
+    hasEdgesCount: false,
+    edgesCount: undefined,
+  });
+  const graphInfoSyncRef = useRef<GraphInfoSync>({
+    bumpVersion: () => {
+      graphInfoPendingRef.current.versionBumps += 1;
+    },
+    setNodesCount: n => {
+      graphInfoPendingRef.current.nodesCount = n;
+      graphInfoPendingRef.current.hasNodesCount = true;
+    },
+    setEdgesCount: e => {
+      graphInfoPendingRef.current.edgesCount = e;
+      graphInfoPendingRef.current.hasEdgesCount = true;
+    },
+  });
+
+  const setGraphInfo = useCallback((gi: GraphInfo) => {
+    // Mutate graphRef.current.GraphInfo in-place — no graph state change, so
+    // GraphContext consumers (canvas, toolbar, …) are not disturbed. graphRef
+    // always points at the current graph (kept in sync on every render), so we
+    // avoid a redundant setGraph call that would bail out anyway (same object).
+    graphRef.current.GraphInfo = gi;
+    // Bump the version counter in GraphInfoProvider so its consumers
+    // re-render and read the fresh data from graph.GraphInfo.
+    graphInfoSyncRef.current.bumpVersion();
+  }, []);
   const [data, setData] = useState<GraphData>({ ...graph.Elements });
   const [graphData, setGraphData] = useState<CanvasData>();
-  const [graphInfo, setGraphInfo] = useState<GraphInfo>(GraphInfo.empty(toast, setIndicator));
-  const [graphName, setGraphName] = useState<string>(urlGraphName);
+  const [layout, setLayout] = useState<LayoutMode>(normalizeLayout(urlLayout));
+  const [direction, setDirection] = useState(() => normalizeDirection(normalizeLayout(urlLayout), urlDirection));
+  // Do NOT initialize from urlGraphName — start empty and let the gated URL sync
+  // below apply it only after the graph list is loaded and the name is validated.
+  // This prevents page.tsx from running queries (and FalkorDB from auto-creating
+  // graphs) before we know whether the URL graph actually exists.
+  const [graphName, setGraphName] = useState<string>("");
   const [contentPersistence, setContentPersistence] = useState(false);
   const [defaultQuery, setDefaultQuery] = useState("");
   const [timeout, setTimeout] = useState(0);
@@ -101,21 +273,29 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [newRefreshInterval, setNewRefreshInterval] = useState(0);
   const [currentTab, setCurrentTab] = useState<Tab>("Graph");
   const [newSecretKey, setNewSecretKey] = useState("");
-  const [newModel, setNewModel] = useState("");
   const [secretKey, setSecretKey] = useState("");
   const [hasChanges, setHasChanges] = useState(false);
-  const [nodesCount, setNodesCount] = useState<number>();
-  const [edgesCount, setEdgesCount] = useState<number>();
   const [newMaxSavedMessages, setNewMaxSavedMessages] = useState(0);
   const [maxSavedMessages, setMaxSavedMessages] = useState(0);
+  const [chatApiKeys, setChatApiKeys] = useState<ChatApiKey[]>([]);
+  const [selectedChatApiKeyId, setSelectedChatApiKeyId] = useState("");
+  const [chatModelSource, setChatModelSource] = useState<ChatModelSource>("api-key");
+  const [localLlmProvider, setLocalLlmProvider] = useState<LocalLlmProvider>("ollama");
+  const [localLlmEndpoint, setLocalLlmEndpoint] = useState(DEFAULT_LOCAL_LLM_ENDPOINTS.ollama);
+  const [newChatModelSource, setNewChatModelSource] = useState<ChatModelSource>("api-key");
+  const [newLocalLlmProvider, setNewLocalLlmProvider] = useState<LocalLlmProvider>("ollama");
+  const [newLocalLlmEndpoint, setNewLocalLlmEndpoint] = useState(DEFAULT_LOCAL_LLM_ENDPOINTS.ollama);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0);
   const [isQueryLoading, setIsQueryLoading] = useState(false);
-  const [syntaxError, setSyntaxError] = useState<SyntaxErrorInfo | null>(null);
+  const [diagnostics, setDiagnostics] = useState<DiagnosticsResult | null>(null);
   const [model, setModel] = useState("");
+  const [newModel, setNewModel] = useState("");
+  const [perSourceModels, setPerSourceModels] = useState<Record<string, string>>({});
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>([]);
   const [userGraphBeforeTutorial, setUserGraphBeforeTutorial] = useState<string>("");
+  const [urlParamsBeforeTutorial, setUrlParamsBeforeTutorial] = useState<string>("");
   const [showMemoryUsage, setShowMemoryUsage] = useState(false);
   const [labels, setLabels] = useState<Label[]>([]);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
@@ -167,7 +347,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       contentPersistenceSettings: { newContentPersistence, setNewContentPersistence },
       captionsKeysSettings: { newCaptionsKeys, setNewCaptionsKeys },
       showPropertyKeyPrefixSettings: { newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
-      chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly },
+      chatSettings: { newSecretKey, setNewSecretKey, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly, newChatModelSource, setNewChatModelSource, newLocalLlmProvider, setNewLocalLlmProvider, newLocalLlmEndpoint, setNewLocalLlmEndpoint, newModel, setNewModel },
       graphInfo: { newRefreshInterval, setNewRefreshInterval, newMaxItemsForSearch, setNewMaxItemsForSearch },
       tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple }
     },
@@ -179,7 +359,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       contentPersistenceSettings: { contentPersistence, setContentPersistence },
       captionsKeysSettings: { captionsKeys, setCaptionsKeys },
       showPropertyKeyPrefixSettings: { showPropertyKeyPrefix, setShowPropertyKeyPrefix },
-      chatSettings: { secretKey, setSecretKey, model, setModel, maxSavedMessages, setMaxSavedMessages, cypherOnly, setCypherOnly },
+      chatSettings: { secretKey, setSecretKey, chatApiKeys, setChatApiKeys, selectedChatApiKeyId, setSelectedChatApiKeyId, chatModelSource, setChatModelSource, localLlmProvider, setLocalLlmProvider, localLlmEndpoint, setLocalLlmEndpoint, model, setModel, maxSavedMessages, setMaxSavedMessages, cypherOnly, setCypherOnly, perSourceModels, setPerSourceModels },
       graphInfo: { showMemoryUsage, refreshInterval, setRefreshInterval, maxItemsForSearch, setMaxItemsForSearch },
       tableViewSettings: { columnWidth, setColumnWidth, rowHeight, setRowHeight, rowHeightExpandMultiple, setRowHeightExpandMultiple }
     },
@@ -195,7 +375,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       localStorage.setItem("defaultQuery", newDefaultQuery);
       localStorage.setItem("limit", newLimit.toString());
       localStorage.setItem("refreshInterval", newRefreshInterval.toString());
-      localStorage.setItem("model", newModel);
       localStorage.setItem("maxSavedMessages", newMaxSavedMessages.toString());
       localStorage.setItem("captionsKeys", JSON.stringify(newCaptionsKeys));
       localStorage.setItem("showPropertyKeyPrefix", newShowPropertyKeyPrefix.toString());
@@ -205,35 +384,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       localStorage.setItem("rowHeightExpandMultiple", newRowHeightExpandMultiple.toString());
       localStorage.setItem("maxItemsForSearch", newMaxItemsForSearch.toString());
 
-      // Only encrypt and save secret key if it has changed
-      if (newSecretKey !== secretKey) {
-        if (newSecretKey) {
-          try {
-            const encryptedKey = await serverEncrypt(newSecretKey);
-            if (!encryptedKey) {
-              toast({
-                title: "Error",
-                description: "Could not encrypt secret key. Please try again.",
-                variant: "destructive",
-              });
-              return;
-            }
-            localStorage.setItem("secretKey", encryptedKey);
-          } catch (error) {
-            console.error('Failed to encrypt secret key:', error);
-            toast({
-              title: "Error",
-              description: "Could not encrypt secret key. Please try again.",
-              variant: "destructive",
-            });
-            return;
-          }
-        } else {
-          // Key is empty - remove it from storage
-          localStorage.removeItem("secretKey");
-        }
-      }
-
       // Update context
       setContentPersistence(newContentPersistence);
       setRunDefaultQuery(newRunDefaultQuery);
@@ -241,8 +391,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setTimeout(newTimeout);
       setLimit(newLimit);
       setLastLimit(limit);
-      setSecretKey(newSecretKey);
-      setModel(newModel);
       setRefreshInterval(newRefreshInterval);
       setMaxSavedMessages(newMaxSavedMessages);
       setCaptionsKeys(newCaptionsKeys);
@@ -252,6 +400,20 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setRowHeight(newRowHeight);
       setRowHeightExpandMultiple(newRowHeightExpandMultiple);
       setMaxItemsForSearch(newMaxItemsForSearch);
+      // Apply LLM connection settings
+      setChatModelSource(newChatModelSource);
+      setLocalLlmProvider(newLocalLlmProvider);
+      setLocalLlmEndpoint(newLocalLlmEndpoint);
+      setModel(newModel);
+      const sourceKey = newChatModelSource === "local" ? newLocalLlmProvider : "api-key";
+      const next = sanitizePerSourceModels({ ...perSourceModels, [sourceKey]: sanitizeModelName(newModel) });
+      setPerSourceModels(next);
+      localStorage.setItem("perSourceModels", JSON.stringify(next));
+      // chatModelSource and localLlmProvider are non-secret enum values
+      localStorage.setItem(CHAT_MODEL_SOURCE_STORAGE_KEY, newChatModelSource === "local" ? "local" : "api-key");
+      localStorage.setItem(LOCAL_LLM_PROVIDER_STORAGE_KEY, newLocalLlmProvider === "lmstudio" ? "lmstudio" : "ollama");
+      localStorage.setItem(LOCAL_LLM_ENDPOINT_STORAGE_KEY, normalizeLocalLlmEndpoint(newLocalLlmProvider, newLocalLlmEndpoint));
+      localStorage.setItem("model", sanitizeModelName(newModel));
       // Reset has changes
       setHasChanges(false);
 
@@ -268,7 +430,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setNewTimeout(timeout);
       setNewLimit(limit);
       setNewSecretKey(secretKey);
-      setNewModel(model);
       setNewRefreshInterval(refreshInterval);
       setNewMaxSavedMessages(maxSavedMessages);
       setNewCaptionsKeys(captionsKeys);
@@ -278,10 +439,14 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setNewRowHeight(rowHeight);
       setNewRowHeightExpandMultiple(rowHeightExpandMultiple);
       setNewMaxItemsForSearch(maxItemsForSearch);
+      setNewChatModelSource(chatModelSource);
+      setNewLocalLlmProvider(localLlmProvider);
+      setNewLocalLlmEndpoint(localLlmEndpoint);
+      setNewModel(model);
       setHasChanges(false);
     }
 
-  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, toast]);
+  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, newContentPersistence, newDefaultQuery, newLimit, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, toast, perSourceModels, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, newModel]);
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -298,10 +463,109 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setIsQueryLoading,
   }), [isQueryLoading]);
 
-  const syntaxErrorContext = useMemo(() => ({
-    syntaxError,
-    setSyntaxError,
-  }), [syntaxError]);
+  const diagnosticsContext = useMemo(() => ({
+    diagnostics,
+    setDiagnostics,
+  }), [diagnostics]);
+
+  // --- "Fix with AI" (Idea #3) -----------------------------------------------
+  const [lastFailure, setLastFailure] = useState<{ query: string; errorMessage: string } | null>(null);
+  const [aiFixResult, setAiFixResult] = useState<AiFixResult>({ status: "idle" });
+  const [pendingConsent, setPendingConsent] = useState<{ query: string; errorMessage: string; provider: ReturnType<typeof detectProviderFromModel> } | null>(null);
+
+  const resolvedChatKey = useMemo(
+    () => (chatApiKeys.find(k => k.id === selectedChatApiKeyId)?.key) || secretKey,
+    [chatApiKeys, selectedChatApiKeyId, secretKey]
+  );
+  const aiFixSupported = useMemo(
+    () => isAiFixSupported({ model, key: resolvedChatKey, source: chatModelSource, localProvider: localLlmProvider }),
+    [model, resolvedChatKey, chatModelSource, localLlmProvider]
+  );
+
+  const doAiFix = useCallback(async (query: string, errorMessage: string) => {
+    setAiFixResult({ status: "loading" });
+    try {
+      const headers = new Headers({ "Content-Type": "application/json" });
+      const connId = getActiveConnectionIdGlobal();
+      if (connId) headers.set("X-Connection-Id", connId);
+      const res = await fetch("/api/chat/fix", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          query,
+          errorMessage,
+          graphName,
+          model,
+          key: chatModelSource === "local" ? "" : resolvedChatKey,
+          modelSource: chatModelSource,
+          localProvider: localLlmProvider,
+          localEndpoint: localLlmEndpoint,
+        }),
+      });
+      if (res.status === 401 && res.headers.get("X-Session-Invalid") === "1") {
+        const { signOut } = await import("next-auth/react");
+        await signOut({ callbackUrl: "/login" });
+        setIndicator("offline");
+        setAiFixResult({ status: "idle" });
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAiFixResult({ status: "error", error: data?.error || "Couldn't get a fix from the AI provider." });
+        return;
+      }
+      setAiFixResult({ status: "done", explanation: data.explanation, correctedQuery: data.correctedQuery });
+    } catch {
+      setAiFixResult({ status: "error", error: "Couldn't reach the server. Please try again." });
+    }
+  }, [graphName, model, chatModelSource, localLlmProvider, localLlmEndpoint, resolvedChatKey]);
+
+  const requestAiFix = useCallback((query: string, errorMessage: string) => {
+    if (aiFixResult.status === "loading") return;
+    if (chatModelSource === "api-key") {
+      const provider = detectProviderFromModel(model);
+      const consented = typeof window !== "undefined" && localStorage.getItem(`aiFixConsent-${provider}`) === "true";
+      if (!consented) {
+        // Capture the provider now so a later model change doesn't alter what the user
+        // is consenting to (the dialog label, the localStorage key, and persistence).
+        setPendingConsent({ query, errorMessage, provider });
+        return;
+      }
+    }
+    doAiFix(query, errorMessage);
+  }, [aiFixResult.status, chatModelSource, model, doAiFix]);
+
+  const confirmConsent = useCallback((dontAskAgain: boolean) => {
+    if (!pendingConsent) return;
+    if (dontAskAgain && typeof window !== "undefined") {
+      localStorage.setItem(`aiFixConsent-${pendingConsent.provider}`, "true");
+    }
+    const { query, errorMessage } = pendingConsent;
+    setPendingConsent(null);
+    doAiFix(query, errorMessage);
+  }, [pendingConsent, doAiFix]);
+
+  const aiFixContext = useMemo(() => ({
+    aiFixSupported,
+    lastFailure,
+    result: aiFixResult,
+    pendingConsentProvider: pendingConsent ? getProviderDisplayName(pendingConsent.provider) : null,
+    requestAiFix,
+    confirmConsent,
+    cancelConsent: () => setPendingConsent(null),
+    dismissResult: () => setAiFixResult({ status: "idle" }),
+    insertCorrectedQuery: (q: string) => {
+      setHistoryQuery(prev => ({ ...prev, query: q }));
+      setUrlQueryText(q);
+      setAiFixResult({ status: "idle" });
+    },
+  }), [aiFixSupported, lastFailure, aiFixResult, pendingConsent, requestAiFix, confirmConsent]);
+
+  // Refs so runQuery can always call the latest requestAiFix without being in its
+  // eslint-disable-next-line dependency array (avoids recreating runQuery on every AI-state change).
+  const requestAiFixRef = useRef(requestAiFix);
+  requestAiFixRef.current = requestAiFix;
+  // ---------------------------------------------------------------------------
 
   const forceGraphContext = useMemo(() => ({
     canvasRef,
@@ -311,7 +575,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setData,
     graphData,
     setGraphData,
-  }), [canvasRef, viewport, data, graphData]);
+    layout,
+    setLayout,
+    direction,
+    setDirection,
+  }), [canvasRef, viewport, data, graphData, layout, direction]);
 
   const tableViewContext = useMemo(() => ({
     scrollPosition,
@@ -324,14 +592,16 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   }), [scrollPosition, search, expand, dataHash]);
 
   const isReadOnly = useMemo(() =>
-    sessionData?.user?.role === "Read-Only" || connectionInfo.sentinelRole === "slave",
-    [sessionData?.user?.role, connectionInfo.sentinelRole]
+    sessionData?.user?.role === "Read-Only" || (connectionType === "Sentinel" && connectionInfo.sentinelRole === "replica"),
+    [sessionData?.user?.role, connectionInfo.sentinelRole, connectionType]
   );
   // Ref that always holds the latest isReadOnly value.
   // Callbacks read from the ref so they don't need isReadOnly in their
   // dependency arrays, which avoids cascading effect re-fires.
   const isReadOnlyRef = useRef(isReadOnly);
   isReadOnlyRef.current = isReadOnly;
+  const activeGraphNameRef = useRef(graphName);
+  activeGraphNameRef.current = graphName;
 
   const connectionContext = useMemo(() => ({
     connectionType,
@@ -360,19 +630,18 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     if (!n || status === "unauthenticated") return;
 
-    setEdgesCount(undefined);
-    setNodesCount(undefined);
-
     try {
       const readOnlyParam = isReadOnlyRef.current ? '?readOnly=true' : '';
       const result = await getSSEGraphResult(`api/graph/${prepareArg(n)}/count${readOnlyParam}`, toast, setIndicator) as { nodes?: number; edges?: number };
 
       if (!result) return;
 
+      if (n !== activeGraphNameRef.current) return;
+
       const { nodes, edges } = result;
 
-      setEdgesCount(edges);
-      setNodesCount(nodes);
+      graphInfoSyncRef.current.setEdgesCount(edges);
+      graphInfoSyncRef.current.setNodesCount(nodes);
     } catch (error) {
       console.error(error);
     }
@@ -385,19 +654,53 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   }, []);
 
   const fetchInfo = useCallback(async (type: string, name: string) => {
-    if (!graphName) return [];
+    if (!name) return [];
+
+    if (type === "(property key)") {
+      const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
+      const query = "CALL db.propertyKeys() YIELD propertyKey as info";
+      const sse = await getSSEGraphResult(
+        `/api/graph/${prepareArg(name)}?query=${prepareArg(query)}${readOnlyParam}`,
+        toast,
+        setIndicator,
+      ) as { data?: Array<{ info?: unknown }> };
+
+      if (!sse || !Array.isArray(sse.data)) return [];
+
+      return sse.data
+        .map((entry) => (typeof entry?.info === "string" ? entry.info : undefined))
+        .filter((value): value is string => typeof value === "string");
+    }
 
     const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
-    const result = await securedFetch(`/api/graph/${name}/info?type=${type}${readOnlyParam}`, {
+    const result = await securedFetch(`/api/graph/${prepareArg(name)}/info?type=${prepareArg(type)}${readOnlyParam}`, {
       method: "GET",
     }, toast, setIndicator);
 
     if (!result.ok) return [];
 
-    const json = await result.json();
+    const bodyText = await result.text();
+    let json: unknown;
 
-    return json.result.data.map(({ info }: { info: string }) => info);
-  }, [graphName, toast, setIndicator]);
+    try {
+      json = JSON.parse(bodyText);
+    } catch (error) {
+      console.error("Failed to parse graph info response", {
+        error,
+        responseUrl: result.url,
+        contentType: result.headers.get("content-type"),
+        preview: bodyText.slice(0, 200),
+      });
+      return [];
+    }
+
+    const data = (json as { result?: { data?: Array<{ info?: unknown }> } })?.result?.data;
+    if (!Array.isArray(data)) return [];
+
+    return data
+      .map((entry) => (typeof entry?.info === "string" ? entry.info : undefined))
+      .filter((value): value is string => typeof value === "string");
+  }, [toast, setIndicator]);
 
   const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator, isReadOnlyRef.current), [toast, setIndicator]);
 
@@ -422,7 +725,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     };
 
     setIsQueryLoading(true);
-    setSyntaxError(null);
+    setDiagnostics(null);
+    setLastFailure(null);
 
     setHistoryQuery(prev => ({
       ...prev,
@@ -434,7 +738,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
     const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}${readOnlyParam}`;
     try {
-      const result = await getSSEGraphResult(url, toast, setIndicator) as { data: Data; metadata: string[] };
+      const result = await getSSEGraphResult(url, toast, setIndicator, {
+        query: q,
+      }) as { data: Data; metadata: string[] };
 
       if (!result) throw new Error("Failed to execute query");
 
@@ -446,7 +752,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         const newLabels = metaStats?.[0] || [];
         const newRelationships = metaStats?.[1] || [];
         const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
-        setGraphInfo(gi);
+        // setGraph(g) below already carries gi inside — no separate setGraphInfo needed.
         return gi;
       }).catch((error) => {
         console.error("Failed to fetch graph info:", error);
@@ -479,6 +785,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setGraph(g);
       setData({ ...g.Elements });
       fetchCount(n);
+      if (!tutorialOpen) {
+        setCurrentTab(g.getElements().length === 0 && g.Data.length !== 0 ? "Table" : "Graph");
+      }
       setLastLimit(limit);
 
       if (!tutorialOpen && prefixReady) {
@@ -504,9 +813,24 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       handleCooldown(-1);
     } catch (err) {
       // Errors from getSSEGraphResult are already surfaced via toast
-      const parsed = parseSyntaxError((err as Error).message || "");
-      if (parsed) setSyntaxError(parsed);
+      const errorMessage = (err as Error).message || "";
+      setDiagnostics(computeEditorDiagnostics(newQuery.text, errorMessage));
+      setLastFailure({ query: newQuery.text, errorMessage });
+
+      // Save failed query to history with the error message
+      newQuery = { ...newQuery, errorMessage };
+      const failedQueries = handelGetNewQueries(newQuery);
+      if (prefixReady) {
+        setConnectionItem("query history", JSON.stringify(failedQueries));
+      }
+      setHistoryQuery(prev => ({
+        ...prev,
+        queries: failedQueries,
+        currentQuery: newQuery,
+        counter: 0
+      }));
     } finally {
+      setUrlQueryText(newQuery.text);
       setIsQueryLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -521,15 +845,16 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setGraphName(name);
     setSelectedParam("");
     setGraphInfo(GraphInfo.empty(toast, setIndicator));
-    setNodesCount(undefined);
-    setEdgesCount(undefined);
+    graphInfoSyncRef.current.setNodesCount(undefined);
+    graphInfoSyncRef.current.setEdgesCount(undefined);
     setData({ nodes: [], links: [] });
     setGraphData(undefined);
     setViewport(undefined);
     setSearch("");
     setScrollPosition(0);
-    setSyntaxError(null);
+    setDiagnostics(null);
     setHistoryQuery(h => ({ ...h, query: "", currentQuery: defaultQueryHistory.currentQuery }));
+    setUrlQueryText(null);
   }, [toast, setIndicator]);
 
   const graphContext = useMemo(() => ({
@@ -537,7 +862,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setGraph,
     graphName,
     handleSetGraphName,
-    graphInfo,
     setGraphInfo,
     graphNames,
     setGraphNames,
@@ -545,10 +869,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setLabels,
     relationships,
     setRelationships,
-    nodesCount,
-    setNodesCount,
-    edgesCount,
-    setEdgesCount,
     currentTab,
     setCurrentTab,
     runQuery,
@@ -562,7 +882,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     selectedParam,
     setSelectedParam,
     initialQuery: initialQueryRef.current,
-  }), [graph, graphName, handleSetGraphName, graphInfo, graphNames, labels, relationships, nodesCount, edgesCount, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, selectedParam]);
+  }), [graph, graphName, handleSetGraphName, graphNames, labels, relationships, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, selectedParam]);
 
   useEffect(() => {
     setRelationships([...graph.Relationships]);
@@ -574,6 +894,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // restoring _activeConnectionId even when Next.js HMR resets the module.
 
   useEffect(() => { setActiveConnectionIdGlobal(activeConnectionId); });
+
+  // Keep "Did you mean…?" function suggestions aware of the loaded UDFs.
+  useEffect(() => { setFunctionCandidates(udfFunctionNames(udfList)); }, [udfList]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -593,7 +916,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         setShowMemoryUsage(name === "graph" && version >= MEMORY_USAGE_VERSION_THRESHOLD);
       } catch { /* ignore */ }
     })();
-     
+
   }, [status, activeConnectionId]);
   useEffect(() => {
     if (status !== "authenticated") {
@@ -601,20 +924,22 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       return;
     }
 
+    let stale = false;
     (async () => {
       try {
         const result = await securedFetch("/api/info", {
           method: "GET",
         }, toast, setIndicator);
 
-        if (!result.ok) return;
+        if (!result.ok || stale) return;
 
         const json = await result.json();
 
+        if (stale) return;
         setConnectionType((() => {
           switch (true) {
             case json.result.includes("cluster_enabled:1"): return "Cluster";
-            case /role:slave/.test(json.result): return "Sentinel";
+            case /role:(slave|replica)/.test(json.result): return "Sentinel";
             case /connected_slaves:[1-9]/.test(json.result): return "Sentinel";
             default: return "Standalone";
           }
@@ -623,7 +948,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         console.error("Failed to fetch connection type:", err);
       }
     })();
-  }, [status, toast]);
+    return () => { stale = true; };
+  }, [status, toast, activeConnectionId]);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -631,23 +957,25 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       return;
     }
 
+    let stale = false;
     (async () => {
       try {
         const result = await securedFetch("/api/connection-info", {
           method: "GET",
         }, toast, setIndicator);
 
-        if (!result.ok) return;
+        if (!result.ok || stale) return;
 
         const json = await result.json();
-        if (json?.result) {
+        if (!stale && json?.result) {
           setConnectionInfo(json.result);
         }
       } catch (err) {
         console.error("Failed to fetch connection info:", err);
       }
     })();
-  }, [status, toast]);
+    return () => { stale = true; };
+  }, [status, toast, activeConnectionId]);
 
   // Fetch connections for this session and auto-select the active one
   useEffect(() => {
@@ -702,6 +1030,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                 activeConnectionId: target,
               });
             }
+
           } else {
             // Token DB returned no connections — the session is out of sync.
             // This happens after a server restart (FileTokenStorage wiped),
@@ -777,7 +1106,49 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         console.error("Failed to parse captions keys from localStorage", error);
         setCaptionsKeys([['name', false], ['title', false]]);
       }
-      setTimeout(parseInt(localStorage.getItem("timeout") || "60", 10));
+      const storedTimeout = localStorage.getItem("timeout");
+      let timeoutVal: number;
+      if (storedTimeout) {
+        const parsedStoredTimeout = parseInt(storedTimeout, 10);
+        timeoutVal = Number.isFinite(parsedStoredTimeout) && parsedStoredTimeout >= 0
+          ? parsedStoredTimeout
+          : 60;
+      } else {
+        // No user-set value: cap the default (60s) with TIMEOUT_MAX from server config.
+        // The timeout query param is in seconds (the API multiplies by 1000), so TIMEOUT_MAX (ms) is converted to seconds below.
+        let fallback = 60;
+        try {
+          const configRes = await fetch("/api/graph/config", { method: "GET" });
+          if (configRes.ok) {
+            const { configs } = await configRes.json();
+            const typedConfigs: [string, string | number][] = Array.isArray(configs)
+              ? configs.filter((entry: unknown): entry is [string, string | number] => {
+                return (
+                  Array.isArray(entry)
+                  && entry.length >= 2
+                  && typeof entry[0] === "string"
+                  && (typeof entry[1] === "string" || typeof entry[1] === "number")
+                );
+              })
+              : [];
+            const timeoutMaxEntry = typedConfigs.find((c) => c[0] === "TIMEOUT_MAX");
+            if (timeoutMaxEntry) {
+              const timeoutMaxMs = Number(timeoutMaxEntry[1]);
+              if (timeoutMaxMs > 0) {
+                const timeoutMaxSeconds = Math.floor(timeoutMaxMs / 1000);
+                if (fallback > timeoutMaxSeconds) {
+                  fallback = timeoutMaxSeconds;
+                }
+              }
+            }
+          }
+        } catch (error) {
+          // If config fetch fails, use the default as-is
+          console.warn("Failed to fetch /api/graph/config for timeout initialization", error);
+        }
+        timeoutVal = fallback;
+      }
+      setTimeout(timeoutVal);
       const l = parseInt(localStorage.getItem("limit") || "300", 10);
       setLimit(l);
       setLastLimit(l);
@@ -794,72 +1165,103 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setRowHeightExpandMultiple(parseInt(localStorage.getItem("rowHeightExpandMultiple") || "3", 10));
       const parsedMaxItems = parseInt(localStorage.getItem("maxItemsForSearch") || "20", 10);
       setMaxItemsForSearch(Number.isFinite(parsedMaxItems) ? Math.min(Math.max(parsedMaxItems, 10), 50) : 20);
-      // Decrypt secret key using server-side decryption, with migration from old client-side encryption
-      const storedSecretKey = localStorage.getItem("secretKey") || "";
-      if (storedSecretKey) {
-        if (isLegacyEncrypted(storedSecretKey)) {
-          // Old client-side encrypted value - decrypt with legacy method, then re-encrypt server-side
-          try {
-            const plainKey = await legacyDecrypt(storedSecretKey);
-            if (plainKey) {
-              setSecretKey(plainKey);
-              const newEncrypted = await serverEncrypt(plainKey);
-              if (newEncrypted) {
-                localStorage.setItem("secretKey", newEncrypted);
-              }
-              clearLegacyEncryptionKey();
-            } else {
-              // eslint-disable-next-line no-console
-              console.warn('Could not decrypt legacy secret key, clearing');
-              setSecretKey('');
-              localStorage.removeItem("secretKey");
-              clearLegacyEncryptionKey();
-            }
-          } catch (error) {
-            console.error('Failed to migrate legacy secret key:', error);
-            setSecretKey('');
-            localStorage.removeItem("secretKey");
-          }
-        } else {
-          // Try server-side decryption (new format or plain text)
-          try {
-            const decryptedKey = await serverDecrypt(storedSecretKey);
-            if (decryptedKey) {
-              setSecretKey(decryptedKey);
-            } else {
-              // eslint-disable-next-line no-console
-              console.warn('Clearing corrupted encrypted secret key');
-              setSecretKey('');
-              localStorage.removeItem("secretKey");
-            }
-          } catch {
-            // Not server-encrypted - treat as plain text, migrate to server encryption
+      const loadedChatModelSource = normalizeChatModelSource(localStorage.getItem(CHAT_MODEL_SOURCE_STORAGE_KEY));
+      const loadedLocalLlmProvider = normalizeLocalLlmProvider(localStorage.getItem(LOCAL_LLM_PROVIDER_STORAGE_KEY));
+      const rawEndpoint = localStorage.getItem(LOCAL_LLM_ENDPOINT_STORAGE_KEY);
+      const loadedLocalLlmEndpoint = normalizeLocalLlmEndpoint(
+        loadedLocalLlmProvider,
+        looksServerEncrypted(rawEndpoint ?? "") ? null : rawEndpoint
+      );
+      setChatModelSource(loadedChatModelSource);
+      setNewChatModelSource(loadedChatModelSource);
+      setLocalLlmProvider(loadedLocalLlmProvider);
+      setNewLocalLlmProvider(loadedLocalLlmProvider);
+      setLocalLlmEndpoint(loadedLocalLlmEndpoint);
+      setNewLocalLlmEndpoint(loadedLocalLlmEndpoint);
+      let loadedChatApiKeys: ChatApiKey[] = [];
+      const storedChatApiKeys = localStorage.getItem(CHAT_API_KEYS_STORAGE_KEY) || "";
+      if (storedChatApiKeys) {
+        try {
+          // Validate format before decrypting - only decrypt if looks server-encrypted
+          if (looksServerEncrypted(storedChatApiKeys)) {
+            const decryptedKeys = await serverDecrypt(storedChatApiKeys);
+            loadedChatApiKeys = decryptedKeys ? parseChatApiKeys(decryptedKeys) : [];
+          } else {
+            // Try to parse directly as plaintext JSON for legacy or test values
             try {
-              setSecretKey(storedSecretKey);
-              const encryptedKey = await serverEncrypt(storedSecretKey);
-              if (encryptedKey) {
-                localStorage.setItem("secretKey", encryptedKey);
-              }
-            } catch (migrateError) {
-              console.error('Failed to migrate plain text key:', migrateError);
+              loadedChatApiKeys = parseChatApiKeys(storedChatApiKeys);
+            } catch {
+              console.warn('Stored API keys format unrecognized, clearing corrupted data');
+              localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
             }
           }
+        } catch (error) {
+          console.error('Failed to decrypt API keys:', error);
+          localStorage.removeItem(CHAT_API_KEYS_STORAGE_KEY);
         }
       }
 
-      setModel(localStorage.getItem("model") || "");
+      // Migrate the legacy single-key setting into the new key list.
+      const storedSecretKey = localStorage.getItem("secretKey") || "";
+      if (loadedChatApiKeys.length === 0 && storedSecretKey) {
+        let migratedKey = "";
+        if (isLegacyEncrypted(storedSecretKey)) {
+          try {
+            migratedKey = await legacyDecrypt(storedSecretKey);
+            clearLegacyEncryptionKey();
+          } catch (error) {
+            console.error('Failed to migrate legacy secret key:', error);
+          }
+        } else {
+          try {
+            migratedKey = await serverDecrypt(storedSecretKey);
+          } catch {
+            migratedKey = storedSecretKey;
+          }
+        }
+
+        if (migratedKey) {
+          const migratedChatApiKeys = [createChatApiKey(migratedKey)];
+          const encryptedKeys = await serverEncrypt(JSON.stringify(migratedChatApiKeys));
+          if (encryptedKeys) {
+            loadedChatApiKeys = migratedChatApiKeys;
+            localStorage.setItem(CHAT_API_KEYS_STORAGE_KEY, encryptedKeys);
+            localStorage.removeItem("secretKey");
+          }
+        } else if (isLegacyEncrypted(storedSecretKey)) {
+          localStorage.removeItem("secretKey");
+        }
+      }
+
+      const storedSelectedId = loadSelectedChatApiKeyId();
+      const selectedApiKey = getSelectedChatApiKey(loadedChatApiKeys, storedSelectedId);
+      // selectedApiKey.id is a UUID identifier, not the API key value itself
+      const selectedId = String(selectedApiKey?.id ?? "");
+      persistSelectedChatApiKeyId(selectedId);
+      setChatApiKeys(loadedChatApiKeys);
+      setSelectedChatApiKeyId(selectedId);
+      setSecretKey(selectedApiKey?.key ?? "");
+
+      const rawModel = localStorage.getItem("model") || "";
+      const loadedModel = looksServerEncrypted(rawModel) ? "" : rawModel;
+      setModel(loadedModel);
+      setNewModel(loadedModel);
+      try {
+        const storedPerSourceModels = localStorage.getItem("perSourceModels");
+        if (storedPerSourceModels) setPerSourceModels(sanitizePerSourceModels(JSON.parse(storedPerSourceModels)));
+      } catch { /* ignore corrupted data */ }
     })();
   }, [status, prefixReady, toast]);
 
   // Re-check UDF availability whenever the active connection changes so
   // switching back to an admin connection restores the UDF menu.
   useEffect(() => {
-    if (status === "unauthenticated") { setShowUDF(false); return; }
+    if (status === "unauthenticated") { setShowUDF(false); setUdfList([]); return; }
     if (status !== "authenticated") return;
     // Use plain fetch with no X-Connection-Id — server resolves via JWT.
     (async () => {
       const res = await fetch("/api/udf", { method: "GET" });
-      if (!res.ok) { setShowUDF(false); return; }
+      if (!res.ok) { setShowUDF(false); setUdfList([]); return; }
 
       const json = await res.json();
       setShowUDF(true);
@@ -899,6 +1301,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (indicator === "offline" || tutorialOpen) return;
 
     await fetchOptions(toast, setIndicator, indicator, setGraphName, setGraphNames);
+    setGraphNamesLoaded(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast, tutorialOpen]);
 
@@ -912,16 +1315,32 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     handleFetchOptions();
   }, [handleFetchOptions, status]);
 
-  // Sync URL → local state only when on /graph (consumers like graphInfo update URL directly)
+  // Unified URL→state sync for the graph name, gated on graphNamesLoaded.
+  // By waiting for the graph list before applying the URL value we prevent:
+  //   1. Page.tsx from running queries against a non-existent graph (which
+  //      FalkorDB would silently create on the first GRAPH.QUERY call).
+  //   2. The default-query fallback from firing before we know the URL graph
+  //      is valid (which would overwrite a failing URL query result).
   useEffect(() => {
-    // [URL] providers: urlGraphName sync effect
     if (pathname !== "/graph") return;
-    if (urlGraphName !== graphName) {
-      // [URL] providers: syncing URL→state
+    if (!graphNamesLoaded) return;
+
+    if (urlGraphName && !graphNamesRef.current.includes(urlGraphName)) {
+      // URL graph does not exist in DB — strip all related URL params
+      setGraphName("");
+      setSelectedParam("");
+      setUrlQueryText(null);
+      return;
+    }
+
+    // Only override state when the URL explicitly names a graph.
+    // When urlGraphName is empty, fetchOptions may have already auto-selected
+    // a graph (e.g. single-graph DB) — don't clobber that with an empty string.
+    if (urlGraphName) {
       setGraphName(urlGraphName);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlGraphName]);
+  }, [urlGraphName, graphNamesLoaded]);
 
   // One-way sync: context state → URL (only while on /graph)
   const prevPathnameRef = useRef(pathname);
@@ -929,20 +1348,24 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   useEffect(() => {
     prevPathnameRef.current = pathname;
 
-    // Only write URL while on /graph
-    if (pathname !== "/graph") return;
+    // Only write URL while on /graph and not during tutorial
+    if (pathname !== "/graph" || tutorialOpen) return;
 
-    const queryForUrl = (graph.Id && graph.Id === graphName && historyQuery.currentQuery.text && historyQuery.currentQuery.graphName === graphName)
-      ? historyQuery.currentQuery.text
-      : null;
+    // Don't wipe URL params before the graph list has loaded. The URL→state
+    // sync is gated on graphNamesLoaded; if we write state→URL with
+    // graphName="" first, we strip ?graph= before URL sync can apply it,
+    // leaving urlGraphName="" permanently and the URL graph never loading.
+    if (!graphNamesLoaded) return;
 
-    // Sync all context state to URL
-    setUrlParam({
-      graph: graphName || null,
-      query: queryForUrl,
-      selected: selectedParam || null,
+    // Sync all context state to URL via centralized builder
+    syncRouteUrlParams(pathname, {
+      graph: graphName,
+      query: urlQueryText,
+      selected: selectedParam,
+      layout,
+      direction,
     });
-  }, [pathname, selectedParam, graphName, historyQuery.currentQuery.text, historyQuery.currentQuery.graphName, graph.Id]);
+  }, [pathname, selectedParam, graphName, urlQueryText, graph.Id, layout, direction, tutorialOpen, graphNamesLoaded]);
 
   // Restore content persistence once on app mount (after auth + settings + graph names loaded)
   useEffect(() => {
@@ -950,6 +1373,17 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     // If a graph is already loaded, mark as restored and skip
     if (graph.Id) {
+      contentRestoredRef.current = true;
+      return;
+    }
+
+    // URL takes priority over saved content. When the URL explicitly names an
+    // existing graph, the URL→state sync and the graph-loading effect handle
+    // everything — skip persistence so it doesn't overwrite the URL graph.
+    // Use the ref captured at render time: by the time this effect fires,
+    // syncRouteUrlParams may have already stripped ?graph= from window.location.
+    const urlGraph = initialUrlGraphNameRef.current;
+    if (urlGraph && graphNames.includes(urlGraph)) {
       contentRestoredRef.current = true;
       return;
     }
@@ -967,6 +1401,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     } catch {
       // Invalid saved content, ignore
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefixReady, contentPersistence, graphNames, graph.Id, runQuery, handleSetGraphName]);
   // Reset all graph state when the active connection changes (user switch)
   useEffect(() => {
@@ -978,14 +1413,17 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Skip if unchanged
     if (prev === activeConnectionId) return;
 
-    // Clear graph data so stale results from the old connection are gone
-    setGraph(Graph.empty());
-    setGraphInfo(GraphInfo.empty(toast, setIndicator));
+    // Clear graph data so stale results from the old connection are gone.
+    // Build the empty graph with the real toast/setIndicator callbacks up front
+    // so its GraphInfo isn't left with Graph.empty()'s console.error fallbacks
+    // (setGraphInfo only mutates the current graph, not this newly queued one).
+    setGraph(Graph.empty(undefined, undefined, undefined, GraphInfo.empty(toast, setIndicator)));
     setGraphName("");
     setSelectedParam("");
+    setGraphNamesLoaded(false);
     setGraphNames([]);
-    setNodesCount(undefined);
-    setEdgesCount(undefined);
+    graphInfoSyncRef.current.setNodesCount(undefined);
+    graphInfoSyncRef.current.setEdgesCount(undefined);
     setHistoryQuery(h => ({ ...h, query: "", currentQuery: defaultQueryHistory.currentQuery }));
     setLabels([]);
     setRelationships([]);
@@ -1001,22 +1439,45 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   const handleLoadDemoGraphs = useCallback(async () => {
     try {
-      // Store current user graphs
+      // Store current user graphs and URL params
       setUserGraphsBeforeTutorial(graphNames);
       setUserGraphBeforeTutorial(graphName);
+      setUrlParamsBeforeTutorial(window.location.search);
+
+      // Clear the visible URL params for the tutorial, but push a new history
+      // entry (rather than replacing) so the user's pre-tutorial URL stays in
+      // the back stack and the browser Back button returns to it.
+      window.history.pushState(null, "", window.location.pathname);
+
+      // Reset layout to force for a clean tutorial experience
+      setLayout('force');
+      setDirection('');
 
       // Create social demo graph
       const socialQuery = `
         CREATE 
-          (alice:Person {name: 'Alice', age: 30, city: 'New York'}),
-          (bob:Person {name: 'Bob', age: 25, city: 'Los Angeles'}),
-          (charlie:Person {name: 'Charlie', age: 35, city: 'Chicago'}),
-          (diana:Person {name: 'Diana', age: 28, city: 'New York'}),
+          (alice:Person {name: 'Alice', age: 30, role: 'CEO'}),
+          (bob:Person {name: 'Bob', age: 25, role: 'VP Engineering'}),
+          (charlie:Person {name: 'Charlie', age: 35, role: 'VP Marketing'}),
+          (diana:Person {name: 'Diana', age: 28, role: 'VP Sales'}),
+          (eve:Person {name: 'Eve', age: 26, role: 'Developer'}),
+          (frank:Person {name: 'Frank', age: 31, role: 'Developer'}),
+          (grace:Person {name: 'Grace', age: 29, role: 'Designer'}),
+          (heidi:Person {name: 'Heidi', age: 27, role: 'Analyst'}),
+          (ivan:Person {name: 'Ivan', age: 33, role: 'Sales Rep'}),
+          (alice)-[:MANAGES]->(bob),
+          (alice)-[:MANAGES]->(charlie),
+          (alice)-[:MANAGES]->(diana),
+          (bob)-[:MANAGES]->(eve),
+          (bob)-[:MANAGES]->(frank),
+          (charlie)-[:MANAGES]->(grace),
+          (charlie)-[:MANAGES]->(heidi),
+          (diana)-[:MANAGES]->(ivan),
           (alice)-[:KNOWS {since: 2015}]->(bob),
           (alice)-[:KNOWS {since: 2018}]->(charlie),
           (bob)-[:KNOWS {since: 2020}]->(diana),
           (charlie)-[:KNOWS {since: 2017}]->(diana),
-          (alice)-[:WORKS_WITH]->(diana)
+          (eve)-[:KNOWS {since: 2021}]->(frank)
       `;
 
       // Create social-test demo graph
@@ -1048,7 +1509,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setGraph(Graph.empty());
       setData({ nodes: [], links: [] });
     } catch (error) {
-       
+
       console.error("Failed to load demo graphs", error);
       toast({
         title: "Error",
@@ -1069,13 +1530,15 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         }, toast, setIndicator)
       ]);
     } catch (error) {
-       
+
       console.error("Failed to cleanup demo graphs", error);
     }
 
-    // Clear current graph to avoid showing deleted demo graph
-    setGraph(Graph.empty());
-    setGraphInfo(GraphInfo.empty(toast, setIndicator));
+    // Clear current graph to avoid showing deleted demo graph. Build the empty
+    // graph with the real toast/setIndicator callbacks up front so its GraphInfo
+    // isn't left with Graph.empty()'s console.error fallbacks (setGraphInfo only
+    // mutates the current graph, not this newly queued one).
+    setGraph(Graph.empty(undefined, undefined, undefined, GraphInfo.empty(toast, setIndicator)));
     setData({ nodes: [], links: [] });
 
     if (userGraphBeforeTutorial && userGraphsBeforeTutorial.includes(userGraphBeforeTutorial)) {
@@ -1100,39 +1563,50 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setGraphNames(userGraphsBeforeTutorial);
     setUserGraphsBeforeTutorial([]);
     setUserGraphBeforeTutorial("");
-  }, [runQuery, runDefaultQuery, defaultQuery, toast, userGraphBeforeTutorial, userGraphsBeforeTutorial]);
+
+    // Restore URL params that were active before the tutorial
+    if (urlParamsBeforeTutorial) {
+      window.history.replaceState(null, "", `${window.location.pathname}${urlParamsBeforeTutorial}`);
+    }
+    setUrlParamsBeforeTutorial("");
+  }, [runQuery, runDefaultQuery, defaultQuery, toast, userGraphBeforeTutorial, userGraphsBeforeTutorial, urlParamsBeforeTutorial]);
 
   return (
     <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange nonce={nonce}>
       <LoginVerification>
         <BrowserSettingsContext.Provider value={browserSettingsContext}>
           <GraphContext.Provider value={graphContext}>
-            <HistoryQueryContext.Provider value={historyQueryContext}>
+            <GraphInfoProvider syncRef={graphInfoSyncRef} pendingRef={graphInfoPendingRef}>
+              <HistoryQueryContext.Provider value={historyQueryContext}>
               <IndicatorContext.Provider value={indicatorContext}>
                 <QueryLoadingContext.Provider value={queryLoadingContext}>
-                  <SyntaxErrorContext.Provider value={syntaxErrorContext}>
+                  <DiagnosticsContext.Provider value={diagnosticsContext}>
                     <ForceGraphContext.Provider value={forceGraphContext}>
                       <TableViewContext.Provider value={tableViewContext}>
                         <ConnectionContext.Provider value={connectionContext}>
                           <UDFContext.Provider value={udfContext}>
-                            <ProviderLayout
-                              panelRef={panelRef}
-                              tutorialOpen={tutorialOpen}
-                              onCloseTutorial={handleCloseTutorial}
-                              onLoadDemoGraphs={handleLoadDemoGraphs}
-                              onCleanupDemoGraphs={handleCleanupDemoGraphs}
-                              showUDF={showUDF}
-                            >
-                              {children}
-                            </ProviderLayout>
+                            <AiFixContext.Provider value={aiFixContext}>
+                              <ProviderLayout
+                                panelRef={panelRef}
+                                tutorialOpen={tutorialOpen}
+                                onCloseTutorial={handleCloseTutorial}
+                                onLoadDemoGraphs={handleLoadDemoGraphs}
+                                onCleanupDemoGraphs={handleCleanupDemoGraphs}
+                                showUDF={showUDF}
+                              >
+                                {children}
+                              </ProviderLayout>
+                              <AiFixDialogs />
+                            </AiFixContext.Provider>
                           </UDFContext.Provider>
                         </ConnectionContext.Provider>
                       </TableViewContext.Provider>
                     </ForceGraphContext.Provider>
-                  </SyntaxErrorContext.Provider>
+                  </DiagnosticsContext.Provider>
                 </QueryLoadingContext.Provider>
               </IndicatorContext.Provider>
             </HistoryQueryContext.Provider>
+            </GraphInfoProvider>
           </GraphContext.Provider>
         </BrowserSettingsContext.Provider>
       </LoginVerification>
@@ -1142,7 +1616,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
 export default function NextAuthProvider({ children, nonce }: { children: React.ReactNode; nonce?: string }) {
   return (
-    <SessionProvider>
+    <SessionProvider basePath="/api/auth">
       <Suspense fallback={null}>
         <ProvidersWithSession nonce={nonce}>{children}</ProvidersWithSession>
       </Suspense>

@@ -92,9 +92,9 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
             const canvas = canvasRef.current;
 
             if (canvas) {
-                const currentData = canvas.getGraphData();
+                const graphData = canvas.getGraphData();
 
-                currentData.nodes.forEach(canvasNode => {
+                graphData.nodes.forEach(canvasNode => {
                     if (canvasNode.id === node.id) {
                         canvasNode.labels = [...node.labels];
                         canvasNode.color = node.color;
@@ -102,7 +102,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
                     }
                 });
 
-                canvas.setGraphData({ ...currentData });
+                canvas.refresh();
             }
 
             return true;
@@ -140,9 +140,9 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
 
             const canvas = canvasRef.current;
             if (canvas) {
-                const currentData = canvas.getGraphData();
+                const graphData = canvas.getGraphData();
 
-                currentData.nodes.forEach(canvasNode => {
+                graphData.nodes.forEach(canvasNode => {
                     if (canvasNode.id === node.id) {
 
                         // Update canvas node to match the updated graph node
@@ -152,7 +152,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
                     }
                 });
 
-                canvas.setGraphData({ ...currentData });
+                canvas.refresh();
             }
 
             return true;

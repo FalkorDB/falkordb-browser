@@ -5,6 +5,7 @@ import type {
   ToastActionElement,
   ToastProps,
 } from "@/components/ui/toast"
+import type { HintLink } from "@/lib/cypherErrors"
 
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000000
@@ -14,6 +15,10 @@ type ToasterToast = ToastProps & {
   title?: React.ReactNode
   description?: React.ReactNode
   action?: ToastActionElement
+  rawMessage?: string
+  hint?: string
+  hintLink?: HintLink
+  query?: string
 }
 
 const actionTypes = {

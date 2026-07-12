@@ -25,7 +25,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
         with:
           fetch-depth: 0
 
@@ -56,6 +58,46 @@ jobs:
           
           echo "Testing with serviceAccount.create=false..."
           helm template test helm/falkordb-browser --set serviceAccount.create=false > /dev/null
+
+          echo "Testing generated encryption key..."
+          GENERATED_KEY=$(helm template test helm/falkordb-browser --show-only templates/secret.yaml | awk -F'"' '/ENCRYPTION_KEY:/ {print $2}')
+          if ! echo "$GENERATED_KEY" | grep -Eq '^[0-9a-fA-F]{64}$'; then
+            echo "Generated ENCRYPTION_KEY must be 64 hexadecimal characters"
+            exit 1
+          fi
+
+          echo "Testing supplied encryption key..."
+          helm template test helm/falkordb-browser \
+            --set encryption.key=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
+            --show-only templates/secret.yaml | grep -q 'ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"'
+
+          echo "Testing existing encryption key Secret reference..."
+          helm template test helm/falkordb-browser \
+            --set encryption.existingSecret.name=existing-encryption-secret \
+            --set encryption.existingSecret.key=key \
+            --show-only templates/deployment.yaml | grep -A 4 'name: ENCRYPTION_KEY' | grep -q 'name: "existing-encryption-secret"'
+
+          if helm template test helm/falkordb-browser \
+            --set encryption.existingSecret.name=existing-encryption-secret \
+            --show-only templates/secret.yaml | grep -q 'ENCRYPTION_KEY:'; then
+            echo "Chart-managed Secret should not include ENCRYPTION_KEY when an existing Secret is configured"
+            exit 1
+          fi
+
+          echo "Testing conflicting encryption key settings rejection..."
+          if helm template test helm/falkordb-browser \
+            --set encryption.existingSecret.name=existing-encryption-secret \
+            --set encryption.key=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
+            > /dev/null 2>&1; then
+            echo "encryption.key and encryption.existingSecret.name should be mutually exclusive"
+            exit 1
+          fi
+
+          echo "Testing invalid encryption key rejection..."
+          if helm template test helm/falkordb-browser --set encryption.key=bad-key > /dev/null 2>&1; then
+            echo "Invalid ENCRYPTION_KEY should fail Helm rendering"
+            exit 1
+          fi
           
           echo "✅ All configuration tests passed"
 
@@ -64,7 +106,9 @@ jobs:
     needs: lint-test
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
 
       - name: Set up Helm
         uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
@@ -109,10 +153,12 @@ jobs:
   package-publish:
     runs-on: ubuntu-latest
     needs: [lint-test, kind-test]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
         with:
           fetch-depth: 0
 
@@ -155,7 +201,7 @@ jobs:
           helm package helm/falkordb-browser --destination .helm-charts
 
       - name: Checkout helm-charts repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           repository: FalkorDB/helm-charts
           path: helm-charts-repo

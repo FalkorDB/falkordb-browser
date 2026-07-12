@@ -353,4 +353,165 @@ test.describe('Canvas Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
+    // ─── Focus Mode (dim) tests ──────────────────────────────────────────────
+
+    test(`@admin Focus mode switch is visible in controls bar`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const graphName = getRandomString('canvas');
+        await graph.addGraph(graphName);
+        await graph.insertQuery(CREATE_TWO_NODES_QUERY);
+        await graph.clickRunQuery();
+        expect(await graph.isDimContainerVisible()).toBe(true);
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin Focus mode switch toggles on and off`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const graphName = getRandomString('canvas');
+        await graph.addGraph(graphName);
+        await graph.insertQuery(CREATE_TWO_NODES_QUERY);
+        await graph.clickRunQuery();
+
+        // Initially on
+        expect(await graph.isDimControlChecked()).toBe(true);
+
+        // Turn off
+        await graph.clickDimControl();
+        expect(await graph.isDimControlChecked()).toBe(false);
+
+        // Turn on
+        await graph.clickDimControl();
+        expect(await graph.isDimControlChecked()).toBe(true);
+
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin Focus mode dims non-selected nodes after clicking a node`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const graphName = getRandomString('canvas');
+        await graph.addGraph(graphName);
+        // Create two disconnected nodes so clicking one does not bring the other into the neighborhood
+        await graph.insertQuery(`CREATE (a:Person {name: 'Alice'}), (b:Person {name: 'Bob'}) RETURN a, b`);
+        await graph.clickRunQuery();
+        await graph.waitForCanvasAnimationToEnd();
+        await graph.clickCenterControl();
+        await graph.waitForScaleToStabilize();
+
+        // Ensure focus mode is enabled
+        if (!(await graph.isDimControlChecked())) {
+            await graph.clickDimControl();
+        }
+        expect(await graph.isDimControlChecked()).toBe(true);
+
+        // Right-click a node to select it (right-click triggers handleRightClick → setSelectedElements)
+        const nodes = await graph.getNodesScreenPositions();
+        expect(nodes.length).toBeGreaterThanOrEqual(2);
+        await graph.elementClick(nodes[0].screenX, nodes[0].screenY);
+        await graph.waitForTimeout(300);
+
+        // Focus mode is active and a node is selected → non-selected nodes are dimmed
+        expect(await graph.isFocusActive()).toBe(true);
+        expect(await graph.getSelectionCount()).toBeGreaterThan(0);
+
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin Disabling focus mode after selecting a node restores full rendering`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const graphName = getRandomString('canvas');
+        await graph.addGraph(graphName);
+        await graph.insertQuery(CREATE_TWO_NODES_QUERY);
+        await graph.clickRunQuery();
+        await graph.waitForCanvasAnimationToEnd();
+        await graph.clickCenterControl();
+        await graph.waitForScaleToStabilize();
+
+        // Ensure focus mode is enabled and then right-click a node to select it
+        if (!(await graph.isDimControlChecked())) {
+            await graph.clickDimControl();
+        }
+        const nodes = await graph.getNodesScreenPositions();
+        await graph.elementClick(nodes[0].screenX, nodes[0].screenY);
+        await graph.waitForTimeout(300);
+        expect(await graph.isFocusActive()).toBe(true);
+
+        // Turn focus mode back off — dimming should be fully restored
+        await graph.clickDimControl();
+        expect(await graph.isDimControlChecked()).toBe(false);
+        expect(await graph.isFocusActive()).toBe(false);
+
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin Clicking a relationship in focus mode keeps its endpoints undimmed`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const graphName = getRandomString('canvas');
+        await graph.addGraph(graphName);
+        // Carol is disconnected: clicking the Alice–Bob link must NOT undim Carol
+        await graph.insertQuery(`CREATE (a:Person {name: 'Alice'})-[r:KNOWS]->(b:Person {name: 'Bob'}), (c:Person {name: 'Carol'}) RETURN a, r, b, c`);
+        await graph.clickRunQuery();
+        await graph.waitForCanvasAnimationToEnd();
+        await graph.clickCenterControl();
+        await graph.waitForScaleToStabilize();
+
+        // Ensure focus mode is enabled
+        if (!(await graph.isDimControlChecked())) {
+            await graph.clickDimControl();
+        }
+        expect(await graph.isDimControlChecked()).toBe(true);
+
+        // Left-click a link to select it (handleLinkClick sets selectedElements)
+        const links = await graph.getLinksScreenPositions();
+        expect(links.length).toBeGreaterThan(0);
+        await graph.clickCanvasElement(links[0].midX, links[0].midY);
+        await graph.waitForTimeout(300);
+
+        // The selected link is in selectedElements → focus mode is active → Carol is dimmed
+        expect(await graph.isFocusActive()).toBe(true);
+        expect(await graph.getSelectionCount()).toBeGreaterThan(0);
+
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin PATH query result visualizes nodes and edges on the canvas`, async () => {
+        const graphName = getRandomString('path-canvas');
+        await apicalls.addGraph(graphName);
+        try {
+            await apicalls.runQuery(graphName, "CREATE (:City {name:'A'})-[:ROAD]->(:City {name:'B'})");
+            const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+            await graph.selectGraphByName(graphName);
+            await graph.insertQuery("MATCH p=(a:City)-[:ROAD]->(b:City) RETURN p");
+            await graph.clickRunQuery();
+            const nodes = await graph.getNodesScreenPositions();
+            expect(nodes.filter(n => n.visible).length).toBe(2);
+            const links = await graph.getLinksScreenPositions();
+            expect(links.filter(l => l.visible).length).toBe(1);
+        } finally {
+            await apicalls.removeGraph(graphName);
+        }
+    });
+
+    test(`@admin algo.SPpaths query result visualizes nodes and edges on the canvas`, async () => {
+        const graphName = getRandomString('path-algo');
+        await apicalls.addGraph(graphName);
+        try {
+            await apicalls.runQuery(graphName, "CREATE (:Station {name:'A'})-[:LINE]->(:Station {name:'B'})-[:LINE]->(:Station {name:'C'})");
+            const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+            await graph.selectGraphByName(graphName);
+            await graph.insertQuery("MATCH (src:Station {name:'A'}), (dest:Station {name:'C'}) CALL algo.SPpaths({sourceNode: src, targetNode: dest, pathCount: 1, weightProp: '', defaultWeight: 1}) YIELD path RETURN path");
+            await graph.clickRunQuery();
+            const nodes = await graph.getNodesScreenPositions();
+            expect(nodes.filter(n => n.visible).length).toBe(3);
+            const links = await graph.getLinksScreenPositions();
+            expect(links.filter(l => l.visible).length).toBe(2);
+        } finally {
+            await apicalls.removeGraph(graphName);
+        }
+    });
+
 });

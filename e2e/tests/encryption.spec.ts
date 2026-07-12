@@ -16,6 +16,33 @@ import LoginPage from "../logic/POM/loginPage";
  */
 
 const HEX_COLON_PATTERN = /^[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+$/;
+const CHAT_API_KEYS_STORAGE_KEY = "chatApiKeys";
+
+async function waitForMigratedChatApiKeys(page: Awaited<ReturnType<BrowserWrapper["getPage"]>>) {
+    await expect.poll(async () => page.evaluate((storageKey) => {
+        const secretKey = localStorage.getItem("secretKey");
+        const chatApiKeys = localStorage.getItem(storageKey);
+        return secretKey === null && chatApiKeys !== null && /^[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+$/.test(chatApiKeys);
+    }, CHAT_API_KEYS_STORAGE_KEY), { timeout: 15000 }).toBe(true);
+
+    return page.evaluate(async (storageKey) => {
+        const encryptedKeys = localStorage.getItem(storageKey);
+        if (!encryptedKeys) return null;
+
+        const response = await fetch('/api/encrypt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value: encryptedKeys, action: 'decrypt' }),
+        });
+        const payload = await response.json();
+
+        return {
+            encryptedKeys,
+            decryptedKeys: payload.value as string,
+            secretKey: localStorage.getItem("secretKey"),
+        };
+    }, CHAT_API_KEYS_STORAGE_KEY);
+}
 
 test.describe(`@admin Encryption migration tests`, () => {
     // Run serially: each test disconnects + re-authenticates which is resource-heavy;
@@ -34,34 +61,29 @@ test.describe(`@admin Encryption migration tests`, () => {
     });
 
     test(`plain text secretKey is migrated to server-side encryption on page load`, async () => {
-        const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-        await login.disconnectConnection();
+        await browser.createNewPage(LoginPage);
         await browser.setPageToFullScreen();
 
         const page = await browser.getPage();
 
         // Set a plain-text secret key directly into localStorage
-        await page.evaluate(() => {
+        await page.addInitScript(() => {
             localStorage.setItem("secretKey", "my-plain-api-key-12345");
         });
 
-        // Log in so the app loads and the migration code in providers.tsx runs
-        await login.clickOnConnect();
-        // Wait for the app to stabilize and the migration effect to run
-        await page.waitForTimeout(2000);
+        await page.goto(urls.graphUrl);
+        await page.waitForLoadState("networkidle");
 
-        // Read back the secretKey from localStorage
-        const storedKey = await page.evaluate(() => localStorage.getItem("secretKey"));
+        const migrated = await waitForMigratedChatApiKeys(page);
+        const migratedKeys = JSON.parse(migrated?.decryptedKeys ?? "[]") as Array<{ key?: string }>;
 
-        // It should now be server-encrypted (iv:authTag:ciphertext hex format)
-        expect(storedKey).not.toBeNull();
-        expect(storedKey).not.toBe("my-plain-api-key-12345");
-        expect(storedKey!).toMatch(HEX_COLON_PATTERN);
+        expect(migrated?.secretKey).toBeNull();
+        expect(migrated?.encryptedKeys).not.toBe("my-plain-api-key-12345");
+        expect(migrated?.encryptedKeys).toMatch(HEX_COLON_PATTERN);
+        expect(migratedKeys[0]?.key).toBe("my-plain-api-key-12345");
     });
-
     test(`legacy enc: prefixed secretKey is detected on page load`, async () => {
-        const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-        await login.disconnectConnection();
+        await browser.createNewPage(LoginPage);
         await browser.setPageToFullScreen();
 
         const page = await browser.getPage();
@@ -72,17 +94,22 @@ test.describe(`@admin Encryption migration tests`, () => {
         // detect the prefix and attempt legacy decryption.
         // Since we don't have a real old crypto key, the migration should fail
         // gracefully and clear the secret key.
-        await page.evaluate(() => {
+        await page.addInitScript(() => {
             localStorage.setItem("secretKey", "enc:AAAA/fake-legacy-base64-data==");
             // Do NOT set 'falkordb-key' so legacy decrypt returns empty → key is cleared
         });
 
-        await login.clickOnConnect();
-        await page.waitForTimeout(2000);
+        await page.goto(urls.graphUrl);
+        await page.waitForLoadState("networkidle");
 
         // The legacy key should be cleared since there's no valid old crypto key
-        const storedKey = await page.evaluate(() => localStorage.getItem("secretKey"));
         // Should either be removed or be empty (cleared by the migration)
+        await expect.poll(async () => page.evaluate(() => {
+            const secretKey = localStorage.getItem("secretKey");
+            return secretKey === null || secretKey === "";
+        }), { timeout: 15000 }).toBe(true);
+
+        const storedKey = await page.evaluate(() => localStorage.getItem("secretKey"));
         expect(storedKey === null || storedKey === "").toBe(true);
     });
 
@@ -134,63 +161,58 @@ test.describe(`@admin Encryption migration tests`, () => {
         // Wait for the migration effect to run
         await page.waitForTimeout(3000);
 
-        // The legacy key should have been decrypted and re-encrypted server-side
-        const storedKey = await page.evaluate(() => localStorage.getItem("secretKey"));
+        const migrated = await waitForMigratedChatApiKeys(page);
+        const migratedKeys = JSON.parse(migrated?.decryptedKeys ?? "[]") as Array<{ key?: string }>;
         const legacyKeyRemains = await page.evaluate(() =>
             localStorage.getItem("falkordb-key") !== null || sessionStorage.getItem("falkordb-key") !== null
         );
 
-        // The key should now be in the new server-encrypted format
-        expect(storedKey).not.toBeNull();
-        expect(storedKey!.startsWith("enc:")).toBe(false);
-        expect(storedKey!).toMatch(HEX_COLON_PATTERN);
+        expect(migrated?.secretKey).toBeNull();
+        expect(migrated?.encryptedKeys).toMatch(HEX_COLON_PATTERN);
+        expect(migratedKeys[0]?.key).toBe("test-api-key-for-migration");
         // The old key should be cleared
         expect(legacyKeyRemains).toBe(false);
     });
 
-    test(`already server-encrypted secretKey survives page reload`, async () => {
-        const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-        await login.disconnectConnection();
+    test(`already server-encrypted chatApiKeys survives page reload`, async () => {
+        await browser.createNewPage(LoginPage, urls.graphUrl);
         await browser.setPageToFullScreen();
 
         const page = await browser.getPage();
 
-        // First, set a plain key and let the server encrypt it
+        // First, set a plain key and let the app migrate it to server encryption
         await page.evaluate(() => {
             localStorage.setItem("secretKey", "key-that-will-be-encrypted");
         });
 
-        await login.clickOnConnect();
-        await page.waitForTimeout(2000);
+        await page.reload({ waitUntil: "networkidle" });
 
-        // Read the now-encrypted value
-        const encryptedValue = await page.evaluate(() => localStorage.getItem("secretKey"));
-        expect(encryptedValue).not.toBeNull();
-        expect(encryptedValue!).toMatch(HEX_COLON_PATTERN);
+        const migrated = await waitForMigratedChatApiKeys(page);
+        const encryptedValue = migrated?.encryptedKeys;
+        expect(encryptedValue).toMatch(HEX_COLON_PATTERN);
 
         // Reload the page — the encrypted value should stay the same
         // (should not be double-encrypted)
         await page.reload({ waitUntil: "networkidle" });
         await page.waitForTimeout(2000);
 
-        const afterReload = await page.evaluate(() => localStorage.getItem("secretKey"));
+        const afterReload = await page.evaluate((storageKey) => localStorage.getItem(storageKey), CHAT_API_KEYS_STORAGE_KEY);
         expect(afterReload).toBe(encryptedValue);
     });
 
     test(`empty secretKey remains empty after page load`, async () => {
-        const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-        await login.disconnectConnection();
+        await browser.createNewPage(LoginPage);
         await browser.setPageToFullScreen();
 
         const page = await browser.getPage();
 
         // Ensure no secretKey is stored
-        await page.evaluate(() => {
+        await page.addInitScript(() => {
             localStorage.removeItem("secretKey");
         });
 
-        await login.clickOnConnect();
-        await page.waitForTimeout(2000);
+        await page.goto(urls.graphUrl);
+        await page.waitForLoadState("networkidle");
 
         const storedKey = await page.evaluate(() => localStorage.getItem("secretKey"));
         // Should still be absent
@@ -198,15 +220,10 @@ test.describe(`@admin Encryption migration tests`, () => {
     });
 
     test(`server-encrypted value can be decrypted through the /api/encrypt endpoint`, async () => {
-        const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-        await login.disconnectConnection();
+        await browser.createNewPage(LoginPage, urls.graphUrl);
         await browser.setPageToFullScreen();
 
         const page = await browser.getPage();
-
-        // Log in first to get authenticated
-        await login.clickOnConnect();
-        await page.waitForTimeout(1000);
 
         // Call the encrypt API through the browser context (authenticated)
         const roundtripResult = await page.evaluate(async () => {

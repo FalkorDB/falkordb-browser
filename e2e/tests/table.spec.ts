@@ -60,4 +60,40 @@ test.describe('Table View Tests', () => {
         const isExportButtonVisible = await tableView.isExportButtonVisible();
         expect(isExportButtonVisible).toBe(true);
     });
+
+    test('@admin PATH query result appears as a single row in table view', async () => {
+        const graphName = getRandomString('path-table');
+        await apiCalls.addGraph(graphName);
+        try {
+            await apiCalls.runQuery(graphName, "CREATE (:City {name:'start'})-[:ROAD]->(:City {name:'end'})");
+            const tableView = await browser.createNewPage(TableView, urls.graphUrl);
+            await tableView.selectGraphByName(graphName);
+            await tableView.insertQuery("MATCH p=(a:City {name:'start'})-[:ROAD]->(b:City {name:'end'}) RETURN p");
+            await tableView.clickRunQuery(false);
+            await tableView.clickTableTab();
+            const rowCount = await tableView.getRowsCount();
+            expect(rowCount).toBe(1);
+        } finally {
+            await apiCalls.removeGraph(graphName);
+        }
+    });
+
+    test('@admin PATH cell renders path data (nodes and edges keys) in table view', async () => {
+        const graphName = getRandomString('path-cell');
+        await apiCalls.addGraph(graphName);
+        try {
+            await apiCalls.runQuery(graphName, "CREATE (:City {name:'start'})-[:ROAD]->(:City {name:'end'})");
+            const tableView = await browser.createNewPage(TableView, urls.graphUrl);
+            await tableView.selectGraphByName(graphName);
+            await tableView.insertQuery("MATCH p=(a:City {name:'start'})-[:ROAD]->(b:City {name:'end'}) RETURN p");
+            await tableView.clickRunQuery(false);
+            await tableView.clickTableTab();
+            // Verify exactly one result row belongs to this query before inspecting content.
+            expect(await tableView.getRowsCount()).toBe(1);
+            expect(await tableView.firstCellContains('nodes')).toBe(true);
+            expect(await tableView.firstCellContains('edges')).toBe(true);
+        } finally {
+            await apiCalls.removeGraph(graphName);
+        }
+    });
 });

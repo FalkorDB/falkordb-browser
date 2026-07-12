@@ -8,6 +8,10 @@
         "queryMemCapacity": "QUERY_MEM_CAPACITY",
         "vKeyMaxEntityCount": "VKEY_MAX_ENTITY_COUNT",
         "cmdInfo": "CMD_INFO",
-        "maxInfoQueries": "MAX_INFO_QUERIES"
+        "maxInfoQueries": "MAX_INFO_QUERIES",
+        "effectsThreshold": "EFFECTS_THRESHOLD",
+        "deltaMaxPendingChanges": "DELTA_MAX_PENDING_CHANGES",
+        "jsHeapSize": "JS_HEAP_SIZE",
+        "jsStackSize": "JS_STACK_SIZE"
     }
 }

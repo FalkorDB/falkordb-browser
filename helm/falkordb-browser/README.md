@@ -10,18 +10,14 @@ This Helm chart deploys the FalkorDB Browser application to a Kubernetes cluster
 
 ## Installation
 
-### Install from Helm Repository (Recommended)
+### Install from OCI Registry (Recommended)
 
 ```bash
-# Add the FalkorDB Helm repository
-helm repo add falkordb https://falkordb.github.io/helm-charts
-helm repo update
-
 # Install the latest version
-helm install falkordb-browser falkordb/falkordb-browser
+helm install falkordb-browser oci://ghcr.io/falkordb/helm-charts/falkordb-browser
 
 # Or install a specific version
-helm install falkordb-browser falkordb/falkordb-browser --version 1.6.7
+helm install falkordb-browser oci://ghcr.io/falkordb/helm-charts/falkordb-browser --version 1.6.7
 ```
 
 ### Install from local chart
@@ -38,8 +34,8 @@ helm install falkordb-browser ./falkordb-browser
 ### Install with custom values
 
 ```bash
-# From Helm repository
-helm install falkordb-browser falkordb/falkordb-browser \
+# From OCI registry
+helm install falkordb-browser oci://ghcr.io/falkordb/helm-charts/falkordb-browser \
   --set env.nextauthUrl=https://your-domain.com \
   --set env.nextauthSecret=your-secret-here \
   --set ingress.enabled=true \
@@ -69,6 +65,9 @@ The following table lists the configurable parameters of the FalkorDB Browser ch
 | `image.repository` | Image repository | `falkordb/falkordb-browser` |
 | `image.tag` | Image tag | `""` (uses chart appVersion) |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
+| `encryption.key` | 64-character hex key for server-side encryption. Generated and reused from the release Secret when empty. | `""` |
+| `encryption.existingSecret.name` | Existing Secret name for `ENCRYPTION_KEY`. Mutually exclusive with `encryption.key`. | `""` |
+| `encryption.existingSecret.key` | Key in `encryption.existingSecret.name` that contains the encryption key. | `ENCRYPTION_KEY` |
 | `service.type` | Kubernetes service type | `ClusterIP` |
 | `service.port` | Service port for browser | `3000` |
 | `service.restPort` | Service port for REST API | `8080` |
@@ -144,6 +143,34 @@ persistence:
 env:
   nextauthSecret: "your-secure-secret-here"
 ```
+
+### Encryption key management
+
+`ENCRYPTION_KEY` is required by the browser for server-side encryption of stored credentials and tokens. The key must be 64 hexadecimal characters (32 bytes).
+
+By default, the chart generates a random key and stores it in the release Secret as `ENCRYPTION_KEY`. On upgrades, the chart reuses the existing Secret value so restarted or rescheduled containers keep using the same key.
+
+Preserve or restore the same `ENCRYPTION_KEY` across upgrades, reinstalls, and chart-managed Secret recreation. If the release Secret is deleted or the chart is reinstalled without the previous key, the chart generates a new key and existing encrypted credentials and tokens become unreadable.
+
+To supply your own key:
+
+```bash
+helm install falkordb-browser ./falkordb-browser \
+  --set encryption.key="$(openssl rand -hex 32)"
+```
+
+To reference an existing Secret in the release namespace instead:
+
+```bash
+kubectl create secret generic falkordb-browser-encryption \
+  --from-literal=ENCRYPTION_KEY="$(openssl rand -hex 32)"
+
+helm install falkordb-browser ./falkordb-browser \
+  --set encryption.existingSecret.name=falkordb-browser-encryption \
+  --set encryption.existingSecret.key=ENCRYPTION_KEY
+```
+
+Do not rotate this key unless you are prepared to invalidate or migrate data encrypted with the previous key.
 
 ### Installation with resource limits
 
@@ -307,9 +334,9 @@ After deploying the browser, you'll need to configure it to connect to your Falk
 
 ## Publishing and CI/CD
 
-This chart is automatically published to the FalkorDB Helm charts repository via GitHub Actions.
+This chart is automatically packaged into the FalkorDB Helm charts repository via GitHub Actions.
 
-The workflow publishes charts to the [FalkorDB/helm-charts](https://github.com/FalkorDB/helm-charts) repository, which is served via GitHub Pages at `https://falkordb.github.io/helm-charts`.
+The [FalkorDB/helm-charts](https://github.com/FalkorDB/helm-charts) repository publishes packaged charts to the GitHub Container Registry. The OCI chart path is `oci://ghcr.io/falkordb/helm-charts/falkordb-browser`.
 
 The workflow requires a `GHCR_TOKEN` or `GITHUB_TOKEN` secret with write access to the FalkorDB/helm-charts repository.
 

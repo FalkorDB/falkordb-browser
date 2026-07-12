@@ -8,11 +8,11 @@ import GraphPage from "./graphPage";
 
 export default class SettingsQueryPage extends GraphPage {
   private get queryExecutionSectionHeader(): Locator {
-    return this.page.getByRole("heading", { name: "Query Execution" }).locator("xpath=ancestor::div[@class and contains(@class, 'cursor-pointer')]");
+    return this.page.getByTestId("queryExecutionSectionHeader");
   }
 
   private get userExperienceSectionHeader(): Locator {
-    return this.page.getByRole("heading", { name: "User Experience" }).locator("xpath=ancestor::div[@class and contains(@class, 'cursor-pointer')]");
+    return this.page.getByTestId("userExperienceSectionHeader");
   }
 
   private get limitInput(): Locator {
