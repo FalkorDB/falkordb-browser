@@ -602,6 +602,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   isReadOnlyRef.current = isReadOnly;
   const activeGraphNameRef = useRef(graphName);
   activeGraphNameRef.current = graphName;
+  // Ref for the auth status so fetchCount reads the latest value without adding
+  // `status` to its deps (which would churn every consumer of that callback).
+  const statusRef = useRef(status);
+  statusRef.current = status;
 
   const connectionContext = useMemo(() => ({
     connectionType,
@@ -628,7 +632,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const fetchCount = useCallback(async (name?: string, options?: { signal?: AbortSignal; connectionId?: string | null; epoch?: number }) => {
     const n = name || graphName;
 
-    if (!n || status === "unauthenticated") return;
+    if (!n || statusRef.current === "unauthenticated") return;
 
     // Capture the connection this request targets. Prefer the caller's captured
     // epoch (the epoch when its poll/action began) so a switch between that start
