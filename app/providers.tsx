@@ -562,7 +562,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   }), [aiFixSupported, lastFailure, aiFixResult, pendingConsent, requestAiFix, confirmConsent]);
 
   // Refs so runQuery can always call the latest requestAiFix without being in its
-  // eslint-disable-next-line dependency array (avoids recreating runQuery on every AI-state change).
+  // dependency array (avoids recreating runQuery on every AI-state change).
   const requestAiFixRef = useRef(requestAiFix);
   requestAiFixRef.current = requestAiFix;
   // ---------------------------------------------------------------------------

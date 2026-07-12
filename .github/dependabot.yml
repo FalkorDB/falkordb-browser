@@ -24,3 +24,12 @@ updates:
       - dependency-name: "typescript"
         versions: ["7.0.x"]
 
+      # eslint-plugin-react (pulled in transitively by eslint-config-next) has no
+      # ESLint 10 compatible release yet: its latest (7.37.x) peer-caps at
+      # eslint ^9.7, and eslint 10 removed the context.getFilename()/ScopeManager
+      # APIs the Next.js lint stack relies on, which crashes `npm run lint`. Stay
+      # on the eslint 9.x maintenance line until eslint-config-next /
+      # eslint-plugin-react / typescript-eslint support eslint 10.
+      - dependency-name: "eslint"
+        versions: [">=10.0.0"]
+
