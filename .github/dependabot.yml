@@ -15,4 +15,12 @@ updates:
       npm-minor-patch:
         update-types:
           - "patch"
-    
+    ignore:
+      # TypeScript 7 (native Go compiler) ships no JS Compiler API, which
+      # Next.js relies on for `next build` type-checking, so the bump breaks
+      # the build. Remove this once we're on Next.js >= 16.3.0 (experimental
+      # useTypeScriptCli) or TypeScript 7.1 restores the programmatic API.
+      # See https://github.com/vercel/next.js/pull/95639
+      - dependency-name: "typescript"
+        versions: ["7.x"]
+
