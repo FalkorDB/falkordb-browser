@@ -48,4 +48,5 @@ next-env.d.ts
 /e2e/playwright/.auth
 /playwright
 /tls
+/uploads/
 .history

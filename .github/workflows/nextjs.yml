@@ -3,56 +3,236 @@ name: Build
 on:
   push:
     branches: ["main", "staging"]
+    paths-ignore:
+      - '**/*.md'
+      - 'LICENSE.txt'
+      - 'helm/**'
+      - '.github/workflows/helm-chart.yml'
+      - '.github/dependabot.yml'
 
   pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'LICENSE.txt'
+      - 'helm/**'
+      - '.github/workflows/helm-chart.yml'
+      - '.github/dependabot.yml'
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+  
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # Build job
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      security-events: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-      - name: Detect package manager
-        id: detect-package-manager
-        run: |
-          if [ -f "${{ github.workspace }}/yarn.lock" ]; then
-            echo "manager=yarn" >> $GITHUB_OUTPUT
-            echo "command=install" >> $GITHUB_OUTPUT
-            echo "runner=yarn" >> $GITHUB_OUTPUT
-            exit 0
-          elif [ -f "${{ github.workspace }}/package.json" ]; then
-            echo "manager=npm" >> $GITHUB_OUTPUT
-            echo "command=ci" >> $GITHUB_OUTPUT
-            echo "runner=npx --no-install" >> $GITHUB_OUTPUT
-            exit 0
-          else
-            echo "Unable to determine package manager"
-            exit 1
-          fi
-      - name: Setup Node
-        uses: actions/setup-node@v3
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
-          node-version: "22"
-          cache: ${{ steps.detect-package-manager.outputs.manager }}
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "24"
+          cache: npm
 
       - name: Restore cache
-        uses: actions/cache@v3
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
             .next/cache
           # Generate a new cache whenever packages or source files change.
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json', '**/yarn.lock') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx') }}
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx') }}
           # If source files changed but packages didn't, rebuild from a prior cache.
           restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json', '**/yarn.lock') }}-
+            ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
             
       - name: Install dependencies
-        run: ${{ steps.detect-package-manager.outputs.manager }} ${{ steps.detect-package-manager.outputs.command }}
-        
+        run: npm ci --no-audit --progress=false
+
+      - name: Run unit tests with coverage
+        run: npm run test:coverage
+
       - name: Build with Next.js
-        run: ${{ steps.detect-package-manager.outputs.runner }} next build
-      
+        run: npx next build
+
+  smoke-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      falkordb:
+        # Pinned to a specific release so PR smoke tests are deterministic: a
+        # server-side error rewording can't break unrelated PRs here. The
+        # drift-canary workflow runs the same tests against :latest to catch drift.
+        image: falkordb/falkordb:v4.18.10
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --progress=false
+      - name: Run smoke tests against FalkorDB
+        run: npm run test:smoke
+        env:
+          FALKORDB_SMOKE: "1"
+          FALKORDB_URL: redis://localhost:6379
+
+  security-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4
+
+      - name: Build Docker image
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: falkordb/falkordb-browser:test
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy vulnerability scanner
+        id: trivy-scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        continue-on-error: true
+        with:
+          image-ref: 'falkordb/falkordb-browser:test'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          exit-code: '1'
+          ignore-unfixed: true
+          scanners: 'vuln'
+          vuln-type: 'os,library'
+          severity: 'HIGH,CRITICAL'
+          version: 'v0.69.2'
+
+      - name: Check scan outcome
+        id: check-sarif
+        if: always()
+        run: |
+          echo "Trivy scan outcome: ${{ steps.trivy-scan.outcome }}"
+          echo "Trivy scan conclusion: ${{ steps.trivy-scan.conclusion }}"
+          if [ -f trivy-results.sarif ]; then
+            echo "SARIF file exists, checking for vulnerabilities..."
+            echo "sarif_exists=true" >> "$GITHUB_OUTPUT"
+            cat trivy-results.sarif
+          else
+            echo "SARIF file not found!"
+            echo "sarif_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4
+        if: always() && steps.check-sarif.outputs.sarif_exists == 'true'
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Generate Trivy report for PR
+        if: github.event_name == 'pull_request'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        continue-on-error: true
+        with:
+          image-ref: 'falkordb/falkordb-browser:test'
+          format: 'table'
+          output: 'trivy-results.txt'
+          ignore-unfixed: true
+          scanners: 'vuln'
+          vuln-type: 'os,library'
+          severity: 'HIGH,CRITICAL'
+          skip-setup-trivy: true
+
+      - name: Comment PR with Trivy results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const fs = require('fs');
+            
+            let comment;
+            if (fs.existsSync('trivy-results.txt')) {
+              const report = fs.readFileSync('trivy-results.txt', 'utf8');
+              comment = `## 🔒 Trivy Security Scan Results\n\n\`\`\`\n${report}\n\`\`\`\n`;
+            } else {
+              comment = `## 🔒 Trivy Security Scan Results\n\n✅ No HIGH or CRITICAL vulnerabilities detected in the Docker image.`;
+            }
+            
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('🔒 Trivy Security Scan Results')
+            );
+            
+            try {
+              if (botComment) {
+                // Update existing comment
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: botComment.id,
+                  body: comment
+                });
+              } else {
+                // Create new comment
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: comment
+                });
+              }
+            } catch (error) {
+              console.error('Error posting comment:', error);
+            }
+
+      - name: Enforce HIGH/CRITICAL vulnerability threshold
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: 'falkordb/falkordb-browser:test'
+          format: 'table'
+          output: 'trivy-enforce.txt'
+          exit-code: '1'
+          ignore-unfixed: true
+          scanners: 'vuln'
+          vuln-type: 'os,library'
+          severity: 'HIGH,CRITICAL'
+          skip-setup-trivy: true

@@ -15,6 +15,10 @@ function getEncryptionKey(): Buffer {
     throw new Error("ENCRYPTION_KEY must be 64 hexadecimal characters (32 bytes)");
   }
   
+  if (!/^[0-9a-fA-F]{64}$/.test(key)) {
+    throw new Error("ENCRYPTION_KEY must contain only hexadecimal characters (0-9, a-f, A-F)");
+  }
+  
   return Buffer.from(key, "hex");
 }
 

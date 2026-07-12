@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { renameGraph, validateBody } from "../../validate-body";
+import { getCorsHeaders, writeGetClientErrorAsSSE, resolveReadOnly, runQuery } from "../../utils";
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
+}
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ graph: string }> }
 ) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -23,20 +28,23 @@ export async function DELETE(
 
         await graph.delete();
 
-        return NextResponse.json({ message: `${graphId} graph deleted` });
+        return NextResponse.json(
+          { message: `${graphId} graph deleted` },
+          { headers: getCorsHeaders(request) }
+        );
       }
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
-      { status: 500 }
+      { message: "Internal server error" },
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }
@@ -46,7 +54,7 @@ export async function POST(
   { params }: { params: Promise<{ graph: string }> }
 ) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -55,29 +63,30 @@ export async function POST(
     const { client, user } = session;
 
     const { graph: graphId } = await params;
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       const graph = client.selectGraph(graphId);
 
-      if (user.role === "Read-Only") await graph.roQuery("RETURN 1");
+      if (isReadOnly) await graph.roQuery("RETURN 1");
       else await graph.query("RETURN 1");
 
       return NextResponse.json(
         { message: "Graph created successfully" },
-        { status: 200 }
+        { status: 200, headers: getCorsHeaders(request) }
       );
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
-      { status: 500 }
+      { message: "Internal server error" },
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }
@@ -87,7 +96,7 @@ export async function PATCH(
   { params }: { params: Promise<{ graph: string }> }
 ) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -106,7 +115,7 @@ export async function PATCH(
       if (!validation.success) {
         return NextResponse.json(
           { message: validation.error },
-          { status: 400 }
+          { status: 400, headers: getCorsHeaders(request) }
         );
       }
 
@@ -117,19 +126,19 @@ export async function PATCH(
 
       if (!data) throw new Error(`${graphId} already exists`);
 
-      return NextResponse.json({ data });
+      return NextResponse.json({ data }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
-      { status: 500 }
+      { message: "Internal server error" },
+      { status: 500, headers: getCorsHeaders(request)  }
     );
   }
 }
@@ -145,16 +154,25 @@ export async function GET(
   const writer = writable.getWriter();
 
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
-      throw new Error(await session.text());
+      await writeGetClientErrorAsSSE(session, writer, encoder);
+      return new Response(readable, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+          ...getCorsHeaders(request),
+        },
+      });
     }
 
     const { client, user } = session;
     const { graph: graphId } = await params;
     const query = request.nextUrl.searchParams.get("query");
-    const timeout = Number(request.nextUrl.searchParams.get("timeout"));
+    const timeout = Number(request.nextUrl.searchParams.get("timeout")) * 1000;
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       if (!query) throw new Error("Missing parameter query");
@@ -162,10 +180,7 @@ export async function GET(
 
       const graph = client.selectGraph(graphId);
 
-      const result =
-        user.role === "Read-Only"
-          ? await graph.roQuery(query, { TIMEOUT: timeout })
-          : await graph.query(query, { TIMEOUT: timeout });
+      const result = await runQuery(graph, query, isReadOnly, { TIMEOUT: timeout });
 
       const writeDataLine = (chunk: string) => {
         writer.write(encoder.encode(`data: ${chunk}\n`));
@@ -214,7 +229,7 @@ export async function GET(
       writer.write(
         encoder.encode(
           `event: error\ndata: ${JSON.stringify({
-            message: (error as Error).message,
+            message: (error as Error).message || "Internal server error",
             status: 400,
           })}\n\n`
         )
@@ -226,7 +241,7 @@ export async function GET(
     writer.write(
       encoder.encode(
         `event: error\ndata: ${JSON.stringify({
-          message: (error as Error).message,
+          message: "Internal server error",
           status: 500,
         })}\n\n`
       )
@@ -244,6 +259,7 @@ export async function GET(
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
+      ...getCorsHeaders(request),
     },
   });
 }

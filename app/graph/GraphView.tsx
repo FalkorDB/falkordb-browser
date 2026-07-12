@@ -1,34 +1,28 @@
-/* eslint-disable no-param-reassign */
+'use client';
 
-'use client'
-
-import { useState, useEffect, Dispatch, SetStateAction, useContext, useCallback } from "react";
-import { GitGraph, ScrollText, Table } from "lucide-react"
-import { cn, GraphRef, Tab } from "@/lib/utils";
+import { useEffect, Dispatch, SetStateAction, useContext, useCallback, useState } from "react";
+import { GitGraph, ScrollText, Table } from "lucide-react";
+import { cn, GraphRef, Tab, Label, Link, Node, Relationship, HistoryQuery } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { GraphContext, ViewportContext } from "@/app/components/provider";
-import { Label, Link, Node, Relationship, HistoryQuery } from "../api/graph/model";
+import { GraphContext, ForceGraphContext, BrowserSettingsContext } from "@/app/components/provider";
+import ForceGraph from "@/app/components/ForceGraph";
+import { setConnectionItem } from "@/lib/connection-storage";
 import Button from "../components/ui/Button";
 import TableView from "./TableView";
 import Toolbar from "./toolbar";
 import Controls from "./controls";
-import GraphDetails from "./GraphDetails";
 import Labels from "./labels";
 import MetadataView from "./MetadataView";
-import ForceGraph from "../components/ForceGraph";
 
 interface Props {
     selectedElements: (Node | Link)[]
-    setSelectedElements: (elements?: (Node | Link)[]) => void
-    chartRef: GraphRef
+    setSelectedElements: (elements?: (Node | Link)[], fromSearch?: boolean) => void
+    canvasRef: GraphRef
     handleDeleteElement: () => Promise<void>
     setLabels: Dispatch<SetStateAction<Label[]>>
     setRelationships: Dispatch<SetStateAction<Relationship[]>>
     labels: Label[]
     relationships: Relationship[]
-    isLoading: boolean
-    handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void
-    cooldownTicks: number | undefined
     fetchCount: () => Promise<void>
     historyQuery: HistoryQuery
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
@@ -41,82 +35,127 @@ interface Props {
 function GraphView({
     selectedElements,
     setSelectedElements,
-    chartRef,
+    canvasRef,
     handleDeleteElement,
     setLabels,
     setRelationships,
     labels,
     relationships,
-    isLoading,
-    handleCooldown,
-    cooldownTicks,
     fetchCount,
     historyQuery,
     setHistoryQuery,
     setIsAddEdge,
     setIsAddNode,
     isAddEdge,
-    isAddNode
+    isAddNode,
 }: Props) {
 
-    const { graph, graphName, currentTab, setCurrentTab } = useContext(GraphContext)
-    const { setData, data, isSaved, setViewport, viewport } = useContext(ViewportContext)
+    const { graph, graphName, currentTab, setCurrentTab, isLoading, setIsLoading, expand, setExpand } = useContext(GraphContext);
+    const { setData, data, graphData, setGraphData, setViewport, viewport } = useContext(ForceGraphContext);
+    const { tutorialOpen } = useContext(BrowserSettingsContext);
 
-    const [parentHeight, setParentHeight] = useState<number>(0)
-    const [parentWidth, setParentWidth] = useState<number>(0)
-    const elementsLength = graph.getElements().length
+    const [dimmed, setDimmed] = useState(false);
+
+    const elementsLength = graph.getElements().length;
 
     useEffect(() => {
-        setRelationships([...graph.Relationships])
-        setLabels([...graph.Labels])
-    }, [graph, graph.Relationships, graph.Labels, setRelationships, setLabels])
+        setRelationships([...graph.Relationships]);
+        setLabels([...graph.Labels]);
+    }, [graph, graph.Relationships, graph.Labels, setRelationships, setLabels]);
 
     const isTabEnabled = useCallback((tab: Tab) => {
-        if (tab === "Table") return graph.Data.length !== 0
-        if (tab === "Metadata") return historyQuery.currentQuery && historyQuery.currentQuery.metadata.length > 0 && graph.Metadata.length > 0 && historyQuery.currentQuery.explain.length > 0
-        return true
-    }, [graph, historyQuery.currentQuery])
+        if (tab === "Table") return graph.Data.length !== 0;
+        if (tab === "Metadata") return historyQuery.currentQuery && historyQuery.currentQuery.metadata.length > 0 && historyQuery.currentQuery.explain.length > 0;
+        if (tab === "Graph") return graph.getElements().length !== 0;
+        return true;
+    }, [graph, historyQuery.currentQuery]);
 
     useEffect(() => {
-        if (currentTab !== "Metadata" && isTabEnabled(currentTab)) return
+        // During tutorial, track setups control the active tab directly
+        if (tutorialOpen) return;
 
-        let defaultChecked: Tab = "Graph"
-        if (elementsLength === 0 && graph.Data.length !== 0) defaultChecked = "Table"
+        let defaultChecked: Tab = "Graph";
+        if (elementsLength === 0 && graph.Data.length !== 0) defaultChecked = "Table";
 
         setCurrentTab(defaultChecked);
-    }, [graph, graph.Id, elementsLength, graph.Data.length, setCurrentTab, isTabEnabled])
-
-    useEffect(() => {
-        setSelectedElements([])
-    }, [graph.Id, setSelectedElements])
+    }, [graph, graph.getElements().length, graph.Data.length, setCurrentTab, tutorialOpen]);
 
     const onLabelClick = (label: Label) => {
-        label.show = !label.show
+        const canvas = canvasRef.current;
+
+        if (!canvas) return;
+
+        label.show = !label.show;
 
         label.elements.forEach((node) => {
-            if (!label.show && node.labels.some(c => graph.LabelsMap.get(c)?.show !== label.show)) return
-            node.visible = label.show
-        })
+            if (!label.show && node.labels.some(c => graph.LabelsMap.get(c)?.show !== label.show)) return;
+            node.visible = label.show;
+        });
 
-        graph.visibleLinks(label.show)
+        graph.visibleLinks(label.show);
+        graph.LabelsMap.set(label.name, label);
 
-        graph.LabelsMap.set(label.name, label)
-        setData({ ...graph.Elements })
-    }
+        const graphData = canvas.getGraphData();
+
+        graphData.nodes.forEach(canvasNode => {
+            const appNode = graph.NodesMap.get(canvasNode.id);
+
+            if (appNode) {
+                canvasNode.visible = appNode.visible;
+            }
+        });
+        graphData.links.forEach(canvasLink => {
+            const appLink = graph.LinksMap.get(canvasLink.id);
+
+            if (appLink) {
+                canvasLink.visible = appLink.visible;
+            }
+        });
+
+        canvas.refresh();
+
+        setLabels([...graph.Labels]);
+    };
 
     const onRelationshipClick = (relationship: Relationship) => {
-        relationship.show = !relationship.show
+        const canvas = canvasRef.current;
 
-        relationship.elements.filter((link) => link.source.visible && link.target.visible).forEach((link) => {
-            link.visible = relationship.show
-        })
+        if (!canvas) return;
 
-        graph.RelationshipsMap.set(relationship.name, relationship)
-        setData({ ...graph.Elements })
-    }
+        relationship.show = !relationship.show;
+
+        relationship.elements.filter((link) => graph.NodesMap.get(link.source)?.visible && graph.NodesMap.get(link.target)?.visible).forEach((link) => {
+            link.visible = relationship.show;
+        });
+
+        graph.RelationshipsMap.set(relationship.name, relationship);
+
+        const graphData = canvas.getGraphData();
+
+        graphData.nodes.forEach(canvasNode => {
+            const appNode = graph.NodesMap.get(canvasNode.id);
+            if (appNode) {
+                canvasNode.visible = appNode.visible;
+            }
+        });
+        graphData.links.forEach(canvasLink => {
+            const appLink = graph.LinksMap.get(canvasLink.id);
+            if (appLink) {
+                canvasLink.visible = appLink.visible;
+            }
+        });
+
+        canvas.refresh();
+
+        setRelationships([...graph.Relationships]);
+    };
+
+    const handleTabChange = (value: string) => {
+        setCurrentTab(value as Tab);
+    };
 
     return (
-        <Tabs data-testid="graphView" value={currentTab} onValueChange={(value) => setCurrentTab(value as Tab)} className={cn("h-full w-full relative border border-border rounded-lg overflow-hidden", currentTab === "Table" && "flex flex-col-reverse")}>
+        <Tabs data-testid="graphView" value={currentTab} onValueChange={handleTabChange} className={cn("h-full w-full relative overflow-hidden", currentTab === "Table" && "flex flex-col-reverse")}>
             <div className="h-full w-full flex flex-col gap-4 absolute p-2 pointer-events-none z-10 justify-between">
                 <div className="grow basis-0 flex flex-col gap-2 overflow-hidden">
                     {
@@ -125,32 +164,29 @@ function GraphView({
                             <Toolbar
                                 graph={graph}
                                 graphName={graphName}
-                                label="Graph"
                                 selectedElements={selectedElements}
                                 setSelectedElements={setSelectedElements}
                                 handleDeleteElement={handleDeleteElement}
-                                chartRef={chartRef}
-                                setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => !!e.labels) ? setIsAddEdge : undefined}
+                                canvasRef={canvasRef}
+                                setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => "labels" in e) ? setIsAddEdge : undefined}
                                 setIsAddNode={setIsAddNode}
+                                expand={expand}
+                                setExpand={setExpand}
                                 isAddEdge={isAddEdge}
                                 isAddNode={isAddNode}
                             />
                             {
-                                (labels.length !== 0 || relationships.length !== 0) &&
-                                <div className={cn("w-fit h-1 grow grid gap-2", labels.length !== 0 && relationships.length !== 0 ? "grid-rows-[minmax(0,max-content)_max-content_minmax(0,max-content)]" : "grid-rows-[minmax(0,max-content)]")}>
-                                    {labels.length !== 0 && <Labels labels={labels} onClick={onLabelClick} label="Labels" type="Graph" />}
-                                    {labels.length !== 0 && relationships.length > 0 && <div className="h-px bg-border rounded-full" />}
-                                    {relationships.length !== 0 && <Labels labels={relationships} onClick={onRelationshipClick} label="Relationships" type="Graph" />}
+                                expand && (labels.length !== 0 || relationships.length !== 0) &&
+                                <div className={cn("w-fit max-w-[180px] h-1 grow grid gap-1.5", labels.length !== 0 && relationships.length !== 0 ? "grid-rows-[minmax(0,max-content)_max-content_minmax(0,max-content)]" : "grid-rows-[minmax(0,max-content)]")}>
+                                    {labels.length !== 0 && <Labels labels={labels} onClick={onLabelClick} label="Labels" />}
+                                    {labels.length !== 0 && relationships.length > 0 && <div className="h-px bg-border/40 rounded-full" />}
+                                    {relationships.length !== 0 && <Labels labels={relationships} onClick={onRelationshipClick} label="Relationships" />}
                                 </div>
                             }
                         </>
                     }
                 </div>
                 <div className="flex flex-col gap-4">
-                    <GraphDetails
-                        graph={graph}
-                        tabsValue={currentTab}
-                    />
                     <div className="flex gap-2 items-center">
                         <TabsList className="bg-transparent flex gap-2 pointer-events-auto p-0">
                             <TabsTrigger
@@ -198,36 +234,31 @@ function GraphView({
                                 <div className="h-full w-px bg-border rounded-full" />
                                 <Controls
                                     graph={graph}
-                                    chartRef={chartRef}
+                                    canvasRef={canvasRef}
                                     disabled={graph.getElements().length === 0}
-                                    handleCooldown={handleCooldown}
-                                    cooldownTicks={cooldownTicks}
+                                    dimmed={dimmed}
+                                    setDimmed={setDimmed}
+                                    selectedElements={selectedElements}
                                 />
                             </>
                         }
                     </div>
                 </div>
             </div>
-            <TabsContent value="Graph" className="h-full w-full mt-0 overflow-hidden">
+            <TabsContent data-testid="graphView" value="Graph" className="h-full w-full mt-0 overflow-hidden">
                 <ForceGraph
                     graph={graph}
                     data={data}
                     setData={setData}
-                    chartRef={chartRef}
+                    graphData={graphData}
+                    setGraphData={setGraphData}
+                    canvasRef={canvasRef}
                     selectedElements={selectedElements}
                     setSelectedElements={setSelectedElements}
                     setRelationships={setRelationships}
-                    parentHeight={parentHeight}
-                    parentWidth={parentWidth}
-                    setParentHeight={setParentHeight}
-                    setParentWidth={setParentWidth}
-                    isLoading={isLoading}
-                    handleCooldown={handleCooldown}
-                    cooldownTicks={cooldownTicks}
-                    currentTab={currentTab}
                     viewport={viewport}
                     setViewport={setViewport}
-                    isSaved={isSaved}
+                    dimmed={dimmed}
                 />
             </TabsContent>
             <TabsContent value="Table" className="h-1 grow w-full mt-0 overflow-hidden">
@@ -240,26 +271,25 @@ function GraphView({
                             const newQuery = {
                                 ...prev.currentQuery,
                                 profile: profile || []
-                            }
+                            };
 
-                            const newQueries = prev.queries.map(q => q.text === newQuery.text ? newQuery : q)
+                            const newQueries = prev.queries.map(q => q.text === newQuery.text ? newQuery : q);
 
-                            localStorage.setItem("query history", JSON.stringify(newQueries))
+                            setConnectionItem("query history", JSON.stringify(newQueries));
 
                             return {
                                 ...prev,
                                 currentQuery: newQuery,
                                 queries: newQueries
-                            }
-                        })
+                            };
+                        });
                     }}
-                    graphName={graph.Id}
                     query={historyQuery.currentQuery}
                     fetchCount={fetchCount}
                 />
             </TabsContent>
         </Tabs>
-    )
+    );
 }
 
 GraphView.displayName = "GraphView";

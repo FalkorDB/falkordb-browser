@@ -13,20 +13,37 @@ export const CREATE_TWO_NODES_QUERY =
 export const CREATE_NODE_QUERY = 'CREATE (a:person1 {name: "a"}) RETURN *';
 export const CREATE_QUERY =
   'CREATE (a:person1 {name: "a"})-[c:KNOWS {name: "knows"}]->(b:person2) RETURN *';
+export const CREATE_PERSON_RELATIONSHIP =
+  'CREATE (a:person1 {name: "a", age: 30, gender: "male", occupation: "engineer"})-[c:KNOWS {name: "knows", since: 2020, strength: "strong"}]->(b:person2 {name: "b", age: 28, gender: "female", occupation: "designer"}) RETURN *';
+
 
 /**
- * Initialize localStorage with default values required by the application
- * This prevents initialization errors in CI environments
+ * Normalize URL by removing trailing slash for comparison
+ * @param url - The URL to normalize
+ * @returns URL without trailing slash
  */
-export const initializeLocalStorage = () => `
+export function normalizeUrl(url: string | null | undefined): string {
+  return url?.replace(/\/$/, '') || '';
+}
+
+/**
+ * Initialize localStorage with default values required by the application.
+ * Global user preferences use plain keys. Per-connection data (e.g. query history)
+ * is prefixed with host:port: to match the runtime connection-scoped storage.
+ */
+export const initializeLocalStorage = (host = "localhost", port = 6379, username = "default") => {
+    const prefix = `${host}:${port}:${username}:`;
+    return `
         if (!localStorage.getItem("timeout")) localStorage.setItem("timeout", "0");
         if (!localStorage.getItem("limit")) localStorage.setItem("limit", "300");
         if (!localStorage.getItem("defaultQuery")) localStorage.setItem("defaultQuery", "");
         if (!localStorage.getItem("runDefaultQuery")) localStorage.setItem("runDefaultQuery", "false");
         if (!localStorage.getItem("contentPersistence")) localStorage.setItem("contentPersistence", "false");
-        if (!localStorage.getItem("query history")) localStorage.setItem("query history", "[]");
+        if (!localStorage.getItem("${prefix}query history")) localStorage.setItem("${prefix}query history", "[]");
         if (!localStorage.getItem("refreshInterval")) localStorage.setItem("refreshInterval", "60");
+        if (!localStorage.getItem("tutorial")) localStorage.setItem("tutorial", "false");
     `;
+};
 
 export function delay(ms: number) {
   return new Promise((resolve) => {
@@ -121,7 +138,9 @@ export async function waitForURL(
 
   while (elapsed < timeout) {
     const currentURL = page.url();
-    if (currentURL === expectedURL) {
+    const currentPath = new URL(currentURL).origin + new URL(currentURL).pathname;
+    const expectedPath = new URL(expectedURL).origin + new URL(expectedURL).pathname;
+    if (currentPath === expectedPath) {
       return;
     }
     await new Promise((resolve) => {
@@ -155,9 +174,9 @@ export async function getAdminToken(): Promise<
     }
 
     const requiredCookies = [
-      "next-auth.callback-url",
-      "next-auth.csrf-token",
-      "next-auth.session-token",
+      "authjs.callback-url",
+      "authjs.csrf-token",
+      "authjs.session-token",
     ];
     const cookieString = authState.cookies
       .filter((cookie: { name: string }) =>
@@ -192,16 +211,13 @@ export function getRandomString(prefix = "", delimiter = "_"): string {
 export async function interactWhenVisible<T>(
   element: Locator,
   action: (el: Locator) => Promise<T>,
-  name: string
+  name: string,
+  time?: number,
+  retry?: number
 ): Promise<T> {
-  const isVisible = await waitForElementToBeVisible(element);
+  const isVisible = await waitForElementToBeVisible(element, time, retry);
   if (!isVisible) throw new Error(`${name} is not visible!`);
   return action(element);
-}
-
-export function inferLabelFromGraph(graph: string): string {
-  if (graph.toLowerCase().includes("schema")) return "Schema";
-  return "Graph";
 }
 
 export async function pollForElementContent(

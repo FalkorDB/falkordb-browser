@@ -1,4 +1,4 @@
-import queryData from '../config/queries.json'
+import queryData from "./queries.json";
 
 export const BATCH_CREATE_PERSONS = queryData.queries[0].testQueries[0].query;
 export const FETCH_FIRST_TEN_NODES = queryData.queries[0].testQueries[1].query;

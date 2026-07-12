@@ -1,17 +1,20 @@
-import { cn } from "@/lib/utils"
-import { Fragment, KeyboardEvent, MouseEvent, useEffect, useRef, useState } from "react"
-import { Check, Circle, Loader2, X } from "lucide-react"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import Button from "./ui/Button"
-import { Query } from "../api/graph/model"
-import Input from "./ui/Input"
+import { cn, Query } from "@/lib/utils";
+import { getCypherErrorHint } from "@/lib/cypherErrors";
+import { suggestForError } from "@/lib/cypherSuggestions";
+import { Fragment, KeyboardEvent, MouseEvent, useEffect, useRef, useState } from "react";
+import { Check, Circle, Loader2, Star, X } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import Button from "./ui/Button";
+import Input from "./ui/Input";
 
-type Item = string | Query
+type Item = string | Query;
 
 type ElementItem = {
     content: React.ReactNode;
     tooltip: string;
     className?: string;
+    tooltipClassName?: string;
 };
 
 const getLastRun = (timestamp: number) => {
@@ -25,59 +28,66 @@ const getLastRun = (timestamp: number) => {
     }
 
     return date.toLocaleString([], { hour12: false });
-}
+};
 
-const getExecutionTime = (metadata: string[]) => metadata.find(value => value.startsWith("Query internal execution time:"))?.split(":")[1].replace(" milliseconds", "ms")
+const getExecutionTime = (metadata: string[]) => metadata.find(value => value.startsWith("Query internal execution time:"))?.split(":")[1].replace(" milliseconds", "ms");
 
 const getItemClassName = (selected: boolean, deleteSelected: boolean, hover: boolean, prefix: "text" | "bg" = "text") => {
-    if (selected) return `${prefix}-primary border-primary`
-    if (deleteSelected) return `${prefix}-destructive border-destructive`
-    if (hover) return `${prefix}-foreground border-foreground`
-    return `${prefix}-border border-border`
-}
+    if (selected) return `${prefix}-primary border-primary`;
+    if (deleteSelected) return `${prefix}-destructive border-destructive`;
+    if (hover) return `${prefix}-foreground border-foreground`;
+    return `${prefix}-foreground/50 border-foreground/50`;
+};
 
-const getSeparator = (selected: boolean, deleteSelected: boolean, hover: boolean) => (
+const getSeparator = () => (
     <div
-        className={cn("h-2/3 w-px rounded-full", getItemClassName(selected, deleteSelected, hover, "bg"))}
+        className={cn("h-2/3 w-px rounded-full bg-foreground/60")}
     />
-)
+);
 
 const getStatusIcon = (status: Query["status"]) => {
-    const size = 20
+    const size = 14;
     switch (status) {
         case "Empty":
-            return <Circle color="orange" size={size} />
+            return <Circle color="orange" size={size} />;
         case "Failed":
-            return <X size={size} color="red" />
+            return <X size={size} color="red" />;
         default:
-            return <Check size={size} color="green" />
+            return <Check size={size} color="green" />;
     }
-}
+};
 
-const getQueryElement = (item: Query, selected: boolean, deleteSelected: boolean, hover: boolean) => {
+const getQueryElement = (item: Query) => {
     const executionTime = getExecutionTime(item.metadata);
 
     // Build array of items to display
     const elements: ElementItem[] = [];
 
     if (item.status) {
+        const errorHint = item.status === "Failed" && item.errorMessage
+            ? (suggestForError(item.errorMessage, { query: item.text }) ?? getCypherErrorHint(item.errorMessage)?.hint)
+            : undefined;
+        const statusTooltip = item.status === "Failed" && item.errorMessage
+            ? `Error: ${item.errorMessage}${errorHint ? `\n💡 ${errorHint}` : ""}`
+            : `Status: ${item.status}`;
         elements.push({
             content: getStatusIcon(item.status),
-            tooltip: `Status: ${item.status}`,
-            className: "text-center truncate"
+            tooltip: statusTooltip,
+            className: "text-center truncate",
+            tooltipClassName: item.status === "Failed" ? "bg-destructive text-destructive-foreground whitespace-pre-line" : undefined
         });
     }
 
     if (item.elementsCount) {
         elements.push({
-            content: item.elementsCount,
+            content: `ELM: ${item.elementsCount}`,
             tooltip: `Elements: ${item.elementsCount}`,
         });
     }
 
     if (item.timestamp) {
         elements.push({
-            content: getLastRun(item.timestamp),
+            content: `LR: ${getLastRun(item.timestamp)}`,
             tooltip: `Last Run: ${getLastRun(item.timestamp)}`,
             className: "truncate"
         });
@@ -85,7 +95,7 @@ const getQueryElement = (item: Query, selected: boolean, deleteSelected: boolean
 
     if (item.graphName) {
         elements.push({
-            content: item.graphName,
+            content: `GN: ${item.graphName}`,
             tooltip: `Graph Name: ${item.graphName}`,
             className: "truncate"
         });
@@ -93,30 +103,30 @@ const getQueryElement = (item: Query, selected: boolean, deleteSelected: boolean
 
     if (executionTime) {
         elements.push({
-            content: executionTime,
+            content: `IET: ${executionTime}`,
             tooltip: `Internal Execution Time: ${executionTime}`,
             className: "truncate"
         });
     }
 
     return (
-        <div className="h-1 grow flex gap-2 items-center w-full">
+        <div className="flex gap-2 items-center text-foreground/60 overflow-hidden whitespace-nowrap">
             {elements.map((element, index) => (
                 <Fragment key={element.tooltip}>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <div className={element.className}>{element.content}</div>
+                            <div className={cn("truncate", element.className)}>{element.content}</div>
                         </TooltipTrigger>
-                        <TooltipContent>
+                        <TooltipContent className={element.tooltipClassName}>
                             {element.tooltip}
                         </TooltipContent>
                     </Tooltip>
-                    {index < elements.length - 1 && getSeparator(selected, deleteSelected, hover)}
+                    {index < elements.length - 1 && getSeparator()}
                 </Fragment>
             ))}
         </div>
     );
-}
+};
 
 interface Props<T extends Item> {
     list: T[]
@@ -126,115 +136,127 @@ interface Props<T extends Item> {
     afterSearchCallback: (newFilteredList: T[]) => void
     isSelected: (item: T) => boolean
     isDeleteSelected?: (item: T) => boolean
-    searchRef: React.RefObject<HTMLInputElement>
+    onDoubleClick?: (label: string, evt: MouseEvent<HTMLButtonElement>) => void
+    onToggleFav?: (item: T, name?: string) => void
+    searchRef: React.RefObject<HTMLInputElement | null>
     isLoading?: boolean
     className?: string
+    actionButtons?: React.ReactNode
     children?: React.ReactNode
 }
 
-export default function PaginationList<T extends Item>({ list, onClick, dataTestId, afterSearchCallback, isSelected, isDeleteSelected, label, isLoading, className, children, searchRef }: Props<T>) {
+export default function PaginationList<T extends Item>({ list, onClick, onDoubleClick, dataTestId, afterSearchCallback, isSelected, isDeleteSelected, onToggleFav, label, isLoading, className, children, searchRef, actionButtons }: Props<T>) {
 
-    const [filteredList, setFilteredList] = useState<T[]>([...list])
-    const [hoverIndex, setHoverIndex] = useState<number>(0)
-    const [stepCounter, setStepCounter] = useState(0)
-    const [pageCount, setPageCount] = useState(0)
-    const [search, setSearch] = useState("")
-    const [itemsPerPage, setItemsPerPage] = useState(1)
+    const [filteredList, setFilteredList] = useState<T[]>([...list]);
+    const [hoverIndex, setHoverIndex] = useState<number>(0);
+    const [stepCounter, setStepCounter] = useState(0);
+    const [pageCount, setPageCount] = useState(0);
+    const [search, setSearch] = useState("");
+    const [itemsPerPage, setItemsPerPage] = useState(1);
+    const [favDialogItem, setFavDialogItem] = useState<T | null>(null);
+    const [favName, setFavName] = useState("");
 
-    const containerRef = useRef<HTMLUListElement>(null)
+    const containerRef = useRef<HTMLUListElement>(null);
 
-    const startIndex = stepCounter * itemsPerPage
-    const endIndex = Math.min(startIndex + itemsPerPage, filteredList.length)
-    const items = filteredList.slice(startIndex, endIndex)
-    const itemHeight = typeof items[0] === "string" ? 30 : 50
-
-    useEffect(() => {
-        setStepCounter(0)
-    }, [filteredList])
+    const startIndex = stepCounter * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, filteredList.length);
+    const items = filteredList.slice(startIndex, endIndex);
+    const itemHeight = typeof items[0] === "string" ? 30 : 40;
 
     useEffect(() => {
-        const newPageCount = Math.ceil(filteredList.length / itemsPerPage)
-        setPageCount(newPageCount)
-        if (newPageCount < stepCounter + 1) setStepCounter(0)
-    }, [filteredList, itemsPerPage, stepCounter])
+        setStepCounter(0);
+        setHoverIndex(0);
+    }, [search]);
+
+    useEffect(() => {
+        const newPageCount = Math.ceil(filteredList.length / itemsPerPage);
+        setPageCount(newPageCount);
+        if (newPageCount < stepCounter + 1) setStepCounter(Math.max(0, newPageCount - 1));
+    }, [filteredList, itemsPerPage, stepCounter]);
 
     useEffect(() => {
         const calculateItemsPerPage = () => {
             if (containerRef.current) {
-                const containerHeight = containerRef.current.clientHeight
-                const calculatedItems = Math.floor(containerHeight / itemHeight)
-                setItemsPerPage(Math.max(1, calculatedItems))
+                const containerHeight = containerRef.current.clientHeight;
+                const calculatedItems = Math.floor(containerHeight / itemHeight);
+                setItemsPerPage(Math.max(1, calculatedItems));
             }
-        }
+        };
 
-        calculateItemsPerPage()
+        calculateItemsPerPage();
 
         const resizeObserver = new ResizeObserver(() => {
-            calculateItemsPerPage()
-        })
+            calculateItemsPerPage();
+        });
 
         if (containerRef.current) {
-            resizeObserver.observe(containerRef.current)
+            resizeObserver.observe(containerRef.current);
         }
 
         return () => {
-            resizeObserver.disconnect()
-        }
-    }, [itemHeight, items, items.length])
+            resizeObserver.disconnect();
+        };
+    }, [itemHeight, items, items.length]);
 
     useEffect(() => {
-        const timeout = setTimeout(() => {
-            const newFilteredList = list.filter((item) => !search || (typeof item === "string" ? item.toLowerCase().includes(search.toLowerCase()) : item.text.toLowerCase().includes(search.toLowerCase()))) || []
+        const applyFilter = () => {
+            const newFilteredList = list.filter((item) => !search || (typeof item === "string" ? item.toLowerCase().includes(search.toLowerCase()) : item.text.toLowerCase().includes(search.toLowerCase()))) || [];
             if (JSON.stringify(newFilteredList) !== JSON.stringify(filteredList)) {
-                setFilteredList([...newFilteredList])
-                afterSearchCallback([...newFilteredList])
-                setStepCounter(0)
-                setHoverIndex(0)
+                setFilteredList([...newFilteredList]);
+                afterSearchCallback([...newFilteredList]);
             }
-        }, 500)
+        };
+
+        if (!search) {
+            applyFilter();
+            return undefined;
+        }
+
+        const timeout = setTimeout(applyFilter, 500);
 
         return () => {
-            clearTimeout(timeout)
-        }
-    }, [afterSearchCallback, list, search, filteredList])
+            clearTimeout(timeout);
+        };
+    }, [afterSearchCallback, list, search, filteredList]);
 
     const handleSetStepCounter = (callback: ((prev: number) => number) | number) => {
-        setStepCounter(callback)
-        searchRef.current?.focus()
-    }
+        setStepCounter(callback);
+        searchRef.current?.focus();
+    };
 
     return (
-        <div className={cn("w-full flex flex-col gap-2 p-3", className)}>
+        <div className={cn("w-full flex flex-col gap-2 p-2", className)}>
             {children}
             <div className="flex gap-2 items-center">
+                {actionButtons}
                 <Input
-                    ref={searchRef}
+                    ref={searchRef as React.RefObject<HTMLInputElement>}
                     data-testid={`${label}Search`}
-                    className="w-full bg-background text-foreground"
+                    className="w-full bg-background text-foreground text-xs"
                     value={search}
                     placeholder={`Search for a ${label}`}
                     onChange={(e) => setSearch(e.target.value)}
                     onKeyDown={(e) => {
                         if (e.key === "Escape") {
-                            e.preventDefault()
-                            setSearch("")
+                            e.preventDefault();
+                            setSearch("");
                         }
 
                         if (e.key === "ArrowUp" || (e.shiftKey && e.key === "Tab" && hoverIndex > 0)) {
-                            e.preventDefault()
+                            e.preventDefault();
 
-                            setHoverIndex(prev => prev ? prev - 1 : prev)
+                            setHoverIndex(prev => prev ? prev - 1 : prev);
                         }
 
                         if (e.key === "ArrowDown" || (!e.shiftKey && e.key === "Tab" && hoverIndex < items.length - 1)) {
-                            e.preventDefault()
+                            e.preventDefault();
 
-                            setHoverIndex(prev => prev < items.length - 1 ? prev + 1 : prev)
+                            setHoverIndex(prev => prev < items.length - 1 ? prev + 1 : prev);
                         }
 
                         if (e.key === "Enter") {
-                            e.preventDefault()
-                            onClick(typeof items[hoverIndex] === "string" ? items[hoverIndex] : items[hoverIndex].text, e)
+                            e.preventDefault();
+                            onClick(typeof items[hoverIndex] === "string" ? items[hoverIndex] : items[hoverIndex].text, e);
                         }
                     }}
                     onFocus={() => setHoverIndex(0)}
@@ -245,67 +267,113 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
             <ul
                 ref={containerRef}
                 data-testid="queryList"
-                className={cn("h-1 grow flex flex-col p-2", items.length > 0 && typeof items[0] === "object" && "SofiaSans")}
+                className={cn("h-1 grow flex flex-col", items.length > 0 && typeof items[0] === "object" && "SofiaSans")}
             >
                 {
                     items.map((item, index) => {
-                        const selected = isSelected ? isSelected(item) : false
-                        const deleteSelected = isDeleteSelected ? isDeleteSelected(item) : false
-                        const hover = hoverIndex === index
-                        const isString = typeof item === "string"
-                        const text = isString ? item : item.text
+                        const selected = isSelected ? isSelected(item) : false;
+                        const deleteSelected = isDeleteSelected ? isDeleteSelected(item) : false;
+                        const hover = hoverIndex === index;
+                        const isString = typeof item === "string";
+                        const text = isString ? item : item.text;
+                        const queryText = <p data-testid={`${dataTestId}${text}Text`} className={cn("truncate w-full text-left", getItemClassName(selected, deleteSelected, hover))}>{text}</p>;
+
+                        const isFav = !isString && item.fav;
 
                         const content = (
                             <>
                                 {
                                     !isString && (item.status || item.elementsCount || item.timestamp || item.graphName || getExecutionTime(item.metadata)) &&
-                                    getQueryElement(item, selected, deleteSelected, hover)
+                                    <div className="w-full flex justify-between text-xs">
+                                        {getQueryElement(item)}
+                                        {!isString && onToggleFav && (
+                                            <div
+                                                className="flex items-center gap-1 justify-end overflow-hidden whitespace-nowrap"
+                                            >
+                                                {
+                                                    item.name &&
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <p className="text-fav font-medium truncate">{item.name}</p>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            Favorite name: {item.name}
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                }
+                                                <Button
+                                                    data-testid={`${dataTestId}${text}Fav`}
+                                                    title={isFav ? "Remove from favorites" : "Add to favorites"}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (isFav) {
+                                                            onToggleFav(item);
+                                                        } else {
+                                                            setFavDialogItem(item);
+                                                            setFavName("");
+                                                        }
+                                                    }}
+                                                    onContextMenu={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                    }}
+                                                >
+                                                    <Star size={14} className={cn(isFav ? "fill-fav text-fav" : "text-foreground/40")} />
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
                                 }
-                                <p data-testid={`${dataTestId}${text}Text`} className={cn("truncate w-full text-left", !isString && "h-1 grow")}>{text}</p>
+                                {
+                                    onClick ?
+                                        <Button
+                                            className={cn("w-full h-full gap-0", !isString ? "flex-col" : "text-center")}
+                                            data-testid={`${dataTestId}${text}Button`}
+                                            title={text}
+                                            onMouseEnter={() => setHoverIndex(index)}
+                                            onMouseLeave={() => searchRef.current !== document.activeElement && setHoverIndex(-1)}
+                                            onClick={(e) => {
+                                                onClick(text, e);
+                                            }}
+                                            onDoubleClick={(e) => {
+                                                if (onDoubleClick) {
+                                                    onDoubleClick(text, e);
+                                                }
+                                            }}
+                                            onContextMenu={(e) => {
+                                                e.preventDefault();
+                                                const syntheticEvent = {
+                                                    ...e,
+                                                    type: "rightclick" as const
+                                                } as typeof e & { type: "rightclick" };
+                                                onClick(text, syntheticEvent);
+                                            }}
+                                            tabIndex={-1}
+                                        >
+                                            {queryText}
+                                        </Button>
+                                        : queryText
+                                }
                             </>
-                        )
+                        );
 
                         return (
                             <li
                                 className={cn(
-                                    "border-b cursor-pointer",
+                                    "border-b cursor-pointer relative",
                                     getItemClassName(selected, deleteSelected, hover)
                                 )}
                                 data-testid={`${dataTestId}${text}`}
-                                onMouseEnter={() => setHoverIndex(index)}
-                                onMouseLeave={() => searchRef.current !== document.activeElement && setHoverIndex(-1)}
                                 style={{ height: `${itemHeight}px` }}
                                 key={text}
                             >
-                                {
-                                    onClick ?
-                                        <Button
-                                            className={cn("w-full h-full text-xl gap-0", !isString ? "flex-col" : "text-center")}
-                                            data-testid={`${dataTestId}${text}Button`}
-                                            title={text}
-                                            onClick={(e) => {
-                                                onClick(text, e)
-                                            }}
-                                            onContextMenu={(e) => {
-                                                e.preventDefault()
-                                                const syntheticEvent = {
-                                                    ...e,
-                                                    type: "rightclick" as const
-                                                } as typeof e & { type: "rightclick" }
-                                                onClick(text, syntheticEvent)
-                                            }}
-                                            tabIndex={-1}
-                                        >
-                                            {content}
-                                        </Button>
-                                        : content
-                                }
+                                {content}
                             </li>
-                        )
+                        );
                     })
                 }
-            </ul>
-            <ul className="flex gap-6 p-2 items-center justify-center">
+            </ul >
+            <ul className="flex gap-6 p-0 items-center justify-center">
                 <li className="flex gap-4">
                     <Button disabled={stepCounter < 4} label="<<" title="Previous 5 pages" onClick={() => setStepCounter(prev => prev > 4 ? prev - 5 : prev)} />
                     <Button disabled={stepCounter === 0} label="<" title="Previous page" onClick={() => handleSetStepCounter(prev => prev > 0 ? prev - 1 : prev)} />
@@ -329,7 +397,7 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                                     label={`[${index + 1}]`}
                                     title={`Page ${index + 1}`}
                                     onClick={() => {
-                                        handleSetStepCounter(index)
+                                        handleSetStepCounter(index);
                                     }}
                                 />
                             </li>
@@ -340,8 +408,48 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                     <Button disabled={stepCounter > pageCount - 6} label=">>" title="Next 5 pages" onClick={() => handleSetStepCounter(prev => prev < pageCount - 5 ? prev + 5 : prev)} />
                 </li>
             </ul>
-        </div>
-    )
+            <Dialog open={!!favDialogItem} onOpenChange={(open) => { if (!open) setFavDialogItem(null); }}>
+                <DialogContent className="max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
+                    <DialogHeader>
+                        <DialogTitle>Add to Favorites</DialogTitle>
+                        <DialogDescription>Enter a nick name (optional)</DialogDescription>
+                    </DialogHeader>
+                    <form
+                        className="flex flex-col gap-4"
+                        onSubmit={(e) => {
+                            e.preventDefault();
+
+                            if (favDialogItem && onToggleFav) {
+                                onToggleFav(favDialogItem, favName.trim());
+                                setFavDialogItem(null);
+                            }
+
+                        }}
+                    >
+                        <Input
+                            autoFocus
+                            className="bg-background"
+                            placeholder="Favorite name"
+                            value={favName}
+                            onChange={(e) => setFavName(e.target.value)}
+                        />
+                        <div className="flex justify-end gap-2">
+                            <Button
+                                variant="Secondary"
+                                label="Cancel"
+                                onClick={() => setFavDialogItem(null)}
+                            />
+                            <Button
+                                variant="Primary"
+                                label="Save"
+                                type="submit"
+                            />
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
+        </div >
+    );
 }
 
 PaginationList.defaultProps = {
@@ -349,4 +457,5 @@ PaginationList.defaultProps = {
     children: undefined,
     isLoading: undefined,
     isDeleteSelected: undefined,
-}
+    onToggleFav: undefined,
+};

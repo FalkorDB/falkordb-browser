@@ -1,17 +1,19 @@
 ARG CYPHER_VERSION=latest
 
-FROM node:22-alpine AS base
+FROM node:24-alpine3.23@sha256:2bdb65ed1dab192432bc31c95f94155ca5ad7fc1392fb7eb7526ab682fa5bf14 AS base
 
-FROM falkordb/text-to-cypher:${CYPHER_VERSION} AS cypher
+# Update all Alpine packages to fix security vulnerabilities
+RUN apk upgrade --no-cache --available
 
 # Install dependencies only when needed
 FROM base AS deps
 # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat && \
+    apk upgrade --no-cache --available
 WORKDIR /app
 
 # Install dependencies based on the preferred package manager
-COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* ./
+COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* .npmrc* ./
 RUN \
   if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
   elif [ -f package-lock.json ]; then npm ci; \
@@ -26,10 +28,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Next.js collects completely anonymous telemetry data about general usage.
-# Learn more here: https://nextjs.org/telemetry
-# Uncomment the following line in case you want to disable telemetry during the build.
-# ENV NEXT_TELEMETRY_DISABLED 1
+# Disable Next.js telemetry during build and runtime.
+ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN \
   if [ -f yarn.lock ]; then yarn run build; \
@@ -42,48 +42,45 @@ RUN \
 FROM base AS runner
 WORKDIR /app
 
-# Install supervisor
-RUN apk add --no-cache supervisor
-
-ENV NODE_ENV production
-# Uncomment the following line in case you want to disable telemetry during runtime.
-# ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+RUN apk add --no-cache su-exec && \
+    npm cache clean --force && \
+    rm -rf /usr/local/lib/node_modules/npm
+
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+    
 COPY --from=builder /app/public ./public
 
 # Set the correct permission for prerender cache
 RUN mkdir .next
 RUN chown nextjs:nodejs .next
 
+# Create data directory for token storage
+RUN mkdir .data
+RUN chown nextjs:nodejs .data
+
 # Automatically leverage output traces to reduce image size
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/.env.local.template ./.env.local
-COPY --from=cypher --chown=nextjs:nodejs /app/text-to-cypher /app/text-to-cypher
-COPY --from=cypher --chown=nextjs:nodejs /app/templates /app/templates
 
 
-# Create supervisor directories and copy config
-RUN mkdir -p /etc/supervisor/conf.d /var/log/supervisor
-COPY ./entrypoint.sh /entrypoint.sh
-COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-RUN chmod +x /entrypoint.sh
-
-EXPOSE 3000 8080 3001
+EXPOSE 3000
 
 ENV PORT=3000
-ENV REST_PORT=8080
-ENV MCP_PORT=3001
-ENV CYPHER=1
+
 ENV HOSTNAME="0.0.0.0"
 
-# Use root to run supervisord (it will drop privileges for individual services)
-USER root
+USER nextjs
+ENTRYPOINT ["docker-entrypoint.sh"]
 
 # server.js is created by next build from the standalone output
 # https://nextjs.org/docs/pages/api-reference/next-config-js/output
-CMD ["/entrypoint.sh"]
+CMD ["node", "server.js"]

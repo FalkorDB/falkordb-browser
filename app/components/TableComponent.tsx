@@ -5,10 +5,10 @@
 /* eslint-disable no-nested-ternary */
 /* eslint-disable react/require-default-props */
 
-"use client"
+"use client";
 
 import { Checkbox } from "@/components/ui/checkbox";
-import { JSONTree } from "react-json-tree"
+import { JSONTree } from "react-json-tree";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Cell, cn, getTheme, Row } from "@/lib/utils";
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
@@ -20,17 +20,21 @@ import Input from "./ui/Input";
 import Combobox from "./ui/combobox";
 import { IndicatorContext } from "./provider";
 
+export type HeaderDef = string | { name: string; width?: string };
+
 interface Props {
-    headers: string[],
+    headers: HeaderDef[],
     rows: Row[],
-    label: "Graphs" | "Schemas" | "Configs" | "Users" | "TableView",
-    entityName: "Graph" | "Schema" | "Config" | "User" | "Element",
+    label: "Graphs" | "Configs" | "Users" | "TableView",
+    entityName: "Graph" | "Config" | "User" | "Element",
+    itemHeight: number
+    itemHeightExpandMultiple?: number
+    itemWidth?: number
     valueClassName?: string
-    inputRef?: React.RefObject<HTMLInputElement>,
+    inputRef?: React.RefObject<HTMLInputElement | null>,
     children?: React.ReactNode,
     setRows?: Dispatch<SetStateAction<Row[]>>,
     className?: string
-    itemHeight?: number
     itemsPerPage?: number
     initialScrollPosition?: number
     onScrollChange?: Dispatch<SetStateAction<number>>
@@ -74,7 +78,9 @@ export default function TableComponent({
     children,
     setRows,
     className,
-    itemHeight = 70.5,
+    itemHeight,
+    itemHeightExpandMultiple,
+    itemWidth = 25,
     itemsPerPage = 30,
     initialScrollPosition,
     onScrollChange,
@@ -84,34 +90,63 @@ export default function TableComponent({
     onExpandChange
 }: Props) {
 
-    const { indicator } = useContext(IndicatorContext)
+    const { indicator } = useContext(IndicatorContext);
 
-    const { theme } = useTheme()
-    const { currentTheme } = getTheme(theme)
+    const { theme } = useTheme();
+    const { currentTheme } = getTheme(theme);
 
-    const searchRef = useRef<HTMLInputElement>(null)
-    const headerRef = useRef<HTMLTableRowElement>(null)
-    const tableRef = useRef<HTMLTableElement>(null)
-    const scrollContainerRef = useRef<HTMLDivElement>(null)
+    const normalizedHeaders = useMemo(() => headers.map(h => typeof h === 'string' ? { name: h } : h), [headers]);
+    const headerNames = useMemo(() => normalizedHeaders.map(h => h.name), [normalizedHeaders]);
+
+    const searchRef = useRef<HTMLInputElement>(null);
+    const headerRef = useRef<HTMLTableRowElement>(null);
+    const tableRef = useRef<HTMLTableElement>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
     const loadAttemptedRef = useRef<Set<string>>(new Set());
     const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
 
-    const [hasRestored, setHasRestored] = useState(false)
-    const [search, setSearch] = useState<string>("")
-    const [editable, setEditable] = useState<string>("")
-    const [hover, setHover] = useState<string>("")
-    const [newValue, setNewValue] = useState<string>("")
-    const [filteredRows, setFilteredRows] = useState<Row[]>([])
-    const [isLoading, setIsLoading] = useState<boolean>(false)
-    const [scrollTop, setScrollTop] = useState<number>(0)
-    const [topFakeRowHeight, setTopFakeRowHeight] = useState<number>(0)
-    const [bottomFakeRowHeight, setBottomFakeRowHeight] = useState<number>(0)
-    const [visibleRows, setVisibleRows] = useState<Row[]>([])
-    const [loadingCells, setLoadingCells] = useState<Set<string>>(new Set())
-    const [loadedCells, setLoadedCells] = useState<Set<string>>(new Set())
-    const [expandArr, setExpandArr] = useState(new Map(initialExpand))
+    const [hasRestored, setHasRestored] = useState(false);
+    const [search, setSearch] = useState<string>("");
+    const [editable, setEditable] = useState<string>("");
+    const [hover, setHover] = useState<string>("");
+    const [newValue, setNewValue] = useState<string>("");
+    const [filteredRows, setFilteredRows] = useState<Row[]>([]);
+    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [scrollTop, setScrollTop] = useState<number>(0);
+    const [topFakeRowHeight, setTopFakeRowHeight] = useState<number>(0);
+    const [bottomFakeRowHeight, setBottomFakeRowHeight] = useState<number>(0);
+    const [visibleRows, setVisibleRows] = useState<Row[]>([]);
+    const [loadingCells, setLoadingCells] = useState<Set<string>>(new Set());
+    const [loadedCells, setLoadedCells] = useState<Set<string>>(new Set());
+    const [expandArr, setExpandArr] = useState(new Map(initialExpand));
+    const [containerWidth, setContainerWidth] = useState(0);
 
-    const height = useMemo(() => expandArr.size === 0 ? itemHeight : itemHeight * 2, [expandArr.size, itemHeight])
+    useEffect(() => {
+        const el = scrollContainerRef.current;
+        if (!el) return undefined;
+
+        const observer = new ResizeObserver(([entry]) => {
+            setContainerWidth(entry.contentRect.width);
+        });
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, []);
+
+    const colMinWidth = useMemo(() => {
+        if (!containerWidth || headerNames.length === 0) return 0;
+        const headerRow = headerRef.current;
+        let fixedColsWidth = 0;
+        if (headerRow) {
+            const cells = Array.from(headerRow.cells);
+            // All columns before the data columns (checkbox + index) are fixed
+            const fixedCols = cells.slice(0, cells.length - headerNames.length);
+            fixedColsWidth = fixedCols.reduce((sum, cell) => sum + cell.getBoundingClientRect().width, 0);
+        }
+        const availableWidth = containerWidth - fixedColsWidth;
+        return Math.floor(availableWidth / Math.min(headerNames.length, 100 / itemWidth));
+    }, [containerWidth, headerNames.length, itemWidth]);
+
+    const height = useMemo(() => itemHeightExpandMultiple !== undefined ? expandArr.size === 0 ? itemHeight : itemHeight * itemHeightExpandMultiple : itemHeight, [expandArr.size, itemHeight, itemHeightExpandMultiple]);
 
     const handleLoadLazyCell = useCallback((rowName: string, cellIndex: number, loadFn: () => Promise<any>) => {
         // Use row name for stable cell key
@@ -190,37 +225,31 @@ export default function TableComponent({
             // Clean up abort controller
             abortControllersRef.current.delete(cellKey);
         });
-    }, [loadingCells, loadedCells, rows, setRows])
+    }, [loadingCells, loadedCells, rows, setRows]);
 
     useEffect(() => {
-        const newStartIndex = Math.max(0, Math.floor((scrollTop - (height * itemsPerPage)) / height))
-        const newEndIndex = Math.min(filteredRows.length, Math.floor((scrollTop + (height * (itemsPerPage * 2))) / height))
-        const newTopFakeRowHeight = newStartIndex * height
-        const newBottomFakeRowHeight = (filteredRows.length - newEndIndex) * height
-        const newVisibleRows = [...filteredRows].slice(newStartIndex, newEndIndex)
+        const newStartIndex = Math.max(0, Math.floor((scrollTop - (height * itemsPerPage)) / height));
+        const newEndIndex = Math.min(filteredRows.length, Math.floor((scrollTop + (height * (itemsPerPage * 2))) / height));
+        const newTopFakeRowHeight = newStartIndex * height;
+        const newBottomFakeRowHeight = (filteredRows.length - newEndIndex) * height;
+        const newVisibleRows = [...filteredRows].slice(newStartIndex, newEndIndex);
 
-        setTopFakeRowHeight(newTopFakeRowHeight)
-        setBottomFakeRowHeight(newBottomFakeRowHeight)
-        setVisibleRows(newVisibleRows)
-    }, [scrollTop, itemHeight, itemsPerPage, filteredRows, height])
+        setTopFakeRowHeight(newTopFakeRowHeight);
+        setBottomFakeRowHeight(newBottomFakeRowHeight);
+        setVisibleRows(newVisibleRows);
+    }, [scrollTop, itemHeight, itemsPerPage, filteredRows, height]);
 
     useEffect(() => {
         if (searchRef.current) {
-            searchRef.current.focus()
+            searchRef.current.focus();
         }
-    }, [])
+    }, []);
 
     useEffect(() => {
         if (inputRef && inputRef.current && editable) {
-            inputRef.current.focus()
+            inputRef.current.focus();
         }
-    }, [inputRef, editable])
-
-    useEffect(() => {
-        if (searchRef.current) {
-            searchRef.current.focus()
-        }
-    }, [])
+    }, [inputRef, editable]);
 
     const handleSearchFilter = useCallback((cell: Cell): boolean => {
         if (!cell.value) return false;
@@ -239,24 +268,31 @@ export default function TableComponent({
         }
 
         return cell.value.toString().toLowerCase().includes(searchLower);
-    }, [search])
+    }, [search]);
 
     useEffect(() => {
         if (!search) {
-            setFilteredRows([...rows])
-            return undefined
+            setFilteredRows([...rows]);
+            return undefined;
         }
 
         const timeout = setTimeout(() => {
-            setFilteredRows([...rows].filter((row) => row.cells.some(cell =>
-                handleSearchFilter(cell)
-            )))
-        }, 500)
+            setFilteredRows(prev => [...rows].filter((row) => {
+                const is = row.cells.some(cell => handleSearchFilter(cell));
+
+                // If using row selection, uncheck rows that no longer match the search
+                if (!is) {
+                    row.checked = prev.every(r => r.checked);
+                }
+
+                return is;
+            }));
+        }, 500);
 
         return () => {
-            clearTimeout(timeout)
-        }
-    }, [search, rows, handleSearchFilter])
+            clearTimeout(timeout);
+        };
+    }, [search, rows, handleSearchFilter]);
 
     // Clean up when rows change and cells no longer have values
     useEffect(() => {
@@ -304,28 +340,28 @@ export default function TableComponent({
             });
             return newSet;
         });
-    }, [rows])
+    }, [rows]);
 
     useEffect(() => {
         // Restore scroll position on mount
-        if (hasRestored || filteredRows.length === 0) return () => { }
+        if (hasRestored || filteredRows.length === 0) return () => { };
 
         // Use setTimeout to ensure virtual scroll content is rendered
         const timer = setTimeout(() => {
             if (initialScrollPosition && scrollContainerRef.current) {
-                scrollContainerRef.current.scrollTop = initialScrollPosition
-                setScrollTop(initialScrollPosition)
+                scrollContainerRef.current.scrollTop = initialScrollPosition;
+                setScrollTop(initialScrollPosition);
             }
 
             if (initialSearch) {
-                setSearch(initialSearch)
+                setSearch(initialSearch);
             }
 
-            setHasRestored(true)
-        }, 0)
+            setHasRestored(true);
+        }, 0);
 
-        return () => clearTimeout(timer)
-    }, [hasRestored, initialScrollPosition, filteredRows.length, initialSearch])
+        return () => clearTimeout(timer);
+    }, [hasRestored, initialScrollPosition, filteredRows.length, initialSearch]);
 
     // Cleanup: abort all pending requests on unmount
     useEffect(() => () => {
@@ -333,38 +369,50 @@ export default function TableComponent({
             controller.abort();
         });
         abortControllersRef.current.clear();
-    }, [])
+    }, []);
 
     const handleSetEditable = (editValue: string, value: string) => {
-        setEditable(editValue)
-        setNewValue(value)
-    }
+        setEditable(editValue);
+        setNewValue(value);
+    };
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-        const newScrollTop = (e.target as HTMLDivElement).scrollTop
-        setScrollTop(newScrollTop)
+        const newScrollTop = (e.target as HTMLDivElement).scrollTop;
+        setScrollTop(newScrollTop);
         if (onScrollChange) {
-            onScrollChange(newScrollTop)
+            onScrollChange(newScrollTop);
         }
-    }
+    };
 
     const stripSVG = useMemo(() => encodeURIComponent(
         `<svg width='100%' height='${itemHeight}' xmlns='http://www.w3.org/2000/svg'>
                 <line x1='0' y1='${itemHeight - 1}' x2='100%' y2='${itemHeight - 1}' stroke='#e5e7eb' stroke-width='2'/>
         </svg>`
-    ), [itemHeight])
-    const stripBackground = useMemo(() => `url("data:image/svg+xml,${stripSVG}")`, [stripSVG])
-    const columnCount = (setRows ? headers.length + 1 : headers.length) + 1;
+    ), [itemHeight]);
+    const stripBackground = useMemo(() => `url("data:image/svg+xml,${stripSVG}")`, [stripSVG]);
+    const columnCount = (setRows ? headerNames.length + 1 : headerNames.length) + 1;
 
     const renderValue = (v: any) => (
-        <span className={cn("pointer-events-auto", valueClassName)}>{v}</span>
-    )
+        <span className={cn("pointer-events-auto text-xs", valueClassName)}>{v}</span>
+    );
 
     const renderLabel = (l: any) => (
-        <span className={cn(valueClassName)}>{l[0]}:</span>
-    )
+        <span className={cn("text-xs", valueClassName)}>{l[0]}:</span>
+    );
 
-    const getClassName = (index: number, level?: number) => cn("text-border rounded-lg", expandArr.get(index) === level && "bg-background text-foreground")
+    const getClassName = (index?: number, level?: number) => {
+        let isActive: boolean;
+        if (index !== undefined) {
+            isActive = expandArr.get(index) === level;
+        } else if (level === undefined) {
+            isActive = headerNames.every((_, i) => !expandArr.has(i));
+        } else {
+            isActive = headerNames.length > 0 && headerNames.every((_, i) => expandArr.get(i) === level);
+        }
+        return cn("text-foreground rounded-lg border border-transparent hover:border-border/10 hover:bg-secondary", isActive && "text-primary");
+    };
+
+    const isObjectType = useMemo(() => visibleRows.some(r => r.cells.some(cell => cell?.type === "object")), [visibleRows]);
 
     return (
         <div className={cn("h-full w-full flex flex-col gap-4", className)}>
@@ -379,65 +427,121 @@ export default function TableComponent({
                     placeholder={`Search for${entityName ? ` a ${entityName}` : ""}`}
                     onKeyDown={(e) => {
                         if (e.key === "Escape") {
-                            e.preventDefault()
-                            setSearch("")
+                            e.preventDefault();
+                            setSearch("");
                         }
 
-                        if (e.key !== "Enter") return
-                        e.preventDefault()
+                        if (e.key !== "Enter") return;
+                        e.preventDefault();
                     }}
                     onChange={(e) => {
-                        const val = e.target.value
-                        setSearch(val)
-                        if (onSearchChange) onSearchChange(val)
+                        const val = e.target.value;
+                        setSearch(val);
+                        if (onSearchChange) onSearchChange(val);
                     }}
                 />
             </div>
-            <Table ref={tableRef} parentRef={scrollContainerRef} parentOnScroll={handleScroll} className="h-full" parentClassName="p-1 relative">
+            <Table ref={tableRef} parentRef={scrollContainerRef} parentOnScroll={handleScroll} className="h-full" parentClassName="p-1 relative overflow-auto">
                 <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow ref={headerRef} className="text-nowrap border-border">
                         {
                             setRows ?
-                                <TableHead className="w-5 border-r border-border p-2 !pr-2" key={headers[0]}>
+                                <TableHead className="w-5 border-r border-border !p-1 !pr-0" key={headerNames[0]}>
                                     <Checkbox
                                         data-testid={`tableCheckbox${label}`}
-                                        className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
-                                        checked={rows.length > 0 && rows.every(row => row.checked)}
+                                        aria-label={`Select all ${label}`}
+                                        className="w-5 h-5 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
+                                        checked={filteredRows.length > 0 && filteredRows.every(row => row.checked)}
                                         onCheckedChange={() => {
-                                            const checked = rows.every(row => row.checked)
+                                            const checked = filteredRows.every(row => row.checked);
+
                                             setRows(rows.map((row) => {
-                                                row.checked = !checked
-                                                return row
-                                            }))
+                                                if (filteredRows.some(r => r.name === row.name)) {
+                                                    row.checked = !checked;
+                                                }
+
+                                                return row;
+                                            }));
                                         }}
                                     />
                                 </TableHead>
                                 : null
                         }
-                        <TableHead key="index" className="w-0 border-r border-border p-2">Index</TableHead>
+                        <TableHead key="index" className="w-5 border-r border-border p-2">
+                            <div className="flex">
+                                <p className={!isObjectType ? "grow basis-0 text-center" : ""}>Index</p>
+                                {
+                                    isObjectType &&
+                                    <>
+                                        <Button
+                                            className={getClassName(undefined, 1)}
+                                            title="Expand Root"
+                                            onClick={() => {
+                                                const newExpandArr = new Map<number, number>();
+                                                headerNames.forEach((_, idx) => newExpandArr.set(idx, 1));
+                                                setExpandArr(newExpandArr);
+
+                                                if (onExpandChange) onExpandChange(newExpandArr);
+                                            }}
+                                        >
+                                            <ChevronDown />
+                                        </Button>
+                                        <Button
+                                            title="Expand All"
+                                            className={getClassName(undefined, -1)}
+                                            onClick={() => {
+                                                const newExpandArr = new Map<number, number>();
+                                                headerNames.forEach((_, idx) => newExpandArr.set(idx, -1));
+                                                setExpandArr(newExpandArr);
+
+                                                if (onExpandChange) onExpandChange(newExpandArr);
+                                            }}
+                                        >
+                                            <ChevronsDown />
+                                        </Button>
+                                        <Button
+                                            title="Collapse All"
+                                            className={getClassName(undefined)}
+                                            onClick={() => {
+                                                const newExpandArr = new Map<number, number>();
+                                                setExpandArr(newExpandArr);
+
+                                                if (onExpandChange) onExpandChange(newExpandArr);
+                                            }}
+                                        >
+                                            <ChevronsUp />
+                                        </Button>
+                                    </>
+                                }
+                            </div>
+                        </TableHead>
                         {
-                            headers.map((header, i) => (
+                            normalizedHeaders.map((header, i) => (
                                 <TableHead
+                                    style={
+                                        header.width !== undefined
+                                            ? { width: header.width, minWidth: header.width, maxWidth: header.width }
+                                            : { width: 'fit-content' }
+                                    }
                                     className={cn(
-                                        i + 1 !== headers.length && "border-r",
-                                        "font-bold text-lg border-border",
-                                        i === 0 && (label === "Graphs" || label === "Schemas" || label === "Users") && "w-full"
+                                        i + 1 !== headerNames.length && "border-r",
+                                        "border-border",
                                     )}
-                                    key={header}
+                                    key={`${header.name}-${i}`}
                                 >
-                                    <div className="flex gap-2 justify-between">
-                                        <p>{header}</p>
+                                    <div className="flex gap-2 justify-between items-center">
+                                        <p className={!isObjectType ? "w-full text-center" : ""}>{header.name}</p>
                                         {
-                                            visibleRows.some(r => r.cells[i].type === "object") &&
-                                            <div className="flex gap-2 bg-secondary p-1 rounded-lg">
+                                            isObjectType &&
+                                            <div className="flex">
                                                 <Button
                                                     className={getClassName(i, 1)}
                                                     title="Expand Root"
                                                     onClick={() => {
-                                                        const newExpandArr = new Map(expandArr).set(i, 1)
-                                                        setExpandArr(newExpandArr)
+                                                        const newExpandArr = new Map(expandArr).set(i, 1);
+                                                        setExpandArr(newExpandArr);
 
-                                                        if (onExpandChange) onExpandChange(newExpandArr)
+                                                        if (onExpandChange) onExpandChange(newExpandArr);
                                                     }}
                                                 >
                                                     <ChevronDown />
@@ -446,10 +550,10 @@ export default function TableComponent({
                                                     title="Expand All"
                                                     className={getClassName(i, -1)}
                                                     onClick={() => {
-                                                        const newExpandArr = new Map(expandArr).set(i, -1)
-                                                        setExpandArr(newExpandArr)
+                                                        const newExpandArr = new Map(expandArr).set(i, -1);
+                                                        setExpandArr(newExpandArr);
 
-                                                        if (onExpandChange) onExpandChange(newExpandArr)
+                                                        if (onExpandChange) onExpandChange(newExpandArr);
                                                     }}
                                                 >
                                                     <ChevronsDown />
@@ -458,11 +562,11 @@ export default function TableComponent({
                                                     title="Collapse All"
                                                     className={getClassName(i)}
                                                     onClick={() => {
-                                                        const newExpandArr = new Map(expandArr)
-                                                        newExpandArr.delete(i)
-                                                        setExpandArr(newExpandArr)
+                                                        const newExpandArr = new Map(expandArr);
+                                                        newExpandArr.delete(i);
+                                                        setExpandArr(newExpandArr);
 
-                                                        if (onExpandChange) onExpandChange(newExpandArr)
+                                                        if (onExpandChange) onExpandChange(newExpandArr);
                                                     }}
                                                 >
                                                     <ChevronsUp />
@@ -496,38 +600,41 @@ export default function TableComponent({
                     }
                     {
                         visibleRows.map((row, index) => {
-                            const actualIndex = topFakeRowHeight / height + index
-                            const rowTestID = `${label}${row.name}`
-
+                            const actualIndex = topFakeRowHeight / height + index;
+                            const rowTestID = `${label}${row.name}`;
                             return (
                                 <TableRow
-                                    className="border-border"
+                                    className="border-border text-xs"
                                     data-testid={`tableRow${rowTestID}`}
                                     onMouseEnter={() => setHover(row.name)}
                                     onMouseLeave={() => setHover("")}
+                                    style={{ height }}
                                     key={row.name}
                                 >
                                     {
                                         setRows ?
-                                            <TableCell className="w-5 border-r border-border p-2 !pr-2">
-                                                <Checkbox
-                                                    className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
-                                                    data-testid={`tableCheckbox${rowTestID}`}
-                                                    checked={row.checked}
-                                                    onCheckedChange={() => {
-                                                        setRows(rows.map((r) => {
-                                                            if (r.name === row.name) {
-                                                                r.checked = !r.checked
-                                                            }
-                                                            return r
-                                                        }))
-                                                    }}
-                                                />
+                                            <TableCell className="w-5 border-r border-border !p-1">
+                                                <div className="h-full min-w-full flex justify-center items-center">
+                                                    <Checkbox
+                                                        className="w-5 h-5 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
+                                                        data-testid={`tableCheckbox${rowTestID}`}
+                                                        aria-label={`Select row ${row.name}`}
+                                                        checked={row.checked}
+                                                        onCheckedChange={() => {
+                                                            setRows(rows.map((r) => {
+                                                                if (r.name === row.name) {
+                                                                    r.checked = !r.checked;
+                                                                }
+                                                                return r;
+                                                            }));
+                                                        }}
+                                                    />
+                                                </div>
                                             </TableCell>
                                             : null
                                     }
-                                    <TableCell className="border-r border-border p-2">
-                                        <p>{actualIndex + 1}.</p>
+                                    <TableCell className="border-r border-border p-1">
+                                        <p className={cn(!isObjectType && "grow basis-0 text-center")}>{actualIndex + 1}.</p>
                                     </TableCell>
                                     {
                                         row.cells.map((cell, j) => {
@@ -548,14 +655,14 @@ export default function TableComponent({
                                                 return (
                                                     <TableCell
                                                         className={cn(
+                                                            "border-border p-0 items-center",
                                                             j + 1 !== row.cells.length && "border-r",
-                                                            row.cells[0]?.value === editable && (cell.type !== "readonly" && cell.type !== "object") && "p-2",
-                                                            cell.type === "object" && "p-1",
-                                                            "border-border"
                                                         )}
                                                         key={j}
                                                     >
-                                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                                        <div style={{ height }} className="overflow-auto flex items-center justify-center">
+                                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                                        </div>
                                                     </TableCell>
                                                 );
                                             }
@@ -564,14 +671,13 @@ export default function TableComponent({
                                             return (
                                                 <TableCell
                                                     className={cn(
-                                                        "border-border p-0",
+                                                        "border-border p-0 items-center",
                                                         j + 1 !== row.cells.length && "border-r"
                                                     )}
                                                     key={cellKey}
                                                 >
                                                     <div
-                                                        style={{ height }}
-                                                        className={cn("overflow-auto p-2", cell.type === "object" && "p-1", j === 0 && "w-full")}
+                                                        className="overflow-auto"
                                                     >
                                                         {
                                                             cell.type === "object" ?
@@ -579,7 +685,7 @@ export default function TableComponent({
                                                                     <JSONTree
                                                                         key={`${Array.from(expandArr.values()).join(",")}-${j}`}
                                                                         shouldExpandNodeInitially={(keyPath) => expandArr.get(j) === -1 || keyPath.length === expandArr.get(j)}
-                                                                        keyPath={[headers[j]]}
+                                                                        keyPath={[headerNames[j]]}
                                                                         valueRenderer={renderValue}
                                                                         labelRenderer={(keyPath) => renderLabel(keyPath)}
                                                                         theme={{
@@ -604,7 +710,7 @@ export default function TableComponent({
                                                                     />
                                                                 </div>
                                                                 : editable === cellKey ?
-                                                                    <div className="h-full w-full flex gap-2 items-center">
+                                                                    <div className="h-full w-full flex gap-2 items-center justify-center">
                                                                         {
                                                                             cell.type === "select" ?
                                                                                 <Combobox
@@ -613,9 +719,9 @@ export default function TableComponent({
                                                                                     inTable
                                                                                     options={cell.options}
                                                                                     setSelectedValue={async (value) => {
-                                                                                        const result = await cell.onChange(value)
+                                                                                        const result = await cell.onChange(value);
                                                                                         if (result) {
-                                                                                            handleSetEditable("", "")
+                                                                                            handleSetEditable("", "");
                                                                                         }
                                                                                     }}
                                                                                     label={cell.selectType}
@@ -624,23 +730,23 @@ export default function TableComponent({
                                                                                 : cell.type === "text" &&
                                                                                 <Input
                                                                                     data-testid={`input${label}`}
-                                                                                    ref={inputRef}
+                                                                                    ref={inputRef as React.RefObject<HTMLInputElement>}
                                                                                     className="grow"
                                                                                     value={newValue}
                                                                                     onChange={(e) => setNewValue(e.target.value)}
                                                                                     onKeyDown={async (e) => {
                                                                                         if (e.key === "Escape") {
-                                                                                            e.preventDefault()
-                                                                                            e.stopPropagation()
-                                                                                            handleSetEditable("", "")
+                                                                                            e.preventDefault();
+                                                                                            e.stopPropagation();
+                                                                                            handleSetEditable("", "");
                                                                                         }
 
-                                                                                        if (e.key !== "Enter") return
+                                                                                        if (e.key !== "Enter") return;
 
-                                                                                        e.preventDefault()
-                                                                                        const result = await cell.onChange(newValue)
+                                                                                        e.preventDefault();
+                                                                                        const result = await cell.onChange(newValue);
                                                                                         if (result) {
-                                                                                            handleSetEditable("", "")
+                                                                                            handleSetEditable("", "");
                                                                                         }
                                                                                     }}
                                                                                 />
@@ -653,13 +759,13 @@ export default function TableComponent({
                                                                                     title="Save"
                                                                                     onClick={async () => {
                                                                                         try {
-                                                                                            setIsLoading(true)
-                                                                                            const result = await cell.onChange(newValue)
+                                                                                            setIsLoading(true);
+                                                                                            const result = await cell.onChange(newValue);
                                                                                             if (result) {
-                                                                                                handleSetEditable("", "")
+                                                                                                handleSetEditable("", "");
                                                                                             }
                                                                                         } finally {
-                                                                                            setIsLoading(false)
+                                                                                            setIsLoading(false);
                                                                                         }
                                                                                     }}
                                                                                     isLoading={isLoading}
@@ -673,7 +779,7 @@ export default function TableComponent({
                                                                                     data-testid={`cancelButton${label}`}
                                                                                     title="Cancel"
                                                                                     onClick={() => {
-                                                                                        handleSetEditable("", "")
+                                                                                        handleSetEditable("", "");
                                                                                     }}
                                                                                 >
                                                                                     <XCircle className="w-4 h-4" />
@@ -681,16 +787,16 @@ export default function TableComponent({
                                                                             }
                                                                         </div>
                                                                     </div>
-                                                                    : <div className="h-full flex items-center gap-2">
+                                                                    : <div className="flex items-center gap-2 justify-center">
                                                                         <Tooltip>
                                                                             <TooltipTrigger asChild>
-                                                                                <p data-testid={`content${cellTestId}${headers[j]}`} >{cell.value}</p>
+                                                                                <p data-testid={`content${cellTestId}${headerNames[j]}`} className="text-center" >{cell.value}</p>
                                                                             </TooltipTrigger>
                                                                             <TooltipContent>
                                                                                 {cell.value}
                                                                             </TooltipContent>
                                                                         </Tooltip>
-                                                                        <div className="w-4">
+                                                                        <div className="w-4 flex-none">
                                                                             {
                                                                                 cell.type !== "readonly" && hover === row.name &&
                                                                                 <Button
@@ -708,11 +814,11 @@ export default function TableComponent({
                                                         }
                                                     </div>
                                                 </TableCell>
-                                            )
+                                            );
                                         })
                                     }
                                 </TableRow>
-                            )
+                            );
                         })
                     }
                     {
@@ -745,5 +851,5 @@ export default function TableComponent({
                 </TableBody>
             </Table>
         </div >
-    )
+    );
 }

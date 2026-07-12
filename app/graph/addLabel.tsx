@@ -24,33 +24,33 @@ export default function AddLabel({
     onAddLabel
 }: Props) {
 
-    const { indicator } = useContext(IndicatorContext)
+    const { indicator } = useContext(IndicatorContext);
 
-    const [open, setOpen] = useState(false)
-    const [label, setLabel] = useState("")
-    const [isLoading, setIsLoading] = useState(false)
+    const [open, setOpen] = useState(false);
+    const [label, setLabel] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
         if (!open) {
-            setLabel("")
-            setIsLoading(false)
+            setLabel("");
+            setIsLoading(false);
         }
-    }, [open])
+    }, [open]);
 
     const handleAddLabel = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
+        e.preventDefault();
 
-        setIsLoading(true)
+        setIsLoading(true);
         try {
-            const success = await onAddLabel(label)
+            const success = await onAddLabel(label);
             if (success) {
-                setLabel("")
-                setOpen(false)
+                setLabel("");
+                setOpen(false);
             }
         } finally {
-            setIsLoading(false)
+            setIsLoading(false);
         }
-    }
+    };
 
     return (
         <DialogComponent
@@ -88,10 +88,10 @@ export default function AddLabel({
                 </div>
             </form>
         </DialogComponent>
-    )
+    );
 }
 
 AddLabel.defaultProps = {
     type: "Label",
     trigger: undefined
-}
+};

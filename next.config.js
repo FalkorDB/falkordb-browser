@@ -1,23 +1,38 @@
 /** @type {import('next').NextConfig} */
+
 const nextConfig = {
+  allowedDevOrigins: ['127.0.0.1', '0.0.0.0'],
   output: 'standalone',
   reactStrictMode: true,
   // Keep falkordb server-only to avoid bundling BigInt in client/runtime
-  serverExternalPackages: ['falkordb'],
+  // Keep text-to-cypher external to avoid bundling native .node binaries
+  serverExternalPackages: ['falkordb', '@falkordb/text-to-cypher'],
   images: {
     unoptimized: true
   },
-  // Keep falkordb server-only to avoid bundling BigInt in client/runtime
-  serverExternalPackages: ['falkordb'],
+  // Enable Turbopack with SVG handling
+  turbopack: {
+    rules: {
+      // Convert SVG imports to React components using @svgr/webpack
+      // This preserves the behavior from the webpack config below
+      // 
+      // Usage:
+      //   import Logo from './logo.svg'           → React component
+      //   import logoUrl from './logo.svg?url'    → string URL (Next.js built-in handling)
+      // 
+      // Note: Turbopack uses Next.js built-in asset handling for ?url query params,
+      // so *.svg?url imports will return the file URL instead of a React component
+      '*.svg': {
+        loaders: ['@svgr/webpack'],
+        as: '*.js',
+      },
+    },
+  },
   async headers() {
     return [
       {
         source: '/(.*)',
         headers: [
-          {
-            key: 'Content-Security-Policy',
-            value: "frame-ancestors 'none';"
-          },
           {
             key: 'Strict-Transport-Security',
             value: 'max-age=63072000; includeSubDomains; preload'
@@ -42,6 +57,8 @@ const nextConfig = {
       }
     ];
   },
+  // Webpack config for production builds (next build --webpack)
+  // SVG handling + local @falkordb/canvas alias
   webpack(config) {
     // Grab the existing rule that handles SVG imports
     const fileLoaderRule = config.module.rules.find((rule) =>

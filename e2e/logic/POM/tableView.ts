@@ -38,4 +38,36 @@ export default class TableView extends GraphPage {
         const rows = await this.tableViewTableRows.count();
         return rows;
     }
+
+    private get exportTableViewButton(): Locator {
+        return this.page.getByTestId("exportTableViewButton");
+    }
+
+    public async isExportButtonVisible(): Promise<boolean> {
+        try {
+            await this.exportTableViewButton.waitFor({ state: 'visible', timeout: 5000 });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    public async clickExportButton(): Promise<void> {
+        await interactWhenVisible(this.exportTableViewButton, async (el: Locator) => {
+            await el.click();
+        }, 'Export Table View Button');
+    }
+
+    /**
+     * Returns true if the first data cell in the first table row contains `text`.
+     * For PATH results the JSONTree renders nodes/edges keys, so checking for
+     * `'nodes'` or `'edges'` confirms the cell holds a PATH value.
+     */
+    public async firstCellContains(text: string): Promise<boolean> {
+        await this.tableViewTabPanel.waitFor({ state: 'visible', timeout: 10000 });
+        const firstCell = this.tableViewTableRows.first().locator('td').first();
+        await firstCell.waitFor({ state: 'visible', timeout: 5000 });
+        const content = await firstCell.textContent();
+        return (content ?? '').includes(text);
+    }
 }

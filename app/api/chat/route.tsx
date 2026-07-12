@@ -1,157 +1,237 @@
 import { NextRequest, NextResponse } from "next/server";
+import { TextToCypher } from "@falkordb/text-to-cypher";
+import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
+import { normalizeLocalEndpoint, type LocalProvider } from "@/lib/local-llm-utils";
+import { UDF_VERSION_THRESHOLD } from "@/app/utils";
 import { getClient } from "../auth/[...nextauth]/options";
 import { chatRequest, validateBody } from "../validate-body";
+import { buildFalkorDBConnection, getCorsHeaders } from "../utils";
 
-const CHAT_URL = process.env.CHAT_URL || "http://localhost:8000/"
-
-export async function GET() {
-    try {
-        const session = await getClient()
-
-        if (session instanceof NextResponse) {
-            throw new Error(await session.text())
-        }
-
-        try {
-            const response = await fetch(`${CHAT_URL}configured-model`, {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-            })
-
-            if (!response.ok) {
-                throw new Error(await response.text())
-            }
-
-            const data = await response.json()
-
-            return NextResponse.json(data)
-        } catch (error) {
-            const { message } = (error as Error)
-            
-            if (message.includes("fetch failed")) {
-                return NextResponse.json({ message: "Server is not available" }, { status: 200 })
-            }
-            
-            console.error(error)
-            return NextResponse.json({ error: message }, { status: 400 })
-        }
-    } catch (error) {
-        console.error(error)
-        return NextResponse.json({ error: (error as Error).message }, { status: 500 })
-    }
+export async function OPTIONS(request: NextRequest) {
+    return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
 
-export type EventType = "Status" | "Schema" | "CypherQuery" | "CypherResult" | "ModelOutputChunk" | "Result" | "Error"
+const LOCAL_PROVIDER_DEFAULT_ENDPOINTS: Record<LocalProvider, string> = {
+    ollama: "http://localhost:11434",
+    lmstudio: "http://localhost:1234/v1",
+};
+
+/**
+ * Create user-friendly error message
+ */
+function createUserFriendlyErrorMessage(error: unknown, model: string, apiKey: string): string {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const modelProvider = detectProviderFromModel(model);
+    const keyProvider = detectProviderFromApiKey(apiKey);
+
+    // Get display names for providers
+    const modelProviderName = getProviderDisplayName(modelProvider);
+    const keyProviderName = getProviderDisplayName(keyProvider);
+
+    // Check for provider mismatch (critical error - show first)
+    if (modelProvider !== "unknown" && keyProvider !== "unknown" && modelProvider !== keyProvider) {
+        // Ollama doesn't need an API key match
+        if (modelProvider !== "ollama") {
+            return `Model/API key mismatch: You selected a ${modelProviderName} model but provided a ${keyProviderName} API key. Please update your API key in Settings to match your selected model.`;
+        }
+    }
+
+    // Check for 404 model not found errors
+    if (errorMessage.includes("404") && errorMessage.includes("model") && errorMessage.includes("not found")) {
+        if (modelProvider === "ollama") {
+            const modelName = model.replace("ollama:", "");
+            return `Ollama model "${modelName}" not found. Please ensure Ollama is running locally and the model is pulled. Run: ollama pull ${modelName}`;
+        }
+        return `Model "${model}" not found. Please check if this model is available for your ${modelProviderName} account or select a different model in Settings.`;
+    }
+
+    // Check for authentication errors
+    if (errorMessage.includes("401") || errorMessage.includes("invalid_api_key") || errorMessage.includes("Incorrect API key") || errorMessage.includes("Authentication failed") || errorMessage.includes("Unauthorized")) {
+        const provider = keyProvider !== "unknown" ? keyProviderName : "";
+        return `Invalid ${provider} API key. Please check your API key in Settings and ensure it is correct.`;
+    }
+
+    // Check for other API key errors
+    if (errorMessage.includes("API key") || errorMessage.includes("api_key")) {
+        return "API key error. Please verify your API key in Settings matches your selected model provider.";
+    }
+
+    // Check for network/connection errors
+    if (errorMessage.includes("fetch failed") || errorMessage.includes("ECONNREFUSED") || errorMessage.includes("ECONNRESET")) {
+        if (modelProvider === "ollama") {
+            return "Cannot connect to Ollama. Please ensure Ollama is running locally on your machine.";
+        }
+        return "Network error. Please check your internet connection and try again.";
+    }
+
+    // Check for empty or non-existent graph
+    if (errorMessage === "EMPTY_GRAPH") {
+        return "Your graph is empty. Add some data to your graph before using the chat.";
+    }
+    if (errorMessage === "GRAPH_NOT_FOUND") {
+        return "Graph not found. Please select an existing graph.";
+    }
+
+    // Check for timeout errors
+    if (errorMessage.includes("timeout") || errorMessage.includes("Timeout") || errorMessage.includes("ETIMEDOUT")) {
+        return "Request timed out. Try a simpler question or check your connection.";
+    }
+
+    // Check for text-to-cypher query generation failures
+    if (errorMessage.includes("Query validation failed") || errorMessage.includes("Query does not contain valid Cypher keywords")) {
+        return "Could not generate a query from your question. Try asking a more specific question about your data.";
+    }
+
+    // Check for general text-to-cypher failures
+    if (errorMessage.includes("Text-to-Cypher failed") || errorMessage.includes("Failed to generate query")) {
+        return "Unable to generate a database query from your question.";
+    }
+
+    // Default: return original error message
+    return errorMessage;
+}
 
 // eslint-disable-next-line import/prefer-default-export
 export async function POST(request: NextRequest) {
-    const encoder = new TextEncoder()
-    const { readable, writable } = new TransformStream()
-    const writer = writable.getWriter()
 
+    let session;
     try {
-        const session = await getClient()
-
-        if (session instanceof NextResponse) {
-            throw new Error(await session.text())
-        }
-
-        const body = await request.json()
-
-        // Validate request body
-        const validation = validateBody(chatRequest, body);
-        
-        if (!validation.success) {
-            writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(validation.error)}\n\n`))
-            writer.close()
-            return new Response(readable, {
-                headers: {
-                    "Content-Type": "text/event-stream",
-                    "Cache-Control": "no-cache",
-                    Connection: "keep-alive",
-                },
-            })
-        }
-
-        const { messages, graphName, key, model } = validation.data
-
-        try {
-
-            const requestBody = {
-                "chat_request": {
-                    messages,
-                },
-                "graph_name": graphName,
-                key,
-                model,
-            }
-
-            const response = await fetch(`${CHAT_URL}text_to_cypher`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(requestBody)
-            });
-
-            if (!response.ok) {
-                throw new Error(`Error: ${await response.text()}`);
-            }
-
-            const reader = response.body?.getReader();
-            const decoder = new TextDecoder();
-
-            const processStream = async () => {
-                if (!reader) return;
-
-                const { done, value } = await reader.read();
-                if (done) return;
-
-                const chunk = decoder.decode(value, { stream: true });
-
-                const lines = chunk.split('\n').filter(line => line);
-                let isResult = false
-
-
-                lines.forEach(line => {
-                    const data = JSON.parse(line.split("data:")[1])
-                    const type: EventType = Object.keys(data)[0] as EventType
-
-                    isResult = type === "Result" || type === "Error"
-
-                    writer.write(encoder.encode(`event: ${type} data: ${data[type]}\n\n`))
-                })
-
-                if (!isResult) {
-                    processStream();
-                } else {
-                    writer.close();
-                }
-            };
-
-            processStream()
-        } catch (error) {
-            console.error(error)
-            writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify((error as Error).message)}\n\n`))
-            writer.close()
-        }
+        // Verify authentication via getClient
+        session = await getClient(request);
     } catch (error) {
-        console.error(error)
-        writer.write(encoder.encode(`event: error status: ${500} data: ${JSON.stringify((error as Error).message)}\n\n`))
-        writer.close()
+        console.error(error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500, headers: getCorsHeaders(request) });
     }
 
-    request.signal.addEventListener("abort", () => {
-        writer.close()
-    })
+    if (session instanceof NextResponse) {
+        return session;
+    }
 
-    return new Response(readable, {
-        headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache",
-            Connection: "keep-alive",
-        },
-    })
+    let body;
+    try {
+        body = await request.json();
+    } catch (error) {
+        console.error(error);
+        return new Response("Invalid JSON body", { status: 400, headers: getCorsHeaders(request) });
+    }
+
+    // Validate request body
+    const validation = validateBody(chatRequest, body);
+
+    if (!validation.success) {
+        return NextResponse.json(
+            { error: validation.error },
+            { status: 400, headers: getCorsHeaders(request) }
+        );
+    }
+
+    const { messages, graphName, key, model, cypherOnly, modelSource, localProvider, localEndpoint, udfs } = validation.data;
+
+    try {
+        // Fail fast on model/API key provider mismatch before making any external calls
+        const modelProvider = detectProviderFromModel(model);
+        const keyProvider = detectProviderFromApiKey(key);
+        if (modelSource === "api-key" && !key) {
+            throw new Error("API key is required for hosted models.");
+        }
+        if (modelSource === "api-key" && modelProvider !== "unknown" && keyProvider !== "unknown" && modelProvider !== keyProvider && modelProvider !== "ollama") {
+            const modelProviderName = getProviderDisplayName(modelProvider);
+            const keyProviderName = getProviderDisplayName(keyProvider);
+            throw new Error(`Model/API key mismatch: You selected a ${modelProviderName} model but provided a ${keyProviderName} API key. Please update your API key in Settings to match your selected model.`);
+        }
+
+        // Build FalkorDB connection URL from user session
+        const falkordbConnection = buildFalkorDBConnection(session.user);
+        const llmEndpoint = modelSource === "local"
+            ? normalizeLocalEndpoint(localProvider, localEndpoint)
+            : undefined;
+
+        // Only honor caller-supplied UDFs when the connected graph module actually supports them.
+        // The client already gates on UDFContext, but the route must not trust a stale/tampered flag.
+        // Reuse the already-authenticated session connection (no extra getClient / connection re-resolve).
+        // Drop libraries with no functions: the schema permits empty `functions` arrays, but an empty
+        // library is useless context, so a degenerate/tampered catalog degrades to "no UDF context"
+        // instead of wasting prompt tokens.
+        const nonEmptyUdfs = udfs?.filter((library) => library.functions.length > 0);
+        let safeUdfs = nonEmptyUdfs && nonEmptyUdfs.length > 0 ? nonEmptyUdfs : undefined;
+        if (safeUdfs) {
+            try {
+                const modules = await (await session.client.connection).moduleList();
+                const graphModule = modules.find((module) => module.name === "graph");
+                if (!graphModule || (graphModule.ver ?? 0) < UDF_VERSION_THRESHOLD) {
+                    safeUdfs = undefined;
+                }
+            } catch {
+                safeUdfs = undefined;
+            }
+        }
+
+        // Create TextToCypher client
+        const textToCypher = new TextToCypher({
+            falkordbConnection,
+            model,
+            apiKey: modelSource === "local" ? localProvider : key,
+            udfs: safeUdfs,
+            llmEndpoint,
+        });
+
+        // Get the last user message
+        if (messages.length === 0) {
+            throw new Error('No messages provided');
+        }
+        const lastUserMessage = messages.filter(msg => msg.role === 'user').pop();
+        if (!lastUserMessage) {
+            throw new Error('No user messages found');
+        }
+        const question = lastUserMessage.content;
+
+        // Check if graph exists and has data before calling text-to-cypher
+        const graphs = await session.client.list();
+        if (!graphs.includes(graphName)) {
+            throw new Error("GRAPH_NOT_FOUND");
+        }
+        const graph = session.client.selectGraph(graphName);
+        const existsResult = await graph.roQuery("MATCH (n) RETURN 1 LIMIT 1");
+        if (!existsResult?.data?.length) {
+            throw new Error("EMPTY_GRAPH");
+        }
+
+        // Call textToCypher and get the result
+        const result = cypherOnly
+            ? await textToCypher.cypherOnly(graphName, question)
+            : await textToCypher.textToCypher(graphName, question);
+
+        // Check if the result has an error status
+        if (result.status === 'error') {
+            throw new Error(result.error || 'Text-to-Cypher failed');
+        }
+
+        return NextResponse.json({
+            cypherQuery: result.cypherQuery || null,
+            cypherResult: result.cypherResult || null,
+            answer: result.answer || null,
+            confidence: (result as { confidence?: number }).confidence ?? null,
+            tokenUsage: result.tokenUsage || null,
+        }, { headers: getCorsHeaders(request) });
+
+    } catch (error) {
+        console.error('Text-to-Cypher error details:', error);
+
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const userFriendlyMessage = createUserFriendlyErrorMessage(error as Error, model, modelSource === "local" ? localProvider : key);
+
+        // Return 400 for known client/state errors, 401 for auth errors, 422 for unexpected LLM/processing failures
+        const authErrors = ["401", "invalid_api_key", "Incorrect API key", "Authentication failed", "Unauthorized"];
+        const knownClientErrors = ["GRAPH_NOT_FOUND", "EMPTY_GRAPH", "Model/API key mismatch", "No messages provided", "No user messages found", "API key is required", "Local LLM endpoint", "endpoint port", "endpoint path"];
+        const status = authErrors.some(e => errorMessage.includes(e))
+            ? 401
+            : knownClientErrors.some(e => errorMessage.includes(e))
+                ? 400
+                : 422;
+
+        return NextResponse.json(
+            { error: userFriendlyMessage },
+            { status, headers: getCorsHeaders(request) }
+        );
+    }
 }

@@ -1,21 +1,20 @@
 /* eslint-disable react/require-default-props */
 
-"use client"
+"use client";
 
-import React, { useState, useContext, useEffect } from "react"
-import { InfoIcon, PlusCircle } from "lucide-react"
-import { prepareArg, securedFetch } from "@/lib/utils"
-import { useToast } from "@/components/ui/use-toast"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import DialogComponent from "./DialogComponent"
-import Button from "./ui/Button"
-import CloseDialog from "./CloseDialog"
-import Input from "./ui/Input"
-import { IndicatorContext } from "./provider"
+import React, { useState, useContext, useEffect } from "react";
+import { InfoIcon, Plus } from "lucide-react";
+import { prepareArg, securedFetch } from "@/lib/utils";
+import { useToast } from "@/components/ui/use-toast";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import DialogComponent from "./DialogComponent";
+import Button from "./ui/Button";
+import CloseDialog from "./CloseDialog";
+import Input from "./ui/Input";
+import { IndicatorContext, ConnectionContext } from "./provider";
 
 interface Props {
     onSetGraphName: (name: string) => void
-    type: "Graph" | "Schema"
     graphNames: string[]
     label?: string
     trigger?: React.ReactNode
@@ -23,80 +22,81 @@ interface Props {
 
 export default function CreateGraph({
     onSetGraphName,
-    type,
     graphNames,
     label = "",
     trigger = (
         <Button
-            data-testid={`create${type}`}
+            data-testid="createGraph"
             variant="Primary"
-            title={`Create New ${type}`}
+            className="hover:!bg-primary/70"
+            title="Create New Graph"
         >
-            <PlusCircle size={20} />
+            <Plus size={20} />
         </Button>
     ),
 }: Props) {
 
-    const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { indicator, setIndicator } = useContext(IndicatorContext);
+    const { isReadOnly } = useContext(ConnectionContext);
 
-    const { toast } = useToast()
+    const { toast } = useToast();
 
-    const [isLoading, setIsLoading] = useState(false)
-    const [graphName, setGraphName] = useState("")
-    const [open, setOpen] = useState(false)
+    const [isLoading, setIsLoading] = useState(false);
+    const [graphName, setGraphName] = useState("");
+    const [open, setOpen] = useState(false);
 
     useEffect(() => {
         if (!open) {
-            setGraphName("")
-            setIsLoading(false)
+            setGraphName("");
+            setIsLoading(false);
         }
-    }, [open])
+    }, [open]);
 
     const handleCreateGraph = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
+        e.preventDefault();
         try {
-            setIsLoading(true)
-            const name = graphName.trim()
+            setIsLoading(true);
+            const name = graphName.trim();
             if (!name) {
                 toast({
                     title: "Error",
-                    description: `${type} name cannot be empty`,
+                    description: "Graph name cannot be empty",
                     variant: "destructive"
-                })
-                return
+                });
+                return;
             }
             if (graphNames.includes(name)) {
                 toast({
                     title: "Error",
-                    description: `${type} name already exists`,
+                    description: "Graph name already exists",
                     variant: "destructive"
-                })
-                return
+                });
+                return;
             }
-            const result = await securedFetch(`api/${type === "Schema" ? "schema" : "graph"}/${prepareArg(name)}`, {
+            const result = await securedFetch(`api/graph/${prepareArg(name)}${isReadOnly ? '?readOnly=true' : ''}`, {
                 method: "POST",
-            }, toast, setIndicator)
+            }, toast, setIndicator);
 
-            if (!result.ok) return
+            if (!result.ok) return;
 
-            onSetGraphName(name)
-            setGraphName("")
-            setOpen(false)
+            onSetGraphName(name);
+            setGraphName("");
+            setOpen(false);
             toast({
-                title: `${type} created successfully`,
-                description: `The ${type.toLowerCase()} has been created successfully`,
-            })
+                title: "Graph created successfully",
+                description: "The graph has been created successfully",
+            });
         } finally {
-            setIsLoading(false)
+            setIsLoading(false);
         }
-    }
+    };
 
     return (
         <DialogComponent
             open={open}
             onOpenChange={setOpen}
             trigger={trigger}
-            title={`Create New ${type}`}
+            title={"Create New Graph"}
         >
             <form className="flex flex-col gap-4" onSubmit={isLoading ? undefined : handleCreateGraph}>
                 <div className="flex gap-2 items-center">
@@ -105,12 +105,12 @@ export default function CreateGraph({
                             <InfoIcon size={20} />
                         </TooltipTrigger>
                         <TooltipContent>
-                            {`${type} names can be edited later`}
+                            {"Graph names can be edited later"}
                         </TooltipContent>
                     </Tooltip>
-                    <p className="font-normal text-2xl">Name your {type}:</p>
+                    <p className="font-normal text-2xl">Name your Graph:</p>
                     <Input
-                        data-testid={`create${type}Input`}
+                        data-testid={"createGraphInput"}
                         ref={ref => ref?.focus()}
                         value={graphName}
                         onChange={(e) => setGraphName(e.target.value)}
@@ -118,16 +118,16 @@ export default function CreateGraph({
                 </div>
                 <div className="flex gap-4 justify-end">
                     <Button
-                        data-testid={`create${type}Confirm`}
+                        data-testid={"createGraphConfirm"}
                         indicator={indicator}
                         variant="Primary"
-                        label={`Create your ${type}`}
-                        title={`Build and customize your ${type}`}
+                        label={"Create your Graph"}
+                        title={"Build and customize your Graph"}
                         type="submit"
                         isLoading={isLoading}
                     />
                     <CloseDialog
-                        data-testid={`create${type}${label}Cancel`}
+                        data-testid={`createGraph${label}Cancel`}
                         variant="Cancel"
                         label="Cancel"
                         type="button"
@@ -135,5 +135,5 @@ export default function CreateGraph({
                 </div>
             </form>
         </DialogComponent>
-    )
+    );
 }

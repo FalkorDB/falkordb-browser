@@ -5,19 +5,18 @@
 
 "use client";
 
-import React, { useEffect, useState, useContext } from "react";
-import { prepareArg, securedFetch, Row } from "@/lib/utils";
+import { useEffect, useState, useContext } from "react";
+import { prepareArg, securedFetch, Row, DataCell } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import TableComponent from "../components/TableComponent";
 import ToastButton from "../components/ToastButton";
-import { DataCell } from "../api/graph/model";
-import { IndicatorContext } from "../components/provider";
+import { IndicatorContext, ConnectionContext } from "../components/provider";
 
 type Config = {
     name: string,
     description: string,
     value: string | number
-}
+};
 
 const disableRunTimeConfigs = new Set([
     "THREAD_COUNT",
@@ -25,8 +24,9 @@ const disableRunTimeConfigs = new Set([
     "OMP_THREAD_COUNT",
     "NODE_CREATION_BUFFER",
     "BOLT_PORT",
-    "IMPORT_FOLDER"
-])
+    "IMPORT_FOLDER",
+    "TEMP_FOLDER"
+]);
 
 const Configs: Map<string, Config> = new Map([
     ["THREAD_COUNT", {
@@ -123,13 +123,29 @@ const Configs: Map<string, Config> = new Map([
         name: "ASYNC_DELETE",
         description: "Controls how graphs are discarded, when set to `yes` graphs are freed on a dedicated thread leaving the server's main thread free, otherwise graphs are freed on the server's main thread.",
         value: ""
+    }],
+    ["TEMP_FOLDER", {
+        name: "TEMP_FOLDER",
+        description: "Path to the folder FalkorDB uses for temporary files during operations such as graph imports and bulk loading. This is a load-time-only parameter and cannot be changed at runtime.",
+        value: ""
+    }],
+    ["JS_HEAP_SIZE", {
+        name: "JS_HEAP_SIZE",
+        description: "Maximum heap memory (in bytes) available to the JavaScript engine (V8) used for executing User-Defined Functions (UDFs). Increasing this value allows UDFs to process larger data sets, but reduces overall memory available to other processes.",
+        value: ""
+    }],
+    ["JS_STACK_SIZE", {
+        name: "JS_STACK_SIZE",
+        description: "Maximum stack size (in bytes) for the JavaScript engine used for executing User-Defined Functions (UDFs). This controls the maximum call stack depth available to JavaScript-based UDFs.",
+        value: ""
     }]
-])
+]);
 
 export default function Configurations() {
     const [configs, setConfigs] = useState<Row[]>([]);
     const { toast } = useToast();
     const { setIndicator } = useContext(IndicatorContext);
+    const { activeConnectionId } = useContext(ConnectionContext);
 
     const handleSetConfig = async (name: string, value: string, isUndo: boolean) => {
         if (!value) {
@@ -174,7 +190,7 @@ export default function Configurations() {
             return currentConfigs.map((config: Row) => {
                 if (config.cells[0].value !== name) return config;
 
-                const newConfig = { ...config }
+                const newConfig = { ...config };
                 newConfig.cells[2].value = value;
                 return newConfig;
             });
@@ -194,14 +210,21 @@ export default function Configurations() {
         });
 
         return true;
-    }
+    };
 
     const fetchConfigs = async () => {
-        const result = await securedFetch("/api/graph/config", {
-            method: "GET"
-        }, toast, setIndicator);
-
-        if (!result.ok) return;
+        // Use plain fetch with no X-Connection-Id header.
+        // The server uses session.activeConnectionId from the JWT as the
+        // authoritative connection (set by every handleSelect call), so
+        // this is always correct regardless of client-side global state.
+        const result = await fetch("/api/graph/config", { method: "GET" });
+        if (!result.ok) {
+            const body = await result.text().catch(() => "");
+            let message = "Failed to load DB configurations";
+            try { message = JSON.parse(body).message || message; } catch { /* ignore */ }
+            toast({ title: "Error", description: message, variant: "destructive" });
+            return;
+        }
 
         const { configs: configurations } = await result.json();
 
@@ -229,15 +252,19 @@ export default function Configurations() {
                             type: "readonly"
                         }
                 ]
-            }
+            };
         });
 
         setConfigs(newConfigs);
-    }
+    };
 
     useEffect(() => {
+        // Fire on mount and whenever the active connection changes.
+        // No guard needed: the server always resolves the correct connection
+        // via session.activeConnectionId from the JWT.
         fetchConfigs();
-    }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeConnectionId]);
 
     return (
         <div className="grow basis-0 overflow-hidden">

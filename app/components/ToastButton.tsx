@@ -23,11 +23,11 @@ export default function ToastButton({ onClick, showUndo, label = "Undo", variant
                 {showUndo && <Undo size={20} />}
             </Button>
         </ToastAction>
-    )
+    );
 }
 
 ToastButton.defaultProps = {
     variant: undefined,
     showUndo: undefined,
     label: "Undo",
-}
+};

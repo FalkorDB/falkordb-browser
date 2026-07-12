@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import swaggerSpec from "./swagger-spec";
+import { getCorsHeaders } from "../utils";
 
 // eslint-disable-next-line import/prefer-default-export
-export async function GET(): Promise<NextResponse> {
+export async function GET(request: Request): Promise<NextResponse> {
   try {
     return NextResponse.json(swaggerSpec, { 
       status: 200,
       headers: {
+        ...getCorsHeaders(request),
         "Cache-Control": "no-cache, no-store, must-revalidate",
         "Pragma": "no-cache", 
         "Expires": "0"
@@ -17,7 +19,7 @@ export async function GET(): Promise<NextResponse> {
     console.error("Error generating Swagger spec:", error);
     return NextResponse.json(
       { error: "Failed to generate API specification" },
-      { status: 500 }
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }

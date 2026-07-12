@@ -1,72 +1,70 @@
-/* eslint-disable consistent-return */
+/* eslint-disable react/require-default-props */
 /* eslint-disable react-hooks/exhaustive-deps */
 
 "use client";
 
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { Editor, Monaco } from "@monaco-editor/react"
-import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext, useMemo } from "react"
+import { loader, Monaco } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
-import { Minimize2, X } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
-import { cn, getTheme, prepareArg, securedFetch } from "@/lib/utils";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { useTheme } from "next-themes";
-import Button from "./ui/Button";
-import CloseDialog from "./CloseDialog";
-import { BrowserSettingsContext, IndicatorContext } from "./provider";
-import { Graph, HistoryQuery } from "../api/graph/model";
+import { getTheme } from "@/lib/utils";
 
-export const setTheme = (monacoI: Monaco, themeName: string, backgroundColor: string, isDark: boolean) => {
-    monacoI.editor.defineTheme(themeName, {
-        base: isDark ? 'vs-dark' : 'vs',
-        inherit: true,
-        rules: [
-            { token: 'keyword', foreground: isDark ? '#99E4E5' : '#7568F2' },
-            { token: 'function', foreground: isDark ? '#DCDCAA' : '#5A5A42' },
-            { token: 'type', foreground: isDark ? '#89D86D' : '#2E5A27' },
-            { token: 'string', foreground: isDark ? '#CE9178' : '#53392C' },
-            { token: 'number', foreground: isDark ? '#b5cea8' : '#3C5335' },
-        ],
-        colors: {
-            'editor.background': backgroundColor,
-            'editor.lineHighlightBackground': isDark ? '#2A2A2A' : '#F7F7F7',
-            'editor.selectionBackground': isDark ? '#264F78' : '#ADD6FF',
-            'editor.inactiveSelectionBackground': isDark ? '#3A3D41' : '#E5EBF1',
-            'editorCursor.foreground': isDark ? '#AEAFAD' : '#000000',
-            'editorSuggestWidget.background': isDark ? '#272745' : '#F3F3F3',
-            'editorSuggestWidget.foreground': isDark ? '#FFFFFF' : '#000000',
-            'editorSuggestWidget.selectedBackground': isDark ? '#57577B' : '#0060C0',
-            'editorSuggestWidget.hoverBackground': isDark ? '#28283F' : '#F0F0F0',
-            'focusBorder': '#00000000',
+if (typeof window !== 'undefined') {
+    (window as Window & { MonacoEnvironment?: { getWorker: (_moduleId: unknown, label: string) => Worker } }).MonacoEnvironment = {
+        getWorker(_moduleId: unknown, label: string) {
+            switch (label) {
+                case 'json':
+                    return new Worker(new URL('monaco-editor/esm/vs/language/json/json.worker', import.meta.url));
+                case 'css':
+                case 'scss':
+                case 'less':
+                    return new Worker(new URL('monaco-editor/esm/vs/language/css/css.worker', import.meta.url));
+                case 'html':
+                case 'handlebars':
+                case 'razor':
+                    return new Worker(new URL('monaco-editor/esm/vs/language/html/html.worker', import.meta.url));
+                case 'typescript':
+                case 'javascript':
+                    return new Worker(new URL('monaco-editor/esm/vs/language/typescript/ts.worker', import.meta.url));
+                default:
+                    return new Worker(new URL('monaco-editor/esm/vs/editor/editor.worker', import.meta.url));
+            }
         },
-    });
-
-    monacoI.editor.setTheme(themeName)
+    };
 }
 
-interface Props {
-    graph: Graph
-    graphName: string
-    historyQuery: HistoryQuery
-    maximize: boolean
-    setMaximize: Dispatch<SetStateAction<boolean>>
-    runQuery: (query: string) => Promise<void>
-    setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
-    editorKey: string
-    isQueryLoading: boolean
-}
+loader.config({ monaco });
 
-const MAX_HEIGHT = 20
-const LINE_HEIGHT = 22
-const PLACEHOLDER = "Type your query here to start"
-const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
+// ---------------------------------------------------------------------------
+// Singleton completion-provider registry.
+// Monaco calls ALL registered providers for a language — registering one per
+// EditorComponent instance causes duplicated suggestions when multiple editors
+// share the same language. This registry ensures at most ONE provider exists
+// per language at any time, while keeping the config ref always up-to-date.
+// ---------------------------------------------------------------------------
+interface ProviderEntry {
+    configRef: { current: LanguageConfig | undefined };
+    disposable: monaco.IDisposable;
+    count: number;
+}
+const completionProviderRegistry = new Map<string, ProviderEntry>();
+
+// Per-model config registry: maps model URI → LanguageConfig.
+// Allows multiple editors using the same language to each have their own
+// suggestions (e.g. query history vs. main editor) without registering
+// duplicate Monaco providers.
+const modelConfigRegistry = new Map<string, LanguageConfig>();
+
+export const LINE_HEIGHT = 22;
+
+export const DEFAULT_MONACO_OPTIONS: monaco.editor.IStandaloneEditorConstructionOptions = {
     renderLineHighlight: "none",
     glyphMargin: false,
     lineDecorationsWidth: 5,
     folding: false,
     fixedOverflowWidgets: true,
     occurrencesHighlight: "off",
+    wordBasedSuggestions: "off",
     hover: {
         delay: 100,
     },
@@ -86,701 +84,360 @@ const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     hideCursorInOverviewRuler: true,
     scrollBeyondLastColumn: 0,
     scrollBeyondLastLine: false,
-    overflowWidgetsDomNode: undefined,
     scrollbar: {
         vertical: 'hidden',
         horizontal: 'hidden'
     },
 };
 
-const KEYWORDS = [
-    "CREATE",
-    "MATCH",
-    "OPTIONAL",
-    "AS",
-    "WHERE",
-    "RETURN",
-    "ORDER BY",
-    "SKIP",
-    "LIMIT",
-    "MERGE",
-    "DELETE",
-    "SET",
-    "WITH",
-    "UNION",
-    "UNWIND",
-    "FOREACH",
-    "CALL",
-    "YIELD",
-]
+export const setEditorTheme = (monacoI: Monaco, themeName: string, backgroundColor: string, isDark: boolean) => {
+    monacoI.editor.defineTheme(themeName, {
+        base: isDark ? 'vs-dark' : 'vs',
+        inherit: true,
+        rules: [
+            { token: 'keyword', foreground: isDark ? '#569CD6' : '#0000FF' },
+            { token: 'keyword.flow', foreground: isDark ? '#C586C0' : '#AF00DB' },
+            { token: 'function', foreground: isDark ? '#DCDCAA' : '#795E26' },
+            { token: 'type', foreground: isDark ? '#89D86D' : '#2E5A27' },
+            { token: 'string', foreground: isDark ? '#CE9178' : '#A31515' },
+            { token: 'number', foreground: isDark ? '#b5cea8' : '#098658' },
+            { token: 'variable', foreground: isDark ? '#9CDCFE' : '#001080' },
+            { token: 'constant', foreground: isDark ? '#4FC1FF' : '#0070C1' },
+            { token: 'comment', foreground: isDark ? '#6A9955' : '#008000' },
+        ],
+        colors: {
+            'editor.background': backgroundColor,
+            'editor.lineHighlightBackground': isDark ? '#2A2A2A' : '#F7F7F7',
+            'editor.selectionBackground': isDark ? '#264F78' : '#ADD6FF',
+            'editor.inactiveSelectionBackground': isDark ? '#3A3D41' : '#E5EBF1',
+            'editorCursor.foreground': isDark ? '#AEAFAD' : '#000000',
+            'editorSuggestWidget.background': isDark ? '#272745' : '#F3F3F3',
+            'editorSuggestWidget.foreground': isDark ? '#FFFFFF' : '#000000',
+            'editorSuggestWidget.selectedBackground': isDark ? '#57577B' : '#0060C0',
+            'editorSuggestWidget.hoverBackground': isDark ? '#28283F' : '#F0F0F0',
+            'focusBorder': '#00000000',
+        },
+    });
+};
 
-const FUNCTIONS = [
-    "all",
-    "any",
-    "exists",
-    "isEmpty",
-    "none",
-    "single",
-    "coalesce",
-    "endNode",
-    "hasLabels",
-    "id",
-    "labels",
-    "properties",
-    "randomUUID",
-    "startNode",
-    "timestamp",
-    "type",
-    "typeOf",
-    "avg",
-    "collect",
-    "count",
-    "max",
-    "min",
-    "percentileCont",
-    "percentileDisc",
-    "stDevP",
-    "sum",
-    "head",
-    "keys",
-    "last",
-    "range",
-    "size",
-    "tail",
-    "reduce",
-    "abs",
-    "ceil",
-    "e",
-    "exp",
-    "floor",
-    "log",
-    "log10",
-    "pow",
-    "rand",
-    "round",
-    "sign",
-    "sqrt",
-    "acos",
-    "atan",
-    "atan2",
-    "cos",
-    "cot",
-    "degrees",
-    "haversin",
-    "pi",
-    "radians",
-    "sin",
-    "tan",
-    "left",
-    "lTrim",
-    "replace",
-    "reverse",
-    "right",
-    "rTrim",
-    "split",
-    "substring",
-    "toLower",
-    "toJSON",
-    "toUpper",
-    "trim",
-    "size",
-    "point",
-    "distance",
-    "toBoolean",
-    "toBooleanList",
-    "toBooleanOrNull",
-    "toFloat",
-    "toFloatList",
-    "toFloatOrNull",
-    "toInteger",
-    "toIntegerList",
-    "toIntegerOrNull",
-    "toString",
-    "toStringList",
-    "toStringOrNull",
-    "indegree",
-    "outdegree",
-    "nodes",
-    "relationships",
-    "length",
-    "shortestPath",
-    "vecf32",
-    "vec.euclideanDistance",
-    "vec.cosineDistance",
-]
+// Keep backward-compatible alias
+export const setTheme = setEditorTheme;
 
-const SUGGESTIONS: monaco.languages.CompletionItem[] = [
-    ...KEYWORDS.map(key => ({
-        insertText: key,
-        label: key,
-        kind: monaco.languages.CompletionItemKind.Keyword,
-        range: new monaco.Range(1, 1, 1, 1),
-        detail: "(keyword)"
-    })),
-    ...FUNCTIONS.map(f => ({
-        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-        insertText: `${f}(\${0})`,
-        label: `${f}()`,
-        kind: monaco.languages.CompletionItemKind.Function,
-        range: new monaco.Range(1, 1, 1, 1),
-        detail: "(function)"
-    }))
-]
+export interface LanguageConfig {
+    /** Monarch tokenizer rules for syntax highlighting */
+    monarchTokensProvider?: monaco.languages.IMonarchLanguage;
+    /** Language configuration (brackets, auto-closing pairs, etc.) */
+    languageConfiguration?: monaco.languages.LanguageConfiguration;
+    /** 
+     * Async function that returns completion suggestions. 
+     * Called once on mount and whenever the completion provider triggers.
+     * The `range` property is optional since EditorComponent always overwrites it.
+     * May return a plain array OR a `{ suggestions, incomplete? }` object.
+     * `incomplete: true` tells Monaco to re-invoke the provider on every keystroke
+     * instead of caching and re-filtering the existing list client-side.
+     */
+    getSuggestions?: (
+        monacoInstance: Monaco,
+        context?: monaco.languages.CompletionContext,
+        model?: monaco.editor.ITextModel,
+        position?: monaco.Position
+    ) => Promise<
+        | (Omit<monaco.languages.CompletionItem, 'range'> & { range?: monaco.languages.CompletionItem['range'] })[]
+        | { suggestions: (Omit<monaco.languages.CompletionItem, 'range'> & { range?: monaco.languages.CompletionItem['range'] })[]; incomplete?: boolean }
+    >;
+    /** Characters that trigger the completion provider in addition to typing identifier characters. */
+    triggerCharacters?: string[];
+}
 
-export default function EditorComponent({ graph, graphName, historyQuery, maximize, setMaximize, runQuery, setHistoryQuery, editorKey, isQueryLoading }: Props) {
-    const { indicator, setIndicator } = useContext(IndicatorContext)
-    const { tutorialOpen } = useContext(BrowserSettingsContext)
+export interface EditorComponentProps {
+    value: string;
+    onChange?: (value: string | undefined) => void;
+    /** Language id. For custom languages, also pass languageConfig. For built-in languages (javascript, json, etc.) just pass the id. */
+    language?: string;
+    /** Configuration for custom language registration (tokenizer, brackets, suggestions) */
+    languageConfig?: LanguageConfig;
+    options?: monaco.editor.IStandaloneEditorConstructionOptions;
+    height?: number | string;
+    className?: string;
+    editorKey?: string;
+    onMount?: (editor: monaco.editor.IStandaloneCodeEditor) => void;
+    /** Callback fired with the Monaco instance after beforeMount completes */
+    onMonacoReady?: (monacoInstance: Monaco) => void;
+    readOnly?: boolean;
+    /** Custom Monaco theme name (defaults to "editor-theme") */
+    themeName?: string;
+    /** Custom background color for the editor theme (defaults to the app background color) */
+    themeBackground?: string;
+}
 
-    const { toast } = useToast()
-    const { theme } = useTheme()
-    const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
-    const dialogEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
-    const placeholderRef = useRef<HTMLDivElement>(null)
-    const submitQuery = useRef<HTMLButtonElement>(null)
-    const containerRef = useRef<HTMLDivElement>(null)
-    const indicatorRef = useRef(indicator)
-    const graphIdRef = useRef(graph.Id)
-    const graphNameRef = useRef(graphName)
-    const queryRef = useRef(historyQuery.query)
-    const tutorialOpenRef = useRef(tutorialOpen)
+export default function EditorComponent({
+    value,
+    onChange,
+    language = "plaintext",
+    languageConfig,
+    options,
+    height,
+    className,
+    editorKey,
+    onMount,
+    onMonacoReady,
+    readOnly = false,
+    themeName = "editor-theme",
+    themeBackground,
+}: EditorComponentProps) {
+    const { theme } = useTheme();
+    const { background, currentTheme } = getTheme(theme);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+    const monacoRef = useRef<Monaco | null>(null);
+    const sugDisposableRef = useRef<monaco.IDisposable | null>(null);
+    const languageConfigRef = useRef(languageConfig);
+    const participatesInRegistry = useRef(false);
+    const onChangeRef = useRef(onChange);
+    const onMountRef = useRef(onMount);
+    const onMonacoReadyRef = useRef(onMonacoReady);
+    const valueRef = useRef(value);
+    const overflowHostRef = useRef<HTMLDivElement | null>(null);
 
-    const [monacoEditor, setMonacoEditor] = useState<Monaco | null>(null)
-    const [sugDisposed, setSugDisposed] = useState<monaco.IDisposable>()
-    const [lineNumber, setLineNumber] = useState(1)
-    const [blur, setBlur] = useState(false)
-
-    const { background, currentTheme } = getTheme(theme)
-
-    const editorHeight = useMemo(() => blur
-        ? LINE_HEIGHT
-        : Math.min(lineNumber * LINE_HEIGHT, document.body.clientHeight / 100 * MAX_HEIGHT),
-        [blur, lineNumber])
-
+    // Keep refs in sync; also update model-specific and shared registry configs when languageConfig changes.
     useEffect(() => {
-        tutorialOpenRef.current = tutorialOpen
-    }, [tutorialOpen])
-
-    useEffect(() => {
-        graphNameRef.current = graphName
-    }, [graphName])
-
-    useEffect(() => {
-        queryRef.current = historyQuery.query
-    }, [historyQuery.query])
-
-    useEffect(() => {
-        indicatorRef.current = indicator
-    }, [indicator])
-
-    useEffect(() => {
-        if (historyQuery.query && placeholderRef.current) {
-            placeholderRef.current.style.display = "none"
-        } else if (!historyQuery.query && placeholderRef.current && blur) {
-            placeholderRef.current.style.display = "block"
+        languageConfigRef.current = languageConfig;
+        if (participatesInRegistry.current && languageConfig?.getSuggestions) {
+            const editorModel = editorRef.current?.getModel();
+            if (editorModel) modelConfigRegistry.set(editorModel.uri.toString(), languageConfig);
+            const entry = completionProviderRegistry.get(language);
+            if (entry) entry.configRef.current = languageConfig;
         }
-    }, [historyQuery.query])
+    }, [languageConfig, language]);
+    useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+    useEffect(() => { onMountRef.current = onMount; }, [onMount]);
+    useEffect(() => { onMonacoReadyRef.current = onMonacoReady; }, [onMonacoReady]);
+    useEffect(() => { valueRef.current = value; }, [value]);
 
+    const mergedOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
+        ...DEFAULT_MONACO_OPTIONS,
+        readOnly,
+        ...options,
+    };
+
+    // Initialize the editor once the container is mounted
     useEffect(() => {
-        graphIdRef.current = graph.Id
-    }, [graph.Id])
+        let disposed = false;
 
-    useEffect(() => () => {
-        sugDisposed?.dispose()
-    }, [sugDisposed])
+        loader.init().then((monacoInstance: Monaco) => {
+            if (disposed || !containerRef.current) return;
 
-    useEffect(() => {
-        if (!containerRef.current) return
+            monacoRef.current = monacoInstance;
 
-        const handleResize = () => {
-            editorRef.current?.layout()
-        }
+            // Set up theme
+            setEditorTheme(monacoInstance, themeName, themeBackground || background, currentTheme === "dark");
 
-        window.addEventListener("resize", handleResize)
+            // Register custom language if needed
+            if (languageConfigRef.current) {
+                const lc = languageConfigRef.current;
+                const languages: monaco.languages.ILanguageExtensionPoint[] = monacoInstance.languages.getLanguages();
+                if (!languages.some(l => l.id === language)) {
+                    monacoInstance.languages.register({ id: language });
+                }
+                if (lc.monarchTokensProvider) {
+                    monacoInstance.languages.setMonarchTokensProvider(language, lc.monarchTokensProvider);
+                }
+                if (lc.languageConfiguration) {
+                    monacoInstance.languages.setLanguageConfiguration(language, lc.languageConfiguration);
+                }
+                if (lc.getSuggestions) {
+                    const existingEntry = completionProviderRegistry.get(language);
+                    if (existingEntry) {
+                        // Another editor already owns the provider — update config and share it.
+                        existingEntry.configRef.current = lc;
+                        existingEntry.count += 1;
+                    } else {
+                        // First instance for this language — register the singleton provider.
+                        const sharedConfigRef: { current: LanguageConfig | undefined } = { current: lc };
+                        const disposable = monacoInstance.languages.registerCompletionItemProvider(language, {
+                            triggerCharacters: lc.triggerCharacters,
+                            provideCompletionItems: (async (model, position, context) => {
+                        const currentConfig = modelConfigRegistry.get(model.uri.toString()) ?? sharedConfigRef.current;
+                                if (!currentConfig?.getSuggestions) return { suggestions: [] };
+                                const word = model.getWordUntilPosition(position);
+                                const range = new monacoInstance.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
+                                const result = await currentConfig.getSuggestions(monacoInstance, context, model, position);
+                                const items = Array.isArray(result) ? result : result.suggestions;
+                                const incomplete = Array.isArray(result) ? undefined : result.incomplete;
+                                // Spread `range` first so that a provider-set `s.range`
+                                // (e.g. a dotted-path replacement range) takes precedence
+                                // over the word-based fallback range computed above.
+                                return { suggestions: items.map(s => ({ range, ...s })), incomplete };
+                            }) as monaco.languages.CompletionItemProvider['provideCompletionItems'],
+                        });
+                        completionProviderRegistry.set(language, { configRef: sharedConfigRef, disposable, count: 1 });
+                    }
+                    participatesInRegistry.current = true;
+                }
+            }
 
-        const observer = new ResizeObserver(handleResize)
+            onMonacoReadyRef.current?.(monacoInstance);
 
-        observer.observe(containerRef.current)
+            // Create a theme-aware host element at body level for Monaco's overflow widgets
+            // (suggest, hover, find). This solves the Radix UI transform trap:
+            //   • Radix positions PopoverContent via `transform: matrix(...)` which makes
+            //     it the CSS containing block for `position:fixed` descendants.
+            //   • Monaco computes suggest-widget positions in viewport coordinates, but the
+            //     browser interprets them relative to the transformed popper → off-screen.
+            // Placing the overflow widget container at body level (no ancestor transform)
+            // restores correct viewport-relative positioning.
+            // We give the host the `.monaco-editor` class so Monaco's own CSS rules
+            // (`.monaco-editor .suggest-widget { … }`) and CSS variables still apply.
+            const isDark = currentTheme === "dark";
+            const overflowHost = document.createElement('div');
+            overflowHost.className = `monaco-editor ${isDark ? 'vs-dark' : 'vs'}`;
+            Object.assign(overflowHost.style, {
+                position: 'fixed',
+                top: '0',
+                left: '0',
+                width: '0',
+                height: '0',
+                overflow: 'visible',
+                pointerEvents: 'none',
+                // Must be above the Radix popper (z-index: 30) so suggest/hover/find
+                // widgets are painted on top of any popover they overlap.
+                zIndex: '50',
+            });
+            document.body.appendChild(overflowHost);
+            overflowHostRef.current = overflowHost;
+
+            //Claude Create the editor
+            const editor = monacoInstance.editor.create(containerRef.current, {
+                ...mergedOptions,
+                value: valueRef.current,
+                language,
+                theme: themeName,
+                overflowWidgetsDomNode: overflowHost,
+            });
+
+            editorRef.current = editor;
+
+            // Register this editor's model for per-model suggestion dispatch.
+            const currentLc = languageConfigRef.current;
+            if (currentLc?.getSuggestions) {
+                const editorModel = editor.getModel();
+                if (editorModel) modelConfigRegistry.set(editorModel.uri.toString(), currentLc);
+            }
+
+            // Listen for content changes — skip callback when change is from our own setValue
+            editor.onDidChangeModelContent(() => {
+                onChangeRef.current?.(editor.getValue());
+            });
+
+            onMountRef.current?.(editor);
+        });
 
         return () => {
-            window.removeEventListener("resize", handleResize)
-            observer.disconnect()
-        }
-    }, [containerRef.current])
-
-    useEffect(() => {
-        setLineNumber(historyQuery.query.split("\n").length)
-    }, [historyQuery.query])
-
-    const fetchSuggestions = async (detail: string): Promise<monaco.languages.CompletionItem[]> => {
-        if (indicator === "offline") return []
-
-        const result = await securedFetch(`api/graph/${graphIdRef.current}/info?type=${prepareArg(detail)}`, {
-            method: 'GET',
-        }, toast, setIndicator)
-
-        if (!result) return []
-
-        const json = await result.json()
-
-        if (json.result.data.length === 0) return []
-
-        return json.result.data.map(({ info }: { info: string }) => ({
-            insertTextRules: detail === '(function)' ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet : undefined,
-            insertText: detail === '(function)' ? `${info}(\${0})` : info,
-            label: detail === '(function)' ? `${info}()` : info,
-            kind: (() => {
-                switch (detail) {
-                    case '(function)':
-                        return monaco.languages.CompletionItemKind.Function;
-                    case '(property key)':
-                        return monaco.languages.CompletionItemKind.Property;
-                    default:
-                        return monaco.languages.CompletionItemKind.Variable;
-                }
-            })(),
-            range: new monaco.Range(1, 1, 1, 1),
-            detail
-        }))
-    }
-
-    const getSuggestions = async () => (await Promise.all([
-        fetchSuggestions('(function)'),
-        fetchSuggestions('(property key)'),
-        fetchSuggestions('(label)'),
-        fetchSuggestions('(relationship type)')
-    ])).flat()
-
-    const addSuggestions = async (monacoI: Monaco) => {
-        const sug = [
-            ...SUGGESTIONS,
-            ...(graphIdRef.current ? await getSuggestions() : [])
-        ];
-
-        const functions = sug.filter(({ detail }) => detail === "(function)")
-
-        const namespaces = new Set(
-            functions
-                .filter(({ label }) => (label as string).includes("."))
-                .map(({ label }) => {
-                    const newNamespaces = (label as string).split(".")
-                    newNamespaces.pop()
-                    return newNamespaces
-                }).flat()
-        )
-
-        monacoI.languages.setMonarchTokensProvider('custom-language', {
-            tokenizer: {
-                root: graphIdRef.current ? [
-                    [new RegExp(`\\b(${Array.from(namespaces.keys()).join('|')})\\b`), "keyword"],
-                    [new RegExp(`\\b(${KEYWORDS.join('|')})\\b`), "keyword"],
-                    [
-                        new RegExp(`\\b(${functions.map(({ label }) => {
-                            if ((label as string).includes(".")) {
-                                const labels = (label as string).split(".")
-                                return labels[labels.length - 1]
-                            }
-                            return label
-                        }).join('|')})\\b`),
-                        "function"
-                    ],
-                    [/"([^"\\]|\\.)*"/, 'string'],
-                    [/'([^'\\]|\\.)*'/, 'string'],
-                    [/\d+/, 'number'],
-                    [/:(\w+)/, 'type'],
-                    [/\{/, { token: 'delimiter.curly', next: '@bracketCounting' }],
-                    [/\[/, { token: 'delimiter.square', next: '@bracketCounting' }],
-                    [/\(/, { token: 'delimiter.parenthesis', next: '@bracketCounting' }],
-                ] : [
-                    [new RegExp(`\\b(${KEYWORDS.join('|')})\\b`), "keyword"],
-                    [/"([^"\\]|\\.)*"/, 'string'],
-                    [/'([^'\\]|\\.)*'/, 'string'],
-                    [/\d+/, 'number'],
-                    [/:(\w+)/, 'type'],
-                    [/\{/, { token: 'delimiter.curly', next: '@bracketCounting' }],
-                    [/\[/, { token: 'delimiter.square', next: '@bracketCounting' }],
-                    [/\(/, { token: 'delimiter.parenthesis', next: '@bracketCounting' }],
-                ],
-                bracketCounting: [
-                    [/\{/, 'delimiter.curly', '@bracketCounting'],
-                    [/\}/, 'delimiter.curly', '@pop'],
-                    [/\[/, 'delimiter.square', '@bracketCounting'],
-                    [/\]/, 'delimiter.square', '@pop'],
-                    [/\(/, 'delimiter.parenthesis', '@bracketCounting'],
-                    [/\)/, 'delimiter.parenthesis', '@pop'],
-                    { include: 'root' }
-                ],
-            },
-            ignoreCase: true,
-        })
-
-        return sug
-    }
-
-    useEffect(() => {
-        if (monacoEditor) {
-            addSuggestions(monacoEditor)
-        }
-    }, [monacoEditor, graphIdRef.current])
-
-    const handleSubmit = async () => {
-        runQuery(historyQuery.query.trim())
-    }
-
-    const handleEditorWillMount = async (monacoI: Monaco) => {
-        setMonacoEditor(monacoI)
-
-        monacoI.languages.register({ id: "custom-language" })
-
-        monacoI.languages.setMonarchTokensProvider('custom-language', {
-            tokenizer: {
-                root: [
-                    [new RegExp(`\\b(${KEYWORDS.join('|')})\\b`), "keyword"],
-                    [/"([^"\\]|\\.)*"/, 'string'],
-                    [/'([^'\\]|\\.)*'/, 'string'],
-                    [/\d+/, 'number'],
-                    [/:(\w+)/, 'type'],
-                    [/\{/, { token: 'delimiter.curly', next: '@bracketCounting' }],
-                    [/\[/, { token: 'delimiter.square', next: '@bracketCounting' }],
-                    [/\(/, { token: 'delimiter.parenthesis', next: '@bracketCounting' }],
-                ],
-                bracketCounting: [
-                    [/\{/, 'delimiter.curly', '@bracketCounting'],
-                    [/\}/, 'delimiter.curly', '@pop'],
-                    [/\[/, 'delimiter.square', '@bracketCounting'],
-                    [/\]/, 'delimiter.square', '@pop'],
-                    [/\(/, 'delimiter.parenthesis', '@bracketCounting'],
-                    [/\)/, 'delimiter.parenthesis', '@pop'],
-                    { include: 'root' }
-                ],
-            },
-            ignoreCase: true,
-        })
-
-        setTheme(monacoI, "editor-theme", background, currentTheme === "dark")
-
-        monacoI.languages.setLanguageConfiguration('custom-language', {
-            brackets: [
-                ['{', '}'],
-                ['[', ']'],
-                ['(', ')']
-            ],
-            autoClosingPairs: [
-                { open: '{', close: '}' },
-                { open: '[', close: ']' },
-                { open: '(', close: ')' },
-                { open: '"', close: '"', notIn: ['string'] },
-                { open: "'", close: "'", notIn: ['string', 'comment'] }
-            ],
-            surroundingPairs: [
-                { open: '{', close: '}' },
-                { open: '[', close: ']' },
-                { open: '(', close: ')' },
-                { open: '"', close: '"' },
-                { open: "'", close: "'" }
-            ]
-        });
-
-        addSuggestions(monacoI)
-
-        const provider = monacoI.languages.registerCompletionItemProvider("custom-language", {
-            provideCompletionItems: async (model, position) => {
-                const word = model.getWordUntilPosition(position)
-                const range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn)
-                return {
-                    suggestions: (await addSuggestions(monacoI)).map(s => ({ ...s, range }))
-                }
-            },
-        })
-
-        setSugDisposed(provider)
-    }
-
-    const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
-        const updatePlaceholderVisibility = () => {
-            const hasContent = !!e.getValue();
-            if (placeholderRef.current) {
-                placeholderRef.current.style.display = hasContent ? 'none' : 'block';
-            }
+            disposed = true;
         };
+    }, []);
 
-        e.onDidFocusEditorText(() => {
-            if (placeholderRef.current) {
-                placeholderRef.current.style.display = 'none';
+    // Synchronous cleanup before DOM removal — prevents rAF callbacks
+    // from accessing destroyed DOM nodes during HMR
+    useLayoutEffect(() => () => {
+        // Release this instance's hold on the singleton provider.
+        if (participatesInRegistry.current) {
+            // Remove model-specific suggestion config.
+            const editorModel = editorRef.current?.getModel();
+            if (editorModel) modelConfigRegistry.delete(editorModel.uri.toString());
+
+            const entry = completionProviderRegistry.get(language);
+            if (entry) {
+                entry.count -= 1;
+                if (entry.count <= 0) {
+                    entry.disposable.dispose();
+                    completionProviderRegistry.delete(language);
+                }
             }
+            participatesInRegistry.current = false;
+        }
+        // Legacy per-instance disposable (kept for safety).
+        sugDisposableRef.current?.dispose();
+        sugDisposableRef.current = null;
 
-            setBlur(false)
-        });
+        if (editorRef.current) {
+            // Get the model before disposing the editor
+            const model = editorRef.current.getModel();
+            editorRef.current.dispose();
+            editorRef.current = null;
+            // Dispose the model separately to avoid leaks
+            model?.dispose();
+        }
+        // Remove the overflow widget host from body when the editor unmounts.
+        if (overflowHostRef.current?.parentNode) {
+            overflowHostRef.current.parentNode.removeChild(overflowHostRef.current);
+            overflowHostRef.current = null;
+        }
+    }, []);
 
-        e.onDidBlurEditorText(() => {
-            updatePlaceholderVisibility();
+    // Re-register monarch tokenizer when languageConfig changes
+    useEffect(() => {
+        const monacoInstance = monacoRef.current;
+        const lc = languageConfigRef.current;
+        if (monacoInstance && lc?.monarchTokensProvider) {
+            monacoInstance.languages.setMonarchTokensProvider(language, lc.monarchTokensProvider);
+        }
+    }, [languageConfig, language]);
 
-            setBlur(true)
-        });
+    // Sync external value changes (history navigation, etc.) into the editor.
+    useEffect(() => {
+        const editor = editorRef.current;
+        if (!editor || value === undefined) return;
+        if (editor.getValue() === value) return;
 
-        updatePlaceholderVisibility();
+        editor.setValue(value);
 
-        const isFirstLine = e.createContextKey<boolean>('isFirstLine', true);
-        const isLastLine = e.createContextKey<boolean>('isLastLine', true);
+        // Move cursor to end so context keys (isFirstLine/isLastLine) stay accurate
+        const model = editor.getModel();
+        if (model) {
+            const lastLine = model.getLineCount();
+            const lastCol = model.getLineMaxColumn(lastLine);
+            editor.setPosition({ lineNumber: lastLine, column: lastCol });
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [value]);
 
-        // Update the context key value based on the cursor position
-        e.onDidChangeCursorPosition(() => {
-            const position = e.getPosition();
-            if (position) {
-                isFirstLine.set(position.lineNumber === 1);
-                isLastLine.set(position.lineNumber === e.getModel()?.getLineCount());
+    // Update options when they change
+    useEffect(() => {
+        editorRef.current?.updateOptions(mergedOptions);
+    }, [readOnly, options]);
+
+    // Update theme when it changes (editorKey is included so that external state
+    // changes – such as closing the query-history dialog – trigger a re-apply)
+    useEffect(() => {
+        if (monacoRef.current) {
+            setEditorTheme(monacoRef.current, themeName, themeBackground || background, currentTheme === "dark");
+            editorRef.current?.updateOptions({ theme: themeName });
+        }
+        // Keep the overflow host base-theme class in sync so Monaco's CSS variables
+        // resolve correctly when the user switches between light and dark mode.
+        if (overflowHostRef.current) {
+            overflowHostRef.current.className = `monaco-editor ${currentTheme === "dark" ? 'vs-dark' : 'vs'}`;
+        }
+    }, [currentTheme, themeName, themeBackground, background, editorKey]);
+
+    // Update language when it changes
+    useEffect(() => {
+        const editor = editorRef.current;
+        const monacoInstance = monacoRef.current;
+        if (editor && monacoInstance) {
+            const model = editor.getModel();
+            if (model) {
+                monacoInstance.editor.setModelLanguage(model, language);
             }
-        });
-
-        e.addCommand(monaco.KeyCode.Escape, () => {
-            const domNode = e.getDomNode();
-            if (domNode) {
-                const textarea = domNode.querySelector('textarea');
-                if (textarea) (textarea as HTMLTextAreaElement).blur();
-            }
-        })
-
-        // eslint-disable-next-line no-bitwise
-        e.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
-            e.trigger('keyboard', 'type', { text: '\n' });
-        });
-
-        // eslint-disable-next-line no-bitwise
-        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-            if (indicatorRef.current === "offline" || !queryRef.current || !graphNameRef.current || tutorialOpenRef.current) return
-            submitQuery.current?.click();
-        });
-
-        e.addAction({
-            id: 'submit',
-            label: 'Submit Query',
-            // eslint-disable-next-line no-bitwise
-            keybindings: [monaco.KeyCode.Enter],
-            contextMenuOrder: 1.5,
-            run: async () => {
-                if (indicatorRef.current === "offline" || !queryRef.current || !graphNameRef.current || tutorialOpenRef.current) return
-                submitQuery.current?.click()
-            },
-            precondition: '!suggestWidgetVisible',
-        });
-
-        e.addAction({
-            id: 'history up',
-            label: 'history up',
-            keybindings: [monaco.KeyCode.UpArrow],
-            contextMenuOrder: 1.5,
-            run: async () => {
-                setHistoryQuery(prev => {
-                    if (prev.queries.length === 0) return prev;
-
-                    let counter;
-                    if (prev.counter !== 1) {
-                        counter = prev.counter ? prev.counter - 1 : prev.queries.length;
-                    } else {
-                        counter = 1;
-                    }
-
-                    return {
-                        ...prev,
-                        counter
-                    }
-                })
-            },
-            precondition: 'isFirstLine && !suggestWidgetVisible',
-        });
-
-        e.addAction({
-            id: 'history down',
-            label: 'history down',
-            keybindings: [monaco.KeyCode.DownArrow],
-            contextMenuOrder: 1.5,
-            run: async () => {
-                setHistoryQuery(prev => {
-                    if (prev.queries.length === 0) return prev
-
-                    let counter
-
-                    if (prev.counter) {
-                        counter = prev.counter + 1 > prev.queries.length ? 0 : prev.counter + 1
-                    } else {
-                        counter = 0
-                    }
-
-                    return {
-                        ...prev,
-                        counter
-                    }
-                })
-            },
-            precondition: 'isLastLine && !suggestWidgetVisible',
-        });
-
-        // Override the default Ctrl + F keybinding
-        // eslint-disable-next-line no-bitwise
-        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => { });
-    }
-
-    const getLabel = () => {
-        if (!graphName) return "Select a graph first"
-        if (!historyQuery.query) return "You need to type a query first"
-        return "Press Enter to run the query"
-    }
+        }
+    }, [language]);
 
     return (
-        <div data-testid="editor" style={{ height: editorHeight + 18 }} className="absolute w-full flex items-start gap-8 border border-border rounded-lg overflow-hidden bg-background p-2">
-            <div className="h-full w-1 grow flex rounded-lg overflow-hidden">
-                <div ref={containerRef} className="h-full relative grow w-1" data-value={historyQuery.query} data-testid="editorContainer">
-                    <Editor
-                        className="SofiaSans"
-                        key={`${editorKey}-${currentTheme}`}
-                        height={editorHeight}
-                        language="custom-language"
-                        options={{
-                            ...monacoOptions,
-                            lineNumbers: lineNumber > 1 ? "on" : "off",
-                        }}
-                        value={blur ? historyQuery.query.replace(/\n/g, ' ') : historyQuery.query}
-                        onChange={(val) => {
-                            if (!historyQuery.counter) {
-                                setHistoryQuery(prev => ({
-                                    ...prev,
-                                    currentQuery: {
-                                        ...prev.currentQuery,
-                                        text: val || "",
-                                    },
-                                    query: val || "",
-                                }))
-                            } else {
-                                setHistoryQuery(prev => ({
-                                    ...prev,
-                                    query: val || "",
-                                }))
-                            }
-                        }}
-                        theme="editor-theme"
-                        beforeMount={handleEditorWillMount}
-                        onMount={(e) => {
-                            handleEditorDidMount(e)
-                            editorRef.current = e
-                        }}
-                    />
-                    <span ref={placeholderRef} className="w-full top-0 left-0 absolute pointer-events-none truncate SofiaSans">
-                        {PLACEHOLDER}
-                    </span>
-                </div>
-                <div style={{ height: LINE_HEIGHT }} className={cn("flex gap-2")}>
-                    {
-                        historyQuery.query &&
-                        <Button
-                            data-testid="clearEditor"
-                            title="Clear"
-                            onClick={() => {
-                                setHistoryQuery(prev => ({
-                                    ...prev,
-                                    query: "",
-                                }))
-                                editorRef.current?.focus()
-                            }}
-                        >
-                            <X />
-                        </Button>
-                    }
-                    <Button
-                        data-testid="editorRun"
-                        ref={submitQuery}
-                        indicator={indicator}
-                        disabled={!historyQuery.query || !graphName}
-                        variant="Primary"
-                        label="RUN"
-                        title={getLabel()}
-                        onClick={handleSubmit}
-                        isLoading={isQueryLoading}
-                    />
-                </div>
-            </div>
-            <Dialog open={maximize} onOpenChange={setMaximize}>
-                <DialogContent hideClose className="w-full h-full">
-                    <div className="relative w-full h-full">
-                        <VisuallyHidden>
-                            <DialogTitle />
-                            <DialogDescription />
-                        </VisuallyHidden>
-                        <div className="z-10 absolute right-0 top-0 bottom-0 py-4 px-8 flex flex-col items-end justify-between pointer-events-none">
-                            <CloseDialog
-                                className="pointer-events-auto"
-                            >
-                                <Minimize2 size={20} />
-                            </CloseDialog>
-                            <div className="flex gap-2 items-center pointer-events-auto">
-                                {
-                                    historyQuery.query &&
-                                    <Button
-                                        data-testid="clearEditor"
-                                        title="Clear"
-                                        onClick={() => {
-                                            setHistoryQuery(prev => ({
-                                                ...prev,
-                                                query: "",
-                                            }))
-                                            dialogEditorRef.current?.focus()
-                                        }}
-                                    >
-                                        <X />
-                                    </Button>
-                                }
-                                <CloseDialog
-                                    data-testid="editorRun"
-                                    className="pointer-events-auto py-2 px-8"
-                                    indicator={indicator}
-                                    disabled={!historyQuery.query || !graphName}
-                                    variant="Primary"
-                                    label="RUN"
-                                    title={getLabel()}
-                                    onClick={handleSubmit}
-                                    isLoading={isQueryLoading}
-                                />
-                            </div>
-                        </div>
-                        <Editor
-                            key={`${editorKey}-${currentTheme}`}
-                            className="w-full h-full"
-                            onMount={(e) => {
-                                handleEditorDidMount(e)
-                                dialogEditorRef.current = e
-                            }}
-                            theme="editor-theme"
-                            options={{
-                                padding: {
-                                    bottom: 10,
-                                    top: 10,
-                                },
-                                lineNumbersMinChars: 3,
-                                minimap: { enabled: false },
-                                lineHeight: LINE_HEIGHT,
-                                fontSize: 25,
-                            }}
-                            value={historyQuery.query}
-                            onChange={(val) => {
-                                if (historyQuery.counter) {
-                                    setHistoryQuery(prev => ({
-                                        ...prev,
-                                        query: val || ""
-                                    }))
-                                } else {
-                                    setHistoryQuery(prev => ({
-                                        ...prev,
-                                        query: val || "",
-                                        currentQuery: {
-                                            ...prev.currentQuery,
-                                            text: val || "",
-                                        },
-                                    }))
-                                }
-                            }}
-                            language="custom-language"
-                        />
-                    </div>
-                </DialogContent>
-            </Dialog>
-        </div>
-    )
+        <div
+            ref={containerRef}
+            className={className}
+            style={{ height: typeof height === "number" ? `${height}px` : (height || "100%"), width: "100%" }}
+        />
+    );
 }

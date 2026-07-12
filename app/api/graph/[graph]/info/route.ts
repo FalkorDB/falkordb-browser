@@ -1,5 +1,6 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
+import { getCorsHeaders, resolveReadOnly } from "../../../utils";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
@@ -7,7 +8,7 @@ export async function GET(
   { params }: { params: Promise<{ graph: string }> }
 ) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -21,6 +22,7 @@ export async function GET(
       | "(label)"
       | "(relationship type)"
       | undefined;
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       const getQuery = () => {
@@ -40,24 +42,23 @@ export async function GET(
 
       const graph = client.selectGraph(graphId);
 
-      const result =
-        user.role === "Read-Only"
+      const result = isReadOnly
           ? await graph.roQuery(getQuery())
           : await graph.query(getQuery());
 
-      return NextResponse.json({ result }, { status: 200 });
+      return NextResponse.json({ result }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
-      { status: 500 }
+      { message: "Internal server error" },
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }

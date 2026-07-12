@@ -13,6 +13,12 @@
       { "input": "1", "description": "valid input", "expected": true },
       { "input": "0", "description": "valid input - zero value", "expected": true }
     ],
+    "inputDataNoZeroCheck": [
+      { "input": "aa", "description": "invalid input - character", "expected": false },
+      { "input": "-3", "description": "invalid input - negative number", "expected": false },
+      { "input": "00-1", "description": "invalid input", "expected": false },
+      { "input": "1", "description": "valid input", "expected": true }
+    ],
     "maxTimeOut": [
       { "input": "aa", "description": "invalid input - character", "expected": false },
       { "input": "-3", "description": "invalid input - negative number", "expected": false },
@@ -27,6 +33,13 @@
       { "input": "no", "description": "valid input - no value", "expected": true },
       { "input": "yes", "description": "valid input - yes value", "expected": true }
     ],
+    "jsMemoryData": [
+      { "input": "aa", "description": "invalid input - character", "expected": false },
+      { "input": "-3", "description": "invalid input - negative number", "expected": false },
+      { "input": "00-1", "description": "invalid input", "expected": false },
+      { "input": "2097152", "description": "valid input - 2MB", "expected": true },
+      { "input": "1", "description": "invalid input - below minimum 1MB", "expected": false }
+    ],
     "roleModificationData": [
         {"role": "MAX_QUEUED_QUERIES", "description": "modify maxQueuedQueries", "input": "24", "expected": true},
         {"role": "TIMEOUT", "description": "modify timeOut", "input": "1001", "expected": true},
@@ -36,11 +49,19 @@
         {"role": "QUERY_MEM_CAPACITY", "description": "modify queryMemCapacity", "input": "1", "expected": true},
         {"role": "VKEY_MAX_ENTITY_COUNT", "description": "modify vKeyMaxEntityCount", "input": "100001", "expected": true},
         {"role": "CMD_INFO", "description": "modify cmdInfo", "input": "no", "expected": true},
-        {"role": "MAX_INFO_QUERIES", "description": "modify maxInfoQueries", "input": "999", "expected": true}
+        {"role": "MAX_INFO_QUERIES", "description": "modify maxInfoQueries", "input": "999", "expected": true},
+        {"role": "EFFECTS_THRESHOLD", "description": "modify effectsThreshold", "input": "500", "expected": true},
+        {"role": "DELTA_MAX_PENDING_CHANGES", "description": "modify deltaMaxPendingChanges", "input": "20000", "expected": true},
+        {"role": "JS_HEAP_SIZE", "description": "modify jsHeapSize", "input": "2097152", "expected": true},
+        {"role": "JS_STACK_SIZE", "description": "modify jsStackSize", "input": "2097152", "expected": true}
     ],
     "searchElements": [
       {"input": "CACHE_SIZE", "expected": 1},
-      {"input": "RESULTSET_SIZE", "expected": 1}
+      {"input": "RESULTSET_SIZE", "expected": 1},
+      {"input": "EFFECTS_THRESHOLD", "expected": 1},
+      {"input": "DELTA_MAX_PENDING_CHANGES", "expected": 1},
+      {"input": "JS_HEAP_SIZE", "expected": 1},
+      {"input": "JS_STACK_SIZE", "expected": 1}
     ]
 }
   

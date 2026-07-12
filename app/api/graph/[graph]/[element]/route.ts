@@ -5,6 +5,11 @@ import {
   deleteGraphElement,
   validateBody,
 } from "../../../validate-body";
+import { getCorsHeaders, resolveReadOnly } from "../../../utils";
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
+}
 
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
@@ -12,7 +17,7 @@ export async function GET(
   { params }: { params: Promise<{ graph: string; element: string }> }
 ) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -21,33 +26,33 @@ export async function GET(
     const { client, user } = session;
     const { graph: graphId, element } = await params;
     const elementId = Number(element);
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       const graph = client.selectGraph(graphId);
 
       // Get node's neighbors
-      const query = `MATCH (src)-[e]-(n)
-                          WHERE ID(src) = $id
-                          RETURN e, n`;
+      const query = `MATCH (n)-[e]-(m)
+                          WHERE ID(n) = $id
+                          RETURN *`;
 
-      const result =
-        user.role === "Read-Only"
+      const result = isReadOnly
           ? await graph.roQuery(query, { params: { id: elementId } })
           : await graph.query(query, { params: { id: elementId } });
 
-      return NextResponse.json({ result }, { status: 200 });
+      return NextResponse.json({ result }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
-      { status: 500 }
+      { message: "Internal server error" },
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }
@@ -57,7 +62,7 @@ export async function POST(
   { params }: { params: Promise<{ graph: string; element: string }> }
 ) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -65,6 +70,7 @@ export async function POST(
 
     const { client, user } = session;
     const { graph: graphId } = await params;
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       const body = await request.json();
@@ -75,7 +81,7 @@ export async function POST(
       if (!validation.success) {
         return NextResponse.json(
           { message: validation.error },
-          { status: 400 }
+          { status: 400, headers: getCorsHeaders(request) }
         );
       }
 
@@ -114,24 +120,23 @@ export async function POST(
         });
       }
 
-      const result =
-        user.role === "Read-Only"
+      const result = isReadOnly
           ? await graph.roQuery(query, { params: queryParams })
           : await graph.query(query, { params: queryParams });
 
-      return NextResponse.json({ result }, { status: 200 });
+      return NextResponse.json({ result }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
-      { status: 500 }
+      { message: "Internal server error" },
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }
@@ -141,7 +146,7 @@ export async function DELETE(
   { params }: { params: Promise<{ graph: string; element: string }> }
 ) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -150,6 +155,7 @@ export async function DELETE(
     const { client, user } = session;
     const { graph: graphId, element } = await params;
     const elementId = Number(element);
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       const body = await request.json();
@@ -160,36 +166,41 @@ export async function DELETE(
       if (!validation.success) {
         return NextResponse.json(
           { message: validation.error },
-          { status: 400 }
+          { status: 400, headers: getCorsHeaders(request) }
         );
       }
 
       const { type } = validation.data;
       const graph = client.selectGraph(graphId);
+      if (isReadOnly) {
+        return NextResponse.json(
+          { message: "Forbidden: read-only connection" },
+          { status: 403, headers: getCorsHeaders(request) }
+        );
+      }
+
       const query = type
         ? `MATCH (n) WHERE ID(n) = $id DELETE n`
         : `MATCH ()-[e]->() WHERE ID(e) = $id DELETE e`;
 
-      if (user.role === "Read-Only")
-        await graph.roQuery(query, { params: { id: elementId } });
-      else await graph.query(query, { params: { id: elementId } });
+      await graph.query(query, { params: { id: elementId } });
 
       return NextResponse.json(
         { message: "Element deleted successfully" },
-        { status: 200 }
+        { status: 200, headers: getCorsHeaders(request) }
       );
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
-      { status: 500 }
+      { message: "Internal server error" },
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }

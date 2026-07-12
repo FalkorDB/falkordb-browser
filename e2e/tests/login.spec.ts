@@ -17,7 +17,7 @@ test.describe(`Login tests`, () => {
 
     test(`@admin validate login as default user without credentials`, async () => {
         const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-        await login.Logout();
+        await login.disconnectConnection();
         await browser.setPageToFullScreen();
         await login.clickOnConnect();
         expect(login.getCurrentURL()).toBe(urls.graphUrl);
@@ -25,10 +25,10 @@ test.describe(`Login tests`, () => {
 
     test(`@admin validate user login with credentials`, async () => {
         const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-        await login.Logout();
+        await login.disconnectConnection();
         await browser.setPageToFullScreen();
         await login.connectWithCredentials("readonlyuser", user.password);
-        await login.waitForUrl(urls.graphUrl)
+        await login.waitForUrl(urls.graphUrl);
         expect(login.getCurrentURL()).toBe(urls.graphUrl);
     });
 
@@ -42,17 +42,17 @@ test.describe(`Login tests`, () => {
     invalidInputs.forEach(({ description, host, port, username, password }) => {
         test(`@admin validate user login with wrong credentials: ${description}`, async () => {
             const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-            if (login.getCurrentURL() === urls.graphUrl) await login.Logout();
+            await login.disconnectConnection();
             await browser.setPageToFullScreen();
             await login.connectWithCredentials(username, password, host, port);
-            await new Promise((res) => { setTimeout(res, 500) });
+            await new Promise((res) => { setTimeout(res, 500); });
             expect(login.getCurrentURL()).not.toBe(urls.graphUrl);
         });
     });
 
     test(`@admin validate login with FalkorDB URL - default user`, async () => {
         const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-        await login.Logout();
+        await login.disconnectConnection();
         await browser.setPageToFullScreen();
         await login.connectWithUrl("falkor://localhost:6379");
         await login.waitForSuccessfulLogin(urls.graphUrl);
@@ -61,16 +61,16 @@ test.describe(`Login tests`, () => {
 
     test(`@admin validate login with FalkorDB URL - with credentials`, async () => {
         const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-        await login.Logout();
+        await login.disconnectConnection();
         await browser.setPageToFullScreen();
-        await login.connectWithUrl(`falkor://readonlyuser:${user.password}@localhost:6379`);
+        await login.connectWithUrl(`falkor://readonlyuser:${encodeURIComponent(user.password)}@localhost:6379`);
         await login.waitForSuccessfulLogin(urls.graphUrl);
         expect(login.getCurrentURL()).toBe(urls.graphUrl);
     });
 
     test(`@admin validate toggle between manual and URL modes`, async () => {
         const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-        await login.Logout();
+        await login.disconnectConnection();
         await browser.setPageToFullScreen();
         
         // Verify manual mode is selected by default
@@ -85,22 +85,32 @@ test.describe(`Login tests`, () => {
         expect(await login.isManualModeSelected()).toBe(true);
     });
 
-    const invalidUrls = [
-        { description: 'invalid protocol', url: 'invalid://localhost:6379' },
-        { description: 'invalid host', url: 'falkor://invalidhost:6379' },
-        { description: 'invalid port', url: 'falkor://localhost:6378' },
-        { description: 'invalid credentials', url: 'falkor://wronguser:wrongpass@localhost:6379' },
+    // URL format validation tests (pre-submit, no network request)
+    const formatErrors = [
+        { description: 'missing @ with credentials', url: 'redis://falkordb:password.cloud:52649' },
+        { description: 'empty credentials with @', url: 'redis://@localhost:6379' },
+        { description: 'colon before @ but no password', url: 'redis://user:@localhost:6379' },
+        { description: 'colon after host but no port', url: 'redis://user:pass@localhost:' },
     ];
 
-    invalidUrls.forEach(({ description, url }) => {
-        test(`@admin validate user login with invalid URL: ${description}`, async () => {
+    formatErrors.forEach(({ description, url }) => {
+        test(`@admin validate URL format error blocks submit: ${description}`, async () => {
             const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-            if (login.getCurrentURL() === urls.graphUrl) await login.Logout();
+            await login.disconnectConnection();
             await browser.setPageToFullScreen();
-            await login.connectWithUrl(url);
-            // Wait for page to process the invalid login attempt
-            await login.waitForPageIdle();
+            await login.submitUrlWithoutWait(url);
+            expect(await login.isFormatErrorVisible()).toBe(true);
+            // Should NOT navigate — blocked before request
             expect(login.getCurrentURL()).not.toBe(urls.graphUrl);
         });
     });
-})
+
+    test(`@admin validate valid URL format does not show format error`, async () => {
+        const login = await browser.createNewPage(LoginPage, urls.loginUrl);
+        await login.disconnectConnection();
+        await browser.setPageToFullScreen();
+        await login.submitUrlWithoutWait('falkor://wronguser:wrongpass@localhost:6379');
+        // Format is valid, so format error should NOT appear (credentials error may appear instead)
+        expect(await login.isFormatErrorVisible()).toBe(false);
+    });
+});

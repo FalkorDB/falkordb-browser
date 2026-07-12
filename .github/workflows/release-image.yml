@@ -1,5 +1,8 @@
 name: Release image to DockerHub
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
     inputs:
@@ -14,41 +17,108 @@ on:
       - main
 
 jobs:
-  build-and-release:
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      cypher_version: ${{ steps.vars.outputs.cypher_version }}
+      tags: ${{ steps.vars.outputs.tags }}
     steps:
       - name: Set up variables
+        id: vars
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "CYPHER_VERSION=${{ github.event.inputs.cypher_version }}" >> $GITHUB_ENV
+            echo "cypher_version=${{ github.event.inputs.cypher_version }}" >> $GITHUB_OUTPUT
           else
             # Get the latest released version from GitHub releases
             LATEST_VERSION=$(curl -s https://api.github.com/repos/falkordb/text-to-cypher/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-            echo "CYPHER_VERSION=$LATEST_VERSION" >> $GITHUB_ENV
+            echo "cypher_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
           fi
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set tags
-        run: |
-          if ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags') }}; then
-            echo "TAGS=falkordb/falkordb-browser:latest,falkordb/falkordb-browser:${{ github.ref_name }}" >> $GITHUB_ENV
+          
+          if [[ "${{ github.event_name }}" == "push" ]] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "tags=falkordb/falkordb-browser:latest,falkordb/falkordb-browser:${{ github.ref_name }}" >> $GITHUB_OUTPUT
           else
-            echo "TAGS=falkordb/falkordb-browser:edge" >> $GITHUB_ENV
+            echo "tags=falkordb/falkordb-browser:edge" >> $GITHUB_OUTPUT
           fi
+
+  build-and-push:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    env:
+      CYPHER_VERSION: ${{ needs.prepare.outputs.cypher_version }}
+      BASE_TAGS: ${{ needs.prepare.outputs.tags }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Compute tags
+        run: |
+          ARCH_TAGS=$(echo "$BASE_TAGS" | awk -v arch="${{ matrix.arch }}" -F',' '{for(i=1;i<=NF;i++){printf "%s-%s", $i, arch; if(i<NF) printf ","}}')
+          echo "ARCH_TAGS=$ARCH_TAGS" >> $GITHUB_ENV
+          if [ "${{ matrix.arch }}" = "amd64" ]; then
+            echo "TRIVY_TAG=$(echo "$BASE_TAGS" | cut -d',' -f1)-amd64" >> $GITHUB_ENV
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
 
       - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-  
-      - name: Build image
-        uses: docker/build-push-action@v5
+
+      - name: Build and push image
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ env.TAGS }}
+          platforms: linux/${{ matrix.arch }}
+          tags: ${{ env.ARCH_TAGS }}
           build-args: |
             CYPHER_VERSION=${{ env.CYPHER_VERSION }}
+          cache-from: type=gha,scope=falkordb-browser-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,ignore-error=true,scope=falkordb-browser-${{ matrix.arch }}
+
+      - name: Run Trivy vulnerability scanner
+        if: matrix.arch == 'amd64'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          image-ref: ${{ env.TRIVY_TAG }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'HIGH,CRITICAL'
+          version: 'v0.69.2'
+  publish-manifest:
+    needs: [build-and-push, prepare]
+    runs-on: ubuntu-latest
+    env:
+      BASE_TAGS: ${{ needs.prepare.outputs.tags }}
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+
+      - name: Login to DockerHub
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Create and push manifest list
+        run: |
+          IFS=',' read -ra TAGS <<< "$BASE_TAGS"
+          for TAG in "${TAGS[@]}"; do
+            docker buildx imagetools create -t "$TAG" "${TAG}-amd64" "${TAG}-arm64"
+          done

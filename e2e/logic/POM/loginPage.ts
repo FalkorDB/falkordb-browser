@@ -1,6 +1,7 @@
 import { Locator } from "@playwright/test";
 import {
   interactWhenVisible,
+  waitForElementToBeVisible,
   waitForElementToNotBeVisible,
   waitForURL,
 } from "@/e2e/infra/utils";
@@ -185,6 +186,8 @@ export default class LoginPage extends HeaderComponent {
   }
 
   async handleSkipTutorial(): Promise<void> {
+    const isVisible = await waitForElementToBeVisible(this.skipTutorial);
+    if (!isVisible) return;
     await this.clickSkipTutorial();
     await waitForElementToNotBeVisible(this.tutorialSpotlight);
   }
@@ -208,6 +211,25 @@ export default class LoginPage extends HeaderComponent {
     }
     await this.fillUsername(username);
     await this.fillPassword(password);
+    await this.clickConnect();
+  }
+
+  async connectWithQueryParams(
+    credentials: { username?: string; password?: string; host?: string; port?: string; tls?: boolean }
+  ): Promise<void> {
+    const params = new URLSearchParams();
+    if (credentials.host) params.set("host", credentials.host);
+    if (credentials.port) params.set("port", credentials.port);
+    if (credentials.username) params.set("username", credentials.username);
+    if (credentials.tls) params.set("tls", "true");
+
+    const loginUrlWithParams = `${urls.loginUrl}?${params.toString()}`;
+    await this.page.goto(loginUrlWithParams);
+    await this.page.waitForLoadState("domcontentloaded");
+
+    if (credentials.password) {
+      await this.fillPassword(credentials.password);
+    }
     await this.clickConnect();
   }
 
@@ -266,9 +288,46 @@ export default class LoginPage extends HeaderComponent {
     );
   }
 
+  private get errorMessage(): Locator {
+    return this.page.locator("text=Invalid URL format");
+  }
+
+  private get credentialsError(): Locator {
+    return this.page.locator("text=Invalid credentials");
+  }
+
   async connectWithUrl(url: string): Promise<void> {
     await this.clickUrlMode();
     await this.fillFalkorDBUrl(url);
     await this.clickConnect();
+  }
+
+  async submitUrlWithoutWait(url: string): Promise<void> {
+    await this.clickUrlMode();
+    await this.fillFalkorDBUrl(url);
+    await this.clickConnect();
+  }
+
+  async isFormatErrorVisible(): Promise<boolean> {
+    try {
+      await this.errorMessage.waitFor({ state: "visible", timeout: 3000 });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async isCredentialsErrorVisible(): Promise<boolean> {
+    try {
+      await this.credentialsError.waitFor({ state: "visible", timeout: 3000 });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async getErrorText(): Promise<string> {
+    const errorEl = this.page.locator(".text-destructive").first();
+    return (await errorEl.textContent()) ?? "";
   }
 }

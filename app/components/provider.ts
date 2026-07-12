@@ -1,6 +1,21 @@
 import { createContext, Dispatch, SetStateAction } from "react";
-import { Panel, Tab, TextPriority, ViewportState } from "@/lib/utils";
-import { Graph, GraphData, GraphInfo, HistoryQuery } from "../api/graph/model";
+import type { AIProvider } from "@/lib/ai-provider-utils";
+import { ConnectionInfo, ConnectionType, GraphData, GraphRef, HistoryQuery, Label, Panel, Relationship, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
+import type { DiagnosticsResult } from "@/lib/cypherDiagnostics";
+import type { Data as CanvasData, LayoutMode, ViewportState } from "@falkordb/canvas";
+import type { SessionConnection } from "next-auth";
+import { Graph, GraphInfo } from "../api/graph/model";
+
+export type ChatApiKey = {
+  id: string;
+  label: string;
+  key: string;
+  provider: AIProvider;
+  createdAt: number;
+};
+
+export type ChatModelSource = "api-key" | "local";
+export type LocalLlmProvider = "ollama" | "lmstudio";
 
 type BrowserSettingsContextType = {
   newSettings: {
@@ -24,17 +39,43 @@ type BrowserSettingsContextType = {
       newContentPersistence: boolean;
       setNewContentPersistence: Dispatch<SetStateAction<boolean>>;
     };
+    captionsKeysSettings: {
+      newCaptionsKeys: [string, boolean][];
+      setNewCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
+    };
+    tableViewSettings: {
+      newColumnWidth: number;
+      setNewColumnWidth: Dispatch<SetStateAction<number>>;
+      newRowHeight: number;
+      setNewRowHeight: Dispatch<SetStateAction<number>>;
+      newRowHeightExpandMultiple: number;
+      setNewRowHeightExpandMultiple: Dispatch<SetStateAction<number>>;
+    };
+    showPropertyKeyPrefixSettings: {
+      newShowPropertyKeyPrefix: boolean;
+      setNewShowPropertyKeyPrefix: Dispatch<SetStateAction<boolean>>;
+    };
     chatSettings: {
       newSecretKey: string;
       setNewSecretKey: Dispatch<SetStateAction<string>>;
+      newMaxSavedMessages: number;
+      setNewMaxSavedMessages: Dispatch<SetStateAction<number>>;
+      newCypherOnly: boolean;
+      setNewCypherOnly: Dispatch<SetStateAction<boolean>>;
+      newChatModelSource: ChatModelSource;
+      setNewChatModelSource: Dispatch<SetStateAction<ChatModelSource>>;
+      newLocalLlmProvider: LocalLlmProvider;
+      setNewLocalLlmProvider: Dispatch<SetStateAction<LocalLlmProvider>>;
+      newLocalLlmEndpoint: string;
+      setNewLocalLlmEndpoint: Dispatch<SetStateAction<string>>;
       newModel: string;
       setNewModel: Dispatch<SetStateAction<string>>;
     };
     graphInfo: {
       newRefreshInterval: number;
       setNewRefreshInterval: Dispatch<SetStateAction<number>>;
-      newDisplayTextPriority: TextPriority[];
-      setNewDisplayTextPriority: Dispatch<SetStateAction<TextPriority[]>>;
+      newMaxItemsForSearch: number;
+      setNewMaxItemsForSearch: Dispatch<SetStateAction<number>>;
     };
   };
   settings: {
@@ -60,20 +101,50 @@ type BrowserSettingsContextType = {
       contentPersistence: boolean;
       setContentPersistence: Dispatch<SetStateAction<boolean>>;
     };
+    showPropertyKeyPrefixSettings: {
+      showPropertyKeyPrefix: boolean;
+      setShowPropertyKeyPrefix: Dispatch<SetStateAction<boolean>>;
+    };
+    captionsKeysSettings: {
+      captionsKeys: [string, boolean][];
+      setCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
+    };
+    tableViewSettings: {
+      columnWidth: number;
+      setColumnWidth: Dispatch<SetStateAction<number>>;
+      rowHeight: number;
+      setRowHeight: Dispatch<SetStateAction<number>>;
+      rowHeightExpandMultiple: number;
+      setRowHeightExpandMultiple: Dispatch<SetStateAction<number>>;
+    };
     chatSettings: {
       secretKey: string;
       setSecretKey: Dispatch<SetStateAction<string>>;
+      chatApiKeys: ChatApiKey[];
+      setChatApiKeys: Dispatch<SetStateAction<ChatApiKey[]>>;
+      selectedChatApiKeyId: string;
+      setSelectedChatApiKeyId: Dispatch<SetStateAction<string>>;
+      chatModelSource: ChatModelSource;
+      setChatModelSource: Dispatch<SetStateAction<ChatModelSource>>;
+      localLlmProvider: LocalLlmProvider;
+      setLocalLlmProvider: Dispatch<SetStateAction<LocalLlmProvider>>;
+      localLlmEndpoint: string;
+      setLocalLlmEndpoint: Dispatch<SetStateAction<string>>;
       model: string;
       setModel: Dispatch<SetStateAction<string>>;
-      navigateToSettings: boolean;
-      displayChat: boolean;
+      maxSavedMessages: number;
+      setMaxSavedMessages: Dispatch<SetStateAction<number>>;
+      cypherOnly: boolean;
+      setCypherOnly: Dispatch<SetStateAction<boolean>>;
+      perSourceModels: Record<string, string>;
+      setPerSourceModels: Dispatch<SetStateAction<Record<string, string>>>;
     };
     graphInfo: {
       showMemoryUsage: boolean;
       refreshInterval: number;
       setRefreshInterval: Dispatch<SetStateAction<number>>;
-      displayTextPriority: TextPriority[];
-      setDisplayTextPriority: Dispatch<SetStateAction<TextPriority[]>>;
+      maxItemsForSearch: number;
+      setMaxItemsForSearch: Dispatch<SetStateAction<number>>;
     };
   };
   hasChanges: boolean;
@@ -87,12 +158,15 @@ type BrowserSettingsContextType = {
 type GraphContextType = {
   graph: Graph;
   setGraph: Dispatch<SetStateAction<Graph>>;
-  graphInfo: GraphInfo;
-  setGraphInfo: Dispatch<SetStateAction<GraphInfo>>;
   graphName: string;
-  setGraphName: Dispatch<SetStateAction<string>>;
+  handleSetGraphName: (name: string) => void;
+  setGraphInfo: (gi: GraphInfo) => void;
   graphNames: string[];
   setGraphNames: Dispatch<SetStateAction<string[]>>;
+  labels: Label[];
+  setLabels: Dispatch<SetStateAction<Label[]>>;
+  relationships: Relationship[];
+  setRelationships: Dispatch<SetStateAction<Relationship[]>>;
   nodesCount: number | undefined;
   setNodesCount: Dispatch<SetStateAction<number | undefined>>;
   edgesCount: number | undefined;
@@ -100,19 +174,16 @@ type GraphContextType = {
   currentTab: Tab;
   setCurrentTab: Dispatch<SetStateAction<Tab>>;
   runQuery: (query: string, name?: string) => Promise<void>;
-  fetchCount: () => Promise<void>;
-  handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void;
+  fetchCount: (name?: string) => Promise<void>;
+  handleCooldown: (ticks?: number, isSetLoading?: boolean) => void;
   cooldownTicks: number | undefined;
   isLoading: boolean;
-};
-
-type SchemaContextType = {
-  schema: Graph;
-  setSchema: Dispatch<SetStateAction<Graph>>;
-  schemaName: string;
-  setSchemaName: Dispatch<SetStateAction<string>>;
-  schemaNames: string[];
-  setSchemaNames: Dispatch<SetStateAction<string[]>>;
+  setIsLoading: (loading: boolean) => void;
+  expand: boolean;
+  setExpand: Dispatch<SetStateAction<boolean>>;
+  selectedParam: string;
+  setSelectedParam: Dispatch<SetStateAction<string>>;
+  initialQuery: string;
 };
 
 type HistoryQueryContextType = {
@@ -128,6 +199,8 @@ type IndicatorContextType = {
 type PanelContextType = {
   panel: Panel;
   setPanel: Dispatch<SetStateAction<Panel>>;
+  panelOpen: boolean;
+  onTogglePanel: () => void;
 };
 
 type QueryLoadingContextType = {
@@ -135,12 +208,18 @@ type QueryLoadingContextType = {
   setIsQueryLoading: Dispatch<SetStateAction<boolean>>;
 };
 
-type ViewportContextType = {
+type ForceGraphContextType = {
+  canvasRef: GraphRef;
   viewport: ViewportState;
   setViewport: Dispatch<SetStateAction<ViewportState>>;
   data: GraphData;
   setData: Dispatch<SetStateAction<GraphData>>;
-  isSaved: boolean;
+  graphData: CanvasData | undefined;
+  setGraphData: Dispatch<SetStateAction<CanvasData | undefined>>;
+  layout: LayoutMode;
+  setLayout: Dispatch<SetStateAction<LayoutMode>>;
+  direction: string;
+  setDirection: Dispatch<SetStateAction<string>>;
 };
 
 type TableViewContextType = {
@@ -153,96 +232,189 @@ type TableViewContextType = {
   dataHash: string;
 };
 
+// Re-export the canonical SessionConnection type from the NextAuth module
+// augmentation so frontend code has a single source of truth.
+export type { SessionConnection } from "next-auth";
+
+type ConnectionContextType = {
+  connectionType: ConnectionType;
+  setConnectionType: Dispatch<SetStateAction<ConnectionType>>;
+  connectionInfo: ConnectionInfo;
+  setConnectionInfo: Dispatch<SetStateAction<ConnectionInfo>>;
+  dbVersion: string;
+  setDbVersion: Dispatch<SetStateAction<string>>;
+  isReadOnly: boolean;
+  additionalConnections: SessionConnection[];
+  setAdditionalConnections: Dispatch<SetStateAction<SessionConnection[]>>;
+  activeConnectionId: string | null;
+  setActiveConnectionId: Dispatch<SetStateAction<string | null>>;
+  updateSession: (data: { activeConnectionId?: string | null }) => Promise<unknown>;
+};
+
+type UDFContextType = {
+  udfList: UDFEntry[];
+  setUdfList: Dispatch<SetStateAction<UDFEntry[]>>;
+  selectedUdf: UDFEntryWithCode | undefined;
+  setSelectedUdf: Dispatch<SetStateAction<UDFEntryWithCode | undefined>>;
+};
+
 export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
   {
     newSettings: {
-      limitSettings: { newLimit: 0, setNewLimit: () => {} },
-      timeoutSettings: { newTimeout: 0, setNewTimeout: () => {} },
+      limitSettings: { newLimit: 0, setNewLimit: () => { } },
+      timeoutSettings: { newTimeout: 0, setNewTimeout: () => { } },
       runDefaultQuerySettings: {
         newRunDefaultQuery: false,
-        setNewRunDefaultQuery: () => {},
+        setNewRunDefaultQuery: () => { },
       },
       defaultQuerySettings: {
         newDefaultQuery: "",
-        setNewDefaultQuery: () => {},
+        setNewDefaultQuery: () => { },
       },
       contentPersistenceSettings: {
         newContentPersistence: false,
-        setNewContentPersistence: () => {},
+        setNewContentPersistence: () => { },
+      },
+      captionsKeysSettings: {
+        newCaptionsKeys: [],
+        setNewCaptionsKeys: () => { },
+      },
+      tableViewSettings: {
+        newColumnWidth: 0,
+        setNewColumnWidth: () => { },
+        newRowHeight: 0,
+        setNewRowHeight: () => { },
+        newRowHeightExpandMultiple: 0,
+        setNewRowHeightExpandMultiple: () => { },
+      },
+      showPropertyKeyPrefixSettings: {
+        newShowPropertyKeyPrefix: false,
+        setNewShowPropertyKeyPrefix: () => { },
       },
       chatSettings: {
         newSecretKey: "",
-        setNewSecretKey: () => {},
+        setNewSecretKey: () => { },
+        newMaxSavedMessages: 0,
+        setNewMaxSavedMessages: () => { },
+        newCypherOnly: false,
+        setNewCypherOnly: () => { },
+        newChatModelSource: "api-key",
+        setNewChatModelSource: () => { },
+        newLocalLlmProvider: "ollama",
+        setNewLocalLlmProvider: () => { },
+        newLocalLlmEndpoint: "http://localhost:11434",
+        setNewLocalLlmEndpoint: () => { },
         newModel: "",
-        setNewModel: () => {},
+        setNewModel: () => { },
       },
-      graphInfo: { newRefreshInterval: 0, setNewRefreshInterval: () => {}, newDisplayTextPriority: [], setNewDisplayTextPriority: () => {} },
+      graphInfo: {
+        newRefreshInterval: 0,
+        setNewRefreshInterval: () => { },
+        newMaxItemsForSearch: 0,
+        setNewMaxItemsForSearch: () => { },
+      },
     },
     settings: {
       limitSettings: {
         limit: 0,
-        setLimit: () => {},
+        setLimit: () => { },
         lastLimit: 0,
-        setLastLimit: () => {},
+        setLastLimit: () => { },
       },
-      timeoutSettings: { timeout: 0, setTimeout: () => {} },
+      timeoutSettings: { timeout: 0, setTimeout: () => { } },
       runDefaultQuerySettings: {
         runDefaultQuery: false,
-        setRunDefaultQuery: () => {},
+        setRunDefaultQuery: () => { },
       },
-      defaultQuerySettings: { defaultQuery: "", setDefaultQuery: () => {} },
+      defaultQuerySettings: { defaultQuery: "", setDefaultQuery: () => { } },
       contentPersistenceSettings: {
         contentPersistence: false,
-        setContentPersistence: () => {},
+        setContentPersistence: () => { },
+      },
+      captionsKeysSettings: {
+        captionsKeys: [],
+        setCaptionsKeys: () => { },
+      },
+      tableViewSettings: {
+        columnWidth: 0,
+        setColumnWidth: () => { },
+        rowHeight: 0,
+        setRowHeight: () => { },
+        rowHeightExpandMultiple: 0,
+        setRowHeightExpandMultiple: () => { },
+      },
+      showPropertyKeyPrefixSettings: {
+        showPropertyKeyPrefix: false,
+        setShowPropertyKeyPrefix: () => { },
       },
       chatSettings: {
         secretKey: "",
-        setSecretKey: () => {},
+        setSecretKey: () => { },
+        chatApiKeys: [],
+        setChatApiKeys: () => { },
+        selectedChatApiKeyId: "",
+        setSelectedChatApiKeyId: () => { },
+        chatModelSource: "api-key",
+        setChatModelSource: () => { },
+        localLlmProvider: "ollama",
+        setLocalLlmProvider: () => { },
+        localLlmEndpoint: "http://localhost:11434",
+        setLocalLlmEndpoint: () => { },
         model: "",
-        setModel: () => {},
-        navigateToSettings: false,
-        displayChat: false,
+        setModel: () => { },
+        maxSavedMessages: 0,
+        setMaxSavedMessages: () => { },
+        cypherOnly: false,
+        setCypherOnly: () => { },
+        perSourceModels: {},
+        setPerSourceModels: () => { },
       },
-      graphInfo: { showMemoryUsage: false, refreshInterval: 0, setRefreshInterval: () => {}, displayTextPriority: [], setDisplayTextPriority: () => {} },
+      graphInfo: {
+        showMemoryUsage: false,
+        refreshInterval: 0,
+        setRefreshInterval: () => { },
+        maxItemsForSearch: 0,
+        setMaxItemsForSearch: () => { },
+      },
     },
     hasChanges: false,
-    setHasChanges: () => {},
-    saveSettings: () => {},
-    resetSettings: () => {},
-    replayTutorial: () => {},
+    setHasChanges: () => { },
+    saveSettings: () => { },
+    resetSettings: () => { },
+    replayTutorial: () => { },
     tutorialOpen: false,
   }
 );
 
 export const GraphContext = createContext<GraphContextType>({
   graph: Graph.empty(),
-  setGraph: () => {},
-  graphInfo: GraphInfo.empty(),
-  setGraphInfo: () => {},
+  setGraph: () => { },
   graphName: "",
-  setGraphName: () => {},
+  handleSetGraphName: () => { },
+  setGraphInfo: () => { },
   graphNames: [],
-  setGraphNames: () => {},
+  setGraphNames: () => { },
+  labels: [],
+  setLabels: () => { },
+  relationships: [],
+  setRelationships: () => { },
   nodesCount: undefined,
-  setNodesCount: () => {},
+  setNodesCount: () => { },
   edgesCount: undefined,
-  setEdgesCount: () => {},
+  setEdgesCount: () => { },
   currentTab: "Graph",
-  setCurrentTab: () => {},
-  runQuery: async () => {},
-  fetchCount: async () => {},
-  handleCooldown: () => {},
+  setCurrentTab: () => { },
+  runQuery: async () => { },
+  fetchCount: async () => { },
+  handleCooldown: () => { },
   cooldownTicks: undefined,
   isLoading: false,
-});
-
-export const SchemaContext = createContext<SchemaContextType>({
-  schema: Graph.empty(),
-  setSchema: () => {},
-  schemaName: "",
-  setSchemaName: () => {},
-  schemaNames: [],
-  setSchemaNames: () => {},
+  setIsLoading: () => { },
+  expand: true,
+  setExpand: () => { },
+  selectedParam: "",
+  setSelectedParam: () => { },
+  initialQuery: "",
 });
 
 export const HistoryQueryContext = createContext<HistoryQueryContextType>({
@@ -258,41 +430,113 @@ export const HistoryQueryContext = createContext<HistoryQueryContextType>({
       timestamp: 0,
       elementsCount: 0,
       status: "Failed",
+      fav: false,
     },
     counter: 0,
   },
-  setHistoryQuery: () => {},
+  setHistoryQuery: () => { },
 });
 
 export const IndicatorContext = createContext<IndicatorContextType>({
   indicator: "online",
-  setIndicator: () => {},
+  setIndicator: () => { },
 });
 
 export const PanelContext = createContext<PanelContextType>({
   panel: undefined,
-  setPanel: () => {},
+  setPanel: () => { },
+  panelOpen: false,
+  onTogglePanel: () => { },
 });
 
 export const QueryLoadingContext = createContext<QueryLoadingContextType>({
   isQueryLoading: false,
-  setIsQueryLoading: () => {},
+  setIsQueryLoading: () => { },
 });
 
-export const ViewportContext = createContext<ViewportContextType>({
+export const ForceGraphContext = createContext<ForceGraphContextType>({
+  canvasRef: { current: null },
   viewport: { centerX: 0, centerY: 0, zoom: 0 },
-  setViewport: () => {},
+  setViewport: () => { },
   data: { nodes: [], links: [] },
-  setData: () => {},
-  isSaved: false,
+  setData: () => { },
+  graphData: { nodes: [], links: [] },
+  setGraphData: () => { },
+  layout: 'force',
+  setLayout: () => { },
+  direction: '',
+  setDirection: () => { },
 });
 
 export const TableViewContext = createContext<TableViewContextType>({
   scrollPosition: 0,
-  setScrollPosition: () => {},
+  setScrollPosition: () => { },
   search: "",
-  setSearch: () => {},
+  setSearch: () => { },
   expand: new Map(),
-  setExpand: () => {},
+  setExpand: () => { },
   dataHash: "",
+});
+
+export const ConnectionContext = createContext<ConnectionContextType>({
+  connectionType: "Standalone",
+  setConnectionType: () => { },
+  connectionInfo: {},
+  setConnectionInfo: () => { },
+  dbVersion: "",
+  setDbVersion: () => { },
+  isReadOnly: false,
+  additionalConnections: [],
+  setAdditionalConnections: () => { },
+  activeConnectionId: null,
+  setActiveConnectionId: () => { },
+  updateSession: async () => { },
+});
+
+export const UDFContext = createContext<UDFContextType>({
+  udfList: [],
+  setUdfList: () => { },
+  selectedUdf: undefined,
+  setSelectedUdf: () => { },
+}); 
+
+type DiagnosticsContextType = {
+  diagnostics: DiagnosticsResult | null;
+  setDiagnostics: Dispatch<SetStateAction<DiagnosticsResult | null>>;
+};
+
+export const DiagnosticsContext = createContext<DiagnosticsContextType>({
+  diagnostics: null,
+  setDiagnostics: () => { },
+});
+
+export type AiFixResult = {
+  status: "idle" | "loading" | "done" | "error";
+  explanation?: string;
+  correctedQuery?: string;
+  error?: string;
+};
+
+type AiFixContextType = {
+  aiFixSupported: boolean;
+  lastFailure: { query: string; errorMessage: string } | null;
+  result: AiFixResult;
+  pendingConsentProvider: string | null;
+  requestAiFix: (query: string, errorMessage: string) => void;
+  confirmConsent: (dontAskAgain: boolean) => void;
+  cancelConsent: () => void;
+  dismissResult: () => void;
+  insertCorrectedQuery: (query: string) => void;
+};
+
+export const AiFixContext = createContext<AiFixContextType>({
+  aiFixSupported: false,
+  lastFailure: null,
+  result: { status: "idle" },
+  pendingConsentProvider: null,
+  requestAiFix: () => { },
+  confirmConsent: () => { },
+  cancelConsent: () => { },
+  dismissResult: () => { },
+  insertCorrectedQuery: () => { },
 });

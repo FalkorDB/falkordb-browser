@@ -1,13 +1,31 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable no-param-reassign */
 // eslint-disable-next-line import/prefer-default-export
 
 "use client";
 
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { MutableRefObject } from "react";
-import { ForceGraphMethods } from "react-force-graph-2d";
-import { Node, Link, DataCell, MemoryValue } from "@/app/api/graph/model";
+import React, { RefObject } from "react";
+import type { FalkorDBCanvas, Data as CanvasData } from "@falkordb/canvas";
+import { signOut } from "next-auth/react";
+import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, enrichSyntaxMessage, type SyntaxErrorInfo, type HintLink } from "./cypherErrors";
+import { suggestForError, findFuncArgTypo } from "./cypherSuggestions";
+
+export { parseSyntaxError };
+export type { SyntaxErrorInfo };
+
+export type ToastArguments = {
+  title: string;
+  description: React.ReactNode;
+  variant: "destructive" | "default";
+  rawMessage?: string;
+  hint?: string;
+  hintLink?: HintLink;
+  query?: string;
+};
+
+export type ToastFn = (args: ToastArguments) => void;
 
 export const screenSize = {
   sm: 640,
@@ -17,16 +35,135 @@ export const screenSize = {
   "2xl": 1536,
 };
 
-export type GraphRef = MutableRefObject<
-  ForceGraphMethods<Node, Link> | undefined
->;
 
-export type Panel = "chat" | "data" | "add" | undefined;
+export type Value = string | number | boolean;
 
-export type TextPriority = {
-  name: string;
-  ignore: boolean;
+export type HistoryQuery = {
+  queries: Query[];
+  currentQuery: Query;
+  query: string;
+  counter: number;
 };
+
+export type Query = {
+  text: string;
+  metadata: string[];
+  explain: string[];
+  profile: string[];
+  graphName: string;
+  timestamp: number;
+  status: "Success" | "Failed" | "Empty";
+  elementsCount: number;
+  fav: boolean;
+  name?: string;
+  errorMessage?: string;
+};
+
+export type Node = {
+  id: number;
+  labels: string[];
+  color: string;
+  visible: boolean;
+  expand: boolean;
+  collapsed: boolean;
+  size?: number;
+  data: {
+    [key: string]: any;
+  };
+};
+
+export type Link = {
+  id: number;
+  relationship: string;
+  color: string;
+  source: number;
+  target: number;
+  visible: boolean;
+  expand: boolean;
+  collapsed: boolean;
+  data: {
+    [key: string]: any;
+  };
+};
+
+export type GraphData = {
+  nodes: Node[];
+  links: Link[];
+};
+
+export type NodeCell = {
+  id: number;
+  labels: string[];
+  properties: {
+    [key: string]: any;
+  };
+};
+
+export type LinkCell = {
+  id: number;
+  relationshipType: string;
+  sourceId: number;
+  destinationId: number;
+  properties: {
+    [key: string]: any;
+  };
+};
+
+export type PathCell = {
+  nodes: NodeCell[];
+  edges?: LinkCell[];
+};
+
+export type DataCell = NodeCell | LinkCell | PathCell | NodeCell[] | LinkCell[] | PathCell[] | number | string | null;
+
+export type DataRow = {
+  [key: string]: DataCell;
+};
+
+export type Data = DataRow[];
+
+export type MemoryValue = number | Map<string, MemoryValue>;
+
+export interface LinkStyle {
+  color: string;
+}
+
+export interface LabelStyle extends LinkStyle {
+  size?: number;
+}
+
+export interface InfoLabel {
+  name: string;
+  style: LabelStyle;
+  show: boolean;
+  count: number;
+}
+
+export interface Label extends Omit<InfoLabel, "count"> {
+  elements: Node[];
+  textWidth?: number;
+  textHeight?: number;
+  style: LabelStyle;
+}
+
+export interface InfoRelationship {
+  name: string;
+  style: LinkStyle;
+  show: boolean;
+  count: number;
+}
+
+export interface Relationship extends Omit<InfoRelationship, "count"> {
+  elements: Link[];
+  textWidth?: number;
+  textHeight?: number;
+  textAscent?: number;
+  textDescent?: number;
+}
+
+export type GraphRef = RefObject<FalkorDBCanvas | null>;
+
+export type Panel = "data" | "add" | undefined;
 
 export type SelectCell = {
   value: string;
@@ -64,22 +201,49 @@ export type Message = {
   role: "user" | "assistant";
   content: string;
   type:
-    | "Text"
-    | "Result"
-    | "Error"
-    | "Status"
-    | "CypherQuery"
-    | "CypherResult"
-    | "Schema";
+  | "Text"
+  | "Result"
+  | "Error"
+  | "Status"
+  | "CypherQuery"
+  | "CypherResult";
+  confidence?: number;
+  tokenUsage?: number;
 };
+
+// [library_name, type, 'functions', function_names[]]
+export type UDFEntry = [string, string, string, string[]];
+
+// [...UDFEntry, library_code, code]
+export type UDFEntryWithCode = [...UDFEntry, string, string];
+
+export type UserFriendlyMessage = {
+  title: string;
+  description: React.ReactNode;
+  rawMessage?: string;
+  hint?: string;
+  hintLink?: HintLink;
+  syntaxError?: SyntaxErrorInfo;
+};
+
+export type ConnectionType = "Standalone" | "Cluster" | "Sentinel";
+
+export interface ClusterNodeInfo {
+  host: string;
+  port: number;
+  role: string;
+  slots?: string;
+}
+
+export interface ConnectionInfo {
+  sentinelRole?: string;
+  sentinelReplicas?: number;
+  sentinelMasterHost?: string;
+  sentinelMasterPort?: number;
+  clusterNodes?: ClusterNodeInfo[];
+}
 
 export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell | LazyCell;
-
-export type ViewportState = {
-  zoom: number;
-  centerX: number;
-  centerY: number;
-};
 
 export interface Row {
   cells: Cell[];
@@ -93,15 +257,21 @@ export function cn(...inputs: ClassValue[]) {
 
 export async function getSSEGraphResult(
   url: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  toast: any,
-  setIndicator: (indicator: "online" | "offline") => void
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): Promise<any> {
+  toast: ToastFn,
+  setIndicator: (indicator: "online" | "offline") => void,
+  errorContext?: { query?: string }
+): Promise<unknown> {
   return new Promise((resolve, reject) => {
     let handled = false;
 
-    const evtSource = new EventSource(url);
+    // EventSource doesn't support headers — inject connectionId as a query param.
+    let effectiveUrl = url;
+    if (_activeConnectionId) {
+      const sep = effectiveUrl.includes("?") ? "&" : "?";
+      effectiveUrl += `${sep}connectionId=${encodeURIComponent(_activeConnectionId)}`;
+    }
+
+    const evtSource = new EventSource(effectiveUrl);
     evtSource.addEventListener("result", (event: MessageEvent) => {
       const result = JSON.parse(event.data);
       evtSource.close();
@@ -111,14 +281,42 @@ export async function getSSEGraphResult(
 
     evtSource.addEventListener("error", (event: MessageEvent) => {
       handled = true;
-      const { message, status } = JSON.parse(event.data);
+      let rawMessage: unknown = "Request failed";
+      let rawStatus: unknown = 0;
+      let code: string | undefined;
+
+      try {
+        const payload = JSON.parse(event.data) as {
+          message?: unknown;
+          status?: unknown;
+          code?: string;
+        };
+        rawMessage = payload.message;
+        rawStatus = payload.status;
+        code = payload.code;
+      } catch (error) {
+        console.error("Failed to parse SSE error event:", error);
+      }
+
+      const message = normalizeErrorMessage(rawMessage) || "Request failed";
+      const parsedStatus = Number(rawStatus);
+      const status = Number.isFinite(parsedStatus) ? parsedStatus : 0;
 
       evtSource.close();
-      toast({ title: "Error", description: message, variant: "destructive" });
+
+      if (status === 401 && code === "SESSION_INVALID") {
+        triggerSessionInvalidationSignOut();
+        setIndicator("offline");
+        reject(new Error(message));
+        return;
+      }
+
+      const friendly = toUserFriendlyMessage(message, status, errorContext);
+      toast({ title: friendly.title, description: friendly.description, variant: "destructive", rawMessage: friendly.rawMessage, hint: friendly.hint, hintLink: friendly.hintLink, query: errorContext?.query });
 
       if (status === 401 || status >= 500) setIndicator("offline");
 
-      reject();
+      reject(new Error(message));
     });
 
     evtSource.onerror = () => {
@@ -131,26 +329,271 @@ export async function getSSEGraphResult(
         variant: "destructive",
       });
       setIndicator("offline");
-      reject();
+      reject(new Error("Network or server error"));
     };
   });
+}
+
+// Builds a React element that highlights the error position in the query snippet.
+// Clamps contextOffset to valid range to prevent blank/incorrect highlights.
+export function formatSyntaxError(
+  message: string,
+  context: string,
+  contextOffset: number
+): React.ReactNode {
+  const safeOffset = context.length > 0
+    ? Math.max(0, Math.min(contextOffset, context.length - 1))
+    : 0;
+  const before = context.slice(0, safeOffset);
+  const errorChar = context[safeOffset] || "";
+  const after = context.slice(safeOffset + 1);
+
+  const enriched = enrichSyntaxMessage(message, context, contextOffset);
+
+  // When the error char is whitespace, step back and highlight the preceding word.
+  let wordStart = safeOffset;
+  while (wordStart > 0 && !/\s/.test(context[wordStart - 1])) wordStart -= 1;
+  let wordEnd = safeOffset;
+  while (wordEnd < context.length && !/\s/.test(context[wordEnd])) wordEnd += 1;
+  const errorWord = context.slice(wordStart, wordEnd);
+
+  const isWhitespaceError = !errorChar || /\s/.test(errorChar);
+  if (isWhitespaceError && errorWord.length > 1) {
+    return React.createElement("div", { className: "flex flex-col gap-1" },
+      React.createElement("span", null, enriched),
+      React.createElement("code", {
+        className: "mt-1 block rounded px-2 py-1 text-xs font-mono whitespace-pre-wrap break-words"
+      },
+        context.slice(0, wordStart),
+        React.createElement("span", {
+          className: "font-bold text-xl underline mx-1"
+        }, errorWord),
+        context.slice(safeOffset) // space + rest
+      )
+    );
+  }
+
+  return React.createElement("div", { className: "flex flex-col gap-1" },
+    React.createElement("span", null, enriched),
+    React.createElement("code", {
+      className: "mt-1 block rounded px-2 py-1 text-xs font-mono whitespace-pre-wrap break-words"
+    },
+      before,
+      React.createElement("span", {
+        className: "font-bold text-xl underline mx-1"
+      }, errorChar || " "),
+      after
+    )
+  );
+}
+
+export function normalizeErrorMessage(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  if (raw instanceof Error) return raw.message;
+  if (raw == null) return "";
+
+  try {
+    return JSON.stringify(raw);
+  } catch {
+    return String(raw);
+  }
+}
+
+function extractResponseErrorMessage(bodyText: string): string {
+  if (!bodyText) return "";
+
+  try {
+    const parsed = JSON.parse(bodyText) as unknown;
+
+    if (typeof parsed === "string") return parsed;
+
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const body = parsed as Record<string, unknown>;
+      const message = normalizeErrorMessage(body.message || body.error || body.detail);
+
+      if (message) return message;
+
+      if (body.status === "offline") return "Database is offline.";
+    }
+  } catch {
+    // bodyText is already plain text
+  }
+
+  return bodyText;
+}
+
+const USER_READABLE_ERROR_PATTERNS = [
+  /\bunknown function\b/i,
+  /\bnot defined\b/i,
+  /\balready exists\b/i,
+  /\bmissing parameter\b/i,
+  /\bempty query\b/i,
+  /\btype mismatch\b/i,
+  /\bdivision by zero\b/i,
+  /\binvalid (?:cypher only|entity|graph name|host|input|json|messages|model|password|port|replace|role|type|url|username|value)\b/i,
+  /\b(?:api key|attribute name|attribute value|code|graph name|key|label|messages|model|name|password|role|source name|type|username|value) (?:is required|cannot be empty)\b/i,
+  /\bselected nodes are required\b/i,
+  /^validation failed$/i,
+  /^database is offline\.$/i,
+  /^graph not found\b/i,
+  /^your graph is empty\b/i,
+  /^model\/api key mismatch\b/i,
+  /^model ".+" not found\b/i,
+  /^ollama model ".+" not found\b/i,
+  /^invalid .*api key\b/i,
+  /^api key error\b/i,
+  /^cannot connect to ollama\b/i,
+  /^network error\b/i,
+  /^request timed out\b/i,
+  /^could not generate\b/i,
+  /^unable to generate\b/i,
+  /^no messages provided$/i,
+  /^no user messages found$/i,
+  // Connection errors from /api/connections
+  /^cannot connect to falkordb\b/i,
+  /^authentication failed\b/i,
+  /^connection timed out\b/i,
+];
+
+function isAllowlistedUserError(message: string): boolean {
+  return USER_READABLE_ERROR_PATTERNS.some(pattern => pattern.test(message));
+}
+
+// Maps raw server/Redis/FalkorDB error messages to user-friendly descriptions.
+// Syntax errors are parsed and displayed with the error position highlighted.
+export function toUserFriendlyMessage(raw: unknown, status: number, ctx?: { query?: string }): UserFriendlyMessage {
+  const rawMessage = normalizeErrorMessage(raw).trim();
+  if (!rawMessage) {
+    if (status === 401) return { title: "Error", description: "Your session has expired. Please sign in again." };
+    if (status >= 500) return { title: "Error", description: "Something went wrong on the server. Please try again later." };
+    return { title: "Error", description: "An unexpected error occurred. Please try again." };
+  }
+
+  const parsed = parseSyntaxError(rawMessage);
+  if (parsed) {
+    let { message, context, contextOffset } = parsed;
+    // If a function-arg typo is the root cause, point the toast highlight at the typo.
+    const typo = ctx?.query ? findFuncArgTypo(ctx.query) : undefined;
+    if (typo) {
+      const re = new RegExp(`\\b${typo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+      const m = re.exec(context);
+      if (m) {
+        contextOffset = m.index;
+        message = `'${typo}' not defined`;
+      }
+    }
+    return { title: "Syntax Error", description: formatSyntaxError(message, context, contextOffset), syntaxError: parsed, rawMessage, hint: SYNTAX_ERROR_HINT };
+  }
+
+  // "Did you mean…?" is more specific than the catalog tip, so it takes precedence.
+  const catalog = getCypherErrorHint(rawMessage);
+  const hint = suggestForError(rawMessage, { query: ctx?.query }) ?? catalog?.hint;
+  const hintLink = catalog?.link;
+
+  // For user-readable errors, description IS the raw message — skip rawMessage
+  // to avoid a duplicate "See more" section.
+  if (isAllowlistedUserError(rawMessage) || hint) {
+    return { title: "Error", description: rawMessage, hint, hintLink };
+  }
+
+  const lower = rawMessage.toLowerCase();
+
+  if (lower.includes("connection refused") || lower.includes("econnrefused")) {
+    return { title: "Error", description: "Unable to connect to the database. Please check your connection settings.", rawMessage, hint, hintLink };
+  }
+
+  if (lower.includes("noauth") || lower.includes("wrongpass")) {
+    return { title: "Error", description: "Database authentication failed. Please check your credentials.", rawMessage, hint, hintLink };
+  }
+
+  if (lower.includes("loading") && lower.includes("dataset")) {
+    return { title: "Error", description: "The database is still loading. Please wait a moment and try again.", rawMessage, hint, hintLink };
+  }
+
+  if (lower.includes("oom") || lower.includes("out of memory")) {
+    return { title: "Error", description: "The server is running low on memory. Please try again later.", rawMessage, hint, hintLink };
+  }
+
+  if (lower.includes("timeout") || lower.includes("timed out")) {
+    return { title: "Error", description: "The request timed out. Please try a simpler query or try again later.", rawMessage, hint, hintLink };
+  }
+
+  if (lower.includes("readonly") && lower.includes("replica")) {
+    return { title: "Error", description: "This operation cannot be performed on a read-only replica.", rawMessage, hint, hintLink };
+  }
+
+  if (status === 401) {
+    return { title: "Error", description: "Your session has expired. Please sign in again.", rawMessage, hint, hintLink };
+  }
+
+  if (status >= 500) {
+    return { title: "Error", description: "Something went wrong on the server. Please try again later.", rawMessage, hint, hintLink };
+  }
+
+  return { title: "Error", description: "An unexpected error occurred. Please try again.", rawMessage, hint, hintLink };
+}
+
+// Guards against concurrent signOut calls when multiple in-flight requests hit an invalidated session.
+let sessionInvalidationInFlight = false;
+
+function triggerSessionInvalidationSignOut(): void {
+  if (sessionInvalidationInFlight) return;
+  sessionInvalidationInFlight = true;
+  signOut({ callbackUrl: "/login" }).catch(() => {
+    sessionInvalidationInFlight = false;
+  });
+}
+
+// Active connection ID — injected into every outgoing request as X-Connection-Id.
+// Not initialised from localStorage to avoid overriding restricted-user sessions.
+// providers.tsx keeps it in sync after every render.
+let _activeConnectionId: string | null = null;
+
+export function setActiveConnectionIdGlobal(id: string | null) {
+  _activeConnectionId = id;
+}
+
+export function getActiveConnectionIdGlobal(): string | null {
+  return _activeConnectionId;
 }
 
 export async function securedFetch(
   input: string,
   init: RequestInit,
-  toast: any,
-  setIndicator: (indicator: "online" | "offline") => void
+  toast: ToastFn,
+  setIndicator: (indicator: "online" | "offline") => void,
 ): Promise<Response> {
-  const response = await fetch(input, init);
+  // Callers that set X-Connection-Id explicitly take priority over the global.
+  const effectiveInit = { ...init };
+  const existingHeaders = new Headers(effectiveInit.headers);
+  if (_activeConnectionId && !existingHeaders.has("X-Connection-Id")) {
+    existingHeaders.set("X-Connection-Id", _activeConnectionId);
+  }
+  effectiveInit.headers = existingHeaders;
+
+  const response = await fetch(input, effectiveInit);
   const { status } = response;
+
+  // Sign out only on an explicit X-Session-Invalid signal, not on all 401s.
+  if (status === 401 && response.headers.get("X-Session-Invalid") === "1") {
+    triggerSessionInvalidationSignOut();
+    setIndicator("offline");
+    return response;
+  }
+
   if (status >= 300) {
-    const err = await response.text();
+    const message = extractResponseErrorMessage(await response.text());
+
+    const friendly = toUserFriendlyMessage(message, status);
     toast({
-      title: "Error",
-      description: err,
+      title: friendly.title,
+      description: friendly.description,
       variant: "destructive",
+      rawMessage: friendly.rawMessage,
+      hint: friendly.hint,
+      hintLink: friendly.hintLink,
     });
+
     if (status === 401 || status >= 500) {
       setIndicator("offline");
     }
@@ -164,8 +607,36 @@ export function prepareArg(arg: string) {
   return encodeURIComponent(arg.trim());
 }
 
+export const between = (hash: number, from: number, to: number) => {
+  if (to <= from) return from;
+  return (Math.abs(hash) % (to - from)) + from;
+};
+
 export const getDefaultQuery = (q?: string) =>
   q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN * LIMIT 100";
+
+export const getMetaStats = async (name: string, toast: ToastFn, setIndicator: (indicator: "online" | "offline") => void, isReadOnly?: boolean) => {
+  const q = "CALL db.meta.stats() YIELD labels, relTypes RETURN labels, relTypes as relationships";
+  const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
+
+  try {
+    const result = await getSSEGraphResult(`/api/graph/${prepareArg(name)}?query=${encodeURIComponent(q)}${readOnlyParam}`, toast, setIndicator) as { data: { labels: { [key: string]: number }, relationships: { [key: string]: number } }[] };
+
+    if (!result) return undefined;
+
+    const row = result.data?.[0];
+
+    if (!row) return undefined;
+
+    const l = Object.entries(row.labels);
+    const r = Object.entries(row.relationships);
+
+    return [l, r];
+  } catch (error) {
+    console.error("Failed to fetch meta stats:", error);
+    return undefined;
+  }
+};
 
 export function rgbToHSL(hex: string): string {
   // Remove the # if present
@@ -211,39 +682,6 @@ export function rgbToHSL(hex: string): string {
   return `hsl(${hDeg}, ${sPct}%, ${lPct}%)`;
 }
 
-/**
- * Fits the force-graph view to show all (optionally filtered) nodes within the canvas bounds.
- *
- * The function computes padding as 10% of the smaller canvas dimension, scales it by
- * `paddingMultiplier`, and invokes the graph's `zoomToFit` with a 500ms duration.
- *
- * @param chartRef - Optional reference to the force-graph instance to operate on.
- * @param filter - Optional predicate to include only nodes that should be considered when fitting.
- * @param paddingMultiplier - Multiplier applied to the computed padding (default: 1).
- */
-export function handleZoomToFit(
-  chartRef?: GraphRef,
-  filter?: (node: Node) => boolean,
-  paddingMultiplier = 1
-) {
-  const chart = chartRef?.current;
-  if (chart) {
-    // Get canvas dimensions
-    const canvas = document.querySelector(
-      ".force-graph-container canvas"
-    ) as HTMLCanvasElement;
-
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-
-    // Calculate padding as 10% of the smallest canvas dimension
-    const minDimension = Math.min(rect.width, rect.height);
-    const padding = minDimension * 0.1;
-    chart.zoomToFit(500, padding * paddingMultiplier, filter);
-  }
-}
-
 type MemoryValueType = (string | number | MemoryValueType)[];
 
 const processEntries = (arr: MemoryValueType): Map<string, MemoryValue> => {
@@ -266,23 +704,29 @@ const processEntries = (arr: MemoryValueType): Map<string, MemoryValue> => {
 
 export const getMemoryUsage = async (
   name: string,
-  toast: any,
-  setIndicator: (indicator: "online" | "offline") => void
+  toast: ToastFn,
+  setIndicator: (indicator: "online" | "offline") => void,
+  // Pass activeConnectionId explicitly from React context/closure.
+  // This avoids relying on the module-level global _activeConnectionId
+  // which can be reset to null by Next.js HMR between renders.
+  connectionId?: string | null
 ): Promise<Map<string, MemoryValue>> => {
-  const result = await securedFetch(
-    `api/graph/${prepareArg(name)}/memory`,
-    {
-      method: "GET",
-    },
-    toast,
-    setIndicator
-  );
-
-  if (!result.ok) return new Map();
-
-  const json = await result.json();
-
-  return processEntries(json.result);
+  // Use plain fetch (not securedFetch) so NOPERM / version-too-low 400 errors
+  // from restricted users don't produce error toasts — memory usage is an
+  // optional admin-only feature and missing it is not an error worth surfacing.
+  try {
+    const effectiveConnId = connectionId !== undefined ? connectionId : _activeConnectionId;
+    const headers = new Headers();
+    if (effectiveConnId) {
+      headers.set("X-Connection-Id", effectiveConnId);
+    }
+    const result = await fetch(`/api/graph/${prepareArg(name)}/memory`, { headers });
+    if (!result.ok) return new Map();
+    const json = await result.json();
+    return processEntries(json.result);
+  } catch {
+    return new Map();
+  }
 };
 
 /**
@@ -298,6 +742,92 @@ export function createNestedObject(arr: string[]): object {
   return { [first]: createNestedObject(rest) };
 }
 
+/**
+ * Finds the index of the closing brace that matches the opening brace at startIndex.
+ * Properly handles nested braces in Cypher queries (e.g., map literals, nested CALL blocks).
+ * Also handles braces inside string literals (single or double quoted).
+ * 
+ * @param str - The string to search in
+ * @param startIndex - The index of the opening brace
+ * @returns The index of the matching closing brace, or -1 if not found
+ */
+function findMatchingBrace(str: string, startIndex: number): number {
+  let depth = 0;
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+
+  for (let i = startIndex; i < str.length; i += 1) {
+    const char = str[i];
+    const prevChar = i > 0 ? str[i - 1] : '';
+
+    // Toggle quote state (ignore escaped quotes)
+    if (char === "'" && prevChar !== '\\') {
+      inSingleQuote = !inSingleQuote;
+    } else if (char === '"' && prevChar !== '\\') {
+      inDoubleQuote = !inDoubleQuote;
+    }
+
+    // Only count braces when not inside a string literal
+    if (!inSingleQuote && !inDoubleQuote) {
+      if (char === '{') {
+        depth += 1;
+      } else if (char === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          return i;
+        }
+      }
+    }
+  }
+  return -1;
+}
+
+/**
+ * Checks if query contains any CALL block followed by RETURN without LIMIT.
+ * Handles nested braces correctly (e.g., map literals like {key: "val"}).
+ * Only matches if RETURN immediately follows the CALL block (before other clauses).
+ * Iterates through ALL CALL blocks to handle multiple subqueries (e.g., UNION queries).
+ * 
+ * @param query - The Cypher query to check
+ * @returns true if any CALL block with RETURN but no LIMIT is found
+ */
+function hasCallBlockWithReturnNoLimit(query: string): boolean {
+  let searchStart = 0;
+
+  // Iterate through all CALL blocks in the query
+  while (searchStart < query.length) {
+    const callMatch = /\bCALL\s*\{/i.exec(query.substring(searchStart));
+    if (!callMatch) break;
+
+    const absoluteIndex = searchStart + callMatch.index;
+    const openBraceIndex = absoluteIndex + callMatch[0].indexOf('{');
+    const closeBraceIndex = findMatchingBrace(query, openBraceIndex);
+
+    if (closeBraceIndex !== -1) {
+      // Check only the immediate continuation after this CALL block
+      // Stop at the next major clause (UNION, WITH, MATCH, CALL, etc.) or end of query
+      const afterCallBlock = query.substring(closeBraceIndex + 1);
+      const nextClauseMatch = afterCallBlock.match(/\b(UNION|WITH|MATCH|CALL|CREATE|MERGE|DELETE|SET|REMOVE)\b/i);
+      const relevantPart = nextClauseMatch
+        ? afterCallBlock.substring(0, nextClauseMatch.index)
+        : afterCallBlock;
+
+      // Check if this immediate part has RETURN without LIMIT
+      if (/\bRETURN\b/i.test(relevantPart) && !/\bLIMIT\b/i.test(relevantPart)) {
+        return true;
+      }
+
+      // Move search position past this CALL block
+      searchStart = closeBraceIndex + 1;
+    } else {
+      // If no matching brace found, move past the opening brace and continue
+      searchStart = openBraceIndex + 1;
+    }
+  }
+
+  return false;
+}
+
 export function getQueryWithLimit(
   query: string,
   limit: number
@@ -305,7 +835,7 @@ export function getQueryWithLimit(
   let existingLimit = 0;
 
   const finalReturnMatch = query.match(
-    /\bRETURN\b(?!\s+.+?\bCALL\b)[^;]*?\bLIMIT\s+(\d+)/
+    /\bRETURN\b(?!\s+.+?\bCALL\b)[^;]*?\bLIMIT\s+(\d+)/is
   );
   if (finalReturnMatch) {
     existingLimit = parseInt(finalReturnMatch[1], 10);
@@ -318,67 +848,53 @@ export function getQueryWithLimit(
       return [`CALL { ${query} } RETURN * LIMIT ${limit}`, limit];
     }
 
-    if (query.match(/\bCALL\s*\{.*?\}\s*RETURN\b(?!\s+.+?\s+\bLIMIT\b)/i)) {
+    if (hasCallBlockWithReturnNoLimit(query)) {
       return [`${query} LIMIT ${limit}`, limit];
     }
   }
 
-  if (query.match(/\bRETURN\b(?!\s+.+?\s+\bLIMIT\b)/i)) {
+  if (query.match(/\bRETURN\b(?![^;]*\bLIMIT\b)/i)) {
     return [`${query} LIMIT ${limit}`, limit];
   }
 
   return [query, existingLimit];
 }
 
-export const getNodeDisplayText = (node: Node, displayTextPriority: TextPriority[]) => {
-  const { data: nodeData } = node;
-
-  const displayText = displayTextPriority.find(({ name, ignore }) => {
-      const key = ignore
-          ? Object.keys(nodeData).find(
-              (k) => k.toLowerCase() === name.toLowerCase()
-          )
-          : name;
-
-      return (
-          key &&
-          nodeData[key] &&
-          typeof nodeData[key] === "string" &&
-          nodeData[key].trim().length > 0
-      );
-  });
-
-  if (displayText) {
-      const key = displayText.ignore
-          ? Object.keys(nodeData).find(
-              (k) => k.toLowerCase() === displayText.name.toLowerCase()
-          )
-          : displayText.name;
-
-      if (key) {
-          return String(nodeData[key]);
-      }
-  }
-
-  return String(node.id);
-}
+export const convertToCanvasData = (graphData: GraphData): CanvasData => ({
+    nodes: graphData.nodes.map(({ id, labels, color, visible, size, data, expand }) => ({
+        id,
+        labels,
+        color,
+        visible,
+        size,
+        expand,
+        data
+    })),
+    links: graphData.links.map(({ id, relationship, color, visible, source, target, data }) => ({
+        id,
+        relationship,
+        color,
+        visible,
+        source,
+        target,
+        data
+    }))
+});
 
 export const formatName = (newGraphName: string) =>
   newGraphName === '""' ? "" : newGraphName;
 
 export async function fetchOptions(
-  type: "Graph" | "Schema",
-  toast: any,
+  toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void,
   indicator: "online" | "offline",
   setSelectedValue: (value: string) => void,
   setOptions: (options: string[]) => void,
-  contentPersistence: boolean
 ) {
   if (indicator === "offline") return;
 
   const result = await securedFetch(
-    `api/${type === "Graph" ? "graph" : "schema"}`,
+    `/api/graph`,
     {
       method: "GET",
     },
@@ -388,17 +904,16 @@ export async function fetchOptions(
 
   if (!result.ok) return;
 
+
   const { opts } = (await result.json()) as { opts: string[] };
 
   setOptions(opts);
 
-  if (
-    setSelectedValue &&
-    opts.length === 1 &&
-    (!contentPersistence || type === "Graph")
-  )
-    setSelectedValue(formatName(opts[0]));
+  if (opts.length === 1) setSelectedValue(formatName(opts[0]));
 }
+
+export const areCaptionKeysEqual = (left: [string, boolean][], right: [string, boolean][]) =>
+  left.length === right.length && left.every((key, index) => key[0] === right[index][0] && key[1] === right[index][1]);
 
 export function getTheme(theme: string | undefined) {
   let currentTheme = theme;
@@ -419,5 +934,5 @@ export function getTheme(theme: string | undefined) {
 // Type guard: runtime check that proves elements is [Node, Node]
 export function isTwoNodes(elements: (Node | Link)[]): elements is [Node, Node] {
   return elements.length === 2 &&
-    elements.every((e): e is Node => !!e.labels)
+    elements.every((e): e is Node => "labels" in e);
 }

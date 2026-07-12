@@ -1,0 +1,273 @@
+import { Locator } from "@playwright/test";
+import {
+  waitForElementToBeVisible,
+  interactWhenVisible,
+  waitForElementToNotBeVisible,
+} from "@/e2e/infra/utils";
+import { EMPTY_DISPLAY_NAME } from "@/app/api/graph/model";
+import GraphInfoPage from "./graphInfoPage";
+
+export default class CustomizeStylePage extends GraphInfoPage {
+  private customizeStyleButton(label: string): Locator {
+    return this.page.getByTestId(`customizeStyle${label}`);
+  }
+
+  private labelButton(label: string): Locator {
+    return this.page.getByTestId(`graphInfo${label}Node`);
+  }
+
+  private get panelTitle(): Locator {
+    return this.page.getByText("Customize Style");
+  }
+
+  private get colorSection(): Locator {
+    return this.page.getByText("Color:");
+  }
+
+  private get sizeSection(): Locator {
+    return this.page.getByText("Size:");
+  }
+
+  private get colorButtons(): Locator {
+    return this.page.locator('button[aria-label^="Select color"]');
+  }
+
+  private get sizeButtons(): Locator {
+    return this.page.locator('button[aria-label^="Select size"]');
+  }
+
+  private get closeButton(): Locator {
+    return this.page.locator('button[title="Close"]').first();
+  }
+
+  private get saveStyleButton(): Locator {
+    return this.page.getByTestId("saveStyleChanges");
+  }
+
+  private get cancelStyleButton(): Locator {
+    return this.page.getByTestId("cancelStyleChanges");
+  }
+
+  private get rgbPickerButton(): Locator {
+    return this.page.getByTestId("rgbColorPickerButton");
+  }
+
+  private get rgbColorInput(): Locator {
+    return this.page.getByTestId("rgbColorInput");
+  }
+
+  private get rgbColorHexInput(): Locator {
+    return this.page.getByTestId("rgbColorHexInput");
+  }
+
+  async isCustomizeStyleButtonVisible(label: string): Promise<boolean> {
+    await interactWhenVisible(
+      this.labelButton(label),
+      (el) => el.click(),
+      `Label Button ${label}`
+    );
+    const visible = await waitForElementToBeVisible(this.customizeStyleButton(label));
+    // Close the popover by pressing Escape
+    await this.page.keyboard.press("Escape");
+    await waitForElementToNotBeVisible(this.customizeStyleButton(label));
+    return visible;
+  }
+
+  async clickCustomizeStyleButton(label: string): Promise<void> {
+    await interactWhenVisible(
+      this.labelButton(label),
+      (el) => el.click(),
+      `Label Button ${label}`
+    );
+    await interactWhenVisible(
+      this.customizeStyleButton(label),
+      (el) => el.click(),
+      `Customize Style Button ${label}`
+    );
+  }
+
+  async isPanelVisible(): Promise<boolean> {
+    return waitForElementToBeVisible(this.panelTitle);
+  }
+
+  async isPanelNotVisible(): Promise<boolean> {
+    return waitForElementToNotBeVisible(this.panelTitle);
+  }
+
+  async isColorSectionVisible(): Promise<boolean> {
+    return waitForElementToBeVisible(this.colorSection);
+  }
+
+  async isSizeSectionVisible(): Promise<boolean> {
+    return waitForElementToBeVisible(this.sizeSection);
+  }
+
+  async selectFirstColor(): Promise<void> {
+    await interactWhenVisible(
+      this.colorButtons.first(),
+      (el) => el.click(),
+      "First Color Button"
+    );
+  }
+
+  async selectColorByIndex(index: number): Promise<void> {
+    await interactWhenVisible(
+      this.colorButtons.nth(index),
+      (el) => el.click(),
+      `Color Button ${index}`
+    );
+  }
+
+  async selectFirstSize(): Promise<void> {
+    await interactWhenVisible(
+      this.sizeButtons.first(),
+      (el) => el.click(),
+      "First Size Button"
+    );
+  }
+
+  async selectSizeByIndex(index: number): Promise<void> {
+    await interactWhenVisible(
+      this.sizeButtons.nth(index),
+      (el) => el.click(),
+      `Size Button ${index}`
+    );
+  }
+
+  async closePanel(): Promise<void> {
+    await interactWhenVisible(
+      this.closeButton,
+      (el) => el.click(),
+      "Close Button"
+    );
+  }
+
+  async closePanelWithEscape(): Promise<void> {
+    await this.page.keyboard.press("Escape");
+  }
+
+  async getLabelButtonColor(label: string): Promise<string> {
+    // Wait for the button to be visible first
+    await waitForElementToBeVisible(this.labelButton(label));
+
+    // Get the color from the inner color dot span or background
+    const color = await this.labelButton(label).evaluate((el: HTMLElement) => {
+      // Check inner color dot element
+      const dotSpan = el.querySelector('[class*="rounded-full"]');
+      if (dotSpan) {
+        const dotBg = window.getComputedStyle(dotSpan).backgroundColor;
+        if (dotBg && dotBg !== 'rgba(0, 0, 0, 0)' && dotBg !== 'transparent') {
+          return dotBg;
+        }
+      }
+      // Fall back to inline or computed background color
+      const computedStyle = window.getComputedStyle(el);
+      return el.style.backgroundColor || computedStyle.backgroundColor;
+    });
+    return color;
+  }
+
+  async getLabelStyleFromLocalStorage(label: string): Promise<{
+    color?: string;
+    size?: number;
+  } | null> {
+    const style = await this.page.evaluate((labelName) => {
+      // labelStyle_ is now connection-scoped, so find the key that ends with `labelStyle_{label}`
+      const suffix = `labelStyle_${labelName}`;
+      const matches: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key || !key.endsWith(suffix)) continue;
+        const value = localStorage.getItem(key);
+        if (value !== null) matches.push(value);
+      }
+      if (matches.length > 1) {
+        throw new Error(`Ambiguous scoped label style for ${suffix}`);
+      }
+      return matches.length === 1 ? JSON.parse(matches[0]) : null;
+    }, label);
+    return style;
+  }
+
+  async getSelectedSizeButtonIndex(): Promise<number> {
+    const selectedIndex = await this.page.evaluate(() => {
+      const sizeButtons = Array.from(
+        document.querySelectorAll('button[aria-label^="Select size"]')
+      );
+      return sizeButtons.findIndex((btn) =>
+        btn.classList.contains("ring-2")
+      );
+    });
+    return selectedIndex;
+  }
+
+  async getSelectedColorButtonIndex(): Promise<number> {
+    const selectedIndex = await this.page.evaluate(() => {
+      const colorButtons = Array.from(
+        document.querySelectorAll('button[aria-label^="Select color"]')
+      );
+      return colorButtons.findIndex((btn) =>
+        btn.classList.contains("ring-2")
+      );
+    });
+    return selectedIndex;
+  }
+
+  async getNodeDisplayName(nodeId: number): Promise<string> {
+    const nodes = await this.getNodesScreenPositions();
+    const node = nodes.find((n) => n.id === nodeId);
+    if (!node) {
+      throw new Error(`Node with id ${nodeId} not found`);
+    }
+    // displayName is a tuple [line1, line2]
+    const [line1, line2] = node.displayName || EMPTY_DISPLAY_NAME;
+    return [line1, line2].filter(Boolean).join(" ");
+  }
+
+  async clickSaveStyleButton(): Promise<void> {
+    await interactWhenVisible(
+      this.saveStyleButton,
+      (el) => el.click(),
+      "Save Style Button"
+    );
+  }
+
+  async clickCancelStyleButton(): Promise<void> {
+    await interactWhenVisible(
+      this.cancelStyleButton,
+      (el) => el.click(),
+      "Cancel Style Button"
+    );
+  }
+
+  async isSaveButtonVisible(): Promise<boolean> {
+    return waitForElementToBeVisible(this.saveStyleButton);
+  }
+
+  async clickRgbPickerButton(): Promise<void> {
+    await interactWhenVisible(
+      this.rgbPickerButton,
+      (el) => el.click(),
+      "RGB Picker Button"
+    );
+  }
+
+  async setRgbColorHexInput(hexColor: string): Promise<void> {
+    await interactWhenVisible(
+      this.rgbColorHexInput,
+      async (el) => {
+        await el.clear();
+        await el.fill(hexColor);
+      },
+      "RGB Hex Input"
+    );
+  }
+
+  async getRgbColorHexInputValue(): Promise<string> {
+    return this.rgbColorHexInput.inputValue();
+  }
+
+  async isRgbPickerPanelVisible(): Promise<boolean> {
+    return this.rgbColorInput.isVisible();
+  }
+}

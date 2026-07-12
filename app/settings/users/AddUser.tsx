@@ -1,34 +1,35 @@
 /* eslint-disable no-param-reassign */
 
-"use client"
+"use client";
 
-import { FormEvent, useEffect, useState } from "react"
+import { FormEvent, useEffect, useState } from "react";
 import { PlusCircle } from "lucide-react";
 import { CreateUser } from "@/app/api/user/model";
 import Button from "@/app/components/ui/Button";
 import FormComponent, { Field } from "@/app/components/FormComponent";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { Drawer, DrawerDescription, DrawerContent, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
+import { Drawer, DrawerDescription, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 
 export default function AddUser({ onAddUser }: {
-    onAddUser: (user: CreateUser) => Promise<void>
+    onAddUser: (user: CreateUser, keys: string[]) => Promise<boolean>
 }) {
-    const [open, setOpen] = useState(false)
-    const [username, setUsername] = useState("")
-    const [password, setPassword] = useState("")
-    const [confirmPassword, setConfirmPassword] = useState("")
-    const [role, setRole] = useState("Admin")
+    const [open, setOpen] = useState(false);
+    const [username, setUsername] = useState("");
+    const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [role, setRole] = useState("");
+    const [keys, setKeys] = useState<string[]>([]);
 
     const handleClose = () => {
-        setPassword("")
-        setConfirmPassword("")
-        setUsername("")
-        setRole("")
-    }
+        setPassword("");
+        setConfirmPassword("");
+        setUsername("");
+        setRole("");
+        setKeys([]);
+    };
 
     useEffect(() => {
-        if (!open) handleClose()
-    }, [open])
+        if (!open) handleClose();
+    }, [open]);
 
     const fields: Field[] = [
         {
@@ -110,17 +111,30 @@ export default function AddUser({ onAddUser }: {
                     condition: (value: string) => !value
                 }
             ]
+        },
+        {
+            value: keys.join(" "),
+            label: "Key / Graph Permissions",
+            type: "tag",
+            tags: keys,
+            onAddTag: (tag) => setKeys(prev => [...prev, tag]),
+            onRemoveTag: (index) => setKeys(prev => prev.filter((_, i) => i !== index)),
+            required: false,
+            placeholder: "*",
+            description: "Pattern for accessible keys / graphs (e.g. mygraph, myprefix*, *)",
+            info: "Defines which keys / graphs this user can access",
+            errors: []
         }
-    ]
+    ];
 
     const handleAddUser = async (e: FormEvent) => {
         e.preventDefault();
 
-        await onAddUser({ username, password, role })
-
-        setOpen(false)
-
-        handleClose()
+        const normalizedKeys = keys.length === 0 ? ["*"] : keys;
+        const ok = await onAddUser({ username, password, role, }, normalizedKeys);
+        if (ok) {
+            setOpen(false);
+        }
     };
 
     return (
@@ -135,17 +149,21 @@ export default function AddUser({ onAddUser }: {
                     <PlusCircle size={20} />
                 </Button>
             </DrawerTrigger>
-            <DrawerContent side="right" className="gap-2 after:hidden">
-                <VisuallyHidden>
-                    <DrawerTitle />
-                    <DrawerDescription />
-                </VisuallyHidden>
-                <FormComponent
-                    className="p-4"
-                    handleSubmit={handleAddUser}
-                    fields={fields}
-                />
+            <DrawerContent side="right" className="w-[30rem] max-w-[90vw] gap-2 after:hidden">
+                <div className="flex-1 flex flex-col overflow-y-auto">
+                    <DrawerHeader className="px-6 pt-6 pb-2 text-left border-b border-border">
+                        <DrawerTitle className="text-xl">Add User</DrawerTitle>
+                        <DrawerDescription>
+                            Create a new user with role-based access permissions.
+                        </DrawerDescription>
+                    </DrawerHeader>
+                    <FormComponent
+                        className="px-6 py-4"
+                        handleSubmit={handleAddUser}
+                        fields={fields}
+                    />
+                </div>
             </DrawerContent>
         </Drawer>
-    )
+    );
 }

@@ -1,6 +1,6 @@
 /* eslint-disable react/require-default-props */
 
-"use client"
+"use client";
 
 import React, { useState, useContext, useEffect } from "react";
 import { Trash2 } from "lucide-react";
@@ -14,7 +14,6 @@ interface Props {
     open: boolean
     setOpen: (open: boolean) => void
     description: string
-    label?: "Graph" | "Schema"
 }
 
 export default function DeleteElement({
@@ -22,27 +21,26 @@ export default function DeleteElement({
     open,
     setOpen,
     description,
-    label = "Graph"
 }: Props) {
 
-    const { indicator } = useContext(IndicatorContext)
-    const [isLoading, setIsLoading] = useState(false)
+    const { indicator } = useContext(IndicatorContext);
+    const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
         if (!open) {
-            setIsLoading(false)
+            setIsLoading(false);
         }
-    }, [open])
+    }, [open]);
 
     const handleDelete = async () => {
         try {
-            setIsLoading(true)
-            await onDeleteElement()
-            setOpen(false)
+            setIsLoading(true);
+            await onDeleteElement();
+            setOpen(false);
         } finally {
-            setIsLoading(false)
+            setIsLoading(false);
         }
-    }
+    };
 
     return (
         <DialogComponent
@@ -52,8 +50,8 @@ export default function DeleteElement({
             description={description}
             trigger={(
                 <Button
-                    data-testid={`deleteElement${label}`}
-                    className="pointer-events-auto bg-background"
+                    data-testid="deleteElementGraph"
+                    className="pointer-events-auto bg-background p-1.5"
                     variant="Delete"
                     tooltipSide="bottom"
                     title="Delete Element(s)"
@@ -64,7 +62,7 @@ export default function DeleteElement({
         >
             <div className="flex justify-end gap-4">
                 <Button
-                    data-testid={`deleteElementConfirm${label}`}
+                    data-testid="deleteElementConfirmGraph"
                     indicator={indicator}
                     className="text-nowrap"
                     variant="Delete"
@@ -74,12 +72,12 @@ export default function DeleteElement({
                     isLoading={isLoading}
                 />
                 <CloseDialog
-                    data-testid={`deleteElementCancel${label}`}
+                    data-testid="deleteElementCancelGraph"
                     className="text-nowrap"
                     variant="Cancel"
                     label="Cancel"
                 />
             </div>
         </DialogComponent>
-    )
+    );
 }

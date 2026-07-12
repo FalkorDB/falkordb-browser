@@ -5,13 +5,18 @@ import {
   removeGraphElementLabel,
   validateBody,
 } from "../../../../validate-body";
+import { getCorsHeaders, resolveReadOnly } from "../../../../utils";
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
+}
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ graph: string; element: string }> }
 ) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -20,6 +25,7 @@ export async function DELETE(
     const { client, user } = session;
     const { graph: graphId, element } = await params;
     const elementId = Number(element);
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       const body = await request.json();
@@ -28,33 +34,38 @@ export async function DELETE(
       const validation = validateBody(removeGraphElementLabel, body);
 
       if (!validation.success) {
-        return NextResponse.json({ message: validation.error }, { status: 400 });
+        return NextResponse.json({ message: validation.error }, { status: 400, headers: getCorsHeaders(request) });
+      }
+
+      if (isReadOnly) {
+        return NextResponse.json(
+          { message: "Forbidden: read-only connection" },
+          { status: 403, headers: getCorsHeaders(request) }
+        );
       }
 
       const { label } = validation.data;
       const query = `MATCH (n) WHERE ID(n) = $id REMOVE n:${label}`;
       const graph = client.selectGraph(graphId);
 
-      if (user.role === "Read-Only")
-        await graph.roQuery(query, { params: { id: elementId } });
-      else await graph.query(query, { params: { id: elementId } });
+      await graph.query(query, { params: { id: elementId } });
 
       return NextResponse.json(
         { message: "Label removed successfully" },
-        { status: 200 }
+        { status: 200, headers: getCorsHeaders(request) }
       );
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
-      { status: 500 }
+      { message: "Internal server error" },
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }
@@ -64,7 +75,7 @@ export async function POST(
   { params }: { params: Promise<{ graph: string; element: string }> }
 ) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -73,6 +84,7 @@ export async function POST(
     const { client, user } = session;
     const { graph: graphId, element } = await params;
     const elementId = Number(element);
+    const isReadOnly = resolveReadOnly(request, user.role);
 
     try {
       const body = await request.json();
@@ -81,35 +93,39 @@ export async function POST(
       const validation = validateBody(addGraphElementLabel, body);
 
       if (!validation.success) {
-        return NextResponse.json({ message: validation.error }, { status: 400 });
+        return NextResponse.json({ message: validation.error }, { status: 400, headers: getCorsHeaders(request) });
+      }
+
+      if (isReadOnly) {
+        return NextResponse.json(
+          { message: "Forbidden: read-only connection" },
+          { status: 403, headers: getCorsHeaders(request) }
+        );
       }
 
       const { label } = validation.data;
       const query = `MATCH (n) WHERE ID(n) = $id SET n:${label}`;
       const graph = client.selectGraph(graphId);
 
-      if (user.role === "Read-Only")
-        await graph.roQuery(query, { params: { id: elementId } });
-      else
-        await graph.query(query, { params: { id: elementId } });
+      await graph.query(query, { params: { id: elementId } });
       
 
       return NextResponse.json(
         { message: "Label added successfully" },
-        { status: 200 }
+        { status: 200, headers: getCorsHeaders(request) }
       );
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
-      { status: 500 }
+      { message: "Internal server error" },
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }

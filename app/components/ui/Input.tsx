@@ -1,7 +1,7 @@
 /* eslint-disable react/require-default-props */
 /* eslint-disable react/jsx-props-no-spreading */
 
-"use client"
+"use client";
 
 import { cn } from "@/lib/utils";
 import { forwardRef } from "react";
@@ -10,7 +10,7 @@ interface Props extends React.InputHTMLAttributes<HTMLInputElement> {
     className?: string;
 }
 
-const Input = forwardRef<HTMLInputElement, Props>(({ 
+const Input = forwardRef<HTMLInputElement | null, Props>(({ 
     className, 
     ...props 
 }, ref) => (
@@ -22,8 +22,8 @@ const Input = forwardRef<HTMLInputElement, Props>(({
             )}
             {...props}
         />
-    ))
+    ));
 
-Input.displayName = "Input"
+Input.displayName = "Input";
 
-export default Input
+export default Input;

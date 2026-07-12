@@ -1,0 +1,365 @@
+/* eslint-disable no-param-reassign */
+
+'use client';
+
+import { useContext, useState, useEffect, useCallback, useRef } from "react";
+import { X, Palette } from "lucide-react";
+import { LabelStyle, InfoLabel, Label, cn } from "@/lib/utils";
+import { GraphContext, ForceGraphContext, BrowserSettingsContext } from "@/app/components/provider";
+import { STYLE_COLORS, getLabelWithFewestElements } from "@/app/api/graph/model";
+import { setConnectionItem } from "@/lib/connection-storage";
+import Button from "@/app/components/ui/Button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { NODE_SIZE } from "@falkordb/canvas";
+
+interface Props {
+    label: InfoLabel;
+    onClose: () => void;
+}
+
+export default function CustomizeStylePanel({ label, onClose }: Props) {
+    const { graph, setLabels } = useContext(GraphContext);
+    const { tutorialOpen } = useContext(BrowserSettingsContext);
+    const { canvasRef } = useContext(ForceGraphContext);
+
+    // Store original values for comparison and cancel functionality
+    const [originalColor] = useState<string>(label.style.color);
+    const [originalSize] = useState(label.style.size || NODE_SIZE);
+
+    const [selectedColor, setSelectedColor] = useState<string>(
+        label.style.color
+    );
+    const [selectedSize, setSelectedSize] = useState(
+        label.style.size || NODE_SIZE
+    );
+
+    // RGB Color Picker state
+    const [showRgbPicker, setShowRgbPicker] = useState(false);
+    const [customRgbColor, setCustomRgbColor] = useState("#000000");
+    const colorInputRef = useRef<HTMLInputElement>(null);
+
+    // Track if there are unsaved changes
+    const hasChanges =
+        selectedColor !== originalColor ||
+        selectedSize !== originalSize;
+
+    const saveStyleToStorage = useCallback((labelName: string, style: LabelStyle) => {
+        const storageKey = `labelStyle_${labelName}`;
+        setConnectionItem(storageKey, JSON.stringify(style));
+    }, []);
+
+    const applyStylesToGraph = useCallback((color: string, size: number) => {
+        // Mutate the InfoLabel prop directly so graphInfo context stays in sync
+        label.style = {
+            ...label.style,
+            color,
+            size,
+        };
+
+        const updatedLabel = graph.LabelsMap.get(label.name);
+
+        if (!updatedLabel) return;
+
+        updatedLabel.style = {
+            ...updatedLabel.style,
+            color,
+            size,
+        };
+
+        // Update all nodes with this label
+        updatedLabel.elements.forEach(n => {
+            if (getLabelWithFewestElements(n.labels.map(l => graph.LabelsMap.get(l)).filter(Boolean) as Label[])?.name === label.name) {
+                n.color = color;
+                n.size = size;
+            }
+        });
+
+        setLabels([...graph.Labels]);
+
+        const canvas = canvasRef.current;
+
+        if (canvas) {
+            const graphData = canvas.getGraphData();
+
+            graphData.nodes.forEach(node => {
+                if (getLabelWithFewestElements(node.labels.map(l => graph.LabelsMap.get(l)).filter(Boolean) as Label[])?.name === label.name) {
+                    node.color = color;
+
+                    if (node.size !== size) {
+                        node.size = size;
+                    }
+                }
+            });
+
+            canvas.refresh();
+        }
+    }, [canvasRef, graph.Labels, graph.LabelsMap, label, setLabels]);
+
+    const handleColorSelect = (color: string) => {
+        setSelectedColor(color);
+        setShowRgbPicker(false); // Close RGB picker when preset color is selected
+        // Apply to graph immediately for preview (without saving to localStorage)
+        applyStylesToGraph(color, selectedSize);
+    };
+
+    const handleRgbColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const color = e.target.value;
+        setCustomRgbColor(color);
+        setSelectedColor(color);
+        // Apply to graph immediately for preview
+        applyStylesToGraph(color, selectedSize);
+    };
+
+    const handleRgbPickerClick = () => {
+        setShowRgbPicker(!showRgbPicker);
+    };
+
+    const handleSizeSelect = (size: number) => {
+        setSelectedSize(size);
+        // Apply to graph immediately for preview (without saving to localStorage)
+        applyStylesToGraph(selectedColor, size);
+    };
+
+
+    const handleSave = () => {
+        // Prevent saving during tutorial
+        if (!tutorialOpen) {
+            // Save to localStorage
+            saveStyleToStorage(label.name, {
+                color: selectedColor,
+                size: selectedSize,
+            });
+        }
+
+        onClose();
+    };
+
+    const handleCancel = useCallback(() => {
+        // Revert to original values in state
+        setSelectedColor(originalColor);
+        setSelectedSize(originalSize);
+
+        // Revert graph to original values
+        applyStylesToGraph(originalColor, originalSize);
+    }, [originalColor, originalSize, applyStylesToGraph]);
+
+    const handleClose = useCallback(() => {
+        handleCancel();
+        // Just close the panel without reverting changes
+        onClose();
+    }, [onClose, handleCancel]);
+
+    useEffect(() => {
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                handleCancel();
+            }
+        };
+
+        window.addEventListener("keydown", handleEscape);
+        return () => window.removeEventListener("keydown", handleEscape);
+    }, [handleCancel]);
+
+    return (
+        <>
+            <Button
+                className="absolute top-2 right-2 z-10"
+                title="Close"
+                onClick={handleClose}
+            >
+                <X className="h-4 w-4" />
+            </Button>
+            <div className="flex justify-between items-center pr-5">
+                <h1 className="text-2xl">Customize Style</h1>
+                <Palette size={25} />
+            </div>
+            <div className="flex gap-2 items-center overflow-hidden">
+                <div
+                    style={{ backgroundColor: selectedColor }}
+                    className="w-8 h-8 rounded-full"
+                />
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <p className="truncate pointer-events-auto SofiaSans">{label.name}</p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        {label.name}
+                    </TooltipContent>
+                </Tooltip>
+            </div>
+
+            {/* Color Selection */}
+            <div className="flex flex-col gap-2 overflow-hidden">
+                <h2 className="text-base font-semibold">Color:</h2>
+                <div className="flex gap-2 flex-wrap p-2 bg-muted/10 rounded-lg overflow-y-auto">
+                    {/* First 15 preset colors */}
+                    {STYLE_COLORS.slice(0, 15).map((color) => (
+                        <Tooltip key={color}>
+                            <TooltipTrigger asChild>
+                                <button
+                                    type="button"
+                                    className={cn(
+                                        "w-8 h-8 rounded-full transition-all hover:scale-110",
+                                        selectedColor === color && "ring-2 ring-foreground ring-offset-2 ring-offset-background"
+                                    )}
+                                    style={{ backgroundColor: color }}
+                                    onClick={() => handleColorSelect(color)}
+                                    aria-label={`Select color ${color}`}
+                                />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                {color}
+                            </TooltipContent>
+                        </Tooltip>
+                    ))}
+
+                    {/* RGB Color Picker Button */}
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <button
+                                type="button"
+                                data-testid="rgbColorPickerButton"
+                                className={cn(
+                                    "w-8 h-8 rounded-full transition-all hover:scale-110 relative overflow-hidden",
+                                    "bg-gradient-to-br from-red-500 via-green-500 to-blue-500",
+                                    showRgbPicker && "ring-2 ring-foreground ring-offset-2 ring-offset-background"
+                                )}
+                                onClick={handleRgbPickerClick}
+                                aria-label="Custom RGB color picker"
+                            >
+                                {showRgbPicker ? (
+                                    <X className="w-4 h-4 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white drop-shadow-md" />
+                                ) : (
+                                    <Palette className="w-4 h-4 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white drop-shadow-md" />
+                                )}
+                            </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            {showRgbPicker ? "Close Custom Color" : "Custom Color"}
+                        </TooltipContent>
+                    </Tooltip>
+
+                    {/* RGB Color Picker Panel */}
+                    {showRgbPicker && (
+                        <div className="relative p-3 bg-muted/10 rounded-lg border border-border animate-in fade-in slide-in-from-top-2 duration-200">
+                            {/* Close button */}
+                            <button
+                                type="button"
+                                onClick={() => setShowRgbPicker(false)}
+                                className="absolute top-2 right-2 p-1 rounded-md hover:bg-muted/50 transition-colors"
+                                aria-label="Close RGB picker"
+                            >
+                                <X className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+                            </button>
+
+                            <div className="flex items-center gap-3">
+                                <div className="flex-1">
+                                    <div className="text-xs font-medium text-muted-foreground mb-1">
+                                        Custom Color
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            id="rgb-picker"
+                                            ref={colorInputRef}
+                                            type="color"
+                                            data-testid="rgbColorInput"
+                                            value={customRgbColor}
+                                            onChange={handleRgbColorChange}
+                                            className="w-12 h-12 rounded-lg cursor-pointer border-2 border-border hover:border-foreground/20 transition-colors"
+                                            aria-label="RGB color picker"
+                                        />
+                                        <div className="flex-1">
+                                            <input
+                                                type="text"
+                                                data-testid="rgbColorHexInput"
+                                                value={customRgbColor}
+                                                onChange={(e) => {
+                                                    const color = e.target.value;
+                                                    if (/^#[0-9A-Fa-f]{0,6}$/.test(color)) {
+                                                        setCustomRgbColor(color);
+                                                        if (color.length === 7) {
+                                                            setSelectedColor(color);
+                                                            applyStylesToGraph(color, selectedSize);
+                                                        }
+                                                    }
+                                                }}
+                                                placeholder="#000000"
+                                                className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm font-mono
+                                                         focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Size Selection */}
+            <div className="flex flex-col gap-2 overflow-hidden">
+                <h2 className="text-base font-semibold">Size:</h2>
+                <div className="flex gap-2 p-2 bg-muted/10 rounded-lg overflow-x-auto">
+                    {/* Size options from 0.25x to 2.5x of NODE_SIZE */}
+                    {Array.from({ length: 10 }, (_, i) => (i + 1) / 4 * NODE_SIZE).map((size) => (
+                        <Tooltip key={size}>
+                            <TooltipTrigger asChild>
+                                <button
+                                    type="button"
+                                    className={cn(
+                                        "flex items-center justify-center transition-all hover:bg-muted rounded-md",
+                                        selectedSize === size && "bg-muted ring-2 ring-foreground"
+                                    )}
+                                    onClick={() => handleSizeSelect(size)}
+                                    aria-label={`Select size ${size}`}
+                                >
+                                    <div
+                                        className="rounded-full"
+                                        style={{
+                                            backgroundColor: selectedColor,
+                                            width: `${size * 4}px`,
+                                            height: `${size * 4}px`,
+                                        }}
+                                    />
+                                </button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                {(size / NODE_SIZE).toFixed(2)}x
+                            </TooltipContent>
+                        </Tooltip>
+                    ))}
+                </div>
+            </div>
+
+            {/* Sticky Save/Cancel Buttons - Only show when there are changes */}
+            {
+                hasChanges && (
+                    <div className="flex-shrink-0 p-3 pt-2 border-t border-border bg-background">
+                        <div className="flex gap-2 justify-center">
+                            <button
+                                type="button"
+                                data-testid="cancelStyleChanges"
+                                className="px-3 py-1.5 rounded-md text-sm font-medium transition-all
+                        bg-muted/50 hover:bg-muted text-foreground
+                                       border border-border hover:border-foreground/20"
+                                onClick={handleCancel}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                data-testid="saveStyleChanges"
+                                className="px-3 py-1.5 rounded-md text-sm font-semibold transition-all
+                                       bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800
+                                       text-white shadow-md hover:shadow-lg"
+                                onClick={handleSave}
+                            >
+                                Save Changes
+                            </button>
+                        </div>
+                    </div>
+                )
+            }
+        </>
+    );
+}

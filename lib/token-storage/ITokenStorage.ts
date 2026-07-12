@@ -1,4 +1,11 @@
 /**
+ * Distinguishes rows created for a NextAuth browser session (ephemeral,
+ * hard-deleted on sign-out) from user-issued personal access tokens
+ * (long-lived, soft-revoked with audit trail).
+ */
+export type TokenKind = 'session' | 'pat';
+
+/**
  * Token data structure
  */
 export interface TokenData {
@@ -15,6 +22,16 @@ export interface TokenData {
   last_used: number; // Unix timestamp, -1 means never used
   is_active: boolean;
   encrypted_password: string;
+  /**
+   * Discriminates between session credentials and PATs. Optional for
+   * backward compatibility with rows written before this field existed
+   * (treated as 'pat' by readers).
+   */
+  kind?: TokenKind;
+  /** Whether the connection uses TLS. Defaults to false for old rows. */
+  tls?: boolean;
+  /** Base64-encoded CA certificate for TLS connections. */
+  ca?: string;
 }
 
 /**
@@ -53,6 +70,13 @@ export interface ITokenStorage {
   revokeToken(tokenId: string, revokerUsername: string): Promise<boolean>;
 
   /**
+   * Permanently delete a token. Use this for ephemeral session credentials
+   * that have no audit value once the session ends. For user-issued PATs
+   * prefer revokeToken to preserve the REVOKED_BY trail.
+   */
+  deleteToken(tokenId: string): Promise<boolean>;
+
+  /**
    * Update last used timestamp for a token
    */
   updateLastUsed(tokenId: string): Promise<void>;
@@ -70,6 +94,13 @@ export interface ITokenStorage {
    * @returns Encrypted password or null if not found
    */
   getEncryptedPassword(tokenId: string): Promise<string | null>;
+
+  /**
+   * Fetch all tokens belonging to a specific user/session, optionally
+   * filtered by kind. Used to list additional connections stored against
+   * a session.
+   */
+  fetchTokensByUserId(userId: string, kind?: TokenKind): Promise<TokenData[]>;
 
   /**
    * Clean up expired tokens (optional, for maintenance)

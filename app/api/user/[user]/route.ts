@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "../../auth/[...nextauth]/options";
-import { ROLE } from "../model";
-import { updateUserRole, validateBody } from "../../validate-body";
+import { ROLE, getRoleWithKeys, extractKeysFromACL } from "../model";
+import { updateUser, validateBody } from "../../validate-body";
+import { getCorsHeaders } from "../../utils";
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
+}
 
 // eslint-disable-next-line import/prefer-default-export
 export async function PATCH(
-  req: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ user: string }> }
 ) {
   try {
-    const session = await getClient();
+    const session = await getClient(request);
 
     if (session instanceof NextResponse) {
       return session;
@@ -20,36 +25,42 @@ export async function PATCH(
     const { user: username } = await params;
     
     try {
-      const body = await req.json();
+      const body = await request.json();
       
       // Validate request body
-      const validation = validateBody(updateUserRole, body);
+      const validation = validateBody(updateUser, body);
       
       if (!validation.success) {
         return NextResponse.json(
           { message: validation.error },
-          { status: 400 }
+          { status: 400, headers: getCorsHeaders(request) }
         );
       }
 
-      const { role: roleKey } = validation.data;
+      const { role: roleKey, keys, password } = validation.data;
       const role = ROLE.get(roleKey);
       if (!role) throw new Error("Invalid role");
 
-      await (await client.connection).aclSetUser(username, role);
-      return NextResponse.json({ message: "User role updated" }, { status: 200 });
+      const connection = await client.connection;
+
+      const finalRole = getRoleWithKeys(role, keys);
+      if (password) {
+        finalRole.push(`>${password}`);
+      }
+      await connection.aclSetUser(username, finalRole);
+      return NextResponse.json({ message: "User role updated" }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { message: (err as Error).message },
-      { status: 500 }
+      { message: "Internal server error" },
+      { status: 500, headers: getCorsHeaders(request) }
     );
   }
 }

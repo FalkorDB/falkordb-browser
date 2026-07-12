@@ -1,0 +1,51 @@
+name: Cypher error drift canary
+
+# Early-warning for FalkorDB error-wording drift. The PR "smoke-tests" job runs
+# against a pinned FalkorDB release so it stays deterministic; this canary runs the
+# SAME smoke tests against :latest on a schedule (and on demand). When FalkorDB
+# rewords an error, this job goes red — telling us to update lib/cypherErrors.ts and
+# lib/cypherErrorDriftCases.ts — without ever blocking a pull request.
+
+on:
+  schedule:
+    # Mondays 06:00 UTC.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: drift-canary
+  cancel-in-progress: true
+
+jobs:
+  drift-canary:
+    runs-on: ubuntu-latest
+    services:
+      falkordb:
+        image: falkordb/falkordb:latest
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --progress=false
+      - name: Run smoke tests against FalkorDB :latest
+        run: npm run test:smoke
+        env:
+          FALKORDB_SMOKE: "1"
+          FALKORDB_URL: redis://localhost:6379
