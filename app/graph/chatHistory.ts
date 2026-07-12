@@ -19,8 +19,23 @@ interface VersionedChatHistory {
     messages: Message[];
 }
 
+const CHAT_ROLES = new Set(["user", "assistant"]);
+const CHAT_TYPES = new Set(["Text", "Result", "Error", "Status", "CypherQuery", "CypherResult"]);
+
+function isOptionalNumber(value: unknown): boolean {
+    return value == null || typeof value === "number";
+}
+
 function isMessageLike(value: unknown): value is Message {
-    return value != null && typeof value === "object" && !Array.isArray(value) && "role" in value;
+    if (value == null || typeof value !== "object" || Array.isArray(value)) return false;
+    const message = value as Record<string, unknown>;
+    return (
+        CHAT_ROLES.has(message.role as string) &&
+        typeof message.content === "string" &&
+        CHAT_TYPES.has(message.type as string) &&
+        isOptionalNumber(message.confidence) &&
+        isOptionalNumber(message.tokenUsage)
+    );
 }
 
 /**
@@ -33,7 +48,9 @@ function isMessageLike(value: unknown): value is Message {
  * - A `{ version, messages }` object is used as-is only when the version
  *   matches the current one; unknown versions are discarded rather than
  *   guessed at.
- * Non-object entries are filtered out so a stray `null` can't crash rendering.
+ * Non-conforming entries (wrong shape, non-string content, invalid role/type,
+ * or non-numeric confidence/tokenUsage) are filtered out so corrupt storage
+ * can't crash rendering.
  */
 export function parseStoredMessages(raw: string | null): Message[] {
     if (!raw) return [];

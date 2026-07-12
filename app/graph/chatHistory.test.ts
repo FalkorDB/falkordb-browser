@@ -43,11 +43,34 @@ describe("parseStoredMessages", () => {
         assert.equal(parsed[0].confidence, undefined);
     });
 
-    it("filters out non-object entries so a stray null cannot crash rendering", () => {
-        const raw = JSON.stringify([null, result("a", 0.8), "oops", [1, 2]]);
+    it("filters out malformed entries so corrupt storage cannot crash rendering", () => {
+        const raw = JSON.stringify([
+            null,
+            "oops",
+            [1, 2],
+            { role: "assistant", type: "Status", content: {} }, // non-string content
+            { role: "bogus", type: "Result", content: "x" }, // invalid role
+            { role: "assistant", type: "Nope", content: "x" }, // invalid type
+            { role: "assistant", type: "Result", content: "x", confidence: "90" }, // non-numeric confidence
+            { role: "assistant", type: "Result", content: "x", tokenUsage: "5" }, // non-numeric tokenUsage
+            result("a", 0.8),
+        ]);
         const parsed = parseStoredMessages(raw);
         assert.equal(parsed.length, 1);
         assert.equal(parsed[0].confidence, 80);
+    });
+
+    it("keeps valid messages with null/absent optional numeric fields", () => {
+        const raw = JSON.stringify([
+            { role: "user", content: "hi", type: "Text" },
+            { role: "assistant", content: "a", type: "Result", confidence: null, tokenUsage: null },
+            { role: "assistant", content: "b", type: "Result", confidence: 90, tokenUsage: 5 },
+        ]);
+        const parsed = parseStoredMessages(raw);
+        assert.equal(parsed.length, 3);
+        assert.equal(parsed[0].confidence, undefined);
+        assert.equal(parsed[1].confidence, null);
+        assert.equal(parsed[2].confidence, 90);
     });
 
     it("uses versioned payloads as-is without rescaling", () => {

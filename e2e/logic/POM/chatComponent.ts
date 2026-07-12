@@ -420,14 +420,6 @@ export default class ChatComponent extends GraphPage {
     );
   }
 
-  async getChatConfidenceBadgeLabel(): Promise<string | null> {
-    return interactWhenVisible(
-      this.chatConfidenceBadge.last(),
-      (el) => el.getAttribute("aria-label"),
-      "Chat Confidence Badge Label"
-    );
-  }
-
   async getChatConfidenceBadgeCount(): Promise<number> {
     return this.chatConfidenceBadge.count();
   }

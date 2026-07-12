@@ -704,13 +704,11 @@ test.describe("Chat Feature Tests", () => {
     const hasConfidenceBadge = await chat.waitForChatConfidenceBadge();
     expect(hasConfidenceBadge).toBe(true);
 
+    // The badge text carries the visible percentage plus the screen-reader tier label
     const confidenceText = await chat.getChatConfidenceBadgeText();
     expect(confidenceText).toContain("90%");
-
     // 90 falls in the high-confidence tier
-    const confidenceLabel = await chat.getChatConfidenceBadgeLabel();
-    expect(confidenceLabel).toContain("High confidence");
-    expect(confidenceLabel).toContain("90%");
+    expect(confidenceText).toContain("High confidence");
 
     // Footer should now display token data
     const hasTokens = await chat.waitForChatFooterTokens();
@@ -838,7 +836,7 @@ test.describe("Chat Feature Tests", () => {
     await chat.clickChatSendButton();
     await chat.waitForAssistantResponse("Result");
     expect(await chat.getChatConfidenceBadgeText()).toContain("90%");
-    expect(await chat.getChatConfidenceBadgeLabel()).toContain("High confidence");
+    expect(await chat.getChatConfidenceBadgeText()).toContain("High confidence");
 
     // 70 → Medium confidence (inclusive lower boundary)
     await chat.fillChatInput("Second question");
@@ -848,12 +846,12 @@ test.describe("Chat Feature Tests", () => {
     await page.waitForFunction(
       () => {
         const badge = document.querySelectorAll('[data-testid="chatConfidenceBadge"]');
-        return badge[badge.length - 1]?.getAttribute("aria-label")?.includes("Medium confidence");
+        return badge[badge.length - 1]?.textContent?.includes("Medium confidence");
       },
       { timeout: 5000 }
     );
     expect(await chat.getChatConfidenceBadgeText()).toContain("70%");
-    expect(await chat.getChatConfidenceBadgeLabel()).toContain("Medium confidence");
+    expect(await chat.getChatConfidenceBadgeText()).toContain("Medium confidence");
 
     // 69 → Low confidence (just below the medium boundary)
     await chat.fillChatInput("Third question");
@@ -863,12 +861,12 @@ test.describe("Chat Feature Tests", () => {
     await page.waitForFunction(
       () => {
         const badge = document.querySelectorAll('[data-testid="chatConfidenceBadge"]');
-        return badge[badge.length - 1]?.getAttribute("aria-label")?.includes("Low confidence");
+        return badge[badge.length - 1]?.textContent?.includes("Low confidence");
       },
       { timeout: 5000 }
     );
     expect(await chat.getChatConfidenceBadgeText()).toContain("69%");
-    expect(await chat.getChatConfidenceBadgeLabel()).toContain("Low confidence");
+    expect(await chat.getChatConfidenceBadgeText()).toContain("Low confidence");
 
     await page.unroute("**/api/chat");
     await apiCall.removeGraph(graphName);

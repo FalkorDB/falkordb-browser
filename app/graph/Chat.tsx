@@ -486,10 +486,10 @@ export default function Chat({ onClose }: Props) {
                                         style.wrap
                                     )}
                                     title={`${style.label}: how confident the model is that this answer is correct given the graph data`}
-                                    aria-label={`${style.label}, ${confidence}%`}
                                 >
                                     <span className={cn("h-1.5 w-1.5 rounded-full", style.dot)} aria-hidden />
-                                    <span className="text-muted-foreground">Confidence</span>
+                                    <span className="sr-only">{style.label}: </span>
+                                    <span className="text-muted-foreground" aria-hidden>Confidence</span>
                                     <span className="tabular-nums">{confidence}%</span>
                                 </span>
                             );
