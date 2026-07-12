@@ -289,28 +289,32 @@ export async function getSSEGraphResult(
     });
 
     evtSource.addEventListener("error", (event: MessageEvent) => {
-      handled = true;
-      let rawMessage: unknown = "";
-      let rawStatus: unknown = 0;
-      let code: string | undefined;
       const eventData = typeof (event as { data?: unknown }).data === "string"
         ? (event as { data?: string }).data
         : "";
 
-      if (eventData) {
-        try {
-          const payload = JSON.parse(eventData) as {
-            message?: unknown;
-            status?: unknown;
-            code?: string;
-          };
-          rawMessage = payload.message;
-          rawStatus = payload.status;
-          code = payload.code;
-        } catch (error) {
-          rawMessage = extractResponseErrorMessage(eventData);
-          console.error("Failed to parse SSE error event:", error);
-        }
+      // A native EventSource "error" (network/connection failure) carries no
+      // data — leave it for evtSource.onerror below so it surfaces as an
+      // offline/network error instead of a generic "Request failed".
+      if (!eventData) return;
+
+      handled = true;
+      let rawMessage: unknown = "";
+      let rawStatus: unknown = 0;
+      let code: string | undefined;
+
+      try {
+        const payload = JSON.parse(eventData) as {
+          message?: unknown;
+          status?: unknown;
+          code?: string;
+        };
+        rawMessage = payload.message;
+        rawStatus = payload.status;
+        code = payload.code;
+      } catch (error) {
+        rawMessage = extractResponseErrorMessage(eventData);
+        console.error("Failed to parse SSE error event:", error);
       }
 
       if (!rawMessage) {
@@ -654,10 +658,13 @@ export const getMetaStats = async (name: string, toast: ToastFn, setIndicator: (
     if (!result) return undefined;
 
     const row = result.data?.[0];
-    if (!row || typeof row !== "object") return undefined;
+    if (!row || typeof row !== "object" || Array.isArray(row)) return undefined;
 
-    const labels = row.labels && typeof row.labels === "object" ? row.labels : {};
-    const relationships = row.relationships && typeof row.relationships === "object" ? row.relationships : {};
+    const { labels, relationships } = row;
+    if (
+      !labels || typeof labels !== "object" || Array.isArray(labels) ||
+      !relationships || typeof relationships !== "object" || Array.isArray(relationships)
+    ) return undefined;
 
     const l = Object.entries(labels);
     const r = Object.entries(relationships);

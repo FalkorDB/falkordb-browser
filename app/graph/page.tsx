@@ -91,9 +91,14 @@ export default function Page() {
     const prevGraphNameRef = useRef<string | undefined>(undefined);
 
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
-    // Ref that always mirrors selectedElements so the graph-change restore effect
-    // can read the current full selection without adding it as a dependency.
-    const selectedElementsRef = useRef<(Node | Link)[]>([]);
+    // Ref that mirrors selectedElements tagged with the graph it belongs to, so the
+    // graph-change restore effect can read the current full selection without adding
+    // it as a dependency — and skip restoring a selection made in a different graph.
+    const selectedElementsRef = useRef<{ graphId: string; elements: (Node | Link)[] }>({ graphId: "", elements: [] });
+    // Mirror the current graph id at render time so the sync effect can tag the
+    // selection with the graph it was made in.
+    const currentGraphIdRef = useRef(graph.Id);
+    currentGraphIdRef.current = graph.Id;
     const [chatOpen, setChatOpen] = useState(false);
     const { size: chatSize, onResize: onChatResize } = useResizableSize("chat-size", 400, 500, 300, 300);
     const [queriesOpen, setQueriesOpen] = useState(false);
@@ -339,20 +344,31 @@ export default function Page() {
     // Keep selectedElementsRef in sync so the restore effect below can read the
     // full multi-selection without adding selectedElements as a dependency.
     useEffect(() => {
-        selectedElementsRef.current = selectedElements;
+        selectedElementsRef.current = { graphId: currentGraphIdRef.current, elements: selectedElements };
     }, [selectedElements]);
 
     // Restore selected element from context when graph data loads, otherwise clear selection
     useEffect(() => {
         if (!graph.Id) return;
-        if (graph.NodesMap.size === 0 && graph.LinksMap.size === 0) return;
+
+        const { graphId: selectionGraphId, elements: prev } = selectedElementsRef.current;
+        const canRestore = selectionGraphId === graph.Id && prev.length > 0;
+
+        if (graph.NodesMap.size === 0 && graph.LinksMap.size === 0) {
+            // Empty graph (e.g. a query returned no rows). Drop a selection carried
+            // over from a *different* graph so a stale element panel doesn't linger;
+            // keep a same-graph selection untouched (the graph may be mid-reload).
+            if (!canRestore && selectedElements.length > 0) handleSetSelectedElements();
+            return;
+        }
 
         // When new query results load a fresh Graph object (setGraphInfo mutates
         // GraphInfo in-place and does NOT trigger this effect), preserve the full
         // multi-selection by re-resolving every previously selected element from
-        // the new graph's NodesMap/LinksMap.
-        const prev = selectedElementsRef.current;
-        if (prev.length > 0) {
+        // the new graph's NodesMap/LinksMap. Only restore a selection made in THIS
+        // graph — FalkorDB node/edge ids are per-graph, so restoring across a graph
+        // switch could resolve unrelated same-id elements.
+        if (canRestore) {
             const restored = prev.flatMap(el => {
                 const found = 'source' in el
                     ? graph.LinksMap.get(el.id)
