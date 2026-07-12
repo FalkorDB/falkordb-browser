@@ -230,18 +230,28 @@ export default function Page() {
         const graphNameJustChanged = prevGraphNameRef.current !== graphName;
         prevGraphNameRef.current = graphName;
 
+        // Neutralizes in-flight polls when the effect re-runs (graph/connection
+        // change) or unmounts, so a late poll can't write stale metadata onto the
+        // graph that is now active (setGraphInfo mutates the current graph).
+        let cancelled = false;
+
         const handleSetInfo = () => Promise.all([
             fetchMetaStats(graphName),
             fetchInfo("(property key)"),
         ]).then(async ([newDataStats, newPropertyKeys]) => {
+            if (cancelled) return;
+
             const memoryUsage = showMemoryUsage ? await getMemoryUsage(graphName, toast, setIndicator, activeConnectionId) : new Map<string, MemoryValue>();
             const newLabels = newDataStats?.[0] || [];
             const newRelationships = newDataStats?.[1] || [];
 
             const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
+            if (cancelled) return;
+
             setGraphInfo(gi);
             fetchCount(graphName);
         }).catch((error) => {
+            if (cancelled) return;
             toast({
                 title: "Error",
                 description: (error as Error).message || "Failed to fetch graph info",
@@ -263,6 +273,7 @@ export default function Page() {
         const interval = setInterval(handleSetInfo, refreshInterval * 1000);
 
         return () => {
+            cancelled = true;
             clearInterval(interval);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
