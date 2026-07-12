@@ -642,9 +642,15 @@ export function createAbortError(): Error {
 }
 
 /** True when the given error is an abort (from createAbortError or a native
- *  fetch/AbortController abort). */
+ *  fetch/AbortController abort). Native aborts reject with a DOMException named
+ *  "AbortError", which is NOT an `instanceof Error` in browsers — so match on
+ *  the `name` of any object rather than the Error prototype. */
 export function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === "AbortError";
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { name?: unknown }).name === "AbortError"
+  );
 }
 
 function normalizeApiUrl(input: string): string {

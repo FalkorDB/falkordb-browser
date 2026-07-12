@@ -287,7 +287,13 @@ describe("abort helpers", () => {
     const native = new Error("stop");
     native.name = "AbortError";
     assert.equal(isAbortError(native), true);
+    // Real fetch / AbortController aborts reject with a DOMException, which is
+    // not an `instanceof Error` in browsers — it must still be recognized.
+    assert.equal(isAbortError(new DOMException("Aborted", "AbortError")), true);
+    // Any object whose name is "AbortError" (defensive against host differences).
+    assert.equal(isAbortError({ name: "AbortError" }), true);
     assert.equal(isAbortError(new Error("boom")), false);
+    assert.equal(isAbortError(new DOMException("Timeout", "TimeoutError")), false);
     assert.equal(isAbortError(null), false);
     assert.equal(isAbortError("AbortError"), false);
   });
