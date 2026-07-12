@@ -183,6 +183,35 @@ describe("getSSEGraphResult error handling", () => {
       mock.restore();
     }
   });
+
+  it("propagates options.query and the server message into the error toast payload", async () => {
+    const mock = installMockEventSource();
+    const toasts: Array<Record<string, unknown>> = [];
+    try {
+      const query = "MATCH (n) RETURN n";
+      const promise = getSSEGraphResult(
+        "api/graph/demo?query=RETURN 1",
+        (t) => { toasts.push(t as Record<string, unknown>); },
+        () => {},
+        { query },
+      );
+      const instance = mock.getInstance();
+
+      instance.listeners.error({ data: JSON.stringify({ message: "Syntax error near WHERE", status: 400 }) } as MessageEvent);
+
+      await assert.rejects(promise);
+      assert.equal(toasts.length, 1);
+      const payload = toasts[0];
+      // The originating query is carried through for error highlighting/debugging.
+      assert.equal(payload.query, query);
+      assert.equal(payload.variant, "destructive");
+      assert.equal(typeof payload.title, "string");
+      // The raw server message is preserved (verbatim or behind "See more").
+      assert.ok(JSON.stringify(payload).includes("Syntax error near WHERE"));
+    } finally {
+      mock.restore();
+    }
+  });
 });
 
 describe("getMetaStats", () => {
