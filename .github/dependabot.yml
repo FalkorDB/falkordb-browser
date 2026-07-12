@@ -16,11 +16,11 @@ updates:
         update-types:
           - "patch"
     ignore:
-      # TypeScript 7 (native Go compiler) ships no JS Compiler API, which
+      # TypeScript 7.0 (native Go compiler) ships no JS Compiler API, which
       # Next.js relies on for `next build` type-checking, so the bump breaks
-      # the build. Remove this once we're on Next.js >= 16.3.0 (experimental
-      # useTypeScriptCli) or TypeScript 7.1 restores the programmatic API.
+      # the build. Scoped to 7.0.x only: TypeScript 7.1 is expected to restore
+      # the programmatic API, so allow Dependabot to propose 7.1+ when it lands.
       # See https://github.com/vercel/next.js/pull/95639
       - dependency-name: "typescript"
-        versions: ["7.x"]
+        versions: ["7.0.x"]
 
