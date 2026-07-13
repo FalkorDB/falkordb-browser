@@ -1,12 +1,16 @@
 import {
     S3Client,
-    PutObjectCommand,
+    GetObjectCommand,
+    HeadObjectCommand,
     DeleteObjectCommand,
     DeleteObjectsCommand,
     ListObjectsV2Command,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { Upload } from "@aws-sdk/lib-storage";
+import type { Readable } from "stream";
 import type { CsvStorageProvider } from "./csv-storage";
+import { isValidOwner, normalizeCsvKey } from "./csv-key";
 
 /** How long (seconds) the presigned GET URL remains valid for FalkorDB to fetch. */
 function resolveReadExpiresIn(): number {
@@ -15,19 +19,19 @@ function resolveReadExpiresIn(): number {
 }
 const READ_EXPIRES_IN = resolveReadExpiresIn(); // default 1 hour
 
+function keyPrefix(): string {
+    return (process.env.S3_KEY_PREFIX ?? "csv-temp/").replace(/\/?$/, "/");
+}
+
 function buildClient(): S3Client {
     return new S3Client({
         region: process.env.S3_REGION ?? "us-east-1",
-        // Leave endpoint undefined for real AWS S3; set for R2 / MinIO.
         ...(process.env.S3_ENDPOINT ? { endpoint: process.env.S3_ENDPOINT } : {}),
         credentials: {
             accessKeyId: process.env.S3_ACCESS_KEY_ID!,
             secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
         },
-        // Required for path-style access (MinIO, some R2 configs).
-        ...(process.env.S3_FORCE_PATH_STYLE === "true"
-            ? { forcePathStyle: true }
-            : {}),
+        ...(process.env.S3_FORCE_PATH_STYLE === "true" ? { forcePathStyle: true } : {}),
     });
 }
 
@@ -37,85 +41,90 @@ function bucket(): string {
     return b;
 }
 
-function objectKey(key: string): string {
-    const prefix = (process.env.S3_KEY_PREFIX ?? "csv-temp/").replace(/\/?$/, "/");
-    return `${prefix}${key}.csv`;
+function requireOwner(owner: string): string {
+    if (!isValidOwner(owner)) throw new Error("Invalid CSV owner.");
+    return owner;
 }
+
+/** Owner-scoped object key: `<prefix>/<owner>/<uuid>.csv`. */
+function objectKey(owner: string, key: string): string {
+    return `${keyPrefix()}${requireOwner(owner)}/${normalizeCsvKey(key)}.csv`;
+}
+
+// Exact owner/uuid leaf under the prefix — cleanup only deletes our own objects.
+const OWNED_LEAF =
+    /\/[0-9a-f]{32}\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.csv$/;
 
 /**
  * Stores CSV files in a private S3 bucket (or compatible: R2, MinIO).
- * Returns a presigned GET URL valid for READ_EXPIRES_IN seconds so FalkorDB
- * can fetch the file via LOAD CSV without the bucket being public.
  *
  * Security layers:
- *   - Bucket is private — no public access at all.
- *   - Presigned GET URL expires in ≤1 h even if explicit delete fails.
- *   - Explicit delete is called in `finally` after the LOAD CSV query.
- *   - Add an S3 lifecycle rule on the prefix as a belt-and-suspenders cleanup.
+ *   - Bucket is private — no public access.
+ *   - A fresh presigned GET URL (≤1 h) is generated at execution time.
+ *   - Objects are scoped per owner; cleanup only removes exact owner/uuid leaves.
+ *   - Multipart streaming upload — never buffers the whole (large) file.
  */
 export class S3CsvStorage implements CsvStorageProvider {
     private readonly client = buildClient();
 
-    async store(key: string, bytes: Uint8Array): Promise<string> {
-        const s3Key = objectKey(key);
-
-        // Upload the file to S3.
-        await this.client.send(
-            new PutObjectCommand({
+    async store(owner: string, key: string, body: Readable): Promise<void> {
+        const upload = new Upload({
+            client: this.client,
+            params: {
                 Bucket: bucket(),
-                Key: s3Key,
-                Body: bytes,
+                Key: objectKey(owner, key),
+                Body: body,
                 ContentType: "text/csv; charset=utf-8",
-                // Explicitly block any public access — belt-and-suspenders.
-                // (Bucket-level block-public-access should already cover this.)
-            })
-        );
+            },
+        });
+        await upload.done();
+    }
 
-        // Generate a presigned GET URL for FalkorDB to fetch.
-        const { GetObjectCommand } = await import("@aws-sdk/client-s3");
-        const readUrl = await getSignedUrl(
+    async resolveReadUrl(owner: string, key: string): Promise<string> {
+        const s3Key = objectKey(owner, key);
+        // Confirm the object exists (and thus belongs to this owner) before use.
+        await this.client.send(new HeadObjectCommand({ Bucket: bucket(), Key: s3Key }));
+        return getSignedUrl(
             this.client,
             new GetObjectCommand({ Bucket: bucket(), Key: s3Key }),
             { expiresIn: READ_EXPIRES_IN }
         );
-
-        return readUrl;
     }
 
-    async delete(key: string): Promise<void> {
+    async delete(owner: string, key: string): Promise<void> {
         await this.client
-            .send(new DeleteObjectCommand({ Bucket: bucket(), Key: objectKey(key) }))
+            .send(new DeleteObjectCommand({ Bucket: bucket(), Key: objectKey(owner, key) }))
             .catch((err: unknown) => {
-                // Log but never throw — delete is best-effort cleanup.
                 console.error("[S3CsvStorage] delete failed:", err);
             });
     }
 
     async cleanupExpired(olderThanMs: number): Promise<number> {
         const b = bucket();
-        const prefix = (process.env.S3_KEY_PREFIX ?? "csv-temp/").replace(/\/?$/, "/");
+        const prefix = keyPrefix();
         let continuationToken: string | undefined;
         let deleted = 0;
 
         do {
+            // eslint-disable-next-line no-await-in-loop
             const listed = await this.client.send(
-                new ListObjectsV2Command({
-                    Bucket: b,
-                    Prefix: prefix,
-                    ContinuationToken: continuationToken,
-                })
+                new ListObjectsV2Command({ Bucket: b, Prefix: prefix, ContinuationToken: continuationToken })
             );
 
             const staleKeys = (listed.Contents ?? [])
-                .filter((obj) => obj.Key && obj.LastModified && obj.LastModified.getTime() <= olderThanMs)
+                .filter(
+                    (obj) =>
+                        obj.Key &&
+                        OWNED_LEAF.test(obj.Key) &&
+                        obj.LastModified &&
+                        obj.LastModified.getTime() <= olderThanMs
+                )
                 .map((obj) => ({ Key: obj.Key as string }));
 
             if (staleKeys.length > 0) {
+                // eslint-disable-next-line no-await-in-loop
                 const result = await this.client.send(
-                    new DeleteObjectsCommand({
-                        Bucket: b,
-                        Delete: { Objects: staleKeys, Quiet: true },
-                    })
+                    new DeleteObjectsCommand({ Bucket: b, Delete: { Objects: staleKeys, Quiet: true } })
                 );
                 deleted += result.Deleted?.length ?? 0;
             }

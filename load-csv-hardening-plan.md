@@ -1,22 +1,32 @@
-# Follow-up PR plan: Harden & re-enable **Load CSV** upload
+# Follow-up PR plan: Harden & re-enable **Load CSV** upload (native `LOAD CSV` + streaming object storage)
 
 ## Context
 PR #1911 ships **Cypher batch** upload and **gates Load CSV off** behind
 `CSV_UPLOAD_ENABLED = false` (`lib/graphUpload.ts`) because a rubber-duck review
 found several security/correctness issues in the new CSV temp-storage subsystem,
 and it had **zero test coverage**. This follow-up PR fixes every issue, adds full
-coverage, and re-enables the feature by flipping the flag.
+coverage, and re-enables the feature.
 
-**Do not start implementing until this plan is approved.**
+## Approach
+Use FalkorDB's native **`LOAD CSV`** command. Because the DB fetches the CSV
+itself (`file://` from a shared `IMPORT_FOLDER`, or `https://`) and the browser
+may run **separately** from the DB (e.g. Vercel → remote FalkorDB), the upload is
+**streamed** to a **pluggable object store** the DB can reach:
+- **S3 / R2 / MinIO** (preferred, streaming multipart) → presigned HTTPS GET.
+- **Vercel Blob** (streaming) → presigned/blob HTTPS URL.
+- **local** (stream to disk) → `file://` (co-located) or signed-capability HTTPS serve.
+
+**Prefer S3/Blob for large files** — cloud storage streams with no local-disk
+limit; the local Docker temp dir may be too small. Uploads stream end-to-end
+(constant memory), size-capped via `CSV_MAX_FILE_SIZE_MB` (413 on exceed).
 
 ## Scope (files)
 - `app/api/graph/[graph]/load-csv/route.ts`
-- `app/api/csv-temp/route.ts`, `app/api/csv-temp/[id]/route.ts`, `app/api/csv-temp/cleanup/route.ts`
-- `app/lib/csv-storage.ts`, `csv-storage-local.ts`, `csv-storage-s3.ts`, `csv-storage-vercel-blob.ts`, `csv-temp-config.ts`
+- `app/api/csv-temp/route.ts`, `app/api/csv-temp/[id]/route.ts`, `app/api/csv-temp/cleanup/route.ts`, `stream-csv.ts`, `csv-head.ts`
+- `app/lib/csv-storage.ts`, `csv-storage-local.ts`, `csv-storage-s3.ts`, `csv-storage-vercel-blob.ts`, `csv-temp-config.ts`, `csv-key.ts`
 - `app/components/graph/UploadGraph.tsx` (Load CSV tab)
-- `lib/graphUpload.ts` (flip `CSV_UPLOAD_ENABLED`)
-- `.github/workflows/playwright.yml` (shared `IMPORT_FOLDER` volume for e2e), `vercel.json` (cron auth), `.env.local.template` / `readme-browser.md` (final contract)
-- Possibly the central query route (`app/api/graph/[graph]/route.ts`) and/or deployment network config, depending on the chosen SSRF policy
+- `lib/graphUpload.ts` (`CSV_UPLOAD_ENABLED`, `containsLoadCsv`)
+- `.github/workflows/playwright.yml` (shared `IMPORT_FOLDER` volume for e2e), `.env.local.template` / `readme-browser.md` (final contract)
 - New tests under each module + `e2e/tests/uploadGraph.spec.ts`
 
 ## Fixes (each maps to a rubber-duck finding)

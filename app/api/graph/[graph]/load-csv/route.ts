@@ -2,69 +2,36 @@ import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
 import { getCorsHeaders, resolveReadOnly } from "../../../utils";
 import { getCsvStorageProvider } from "@/app/lib/csv-storage";
-import path from "path";
-import { pathToFileURL } from "url";
-import { getCsvTempDir } from "@/app/lib/csv-storage-local";
-import { CSV_UPLOAD_ENABLED } from "@/lib/graphUpload";
+import { hashOwner, isValidCsvKey, normalizeCsvKey } from "@/app/lib/csv-key";
+import { CSV_UPLOAD_ENABLED, containsLoadCsv } from "@/lib/graphUpload";
 
 interface LoadCsvBody {
     key?: string;
-    query?: string;
+    withHeaders?: boolean;
+    body?: string;
 }
-
-function downgradeLoadCsvUrlToHttp(query: string): string {
-    const pattern = /(LOAD\s+CSV(?:\s+WITH\s+HEADERS)?\s+FROM\s+')([^']+)('\s+AS\s+row)/i;
-    const match = query.match(pattern);
-    if (!match) return query;
-
-    const originalUrl = match[2].trim();
-    let downgradedUrl = originalUrl;
-
-    try {
-        const parsed = new URL(originalUrl);
-        if (parsed.protocol === "https:") {
-            parsed.protocol = "http:";
-            downgradedUrl = parsed.toString();
-        }
-    } catch {
-        // Keep original URL if parsing fails.
-    }
-
-    return query.replace(pattern, `$1${downgradedUrl}$3`);
-}
-
-function replaceLoadCsvUrl(query: string, nextUrl: string): string {
-    const pattern = /(LOAD\s+CSV(?:\s+WITH\s+HEADERS)?\s+FROM\s+')([^']+)('\s+AS\s+row)/i;
-    return query.replace(pattern, `$1${nextUrl}$3`);
-}
-
-function buildLocalCsvFileUri(key: string): string {
-    const localUriMode = process.env.CSV_LOCAL_LOAD_URI_MODE?.toLowerCase();
-    if (localUriMode === "file") {
-        return `file://${key.toLowerCase()}.csv`;
-    }
-
-    const filePath = path.join(getCsvTempDir(), `${key.toLowerCase()}.csv`);
-    return pathToFileURL(filePath).toString();
-}
-
-const UUID_PATTERN =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function OPTIONS(request: Request) {
     return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
 
 /**
- * Execute a `LOAD CSV FROM '...' AS row` Cypher query against the graph.
+ * Execute a native `LOAD CSV [WITH HEADERS] FROM $csvUrl AS row <body>` query.
  *
- * Temporary CSV files are deleted only after a successful import. On failure,
- * files are kept so users can adjust query options and retry.
+ * The client sends only `{ key, withHeaders, body }` — never the URL. The server
+ * resolves the owner-scoped URL from the storage provider and passes it as a
+ * query PARAMETER (`$csvUrl`), so the fetched URL can never be attacker
+ * controlled (SSRF-safe) and cannot be injected into the Cypher. The user body
+ * may not contain its own `LOAD CSV` clause.
+ *
+ * The temp file is deleted only after a successful import; failures keep it so
+ * the user can adjust and retry, and the scheduled cleanup removes leftovers.
  */
 export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ graph: string }> }
 ) {
+    let owner: string | null = null;
     let keyToDelete: string | null = null;
     let shouldDeleteTempFile = false;
 
@@ -81,9 +48,9 @@ export async function POST(
 
         const { graph: graphId } = await params;
 
-        let body: LoadCsvBody;
+        let parsed: LoadCsvBody;
         try {
-            body = (await request.json()) as LoadCsvBody;
+            parsed = (await request.json()) as LoadCsvBody;
         } catch {
             return NextResponse.json(
                 { message: "Invalid request body." },
@@ -91,18 +58,23 @@ export async function POST(
             );
         }
 
-        const { key, query } = body;
+        const { key, withHeaders, body } = parsed;
 
-        if (!key || !query?.trim()) {
+        if (!key || !body?.trim()) {
             return NextResponse.json(
-                { message: "key and query are required." },
+                { message: "key and a query body are required." },
                 { status: 400, headers: getCorsHeaders(request) }
             );
         }
-
-        if (!UUID_PATTERN.test(key)) {
+        if (!isValidCsvKey(key)) {
             return NextResponse.json(
                 { message: "Invalid key." },
+                { status: 400, headers: getCorsHeaders(request) }
+            );
+        }
+        if (containsLoadCsv(body)) {
+            return NextResponse.json(
+                { message: "The query must not contain its own LOAD CSV clause." },
                 { status: 400, headers: getCorsHeaders(request) }
             );
         }
@@ -114,14 +86,28 @@ export async function POST(
             );
         }
 
-        // Register before query execution so the finally block always cleans up.
-        keyToDelete = key;
+        owner = hashOwner(session.user.id);
+        const safeKey = normalizeCsvKey(key);
+        const provider = getCsvStorageProvider();
+
+        let csvUrl: string;
+        try {
+            csvUrl = await provider.resolveReadUrl(owner, safeKey);
+        } catch {
+            return NextResponse.json(
+                { message: "Uploaded CSV not found. Please re-upload and try again." },
+                { status: 404, headers: getCorsHeaders(request) }
+            );
+        }
+
+        keyToDelete = safeKey;
 
         const graph = session.client.selectGraph(graphId);
-        const loadCsvQuery = query.trim();
+        const withHeadersClause = withHeaders ? "WITH HEADERS " : "";
+        const loadCsvQuery = `LOAD CSV ${withHeadersClause}FROM $csvUrl AS row\n${body.trim()}`;
 
         try {
-            const result = await graph.query(loadCsvQuery);
+            const result = await graph.query(loadCsvQuery, { params: { csvUrl } });
             shouldDeleteTempFile = true;
             return NextResponse.json(
                 { message: "LOAD CSV completed successfully.", result },
@@ -129,67 +115,15 @@ export async function POST(
             );
         } catch (queryError) {
             console.error(queryError);
-
-            let message = (queryError as Error).message || "Failed to execute the LOAD CSV query.";
-            const isUnsupportedUriError = /unsupported uri/i.test(message);
-
-            // Some FalkorDB builds reject https URIs for LOAD CSV. Try a
-            // one-time protocol downgrade and rerun.
-            if (isUnsupportedUriError) {
-                const httpFallbackQuery = downgradeLoadCsvUrlToHttp(loadCsvQuery);
-                if (httpFallbackQuery !== loadCsvQuery) {
-                    try {
-                        const fallbackResult = await graph.query(httpFallbackQuery);
-                        shouldDeleteTempFile = true;
-                        return NextResponse.json(
-                            {
-                                message: "LOAD CSV completed successfully (using HTTP URL fallback).",
-                                result: fallbackResult,
-                            },
-                            { status: 200, headers: getCorsHeaders(request) }
-                        );
-                    } catch (fallbackError) {
-                        console.error(fallbackError);
-                        message = (fallbackError as Error).message || message;
-                    }
-                }
-
-                // Some local FalkorDB setups support file:// imports while
-                // rejecting HTTP(S) URLs for LOAD CSV.
-                try {
-                    const fileUriFallbackQuery = replaceLoadCsvUrl(
-                        loadCsvQuery,
-                        buildLocalCsvFileUri(key)
-                    );
-                    if (fileUriFallbackQuery !== loadCsvQuery) {
-                        const fileUriFallbackResult = await graph.query(fileUriFallbackQuery);
-                        shouldDeleteTempFile = true;
-                        return NextResponse.json(
-                            {
-                                message: "LOAD CSV completed successfully (using local file URI fallback).",
-                                result: fileUriFallbackResult,
-                            },
-                            { status: 200, headers: getCorsHeaders(request) }
-                        );
-                    }
-                } catch (fileUriFallbackError) {
-                    console.error(fileUriFallbackError);
-                    message = (fileUriFallbackError as Error).message || message;
-                }
-            }
-
+            const message = (queryError as Error).message || "Failed to execute the LOAD CSV query.";
             const isHeaderError = /failed reading csv header row/i.test(message);
-            const isUnsupportedAfterFallback = /unsupported uri/i.test(message);
-            const isErrorOpeningCsvUri = /error opening csv uri/i.test(message);
-            const usesFileScheme = /LOAD\s+CSV(?:\s+WITH\s+HEADERS)?\s+FROM\s+'file:\/\//i.test(loadCsvQuery);
+            const isFetchError = /(unsupported uri|error opening csv uri)/i.test(message);
             return NextResponse.json(
                 {
                     message: isHeaderError
-                        ? "Failed reading CSV header row. Verify the file has a valid header row, or disable 'Use CSV headers' and access columns as row[0], row[1], ..."
-                        : isErrorOpeningCsvUri && usesFileScheme
-                            ? "FalkorDB could not open the file:// CSV in IMPORT_FOLDER. Ensure Docker mounts your local CSV directory into /var/lib/FalkorDB/import and that IMPORT_FOLDER is set to /var/lib/FalkorDB/import/."
-                        : isUnsupportedAfterFallback
-                            ? "Unsupported URI for LOAD CSV. This FalkorDB instance likely cannot fetch the URL scheme. re-upload the CSV, and retry."
+                        ? "Failed reading CSV header row. Verify the file has a valid header row, or turn off 'Use CSV headers' and access columns as row[0], row[1], ..."
+                        : isFetchError
+                            ? "FalkorDB could not fetch the uploaded CSV. Check the CSV storage configuration (CSV_STORAGE / CSV_SERVE_BASE_URL / IMPORT_FOLDER) so the database can reach the file."
                             : message,
                 },
                 { status: 422, headers: getCorsHeaders(request) }
@@ -202,11 +136,8 @@ export async function POST(
             { status: 500, headers: getCorsHeaders(request) }
         );
     } finally {
-        // Delete temp file only after a successful import. On failure, keep it
-        // so the user can tweak the query/headers mode and retry; cron cleanup
-        // removes stale leftovers.
-        if (keyToDelete && shouldDeleteTempFile) {
-            await getCsvStorageProvider().delete(keyToDelete).catch(() => undefined);
+        if (owner && keyToDelete && shouldDeleteTempFile) {
+            await getCsvStorageProvider().delete(owner, keyToDelete).catch(() => undefined);
         }
     }
 }
