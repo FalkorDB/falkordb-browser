@@ -45,6 +45,10 @@ export class CsvHeadTransform extends Transform {
         this.headChunks = [];
         this.headDone = true;
 
+        if (head.length === 0) {
+            cb(new CsvValidationError("The file is empty."));
+            return;
+        }
         if (headLooksBinary(head)) {
             cb(new CsvValidationError("The file does not appear to be a valid CSV (contains binary data)."));
             return;

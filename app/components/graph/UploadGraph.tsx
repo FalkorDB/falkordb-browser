@@ -100,6 +100,11 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
     const cypherFormRef = useRef<HTMLFormElement>(null);
     const uploadCsvFormRef = useRef<HTMLFormElement>(null);
     const loadCsvFormRef = useRef<HTMLFormElement>(null);
+    // Synchronous re-entrancy guard shared by all three ingestion handlers.
+    // `isLoading` is async React state, but Monaco's Enter keybinding calls
+    // requestSubmit() directly, so two submits can race before it renders —
+    // guarding here prevents executing a Cypher batch / LOAD CSV twice.
+    const inFlightRef = useRef(false);
 
     const udfSuggestions = useMemo(() => buildUdfFunctionSuggestions(udfList), [udfList]);
 
@@ -269,6 +274,8 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             toast({ title: "Error", description: "Please select exactly one file.", variant: "destructive" });
             return;
         }
+        if (inFlightRef.current) return;
+        inFlightRef.current = true;
 
         try {
             setIsLoading(true);
@@ -278,7 +285,15 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             const uploadResult = await uploadFileWithProgress("api/upload", cypherFiles[0], toast, setIndicator, setUploadPct);
             if (!uploadResult.ok) return;
 
-            const { id } = JSON.parse(uploadResult.body) as { id: string };
+            let id: string;
+            try {
+                const parsed = JSON.parse(uploadResult.body) as { id?: string };
+                if (!parsed.id) throw new Error("Missing id in upload response");
+                id = parsed.id;
+            } catch {
+                toast({ title: "Upload failed", description: "Unexpected response from server.", variant: "destructive" });
+                return;
+            }
             setPhase("processing");
 
             const processResult = await securedFetch(
@@ -294,7 +309,14 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             setCypherFiles([]);
             onSuccess?.();
             handleOpenChange(false, true);
+        } catch {
+            toast({
+                title: "Upload status unknown",
+                description: "The upload may not have completed. Refresh and verify the graph before retrying to avoid duplicating data.",
+                variant: "destructive",
+            });
         } finally {
+            inFlightRef.current = false;
             setIsLoading(false);
             setPhase(null);
             setUploadPct(0);
@@ -323,6 +345,8 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             toast({ title: "Error", description: "Please select exactly one CSV file.", variant: "destructive" });
             return;
         }
+        if (inFlightRef.current) return;
+        inFlightRef.current = true;
 
         try {
             setIsLoading(true);
@@ -348,7 +372,14 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             setCsvKey(key);
             setCsvFileName(fileName);
             setCsvQuery(buildLoadCsvBodyStarter());
+        } catch {
+            toast({
+                title: "Upload status unknown",
+                description: "The CSV upload may not have completed. Try again.",
+                variant: "destructive",
+            });
         } finally {
+            inFlightRef.current = false;
             setIsLoading(false);
             setPhase(null);
             setUploadPct(0);
@@ -364,6 +395,8 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
         }
 
         if (!csvKey || !csvQuery.trim()) return;
+        if (inFlightRef.current) return;
+        inFlightRef.current = true;
 
         try {
             setIsLoading(true);
@@ -443,7 +476,10 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                         setIndicator
                     );
                 } catch {
-                    graphInfo = graph.GraphInfo;
+                    // Only fall back to the current graph's cached schema when it
+                    // IS the graph we just imported into — otherwise we'd publish a
+                    // different graph's schema as this one's.
+                    graphInfo = graph.Id === graphName ? graph.GraphInfo : undefined;
                 }
 
                 const nextGraph = await Graph.create(
@@ -484,7 +520,14 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
 
             onSuccess?.();
             handleOpenChange(false, true);
+        } catch {
+            toast({
+                title: "LOAD CSV status unknown",
+                description: "The import may not have completed. Refresh and verify the graph before retrying to avoid duplicating data.",
+                variant: "destructive",
+            });
         } finally {
+            inFlightRef.current = false;
             setIsLoading(false);
             setPhase(null);
         }

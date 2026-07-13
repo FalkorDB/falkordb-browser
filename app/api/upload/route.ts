@@ -62,7 +62,16 @@ async function streamToDisk(
       // on total parts so a flood of parts can't tie up the parser.
       busboy = Busboy({
         headers: { "content-type": contentType },
-        limits: { files: 1, fields: 0, parts: 10 },
+        // A busboy-level fileSize cap cuts oversized bodies off at the parser,
+        // bounding the DoS surface even for rejected file types that are only
+        // drained (resumed) without the per-type write check below. Use the
+        // largest currently-acceptable size as the hard ceiling.
+        limits: {
+          files: 1,
+          fields: 0,
+          parts: 10,
+          fileSize: DUMP_RESTORE_ENABLED ? MAX_DUMP_SIZE : MAX_FILE_SIZE,
+        },
       });
     } catch (err) {
       // A malformed/missing multipart content-type makes the parser throw on
@@ -73,6 +82,11 @@ async function streamToDisk(
     }
 
     busboy.on("file", (fieldname, fileStream, info) => {
+      // Handle the file stream's error up front so a parser-driven destroy (e.g.
+      // on the size-cap path below, or a client abort) can't emit an unhandled
+      // "error" event and crash the process.
+      fileStream.on("error", () => undefined);
+
       // Ignore unexpected field names and any file after the first, so a crafted
       // multipart body can't write extra files or stall the parser. Draining the
       // stream lets busboy finish parsing cleanly.
@@ -118,6 +132,17 @@ async function streamToDisk(
       const sizeLimit = BINARY_EXTENSIONS.has(extension) ? MAX_DUMP_SIZE : MAX_FILE_SIZE;
       let bytesWritten = 0;
       let sizeLimitHit = false;
+
+      // If the busboy fileSize ceiling truncates the stream (an oversized upload
+      // right at the ceiling that the strict `>` check below can miss), reject it
+      // rather than silently accepting a truncated file.
+      fileStream.on("limit", () => {
+        if (sizeLimitHit) return;
+        sizeLimitHit = true;
+        writeStream.destroy();
+        fs.unlink(tempFilePath, () => {});
+        done({ ok: false, error: "File is too large.", status: 413 });
+      });
 
       fileStream.on("data", (chunk: Buffer) => {
         bytesWritten += chunk.length;
@@ -205,7 +230,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Post-write content validation (reads from disk — never buffers the upload).
-    const valid = await validateContentFromPath(extension, filePath);
+    let valid: boolean;
+    try {
+      valid = await validateContentFromPath(extension, filePath);
+    } catch (error) {
+      // Don't leave the finalized (potentially sensitive) file on disk if the
+      // validator itself throws — the outer catch would otherwise 500 and orphan it.
+      await fs.promises.unlink(filePath).catch(() => {});
+      throw error;
+    }
     if (!valid) {
       await fs.promises.unlink(filePath).catch(() => {});
       return NextResponse.json({ error: "Invalid file contents." }, { status: 400, headers: corsHeaders });

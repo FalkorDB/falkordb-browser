@@ -3,7 +3,7 @@
 "use client";
 
 import React, { useState, useContext, useEffect } from "react";
-import { InfoIcon, Plus, File, X } from "lucide-react";
+import { InfoIcon, Plus, File as FileIcon, X } from "lucide-react";
 import { prepareArg, securedFetch, uploadFileWithProgress } from "@/lib/utils";
 import { DUMP_RESTORE_ENABLED } from "@/lib/graphUpload";
 import { useToast } from "@/components/ui/use-toast";
@@ -194,7 +194,7 @@ export default function CreateGraph({
                     />
                     {files.length === 1 && (
                         <div className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm">
-                            <File size={14} className="shrink-0 text-muted-foreground" />
+                            <FileIcon size={14} className="shrink-0 text-muted-foreground" />
                             <span className="truncate flex-1">{files[0].name}</span>
                             <button
                                 type="button"
