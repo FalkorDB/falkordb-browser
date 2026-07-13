@@ -3,7 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCorsHeaders, resolveReadOnly } from "../../../utils";
 import { getCsvStorageProvider } from "@/app/lib/csv-storage";
 import { hashOwner, isValidCsvKey, normalizeCsvKey } from "@/app/lib/csv-key";
+import { assertFalkorFetchableCsvUrl, CsvUrlConfigError } from "@/app/lib/csv-load-url";
 import { CSV_UPLOAD_ENABLED, containsLoadCsv } from "@/lib/graphUpload";
+
+/**
+ * Interval for keep-alive heartbeat bytes streamed while a (potentially long,
+ * atomic) LOAD CSV runs, so idle proxies/load balancers don't drop the request.
+ */
+const HEARTBEAT_INTERVAL_MS = 15_000;
 
 interface LoadCsvBody {
     key?: string;
@@ -33,7 +40,6 @@ export async function POST(
 ) {
     let owner: string | null = null;
     let keyToDelete: string | null = null;
-    let shouldDeleteTempFile = false;
 
     try {
         if (!CSV_UPLOAD_ENABLED) {
@@ -108,42 +114,90 @@ export async function POST(
 
         keyToDelete = safeKey;
 
+        // Fail fast with a clear message when the storage is misconfigured to
+        // produce a URL FalkorDB cannot fetch (e.g. MinIO/S3 over http, or a
+        // non-HTTPS local serve base) — otherwise LOAD CSV silently reads 0 rows
+        // or errors opaquely.
+        try {
+            assertFalkorFetchableCsvUrl(csvUrl);
+        } catch (configError) {
+            if (configError instanceof CsvUrlConfigError) {
+                console.error("[load-csv] unsupported CSV storage URL:", configError.message);
+                return NextResponse.json(
+                    { message: configError.message },
+                    { status: 422, headers: getCorsHeaders(request) }
+                );
+            }
+            throw configError;
+        }
+
         const graph = session.client.selectGraph(graphId);
         const withHeadersClause = withHeaders ? "WITH HEADERS " : "";
         const loadCsvQuery = `LOAD CSV ${withHeadersClause}FROM $csvUrl AS row\n${body.trim()}`;
 
-        try {
-            const result = await graph.query(loadCsvQuery, { params: { csvUrl } });
-            shouldDeleteTempFile = true;
-            return NextResponse.json(
-                { message: "LOAD CSV completed successfully.", result },
-                { status: 200, headers: getCorsHeaders(request) }
-            );
-        } catch (queryError) {
-            console.error(queryError);
-            const message = (queryError as Error).message || "Failed to execute the LOAD CSV query.";
-            const isHeaderError = /failed reading csv header row/i.test(message);
-            const isFetchError = /(unsupported uri|error opening csv uri)/i.test(message);
-            return NextResponse.json(
-                {
-                    message: isHeaderError
+        // LOAD CSV is a single atomic query with no observable row-by-row progress
+        // and can run long on large files. Stream a keep-alive heartbeat
+        // (JSON-safe whitespace) while it runs so idle proxies/load balancers don't
+        // drop the connection, then emit exactly one final JSON object:
+        // `{ message, result }` on success or `{ error: { message, status } }` on a
+        // query error. The temp object is deleted only on success (kept for retry
+        // otherwise). Pre-query validation above still returns normal status codes.
+        const ownerForDelete = owner;
+        const keyForDelete = keyToDelete;
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream<Uint8Array>({
+            async start(controller) {
+                const heartbeat = setInterval(() => {
+                    try {
+                        controller.enqueue(encoder.encode("\n"));
+                    } catch {
+                        // stream already closed
+                    }
+                }, HEARTBEAT_INTERVAL_MS);
+
+                let importSucceeded = false;
+                try {
+                    const result = await graph.query(loadCsvQuery, { params: { csvUrl } });
+                    importSucceeded = true;
+                    controller.enqueue(
+                        encoder.encode(
+                            JSON.stringify({ message: "LOAD CSV completed successfully.", result })
+                        )
+                    );
+                } catch (queryError) {
+                    console.error(queryError);
+                    const raw = (queryError as Error).message || "Failed to execute the LOAD CSV query.";
+                    const isHeaderError = /failed reading csv header row/i.test(raw);
+                    const isFetchError = /(unsupported uri|error opening csv uri)/i.test(raw);
+                    const message = isHeaderError
                         ? "Failed reading CSV header row. Verify the file has a valid header row, or turn off 'Use CSV headers' and access columns as row[0], row[1], ..."
                         : isFetchError
                             ? "FalkorDB could not fetch the uploaded CSV. Check the CSV storage configuration (CSV_STORAGE / CSV_SERVE_BASE_URL / IMPORT_FOLDER) so the database can reach the file."
-                            : message,
-                },
-                { status: 422, headers: getCorsHeaders(request) }
-            );
-        }
+                            : raw;
+                    controller.enqueue(encoder.encode(JSON.stringify({ error: { message, status: 422 } })));
+                } finally {
+                    clearInterval(heartbeat);
+                    controller.close();
+                    if (importSucceeded && ownerForDelete && keyForDelete) {
+                        await getCsvStorageProvider().delete(ownerForDelete, keyForDelete).catch(() => undefined);
+                    }
+                }
+            },
+        });
+
+        return new Response(stream, {
+            status: 200,
+            headers: {
+                "Content-Type": "application/json; charset=utf-8",
+                "Cache-Control": "no-store",
+                ...getCorsHeaders(request),
+            },
+        });
     } catch (error) {
         console.error(error);
         return NextResponse.json(
             { message: "Failed to execute the LOAD CSV query." },
             { status: 500, headers: getCorsHeaders(request) }
         );
-    } finally {
-        if (owner && keyToDelete && shouldDeleteTempFile) {
-            await getCsvStorageProvider().delete(owner, keyToDelete).catch(() => undefined);
-        }
     }
 }

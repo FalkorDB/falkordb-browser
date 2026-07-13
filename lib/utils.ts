@@ -539,6 +539,8 @@ const USER_READABLE_ERROR_PATTERNS = [
   /\bis not a valid identifier\b/i,
   /^duplicate csv column\b/i,
   /\bfailed to (?:restore the graph dump|process csv rows?|process the csv file|execute cypher statement|execute the cypher batch)\b/i,
+  /\bcan only fetch csv files over https\b/i,
+  /^the csv storage produced an invalid url\b/i,
 ];
 
 function isAllowlistedUserError(message: string): boolean {
