@@ -492,9 +492,14 @@ test.describe("Chat Feature Tests", () => {
     // Inject fake model + plain-text API key into localStorage so
     // handleSubmit does not bail out before sending the request.
     const page = await browser.getPage();
+    // The response is mocked below, so no real LLM/key is needed. Use the "local"
+    // model source to skip handleSubmit's API-key guard — this avoids the flaky
+    // async legacy-secretKey → encrypted-chatApiKeys migration (server round-trips
+    // after reload) that previously made this test race and intermittently fail
+    // with "No API Key Provided".
     await page.evaluate(() => {
       localStorage.setItem("model", "gpt-4o-mini");
-      localStorage.setItem("secretKey", "fake-test-key-for-markdown");
+      localStorage.setItem("chatModelSource", "local");
     });
     // Reload so the React context picks up the new values
     await page.reload({ waitUntil: "networkidle" });
@@ -674,6 +679,7 @@ test.describe("Chat Feature Tests", () => {
     await page.addInitScript(({ selectedModel }) => {
       localStorage.setItem("model", selectedModel);
       localStorage.setItem("secretKey", "fake-key-footer-test");
+      localStorage.setItem("chatModelSource", "local"); // mock-only: skip API-key guard (avoids flaky async key migration)
     }, { selectedModel: DEFAULT_CHAT_MODEL });
     await page.goto(urls.graphUrl);
     await page.waitForLoadState("networkidle");
@@ -736,6 +742,7 @@ test.describe("Chat Feature Tests", () => {
     await page.addInitScript(({ selectedModel }) => {
       localStorage.setItem("model", selectedModel);
       localStorage.setItem("secretKey", "fake-key-footer-test");
+      localStorage.setItem("chatModelSource", "local"); // mock-only: skip API-key guard (avoids flaky async key migration)
     }, { selectedModel: DEFAULT_CHAT_MODEL });
     await page.goto(urls.graphUrl);
     await page.waitForLoadState("networkidle");
@@ -803,6 +810,7 @@ test.describe("Chat Feature Tests", () => {
     await page.addInitScript(({ selectedModel }) => {
       localStorage.setItem("model", selectedModel);
       localStorage.setItem("secretKey", "fake-key-confidence-tiers");
+      localStorage.setItem("chatModelSource", "local"); // mock-only: skip API-key guard (avoids flaky async key migration)
     }, { selectedModel: DEFAULT_CHAT_MODEL });
     await page.goto(urls.graphUrl);
     await page.waitForLoadState("networkidle");
@@ -884,6 +892,7 @@ test.describe("Chat Feature Tests", () => {
     await page.addInitScript(({ selectedModel }) => {
       localStorage.setItem("model", selectedModel);
       localStorage.setItem("secretKey", "fake-key-footer-persist");
+      localStorage.setItem("chatModelSource", "local"); // mock-only: skip API-key guard (avoids flaky async key migration)
     }, { selectedModel: DEFAULT_CHAT_MODEL });
     await page.goto(urls.graphUrl);
     await page.waitForLoadState("networkidle");
@@ -941,6 +950,7 @@ test.describe("Chat Feature Tests", () => {
     await page.addInitScript(({ selectedModel }) => {
       localStorage.setItem("model", selectedModel);
       localStorage.setItem("secretKey", "fake-key-footer-model");
+      localStorage.setItem("chatModelSource", "local"); // mock-only: skip API-key guard (avoids flaky async key migration)
     }, { selectedModel: DEFAULT_CHAT_MODEL });
     await page.goto(urls.graphUrl);
     await page.waitForLoadState("networkidle");

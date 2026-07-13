@@ -4,7 +4,7 @@
 
 import React, { useState, useContext, useEffect } from "react";
 import { InfoIcon, Plus, File, X } from "lucide-react";
-import { prepareArg, securedFetch } from "@/lib/utils";
+import { prepareArg, securedFetch, uploadFileWithProgress } from "@/lib/utils";
 import { DUMP_RESTORE_ENABLED } from "@/lib/graphUpload";
 import { useToast } from "@/components/ui/use-toast";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -88,20 +88,51 @@ export default function CreateGraph({
                 return;
             }
 
-            if (hasDump) {
-                toast({
-                    title: "Restore unavailable",
-                    description: "Dump restore API is not currently available. Create the graph first, then use Upload Data to import data.",
-                    variant: "destructive"
-                });
-                return;
+            if (!hasDump) {
+                const result = await securedFetch(`api/graph/${prepareArg(name)}${isReadOnly ? '?readOnly=true' : ''}`, {
+                    method: "POST",
+                }, toast, setIndicator);
+
+                if (!result.ok) return;
+            } else {
+                setPhase("uploading");
+                setUploadPct(0);
+
+                const uploadResult = await uploadFileWithProgress(
+                    "api/upload",
+                    files[0],
+                    toast,
+                    setIndicator,
+                    setUploadPct
+                );
+
+                if (!uploadResult.ok) return;
+
+                let id: string;
+                try {
+                    const parsed = JSON.parse(uploadResult.body) as { id?: string };
+                    if (!parsed.id) throw new Error("Missing id in upload response");
+                    id = parsed.id;
+                } catch {
+                    toast({ title: "Upload failed", description: "Unexpected response from server.", variant: "destructive" });
+                    return;
+                }
+
+                setPhase("processing");
+
+                const processResult = await securedFetch(
+                    `api/graph/${prepareArg(name)}/upload`,
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ mode: "dump", fileId: id })
+                    },
+                    toast,
+                    setIndicator
+                );
+
+                if (!processResult.ok) return;
             }
-
-            const result = await securedFetch(`api/graph/${prepareArg(name)}${isReadOnly ? '?readOnly=true' : ''}`, {
-                method: "POST",
-            }, toast, setIndicator);
-
-            if (!result.ok) return;
 
             onSetGraphName(name);
             setGraphName("");

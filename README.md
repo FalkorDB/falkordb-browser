@@ -120,11 +120,7 @@ GET).
   S3_SECRET_ACCESS_KEY=minioadmin
   S3_REGION=us-east-1
   S3_BUCKET=falkordb-csv-temp
-<<<<<<< HEAD
-  S3_ENDPOINT=https://minio.example.com
-=======
-  S3_ENDPOINT=https://minio.your-domain.example   # must be HTTPS-reachable by FalkorDB
->>>>>>> f822d4b52a6326a378dea4fed18693e3b7a284da
+  S3_ENDPOINT=https://minio.example.com   # must be HTTPS-reachable by FalkorDB
   S3_FORCE_PATH_STYLE=true
   S3_KEY_PREFIX=csv-temp/
   S3_URL_EXPIRES_IN=3600
@@ -134,12 +130,8 @@ GET).
 
 Notes:
 - Keep the bucket private (default in the init container).
-<<<<<<< HEAD
 - Signed URLs are generated automatically for LOAD CSV and must be HTTPS-reachable by FalkorDB.
 - For local non-TLS MinIO (`http://localhost:9000`), prefer `CSV_STORAGE=local` with `CSV_LOCAL_LOAD_URI_MODE=file`.
-=======
-- Signed HTTPS URLs are generated automatically for LOAD CSV.
->>>>>>> f822d4b52a6326a378dea4fed18693e3b7a284da
 - MinIO console is available at `http://localhost:9001` (user/password: `minioadmin`/`minioadmin`).
 
 ### Deploy to Kubernetes with Helm
