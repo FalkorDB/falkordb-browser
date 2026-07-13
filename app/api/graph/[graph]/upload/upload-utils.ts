@@ -16,7 +16,8 @@ export async function executeCypherBatch(graph: Graph, batchText: string): Promi
       // eslint-disable-next-line no-await-in-loop
       await graph.query(statements[index]);
     } catch (error) {
-      throw new Error(`Failed to execute Cypher statement ${index + 1}: ${(error as Error).message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to execute Cypher statement ${index + 1}: ${message}`);
     }
   }
 

@@ -12,10 +12,10 @@ function multipartRequest(
     const form = new FormData();
     for (const part of parts) {
         if (part.filename === undefined) {
-            form.set(part.field, typeof part.content === "string" ? part.content : part.content.toString());
+            form.append(part.field, typeof part.content === "string" ? part.content : part.content.toString());
         } else {
             const bytes = typeof part.content === "string" ? Buffer.from(part.content) : part.content;
-            form.set(part.field, new File([new Uint8Array(bytes)], part.filename, { type: "text/csv" }));
+            form.append(part.field, new File([new Uint8Array(bytes)], part.filename, { type: "text/csv" }));
         }
     }
     const req = new Request("http://localhost/api/csv-temp", { method: "POST", body: form });
@@ -64,6 +64,19 @@ test("streamCsvUpload strips a leading UTF-8 BOM before storing", async () => {
     );
     assert.deepEqual(result, { ok: true });
     assert.equal(sink.bytes.toString(), "name,age\nAlice,30\n");
+});
+
+test("streamCsvUpload rejects a BOM-only CSV with 400", async () => {
+    const sink = collectingStore();
+    const result = await run(
+        [{ field: "file", filename: "empty.csv", content: "\uFEFF" }],
+        sink.store
+    );
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+        assert.equal(result.status, 400);
+        assert.match(result.error, /empty/i);
+    }
 });
 
 test("streamCsvUpload rejects binary content (NUL byte) with 400", async () => {
@@ -148,6 +161,27 @@ test("streamCsvUpload settles when the store rejects immediately (no deadlock)",
     );
     assert.equal(result.ok, false);
     if (!result.ok) assert.equal(result.status, 500);
+});
+
+test("streamCsvUpload rejects a second large file part without hanging", async () => {
+    const sink = collectingStore();
+    const bigSecondFile = Buffer.alloc(8 * 1024 * 1024, 0x61);
+    const result = await withTimeout(
+        run(
+            [
+                { field: "file", filename: "first.csv", content: "a,b\n1,2\n" },
+                { field: "file", filename: "second.csv", content: bigSecondFile },
+            ],
+            sink.store
+        ),
+        5000
+    );
+
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+        assert.equal(result.status, 400);
+        assert.match(result.error, /single file/i);
+    }
 });
 
 test("streamCsvUpload settles (500) without crashing when the source errors mid-store", async () => {

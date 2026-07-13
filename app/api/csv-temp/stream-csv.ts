@@ -78,6 +78,12 @@ export async function streamCsvUpload(
             drain(sourceStream);
         };
 
+        const abortParser = (status: number, error: string) => {
+            recordError(status, error);
+            abortActiveStore(new Error(error));
+            busboy.destroy(new Error(error));
+        };
+
         // Resolve only once busboy has closed and any store has settled.
         const settleIfReady = () => {
             if (!busboyClosed || !storeSettled) return;
@@ -175,9 +181,9 @@ export async function streamCsvUpload(
                 );
         });
 
-        busboy.on("filesLimit", () => recordError(400, "Only a single file may be uploaded."));
-        busboy.on("fieldsLimit", () => recordError(400, "Unexpected form fields."));
-        busboy.on("partsLimit", () => recordError(400, "Too many form parts."));
+        busboy.on("filesLimit", () => abortParser(400, "Only a single file may be uploaded."));
+        busboy.on("fieldsLimit", () => abortParser(400, "Unexpected form fields."));
+        busboy.on("partsLimit", () => abortParser(400, "Too many form parts."));
 
         busboy.on("close", () => {
             busboyClosed = true;

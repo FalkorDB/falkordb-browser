@@ -57,12 +57,13 @@ async function streamToDisk(
 
     let busboy: ReturnType<typeof Busboy>;
     try {
+      const parserMaxFileSize = DUMP_RESTORE_ENABLED ? MAX_DUMP_SIZE : MAX_FILE_SIZE;
       // Conservative limits make the single-file upload contract explicit and cap
       // the DoS surface: at most one file part, no text fields, and a small ceiling
       // on total parts so a flood of parts can't tie up the parser.
       busboy = Busboy({
         headers: { "content-type": contentType },
-        limits: { files: 1, fields: 0, parts: 10 },
+        limits: { files: 1, fields: 0, parts: 10, fileSize: parserMaxFileSize },
       });
     } catch (err) {
       // A malformed/missing multipart content-type makes the parser throw on
@@ -73,6 +74,9 @@ async function streamToDisk(
     }
 
     busboy.on("file", (fieldname, fileStream, info) => {
+      // Prevent unhandled 'error' events when the stream is destroyed on limits.
+      fileStream.on("error", () => undefined);
+
       // Ignore unexpected field names and any file after the first, so a crafted
       // multipart body can't write extra files or stall the parser. Draining the
       // stream lets busboy finish parsing cleanly.
@@ -205,7 +209,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Post-write content validation (reads from disk — never buffers the upload).
-    const valid = await validateContentFromPath(extension, filePath);
+    let valid: boolean;
+    try {
+      valid = await validateContentFromPath(extension, filePath);
+    } catch {
+      await fs.promises.unlink(filePath).catch(() => {});
+      throw new Error("Failed to validate uploaded file.");
+    }
     if (!valid) {
       await fs.promises.unlink(filePath).catch(() => {});
       return NextResponse.json({ error: "Invalid file contents." }, { status: 400, headers: corsHeaders });

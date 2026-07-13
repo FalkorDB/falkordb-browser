@@ -32,32 +32,34 @@ test.describe("Upload Graph – Cypher batch", () => {
   test(`@admin Upload a Cypher batch file and verify nodes are created`, async () => {
     const graphName = getRandomString("uploadCypher");
     await apiCall.addGraph(graphName);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      await graph.uploadGraphData(graphName, "cypher", CYPHER_FIXTURE);
 
-    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-    await graph.uploadGraphData(graphName, "cypher", CYPHER_FIXTURE);
+      expect(await graph.toast.textContent()).toContain("Upload completed");
 
-    expect(await graph.toast.textContent()).toContain("Upload completed");
-
-    const result = await apiCall.runQuery(
-      graphName,
-      "MATCH (n:City) RETURN count(n) AS cnt"
-    );
-    const cnt = result.data[0]?.cnt ?? result.data[0]?.["count(n)"];
-    expect(Number(cnt)).toBe(3);
-
-    await apiCall.removeGraph(graphName);
+      const result = await apiCall.runQuery(
+        graphName,
+        "MATCH (n:City) RETURN count(n) AS cnt"
+      );
+      const cnt = result.data[0]?.cnt ?? result.data[0]?.["count(n)"];
+      expect(Number(cnt)).toBe(3);
+    } finally {
+      await apiCall.removeGraph(graphName).catch(() => undefined);
+    }
   });
 
   test(`@admin Upload button is disabled when no file is selected`, async () => {
     const graphName = getRandomString("uploadNoFile");
     await apiCall.addGraph(graphName);
-
-    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-    await graph.openUploadDialog(graphName);
-    // No file attached — confirm button should be disabled (Cypher-only dialog)
-    expect(await graph.uploadConfirm.isDisabled()).toBe(true);
-
-    await apiCall.removeGraph(graphName);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      await graph.openUploadDialog(graphName);
+      // No file attached — confirm button should be disabled (Cypher-only dialog)
+      expect(await graph.uploadConfirm.isDisabled()).toBe(true);
+    } finally {
+      await apiCall.removeGraph(graphName).catch(() => undefined);
+    }
   });
 });
 
@@ -82,38 +84,40 @@ test.describe("Upload Graph – Load CSV", () => {
     testInfo.setTimeout(90000);
     const graphName = getRandomString("loadCsv");
     await apiCall.addGraph(graphName);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      await graph.loadCsvData(
+        graphName,
+        CSV_FIXTURE,
+        "CREATE (:Person {name: row.name, age: toInteger(row.age), city: row.city})",
+        true
+      );
 
-    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-    await graph.loadCsvData(
-      graphName,
-      CSV_FIXTURE,
-      "CREATE (:Person {name: row.name, age: toInteger(row.age), city: row.city})",
-      true
-    );
+      expect(await graph.toast.textContent()).toContain("LOAD CSV completed");
 
-    expect(await graph.toast.textContent()).toContain("LOAD CSV completed");
-
-    const result = await apiCall.runQuery(
-      graphName,
-      "MATCH (n:Person) RETURN count(n) AS cnt"
-    );
-    const cnt = result.data[0]?.cnt ?? result.data[0]?.["count(n)"];
-    expect(Number(cnt)).toBe(3);
-
-    await apiCall.removeGraph(graphName);
+      const result = await apiCall.runQuery(
+        graphName,
+        "MATCH (n:Person) RETURN count(n) AS cnt"
+      );
+      const cnt = result.data[0]?.cnt ?? result.data[0]?.["count(n)"];
+      expect(Number(cnt)).toBe(3);
+    } finally {
+      await apiCall.removeGraph(graphName).catch(() => undefined);
+    }
   });
 
   test(`@admin Upload CSV button is disabled until a CSV file is selected`, async () => {
     const graphName = getRandomString("csvNoInput");
     await apiCall.addGraph(graphName);
-
-    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-    await graph.openUploadDialog(graphName);
-    await graph.selectUploadTab("csv");
-    // No file selected — the "Upload CSV" button should be disabled.
-    expect(await graph.csvUploadTempConfirm.isDisabled()).toBe(true);
-
-    await apiCall.removeGraph(graphName);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      await graph.openUploadDialog(graphName);
+      await graph.selectUploadTab("csv");
+      // No file selected — the "Upload CSV" button should be disabled.
+      expect(await graph.csvUploadTempConfirm.isDisabled()).toBe(true);
+    } finally {
+      await apiCall.removeGraph(graphName).catch(() => undefined);
+    }
   });
 });
 

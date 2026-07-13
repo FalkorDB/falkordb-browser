@@ -100,6 +100,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
     const cypherFormRef = useRef<HTMLFormElement>(null);
     const uploadCsvFormRef = useRef<HTMLFormElement>(null);
     const loadCsvFormRef = useRef<HTMLFormElement>(null);
+    const uploadInFlightRef = useRef(false);
 
     const udfSuggestions = useMemo(() => buildUdfFunctionSuggestions(udfList), [udfList]);
 
@@ -194,7 +195,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
     }, [toast]);
 
     const handleOpenChange = (nextOpen: boolean, force = false) => {
-        if (!nextOpen && isLoading && !force) return;
+        if (!nextOpen && (isLoading || uploadInFlightRef.current) && !force) return;
 
         // If user closes/cancels after uploading a CSV (but before execution),
         // try deleting the temp file immediately as a best-effort cleanup.
@@ -270,7 +271,10 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             return;
         }
 
+        if (uploadInFlightRef.current) return;
+
         try {
+            uploadInFlightRef.current = true;
             setIsLoading(true);
             setPhase("uploading");
             setUploadPct(0);
@@ -278,7 +282,15 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             const uploadResult = await uploadFileWithProgress("api/upload", cypherFiles[0], toast, setIndicator, setUploadPct);
             if (!uploadResult.ok) return;
 
-            const { id } = JSON.parse(uploadResult.body) as { id: string };
+            let id: string;
+            try {
+                const parsed = JSON.parse(uploadResult.body) as { id?: string };
+                if (!parsed.id) throw new Error("Missing id in upload response");
+                id = parsed.id;
+            } catch {
+                toast({ title: "Upload failed", description: "Unexpected response from server.", variant: "destructive" });
+                return;
+            }
             setPhase("processing");
 
             const processResult = await securedFetch(
@@ -294,7 +306,14 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             setCypherFiles([]);
             onSuccess?.();
             handleOpenChange(false, true);
+        } catch {
+            toast({
+                title: "Upload state uncertain",
+                description: "The request may have completed. Refresh and verify graph data before retrying.",
+                variant: "destructive",
+            });
         } finally {
+            uploadInFlightRef.current = false;
             setIsLoading(false);
             setPhase(null);
             setUploadPct(0);
@@ -324,7 +343,10 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             return;
         }
 
+        if (uploadInFlightRef.current) return;
+
         try {
+            uploadInFlightRef.current = true;
             setIsLoading(true);
             setPhase("uploading");
             setUploadPct(0);
@@ -348,7 +370,14 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             setCsvKey(key);
             setCsvFileName(fileName);
             setCsvQuery(buildLoadCsvBodyStarter());
+        } catch {
+            toast({
+                title: "Upload state uncertain",
+                description: "The request may have completed. Refresh and verify before retrying.",
+                variant: "destructive",
+            });
         } finally {
+            uploadInFlightRef.current = false;
             setIsLoading(false);
             setPhase(null);
             setUploadPct(0);
@@ -365,7 +394,10 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
 
         if (!csvKey || !csvQuery.trim()) return;
 
+        if (uploadInFlightRef.current) return;
+
         try {
+            uploadInFlightRef.current = true;
             setIsLoading(true);
             setPhase("processing");
 
@@ -443,7 +475,9 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                         setIndicator
                     );
                 } catch {
-                    graphInfo = graph.GraphInfo;
+                    graphInfo = graph.Id === graphName
+                        ? graph.GraphInfo
+                        : undefined;
                 }
 
                 const nextGraph = await Graph.create(
@@ -484,7 +518,14 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
 
             onSuccess?.();
             handleOpenChange(false, true);
+        } catch {
+            toast({
+                title: "Upload state uncertain",
+                description: "The import may have completed. Refresh and verify graph data before retrying.",
+                variant: "destructive",
+            });
         } finally {
+            uploadInFlightRef.current = false;
             setIsLoading(false);
             setPhase(null);
         }
