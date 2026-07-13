@@ -19,10 +19,11 @@ export type CsvUploadResult = { ok: true } | { ok: false; error: string; status:
  * The result is resolved only after BOTH busboy has closed AND the store has
  * settled, so a late error or an extra/delayed part can't be accepted, and the
  * caller's post-failure delete can't race a still-writing store (e.g. a local
- * `.part` rename). When the store/validator rejects mid-file, the source stream
- * is drained so busboy can still reach `close` instead of deadlocking. On any
- * non-ok result the caller should best-effort delete the (possibly partial)
- * object.
+ * `.part` rename). When the head validator/store rejects mid-file — or the
+ * source/parser fails while a store is still active — the validator is destroyed
+ * so the store rejects, and the source is drained so busboy can still reach
+ * `close` instead of deadlocking. On any non-ok result the caller should
+ * best-effort delete the (possibly partial) object.
  */
 export async function streamCsvUpload(
     request: NextRequest,
@@ -41,9 +42,11 @@ export async function streamCsvUpload(
         let fileSeen = false;
         let sizeLimitHit = false;
         let busboyClosed = false;
+        let storeStarted = false;
         let storeSettled = false;
         let terminalError: { status: number; error: string } | null = null;
         let sourceStream: Readable | null = null;
+        let validatorStream: CsvHeadTransform | null = null;
 
         const finish = (result: CsvUploadResult) => {
             if (!settled) {
@@ -64,6 +67,15 @@ export async function streamCsvUpload(
                 stream.unpipe();
                 stream.resume();
             }
+        };
+
+        // Fail an in-flight store: destroy the validator so the store's read
+        // rejects (its own handler then sets storeSettled), and drain the source.
+        const abortActiveStore = (err: Error) => {
+            if (validatorStream && !validatorStream.destroyed) {
+                validatorStream.destroy(err);
+            }
+            drain(sourceStream);
         };
 
         // Resolve only once busboy has closed and any store has settled.
@@ -88,6 +100,20 @@ export async function streamCsvUpload(
             finish({ ok: true });
         };
 
+        // A source/parser failure. Don't synthesize storeSettled while a store is
+        // still active — abort it and let its own handler settle it; only mark
+        // settled when nothing was being stored.
+        const failPipeline = (message: string) => {
+            recordError(500, message);
+            busboyClosed = true;
+            if (storeStarted && !storeSettled) {
+                abortActiveStore(new Error(message));
+            } else {
+                storeSettled = true;
+            }
+            settleIfReady();
+        };
+
         let busboy: ReturnType<typeof Busboy>;
         try {
             busboy = Busboy({
@@ -101,6 +127,10 @@ export async function streamCsvUpload(
         }
 
         busboy.on("file", (fieldname, fileStream, info) => {
+            // Always handle the file stream's error so a parser-driven destroy
+            // can't crash the process with an unhandled "error" event.
+            fileStream.on("error", () => undefined);
+
             if (fieldname !== "file" || fileSeen) {
                 fileStream.resume();
                 return;
@@ -120,9 +150,11 @@ export async function streamCsvUpload(
                 sizeLimitHit = true;
             });
 
+            validatorStream = new CsvHeadTransform();
+            storeStarted = true;
             // Defer so a synchronous throw from `store` is caught here too.
             Promise.resolve()
-                .then(() => store(fileStream.pipe(new CsvHeadTransform())))
+                .then(() => store(fileStream.pipe(validatorStream as CsvHeadTransform)))
                 .then(
                     () => {
                         storeSettled = true;
@@ -155,11 +187,7 @@ export async function streamCsvUpload(
 
         busboy.on("error", (err) => {
             console.error("csv busboy error:", err);
-            recordError(500, "Failed to parse upload.");
-            drain(sourceStream);
-            storeSettled = true;
-            busboyClosed = true;
-            settleIfReady();
+            failPipeline("Failed to parse upload.");
         });
 
         pipeline(
@@ -167,11 +195,7 @@ export async function streamCsvUpload(
             busboy
         ).catch((err: unknown) => {
             console.error("csv upload stream error:", err);
-            recordError(500, "Failed to parse upload.");
-            drain(sourceStream);
-            storeSettled = true;
-            busboyClosed = true;
-            settleIfReady();
+            failPipeline("Failed to parse upload.");
         });
     });
 }
