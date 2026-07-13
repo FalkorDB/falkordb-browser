@@ -228,15 +228,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             const uploadResult = await uploadFileWithProgress("api/upload", cypherFiles[0], toast, setIndicator, setUploadPct);
             if (!uploadResult.ok) return;
 
-            let id: string;
-            try {
-                const parsed = JSON.parse(uploadResult.body) as { id?: string };
-                if (!parsed.id) throw new Error("Missing id in upload response");
-                id = parsed.id;
-            } catch {
-                toast({ title: "Upload failed", description: "Unexpected response from server.", variant: "destructive" });
-                return;
-            }
+            const { id } = JSON.parse(uploadResult.body) as { id: string };
             setPhase("processing");
 
             const processResult = await securedFetch(
