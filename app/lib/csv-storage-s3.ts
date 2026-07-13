@@ -9,7 +9,11 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { CsvStorageProvider } from "./csv-storage";
 
 /** How long (seconds) the presigned GET URL remains valid for FalkorDB to fetch. */
-const READ_EXPIRES_IN = Number(process.env.S3_URL_EXPIRES_IN ?? 3600); // 1 hour
+function resolveReadExpiresIn(): number {
+    const raw = Number(process.env.S3_URL_EXPIRES_IN);
+    return Number.isFinite(raw) && raw > 0 ? raw : 3600;
+}
+const READ_EXPIRES_IN = resolveReadExpiresIn(); // default 1 hour
 
 function buildClient(): S3Client {
     return new S3Client({

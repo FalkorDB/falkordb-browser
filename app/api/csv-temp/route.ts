@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { getCorsHeaders } from "../utils";
+import { getCorsHeaders, resolveReadOnly } from "../utils";
 import { getClient } from "../auth/[...nextauth]/options";
 import { MAX_FILE_SIZE } from "../upload/file-validation";
 import { getCsvStorageProvider } from "@/app/lib/csv-storage";
@@ -13,7 +13,7 @@ export async function OPTIONS(request: Request) {
 
 /**
  * Upload a CSV file into a temporary public location.
- * Returns `{ tempId, url }` where `url` can be used directly in a
+ * Returns `{ key, readUrl }` where `readUrl` can be used in a
  * `LOAD CSV FROM '...' AS row` Cypher statement.
  * The file is deleted by the `/api/graph/[graph]/load-csv` endpoint after a
  * successful import; failed imports keep the file for retry and rely on the
@@ -29,6 +29,14 @@ export async function POST(request: NextRequest) {
 
     const session = await getClient(request);
     if (session instanceof NextResponse) return session;
+
+    // Storing a temp CSV is a write; reject Read-Only users like /api/upload.
+    if (resolveReadOnly(request, session.user.role)) {
+        return NextResponse.json(
+            { message: "You do not have permission to upload files." },
+            { status: 403, headers: getCorsHeaders(request) }
+        );
+    }
 
     let formData: FormData;
     try {

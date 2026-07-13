@@ -206,7 +206,7 @@ export async function POST(
         // so the user can tweak the query/headers mode and retry; cron cleanup
         // removes stale leftovers.
         if (keyToDelete && shouldDeleteTempFile) {
-            await getCsvStorageProvider().delete(keyToDelete);
+            await getCsvStorageProvider().delete(keyToDelete).catch(() => undefined);
         }
     }
 }

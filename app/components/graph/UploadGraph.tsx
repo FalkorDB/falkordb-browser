@@ -543,7 +543,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                                     variant="Primary"
                                     isLoading={isLoading}
                                     indicator={indicator}
-                                    disabled={cypherFiles.length !== 1}
+                                    disabled={cypherFiles.length !== 1 || isLoading}
                                     data-testid="uploadGraphConfirm"
                                 />
                                 <CloseDialog data-testid="uploadGraphCancel" disabled={isLoading} />
@@ -607,7 +607,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                                         variant="Primary"
                                         isLoading={isLoading}
                                         indicator={indicator}
-                                        disabled={csvFiles.length !== 1}
+                                        disabled={csvFiles.length !== 1 || isLoading}
                                         data-testid="uploadCsvTempConfirm"
                                     />
                                     <CloseDialog data-testid="uploadGraphCancel" disabled={isLoading} />
@@ -708,7 +708,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                                         variant="Primary"
                                         isLoading={isLoading}
                                         indicator={indicator}
-                                        disabled={!graphName || !fullCsvQuery.trim()}
+                                        disabled={!graphName || !fullCsvQuery.trim() || isLoading}
                                         data-testid="loadCsvRunConfirm"
                                     />
                                     <CloseDialog data-testid="uploadGraphCancel" disabled={isLoading} />
