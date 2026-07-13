@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { cn, convertToCanvasData, getMemoryUsage, getMetaStats, isTwoNodes, Link, MemoryValue, Node, prepareArg, securedFetch, Value } from "@/lib/utils";
+import { cn, convertToCanvasData, getConnectionEpoch, getMemoryUsage, getMetaStats, getSSEGraphResult, isAbortError, isTwoNodes, Link, MemoryValue, Node, prepareArg, securedFetch, Value } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamicImport from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -91,9 +91,14 @@ export default function Page() {
     const prevGraphNameRef = useRef<string | undefined>(undefined);
 
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
-    // Ref that always mirrors selectedElements so the graph-change restore effect
-    // can read the current full selection without adding it as a dependency.
-    const selectedElementsRef = useRef<(Node | Link)[]>([]);
+    // Ref that mirrors selectedElements tagged with the graph it belongs to, so the
+    // graph-change restore effect can read the current full selection without adding
+    // it as a dependency — and skip restoring a selection made in a different graph.
+    const selectedElementsRef = useRef<{ graphId: string; elements: (Node | Link)[] }>({ graphId: "", elements: [] });
+    // Mirror the current graph id at render time so the sync effect can tag the
+    // selection with the graph it was made in.
+    const currentGraphIdRef = useRef(graph.Id);
+    currentGraphIdRef.current = graph.Id;
     const [chatOpen, setChatOpen] = useState(false);
     const { size: chatSize, onResize: onChatResize } = useResizableSize("chat-size", 400, 500, 300, 300);
     const [queriesOpen, setQueriesOpen] = useState(false);
@@ -165,22 +170,61 @@ export default function Page() {
         }
     }, [currentTab, panel, selectedElements.length, setPanel]);
 
-    const fetchInfo = useCallback(async (type: string) => {
+    const fetchInfo = useCallback(async (type: string, options?: { signal?: AbortSignal; connectionId?: string | null }) => {
         if (!graphName) return [];
 
+        if (type === "(property key)") {
+            const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
+            const query = "CALL db.propertyKeys() YIELD propertyKey as info";
+            const sse = await getSSEGraphResult(
+                `/api/graph/${prepareArg(graphName)}?query=${prepareArg(query)}${readOnlyParam}`,
+                toast,
+                setIndicator,
+                { signal: options?.signal, connectionId: options?.connectionId },
+            ) as { data?: Array<{ info?: unknown }> };
+
+            if (!sse || !Array.isArray(sse.data)) return [];
+
+            return sse.data
+                .map((entry) => (typeof entry?.info === "string" ? entry.info : undefined))
+                .filter((value): value is string => typeof value === "string");
+        }
+
         const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
-        const result = await securedFetch(`/api/graph/${graphName}/info?type=${type}${readOnlyParam}`, {
+        const headers = new Headers();
+        if (options?.connectionId) headers.set("X-Connection-Id", options.connectionId);
+        const result = await securedFetch(`/api/graph/${prepareArg(graphName)}/info?type=${prepareArg(type)}${readOnlyParam}`, {
             method: "GET",
+            headers,
+            signal: options?.signal,
         }, toast, setIndicator);
 
         if (!result.ok) return [];
 
-        const json = await result.json();
+        const bodyText = await result.text();
+        let json: unknown;
 
-        return json.result.data.map(({ info }: { info: string }) => info);
+        try {
+            json = JSON.parse(bodyText);
+        } catch (error) {
+            console.error("Failed to parse graph info response", {
+                error,
+                responseUrl: result.url,
+                contentType: result.headers.get("content-type"),
+                preview: bodyText.slice(0, 200),
+            });
+            return [];
+        }
+
+        const data = (json as { result?: { data?: Array<{ info?: unknown }> } })?.result?.data;
+        if (!Array.isArray(data)) return [];
+
+        return data
+            .map((entry) => (typeof entry?.info === "string" ? entry.info : undefined))
+            .filter((value): value is string => typeof value === "string");
     }, [graphName, setIndicator, toast]);
 
-    const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator, isReadOnlyRef.current), [setIndicator, toast]);
+    const fetchMetaStats = useCallback((name: string, options?: { signal?: AbortSignal; connectionId?: string | null }) => getMetaStats(name, toast, setIndicator, isReadOnlyRef.current, options), [setIndicator, toast]);
 
     useEffect(() => {
         if (!graphName) {
@@ -191,18 +235,43 @@ export default function Page() {
         const graphNameJustChanged = prevGraphNameRef.current !== graphName;
         prevGraphNameRef.current = graphName;
 
+        // Neutralizes in-flight polls when the effect re-runs (graph/connection
+        // change) or unmounts, so a late poll can't write stale metadata onto the
+        // graph that is now active (setGraphInfo mutates the current graph).
+        let cancelled = false;
+        // AbortController closes in-flight EventSource/fetch requests on cleanup so
+        // a superseded poll can't surface a stale error toast or flip the
+        // indicator offline for the connection that is now active.
+        const controller = new AbortController();
+        const { signal } = controller;
+        // Pin every request in this run to the connection active at start, so the
+        // whole poll targets one connection even if the global changes mid-flight.
+        // activeConnectionId is intentionally NOT an effect dependency: a
+        // connection switch always resets graphName (providers.tsx), which re-runs
+        // this effect and aborts the old poll. Re-running on activeConnectionId
+        // directly would fire a query for the *previous* graph against the *new*
+        // connection (auto-creating it) before graphName is cleared.
+        const pollConnectionId = activeConnectionId;
+        const pollEpoch = getConnectionEpoch();
+        const requestOptions = { signal, connectionId: pollConnectionId, epoch: pollEpoch };
+
         const handleSetInfo = () => Promise.all([
-            fetchMetaStats(graphName),
-            fetchInfo("(property key)"),
+            fetchMetaStats(graphName, requestOptions),
+            fetchInfo("(property key)", requestOptions),
         ]).then(async ([newDataStats, newPropertyKeys]) => {
-            const memoryUsage = showMemoryUsage ? await getMemoryUsage(graphName, toast, setIndicator, activeConnectionId) : new Map<string, MemoryValue>();
+            if (cancelled) return;
+
+            const memoryUsage = showMemoryUsage ? await getMemoryUsage(graphName, toast, setIndicator, pollConnectionId, signal) : new Map<string, MemoryValue>();
             const newLabels = newDataStats?.[0] || [];
             const newRelationships = newDataStats?.[1] || [];
 
             const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
+            if (cancelled) return;
+
             setGraphInfo(gi);
-            fetchCount(graphName);
+            fetchCount(graphName, requestOptions);
         }).catch((error) => {
+            if (cancelled || isAbortError(error)) return;
             toast({
                 title: "Error",
                 description: (error as Error).message || "Failed to fetch graph info",
@@ -224,6 +293,8 @@ export default function Page() {
         const interval = setInterval(handleSetInfo, refreshInterval * 1000);
 
         return () => {
+            cancelled = true;
+            controller.abort();
             clearInterval(interval);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -305,19 +376,31 @@ export default function Page() {
     // Keep selectedElementsRef in sync so the restore effect below can read the
     // full multi-selection without adding selectedElements as a dependency.
     useEffect(() => {
-        selectedElementsRef.current = selectedElements;
+        selectedElementsRef.current = { graphId: currentGraphIdRef.current, elements: selectedElements };
     }, [selectedElements]);
 
     // Restore selected element from context when graph data loads, otherwise clear selection
     useEffect(() => {
         if (!graph.Id) return;
-        if (graph.NodesMap.size === 0 && graph.LinksMap.size === 0) return;
 
-        // When graph info updates (setGraphInfo creates a new Graph clone that shares
-        // the same NodesMap/LinksMap), preserve the full multi-selection by re-resolving
-        // every previously selected element from the new graph's maps.
-        const prev = selectedElementsRef.current;
-        if (prev.length > 0) {
+        const { graphId: selectionGraphId, elements: prev } = selectedElementsRef.current;
+        const canRestore = selectionGraphId === graph.Id && prev.length > 0;
+
+        if (graph.NodesMap.size === 0 && graph.LinksMap.size === 0) {
+            // Empty graph (e.g. a query returned no rows). Drop a selection carried
+            // over from a *different* graph so a stale element panel doesn't linger;
+            // keep a same-graph selection untouched (the graph may be mid-reload).
+            if (!canRestore && selectedElements.length > 0) handleSetSelectedElements();
+            return;
+        }
+
+        // When new query results load a fresh Graph object (setGraphInfo mutates
+        // GraphInfo in-place and does NOT trigger this effect), preserve the full
+        // multi-selection by re-resolving every previously selected element from
+        // the new graph's NodesMap/LinksMap. Only restore a selection made in THIS
+        // graph — FalkorDB node/edge ids are per-graph, so restoring across a graph
+        // switch could resolve unrelated same-id elements.
+        if (canRestore) {
             const restored = prev.flatMap(el => {
                 const found = 'source' in el
                     ? graph.LinksMap.get(el.id)

@@ -3,7 +3,7 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue } from "@/lib/utils";
+import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue } from "@/lib/utils";
 import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
@@ -20,7 +20,8 @@ import type { Data as CanvasData, HierarchyDirection, LayoutMode, RadialDirectio
 import LoginVerification from "./loginVerification";
 import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
-import { GraphContext, GraphInfoContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
+import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
 
@@ -215,15 +216,39 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // graph.GraphInfo in-place without triggering a graph state change.
   const graphRef = useRef<Graph>(graph);
   graphRef.current = graph;
-  // graphInfo and nodesCount/edgesCount are owned by GraphInfoContext so that
-  // only GraphInfoPanel re-renders on periodic info polls, not the whole tree.
-  const [graphInfo, setGraphInfoState] = useState<GraphInfo>(graph.GraphInfo);
+  // graphInfo / nodesCount / edgesCount state is owned by GraphInfoProvider so
+  // that periodic info polls only re-render that isolated subtree, not the
+  // whole providers tree.  We communicate with it via a stable ref of setters.
+  const graphInfoPendingRef = useRef<GraphInfoPendingUpdates>({
+    versionBumps: 0,
+    hasNodesCount: false,
+    nodesCount: undefined,
+    hasEdgesCount: false,
+    edgesCount: undefined,
+  });
+  const graphInfoSyncRef = useRef<GraphInfoSync>({
+    bumpVersion: () => {
+      graphInfoPendingRef.current.versionBumps += 1;
+    },
+    setNodesCount: n => {
+      graphInfoPendingRef.current.nodesCount = n;
+      graphInfoPendingRef.current.hasNodesCount = true;
+    },
+    setEdgesCount: e => {
+      graphInfoPendingRef.current.edgesCount = e;
+      graphInfoPendingRef.current.hasEdgesCount = true;
+    },
+  });
+
   const setGraphInfo = useCallback((gi: GraphInfo) => {
-    // Mutate graph.GraphInfo in-place — no graph state change, so GraphContext
-    // consumers (canvas, toolbar, …) are not disturbed.
+    // Mutate graphRef.current.GraphInfo in-place — no graph state change, so
+    // GraphContext consumers (canvas, toolbar, …) are not disturbed. graphRef
+    // always points at the current graph (kept in sync on every render), so we
+    // avoid a redundant setGraph call that would bail out anyway (same object).
     graphRef.current.GraphInfo = gi;
-    // Update GraphInfoContext so only its consumers re-render.
-    setGraphInfoState(gi);
+    // Bump the version counter in GraphInfoProvider so its consumers
+    // re-render and read the fresh data from graph.GraphInfo.
+    graphInfoSyncRef.current.bumpVersion();
   }, []);
   const [data, setData] = useState<GraphData>({ ...graph.Elements });
   const [graphData, setGraphData] = useState<CanvasData>();
@@ -250,8 +275,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [newSecretKey, setNewSecretKey] = useState("");
   const [secretKey, setSecretKey] = useState("");
   const [hasChanges, setHasChanges] = useState(false);
-  const [nodesCount, setNodesCount] = useState<number>();
-  const [edgesCount, setEdgesCount] = useState<number>();
   const [newMaxSavedMessages, setNewMaxSavedMessages] = useState(0);
   const [maxSavedMessages, setMaxSavedMessages] = useState(0);
   const [chatApiKeys, setChatApiKeys] = useState<ChatApiKey[]>([]);
@@ -545,7 +568,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   }), [aiFixSupported, lastFailure, aiFixResult, pendingConsent, requestAiFix, confirmConsent]);
 
   // Refs so runQuery can always call the latest requestAiFix without being in its
-  // eslint-disable-next-line dependency array (avoids recreating runQuery on every AI-state change).
+  // dependency array (avoids recreating runQuery on every AI-state change).
   const requestAiFixRef = useRef(requestAiFix);
   requestAiFixRef.current = requestAiFix;
   // ---------------------------------------------------------------------------
@@ -583,6 +606,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // dependency arrays, which avoids cascading effect re-fires.
   const isReadOnlyRef = useRef(isReadOnly);
   isReadOnlyRef.current = isReadOnly;
+  const activeGraphNameRef = useRef(graphName);
+  activeGraphNameRef.current = graphName;
+  // Ref for the auth status so fetchCount reads the latest value without adding
+  // `status` to its deps (which would churn every consumer of that callback).
+  const statusRef = useRef(status);
+  statusRef.current = status;
 
   const connectionContext = useMemo(() => ({
     connectionType,
@@ -606,22 +635,49 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setSelectedUdf
   }), [selectedUdf, udfList]);
 
-  const fetchCount = useCallback(async (name?: string) => {
+  const fetchCount = useCallback(async (name?: string, options?: { signal?: AbortSignal; connectionId?: string | null; epoch?: number }) => {
     const n = name || graphName;
 
-    if (!n || status === "unauthenticated") return;
+    if (!n || statusRef.current === "unauthenticated") return;
+
+    // Capture the connection this request targets. Prefer the caller's captured
+    // epoch (the epoch when its poll/action began) so a switch between that start
+    // and this call is caught; otherwise capture it now.
+    const connectionId = options?.connectionId !== undefined ? options.connectionId : getActiveConnectionIdGlobal();
+    const startEpoch = options?.epoch !== undefined ? options.epoch : getConnectionEpoch();
+
+    // Already superseded: skip the request entirely so we never query a stale
+    // graph against a switched connection (which could auto-create it).
+    if (getConnectionEpoch() !== startEpoch) return;
+
+    // Suppress the request's toast / indicator side effects if the connection is
+    // switched while it is in flight — getSSEGraphResult fires them internally
+    // before we can inspect the epoch, and not every caller passes an AbortSignal.
+    const guardedToast = ((...args: Parameters<typeof toast>) => {
+      if (getConnectionEpoch() === startEpoch) toast(...args);
+    }) as typeof toast;
+    const guardedSetIndicator = (indicator: "online" | "offline") => {
+      if (getConnectionEpoch() === startEpoch) setIndicator(indicator);
+    };
 
     try {
       const readOnlyParam = isReadOnlyRef.current ? '?readOnly=true' : '';
-      const result = await getSSEGraphResult(`api/graph/${prepareArg(n)}/count${readOnlyParam}`, toast, setIndicator) as { nodes?: number; edges?: number };
+      const result = await getSSEGraphResult(`api/graph/${prepareArg(n)}/count${readOnlyParam}`, guardedToast, guardedSetIndicator, {
+        signal: options?.signal,
+        connectionId,
+      }) as { nodes?: number; edges?: number };
 
       if (!result) return;
 
+      // Discard if the graph name or the connection changed while in flight.
+      if (n !== activeGraphNameRef.current || getConnectionEpoch() !== startEpoch) return;
+
       const { nodes, edges } = result;
 
-      setEdgesCount(edges);
-      setNodesCount(nodes);
+      graphInfoSyncRef.current.setEdgesCount(edges);
+      graphInfoSyncRef.current.setNodesCount(nodes);
     } catch (error) {
+      if (isAbortError(error)) return;
       console.error(error);
     }
   }, [graphName, toast]);
@@ -633,19 +689,53 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   }, []);
 
   const fetchInfo = useCallback(async (type: string, name: string) => {
-    if (!graphName) return [];
+    if (!name) return [];
+
+    if (type === "(property key)") {
+      const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
+      const query = "CALL db.propertyKeys() YIELD propertyKey as info";
+      const sse = await getSSEGraphResult(
+        `/api/graph/${prepareArg(name)}?query=${prepareArg(query)}${readOnlyParam}`,
+        toast,
+        setIndicator,
+      ) as { data?: Array<{ info?: unknown }> };
+
+      if (!sse || !Array.isArray(sse.data)) return [];
+
+      return sse.data
+        .map((entry) => (typeof entry?.info === "string" ? entry.info : undefined))
+        .filter((value): value is string => typeof value === "string");
+    }
 
     const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
-    const result = await securedFetch(`/api/graph/${name}/info?type=${type}${readOnlyParam}`, {
+    const result = await securedFetch(`/api/graph/${prepareArg(name)}/info?type=${prepareArg(type)}${readOnlyParam}`, {
       method: "GET",
     }, toast, setIndicator);
 
     if (!result.ok) return [];
 
-    const json = await result.json();
+    const bodyText = await result.text();
+    let json: unknown;
 
-    return json.result.data.map(({ info }: { info: string }) => info);
-  }, [graphName, toast, setIndicator]);
+    try {
+      json = JSON.parse(bodyText);
+    } catch (error) {
+      console.error("Failed to parse graph info response", {
+        error,
+        responseUrl: result.url,
+        contentType: result.headers.get("content-type"),
+        preview: bodyText.slice(0, 200),
+      });
+      return [];
+    }
+
+    const data = (json as { result?: { data?: Array<{ info?: unknown }> } })?.result?.data;
+    if (!Array.isArray(data)) return [];
+
+    return data
+      .map((entry) => (typeof entry?.info === "string" ? entry.info : undefined))
+      .filter((value): value is string => typeof value === "string");
+  }, [toast, setIndicator]);
 
   const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator, isReadOnlyRef.current), [toast, setIndicator]);
 
@@ -790,8 +880,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setGraphName(name);
     setSelectedParam("");
     setGraphInfo(GraphInfo.empty(toast, setIndicator));
-    setNodesCount(undefined);
-    setEdgesCount(undefined);
+    graphInfoSyncRef.current.setNodesCount(undefined);
+    graphInfoSyncRef.current.setEdgesCount(undefined);
     setData({ nodes: [], links: [] });
     setGraphData(undefined);
     setViewport(undefined);
@@ -828,12 +918,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setSelectedParam,
     initialQuery: initialQueryRef.current,
   }), [graph, graphName, handleSetGraphName, graphNames, labels, relationships, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, selectedParam]);
-
-  const graphInfoContextValue = useMemo(() => ({
-    graphInfo,
-    nodesCount,
-    edgesCount,
-  }), [graphInfo, nodesCount, edgesCount]);
 
   useEffect(() => {
     setRelationships([...graph.Relationships]);
@@ -1364,15 +1448,17 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Skip if unchanged
     if (prev === activeConnectionId) return;
 
-    // Clear graph data so stale results from the old connection are gone
-    setGraph(Graph.empty());
-    setGraphInfo(GraphInfo.empty(toast, setIndicator));
+    // Clear graph data so stale results from the old connection are gone.
+    // Build the empty graph with the real toast/setIndicator callbacks up front
+    // so its GraphInfo isn't left with Graph.empty()'s console.error fallbacks
+    // (setGraphInfo only mutates the current graph, not this newly queued one).
+    setGraph(Graph.empty(undefined, undefined, undefined, GraphInfo.empty(toast, setIndicator)));
     setGraphName("");
     setSelectedParam("");
     setGraphNamesLoaded(false);
     setGraphNames([]);
-    setNodesCount(undefined);
-    setEdgesCount(undefined);
+    graphInfoSyncRef.current.setNodesCount(undefined);
+    graphInfoSyncRef.current.setEdgesCount(undefined);
     setHistoryQuery(h => ({ ...h, query: "", currentQuery: defaultQueryHistory.currentQuery }));
     setLabels([]);
     setRelationships([]);
@@ -1483,9 +1569,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       console.error("Failed to cleanup demo graphs", error);
     }
 
-    // Clear current graph to avoid showing deleted demo graph
-    setGraph(Graph.empty());
-    setGraphInfo(GraphInfo.empty(toast, setIndicator));
+    // Clear current graph to avoid showing deleted demo graph. Build the empty
+    // graph with the real toast/setIndicator callbacks up front so its GraphInfo
+    // isn't left with Graph.empty()'s console.error fallbacks (setGraphInfo only
+    // mutates the current graph, not this newly queued one).
+    setGraph(Graph.empty(undefined, undefined, undefined, GraphInfo.empty(toast, setIndicator)));
     setData({ nodes: [], links: [] });
 
     if (userGraphBeforeTutorial && userGraphsBeforeTutorial.includes(userGraphBeforeTutorial)) {
@@ -1523,7 +1611,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       <LoginVerification>
         <BrowserSettingsContext.Provider value={browserSettingsContext}>
           <GraphContext.Provider value={graphContext}>
-            <GraphInfoContext.Provider value={graphInfoContextValue}>
+            <GraphInfoProvider syncRef={graphInfoSyncRef} pendingRef={graphInfoPendingRef}>
               <HistoryQueryContext.Provider value={historyQueryContext}>
               <IndicatorContext.Provider value={indicatorContext}>
                 <QueryLoadingContext.Provider value={queryLoadingContext}>
@@ -1553,7 +1641,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                 </QueryLoadingContext.Provider>
               </IndicatorContext.Provider>
             </HistoryQueryContext.Provider>
-            </GraphInfoContext.Provider>
+            </GraphInfoProvider>
           </GraphContext.Provider>
         </BrowserSettingsContext.Provider>
       </LoginVerification>

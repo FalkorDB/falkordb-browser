@@ -54,7 +54,7 @@ function GraphView({
     const { setData, data, graphData, setGraphData, setViewport, viewport } = useContext(ForceGraphContext);
     const { tutorialOpen } = useContext(BrowserSettingsContext);
 
-    const [dimmed, setDimmed] = useState(false);
+    const [dimmed, setDimmed] = useState(true);
 
     const elementsLength = graph.getElements().length;
 

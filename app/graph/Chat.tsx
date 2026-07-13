@@ -16,6 +16,8 @@ import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayNa
 import ToastButton from "../components/ToastButton";
 import { ShineBorder } from "@/components/ui/shine-border";
 import { getConnectionItem, setConnectionItem, getConnectionPrefix } from "@/lib/connection-storage";
+import { getConfidenceStyle, normalizeConfidence } from "./confidence";
+import { parseStoredMessages, serializeChatHistory } from "./chatHistory";
 
 const mdInstance = new MarkdownIt({
     html: false,
@@ -60,6 +62,9 @@ const getErrorStatus = (error: unknown) => {
     if (error instanceof Error && "status" in error && typeof error.status === "number") return error.status;
     return 0;
 };
+
+// Confidence badge tiers moved to ./confidence for unit testing.
+// Chat history persistence/migration moved to ./chatHistory for unit testing.
 
 export default function Chat({ onClose }: Props) {
     const { resolvedTheme } = useTheme();
@@ -147,8 +152,7 @@ export default function Chat({ onClose }: Props) {
     useEffect(() => {
         if (!getConnectionPrefix()) return;
         const savedMessages = getConnectionItem(`chat-${graphName}`);
-        const currentMessages = JSON.parse(savedMessages || "[]");
-        setMessages(currentMessages);
+        setMessages(parseStoredMessages(savedMessages));
 
         const savedCypherOnly = getConnectionItem(`cypherOnly-${graphName}`);
         setCypherOnly(savedCypherOnly === "true");
@@ -158,7 +162,7 @@ export default function Chat({ onClose }: Props) {
         let statusGroup: Message[];
 
         if (messages.length > 0) {
-            setConnectionItem(`chat-${graphName}`, JSON.stringify(getLastUserMessagesWithContext(messages, maxSavedMessages)));
+            setConnectionItem(`chat-${graphName}`, serializeChatHistory(getLastUserMessagesWithContext(messages, maxSavedMessages)));
         }
 
         const newMessagesList = messages.map((message, i): Message | [Message[], boolean] | undefined => {
@@ -469,16 +473,27 @@ export default function Chat({ onClose }: Props) {
                 return (
                     <div className="flex flex-col gap-1">
                         <MarkdownMessage content={message.content} />
-                        {message.type === "Result" && message.confidence != null && (
-                            <span className={cn(
-                                "text-xs px-1.5 py-0.5 rounded w-fit",
-                                message.confidence >= 0.9 ? "bg-green-500/20 text-green-400" :
-                                    message.confidence >= 0.7 ? "bg-yellow-500/20 text-yellow-400" :
-                                        "bg-red-500/20 text-red-400"
-                            )}>
-                                Confidence: {Math.round(message.confidence * 100)}%
-                            </span>
-                        )}
+                        {message.type === "Result" && (() => {
+                            const confidence = normalizeConfidence(message.confidence);
+                            if (confidence == null) return null;
+                            const style = getConfidenceStyle(confidence);
+                            return (
+                                <span
+                                    data-testid="chatConfidenceBadge"
+                                    className={cn(
+                                        "mt-1 inline-flex w-fit items-center gap-1.5 rounded-full px-2 py-0.5",
+                                        "text-[11px] font-medium leading-none ring-1 ring-inset",
+                                        style.wrap
+                                    )}
+                                    title={`${style.label}: how confident the model is that this answer is correct given the graph data`}
+                                >
+                                    <span className={cn("h-1.5 w-1.5 rounded-full", style.dot)} aria-hidden />
+                                    <span className="sr-only">{style.label}: </span>
+                                    <span className="text-muted-foreground" aria-hidden>Confidence</span>
+                                    <span className="tabular-nums">{confidence}%</span>
+                                </span>
+                            );
+                        })()}
                     </div>
                 );
         }
