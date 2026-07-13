@@ -29,7 +29,7 @@ export const DUMP_RESTORE_ENABLED: boolean = false;
  * tab and the CSV temp / load-csv routes reject requests with a 403. Set it back
  * to `true` once the follow-up work lands.
  */
-export const CSV_UPLOAD_ENABLED: boolean = false;
+export const CSV_UPLOAD_ENABLED: boolean = true;
 
 /**
  * Split a Cypher batch file into individual statements on top-level `;`,

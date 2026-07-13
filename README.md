@@ -86,6 +86,38 @@ When FalkorDB runs in a different container, mount the same `falkordb-import`
 volume to `/var/lib/FalkorDB/import` there as well and configure
 `IMPORT_FOLDER /var/lib/FalkorDB/import` on the DB side.
 
+### Use MinIO for CSV temp uploads (S3-compatible)
+
+The CSV upload flow already supports S3-compatible backends, including MinIO.
+This repository includes a local MinIO stack in [docker-compose.minio.yml](docker-compose.minio.yml).
+
+1. Start MinIO and create the CSV temp bucket:
+
+  ```bash
+  docker compose -f docker-compose.minio.yml up -d
+  ```
+
+2. Set these values in `.env.local`:
+
+  ```env
+  CSV_STORAGE=s3
+  S3_ACCESS_KEY_ID=minioadmin
+  S3_SECRET_ACCESS_KEY=minioadmin
+  S3_REGION=us-east-1
+  S3_BUCKET=falkordb-csv-temp
+  S3_ENDPOINT=http://localhost:9000
+  S3_FORCE_PATH_STYLE=true
+  S3_KEY_PREFIX=csv-temp/
+  S3_URL_EXPIRES_IN=3600
+  ```
+
+3. Restart the browser server and upload CSV from Manage Graph -> Upload Data.
+
+Notes:
+- Keep the bucket private (default in the init container).
+- Signed URLs are generated automatically for LOAD CSV.
+- MinIO console is available at `http://localhost:9001` (user/password: `minioadmin`/`minioadmin`).
+
 ### Deploy to Kubernetes with Helm
 
 Deploy the FalkorDB Browser to your Kubernetes cluster using Helm:

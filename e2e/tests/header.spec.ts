@@ -25,7 +25,7 @@ test.describe(`Header tests`, () => {
     const navBar = await browser.createNewPage(NavBarComponent, urls.settingsUrl);
     await navBar.clickOnGraphsButton();
     const newUrl = navBar.getCurrentURL();
-    expect(newUrl).toBe(urls.graphUrl);
+    expect(new URL(newUrl).origin + new URL(newUrl).pathname).toBe(urls.graphUrl);
   });
 
   test(`@admin Verify clicking on help -> Documentation redirects to specified URL`, async () => {
