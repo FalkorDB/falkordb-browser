@@ -544,6 +544,9 @@ test.describe("Chat Feature Tests", () => {
     const hasCodeBlock = await markdownDiv.locator("pre code").count();
     expect(hasCodeBlock).toBeGreaterThanOrEqual(1);
 
+    // A null confidence must not render a badge
+    expect(await chat.getChatConfidenceBadgeCount()).toBe(0);
+
     // Cleanup mock
     await page.unroute("**/api/chat");
     await apiCall.removeGraph(graphName);
@@ -683,7 +686,7 @@ test.describe("Chat Feature Tests", () => {
           cypherQuery: "MATCH (a:Person)-[:KNOWS]->(b) RETURN b.name",
           cypherResult: null,
           answer: "Bob is Alice's friend.",
-          confidence: 0.9,
+          confidence: 90,
           tokenUsage: { totalTokens: 150 },
         }),
       });
@@ -696,6 +699,16 @@ test.describe("Chat Feature Tests", () => {
     await chat.fillChatInput("Who are Alice's friends?");
     await chat.clickChatSendButton();
     await chat.waitForAssistantResponse("Result");
+
+    // Confidence badge should render the 0-100 value directly (not as a 0-1 fraction)
+    const hasConfidenceBadge = await chat.waitForChatConfidenceBadge();
+    expect(hasConfidenceBadge).toBe(true);
+
+    // The badge text carries the visible percentage plus the screen-reader tier label
+    const confidenceText = await chat.getChatConfidenceBadgeText();
+    expect(confidenceText).toContain("90%");
+    // 90 falls in the high-confidence tier
+    expect(confidenceText).toContain("High confidence");
 
     // Footer should now display token data
     const hasTokens = await chat.waitForChatFooterTokens();
@@ -773,6 +786,87 @@ test.describe("Chat Feature Tests", () => {
 
     expect(await chat.getChatFooterLastTokens()).toContain("50");
     expect(await chat.getChatFooterTotalTokens()).toContain("150");
+
+    await page.unroute("**/api/chat");
+    await apiCall.removeGraph(graphName);
+  });
+
+  test(`@readwrite Verify confidence badge renders the correct tier and percentage per message`, async () => {
+    const graphName = getRandomString("chat");
+    await apiCall.addGraph(graphName);
+    await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
+
+    const chat = await browser.createNewPage(ChatComponent);
+    await browser.setPageToFullScreen();
+    const page = await browser.getPage();
+
+    await page.addInitScript(({ selectedModel }) => {
+      localStorage.setItem("model", selectedModel);
+      localStorage.setItem("secretKey", "fake-key-confidence-tiers");
+    }, { selectedModel: DEFAULT_CHAT_MODEL });
+    await page.goto(urls.graphUrl);
+    await page.waitForLoadState("networkidle");
+
+    // Each call returns the next confidence on the 0-100 scale so we exercise
+    // every tier boundary: 90 (high), 70 (medium), 69 (low).
+    const confidences = [90, 70, 69];
+    let callCount = 0;
+    await page.route("**/api/chat", (route) => {
+      const confidence = confidences[Math.min(callCount, confidences.length - 1)];
+      callCount += 1;
+      route.fulfill({
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cypherQuery: "MATCH (n) RETURN n",
+          cypherResult: null,
+          answer: `Answer with confidence ${confidence}.`,
+          confidence,
+          tokenUsage: { totalTokens: 10 },
+        }),
+      });
+    });
+
+    await chat.selectGraphByName(graphName);
+    await chat.openChat();
+    await chat.waitForChatPanel();
+
+    // 90 → High confidence (inclusive lower boundary)
+    await chat.fillChatInput("First question");
+    await chat.clickChatSendButton();
+    await chat.waitForAssistantResponse("Result");
+    expect(await chat.getChatConfidenceBadgeText()).toContain("90%");
+    expect(await chat.getChatConfidenceBadgeText()).toContain("High confidence");
+
+    // 70 → Medium confidence (inclusive lower boundary)
+    await chat.fillChatInput("Second question");
+    await chat.waitForChatSendButtonEnabled();
+    await chat.clickChatSendButton();
+    await chat.waitForAssistantResponse("Result");
+    await page.waitForFunction(
+      () => {
+        const badge = document.querySelectorAll('[data-testid="chatConfidenceBadge"]');
+        return badge[badge.length - 1]?.textContent?.includes("Medium confidence");
+      },
+      { timeout: 5000 }
+    );
+    expect(await chat.getChatConfidenceBadgeText()).toContain("70%");
+    expect(await chat.getChatConfidenceBadgeText()).toContain("Medium confidence");
+
+    // 69 → Low confidence (just below the medium boundary)
+    await chat.fillChatInput("Third question");
+    await chat.waitForChatSendButtonEnabled();
+    await chat.clickChatSendButton();
+    await chat.waitForAssistantResponse("Result");
+    await page.waitForFunction(
+      () => {
+        const badge = document.querySelectorAll('[data-testid="chatConfidenceBadge"]');
+        return badge[badge.length - 1]?.textContent?.includes("Low confidence");
+      },
+      { timeout: 5000 }
+    );
+    expect(await chat.getChatConfidenceBadgeText()).toContain("69%");
+    expect(await chat.getChatConfidenceBadgeText()).toContain("Low confidence");
 
     await page.unroute("**/api/chat");
     await apiCall.removeGraph(graphName);
