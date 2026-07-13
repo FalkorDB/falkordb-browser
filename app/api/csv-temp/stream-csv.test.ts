@@ -38,6 +38,16 @@ async function run(
     return streamCsvUpload(multipartRequest(parts), store);
 }
 
+/** Fail fast (instead of hanging the whole suite) if the upload deadlocks. */
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+    return Promise.race([
+        p,
+        new Promise<T>((_, reject) => {
+            setTimeout(() => reject(new Error(`timed out after ${ms}ms (deadlock?)`)), ms).unref();
+        }),
+    ]);
+}
+
 test("streamCsvUpload stores a valid .csv and resolves ok", async () => {
     const sink = collectingStore();
     const content = "name,age\nAlice,30\nBob,25\n";
@@ -108,4 +118,34 @@ test("streamCsvUpload enforces the size cap with 413", async () => {
         if (prev === undefined) delete process.env.CSV_MAX_FILE_SIZE_MB;
         else process.env.CSV_MAX_FILE_SIZE_MB = prev;
     }
+});
+
+test("streamCsvUpload rejects a large binary file with an early NUL without deadlocking", async () => {
+    const sink = collectingStore();
+    // >8 KiB so CsvHeadTransform flushes/validates the head mid-stream (via
+    // _transform, not _flush at EOF), with a NUL in the first bytes. If the
+    // source is not drained on reject, busboy never emits "close" and the upload
+    // deadlocks — the timeout guard turns that regression into a fast failure.
+    const content = Buffer.concat([Buffer.from("a,b\n\0"), Buffer.alloc(9000, 0x61)]);
+    const result = await withTimeout(
+        run([{ field: "file", filename: "big.csv", content }], sink.store),
+        5000
+    );
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.status, 400);
+});
+
+test("streamCsvUpload settles when the store rejects immediately (no deadlock)", async () => {
+    // A store that rejects without consuming the stream leaves the source
+    // undrained; the orchestrator must drain it so busboy can close.
+    const store = async (): Promise<void> => {
+        throw new Error("store unavailable");
+    };
+    const content = Buffer.concat([Buffer.from("a,b\n"), Buffer.alloc(9000, 0x61)]);
+    const result = await withTimeout(
+        run([{ field: "file", filename: "big.csv", content }], store),
+        5000
+    );
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.status, 500);
 });
