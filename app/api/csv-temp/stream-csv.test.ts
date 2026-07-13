@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { Readable } from "node:stream";
+import { Readable } from "node:stream";
 import { streamCsvUpload, type CsvUploadResult } from "./stream-csv.ts";
 
 type StreamCsvRequest = Parameters<typeof streamCsvUpload>[0];
@@ -146,6 +146,45 @@ test("streamCsvUpload settles when the store rejects immediately (no deadlock)",
         run([{ field: "file", filename: "big.csv", content }], store),
         5000
     );
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.status, 500);
+});
+
+test("streamCsvUpload settles (500) without crashing when the source errors mid-store", async () => {
+    // Build a raw multipart body that starts a file part (so the store begins),
+    // then the underlying source stream errors before the closing boundary. The
+    // orchestrator must abort the in-flight store, settle 500, and — critically —
+    // not emit an unhandled "error" on the file stream (which would crash Node).
+    const boundary = "TESTBOUNDARY";
+    const head =
+        `--${boundary}\r\n` +
+        `Content-Disposition: form-data; name="file"; filename="x.csv"\r\n` +
+        `Content-Type: text/csv\r\n\r\n`;
+    const src = new Readable({ read() {} });
+    src.push(Buffer.from(head + "a,b\n1,2\n"));
+    setTimeout(() => src.destroy(new Error("connection reset")), 30);
+
+    // Slow store: still actively consuming (pending) when the source errors,
+    // because the multipart part never ends (no closing boundary is sent).
+    const store = (body: Readable): Promise<void> =>
+        new Promise((resolve, reject) => {
+            body.on("data", () => undefined);
+            body.on("end", () => resolve());
+            body.on("error", reject);
+        });
+
+    const headers = {
+        get: (k: string) =>
+            k.toLowerCase() === "content-type"
+                ? `multipart/form-data; boundary=${boundary}`
+                : null,
+    };
+    const request = {
+        body: Readable.toWeb(src),
+        headers,
+    } as unknown as StreamCsvRequest;
+
+    const result = await withTimeout(streamCsvUpload(request, store), 5000);
     assert.equal(result.ok, false);
     if (!result.ok) assert.equal(result.status, 500);
 });
