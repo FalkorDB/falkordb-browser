@@ -1,8 +1,21 @@
 const DEFAULT_CSV_TEMP_TTL_SECONDS = 1800;
+const DEFAULT_CSV_MAX_UPLOAD_BYTES = 100 * 1024 * 1024; // 100 MB
 
 export function getCsvTempTtlSeconds(): number {
     const raw = Number(process.env.CSV_TEMP_TTL_SECONDS ?? DEFAULT_CSV_TEMP_TTL_SECONDS);
     return Number.isFinite(raw) && raw >= 0 ? raw : DEFAULT_CSV_TEMP_TTL_SECONDS;
+}
+
+/**
+ * Max accepted CSV upload size in bytes. CSV imports can be large, so this is
+ * higher than the generic upload cap and is streamed (never buffered whole) to
+ * storage. Configurable via CSV_MAX_FILE_SIZE_MB.
+ */
+export function getCsvMaxUploadBytes(): number {
+    const raw = Number(process.env.CSV_MAX_FILE_SIZE_MB);
+    return Number.isFinite(raw) && raw > 0
+        ? Math.floor(raw * 1024 * 1024)
+        : DEFAULT_CSV_MAX_UPLOAD_BYTES;
 }
 
 export function getCsvTempCleanupSecrets(): string[] {

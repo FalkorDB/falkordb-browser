@@ -19,19 +19,29 @@
  *   - If both cloud providers are configured, S3 is preferred.
  */
 
+import type { Readable } from "stream";
+
 export interface CsvStorageProvider {
     /**
-     * Persist the CSV bytes under `key`.
-     * Returns the URL that FalkorDB should use in `LOAD CSV FROM '...'`.
-     * For S3 this is a presigned GET URL; for local it is an HTTP path on this server.
+     * Persist the CSV `body` stream for `(owner, key)`, without buffering the
+     * whole (possibly very large) file in memory. The owner scopes storage so one
+     * user can never read/delete another user's temp CSV, and so cleanup only
+     * ever touches files created by this feature.
      */
-    store(key: string, bytes: Uint8Array): Promise<string>;
-
-    /** Delete the stored object. Called in `finally` after the LOAD CSV query. */
-    delete(key: string): Promise<void>;
+    store(owner: string, key: string, body: Readable): Promise<void>;
 
     /**
-     * Best-effort cleanup for stale temp files/objects.
+     * Resolve the URL that FalkorDB should use in `LOAD CSV FROM $csvUrl`.
+     * Generated server-side (presigned GET for S3/Blob, a signed capability URL
+     * or `file://` path for local) so the client never controls the fetched URL.
+     */
+    resolveReadUrl(owner: string, key: string): Promise<string>;
+
+    /** Delete the stored object for `(owner, key)`. Best-effort; never throws. */
+    delete(owner: string, key: string): Promise<void>;
+
+    /**
+     * Best-effort cleanup for stale temp files/objects created by this feature.
      * Removes entries older than the provided unix timestamp in milliseconds.
      * Returns the number of deleted entries.
      */

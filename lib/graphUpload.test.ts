@@ -77,3 +77,33 @@ test("splitCypherStatements replaces block comments with a boundary (no token me
 test("splitCypherStatements retains an unterminated block comment so it surfaces downstream", () => {
   assert.deepEqual(splitCypherStatements("CREATE (:A); /* oops"), ["CREATE (:A)", "/* oops"]);
 });
+
+import { containsLoadCsv, stripCypherStringsAndComments } from "./graphUpload.ts";
+
+test("containsLoadCsv detects a top-level LOAD CSV clause (any case/spacing)", () => {
+  assert.ok(containsLoadCsv("LOAD CSV WITH HEADERS FROM 'x' AS row RETURN row"));
+  assert.ok(containsLoadCsv("load   csv from 'x' as row return row"));
+  assert.ok(containsLoadCsv("MATCH (n) WITH n LOAD CSV FROM 'x' AS row RETURN row"));
+  assert.ok(containsLoadCsv("LOAD/**/CSV FROM 'x' AS row RETURN row"));
+});
+
+test("containsLoadCsv ignores LOAD CSV inside string / backtick literals and comments", () => {
+  assert.ok(!containsLoadCsv("RETURN 'LOAD CSV' AS s"));
+  assert.ok(!containsLoadCsv("MATCH (n:`LOAD CSV`) RETURN n"));
+  assert.ok(!containsLoadCsv("// LOAD CSV FROM 'x' AS row\nRETURN 1"));
+  assert.ok(!containsLoadCsv("/* LOAD CSV FROM 'x' */ RETURN 1"));
+  assert.ok(!containsLoadCsv("CREATE (:Row {name: row.name}) RETURN count(*)"));
+});
+
+test("stripCypherStringsAndComments blanks literals/comments but keeps structure", () => {
+  const a = stripCypherStringsAndComments("RETURN 'abc' AS s");
+  assert.equal(a.length, "RETURN 'abc' AS s".length);
+  assert.ok(!a.includes("abc"));
+
+  const b = stripCypherStringsAndComments("a // b\nc");
+  assert.equal(b.length, "a // b\nc".length);
+  assert.ok(!b.includes("b"));
+  assert.ok(b.endsWith("\nc"));
+
+  assert.equal(stripCypherStringsAndComments("MATCH (n) RETURN n"), "MATCH (n) RETURN n");
+});

@@ -8,16 +8,33 @@ import {
 } from "@/app/lib/csv-temp-config";
 import { CSV_UPLOAD_ENABLED } from "@/lib/graphUpload";
 
-function isAuthorized(request: NextRequest): boolean {
+type AuthResult = { ok: true } | { ok: false; status: number; message: string };
+
+/**
+ * Fail closed: a cleanup secret MUST be configured. Missing configuration is a
+ * server/config error (503), a wrong/absent caller credential is 401. An
+ * authenticated GET is kept because Vercel Cron invokes scheduled routes with GET.
+ */
+function authorize(request: NextRequest): AuthResult {
     const configured = getCsvTempCleanupSecrets();
 
-    if (configured.length === 0) return true;
+    if (configured.length === 0) {
+        return {
+            ok: false,
+            status: 503,
+            message:
+                "Cleanup is not configured. Set CSV_TEMP_CLEANUP_SECRET or CRON_SECRET to enable this endpoint.",
+        };
+    }
 
     const auth = request.headers.get("authorization") ?? "";
     const bearer = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
     const headerSecret = request.headers.get("x-csv-cleanup-secret") ?? "";
 
-    return configured.includes(bearer) || configured.includes(headerSecret);
+    if (configured.includes(bearer) || configured.includes(headerSecret)) {
+        return { ok: true };
+    }
+    return { ok: false, status: 401, message: "Unauthorized" };
 }
 
 async function runCleanup(request: NextRequest) {
@@ -31,10 +48,11 @@ async function runCleanup(request: NextRequest) {
         );
     }
 
-    if (!isAuthorized(request)) {
+    const auth = authorize(request);
+    if (!auth.ok) {
         return NextResponse.json(
-            { message: "Unauthorized" },
-            { status: 401, headers: getCorsHeaders(request) }
+            { message: auth.message },
+            { status: auth.status, headers: getCorsHeaders(request) }
         );
     }
 

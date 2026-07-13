@@ -29,7 +29,7 @@ export const DUMP_RESTORE_ENABLED: boolean = false;
  * tab and the CSV temp / load-csv routes reject requests with a 403. Set it back
  * to `true` once the follow-up work lands.
  */
-export const CSV_UPLOAD_ENABLED: boolean = false;
+export const CSV_UPLOAD_ENABLED: boolean = true;
 
 /**
  * Split a Cypher batch file into individual statements on top-level `;`,
@@ -126,4 +126,95 @@ export function splitCypherStatements(cypherBatch: string): string[] {
   if (finalQuery) queries.push(finalQuery);
 
   return queries;
+}
+
+/**
+ * Replace the content of string/backtick literals and `//` or `/* *\/` comments
+ * with spaces, preserving overall length. Lets keyword scanning (e.g.
+ * `containsLoadCsv`) ignore keywords that appear inside literals/comments.
+ */
+export function stripCypherStringsAndComments(cypher: string): string {
+  let out = "";
+  let quote: "'" | "\"" | "`" | null = null;
+  let escaped = false;
+  let lineComment = false;
+  let blockComment = false;
+
+  for (let i = 0; i < cypher.length; i += 1) {
+    const char = cypher[i];
+    const next = cypher[i + 1];
+
+    if (lineComment) {
+      if (char === "\n" || char === "\r") {
+        lineComment = false;
+        out += char;
+      } else {
+        out += " ";
+      }
+      continue;
+    }
+
+    if (blockComment) {
+      if (char === "*" && next === "/") {
+        blockComment = false;
+        out += "  ";
+        i += 1;
+      } else {
+        out += " ";
+      }
+      continue;
+    }
+
+    if (escaped) {
+      out += " ";
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\" && (quote === "'" || quote === "\"")) {
+      out += " ";
+      escaped = true;
+      continue;
+    }
+
+    if (quote) {
+      out += char === quote ? char : " ";
+      if (char === quote) quote = null;
+      continue;
+    }
+
+    if (char === "/" && next === "/") {
+      lineComment = true;
+      out += "  ";
+      i += 1;
+      continue;
+    }
+
+    if (char === "/" && next === "*") {
+      blockComment = true;
+      out += "  ";
+      i += 1;
+      continue;
+    }
+
+    if (char === "'" || char === "\"" || char === "`") {
+      quote = char;
+      out += char;
+      continue;
+    }
+
+    out += char;
+  }
+
+  return out;
+}
+
+/**
+ * True if `cypher` contains a `LOAD CSV` clause outside of string/backtick
+ * literals and comments. Used to reject a user-supplied query body that tries to
+ * smuggle a second (attacker-controlled) `LOAD CSV FROM '...'` URL past the
+ * server-owned one.
+ */
+export function containsLoadCsv(cypher: string): boolean {
+  return /\bLOAD\s+CSV\b/i.test(stripCypherStringsAndComments(cypher));
 }
