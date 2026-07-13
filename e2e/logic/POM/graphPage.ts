@@ -71,6 +71,10 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("uploadGraphConfirm");
   }
 
+  public get uploadCancel(): Locator {
+    return this.page.getByTestId("uploadGraphCancel");
+  }
+
   public get uploadFileInput(): Locator {
     return this.page.locator('input[type="file"]');
   }
