@@ -257,7 +257,6 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                 title: "Upload state uncertain",
                 description: "The request may have completed. Refresh and verify graph data before retrying.",
                 variant: "destructive",
-                variant: "destructive",
             });
         } finally {
             inFlightRef.current = false;
@@ -320,7 +319,6 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             toast({
                 title: "Upload state uncertain",
                 description: "The request may have completed. Refresh and verify before retrying.",
-                variant: "destructive",
                 variant: "destructive",
             });
         } finally {
@@ -460,7 +458,6 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             toast({
                 title: "Upload state uncertain",
                 description: "The import may have completed. Refresh and verify graph data before retrying.",
-                variant: "destructive",
                 variant: "destructive",
             });
         } finally {
