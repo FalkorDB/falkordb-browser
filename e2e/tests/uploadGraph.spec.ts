@@ -35,7 +35,6 @@ test.describe("Upload Graph – Cypher batch", () => {
     try {
       const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
       await graph.uploadGraphData(graphName, "cypher", CYPHER_FIXTURE);
-
       expect(await graph.toast.textContent()).toContain("Upload completed");
 
       const result = await apiCall.runQuery(
@@ -92,7 +91,6 @@ test.describe("Upload Graph – Load CSV", () => {
         "CREATE (:Person {name: row.name, age: toInteger(row.age), city: row.city})",
         true
       );
-
       expect(await graph.toast.textContent()).toContain("LOAD CSV completed");
 
       const result = await apiCall.runQuery(

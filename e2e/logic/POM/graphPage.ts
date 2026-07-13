@@ -71,6 +71,10 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("uploadGraphConfirm");
   }
 
+  public get uploadCancel(): Locator {
+    return this.page.getByTestId("uploadGraphCancel");
+  }
+
   public get uploadFileInput(): Locator {
     return this.page.locator('input[type="file"]');
   }
@@ -1399,8 +1403,8 @@ export default class GraphPage extends BasePage {
   }
 
   /**
-   * Full upload flow: open Manage, select graph, open dialog, switch tab,
-   * attach file, submit and wait for success toast.
+   * Full upload flow: open Manage, select graph, open dialog, switch to the tab
+   * for `mode`, attach the file, submit and wait for the success toast.
    */
   async uploadGraphData(
     graphName: string,
@@ -1408,9 +1412,10 @@ export default class GraphPage extends BasePage {
     absoluteFilePath: string,
     csvQuery?: string
   ): Promise<void> {
-    // Cypher batch upload uses the default active tab in the Manage upload
-    // dialog, so no tab switch is needed before attaching the file.
     await this.openUploadDialog(graphName);
+    // Select the tab for the requested mode. Cypher batch is the default active
+    // tab, but selecting it explicitly keeps the helper correct for every mode.
+    await this.selectUploadTab(mode);
     await this.setUploadFile(absoluteFilePath);
     if (mode === "csv" && csvQuery !== undefined) {
       await this.setUploadCsvQuery(csvQuery);

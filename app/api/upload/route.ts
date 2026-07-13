@@ -123,6 +123,17 @@ async function streamToDisk(
       let bytesWritten = 0;
       let sizeLimitHit = false;
 
+      // If the busboy fileSize ceiling truncates the stream (an oversized upload
+      // right at the ceiling that the strict `>` check below can miss), reject it
+      // rather than silently accepting a truncated file.
+      fileStream.on("limit", () => {
+        if (sizeLimitHit) return;
+        sizeLimitHit = true;
+        writeStream.destroy();
+        fs.unlink(tempFilePath, () => {});
+        done({ ok: false, error: "File is too large.", status: 413 });
+      });
+
       fileStream.on("data", (chunk: Buffer) => {
         bytesWritten += chunk.length;
         if (bytesWritten > sizeLimit) {
@@ -212,9 +223,11 @@ export async function POST(request: NextRequest) {
     let valid: boolean;
     try {
       valid = await validateContentFromPath(extension, filePath);
-    } catch {
+    } catch (error) {
+      // Don't leave the finalized (potentially sensitive) file on disk if the
+      // validator itself throws — the outer catch would otherwise 500 and orphan it.
       await fs.promises.unlink(filePath).catch(() => {});
-      throw new Error("Failed to validate uploaded file.");
+      throw error;
     }
     if (!valid) {
       await fs.promises.unlink(filePath).catch(() => {});

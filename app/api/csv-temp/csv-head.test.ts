@@ -58,6 +58,13 @@ test("CsvHeadTransform rejects an empty stream", async () => {
     );
 });
 
+test("CsvHeadTransform rejects a BOM-only file as empty", async () => {
+    await assert.rejects(
+        () => runThrough([Buffer.from([0xef, 0xbb, 0xbf])]),
+        (err) => err instanceof CsvValidationError && /empty/i.test(err.message)
+    );
+});
+
 test("CsvValidationError carries a 400 status", () => {
     assert.equal(new CsvValidationError("x").status, 400);
 });
