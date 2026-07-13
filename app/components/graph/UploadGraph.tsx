@@ -16,6 +16,7 @@ import EditorComponent, { LanguageConfig } from "../EditorComponent";
 import { CYPHER_LANGUAGE_CONFIGURATION, CYPHER_LANGUAGE_NAME, DEFAULT_MONARCH_TOKENIZER, STATIC_SUGGESTIONS } from "../CypherEditor";
 import { buildCypherCompletionItems, buildUdfFunctionSuggestions } from "../cypherLanguageSuggestions";
 import { Graph, GraphInfo } from "../../api/graph/model";
+import { CSV_UPLOAD_ENABLED } from "@/lib/graphUpload";
 
 type UploadMode = "cypher" | "load-csv";
 
@@ -479,13 +480,15 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                         >
                             Cypher batch
                         </TabsTrigger>
-                        <TabsTrigger
-                            className={cn("px-2 py-0.5 text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")}
-                            value="load-csv"
-                            disabled={isLoading}
-                        >
-                            Load CSV
-                        </TabsTrigger>
+                        {CSV_UPLOAD_ENABLED && (
+                            <TabsTrigger
+                                className={cn("px-2 py-0.5 text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")}
+                                value="load-csv"
+                                disabled={isLoading}
+                            >
+                                Load CSV
+                            </TabsTrigger>
+                        )}
                     </TabsList>
 
                     {/* ── Cypher batch ─────────────────────────────────── */}
@@ -548,6 +551,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                     </TabsContent>
 
                     {/* ── Load CSV ─────────────────────────────────────── */}
+                    {CSV_UPLOAD_ENABLED && (
                     <TabsContent value="load-csv">
                         {/* Step 1: pick and upload the CSV file */}
                         {!csvKey && (
@@ -711,6 +715,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                             </form>
                         )}
                     </TabsContent>
+                    )}
                 </Tabs>
             </div>
         </DialogComponent>

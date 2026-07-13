@@ -5,6 +5,7 @@ import { getClient } from "../auth/[...nextauth]/options";
 import { MAX_FILE_SIZE } from "../upload/file-validation";
 import { getCsvStorageProvider } from "@/app/lib/csv-storage";
 import { getCsvTempCleanupCutoffMs } from "@/app/lib/csv-temp-config";
+import { CSV_UPLOAD_ENABLED } from "@/lib/graphUpload";
 
 export async function OPTIONS(request: Request) {
     return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
@@ -18,6 +19,13 @@ export async function OPTIONS(request: Request) {
  * query finishes (success or failure).
  */
 export async function POST(request: NextRequest) {
+    if (!CSV_UPLOAD_ENABLED) {
+        return NextResponse.json(
+            { message: "CSV upload is temporarily disabled." },
+            { status: 403, headers: getCorsHeaders(request) }
+        );
+    }
+
     const session = await getClient(request);
     if (session instanceof NextResponse) return session;
 

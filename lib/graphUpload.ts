@@ -1,172 +1,37 @@
 /**
- * Browser-safe helpers for the Manage Graph → Upload Data flow.
+ * Browser-safe helpers and feature flags for the Manage Graph → Upload Data flow.
  *
  * This module is intentionally free of server-only dependencies (no FalkorDB
  * driver, `fs`, or redis client) so it can be imported by both the client
- * component (`UploadGraph.tsx`) and the API route without coupling the browser
+ * component (`UploadGraph.tsx`) and the API routes without coupling the browser
  * bundle to server ingestion logic. The graph-executing functions live in the
  * API route's `upload-utils.ts` sibling module.
  */
 
-export type UploadMode = "dump" | "csv" | "cypher";
-
 /**
  * Dump restore is temporarily disabled: a FalkorDB server-side bug can corrupt
- * the target graph on RESTORE. Both the API (validateUploadInput) and the UI
- * (UploadGraph / CreateGraph) read this flag, which makes the feature
+ * the target graph on RESTORE. Both the API (`/api/upload`) and the UI
+ * (`UploadGraph` / `CreateGraph`) read this flag, which makes the feature
  * non-accessible without removing any of the restore code. Set it back to
  * `true` to re-enable dump restore once the database issue is fixed.
  */
 export const DUMP_RESTORE_ENABLED: boolean = false;
 
-export const RESTORE_UPLOAD_EXTENSIONS: readonly string[] = [".dump"];
-export const CSV_UPLOAD_EXTENSIONS: readonly string[] = [".csv"];
-export const CYPHER_UPLOAD_EXTENSIONS: readonly string[] = [".txt", ".cypher", ".cql"];
-
-export interface UploadValidationInput {
-  mode?: string;
-  fileId?: string;
-  extension?: string;
-  query?: string;
-}
-
-export type UploadValidationResult =
-  | { ok: true; mode: UploadMode }
-  | { ok: false; status: number; message: string };
-
-function hasExtension(allowed: readonly string[], extension?: string): boolean {
-  return typeof extension === "string" && allowed.includes(extension);
-}
+/**
+ * LOAD CSV upload is temporarily disabled while its CSV temp-storage subsystem
+ * (local / S3 / Vercel Blob + `/api/csv-temp` + `/api/graph/[graph]/load-csv`)
+ * is hardened and given full test coverage in a follow-up PR. The flag makes the
+ * feature non-accessible without deleting the code: the UI hides the "Load CSV"
+ * tab and the CSV temp / load-csv routes reject requests with a 403. Set it back
+ * to `true` once the follow-up work lands.
+ */
+export const CSV_UPLOAD_ENABLED: boolean = false;
 
 /**
- * Validate an upload request body against the resolved file extension.
- * Pure and side-effect free so it can be unit tested in isolation.
+ * Split a Cypher batch file into individual statements on top-level `;`,
+ * ignoring separators inside string/backtick literals and `//` or `/* *\/`
+ * comments. Pure and side-effect free so it can be unit tested in isolation.
  */
-export function validateUploadInput({
-  mode,
-  fileId,
-  extension,
-  query,
-}: UploadValidationInput): UploadValidationResult {
-  if (!mode || !fileId) {
-    return { ok: false, status: 400, message: "mode and fileId are required." };
-  }
-
-  if (mode === "dump") {
-    if (!DUMP_RESTORE_ENABLED) {
-      return { ok: false, status: 403, message: "Dump restore is temporarily disabled." };
-    }
-    if (!hasExtension(RESTORE_UPLOAD_EXTENSIONS, extension)) {
-      return { ok: false, status: 400, message: "Restore requires a .dump file." };
-    }
-    return { ok: true, mode };
-  }
-
-  if (mode === "csv") {
-    if (!hasExtension(CSV_UPLOAD_EXTENSIONS, extension)) {
-      return { ok: false, status: 400, message: "CSV upload requires a .csv file." };
-    }
-    if (!query?.trim()) {
-      return { ok: false, status: 400, message: "CSV upload requires a query." };
-    }
-    return { ok: true, mode };
-  }
-
-  if (mode === "cypher") {
-    if (!hasExtension(CYPHER_UPLOAD_EXTENSIONS, extension)) {
-      return { ok: false, status: 400, message: "Cypher upload requires a .txt, .cypher, or .cql file." };
-    }
-    return { ok: true, mode };
-  }
-
-  return { ok: false, status: 400, message: "Invalid upload mode." };
-}
-
-export function parseCsvRows(csvText: string): Record<string, string>[] {
-  // Strip a leading UTF-8 BOM (common in CSVs exported from Excel) so the first
-  // header isn't prefixed with \uFEFF, which would break identifier validation.
-  const text = csvText.charCodeAt(0) === 0xfeff ? csvText.slice(1) : csvText;
-  const rows: string[][] = [];
-  let currentField = "";
-  let currentRow: string[] = [];
-  let inQuotes = false;
-
-  for (let i = 0; i < text.length; i += 1) {
-    const char = text[i];
-    const next = text[i + 1];
-
-    if (char === "\"") {
-      if (inQuotes && next === "\"") {
-        currentField += "\"";
-        i += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-      continue;
-    }
-
-    if (!inQuotes && char === ",") {
-      currentRow.push(currentField);
-      currentField = "";
-      continue;
-    }
-
-    if (!inQuotes && (char === "\n" || char === "\r")) {
-      if (char === "\r" && next === "\n") i += 1;
-      currentRow.push(currentField);
-      rows.push(currentRow);
-      currentField = "";
-      currentRow = [];
-      continue;
-    }
-
-    currentField += char;
-  }
-
-  if (currentField.length > 0 || currentRow.length > 0) {
-    currentRow.push(currentField);
-    rows.push(currentRow);
-  }
-
-  // Drop only truly blank lines (a single empty field with no separators). A row
-  // like `,` parses to multiple empty fields and is a legitimate all-empty record,
-  // so it must be preserved rather than silently dropped.
-  const normalizedRows = rows.filter((row) => !(row.length === 1 && row[0].trim() === ""));
-
-  if (normalizedRows.length === 0) {
-    return [];
-  }
-
-  const [headerRow, ...dataRows] = normalizedRows;
-  const headers = headerRow.map((header, index) => {
-    const value = header.trim();
-    return value.length > 0 ? value : `column${index + 1}`;
-  });
-
-  const seenHeaders = new Set<string>();
-  for (const header of headers) {
-    if (seenHeaders.has(header)) {
-      throw new Error(`Duplicate CSV column "${header}"; column names must be unique.`);
-    }
-    seenHeaders.add(header);
-  }
-
-  return dataRows.map((dataRow) => {
-    const record: Record<string, string> = {};
-    headers.forEach((header, index) => {
-      // defineProperty (not record[header]=…) so a header like "__proto__"
-      // becomes an own enumerable property instead of hitting the prototype setter.
-      Object.defineProperty(record, header, {
-        value: dataRow[index] ?? "",
-        enumerable: true,
-        writable: true,
-        configurable: true,
-      });
-    });
-    return record;
-  });
-}
-
 export function splitCypherStatements(cypherBatch: string): string[] {
   const queries: string[] = [];
   let current = "";
@@ -257,197 +122,4 @@ export function splitCypherStatements(cypherBatch: string): string[] {
   if (finalQuery) queries.push(finalQuery);
 
   return queries;
-}
-
-/** Default batching bounds for CSV ingestion: rows per chunk and bytes per chunk. */
-export const DEFAULT_CSV_CHUNK_SIZE = 1000;
-export const DEFAULT_CSV_CHUNK_BYTES = 512 * 1024;
-
-export type CsvParamValue =
-  | null
-  | string
-  | number
-  | boolean
-  | CsvParamValue[]
-  | { [key: string]: CsvParamValue };
-
-export interface CsvRowItem {
-  index: number;
-  data: Record<string, CsvParamValue>;
-}
-
-export interface CsvIngestionOptions {
-  chunkSize?: number;
-  maxChunkBytes?: number;
-  transformRow?: (row: Record<string, string>) => Record<string, CsvParamValue>;
-}
-
-export interface CsvIngestionResult {
-  processedRows: number;
-  chunks: number;
-}
-
-export type CsvColumnType = "string" | "integer" | "float" | "boolean";
-
-/**
- * Coerce a raw CSV cell (always a string) to the target column type.
- * Empty values become null for non-string types. Invalid values throw so the
- * caller can surface an actionable error. Unknown types fall back to string.
- */
-export function coerceValue(value: string, type: CsvColumnType): CsvParamValue {
-  if (type === "integer" || type === "float" || type === "boolean") {
-    const trimmed = value.trim();
-    if (trimmed === "") return null;
-
-    if (type === "integer") {
-      if (!/^[+-]?\d+$/.test(trimmed)) {
-        throw new Error(`"${value}" is not an integer`);
-      }
-      const parsed = Number.parseInt(trimmed, 10);
-      if (!Number.isSafeInteger(parsed)) {
-        throw new Error(`"${value}" is out of the safe integer range`);
-      }
-      return parsed;
-    }
-
-    if (type === "float") {
-      const parsed = Number(trimmed);
-      if (!Number.isFinite(parsed)) {
-        throw new Error(`"${value}" is not a number`);
-      }
-      return parsed;
-    }
-
-    const lower = trimmed.toLowerCase();
-    if (lower === "true" || lower === "1") return true;
-    if (lower === "false" || lower === "0") return false;
-    throw new Error(`"${value}" is not a boolean`);
-  }
-
-  return value;
-}
-
-/**
- * Coerce every cell of a row using a per-column type map (default string).
- * Errors are annotated with the column name.
- */
-export function coerceRow(
-  row: Record<string, string>,
-  columnTypes: Record<string, CsvColumnType>
-): Record<string, CsvParamValue> {
-  const result: Record<string, CsvParamValue> = {};
-  for (const [key, raw] of Object.entries(row)) {
-    try {
-      // defineProperty guards against special keys like "__proto__".
-      Object.defineProperty(result, key, {
-        value: coerceValue(raw, columnTypes[key] ?? "string"),
-        enumerable: true,
-        writable: true,
-        configurable: true,
-      });
-    } catch (error) {
-      throw new Error(`Column "${key}": ${(error as Error).message}`);
-    }
-  }
-  return result;
-}
-
-const CYPHER_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
-
-/**
- * Return a name usable as a Cypher label/property key: bare when it is a valid
- * identifier, otherwise backtick-quoted with embedded backticks doubled.
- */
-export function escapeCypherIdentifier(name: string): string {
-  if (CYPHER_IDENTIFIER.test(name)) return name;
-  return `\`${name.replace(/`/g, "``")}\``;
-}
-
-/**
- * Build a safe starter `CREATE` statement from a node label and CSV headers.
- * Labels and property keys are escaped so arbitrary header text cannot inject
- * Cypher.
- */
-export function generateCsvQuery(label: string, columns: string[]): string {
-  const safeLabel = escapeCypherIdentifier(label.trim() || "Row");
-  const props = columns
-    .filter((col) => col.trim() !== "")
-    .map((col) => `${escapeCypherIdentifier(col)}: row.${escapeCypherIdentifier(col)}`)
-    .join(", ");
-  return props ? `CREATE (:${safeLabel} {${props}})` : `CREATE (:${safeLabel})`;
-}
-
-/**
- * Wrap a user-provided per-row Cypher body so it runs over a batch of rows.
- * Each row is exposed as `row` (a map) and its zero-based position as `index`.
- * A trailing semicolon is stripped so the result is a single statement.
- *
- * Note: cardinality-changing clauses in the body (aggregating `WITH`, `LIMIT`,
- * a nested `UNWIND`, etc.) operate over the whole chunk, not a single row.
- */
-export function buildBatchCsvQuery(body: string): string {
-  const normalized = body.replace(/[;\s]+$/, "").trim();
-  return `UNWIND $rows AS __r WITH __r.index AS index, __r.data AS row\n${normalized}`;
-}
-
-const csvByteEncoder = new TextEncoder();
-
-/** Approximate the serialized UTF-8 byte size of a row item. */
-function approximateItemBytes(item: CsvRowItem): number {
-  return csvByteEncoder.encode(JSON.stringify(item)).length;
-}
-
-/**
- * Split row items into chunks bounded by both a row count and an approximate
- * serialized byte size, so wide rows don't produce oversized query params.
- */
-export function chunkCsvItems(
-  items: CsvRowItem[],
-  maxRows: number,
-  maxBytes: number
-): CsvRowItem[][] {
-  const chunks: CsvRowItem[][] = [];
-  let current: CsvRowItem[] = [];
-  let currentBytes = 0;
-
-  for (const item of items) {
-    const size = approximateItemBytes(item);
-
-    if (size > maxBytes) {
-      throw new Error(
-        `Failed to process CSV row ${item.index + 1}: row is too large to fit in maxChunkBytes (${maxBytes} bytes).`
-      );
-    }
-
-    if (current.length > 0 && (current.length >= maxRows || currentBytes + size > maxBytes)) {
-      chunks.push(current);
-      current = [];
-      currentBytes = 0;
-    }
-    current.push(item);
-    currentBytes += size;
-  }
-
-  if (current.length > 0) chunks.push(current);
-
-  return chunks;
-}
-
-const CSV_HEADER_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
-
-/**
- * Reject CSV headers that aren't valid Cypher identifiers. The FalkorDB param
- * serializer emits map keys verbatim (`{key:value}`), so a header with spaces or
- * special characters would produce an invalid — and potentially injectable — map
- * literal when bound as `$rows`.
- */
-export function assertSafeCsvHeaders(rows: Record<string, string>[]): void {
-  if (rows.length === 0) return;
-  for (const key of Object.keys(rows[0])) {
-    if (!CSV_HEADER_IDENTIFIER.test(key)) {
-      throw new Error(
-        `CSV column "${key}" is not a valid identifier; it must start with a letter or underscore and use only letters, digits, and underscores.`
-      );
-    }
-  }
 }

@@ -6,6 +6,7 @@ import {
     getCsvTempCleanupSecrets,
     getCsvTempTtlSeconds,
 } from "@/app/lib/csv-temp-config";
+import { CSV_UPLOAD_ENABLED } from "@/lib/graphUpload";
 
 function isAuthorized(request: NextRequest): boolean {
     const configured = getCsvTempCleanupSecrets();
@@ -20,6 +21,13 @@ function isAuthorized(request: NextRequest): boolean {
 }
 
 async function runCleanup(request: NextRequest) {
+    if (!CSV_UPLOAD_ENABLED) {
+        return NextResponse.json(
+            { message: "CSV upload is temporarily disabled." },
+            { status: 403, headers: getCorsHeaders(request) }
+        );
+    }
+
     if (!isAuthorized(request)) {
         return NextResponse.json(
             { message: "Unauthorized" },

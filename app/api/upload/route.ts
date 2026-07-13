@@ -6,7 +6,7 @@ import { pipeline } from "stream/promises";
 import fs from "fs";
 import { randomUUID } from "crypto";
 import Busboy from "busboy";
-import { getCorsHeaders } from "../utils";
+import { getCorsHeaders, resolveReadOnly } from "../utils";
 import { getClient } from "../auth/[...nextauth]/options";
 import {
   getAllowedFileType,
@@ -178,6 +178,16 @@ export async function POST(request: NextRequest) {
 
     if (session instanceof NextResponse) {
       return session;
+    }
+
+    // Uploads only feed graph-mutating flows (Cypher batch / dump restore), so
+    // reject Read-Only users before staging anything to disk — matching every
+    // other mutating graph route (resolveReadOnly).
+    if (resolveReadOnly(request, session.user.role)) {
+      return NextResponse.json(
+        { error: "You do not have permission to upload files." },
+        { status: 403, headers: corsHeaders }
+      );
     }
 
     const result = await streamToDisk(request, session.user.id);

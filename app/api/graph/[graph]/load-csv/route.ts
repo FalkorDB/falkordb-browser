@@ -5,6 +5,7 @@ import { getCsvStorageProvider } from "@/app/lib/csv-storage";
 import path from "path";
 import { pathToFileURL } from "url";
 import { getCsvTempDir } from "@/app/lib/csv-storage-local";
+import { CSV_UPLOAD_ENABLED } from "@/lib/graphUpload";
 
 interface LoadCsvBody {
     key?: string;
@@ -68,6 +69,13 @@ export async function POST(
     let shouldDeleteTempFile = false;
 
     try {
+        if (!CSV_UPLOAD_ENABLED) {
+            return NextResponse.json(
+                { message: "CSV upload is temporarily disabled." },
+                { status: 403, headers: getCorsHeaders(request) }
+            );
+        }
+
         const session = await getClient(request);
         if (session instanceof NextResponse) return session;
 

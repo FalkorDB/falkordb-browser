@@ -63,9 +63,11 @@ test.describe("Upload Graph – Cypher batch", () => {
 
 // ---------------------------------------------------------------------------
 // CSV upload: run a per-row Cypher statement over each CSV row
-// Temporarily skipped — the Manage upload dialog was simplified to Cypher-batch
-// only (commit 47aa4930), so the CSV tab no longer exists in the UI. Re-enable
-// if the CSV upload UI is restored.
+// Temporarily skipped — the "Load CSV" mode is gated off behind
+// CSV_UPLOAD_ENABLED (lib/graphUpload.ts) while its CSV temp-storage subsystem
+// is hardened and given full coverage in a follow-up PR, so the CSV tab is
+// hidden in the UI. Re-enable together with the flag. Note: these cases target
+// the older per-row UNWIND flow and must be rewritten for the LOAD CSV flow.
 // ---------------------------------------------------------------------------
 test.describe.skip("Upload Graph – CSV", () => {
   let browser: BrowserWrapper;

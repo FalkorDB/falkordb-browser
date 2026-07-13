@@ -2,8 +2,11 @@ import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { getStoredUpload } from "@/app/api/upload/file-validation";
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
+import path from "path";
 import { getCorsHeaders, resolveReadOnly } from "../../../utils";
 import { executeCypherBatch } from "./upload-utils";
+
+const CYPHER_BATCH_EXTENSIONS = [".txt", ".cql", ".cypher"];
 
 interface UploadBody {
   fileId?: string;
@@ -65,6 +68,16 @@ export async function POST(
       return NextResponse.json(
         { message: "You do not have permission to modify this graph." },
         { status: 403, headers: getCorsHeaders(request) }
+      );
+    }
+
+    // Only Cypher batch files are executable here. Reject anything else (e.g. a
+    // stale .dump) so a non-Cypher file is never decoded and run as a batch.
+    const extension = path.extname(storedUpload.filePath).toLowerCase();
+    if (!CYPHER_BATCH_EXTENSIONS.includes(extension)) {
+      return NextResponse.json(
+        { message: "Only .txt, .cql, or .cypher batch files can be executed." },
+        { status: 400, headers: getCorsHeaders(request) }
       );
     }
 
