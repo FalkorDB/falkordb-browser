@@ -182,11 +182,6 @@ test("streamCsvUpload rejects a second large file part without hanging", async (
         assert.equal(result.status, 400);
         assert.match(result.error, /single file/i);
     }
-    // Wait for all pending event loop tasks and timers to complete, including
-    // FormData stream cleanup that may still be pending after busboy aborts.
-    // Use Promise-based setTimeout to allow timer callbacks and uncaught errors
-    // in promises to surface before the test ends.
-    await new Promise(resolve => setTimeout(resolve, 10));
 });
 
 test("streamCsvUpload settles (500) without crashing when the source errors mid-store", async () => {

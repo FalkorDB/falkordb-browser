@@ -124,7 +124,7 @@ export async function streamCsvUpload(
         try {
             busboy = Busboy({
                 headers: { "content-type": contentType },
-                limits: { files: 1, fields: 0, parts: 10, fileSize: maxSize },
+                limits: { files: 2, fields: 0, parts: 10, fileSize: maxSize },
             });
         } catch (err) {
             console.error("csv busboy init error:", err);
@@ -137,10 +137,23 @@ export async function streamCsvUpload(
             // can't crash the process with an unhandled "error" event.
             fileStream.on("error", () => undefined);
 
-            if (fieldname !== "file" || fileSeen) {
+            if (fieldname !== "file") {
                 fileStream.resume();
                 return;
             }
+
+            if (fileSeen) {
+                // Second file: reject directly without destroying the parser.
+                // Destroying busboy mid-stream leaves the source/FormData stream in
+                // an invalid state (ERR_INVALID_STATE from undici/webstreams).
+                // Instead, record the error and drain this stream so busboy reaches
+                // close naturally. The store has already settled (after the first file),
+                // so the settle logic will finalize with this recorded error when busboy closes.
+                recordError(400, "Only a single file may be uploaded.");
+                fileStream.resume();
+                return;
+            }
+
             fileSeen = true;
             sourceStream = fileStream;
 
@@ -181,7 +194,6 @@ export async function streamCsvUpload(
                 );
         });
 
-        busboy.on("filesLimit", () => abortParser(400, "Only a single file may be uploaded."));
         busboy.on("fieldsLimit", () => abortParser(400, "Unexpected form fields."));
         busboy.on("partsLimit", () => abortParser(400, "Too many form parts."));
 
