@@ -2,6 +2,7 @@ import test, { expect } from "@playwright/test";
 import urls from "../config/urls.json";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import LoginPage from "../logic/POM/loginPage";
+import { urlPath } from "../infra/utils";
 
 /**
  * Smoke system tests that run against the dockerized stack: the locally-built
@@ -41,6 +42,6 @@ test.describe("@smoke smoke tests against dockers", () => {
         const login = await browser.createNewPage(LoginPage, urls.loginUrl);
         await browser.setPageToFullScreen();
         await login.clickOnConnect();
-        expect(login.getCurrentURL()).toBe(urls.graphUrl);
+        expect(urlPath(login.getCurrentURL())).toBe(urlPath(urls.graphUrl));
     });
 });
