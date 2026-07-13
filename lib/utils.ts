@@ -747,6 +747,7 @@ export function uploadFileWithProgress(
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", normalizeApiUrl(input));
+    xhr.timeout = 120_000;
 
     if (_activeConnectionId) {
       xhr.setRequestHeader("X-Connection-Id", _activeConnectionId);
@@ -791,6 +792,16 @@ export function uploadFileWithProgress(
       toast({
         title: "Error",
         description: "Network error while uploading the file. Please try again.",
+        variant: "destructive",
+      });
+      setIndicator("offline");
+      resolve({ ok: false, status: 0, body: "" });
+    };
+
+    xhr.ontimeout = () => {
+      toast({
+        title: "Error",
+        description: "Upload timed out. Please try again.",
         variant: "destructive",
       });
       setIndicator("offline");

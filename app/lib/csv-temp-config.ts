@@ -2,8 +2,11 @@ const DEFAULT_CSV_TEMP_TTL_SECONDS = 1800;
 const DEFAULT_CSV_MAX_UPLOAD_BYTES = 100 * 1024 * 1024; // 100 MB
 
 export function getCsvTempTtlSeconds(): number {
-    const raw = Number(process.env.CSV_TEMP_TTL_SECONDS ?? DEFAULT_CSV_TEMP_TTL_SECONDS);
-    return Number.isFinite(raw) && raw >= 0 ? raw : DEFAULT_CSV_TEMP_TTL_SECONDS;
+    const configured = process.env.CSV_TEMP_TTL_SECONDS?.trim();
+    if (!configured) return DEFAULT_CSV_TEMP_TTL_SECONDS;
+
+    const raw = Number(configured);
+    return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_CSV_TEMP_TTL_SECONDS;
 }
 
 /**
