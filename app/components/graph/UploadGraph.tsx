@@ -1,7 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { type FormEvent, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Copy, Check, FileSpreadsheet, X } from "lucide-react";
+import { FileSpreadsheet, X } from "lucide-react";
 import { Monaco } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
 import Dropzone from "../ui/Dropzone";
@@ -46,12 +46,6 @@ function buildLoadCsvQuery(url: string, withHeaders: boolean, body: string): str
     return normalizedBody ? `${prefix}\n${normalizedBody}` : prefix;
 }
 
-function buildShortLoadCsvUrl(url: string): string {
-    const MAX_LEN = 96;
-    if (url.length <= MAX_LEN) return url;
-    return `${url.slice(0, 52)}...${url.slice(-28)}`;
-}
-
 function formatFileSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -91,10 +85,9 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
     const [csvFiles, setCsvFiles] = useState<File[]>([]);
     /** Non-null once the CSV has been uploaded and a storage key is available. */
     const [csvKey, setCsvKey] = useState<string | null>(null);
-    const [csvUrl, setCsvUrl] = useState("");
+    const [csvFileName, setCsvFileName] = useState("");
     const [csvQuery, setCsvQuery] = useState("");
     const [csvWithHeaders, setCsvWithHeaders] = useState(true);
-    const [csvUrlCopied, setCsvUrlCopied] = useState(false);
     const loadCsvFormRef = useRef<HTMLFormElement>(null);
 
     const udfSuggestions = useMemo(() => buildUdfFunctionSuggestions(udfList), [udfList]);
@@ -126,13 +119,13 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
     }, [cypherLanguageConfig, loadCsvLanguageConfig]);
 
     const loadCsvPrefix = useMemo(
-        () => (csvUrl ? buildLoadCsvPrefix(buildShortLoadCsvUrl(csvUrl), csvWithHeaders) : ""),
-        [csvUrl, csvWithHeaders]
+        () => (csvFileName ? buildLoadCsvPrefix(csvFileName, csvWithHeaders) : ""),
+        [csvFileName, csvWithHeaders]
     );
 
     const fullCsvQuery = useMemo(
-        () => (csvUrl ? buildLoadCsvQuery(csvUrl, csvWithHeaders, csvQuery) : ""),
-        [csvUrl, csvWithHeaders, csvQuery]
+        () => (csvFileName ? buildLoadCsvQuery(csvFileName, csvWithHeaders, csvQuery) : ""),
+        [csvFileName, csvWithHeaders, csvQuery]
     );
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -172,10 +165,9 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             setCypherFiles([]);
             setCsvFiles([]);
             setCsvKey(null);
-            setCsvUrl("");
+            setCsvFileName("");
             setCsvQuery("");
             setCsvWithHeaders(true);
-            setCsvUrlCopied(false);
             setIsLoading(false);
             setPhase(null);
             setUploadPct(0);
@@ -189,10 +181,9 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
         setCypherFiles([]);
         setCsvFiles([]);
         setCsvKey(null);
-        setCsvUrl("");
+        setCsvFileName("");
         setCsvQuery("");
         setCsvWithHeaders(true);
-        setCsvUrlCopied(false);
         setPhase(null);
         setUploadPct(0);
     }, [csvKey, cleanupUploadedCsv]);
@@ -279,13 +270,24 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             setPhase("uploading");
             setUploadPct(0);
 
-            // Upload CSV to temp storage — returns { key, readUrl }.
+            // Upload CSV to per-user temp storage — returns an opaque { key }.
+            // The client never receives/handles the storage URL (SSRF-safe): the
+            // server resolves the owner-scoped URL when running LOAD CSV.
+            const fileName = csvFiles[0].name;
             const uploadResult = await uploadFileWithProgress("api/csv-temp", csvFiles[0], toast, setIndicator, setUploadPct);
             if (!uploadResult.ok) return;
 
-            const { key, readUrl } = JSON.parse(uploadResult.body) as { key: string; readUrl: string };
+            let key: string;
+            try {
+                const parsed = JSON.parse(uploadResult.body) as { key?: string };
+                if (!parsed.key) throw new Error("Missing key in upload response");
+                key = parsed.key;
+            } catch {
+                toast({ title: "Upload failed", description: "Unexpected response from server.", variant: "destructive" });
+                return;
+            }
             setCsvKey(key);
-            setCsvUrl(readUrl);
+            setCsvFileName(fileName);
             setCsvQuery(buildLoadCsvBodyStarter());
         } finally {
             setIsLoading(false);
@@ -302,7 +304,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             return;
         }
 
-        if (!csvKey || !fullCsvQuery.trim()) return;
+        if (!csvKey || !csvQuery.trim()) return;
 
         try {
             setIsLoading(true);
@@ -310,7 +312,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
 
             const result = await securedFetch(
                 `api/graph/${prepareArg(graphName)}/load-csv`,
-                { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: csvKey, query: fullCsvQuery }) },
+                { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: csvKey, withHeaders: csvWithHeaders, body: csvQuery }) },
                 toast,
                 setIndicator
             );
@@ -392,16 +394,6 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
         } finally {
             setIsLoading(false);
             setPhase(null);
-        }
-    };
-
-    const handleCopyUrl = async () => {
-        try {
-            await navigator.clipboard.writeText(csvUrl);
-            setCsvUrlCopied(true);
-            setTimeout(() => setCsvUrlCopied(false), 2000);
-        } catch {
-            // ignore clipboard errors
         }
     };
 
@@ -558,9 +550,9 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                         {!csvKey && (
                             <form onSubmit={onUploadCsvToTemp} className="flex flex-col gap-4 mt-2">
                                 <p className="text-sm text-muted-foreground">
-                                    Upload a .csv file to get a temporary URL, then write a{" "}
-                                    <code className="rounded bg-muted px-1 py-0.5 text-xs">LOAD CSV FROM &apos;url&apos; AS row</code>{" "}
-                                    Cypher query to import it into the graph.
+                                    Upload a .csv file, then complete the{" "}
+                                    <code className="rounded bg-muted px-1 py-0.5 text-xs">LOAD CSV ... AS row</code>{" "}
+                                    query body to import it into the graph.
                                 </p>
                                 <Dropzone
                                     filesCount
@@ -623,18 +615,10 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                                     The file will be deleted after the query finishes.
                                 </p>
 
-                                {/* URL display with copy button */}
+                                {/* Uploaded file display */}
                                 <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2">
-                                    <span className="flex-1 truncate font-mono text-xs" title={csvUrl}>{csvUrl}</span>
-                                    <button
-                                        type="button"
-                                        onClick={handleCopyUrl}
-                                        className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                                        title="Copy URL"
-                                        aria-label="Copy CSV URL"
-                                    >
-                                        {csvUrlCopied ? <Check size={14} /> : <Copy size={14} />}
-                                    </button>
+                                    <FileSpreadsheet size={14} className="shrink-0 text-muted-foreground" />
+                                    <span className="flex-1 truncate font-mono text-xs" title={csvFileName}>{csvFileName}</span>
                                 </div>
 
                                 {/* Editable LOAD CSV query */}
@@ -708,7 +692,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                                         variant="Primary"
                                         isLoading={isLoading}
                                         indicator={indicator}
-                                        disabled={!graphName || !fullCsvQuery.trim() || isLoading}
+                                        disabled={!graphName || !csvQuery.trim() || isLoading}
                                         data-testid="loadCsvRunConfirm"
                                     />
                                     <CloseDialog data-testid="uploadGraphCancel" disabled={isLoading} />

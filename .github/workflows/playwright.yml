@@ -115,6 +115,9 @@ jobs:
         image: falkordb/falkordb:v4.18.10
         ports:
           - 6379:6379
+        # Shared IMPORT_FOLDER so Load CSV (file:// mode) can hand files to the DB.
+        volumes:
+          - /tmp/fdb-import:/var/lib/FalkorDB/import
       falkordb-pat:
         image: falkordb/falkordb:v4.18.10
         ports:
@@ -155,6 +158,11 @@ jobs:
         env:
           OPENAI_TOKEN: ${{ secrets.OPENAI_TOKEN }}
         run: |
+          # Shared IMPORT_FOLDER for Load CSV file:// mode. The falkordb service
+          # bind-mounts /tmp/fdb-import (created by Docker as root); make it
+          # writable by the runner user so the app can stream CSV files there.
+          sudo mkdir -p /tmp/fdb-import
+          sudo chmod 777 /tmp/fdb-import
           export CHAT_URL="http://localhost:8080/"
           export NEXTAUTH_URL="http://localhost:3000/"
           export NEXTAUTH_SECRET=SECRET
@@ -164,6 +172,10 @@ jobs:
           export PAT_FALKORDB_USERNAME=default
           export PAT_FALKORDB_PASSWORD=""
           export PAT_FALKORDB_GRAPH_NAME=token_management
+          export CSV_STORAGE=local
+          export CSV_LOCAL_TEMP_DIR=/tmp/fdb-import
+          export CSV_LOCAL_LOAD_URI_MODE=file
+          export CSV_TEMP_SIGNING_SECRET=SECRET
           npm start > nextjs.log 2>&1 &
           timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
           npx playwright test \
