@@ -49,8 +49,6 @@ export default function Toolbar({
 
 
     const suggestionRef = useRef<HTMLDivElement>(null);
-    const graphRef = useRef(graph);
-    graphRef.current = graph;
 
     const [suggestions, setSuggestions] = useState<(Node | Link)[]>([]);
     const [suggestionIndex, setSuggestionIndex] = useState(0);
@@ -91,7 +89,7 @@ export default function Toolbar({
             return;
         }
 
-        const elements = graphRef.current.getElements().filter(el =>
+        const elements = graph.getElements().filter(el =>
             Object.values(el.data).some(value => value != null && value.toString().toLowerCase().startsWith(searchElement.toLowerCase()))
             || el.id.toString().toLowerCase().includes(searchElement.toLowerCase())
             || ("relationship" in el && (el as Link).relationship.toLowerCase().includes(searchElement.toLowerCase()))
@@ -99,7 +97,9 @@ export default function Toolbar({
         );
 
         setSuggestions(elements);
-    }, [searchElement]);
+        // Recompute when the search text OR the graph changes so suggestions
+        // don't go stale after a new query / graph switch keeps the same text.
+    }, [searchElement, graph]);
 
     useEffect(() => {
         const timeout = setTimeout(handleOnChange, 300);

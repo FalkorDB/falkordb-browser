@@ -48,7 +48,7 @@ export const CYPHER_KEYWORDS = [
   "EXISTS",
   "TRUE",
   "FALSE",
-  "OR", 
+  "OR",
   "AND",
   "XOR"
 ];

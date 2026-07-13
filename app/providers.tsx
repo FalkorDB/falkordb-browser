@@ -3,7 +3,7 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue } from "@/lib/utils";
+import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue } from "@/lib/utils";
 import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
@@ -242,13 +242,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   });
 
   const setGraphInfo = useCallback((gi: GraphInfo) => {
-    // Mutate graph.GraphInfo in-place — no graph state change, so GraphContext
-    // consumers (canvas, toolbar, …) are not disturbed.
-    setGraph(current => {
-      current.GraphInfo = gi;
-      graphRef.current = current;
-      return current;
-    });
+    // Mutate graphRef.current.GraphInfo in-place — no graph state change, so
+    // GraphContext consumers (canvas, toolbar, …) are not disturbed. graphRef
+    // always points at the current graph (kept in sync on every render), so we
+    // avoid a redundant setGraph call that would bail out anyway (same object).
+    graphRef.current.GraphInfo = gi;
     // Bump the version counter in GraphInfoProvider so its consumers
     // re-render and read the fresh data from graph.GraphInfo.
     graphInfoSyncRef.current.bumpVersion();
@@ -566,7 +564,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   }), [aiFixSupported, lastFailure, aiFixResult, pendingConsent, requestAiFix, confirmConsent]);
 
   // Refs so runQuery can always call the latest requestAiFix without being in its
-  // eslint-disable-next-line dependency array (avoids recreating runQuery on every AI-state change).
+  // dependency array (avoids recreating runQuery on every AI-state change).
   const requestAiFixRef = useRef(requestAiFix);
   requestAiFixRef.current = requestAiFix;
   // ---------------------------------------------------------------------------
@@ -606,6 +604,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   isReadOnlyRef.current = isReadOnly;
   const activeGraphNameRef = useRef(graphName);
   activeGraphNameRef.current = graphName;
+  // Ref for the auth status so fetchCount reads the latest value without adding
+  // `status` to its deps (which would churn every consumer of that callback).
+  const statusRef = useRef(status);
+  statusRef.current = status;
 
   const connectionContext = useMemo(() => ({
     connectionType,
@@ -634,24 +636,49 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setCypherLanguageConfig,
   }), [cypherLanguageConfig]);
 
-  const fetchCount = useCallback(async (name?: string) => {
+  const fetchCount = useCallback(async (name?: string, options?: { signal?: AbortSignal; connectionId?: string | null; epoch?: number }) => {
     const n = name || graphName;
 
-    if (!n || status === "unauthenticated") return;
+    if (!n || statusRef.current === "unauthenticated") return;
+
+    // Capture the connection this request targets. Prefer the caller's captured
+    // epoch (the epoch when its poll/action began) so a switch between that start
+    // and this call is caught; otherwise capture it now.
+    const connectionId = options?.connectionId !== undefined ? options.connectionId : getActiveConnectionIdGlobal();
+    const startEpoch = options?.epoch !== undefined ? options.epoch : getConnectionEpoch();
+
+    // Already superseded: skip the request entirely so we never query a stale
+    // graph against a switched connection (which could auto-create it).
+    if (getConnectionEpoch() !== startEpoch) return;
+
+    // Suppress the request's toast / indicator side effects if the connection is
+    // switched while it is in flight — getSSEGraphResult fires them internally
+    // before we can inspect the epoch, and not every caller passes an AbortSignal.
+    const guardedToast = ((...args: Parameters<typeof toast>) => {
+      if (getConnectionEpoch() === startEpoch) toast(...args);
+    }) as typeof toast;
+    const guardedSetIndicator = (indicator: "online" | "offline") => {
+      if (getConnectionEpoch() === startEpoch) setIndicator(indicator);
+    };
 
     try {
       const readOnlyParam = isReadOnlyRef.current ? '?readOnly=true' : '';
-      const result = await getSSEGraphResult(`api/graph/${prepareArg(n)}/count${readOnlyParam}`, toast, setIndicator) as { nodes?: number; edges?: number };
+      const result = await getSSEGraphResult(`api/graph/${prepareArg(n)}/count${readOnlyParam}`, guardedToast, guardedSetIndicator, {
+        signal: options?.signal,
+        connectionId,
+      }) as { nodes?: number; edges?: number };
 
       if (!result) return;
 
-      if (n !== activeGraphNameRef.current) return;
+      // Discard if the graph name or the connection changed while in flight.
+      if (n !== activeGraphNameRef.current || getConnectionEpoch() !== startEpoch) return;
 
       const { nodes, edges } = result;
 
       graphInfoSyncRef.current.setEdgesCount(edges);
       graphInfoSyncRef.current.setNodesCount(nodes);
     } catch (error) {
+      if (isAbortError(error)) return;
       console.error(error);
     }
   }, [graphName, toast]);
@@ -1428,9 +1455,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Skip if unchanged
     if (prev === activeConnectionId) return;
 
-    // Clear graph data so stale results from the old connection are gone
-    setGraph(Graph.empty());
-    setGraphInfo(GraphInfo.empty(toast, setIndicator));
+    // Clear graph data so stale results from the old connection are gone.
+    // Build the empty graph with the real toast/setIndicator callbacks up front
+    // so its GraphInfo isn't left with Graph.empty()'s console.error fallbacks
+    // (setGraphInfo only mutates the current graph, not this newly queued one).
+    setGraph(Graph.empty(undefined, undefined, undefined, GraphInfo.empty(toast, setIndicator)));
     setGraphName("");
     setSelectedParam("");
     setGraphNamesLoaded(false);
@@ -1547,9 +1576,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       console.error("Failed to cleanup demo graphs", error);
     }
 
-    // Clear current graph to avoid showing deleted demo graph
-    setGraph(Graph.empty());
-    setGraphInfo(GraphInfo.empty(toast, setIndicator));
+    // Clear current graph to avoid showing deleted demo graph. Build the empty
+    // graph with the real toast/setIndicator callbacks up front so its GraphInfo
+    // isn't left with Graph.empty()'s console.error fallbacks (setGraphInfo only
+    // mutates the current graph, not this newly queued one).
+    setGraph(Graph.empty(undefined, undefined, undefined, GraphInfo.empty(toast, setIndicator)));
     setData({ nodes: [], links: [] });
 
     if (userGraphBeforeTutorial && userGraphsBeforeTutorial.includes(userGraphBeforeTutorial)) {

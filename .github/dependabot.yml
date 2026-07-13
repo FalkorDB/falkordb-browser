@@ -15,4 +15,21 @@ updates:
       npm-minor-patch:
         update-types:
           - "patch"
-    
+    ignore:
+      # TypeScript 7.0 (native Go compiler) ships no JS Compiler API, which
+      # Next.js relies on for `next build` type-checking, so the bump breaks
+      # the build. Scoped to 7.0.x only: TypeScript 7.1 is expected to restore
+      # the programmatic API, so allow Dependabot to propose 7.1+ when it lands.
+      # See https://github.com/vercel/next.js/pull/95639
+      - dependency-name: "typescript"
+        versions: ["7.0.x"]
+
+      # eslint-plugin-react (pulled in transitively by eslint-config-next) has no
+      # ESLint 10 compatible release yet: its latest (7.37.x) peer-caps at
+      # eslint ^9.7, and eslint 10 removed the context.getFilename()/ScopeManager
+      # APIs the Next.js lint stack relies on, which crashes `npm run lint`. Stay
+      # on the eslint 9.x maintenance line until eslint-config-next /
+      # eslint-plugin-react / typescript-eslint support eslint 10.
+      - dependency-name: "eslint"
+        versions: [">=10.0.0"]
+
