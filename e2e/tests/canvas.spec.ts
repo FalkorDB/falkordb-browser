@@ -54,8 +54,12 @@ test.describe('Canvas Tests', () => {
         await graph.clickZoomInControl();
         await graph.waitForScaleToStabilize();
         const updatedGraph = await graph.getCanvasScaling();
-        expect(updatedGraph.scaleX - initialGraph.scaleX).toBeCloseTo(1, 0);
-        expect(updatedGraph.scaleY - initialGraph.scaleY).toBeCloseTo(1, 0);
+        // Zoom is multiplicative (each click scales by 1.1), so two zoom-in
+        // clicks multiply the scale by 1.1 * 1.1 = 1.21. Assert the ratio rather
+        // than an absolute delta, which depends on the (layout-dependent) base
+        // zoom and made this test flaky.
+        expect(updatedGraph.scaleX / initialGraph.scaleX).toBeCloseTo(1.21, 1);
+        expect(updatedGraph.scaleY / initialGraph.scaleY).toBeCloseTo(1.21, 1);
         await apicalls.removeGraph(graphName);
     });
 
@@ -74,8 +78,12 @@ test.describe('Canvas Tests', () => {
         await graph.clickZoomOutControl();
         await graph.waitForScaleToStabilize();
         const updatedGraph = await graph.getCanvasScaling();
-        expect(initialGraph.scaleX - updatedGraph.scaleX).toBeCloseTo(1, 0);
-        expect(initialGraph.scaleY - updatedGraph.scaleY).toBeCloseTo(1, 0);
+        // Zoom is multiplicative (each click scales by 0.9), so two zoom-out
+        // clicks multiply the scale by 0.9 * 0.9 = 0.81. Assert the ratio rather
+        // than an absolute delta, which depends on the (layout-dependent) base
+        // zoom and made this test flaky.
+        expect(updatedGraph.scaleX / initialGraph.scaleX).toBeCloseTo(0.81, 1);
+        expect(updatedGraph.scaleY / initialGraph.scaleY).toBeCloseTo(0.81, 1);
 
         await apicalls.removeGraph(graphName);
     });
