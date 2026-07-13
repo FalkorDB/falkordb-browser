@@ -3,6 +3,7 @@ import urls from '../config/urls.json';
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import LoginPage from "../logic/POM/loginPage";
 import { userRoles, user } from '../config/user.json';
+import { urlPath } from "../infra/utils";
 
 test.describe(`Login tests`, () => {
     let browser: BrowserWrapper;
@@ -22,7 +23,7 @@ test.describe(`Login tests`, () => {
         await login.clickOnConnect();
         // clickOnConnect waits for the normalized path; poll the exact URL so a
         // transient trailing-slash/param during navigation doesn't flake the check.
-        await expect.poll(() => login.getCurrentURL(), { timeout: 10000 }).toBe(urls.graphUrl);
+        await expect.poll(() => urlPath(login.getCurrentURL()), { timeout: 10000 }).toBe(urlPath(urls.graphUrl));
     });
 
     test(`@admin validate user login with credentials`, async () => {
@@ -31,7 +32,7 @@ test.describe(`Login tests`, () => {
         await browser.setPageToFullScreen();
         await login.connectWithCredentials("readonlyuser", user.password);
         await login.waitForUrl(urls.graphUrl);
-        expect(login.getCurrentURL()).toBe(urls.graphUrl);
+        expect(urlPath(login.getCurrentURL())).toBe(urlPath(urls.graphUrl));
     });
 
     const invalidInputs = [
@@ -48,7 +49,7 @@ test.describe(`Login tests`, () => {
             await browser.setPageToFullScreen();
             await login.connectWithCredentials(username, password, host, port);
             await new Promise((res) => { setTimeout(res, 500); });
-            expect(login.getCurrentURL()).not.toBe(urls.graphUrl);
+            expect(urlPath(login.getCurrentURL())).not.toBe(urlPath(urls.graphUrl));
         });
     });
 
@@ -58,7 +59,7 @@ test.describe(`Login tests`, () => {
         await browser.setPageToFullScreen();
         await login.connectWithUrl("falkor://localhost:6379");
         await login.waitForSuccessfulLogin(urls.graphUrl);
-        expect(login.getCurrentURL()).toBe(urls.graphUrl);
+        expect(urlPath(login.getCurrentURL())).toBe(urlPath(urls.graphUrl));
     });
 
     test(`@admin validate login with FalkorDB URL - with credentials`, async () => {
@@ -67,7 +68,7 @@ test.describe(`Login tests`, () => {
         await browser.setPageToFullScreen();
         await login.connectWithUrl(`falkor://readonlyuser:${encodeURIComponent(user.password)}@localhost:6379`);
         await login.waitForSuccessfulLogin(urls.graphUrl);
-        expect(login.getCurrentURL()).toBe(urls.graphUrl);
+        expect(urlPath(login.getCurrentURL())).toBe(urlPath(urls.graphUrl));
     });
 
     test(`@admin validate toggle between manual and URL modes`, async () => {
@@ -103,7 +104,7 @@ test.describe(`Login tests`, () => {
             await login.submitUrlWithoutWait(url);
             expect(await login.isFormatErrorVisible()).toBe(true);
             // Should NOT navigate — blocked before request
-            expect(login.getCurrentURL()).not.toBe(urls.graphUrl);
+            expect(urlPath(login.getCurrentURL())).not.toBe(urlPath(urls.graphUrl));
         });
     });
 

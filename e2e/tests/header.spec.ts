@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import urls from "../config/urls.json";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import NavBarComponent from "../logic/POM/headerComponent";
-import { normalizeUrl } from "../infra/utils";
+import { normalizeUrl, urlPath } from "../infra/utils";
 
 test.describe(`Header tests`, () => {
   let browser: BrowserWrapper;
@@ -25,7 +25,8 @@ test.describe(`Header tests`, () => {
     const navBar = await browser.createNewPage(NavBarComponent, urls.settingsUrl);
     await navBar.clickOnGraphsButton();
     const newUrl = navBar.getCurrentURL();
-    expect(new URL(newUrl).origin + new URL(newUrl).pathname).toBe(urls.graphUrl);
+    // Ignore a `?graph=<name>` query the app may append (see urlPath).
+    expect(urlPath(newUrl)).toBe(urlPath(urls.graphUrl));
   });
 
   test(`@admin Verify clicking on help -> Documentation redirects to specified URL`, async () => {
