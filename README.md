@@ -70,10 +70,6 @@ docker run -p 6379:6379 -it --rm falkordb/falkordb:latest
 
 ### Run browser-only Docker image (with local LOAD CSV defaults)
 
-> LOAD CSV is currently disabled by `CSV_UPLOAD_ENABLED` in
-> `lib/graphUpload.ts`. The configuration below applies after it is re-enabled
-> and the image is rebuilt.
-
 If you run the browser separately from FalkorDB, use the browser image and set
 the same CSV temp defaults used by compose:
 
@@ -92,18 +88,31 @@ volume to `/var/lib/FalkorDB/import` there as well and configure
 
 ### Use MinIO for CSV temp uploads (S3-compatible)
 
-The CSV upload flow supports S3-compatible backends, including MinIO.
-LOAD CSV is currently disabled by `CSV_UPLOAD_ENABLED` in `lib/graphUpload.ts`.
-Use this setup after re-enabling LOAD CSV and rebuilding the image.
-This repository includes a local MinIO stack in [docker-compose.minio.yml](docker-compose.minio.yml).
+The CSV upload flow supports any S3-compatible backend, including MinIO. This
+repo includes a local MinIO stack in [docker-compose.minio.yml](docker-compose.minio.yml)
+for exercising the **S3 storage provider** (streaming multipart upload + presigned
+GET).
 
-1. Start MinIO and create the CSV temp bucket:
+> **⚠️ `LOAD CSV` needs HTTPS.** FalkorDB fetches the CSV itself and only accepts
+> `https://` or `file://` URIs — plain `http://` is rejected ("Unsupported URI").
+> A plain‑http MinIO endpoint (`http://localhost:9000`) works for the browser→store
+> upload, but the presigned URL handed to FalkorDB is `http://…`, so the import
+> fails fast with a clear error. For a full end‑to‑end `LOAD CSV`, either:
+> - point at an **HTTPS‑reachable** object store — real **S3 / Cloudflare R2**, or
+>   MinIO behind a TLS proxy (set `S3_ENDPOINT=https://…`), or
+> - use the **local** backend for local dev — `CSV_STORAGE=local` with
+>   `CSV_LOCAL_LOAD_URI_MODE=file` and a shared `IMPORT_FOLDER` (see above); no
+>   HTTPS needed.
+
+1. Start MinIO and create the private CSV temp bucket:
 
   ```bash
   docker compose -f docker-compose.minio.yml up -d
   ```
 
-2. Set these values in `.env.local`:
+2. Set these values in `.env.local` (the endpoint is how the **browser server**
+   reaches MinIO; for `LOAD CSV` to succeed it must resolve to an HTTPS URL the
+   **database** can reach):
 
   ```env
   CSV_STORAGE=s3
@@ -111,7 +120,7 @@ This repository includes a local MinIO stack in [docker-compose.minio.yml](docke
   S3_SECRET_ACCESS_KEY=minioadmin
   S3_REGION=us-east-1
   S3_BUCKET=falkordb-csv-temp
-  S3_ENDPOINT=http://localhost:9000
+  S3_ENDPOINT=https://minio.your-domain.example   # must be HTTPS-reachable by FalkorDB
   S3_FORCE_PATH_STYLE=true
   S3_KEY_PREFIX=csv-temp/
   S3_URL_EXPIRES_IN=3600
@@ -121,7 +130,7 @@ This repository includes a local MinIO stack in [docker-compose.minio.yml](docke
 
 Notes:
 - Keep the bucket private (default in the init container).
-- Signed URLs are generated automatically for LOAD CSV.
+- Signed HTTPS URLs are generated automatically for LOAD CSV.
 - MinIO console is available at `http://localhost:9001` (user/password: `minioadmin`/`minioadmin`).
 
 ### Deploy to Kubernetes with Helm

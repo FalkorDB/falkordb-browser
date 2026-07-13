@@ -9,7 +9,7 @@ import Button from "../ui/Button";
 import CloseDialog from "../CloseDialog";
 import { BrowserSettingsContext, ConnectionContext, CypherLanguageContext, ForceGraphContext, GraphContext, HistoryQueryContext, IndicatorContext, TableViewContext, UDFContext } from "../provider";
 import DialogComponent from "../DialogComponent";
-import { cn, Data, getActiveConnectionIdGlobal, getMemoryUsage, getMetaStats, MemoryValue, prepareArg, securedFetch, uploadFileWithProgress } from "@/lib/utils";
+import { cn, Data, getActiveConnectionIdGlobal, getMemoryUsage, getMetaStats, MemoryValue, prepareArg, securedFetch, toUserFriendlyMessage, uploadFileWithProgress } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import type { FileRejection } from "react-dropzone";
 import EditorComponent, { LanguageConfig } from "../EditorComponent";
@@ -318,7 +318,33 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             );
             if (!result.ok) return;
 
-            const data = await result.json() as { message?: string; result?: { data?: Data; metadata?: unknown[] } };
+            const data = await result.json() as {
+                message?: string;
+                error?: { message?: string; status?: number };
+                result?: { data?: Data; metadata?: unknown[] };
+            };
+
+            // The import streams a keep-alive heartbeat then a single JSON object;
+            // a query-execution failure is reported in the body (HTTP 200) as
+            // `error` rather than a status code. Route it through the same
+            // user-friendly mapping securedFetch uses (syntax highlighting, hints,
+            // allowlisted verbatim messages).
+            if (data.error) {
+                const friendly = toUserFriendlyMessage(
+                    data.error.message ?? "Failed to execute the LOAD CSV query.",
+                    data.error.status ?? 422,
+                    { query: fullCsvQuery }
+                );
+                toast({
+                    title: friendly.title,
+                    description: friendly.description,
+                    variant: "destructive",
+                    rawMessage: friendly.rawMessage,
+                    hint: friendly.hint,
+                    hintLink: friendly.hintLink,
+                });
+                return;
+            }
 
             if (data.result?.data && Array.isArray(data.result.metadata)) {
                 let graphInfo: GraphInfo | undefined;
