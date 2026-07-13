@@ -10,10 +10,14 @@
 
 /**
  * Dump restore is temporarily disabled: a FalkorDB server-side bug can corrupt
- * the target graph on RESTORE. Both the API (`/api/upload`) and the UI
- * (`UploadGraph` / `CreateGraph`) read this flag, which makes the feature
- * non-accessible without removing any of the restore code. Set it back to
- * `true` to re-enable dump restore once the database issue is fixed.
+ * the target graph on RESTORE. The API (`/api/upload`) and the UI (`UploadGraph`
+ * / `CreateGraph`) read this flag to keep the feature non-accessible without
+ * removing the restore UI code.
+ *
+ * Note: flipping this flag alone does NOT re-enable restore — there is currently
+ * no dump-restore execution route (`/api/graph/[graph]/upload` runs Cypher
+ * batches only). A dedicated restore endpoint must also be (re)added once the
+ * database issue is fixed.
  */
 export const DUMP_RESTORE_ENABLED: boolean = false;
 

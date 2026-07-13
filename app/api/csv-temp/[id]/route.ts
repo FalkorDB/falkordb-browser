@@ -16,7 +16,8 @@ const UUID_PATTERN =
  *
  * No authentication is required — the UUID-based tempId acts as an
  * unguessable one-time token.  The file is deleted by the load-csv execute
- * endpoint after the Cypher query finishes, regardless of outcome.
+ * endpoint after a successful import (failed imports keep the file for retry,
+ * and stale files are removed by the scheduled cleanup).
  */
 export async function GET(
     _request: NextRequest,

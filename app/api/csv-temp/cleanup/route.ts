@@ -21,10 +21,13 @@ function isAuthorized(request: NextRequest): boolean {
 }
 
 async function runCleanup(request: NextRequest) {
+    // While CSV upload is gated off no temp files are created, so the scheduled
+    // cleanup cron has nothing to do. Return a 200 no-op (not 403) so Vercel Cron
+    // does not record continuous failures while the feature is disabled.
     if (!CSV_UPLOAD_ENABLED) {
         return NextResponse.json(
-            { message: "CSV upload is temporarily disabled." },
-            { status: 403, headers: getCorsHeaders(request) }
+            { deleted: 0, disabled: true },
+            { status: 200, headers: getCorsHeaders(request) }
         );
     }
 

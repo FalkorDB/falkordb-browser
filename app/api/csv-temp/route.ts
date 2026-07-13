@@ -15,8 +15,9 @@ export async function OPTIONS(request: Request) {
  * Upload a CSV file into a temporary public location.
  * Returns `{ tempId, url }` where `url` can be used directly in a
  * `LOAD CSV FROM '...' AS row` Cypher statement.
- * The file is deleted by the `/api/graph/[graph]/load-csv` endpoint after the
- * query finishes (success or failure).
+ * The file is deleted by the `/api/graph/[graph]/load-csv` endpoint after a
+ * successful import; failed imports keep the file for retry and rely on the
+ * scheduled cleanup.
  */
 export async function POST(request: NextRequest) {
     if (!CSV_UPLOAD_ENABLED) {

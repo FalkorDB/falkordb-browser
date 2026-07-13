@@ -521,7 +521,8 @@ const USER_READABLE_ERROR_PATTERNS = [
   /^connection timed out\b/i,
   // Data ingestion / file upload (app/api/upload, app/api/graph/[graph]/upload).
   // These messages are authored for end users, so show them verbatim.
-  /\brequires a (?:\.dump|\.csv|\.txt)\b/i,
+  /\brequires a (?:\.dump|\.csv|\.txt|\.cql|\.cypher)\b/i,
+  /\bbatch files can be executed\b/i,
   /\brequires a query\b/i,
   /^invalid upload mode\b/i,
   /\btemporarily disabled\b/i,
@@ -745,7 +746,7 @@ export function uploadFileWithProgress(
 ): Promise<{ ok: boolean; status: number; body: string }> {
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", input);
+    xhr.open("POST", normalizeApiUrl(input));
 
     if (_activeConnectionId) {
       xhr.setRequestHeader("X-Connection-Id", _activeConnectionId);

@@ -143,8 +143,9 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
     );
 
     const cleanupUploadedCsv = useCallback((key: string) => {
-        // Best-effort cleanup for cancel/exit paths.
-        void fetch(`api/csv-temp/${encodeURIComponent(key)}`, {
+        // Best-effort cleanup for cancel/exit paths. Leading slash so the request
+        // targets /api/... regardless of the current route (e.g. /graph).
+        void fetch(`/api/csv-temp/${encodeURIComponent(key)}`, {
             method: "DELETE",
             credentials: "same-origin",
         }).catch(() => undefined);
@@ -354,7 +355,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                     graphName,
                     { data: data.result.data, metadata: data.result.metadata },
                     showPropertyKeyPrefix,
-                    0,
+                    graph.CurrentLimit,
                     graphInfo
                 );
 
