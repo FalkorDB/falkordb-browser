@@ -11,7 +11,7 @@ process.env.CSV_LOCAL_LOAD_URI_MODE = "file";
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "csv-local-test-"));
 process.env.CSV_LOCAL_TEMP_DIR = tempRoot;
 
-const { LocalCsvStorage, getCsvTempBaseDir, readLocalCsv } = await import("./csv-storage-local.ts");
+const { LocalCsvStorage, getCsvTempBaseDir, openLocalCsvReadStream } = await import("./csv-storage-local.ts");
 
 const OWNER_A = "a".repeat(32);
 const OWNER_B = "b".repeat(32);
@@ -21,25 +21,36 @@ function streamOf(text: string): Readable {
     return Readable.from(Buffer.from(text, "utf-8"));
 }
 
-test("store streams under <base>/<owner>/<key>.csv and readLocalCsv reads it back", async () => {
+test("store streams under <base>/<owner>/<key>.csv and it can be read back", async () => {
     const storage = new LocalCsvStorage();
     await storage.store(OWNER_A, KEY_1, streamOf("name,age\nAlice,30\n"));
     const expected = path.join(getCsvTempBaseDir(), OWNER_A, `${KEY_1}.csv`);
     assert.ok(fs.existsSync(expected));
-    const read = await readLocalCsv(OWNER_A, KEY_1);
-    assert.equal(read?.toString("utf-8"), "name,age\nAlice,30\n");
+    assert.equal(fs.readFileSync(expected, "utf-8"), "name,age\nAlice,30\n");
 });
 
-test("readLocalCsv is owner-scoped (a different owner cannot read the file)", async () => {
+test("openLocalCsvReadStream is owner-scoped (a different owner cannot read the file)", async () => {
     const storage = new LocalCsvStorage();
     await storage.store(OWNER_A, KEY_1, streamOf("secret\n"));
-    assert.equal(await readLocalCsv(OWNER_B, KEY_1), null);
+    assert.equal(openLocalCsvReadStream(OWNER_B, KEY_1), null);
+    const stream = openLocalCsvReadStream(OWNER_A, KEY_1);
+    assert.ok(stream);
+    stream?.destroy();
 });
 
 test("resolveReadUrl (file mode) returns a nested owner-scoped file:// URI", async () => {
     const storage = new LocalCsvStorage();
+    await storage.store(OWNER_A, KEY_1, streamOf("name,age\n"));
     const url = await storage.resolveReadUrl(OWNER_A, KEY_1);
     assert.equal(url, `file://falkordb-browser-csv-temp/${OWNER_A}/${KEY_1}.csv`);
+});
+
+test("resolveReadUrl throws for a missing object (surfaces as a 404)", async () => {
+    const storage = new LocalCsvStorage();
+    await assert.rejects(
+        () => storage.resolveReadUrl(OWNER_B, "99999999-9999-4999-8999-999999999999"),
+        /not found/i
+    );
 });
 
 test("store rejects an invalid owner or key (path-traversal safe)", async () => {

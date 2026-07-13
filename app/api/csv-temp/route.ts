@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCorsHeaders, resolveReadOnly } from "../utils";
 import { getClient } from "../auth/[...nextauth]/options";
 import { getCsvStorageProvider } from "@/app/lib/csv-storage";
-import { getCsvTempCleanupCutoffMs } from "@/app/lib/csv-temp-config";
 import { generateCsvKey, hashOwner } from "@/app/lib/csv-key";
 import { CSV_UPLOAD_ENABLED } from "@/lib/graphUpload";
 import { streamCsvUpload } from "./stream-csv";
@@ -46,12 +45,6 @@ export async function POST(request: NextRequest) {
     const owner = hashOwner(session.user.id);
     const key = generateCsvKey();
     const provider = getCsvStorageProvider();
-
-    try {
-        await provider.cleanupExpired(getCsvTempCleanupCutoffMs());
-    } catch {
-        // Keep uploads unaffected by cleanup issues.
-    }
 
     const result = await streamCsvUpload(request, (body) => provider.store(owner, key, body));
     if (!result.ok) {

@@ -83,8 +83,28 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("uploadCsvQuery");
   }
 
+  public get loadCsvTabTrigger(): Locator {
+    return this.page.getByRole("tab", { name: "Load CSV" });
+  }
+
+  public get csvUploadTempConfirm(): Locator {
+    return this.page.getByTestId("uploadCsvTempConfirm");
+  }
+
+  public get loadCsvRunConfirm(): Locator {
+    return this.page.getByTestId("loadCsvRunConfirm");
+  }
+
+  public get loadCsvQueryEditor(): Locator {
+    return this.page.getByTestId("loadCsvQuery");
+  }
+
+  public get loadCsvWithHeadersCheckbox(): Locator {
+    return this.page.locator("#loadCsvWithHeaders");
+  }
+
   public uploadTabTrigger(mode: UploadMode): Locator {
-    const labels: Record<UploadMode, string> = { dump: "Restore", csv: "CSV", cypher: "Cypher batch" };
+    const labels: Record<UploadMode, string> = { dump: "Restore", csv: "Load CSV", cypher: "Cypher batch" };
     return this.page.getByRole("tab", { name: labels[mode] });
   }
 
@@ -1402,6 +1422,67 @@ export default class GraphPage extends BasePage {
     }
     await this.clickUploadConfirm();
     await waitForElementToBeVisible(this.toast);
+  }
+
+  /**
+   * Full "Load CSV" flow: open Manage, select graph, open dialog, switch to the
+   * Load CSV tab, upload the CSV to temp storage, replace the starter body with
+   * `body`, and Run the `LOAD CSV` query. Waits for the success toast.
+   */
+  async loadCsvData(
+    graphName: string,
+    absoluteFilePath: string,
+    body: string,
+    withHeaders = true
+  ): Promise<void> {
+    await this.openUploadDialog(graphName);
+    await interactWhenVisible(this.loadCsvTabTrigger, (el) => el.click(), "Load CSV Tab");
+    await this.setUploadFile(absoluteFilePath);
+    await interactWhenVisible(this.csvUploadTempConfirm, (el) => el.click(), "Upload CSV Button");
+
+    // Step 2 (query editor + Run) appears once the CSV is stored.
+    await waitForElementToBeVisible(this.loadCsvRunConfirm);
+
+    if (!withHeaders) {
+      await this.loadCsvWithHeadersCheckbox.uncheck();
+    }
+
+    // Set the query body via Monaco's model API. Keyboard-based replacement is
+    // unreliable here: the editor prefills an example, intercepts select-all, and
+    // binds Enter to submit. `window.monaco` is exposed by EditorComponent.
+    await this.setLoadCsvBody(body);
+
+    await interactWhenVisible(this.loadCsvRunConfirm, (el) => el.click(), "Run LOAD CSV");
+    await waitForElementToBeVisible(this.toast);
+  }
+
+  /**
+   * Deterministically set the Load CSV query body. Finds the Monaco editor whose
+   * container lives inside the `loadCsvQuery` wrapper and calls `setValue`, which
+   * fires the React `onChange`. Relies on `window.monaco` exposed by
+   * EditorComponent (the editor is bundled, so it is not global by default).
+   */
+  async setLoadCsvBody(body: string): Promise<void> {
+    await this.page.waitForFunction(() => {
+      const wrapper = document.querySelector('[data-testid="loadCsvQuery"]');
+      const m = (window as unknown as { monaco?: typeof import("monaco-editor") }).monaco;
+      return (
+        !!m &&
+        !!wrapper &&
+        m.editor
+          .getEditors()
+          .some((e) => wrapper.contains(e.getContainerDomNode()))
+      );
+    });
+    await this.page.evaluate((text) => {
+      const wrapper = document.querySelector('[data-testid="loadCsvQuery"]');
+      const m = (window as unknown as { monaco?: typeof import("monaco-editor") }).monaco;
+      const editor = m!.editor
+        .getEditors()
+        .find((e) => wrapper!.contains(e.getContainerDomNode()));
+      if (!editor) throw new Error("Load CSV Monaco editor not found");
+      editor.setValue(text);
+    }, body);
   }
 
   async isModifyGraphNameButtonVisible(graphName: string): Promise<boolean> {

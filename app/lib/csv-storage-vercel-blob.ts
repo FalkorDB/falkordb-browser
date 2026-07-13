@@ -1,4 +1,4 @@
-import { BlobAccessError, del, issueSignedToken, list, presignUrl, put } from "@vercel/blob";
+import { del, issueSignedToken, list, presignUrl, put } from "@vercel/blob";
 import type { Readable } from "stream";
 import type { CsvStorageProvider } from "./csv-storage";
 import { isValidOwner, normalizeCsvKey } from "./csv-key";
@@ -53,35 +53,15 @@ async function createPrivatePresignedGetUrl(pathname: string): Promise<string> {
     return presignedUrl;
 }
 
-/** True when the store rejects public access because it is private. */
-function isPrivateStoreAccessError(err: unknown): boolean {
-    if (err instanceof BlobAccessError) return true;
-    const message = err instanceof Error ? err.message : String(err);
-    return /cannot use public access on a private store/i.test(message);
-}
-
 export class VercelBlobCsvStorage implements CsvStorageProvider {
     async store(owner: string, key: string, body: Readable): Promise<void> {
-        const requestedAccess = getBlobAccessMode();
-        const pathname = buildPathname(owner, key);
-
-        try {
-            await put(pathname, body, {
-                access: requestedAccess,
-                addRandomSuffix: false,
-                contentType: "text/csv; charset=utf-8",
-            });
-        } catch (err) {
-            if (requestedAccess === "public" && isPrivateStoreAccessError(err)) {
-                await put(pathname, body, {
-                    access: "private",
-                    addRandomSuffix: false,
-                    contentType: "text/csv; charset=utf-8",
-                });
-                return;
-            }
-            throw err;
-        }
+        // The stream can only be consumed once, so we cannot retry on the wrong
+        // access mode — BLOB_ACCESS must match the store's actual access mode.
+        await put(buildPathname(owner, key), body, {
+            access: getBlobAccessMode(),
+            addRandomSuffix: false,
+            contentType: "text/csv; charset=utf-8",
+        });
     }
 
     async resolveReadUrl(owner: string, key: string): Promise<string> {

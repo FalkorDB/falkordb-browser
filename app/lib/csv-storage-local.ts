@@ -77,13 +77,11 @@ function serveBaseUrl(): string {
     ).replace(/\/$/, "");
 }
 
-/** Read a stored temp CSV for the HTTP serve endpoint. Returns null if missing. */
-export async function readLocalCsv(owner: string, key: string): Promise<Buffer | null> {
-    try {
-        return await fs.promises.readFile(safeFilePath(owner, key));
-    } catch {
-        return null;
-    }
+/** Open a stored temp CSV as a stream for the HTTP serve endpoint (or null). */
+export function openLocalCsvReadStream(owner: string, key: string): fs.ReadStream | null {
+    const filePath = safeFilePath(owner, key);
+    if (!fs.existsSync(filePath)) return null;
+    return fs.createReadStream(filePath);
 }
 
 export class LocalCsvStorage implements CsvStorageProvider {
@@ -105,6 +103,12 @@ export class LocalCsvStorage implements CsvStorageProvider {
     async resolveReadUrl(owner: string, key: string): Promise<string> {
         const safeOwner = requireOwner(owner);
         const safeKey = normalizeCsvKey(key);
+
+        // Confirm the object exists (and belongs to this owner) so a missing /
+        // cross-owner key surfaces as a route-level 404 rather than a DB error.
+        if (!fs.existsSync(safeFilePath(safeOwner, safeKey))) {
+            throw new Error("CSV temp object not found.");
+        }
 
         if (getLocalLoadUriMode() === "file") {
             return `file://${relativeImportPath(safeOwner, safeKey)}`;

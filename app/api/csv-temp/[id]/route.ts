@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Readable } from "stream";
 import { getCsvStorageProvider } from "@/app/lib/csv-storage";
-import { readLocalCsv } from "@/app/lib/csv-storage-local";
+import { openLocalCsvReadStream } from "@/app/lib/csv-storage-local";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { getCorsHeaders, resolveReadOnly } from "@/app/api/utils";
 import { hashOwner, isValidCsvKey, normalizeCsvKey, verifyCsvCapability } from "@/app/lib/csv-key";
@@ -36,12 +37,13 @@ export async function GET(
         return new NextResponse("Not found.", { status: 404 });
     }
 
-    const content = await readLocalCsv(owner, key);
-    if (!content) {
+    const stream = openLocalCsvReadStream(owner, key);
+    if (!stream) {
         return new NextResponse("Not found.", { status: 404 });
     }
 
-    return new NextResponse(content as unknown as BodyInit, {
+    // Stream the file (with backpressure) rather than buffering it in memory.
+    return new NextResponse(Readable.toWeb(stream) as unknown as ReadableStream, {
         status: 200,
         headers: {
             "Content-Type": "text/csv; charset=utf-8",
