@@ -62,14 +62,10 @@ test.describe("Upload Graph – Cypher batch", () => {
 });
 
 // ---------------------------------------------------------------------------
-// CSV upload: run a per-row Cypher statement over each CSV row
-// Temporarily skipped — the "Load CSV" mode is gated off behind
-// CSV_UPLOAD_ENABLED (lib/graphUpload.ts) while its CSV temp-storage subsystem
-// is hardened and given full coverage in a follow-up PR, so the CSV tab is
-// hidden in the UI. Re-enable together with the flag. Note: these cases target
-// the older per-row UNWIND flow and must be rewritten for the LOAD CSV flow.
+// Load CSV: import a .csv via FalkorDB's native LOAD CSV. The upload is streamed
+// to storage; here CI uses local file:// mode with a shared IMPORT_FOLDER volume.
 // ---------------------------------------------------------------------------
-test.describe.skip("Upload Graph – CSV", () => {
+test.describe("Upload Graph – Load CSV", () => {
   let browser: BrowserWrapper;
   let apiCall: ApiCalls;
 
@@ -82,19 +78,20 @@ test.describe.skip("Upload Graph – CSV", () => {
     await browser.closeBrowser();
   });
 
-  test(`@admin Upload a CSV file with a per-row query and verify nodes are created`, async () => {
-    const graphName = getRandomString("uploadCsv");
+  test(`@admin Load a CSV via LOAD CSV and verify nodes are created`, async ({ }, testInfo) => {
+    testInfo.setTimeout(90000);
+    const graphName = getRandomString("loadCsv");
     await apiCall.addGraph(graphName);
 
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-    await graph.uploadGraphData(
+    await graph.loadCsvData(
       graphName,
-      "csv",
       CSV_FIXTURE,
-      "CREATE (:Person {name: row.name, age: row.age, city: row.city})"
+      "CREATE (:Person {name: row.name, age: toInteger(row.age), city: row.city})",
+      true
     );
 
-    expect(await graph.toast.textContent()).toContain("Upload completed");
+    expect(await graph.toast.textContent()).toContain("LOAD CSV completed");
 
     const result = await apiCall.runQuery(
       graphName,
@@ -106,15 +103,15 @@ test.describe.skip("Upload Graph – CSV", () => {
     await apiCall.removeGraph(graphName);
   });
 
-  test(`@admin Upload button is disabled until a CSV file and query are provided`, async () => {
+  test(`@admin Upload CSV button is disabled until a CSV file is selected`, async () => {
     const graphName = getRandomString("csvNoInput");
     await apiCall.addGraph(graphName);
 
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
     await graph.openUploadDialog(graphName);
     await graph.selectUploadTab("csv");
-    // No file and no query — confirm button should be disabled
-    expect(await graph.uploadConfirm.isDisabled()).toBe(true);
+    // No file selected — the "Upload CSV" button should be disabled.
+    expect(await graph.csvUploadTempConfirm.isDisabled()).toBe(true);
 
     await apiCall.removeGraph(graphName);
   });

@@ -60,9 +60,15 @@ export async function POST(
 
         const { key, withHeaders, body } = parsed;
 
-        if (!key || !body?.trim()) {
+        if (typeof key !== "string" || typeof body !== "string" || !body.trim()) {
             return NextResponse.json(
                 { message: "key and a query body are required." },
+                { status: 400, headers: getCorsHeaders(request) }
+            );
+        }
+        if (withHeaders !== undefined && typeof withHeaders !== "boolean") {
+            return NextResponse.json(
+                { message: "withHeaders must be a boolean." },
                 { status: 400, headers: getCorsHeaders(request) }
             );
         }
