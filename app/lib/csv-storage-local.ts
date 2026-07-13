@@ -65,7 +65,12 @@ function getLocalLoadUriMode(): "file" | "http" {
     const configured = process.env.CSV_LOCAL_LOAD_URI_MODE?.toLowerCase();
     if (configured === "file") return "file";
     if (configured === "http") return "http";
-    return isRunningInDocker() ? "file" : "http";
+
+    if (isRunningInDocker()) return "file";
+
+    // Outside Docker, default to file:// unless an explicit HTTPS base URL is
+    // configured for served CSVs. FalkorDB rejects plain HTTP LOAD CSV URLs.
+    return serveBaseUrl().toLowerCase().startsWith("https://") ? "http" : "file";
 }
 
 function serveBaseUrl(): string {

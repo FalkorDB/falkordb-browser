@@ -70,10 +70,6 @@ docker run -p 6379:6379 -it --rm falkordb/falkordb:latest
 
 ### Run browser-only Docker image (with local LOAD CSV defaults)
 
-> LOAD CSV is currently disabled by `CSV_UPLOAD_ENABLED` in
-> `lib/graphUpload.ts`. The configuration below applies after it is re-enabled
-> and the image is rebuilt.
-
 If you run the browser separately from FalkorDB, use the browser image and set
 the same CSV temp defaults used by compose:
 
@@ -93,8 +89,7 @@ volume to `/var/lib/FalkorDB/import` there as well and configure
 ### Use MinIO for CSV temp uploads (S3-compatible)
 
 The CSV upload flow supports S3-compatible backends, including MinIO.
-LOAD CSV is currently disabled by `CSV_UPLOAD_ENABLED` in `lib/graphUpload.ts`.
-Use this setup after re-enabling LOAD CSV and rebuilding the image.
+`CSV_UPLOAD_ENABLED` controls whether the Load CSV UI/routes are exposed (default: `true`).
 This repository includes a local MinIO stack in [docker-compose.minio.yml](docker-compose.minio.yml).
 
 1. Start MinIO and create the CSV temp bucket:
@@ -111,7 +106,7 @@ This repository includes a local MinIO stack in [docker-compose.minio.yml](docke
   S3_SECRET_ACCESS_KEY=minioadmin
   S3_REGION=us-east-1
   S3_BUCKET=falkordb-csv-temp
-  S3_ENDPOINT=http://localhost:9000
+  S3_ENDPOINT=https://minio.example.com
   S3_FORCE_PATH_STYLE=true
   S3_KEY_PREFIX=csv-temp/
   S3_URL_EXPIRES_IN=3600
@@ -121,7 +116,8 @@ This repository includes a local MinIO stack in [docker-compose.minio.yml](docke
 
 Notes:
 - Keep the bucket private (default in the init container).
-- Signed URLs are generated automatically for LOAD CSV.
+- Signed URLs are generated automatically for LOAD CSV and must be HTTPS-reachable by FalkorDB.
+- For local non-TLS MinIO (`http://localhost:9000`), prefer `CSV_STORAGE=local` with `CSV_LOCAL_LOAD_URI_MODE=file`.
 - MinIO console is available at `http://localhost:9001` (user/password: `minioadmin`/`minioadmin`).
 
 ### Deploy to Kubernetes with Helm

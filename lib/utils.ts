@@ -747,7 +747,9 @@ export function uploadFileWithProgress(
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", normalizeApiUrl(input));
-    xhr.timeout = 120_000;
+    // Keep uploads unbounded client-side; server/proxy limits should enforce
+    // maximum duration/size for large files on slower links.
+    xhr.timeout = 0;
 
     if (_activeConnectionId) {
       xhr.setRequestHeader("X-Connection-Id", _activeConnectionId);

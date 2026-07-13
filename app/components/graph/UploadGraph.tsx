@@ -31,17 +31,19 @@ const ACCEPTED_CSV = {
     "text/plain": [".csv"],
 };
 
-function buildLoadCsvPrefix(url: string, withHeaders: boolean): string {
+const CSV_URL_PLACEHOLDER = "$csvUrl";
+
+function buildLoadCsvPrefix(withHeaders: boolean): string {
     const loadPrefix = withHeaders ? "LOAD CSV WITH HEADERS" : "LOAD CSV";
-    return `${loadPrefix} FROM '${url}' AS row`;
+    return `${loadPrefix} FROM ${CSV_URL_PLACEHOLDER} AS row`;
 }
 
 function buildLoadCsvBodyStarter(): string {
     return "WITH row\nRETURN count(*) AS rows_loaded\n";
 }
 
-function buildLoadCsvQuery(url: string, withHeaders: boolean, body: string): string {
-    const prefix = buildLoadCsvPrefix(url, withHeaders);
+function buildLoadCsvQuery(withHeaders: boolean, body: string): string {
+    const prefix = buildLoadCsvPrefix(withHeaders);
     const normalizedBody = body.trim();
     return normalizedBody ? `${prefix}\n${normalizedBody}` : prefix;
 }
@@ -119,13 +121,13 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
     }, [cypherLanguageConfig, loadCsvLanguageConfig]);
 
     const loadCsvPrefix = useMemo(
-        () => (csvFileName ? buildLoadCsvPrefix(csvFileName, csvWithHeaders) : ""),
-        [csvFileName, csvWithHeaders]
+        () => (csvKey ? buildLoadCsvPrefix(csvWithHeaders) : ""),
+        [csvKey, csvWithHeaders]
     );
 
     const fullCsvQuery = useMemo(
-        () => (csvFileName ? buildLoadCsvQuery(csvFileName, csvWithHeaders, csvQuery) : ""),
-        [csvFileName, csvWithHeaders, csvQuery]
+        () => (csvKey ? buildLoadCsvQuery(csvWithHeaders, csvQuery) : ""),
+        [csvKey, csvWithHeaders, csvQuery]
     );
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -595,7 +597,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                                     <Button
                                         type="submit"
                                         label="Upload CSV"
-                                        title="Upload the CSV to temporary storage and get a URL"
+                                        title="Upload the CSV to temporary storage and get a temporary key"
                                         variant="Primary"
                                         isLoading={isLoading}
                                         indicator={indicator}

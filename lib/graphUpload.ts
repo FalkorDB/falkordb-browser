@@ -22,12 +22,11 @@
 export const DUMP_RESTORE_ENABLED: boolean = false;
 
 /**
- * LOAD CSV upload is temporarily disabled while its CSV temp-storage subsystem
- * (local / S3 / Vercel Blob + `/api/csv-temp` + `/api/graph/[graph]/load-csv`)
- * is hardened and given full test coverage in a follow-up PR. The flag makes the
- * feature non-accessible without deleting the code: the UI hides the "Load CSV"
- * tab and the CSV temp / load-csv routes reject requests with a 403. Set it back
- * to `true` once the follow-up work lands.
+ * LOAD CSV upload feature flag.
+ *
+ * When enabled, the UI exposes the "Load CSV" tab and server routes
+ * (`/api/csv-temp`, `/api/graph/[graph]/load-csv`) accept requests.
+ * Set to `false` only when intentionally disabling the end-to-end flow.
  */
 export const CSV_UPLOAD_ENABLED: boolean = true;
 
