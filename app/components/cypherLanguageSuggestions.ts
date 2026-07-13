@@ -54,7 +54,14 @@ export function buildCypherCompletionItems({
         }));
     }
 
-    const items: SuggestionItem[] = [...staticSuggestions, ...udfSuggestions];
+    // Strip the placeholder (1,1)-(1,1) range that STATIC_SUGGESTIONS carry so
+    // EditorComponent applies its word-based cursor range instead of inserting
+    // the completion at the start of the document. Mirrors CypherEditor's own
+    // provider, which strips the same placeholder range.
+    const items: SuggestionItem[] = [
+        ...staticSuggestions.map(({ range: _range, ...rest }) => rest),
+        ...udfSuggestions,
+    ];
 
     extractVariableCandidates(queryText).forEach((v) => {
         items.push({
