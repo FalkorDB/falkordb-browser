@@ -182,6 +182,8 @@ test("streamCsvUpload rejects a second large file part without hanging", async (
         assert.equal(result.status, 400);
         assert.match(result.error, /single file/i);
     }
+    // Flush any pending microtasks to prevent "asynchronous activity after test" warnings
+    await new Promise(resolve => setImmediate(resolve));
 });
 
 test("streamCsvUpload settles (500) without crashing when the source errors mid-store", async () => {
