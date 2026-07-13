@@ -9,14 +9,17 @@ import { cn, getTheme, Query } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/components/ui/use-toast";
 import { setConnectionItem, removeConnectionItem } from "@/lib/connection-storage";
 import Button from "../components/ui/Button";
 import EditorComponent from "../components/EditorComponent";
 import { LanguageConfig } from "../components/EditorComponent";
 import { CYPHER_LANGUAGE_NAME, STATIC_SUGGESTIONS } from "../components/CypherEditor";
 import { extractVariableCandidates } from "@/lib/cypherSuggestions";
+import { udfFunctionNames } from "@/lib/cypherLang";
+import { createFalkorCypherEngine, attachGrammarLinting, registerGrammarCodeActions, getGrammarDiagnostics, toCompletionItems, type FalkorSchema } from "@/lib/falkordb-cypher";
 import PaginationList from "../components/PaginationList";
-import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, UDFContext } from "../components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, UDFContext, AiFixContext } from "../components/provider";
 import { Explain, Metadata, Profile } from "./MetadataView";
 
 type Tab = "text" | "metadata" | "explain" | "profile";
@@ -35,6 +38,8 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     const { udfList } = useContext(UDFContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
     const { indicator } = useContext(IndicatorContext);
+    const { aiFixSupported, requestAiFix, reportClientError } = useContext(AiFixContext);
+    const { toast } = useToast();
 
     const { theme } = useTheme();
     const { background } = getTheme(theme);
@@ -42,6 +47,17 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
     const submitQuery = useRef<HTMLButtonElement>(null);
     const searchQueryRef = useRef<HTMLInputElement>(null);
+
+    // falkordb-cypher engine — same brain the main editor uses, so the history
+    // editor gets identical real-time syntax validation. Its schema getter reads
+    // the always-current engineSchemaRef (kept in sync below).
+    const engineSchemaRef = useRef<FalkorSchema>({});
+    const engineRef = useRef(createFalkorCypherEngine(() => engineSchemaRef.current));
+    // Latest AI-fix capability/handler for the shared grammar code-action provider.
+    const aiFixRef = useRef({ aiFixSupported, requestAiFix });
+    useEffect(() => { aiFixRef.current = { aiFixSupported, requestAiFix }; }, [aiFixSupported, requestAiFix]);
+    // Toggled by the real-time linter; false blocks execution.
+    const [isQueryValid, setIsQueryValid] = useState(true);
 
     const [filteredQueries, setFilteredQueries] = useState<Query[]>([]);
     const [activeFilters, setActiveFilters] = useState<string[]>([]);
@@ -71,6 +87,17 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     useEffect(() => { graphRef.current = graph; }, [graph]);
     useEffect(() => { graphNameRef.current = graphName; }, [graphName]);
 
+    // Keep the engine schema in sync so completion (once the grammar is generated)
+    // sees this graph's labels, relationship types, property keys, and UDFs.
+    useEffect(() => {
+        engineSchemaRef.current = {
+            labels: Array.from(graph.GraphInfo.Labels.keys()).filter(Boolean) as string[],
+            relationshipTypes: Array.from(graph.GraphInfo.Relationships.keys()).filter(Boolean) as string[],
+            propertyKeys: (graph.GraphInfo.PropertyKeys ?? []) as string[],
+            functions: udfFunctionNames(udfList),
+        };
+    }, [graph, udfList]);
+
     const udfSuggestions = useMemo(() =>
         udfList.flatMap(([, libName, , functions]) =>
             functions.map((fn: string) => ({
@@ -90,7 +117,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const historyLanguageConfig = useMemo((): LanguageConfig => ({
         triggerCharacters: ['.'],
-        getSuggestions: async (monacoInstance: Monaco, context) => {
+        getSuggestions: async (monacoInstance: Monaco, context, model, position) => {
             const g = graphRef.current;
             const graphMatches = currentQueryRef.current?.graphName === graphNameRef.current;
             const udfs = udfSuggestionsRef.current;
@@ -133,6 +160,17 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                 });
                 (g.GraphInfo.PropertyKeys ?? []).forEach(key => {
                     items.push({ insertText: key, label: key, kind: monacoInstance.languages.CompletionItemKind.Property, detail: '(property key)' });
+                });
+            }
+
+            // Grammar-aware completions from the engine (inert until the ANTLR
+            // grammar is generated), merged in and deduped by label.
+            if (model && position) {
+                const engineItems = toCompletionItems(monacoInstance, engineRef.current.getCompletions(model.getValue(), position.lineNumber, position.column - 1));
+                const seen = new Set(items.map(s => (typeof s.label === 'string' ? s.label : s.label.label)));
+                engineItems.forEach(s => {
+                    const l = typeof s.label === 'string' ? s.label : s.label.label;
+                    if (!seen.has(l)) items.push(s);
                 });
             }
 
@@ -268,6 +306,13 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
         editorRef.current = e;
 
+        // Real-time grammar linting: enriched (prettified + hint + quick-fix)
+        // squigglies and the isQueryValid execution gate — identical to the main
+        // editor. Register the shared quick-fix + "Fix with AI" provider (guarded).
+        registerGrammarCodeActions(monaco, CYPHER_LANGUAGE_NAME, () => aiFixRef.current);
+        const lintDisposable = attachGrammarLinting(monaco, e, engineRef.current, setIsQueryValid);
+        e.onDidDispose(() => lintDisposable.dispose());
+
         // eslint-disable-next-line no-bitwise
         e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
             submitQuery.current?.click();
@@ -315,6 +360,16 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     };
 
     const handleSubmit = async () => {
+        // Grammar validation gates execution: invalid syntax never runs. Reuse the
+        // failed-run pipeline: prettified toast + "Fix with AI" button.
+        if (!isQueryValid) {
+            const model = editorRef.current?.getModel();
+            const message = (model ? getGrammarDiagnostics(model)[0]?.message : undefined) ?? "Syntax error";
+            const query = historyQuery!.query.trim();
+            reportClientError(query, message);
+            toast({ title: "Syntax Error", description: message, variant: "destructive", query });
+            return;
+        }
         try {
             setIsLoading(true);
             await runQuery(historyQuery!.query.trim());
@@ -551,10 +606,10 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                                     indicator={indicator}
                                     variant="Primary"
                                     label="Run"
-                                    title="Press Enter to run the query"
+                                    title={isQueryValid ? "Press Enter to run the query" : "Fix the highlighted syntax errors to run"}
                                     onClick={handleSubmit}
                                     isLoading={isLoading}
-                                    disabled={isQueryLoading}
+                                    disabled={isQueryLoading || !isQueryValid}
                                 />
                                 <label
                                     htmlFor="queryHistoryEditorWrapLines"

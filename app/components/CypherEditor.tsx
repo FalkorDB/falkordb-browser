@@ -11,14 +11,15 @@ import * as monaco from "monaco-editor";
 import { Info, Maximize2, Minimize2, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { cn, HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
-import { BUILTIN_FUNCTIONS, CYPHER_KEYWORDS, FALLBACK_PROCEDURE_NAMES } from "@/lib/cypherLang";
+import { BUILTIN_FUNCTIONS, CYPHER_KEYWORDS, FALLBACK_PROCEDURE_NAMES, udfFunctionNames } from "@/lib/cypherLang";
 import { codeActionEditsForMarkers, analyzeSchemaWarnings, type EditorDiagnostic } from "@/lib/cypherDiagnostics";
 import { extractVariableCandidates } from "@/lib/cypherSuggestions";
+import { createFalkorCypherEngine, attachGrammarLinting, registerGrammarCodeActions, getGrammarDiagnostics, toCompletionItems, type FalkorSchema } from "@/lib/falkordb-cypher";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
 import EditorComponent, { LINE_HEIGHT, LanguageConfig } from "./EditorComponent";
-import { BrowserSettingsContext, IndicatorContext, UDFContext, ConnectionContext, DiagnosticsContext } from "./provider";
+import { BrowserSettingsContext, IndicatorContext, UDFContext, ConnectionContext, DiagnosticsContext, AiFixContext } from "./provider";
 import { Graph } from "../api/graph/model";
 
 interface Props {
@@ -162,6 +163,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const { udfList } = useContext(UDFContext);
     const { isReadOnly } = useContext(ConnectionContext);
     const { diagnostics, setDiagnostics } = useContext(DiagnosticsContext);
+    const { aiFixSupported, requestAiFix, reportClientError } = useContext(AiFixContext);
 
     const { toast } = useToast();
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -187,10 +189,24 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     // Procedures fetched once per graph (they don't change at runtime).
     const procedureSuggestionsRef = useRef<monaco.languages.CompletionItem[]>([]);
 
+    // --- falkordb-cypher engine (ANTLR4 + antlr4-c3) ---------------------------
+    // Live schema injected into the engine on every lint/completion pass, so new
+    // labels / relationship types / procedures / algo params flow in with zero
+    // re-registration (see effect below).
+    const engineSchemaRef = useRef<FalkorSchema>({});
+    // The engine is the UI-agnostic "brain": it lints and completes. Created once;
+    // its schema getter reads the always-current engineSchemaRef.
+    const engineRef = useRef(createFalkorCypherEngine(() => engineSchemaRef.current));
+    // Latest AI-fix capability/handler for the grammar code-action provider.
+    const aiFixRef = useRef({ aiFixSupported, requestAiFix });
+    useEffect(() => { aiFixRef.current = { aiFixSupported, requestAiFix }; }, [aiFixSupported, requestAiFix]);
+
     const [lineNumber, setLineNumber] = useState(1);
     const [blur, setBlur] = useState(false);
     const [editorMountVersion, setEditorMountVersion] = useState(0);
     const [schemaLabelsVersion, setSchemaLabelsVersion] = useState(0);
+    // Toggled by the real-time linter; false blocks execution (requirement 6).
+    const [isQueryValid, setIsQueryValid] = useState(true);
 
     const editorHeight = useMemo(() => blur
         ? LINE_HEIGHT
@@ -240,6 +256,23 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     useEffect(() => {
         graphIdRef.current = graph.Id;
     }, [graph.Id]);
+
+    // Keep the falkordb-cypher engine's schema in sync with the live graph so
+    // labels, relationship types, property keys, server procedures, UDFs, and
+    // FalkorDB algorithm params (algo.pageRank, algo.BFS, …) are all injected
+    // into real-time validation + completion without re-registering anything.
+    useEffect(() => {
+        engineSchemaRef.current = {
+            labels: Array.from(graph.GraphInfo.Labels.keys()).filter(Boolean) as string[],
+            relationshipTypes: Array.from(graph.GraphInfo.Relationships.keys()).filter(Boolean) as string[],
+            propertyKeys: (graph.GraphInfo.PropertyKeys ?? []) as string[],
+            procedures: procedureSuggestionsRef.current.map(p => {
+                const label = typeof p.label === "string" ? p.label : p.label.label;
+                return label.replace(/\(\)$/, "");
+            }),
+            functions: udfFunctionNames(udfList),
+        };
+    }, [graph.Id, graph.GraphInfo, udfList, schemaLabelsVersion]);
 
     // Fetch procedures whenever the graph or read-only mode changes.
     // Read-only mode is included because the server may return a different set
@@ -938,7 +971,17 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             // EditorComponent's word-based fallback range is used instead.
             // The CALL and dot branches above already carry position-correct ranges
             // and are unaffected.
-            return (await getAllSuggestions(fullSug)).map(({ range: _r, ...rest }) => rest);
+            const base = await getAllSuggestions(fullSug);
+            // Grammar-aware completions from the engine (context-filtered keywords/
+            // schema). Inert until the ANTLR grammar is generated; then merged in,
+            // deduped by label so the existing rich list is never duplicated.
+            const engineItems = (model && position)
+                ? toCompletionItems(monacoI, engineRef.current.getCompletions(model.getValue(), position.lineNumber, position.column - 1))
+                : [];
+            const labelOf = (s: { label: string | monaco.languages.CompletionItemLabel }) => typeof s.label === 'string' ? s.label : s.label.label;
+            const seenLabels = new Set(base.map(labelOf));
+            const merged = [...base, ...engineItems.filter(s => !seenLabels.has(labelOf(s)))];
+            return merged.map(({ range: _r, ...rest }) => rest);
         },
         // updateTokenizer intentionally excluded: getSuggestions no longer calls it.
     }), [getFullSuggestions, getAllSuggestions]);
@@ -949,6 +992,17 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     }, [cypherLanguageConfig, onLanguageConfig]);
 
     const handleSubmit = async () => {
+        // Real-time grammar validation gates execution: invalid syntax never runs
+        // (the backend therefore only ever sees runtime issues, not syntax errors).
+        if (!isQueryValid) {
+            const model = (maximize ? dialogEditorRef.current : editorRef.current)?.getModel();
+            const message = (model ? getGrammarDiagnostics(model)[0]?.message : undefined) ?? "Syntax error";
+            const query = historyQuery.query.trim();
+            // Reuse the failed-run pipeline: prettified toast + "Fix with AI" button.
+            reportClientError(query, message);
+            toast({ title: "Syntax Error", description: message, variant: "destructive", query });
+            return;
+        }
         runQuery(historyQuery.query.trim());
     };
 
@@ -957,6 +1011,10 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         // Pre-warm the tokenizer + suggestion cache immediately so highlights are
         // correct before the user opens autocomplete for the first time.
         updateTokenizer(monacoI);
+
+        // Register the grammar quick-fix + "Fix with AI" provider once (module-guarded
+        // internally). Serves every editor via the shared per-model registry.
+        registerGrammarCodeActions(monacoI, LANGUAGE_NAME, () => aiFixRef.current);
 
         // Register the quick-fix (code action) provider exactly once.
         if (!codeActionProviderRef.current) {
@@ -993,6 +1051,13 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     };
 
     const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor, onEscape?: () => void) => {
+        // Real-time (on-input) grammar linting: enriches ANTLR errors into the same
+        // prettified message + hint + quick-fix diagnostics the backend pipeline
+        // produces, paints red squigglies, and toggles isQueryValid to gate Run.
+        // Tied to the editor's lifetime so it disposes automatically.
+        const lintDisposable = attachGrammarLinting(monaco, e, engineRef.current, setIsQueryValid);
+        e.onDidDispose(() => lintDisposable.dispose());
+
         const updatePlaceholderVisibility = () => {
             const hasContent = !!e.getValue();
             if (placeholderRef.current) {
@@ -1121,6 +1186,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const getLabel = () => {
         if (!graphName) return "Select a graph first";
         if (!historyQuery.query) return "You need to type a query first";
+        if (!isQueryValid) return "Fix the highlighted syntax errors to run";
         return "Press Enter to run the query";
     };
 
@@ -1223,7 +1289,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                         data-testid="editorRun"
                         ref={submitQuery}
                         indicator={indicator}
-                        disabled={!historyQuery.query || !graphName}
+                        disabled={!historyQuery.query || !graphName || !isQueryValid}
                         variant="Primary"
                         label="RUN"
                         title={getLabel()}

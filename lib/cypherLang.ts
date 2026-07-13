@@ -238,24 +238,34 @@ export const BUILTIN_FUNCTIONS = [
  * unavailable. This list matches the procedures shipped with FalkorDB 4.x.
  */
 export const FALLBACK_PROCEDURE_NAMES: string[] = [
+  // db.* introspection
   "db.constraints",
   "db.indexes",
   "db.labels",
   "db.propertyKeys",
   "db.relationshipTypes",
   "db.meta.stats",
+  // db.idx.* full-text & vector index procedures
   "db.idx.fulltext.createNodeIndex",
   "db.idx.fulltext.drop",
   "db.idx.fulltext.queryNodes",
-  "db.idx.vector.createNodeIndex",
-  "db.idx.vector.drop",
+  "db.idx.fulltext.queryRelationships",
   "db.idx.vector.queryNodes",
-  "algo.SPpaths",
-  "algo.SSpaths",
+  "db.idx.vector.queryRelationships",
+  // dbms.*
+  "dbms.functions",
+  "dbms.procedures",
+  // algo.* graph algorithms
   "algo.betweenness",
   "algo.BFS",
+  "algo.HarmonicCentrality",
+  "algo.labelPropagation",
+  "algo.maxFlow",
+  "algo.MSF",
   "algo.pageRank",
-  "algo.degree",
+  "algo.SPpaths",
+  "algo.SSpaths",
+  "algo.WCC",
 ];
 
 // Derives the namespaced UDF function names (e.g. "myLib.myFunc") from the UDF
