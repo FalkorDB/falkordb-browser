@@ -293,11 +293,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                             className="h-full w-full flex flex-col gap-2"
                         >
                             <div className="flex flex-row justify-between items-center border-b border-border pb-1">
-                                <div className="flex items-center gap-2">
-                                    <h2 className="text-2xl font-medium">Manage Graphs</h2>
+                                <div className="flex items-center gap-2 text-2xl">
+                                    <h2 className="font-medium">Manage Graphs</h2>
                                     <Tooltip>
                                         <TooltipTrigger asChild>
-                                            <span>({options ? options.length : <Loader2 className="inline animate-spin" />})</span>
+                                            <span>[{options ? options.length : <Loader2 className="inline animate-spin" />}]</span>
                                         </TooltipTrigger>
                                         <TooltipContent>
                                             <p> Graphs Count</p>

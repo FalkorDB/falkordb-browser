@@ -76,8 +76,7 @@ export default function Page() {
     } = useContext(GraphContext);
     const {
         settings: {
-            runDefaultQuerySettings: { runDefaultQuery },
-            defaultQuerySettings: { defaultQuery },
+            querySettings: { runDefaultQuery, defaultQuery },
             graphInfo: { showMemoryUsage, refreshInterval }
         }
     } = useContext(BrowserSettingsContext);
@@ -687,7 +686,7 @@ export default function Page() {
                 </ResizablePanel>
                 {
                     chatOpen && graphName &&
-                    <div className="absolute bottom-3 right-3 z-30">
+                    <div className="absolute bottom-12 right-3 z-30">
                         <ResizableBox
                             width={chatSize.width}
                             height={chatSize.height}

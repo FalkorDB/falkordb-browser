@@ -72,7 +72,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
     const isControlled = typeof open === "boolean" && typeof onOpenChange === "function";
     const [internalOpen, setInternalOpen] = useState(false);
     const { toast } = useToast();
-    const { settings: { showPropertyKeyPrefixSettings: { showPropertyKeyPrefix }, graphInfo: { showMemoryUsage } }, tutorialOpen } = useContext(BrowserSettingsContext);
+    const { settings: { userExperienceSettings: { captionKeysSettings: { showPropertyKeyPrefix } }, graphInfo: { showMemoryUsage } }, tutorialOpen } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
     const { setData, setViewport, setGraphData } = useContext(ForceGraphContext);
     const { setSearch, setScrollPosition } = useContext(TableViewContext);

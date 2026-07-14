@@ -345,8 +345,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const browserSettingsContext = useMemo(() => ({
     newSettings: {
       querySettings: {
-        newLimit,
-        setNewLimit,
+        limitSettings: {
+          newLimit,
+          setNewLimit,
+        },
         newTimeout,
         setNewTimeout,
         newRunDefaultQuery,
@@ -367,42 +369,29 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         newRefreshInterval,
         setNewRefreshInterval,
       },
-      // Legacy keys kept for compatibility with existing consumers.
-      limitSettings: { newLimit, setNewLimit },
-      timeoutSettings: { newTimeout, setNewTimeout },
-      runDefaultQuerySettings: { newRunDefaultQuery, setNewRunDefaultQuery },
-      defaultQuerySettings: { newDefaultQuery, setNewDefaultQuery },
-      contentPersistenceSettings: { newContentPersistence, setNewContentPersistence },
-      captionsKeysSettings: { newCaptionsKeys, setNewCaptionsKeys },
-      showPropertyKeyPrefixSettings: { newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
       chatSettings: { newSecretKey, setNewSecretKey, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly, newChatModelSource, setNewChatModelSource, newLocalLlmProvider, setNewLocalLlmProvider, newLocalLlmEndpoint, setNewLocalLlmEndpoint, newModel, setNewModel },
       graphInfo: { newMaxItemsForSearch, setNewMaxItemsForSearch },
-      tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple }
     },
     settings: {
       querySettings: {
         limitSettings: { limit, setLimit, lastLimit, setLastLimit },
-        timeoutSettings: { timeout, setTimeout },
-        runDefaultQuerySettings: { runDefaultQuery, setRunDefaultQuery },
-        defaultQuerySettings: { defaultQuery, setDefaultQuery },
+        timeout,
+        setTimeout,
+        runDefaultQuery,
+        setRunDefaultQuery,
+        defaultQuery,
+        setDefaultQuery,
       },
       userExperienceSettings: {
-        contentPersistenceSettings: { contentPersistence, setContentPersistence },
+        contentPersistence,
+        setContentPersistence,
+        refreshInterval,
+        setRefreshInterval,
         captionKeysSettings: { captionsKeys, setCaptionsKeys, showPropertyKeyPrefix, setShowPropertyKeyPrefix },
         tableViewSettings: { columnWidth, setColumnWidth, rowHeight, setRowHeight, rowHeightExpandMultiple, setRowHeightExpandMultiple },
-        refreshIntervalSettings: { refreshInterval, setRefreshInterval },
       },
-      // Legacy keys kept for compatibility with existing consumers.
-      limitSettings: { limit, setLimit, lastLimit, setLastLimit },
-      timeoutSettings: { timeout, setTimeout },
-      runDefaultQuerySettings: { runDefaultQuery, setRunDefaultQuery },
-      defaultQuerySettings: { defaultQuery, setDefaultQuery },
-      contentPersistenceSettings: { contentPersistence, setContentPersistence },
-      captionsKeysSettings: { captionsKeys, setCaptionsKeys },
-      showPropertyKeyPrefixSettings: { showPropertyKeyPrefix, setShowPropertyKeyPrefix },
       chatSettings: { secretKey, setSecretKey, chatApiKeys, setChatApiKeys, selectedChatApiKeyId, setSelectedChatApiKeyId, chatModelSource, setChatModelSource, localLlmProvider, setLocalLlmProvider, localLlmEndpoint, setLocalLlmEndpoint, model, setModel, maxSavedMessages, setMaxSavedMessages, cypherOnly, setCypherOnly, perSourceModels, setPerSourceModels },
       graphInfo: { showMemoryUsage, refreshInterval, setRefreshInterval, maxItemsForSearch, setMaxItemsForSearch },
-      tableViewSettings: { columnWidth, setColumnWidth, rowHeight, setRowHeight, rowHeightExpandMultiple, setRowHeightExpandMultiple }
     },
     hasChanges,
     setHasChanges,
