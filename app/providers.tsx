@@ -1391,8 +1391,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setGraphNames([]);
     }
     setGraphNamesLoaded(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toast, tutorialOpen]);
+  }, [toast, setIndicator, indicator, tutorialOpen]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -1520,7 +1519,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Re-fetch graph list for the new connection
     connectionSwitchFetchedRef.current = true;
     handleFetchOptions();
-  }, [activeConnectionId]);
+  }, [activeConnectionId, toast, setIndicator, handleFetchOptions]);
 
   const handleCloseTutorial = () => {
     setTutorialOpen(false);
