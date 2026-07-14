@@ -176,7 +176,7 @@ function GraphView({
                         </>
                     }
                 </div>
-                <div className="flex flex-col gap-4">
+                <div className="flex justify-between">
                     <div className="flex gap-2 items-center">
                         <TabsList className="bg-transparent flex gap-2 pointer-events-auto p-0">
                             <TabsTrigger
@@ -232,6 +232,11 @@ function GraphView({
                                 />
                             </>
                         }
+                    </div>
+                    <div className="flex gap-1">
+                        <p>Nodes: {graph.NodesMap.size}</p>
+                        <p>Edges: {graph.LinksMap.size}</p>
+                        <p>RT: {(historyQuery?.currentQuery?.metadata[1] || "").split(':')[1]}</p>
                     </div>
                 </div>
             </div>
