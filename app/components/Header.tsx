@@ -115,8 +115,8 @@ export default function Header() {
                 </Tooltip>
                 {
                     graphNames === undefined
-                        ? <Loader2 className="animate-spin" size={16} />
-                        : <h2>{graphNames.length}</h2>
+                        ? <Loader2 data-testid="graphsCountLoader" className="animate-spin" size={16} />
+                        : <h2 data-testid="graphsCountValue">{graphNames.length}</h2>
                 }
             </div>
             <div className="flex gap-1 items-center">

@@ -210,7 +210,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // Always-current ref so effects can validate graph names without re-running
   // on every graphNames mutation (prevents spurious URL→state rollbacks).
   const graphNamesRef = useRef<string[]>([]);
-  graphNamesRef.current = graphNames ?? [];
+  useEffect(() => {
+    graphNamesRef.current = graphNames ?? [];
+  }, [graphNames]);
   const [graphNamesLoaded, setGraphNamesLoaded] = useState(false);
   const [graph, setGraph] = useState<Graph>(Graph.empty());
   // graphRef always points to the current graph so setGraphInfo can mutate
@@ -1380,7 +1382,14 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (indicator === "offline" || tutorialOpen) return;
 
     setGraphNames(undefined);
-    await fetchOptions(toast, setIndicator, indicator, setGraphName, opts => setGraphNames(opts));
+    let fetched = false;
+    await fetchOptions(toast, setIndicator, indicator, setGraphName, opts => {
+      fetched = true;
+      setGraphNames(opts);
+    });
+    if (!fetched) {
+      setGraphNames([]);
+    }
     setGraphNamesLoaded(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast, tutorialOpen]);
