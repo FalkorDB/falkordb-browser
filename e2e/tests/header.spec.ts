@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import { chromium } from "playwright";
 import urls from "../config/urls.json";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import NavBarComponent from "../logic/POM/headerComponent";
@@ -42,13 +41,12 @@ test.describe(`Header tests`, () => {
     expect(await navBar.getGraphsCountValue()).toBe(graphs.opts.length);
   });
 
-  test(`@admin Verify header graphs loader is shown while graph list is fetching`, async () => {
-    const raw = await chromium.launch();
+  test(`@admin Verify header graphs loader is shown while graph list is fetching`, async ({ browser: pwBrowser }) => {
+    const context = await pwBrowser.newContext({
+      storageState: 'playwright/.auth/admin.json',
+      permissions: ['clipboard-read', 'clipboard-write'],
+    });
     try {
-      const context = await raw.newContext({
-        storageState: 'playwright/.auth/admin.json',
-        permissions: ['clipboard-read', 'clipboard-write'],
-      });
       const page = await context.newPage();
       await page.addInitScript(initializeLocalStorage("localhost", 6379));
 
@@ -70,9 +68,8 @@ test.describe(`Header tests`, () => {
 
       releaseGraphRequest();
       await navBar.waitForGraphsCountValue();
-      await context.close();
     } finally {
-      await raw.close();
+      await context.close();
     }
   });
 
