@@ -48,6 +48,14 @@ export default class HeaderComponent extends BasePage {
         return this.page.locator('//div[@id="about"]');
     }
 
+    private get graphsCountLoader(): Locator {
+        return this.page.getByTestId("graphsCountLoader");
+    }
+
+    private get graphsCountValue(): Locator {
+        return this.page.getByTestId("graphsCountValue");
+    }
+
     async clickFalkorDBLogo(): Promise<void> {
         await interactWhenVisible(this.falkorDBLogo, (el) => el.click(), "Click FalkorDB Logo");
     }
@@ -189,5 +197,18 @@ export default class HeaderComponent extends BasePage {
     async clickOnAbout(): Promise<void> {
         await this.clickOnHelpBtn();
         await this.clickOnAboutBtn();
+    }
+
+    async waitForGraphsCountLoader(): Promise<void> {
+        await this.graphsCountLoader.waitFor({ state: 'visible', timeout: 10000 });
+    }
+
+    async waitForGraphsCountValue(): Promise<void> {
+        await this.graphsCountValue.waitFor({ state: 'visible', timeout: 15000 });
+    }
+
+    async getGraphsCountValue(): Promise<number> {
+        const text = await this.graphsCountValue.textContent();
+        return Number(text ?? 0);
     }
 }

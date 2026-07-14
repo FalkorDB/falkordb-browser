@@ -206,11 +206,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [urlQueryText, setUrlQueryText] = useState<string | null>(null);
   const [selectedParam, setSelectedParam] = useState<string>(urlSelected);
   const [runDefaultQuery, setRunDefaultQuery] = useState(false);
-  const [graphNames, setGraphNames] = useState<string[]>([]);
+  const [graphNames, setGraphNames] = useState<string[] | undefined>(undefined);
   // Always-current ref so effects can validate graph names without re-running
   // on every graphNames mutation (prevents spurious URL→state rollbacks).
   const graphNamesRef = useRef<string[]>([]);
-  graphNamesRef.current = graphNames;
+  useEffect(() => {
+    graphNamesRef.current = graphNames ?? [];
+  }, [graphNames]);
   const [graphNamesLoaded, setGraphNamesLoaded] = useState(false);
   const [graph, setGraph] = useState<Graph>(Graph.empty());
   // graphRef always points to the current graph so setGraphInfo can mutate
@@ -295,7 +297,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [newModel, setNewModel] = useState("");
   const [perSourceModels, setPerSourceModels] = useState<Record<string, string>>({});
   const [tutorialOpen, setTutorialOpen] = useState(false);
-  const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>([]);
+  const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>();
   const [userGraphBeforeTutorial, setUserGraphBeforeTutorial] = useState<string>("");
   const [urlParamsBeforeTutorial, setUrlParamsBeforeTutorial] = useState<string>("");
   const [showMemoryUsage, setShowMemoryUsage] = useState(false);
@@ -342,6 +344,30 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   const browserSettingsContext = useMemo(() => ({
     newSettings: {
+      querySettings: {
+        newLimit,
+        setNewLimit,
+        newTimeout,
+        setNewTimeout,
+        newRunDefaultQuery,
+        setNewRunDefaultQuery,
+        newDefaultQuery,
+        setNewDefaultQuery,
+      },
+      userExperienceSettings: {
+        newContentPersistence,
+        setNewContentPersistence,
+        captionKeysSettings: {
+          newCaptionsKeys,
+          setNewCaptionsKeys,
+          newShowPropertyKeyPrefix,
+          setNewShowPropertyKeyPrefix,
+        },
+        tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple },
+        newRefreshInterval,
+        setNewRefreshInterval,
+      },
+      // Legacy keys kept for compatibility with existing consumers.
       limitSettings: { newLimit, setNewLimit },
       timeoutSettings: { newTimeout, setNewTimeout },
       runDefaultQuerySettings: { newRunDefaultQuery, setNewRunDefaultQuery },
@@ -350,10 +376,23 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       captionsKeysSettings: { newCaptionsKeys, setNewCaptionsKeys },
       showPropertyKeyPrefixSettings: { newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
       chatSettings: { newSecretKey, setNewSecretKey, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly, newChatModelSource, setNewChatModelSource, newLocalLlmProvider, setNewLocalLlmProvider, newLocalLlmEndpoint, setNewLocalLlmEndpoint, newModel, setNewModel },
-      graphInfo: { newRefreshInterval, setNewRefreshInterval, newMaxItemsForSearch, setNewMaxItemsForSearch },
+      graphInfo: { newMaxItemsForSearch, setNewMaxItemsForSearch },
       tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple }
     },
     settings: {
+      querySettings: {
+        limitSettings: { limit, setLimit, lastLimit, setLastLimit },
+        timeoutSettings: { timeout, setTimeout },
+        runDefaultQuerySettings: { runDefaultQuery, setRunDefaultQuery },
+        defaultQuerySettings: { defaultQuery, setDefaultQuery },
+      },
+      userExperienceSettings: {
+        contentPersistenceSettings: { contentPersistence, setContentPersistence },
+        captionKeysSettings: { captionsKeys, setCaptionsKeys, showPropertyKeyPrefix, setShowPropertyKeyPrefix },
+        tableViewSettings: { columnWidth, setColumnWidth, rowHeight, setRowHeight, rowHeightExpandMultiple, setRowHeightExpandMultiple },
+        refreshIntervalSettings: { refreshInterval, setRefreshInterval },
+      },
+      // Legacy keys kept for compatibility with existing consumers.
       limitSettings: { limit, setLimit, lastLimit, setLastLimit },
       timeoutSettings: { timeout, setTimeout },
       runDefaultQuerySettings: { runDefaultQuery, setRunDefaultQuery },
@@ -1342,10 +1381,17 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const handleFetchOptions = useCallback(async () => {
     if (indicator === "offline" || tutorialOpen) return;
 
-    await fetchOptions(toast, setIndicator, indicator, setGraphName, setGraphNames);
+    setGraphNames(undefined);
+    let fetched = false;
+    await fetchOptions(toast, setIndicator, indicator, setGraphName, opts => {
+      fetched = true;
+      setGraphNames(opts);
+    });
+    if (!fetched) {
+      setGraphNames([]);
+    }
     setGraphNamesLoaded(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toast, tutorialOpen]);
+  }, [toast, setIndicator, indicator, tutorialOpen]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -1411,7 +1457,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   // Restore content persistence once on app mount (after auth + settings + graph names loaded)
   useEffect(() => {
-    if (contentRestoredRef.current || !prefixReady || !contentPersistence || graphNames.length === 0) return;
+    if (contentRestoredRef.current || !prefixReady || !contentPersistence || !graphNames || graphNames.length === 0) return;
 
     // If a graph is already loaded, mark as restored and skip
     if (graph.Id) {
@@ -1425,7 +1471,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Use the ref captured at render time: by the time this effect fires,
     // syncRouteUrlParams may have already stripped ?graph= from window.location.
     const urlGraph = initialUrlGraphNameRef.current;
-    if (urlGraph && graphNames.includes(urlGraph)) {
+    if (urlGraph && graphNames?.includes(urlGraph)) {
       contentRestoredRef.current = true;
       return;
     }
@@ -1435,7 +1481,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     try {
       const { graphName: name, query } = JSON.parse(content);
-      if (graphNames.includes(name)) {
+      if (graphNames?.includes(name)) {
         contentRestoredRef.current = true;
         handleSetGraphName(name);
         runQuery(query, name);
@@ -1463,7 +1509,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setGraphName("");
     setSelectedParam("");
     setGraphNamesLoaded(false);
-    setGraphNames([]);
+    setGraphNames(undefined);
     graphInfoSyncRef.current.setNodesCount(undefined);
     graphInfoSyncRef.current.setEdgesCount(undefined);
     setHistoryQuery(h => ({ ...h, query: "", currentQuery: defaultQueryHistory.currentQuery }));
@@ -1473,7 +1519,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Re-fetch graph list for the new connection
     connectionSwitchFetchedRef.current = true;
     handleFetchOptions();
-  }, [activeConnectionId, handleFetchOptions]);
+  }, [activeConnectionId, toast, setIndicator, handleFetchOptions]);
 
   const handleCloseTutorial = () => {
     setTutorialOpen(false);
@@ -1583,10 +1629,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setGraph(Graph.empty(undefined, undefined, undefined, GraphInfo.empty(toast, setIndicator)));
     setData({ nodes: [], links: [] });
 
-    if (userGraphBeforeTutorial && userGraphsBeforeTutorial.includes(userGraphBeforeTutorial)) {
+    if (userGraphBeforeTutorial && userGraphsBeforeTutorial?.includes(userGraphBeforeTutorial)) {
       handleSetGraphName(userGraphBeforeTutorial);
       setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }));
-    } else if (userGraphsBeforeTutorial.length === 1) {
+    } else if (userGraphsBeforeTutorial?.length === 1) {
       handleSetGraphName(userGraphsBeforeTutorial[0]);
 
       // Run default query for the graph if enabled
@@ -1620,36 +1666,36 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
           <GraphContext.Provider value={graphContext}>
             <GraphInfoProvider syncRef={graphInfoSyncRef} pendingRef={graphInfoPendingRef}>
               <HistoryQueryContext.Provider value={historyQueryContext}>
-              <IndicatorContext.Provider value={indicatorContext}>
-                <QueryLoadingContext.Provider value={queryLoadingContext}>
-                  <DiagnosticsContext.Provider value={diagnosticsContext}>
-                    <ForceGraphContext.Provider value={forceGraphContext}>
-                      <TableViewContext.Provider value={tableViewContext}>
-                        <ConnectionContext.Provider value={connectionContext}>
-                          <UDFContext.Provider value={udfContext}>
-                            <CypherLanguageContext.Provider value={cypherLanguageContext}>
-                              <AiFixContext.Provider value={aiFixContext}>
-                                <ProviderLayout
-                                  panelRef={panelRef}
-                                  tutorialOpen={tutorialOpen}
-                                  onCloseTutorial={handleCloseTutorial}
-                                  onLoadDemoGraphs={handleLoadDemoGraphs}
-                                  onCleanupDemoGraphs={handleCleanupDemoGraphs}
-                                  showUDF={showUDF}
-                                >
-                                  {children}
-                                </ProviderLayout>
-                                <AiFixDialogs />
-                              </AiFixContext.Provider>
-                            </CypherLanguageContext.Provider>
-                          </UDFContext.Provider>
-                        </ConnectionContext.Provider>
-                      </TableViewContext.Provider>
-                    </ForceGraphContext.Provider>
-                  </DiagnosticsContext.Provider>
-                </QueryLoadingContext.Provider>
-              </IndicatorContext.Provider>
-            </HistoryQueryContext.Provider>
+                <IndicatorContext.Provider value={indicatorContext}>
+                  <QueryLoadingContext.Provider value={queryLoadingContext}>
+                    <DiagnosticsContext.Provider value={diagnosticsContext}>
+                      <ForceGraphContext.Provider value={forceGraphContext}>
+                        <TableViewContext.Provider value={tableViewContext}>
+                          <ConnectionContext.Provider value={connectionContext}>
+                            <UDFContext.Provider value={udfContext}>
+                              <CypherLanguageContext.Provider value={cypherLanguageContext}>
+                                <AiFixContext.Provider value={aiFixContext}>
+                                  <ProviderLayout
+                                    panelRef={panelRef}
+                                    tutorialOpen={tutorialOpen}
+                                    onCloseTutorial={handleCloseTutorial}
+                                    onLoadDemoGraphs={handleLoadDemoGraphs}
+                                    onCleanupDemoGraphs={handleCleanupDemoGraphs}
+                                    showUDF={showUDF}
+                                  >
+                                    {children}
+                                  </ProviderLayout>
+                                  <AiFixDialogs />
+                                </AiFixContext.Provider>
+                              </CypherLanguageContext.Provider>
+                            </UDFContext.Provider>
+                          </ConnectionContext.Provider>
+                        </TableViewContext.Provider>
+                      </ForceGraphContext.Provider>
+                    </DiagnosticsContext.Provider>
+                  </QueryLoadingContext.Provider>
+                </IndicatorContext.Provider>
+              </HistoryQueryContext.Provider>
             </GraphInfoProvider>
           </GraphContext.Provider>
         </BrowserSettingsContext.Provider>

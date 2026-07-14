@@ -176,7 +176,7 @@ function GraphView({
                         </>
                     }
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                     <div className="flex gap-2 items-center">
                         <TabsList className="bg-transparent flex gap-2 pointer-events-auto p-0">
                             <TabsTrigger
@@ -221,7 +221,7 @@ function GraphView({
                         {
                             graph.getElements().length > 0 && currentTab === "Graph" && !isLoading &&
                             <>
-                                <div className="h-full w-px bg-border rounded-full" />
+                                <div className="h-4 w-px bg-border rounded-full" />
                                 <Controls
                                     graph={graph}
                                     canvasRef={canvasRef}
@@ -233,10 +233,17 @@ function GraphView({
                             </>
                         }
                     </div>
-                    <div className="flex gap-1">
-                        <p>Nodes: {graph.NodesMap.size}</p>
-                        <p>Edges: {graph.LinksMap.size}</p>
-                        <p>RT: {(historyQuery?.currentQuery?.metadata[1] || "").split(':')[1]}</p>
+                    <div className="flex gap-2 items-center font-normal text-muted-foreground">
+                        {
+                            historyQuery?.currentQuery?.metadata?.[1] &&
+                            <>
+                                <p>Nodes: {graph.NodesMap.size}</p>
+                                <div className="h-4 w-px bg-border rounded-full" />
+                                <p>Edges: {graph.LinksMap.size}</p>
+                                <div className="h-4 w-px bg-border rounded-full" />
+                                <p>RT: {(historyQuery?.currentQuery?.metadata?.[1] || "").split(':')[1]}</p>
+                            </>
+                        }
                     </div>
                 </div>
             </div>

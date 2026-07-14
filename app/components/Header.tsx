@@ -1,7 +1,7 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Button from "./ui/Button";
-import { ConnectionContext, IndicatorContext } from "./provider";
+import { ConnectionContext, GraphContext, IndicatorContext } from "./provider";
 import { useCallback, useContext, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Copy, Loader2 } from "lucide-react";
@@ -31,6 +31,7 @@ function formatVersion(version: string | undefined): string {
 
 export default function Header() {
     const { indicator, setIndicator } = useContext(IndicatorContext);
+    const { graphNames } = useContext(GraphContext);
     const { connectionType, connectionInfo, dbVersion } = useContext(ConnectionContext);
     const { status, data: session } = useSession();
     const { toast } = useToast();
@@ -42,7 +43,8 @@ export default function Header() {
 
     useEffect(() => {
         setUsedMemory(null);
-        (async () => {
+
+        const fetchMemory = async () => {
             if (status !== "authenticated") return;
 
             const result = await securedFetch("/api/info?section=memory", {
@@ -58,8 +60,14 @@ export default function Header() {
             if (!match) return;
 
             setUsedMemory(match[1]);
-        })();
-    }, [toast, setIndicator, connectionType, connectionInfo]);
+        };
+
+        fetchMemory();
+
+        const interval = setInterval(fetchMemory, 5000);
+
+        return () => clearInterval(interval);
+    }, [toast, setIndicator, connectionType, connectionInfo, status]);
 
     const handleCopy = useCallback((text: string) => {
         if (!navigator.clipboard?.writeText) {
@@ -94,6 +102,21 @@ export default function Header() {
                     usedMemory !== null ?
                         <h2>{usedMemory}</h2>
                         : <Loader2 className="animate-spin" size={16} />
+                }
+            </div>
+            <div className="flex gap-1 items-center">
+                <Tooltip>
+                    <TooltipTrigger>
+                        <span className="font-bold">Graphs:</span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>Graphs Count</p>
+                    </TooltipContent>
+                </Tooltip>
+                {
+                    graphNames === undefined
+                        ? <Loader2 data-testid="graphsCountLoader" className="animate-spin" size={16} />
+                        : <h2 data-testid="graphsCountValue">{graphNames.length}</h2>
                 }
             </div>
             <div className="flex gap-1 items-center">

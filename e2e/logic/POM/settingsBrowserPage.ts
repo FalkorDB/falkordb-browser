@@ -739,15 +739,17 @@ export default class SettingsBrowserPage extends BasePage {
     const isExpanded = await this.graphInfoSectionHeader.getAttribute('aria-expanded');
     if (isExpanded !== 'true') {
       await this.graphInfoSectionHeader.click();
-      await this.refreshIntervalSlider.waitFor({ state: 'visible', timeout: 5000 });
+      await this.maxItemsForSearchSlider.waitFor({ state: 'visible', timeout: 5000 });
     }
   }
 
   async setRefreshIntervalSlider(value: number): Promise<void> {
+    await this.expandUserExperienceSection();
     await this.setSliderByStep(this.refreshIntervalSlider, value, 1);
   }
 
   async getRefreshIntervalValue(): Promise<number> {
+    await this.expandUserExperienceSection();
     return this.getSliderValue(this.refreshIntervalSlider);
   }
 

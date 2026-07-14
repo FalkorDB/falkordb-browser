@@ -31,6 +31,8 @@ const ACCEPTED_CSV = {
     "text/plain": [".csv"],
 };
 
+const PREVIEW_MAX_CHARS = 250_000;
+
 const CSV_URL_PLACEHOLDER = "$csvUrl";
 
 function buildLoadCsvPrefix(withHeaders: boolean): string {
@@ -49,13 +51,13 @@ function buildLoadCsvQuery(withHeaders: boolean, body: string): string {
 }
 
 function formatFileSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024) return `${bytes.toLocaleString()} ${bytes === 1 ? "byte" : "bytes"}`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
 export default function UploadGraph({ graphName, disabled, open, onOpenChange, onSuccess }: {
-    /* eslint-disable react/require-default-props */
     graphName: string
     disabled?: boolean
     open?: boolean
@@ -90,6 +92,13 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
     const [csvFileName, setCsvFileName] = useState("");
     const [csvQuery, setCsvQuery] = useState("");
     const [csvWithHeaders, setCsvWithHeaders] = useState(true);
+    const [cypherPreviewOpen, setCypherPreviewOpen] = useState(false);
+    const [cypherPreviewContent, setCypherPreviewContent] = useState("");
+    const [csvPreviewOpen, setCsvPreviewOpen] = useState(false);
+    const [csvPreviewContent, setCsvPreviewContent] = useState("");
+    const [previewLoadingMode, setPreviewLoadingMode] = useState<UploadMode | null>(null);
+    const cypherFormRef = useRef<HTMLFormElement>(null);
+    const uploadCsvFormRef = useRef<HTMLFormElement>(null);
     const loadCsvFormRef = useRef<HTMLFormElement>(null);
     // Synchronous re-entrancy guard shared by all three ingestion handlers.
     // `isLoading` is async React state, but Monaco's Enter keybinding calls
@@ -151,6 +160,113 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
         }).catch(() => undefined);
     }, []);
 
+    const openFilePreview = useCallback(async (file: File, uploadMode: UploadMode) => {
+        try {
+            setPreviewLoadingMode(uploadMode);
+
+            const previewBlob = file.slice(0, PREVIEW_MAX_CHARS);
+            let fileText = await previewBlob.text();
+            const wasTruncated = file.size > PREVIEW_MAX_CHARS || fileText.length > PREVIEW_MAX_CHARS;
+            if (fileText.length > PREVIEW_MAX_CHARS) {
+                fileText = fileText.slice(0, PREVIEW_MAX_CHARS);
+            }
+
+            if (uploadMode === "cypher") {
+                setCypherPreviewContent(fileText);
+                setCypherPreviewOpen(true);
+            } else {
+                setCsvPreviewContent(fileText);
+                setCsvPreviewOpen(true);
+            }
+
+            if (wasTruncated) {
+                toast({
+                    title: "Preview truncated",
+                    description: `Showing the first ${PREVIEW_MAX_CHARS.toLocaleString()} characters.`,
+                });
+            }
+        } catch {
+            toast({
+                title: "Preview unavailable",
+                description: "Could not read this file for preview.",
+                variant: "destructive",
+            });
+        } finally {
+            setPreviewLoadingMode(null);
+        }
+    }, [toast]);
+
+    const isLoadCsvStepOne = mode === "load-csv" && !csvKey;
+    const isLoadCsvStepTwo = mode === "load-csv" && Boolean(csvKey);
+    const loadCsvStep = csvKey ? 2 : 1;
+
+    const primaryAction = useMemo(() => {
+        if (mode === "cypher") {
+            return {
+                label: "Upload",
+                title: "Execute Cypher statements into the graph",
+                testId: "uploadGraphConfirm",
+                disabled: cypherFiles.length !== 1 || isLoading,
+            };
+        }
+
+        if (isLoadCsvStepOne) {
+            return {
+                label: "Upload CSV",
+                title: "Upload the CSV to temporary storage and get a temporary key",
+                testId: "uploadCsvTempConfirm",
+                disabled: csvFiles.length !== 1 || isLoading,
+            };
+        }
+
+        return {
+            label: "Run",
+            title: "Execute the LOAD CSV query and import data into the graph",
+            testId: "loadCsvRunConfirm",
+            disabled: !graphName || !csvQuery.trim() || isLoading,
+        };
+    }, [mode, isLoadCsvStepOne, cypherFiles.length, isLoading, csvFiles.length, graphName, csvQuery]);
+
+    const submitActiveForm = useCallback(() => {
+        if (mode === "cypher") {
+            cypherFormRef.current?.requestSubmit();
+            return;
+        }
+
+        if (isLoadCsvStepOne) {
+            uploadCsvFormRef.current?.requestSubmit();
+            return;
+        }
+
+        if (isLoadCsvStepTwo) {
+            loadCsvFormRef.current?.requestSubmit();
+        }
+    }, [mode, isLoadCsvStepOne, isLoadCsvStepTwo]);
+
+    const footerViewAction = useMemo(() => {
+        if (mode === "cypher") {
+            return {
+                uploadMode: "cypher" as const,
+                file: cypherFiles[0],
+                disabled: isLoading || cypherFiles.length !== 1,
+                loading: previewLoadingMode === "cypher",
+                title: "Preview selected Cypher file",
+            };
+        }
+
+        if (isLoadCsvStepOne) {
+            return {
+                uploadMode: "load-csv" as const,
+                file: csvFiles[0],
+                disabled: isLoading || csvFiles.length !== 1,
+                loading: previewLoadingMode === "load-csv",
+                title: "Preview selected CSV file",
+            };
+        }
+
+        return null;
+    }, [csvFiles, cypherFiles, isLoadCsvStepOne, isLoading, mode, previewLoadingMode]);
+
     const handleOpenChange = (nextOpen: boolean, force = false) => {
         if (!nextOpen && (isLoading || inFlightRef.current) && !force) return;
 
@@ -175,6 +291,11 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             setCsvFileName("");
             setCsvQuery("");
             setCsvWithHeaders(true);
+            setCypherPreviewOpen(false);
+            setCypherPreviewContent("");
+            setCsvPreviewOpen(false);
+            setCsvPreviewContent("");
+            setPreviewLoadingMode(null);
             setIsLoading(false);
             setPhase(null);
             setUploadPct(0);
@@ -191,6 +312,11 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
         setCsvFileName("");
         setCsvQuery("");
         setCsvWithHeaders(true);
+        setCypherPreviewOpen(false);
+        setCypherPreviewContent("");
+        setCsvPreviewOpen(false);
+        setCsvPreviewContent("");
+        setPreviewLoadingMode(null);
         setPhase(null);
         setUploadPct(0);
     }, [csvKey, cleanupUploadedCsv]);
@@ -315,6 +441,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             setCsvKey(key);
             setCsvFileName(fileName);
             setCsvQuery(buildLoadCsvBodyStarter());
+            setCsvPreviewOpen(false);
         } catch {
             toast({
                 title: "Upload state uncertain",
@@ -479,7 +606,6 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
         });
 
         // Ctrl/Cmd+Enter inserts a raw newline in the Upload editor.
-        // eslint-disable-next-line no-bitwise
         editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
             editor.trigger("keyboard", "type", { text: "\n" });
         });
@@ -498,15 +624,16 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
     // ─────────────────────────────────────────────────────────────────────────
 
     const progressBar = phase && (
-        <div className="flex flex-col gap-1" data-testid="uploadProgress">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{phase === "uploading" ? "Uploading file…" : "Processing…"}</span>
-                {phase === "uploading" && <span>{uploadPct}%</span>}
-            </div>
+        <div className="relative" data-testid="uploadProgress">
             <Progress
                 value={phase === "uploading" ? uploadPct : 100}
-                className={phase === "processing" ? "animate-pulse" : undefined}
+                className={cn("h-5", phase === "processing" ? "animate-pulse" : undefined)}
             />
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-2">
+                <span className="truncate text-[11px] font-medium text-foreground">
+                    {phase === "uploading" ? `Uploading file… ${uploadPct}%` : "Processing…"}
+                </span>
+            </div>
         </div>
     );
 
@@ -527,15 +654,15 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                     : <Button className="hidden" />
             }
             title="Upload Data"
-            className="max-h-[90dvh] max-w-[60dvw]"
+            className="h-[min(86vh,680px)] w-[min(94vw,760px)]"
         >
-            <div className="grow p-2 flex flex-col gap-4 overflow-hidden">
+            <div className="h-full p-3 flex flex-col gap-3 overflow-hidden">
                 <Tabs
                     value={mode}
                     onValueChange={(v) => { setMode(v as UploadMode); resetMode(); }}
-                    className="w-full"
+                    className="w-full h-full flex flex-col overflow-hidden"
                 >
-                    <TabsList className="h-fit bg-background gap-1">
+                    <TabsList className="h-fit shrink-0 bg-background gap-1">
                         <TabsTrigger
                             className={cn("px-2 py-0.5 text-sm border border-transparent hover:bg-background/10 hover:border-border/10 data-[state=active]:!bg-secondary data-[state=active]:!text-primary")}
                             value="cypher"
@@ -555,8 +682,8 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                     </TabsList>
 
                     {/* ── Cypher batch ─────────────────────────────────── */}
-                    <TabsContent value="cypher">
-                        <form onSubmit={onUploadCypher} className="flex flex-col gap-4 mt-2">
+                    <TabsContent value="cypher" className="mt-2 flex-1 overflow-hidden">
+                        <form ref={cypherFormRef} onSubmit={onUploadCypher} className="flex h-full flex-col gap-4">
                             <p className="text-sm text-muted-foreground">
                                 Upload a .txt, .cql, or .cypher file and execute each statement sequentially into the existing graph.
                             </p>
@@ -596,182 +723,310 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                                     </div>
                                 </div>
                             )}
-                            {progressBar}
-                            <div className="flex gap-3 justify-end">
-                                <Button
-                                    type="submit"
-                                    label="Upload"
-                                    title="Execute Cypher statements into the graph"
-                                    variant="Primary"
-                                    isLoading={isLoading}
-                                    indicator={indicator}
-                                    disabled={cypherFiles.length !== 1 || isLoading}
-                                    data-testid="uploadGraphConfirm"
-                                />
-                                <CloseDialog data-testid="uploadGraphCancel" disabled={isLoading} />
-                            </div>
+                            {cypherPreviewOpen && (
+                                <div className="rounded-lg border border-border bg-muted/30 p-2">
+                                    <div className="mb-2 flex items-center justify-between">
+                                        <p className="text-xs font-medium text-muted-foreground">Read-only file preview</p>
+                                        <button
+                                            type="button"
+                                            onClick={() => setCypherPreviewOpen(false)}
+                                            className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-background/60 hover:text-foreground"
+                                        >
+                                            Hide preview
+                                        </button>
+                                    </div>
+                                    <div className="h-44 w-full rounded-md border border-border overflow-hidden">
+                                        <EditorComponent
+                                            className="SofiaSans"
+                                            language={CYPHER_LANGUAGE_NAME}
+                                            languageConfig={editorLanguageConfig}
+                                            themeName="selector-theme"
+                                            value={cypherPreviewContent}
+                                            readOnly
+                                            options={{
+                                                minimap: { enabled: false },
+                                                lineNumbersMinChars: 3,
+                                                quickSuggestions: false,
+                                                suggestOnTriggerCharacters: false,
+                                                renderWhitespace: "none",
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </form>
                     </TabsContent>
 
                     {/* ── Load CSV ─────────────────────────────────────── */}
                     {CSV_UPLOAD_ENABLED && (
-                    <TabsContent value="load-csv">
-                        {/* Step 1: pick and upload the CSV file */}
-                        {!csvKey && (
-                            <form onSubmit={onUploadCsvToTemp} className="flex flex-col gap-4 mt-2">
-                                <p className="text-sm text-muted-foreground">
-                                    Upload a .csv file, then complete the{" "}
-                                    <code className="rounded bg-muted px-1 py-0.5 text-xs">LOAD CSV ... AS row</code>{" "}
-                                    query body to import it into the graph.
-                                </p>
-                                <Dropzone
-                                    filesCount
-                                    className="flex-col"
-                                    maxFiles={1}
-                                    disabled={isLoading}
-                                    onFileDrop={setCsvFiles}
-                                    onDropRejected={handleCsvDropRejected}
-                                    accept={ACCEPTED_CSV}
-                                />
-                                {csvFiles.length === 1 && (
-                                    <div className="rounded-lg border border-border bg-secondary/30 px-3 py-2">
-                                        <div className="flex items-center gap-2">
-                                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                                                <FileSpreadsheet size={16} />
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <p className="truncate text-sm font-medium" title={csvFiles[0].name}>
-                                                    {csvFiles[0].name}
-                                                </p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {formatFileSize(csvFiles[0].size)} · CSV file ready to upload
-                                                </p>
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => setCsvFiles([])}
-                                                className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-background/60 hover:text-foreground"
-                                                title="Remove file"
-                                                aria-label="Remove selected CSV file"
-                                                disabled={isLoading}
-                                            >
-                                                <X size={14} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                                {progressBar}
-                                <div className="flex gap-3 justify-end">
-                                    <Button
-                                        type="submit"
-                                        label="Upload CSV"
-                                        title="Upload the CSV to temporary storage and get a temporary key"
-                                        variant="Primary"
-                                        isLoading={isLoading}
-                                        indicator={indicator}
-                                        disabled={csvFiles.length !== 1 || isLoading}
-                                        data-testid="uploadCsvTempConfirm"
-                                    />
-                                    <CloseDialog data-testid="uploadGraphCancel" disabled={isLoading} />
-                                </div>
-                            </form>
-                        )}
-
-                        {/* Step 2: edit query and run */}
-                        {csvKey && (
-                            <form ref={loadCsvFormRef} onSubmit={onRunLoadCsv} className="flex flex-col gap-4 mt-2">
-                                <p className="text-sm text-muted-foreground">
-                                    CSV uploaded. Complete the query below and click <strong>Run</strong>.
-                                    The file will be deleted after the query finishes.
-                                </p>
-
-                                {/* Uploaded file display */}
-                                <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2">
-                                    <FileSpreadsheet size={14} className="shrink-0 text-muted-foreground" />
-                                    <span className="flex-1 truncate font-mono text-xs" title={csvFileName}>{csvFileName}</span>
-                                </div>
-
-                                {/* Editable LOAD CSV query */}
-                                <div className="flex flex-col gap-1.5">
-                                    <label htmlFor="loadCsvQuery" className="text-sm font-medium">
-                                        Cypher query
-                                    </label>
-                                    <label
-                                        htmlFor="loadCsvWithHeaders"
-                                        className="inline-flex items-center gap-2 text-xs text-muted-foreground"
-                                    >
-                                        <input
-                                            id="loadCsvWithHeaders"
-                                            type="checkbox"
-                                            checked={csvWithHeaders}
-                                            onChange={(e) => setCsvWithHeaders(e.target.checked)}
-                                            disabled={isLoading}
-                                            className="h-4 w-4 rounded border border-border bg-background align-middle"
-                                        />
-                                        Use CSV headers
-                                    </label>
-                                    <div className="rounded-md border bg-muted/40 px-3 py-2">
-                                        <code className="font-mono text-xs">{loadCsvPrefix}</code>
-                                    </div>
-                                    <div className="h-36 w-full rounded-lg border border-border overflow-hidden" data-testid="loadCsvQuery">
-                                        <EditorComponent
-                                            className="SofiaSans"
-                                            height="100%"
-                                            language={CYPHER_LANGUAGE_NAME}
-                                            languageConfig={editorLanguageConfig}
-                                            themeName="selector-theme"
-                                            options={{
-                                                lineHeight: 22,
-                                                fontSize: 14,
-                                                lineNumbersMinChars: 3,
-                                                quickSuggestions: true,
-                                                suggestOnTriggerCharacters: true,
-                                                scrollBeyondLastLine: false,
-                                                wordWrap: "on",
-                                                renderWhitespace: "none"
-                                            }}
-                                            value={csvQuery}
-                                            onChange={(value) => setCsvQuery(value ?? "")}
-                                            onMount={handleLoadCsvEditorDidMount}
-                                            readOnly={isLoading}
-                                        />
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">
-                                        {csvWithHeaders ? (
-                                            <>
-                                                Each CSV column is available as{" "}
-                                                <code className="rounded bg-muted px-1 py-0.5">row.columnName</code>.
-                                            </>
-                                        ) : (
-                                            <>
-                                                Without headers, columns are available as{" "}
-                                                <code className="rounded bg-muted px-1 py-0.5">row[0]</code>,{" "}
-                                                <code className="rounded bg-muted px-1 py-0.5">row[1]</code>, ...
-                                            </>
-                                        )}
+                        <TabsContent value="load-csv" className="mt-2 flex-1 overflow-hidden">
+                            {/* Step 1: pick and upload the CSV file */}
+                            {!csvKey && (
+                                <form ref={uploadCsvFormRef} onSubmit={onUploadCsvToTemp} className="flex h-full flex-col gap-4">
+                                    <p className="text-sm text-muted-foreground">
+                                        Upload a .csv file, then complete the{" "}
+                                        <code className="rounded bg-border px-1 py-0.5 text-xs">LOAD CSV ... AS row</code>{" "}
+                                        query body to import it into the graph.
                                     </p>
-                                </div>
-
-                                {progressBar}
-
-                                <div className="flex gap-3 justify-end">
-                                    <Button
-                                        type="submit"
-                                        label="Run"
-                                        title="Execute the LOAD CSV query and import data into the graph"
-                                        variant="Primary"
-                                        isLoading={isLoading}
-                                        indicator={indicator}
-                                        disabled={!graphName || !csvQuery.trim() || isLoading}
-                                        data-testid="loadCsvRunConfirm"
+                                    <Dropzone
+                                        filesCount
+                                        className="flex-col"
+                                        maxFiles={1}
+                                        disabled={isLoading}
+                                        onFileDrop={setCsvFiles}
+                                        onDropRejected={handleCsvDropRejected}
+                                        accept={ACCEPTED_CSV}
                                     />
-                                    <CloseDialog data-testid="uploadGraphCancel" disabled={isLoading} />
-                                </div>
-                            </form>
-                        )}
-                    </TabsContent>
+                                    {csvFiles.length === 1 && (
+                                        <div className="rounded-lg border border-border bg-secondary/30 px-3 py-2">
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                                                    <FileSpreadsheet size={16} />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="truncate text-sm font-medium" title={csvFiles[0].name}>
+                                                        {csvFiles[0].name}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {formatFileSize(csvFiles[0].size)} · CSV file ready to upload
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setCsvFiles([])}
+                                                    className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-background/60 hover:text-foreground"
+                                                    title="Remove file"
+                                                    aria-label="Remove selected CSV file"
+                                                    disabled={isLoading}
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {csvPreviewOpen && (
+                                        <div className="rounded-lg border border-border bg-muted/30 p-2">
+                                            <div className="mb-2 flex items-center justify-between">
+                                                <p className="text-xs font-medium text-muted-foreground">Read-only file preview</p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setCsvPreviewOpen(false)}
+                                                    className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-background/60 hover:text-foreground"
+                                                >
+                                                    Hide preview
+                                                </button>
+                                            </div>
+                                            <div className="h-44 w-full rounded-md border border-border overflow-hidden">
+                                                <EditorComponent
+                                                    className="SofiaSans"
+                                                    language="plaintext"
+                                                    themeName="selector-theme"
+                                                    value={csvPreviewContent}
+                                                    readOnly
+                                                    options={{
+                                                        minimap: { enabled: false },
+                                                        lineNumbersMinChars: 3,
+                                                        quickSuggestions: false,
+                                                        suggestOnTriggerCharacters: false,
+                                                        renderWhitespace: "none",
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </form>
+                            )}
+
+                            {/* Step 2: edit query and run */}
+                            {csvKey && (
+                                <form ref={loadCsvFormRef} onSubmit={onRunLoadCsv} className="flex h-full flex-col gap-4">
+                                    <p className="text-sm text-muted-foreground">
+                                        CSV uploaded. Complete the query below and click <strong>Run</strong>.
+                                        The file will be deleted after the query finishes.
+                                    </p>
+
+                                    {/* Uploaded file display */}
+                                    <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2">
+                                        <FileSpreadsheet size={14} className="shrink-0 text-muted-foreground" />
+                                        <span className="flex-1 truncate font-mono text-xs" title={csvFileName}>{csvFileName}</span>
+                                    </div>
+
+                                    {csvPreviewOpen && (
+                                        <div className="rounded-lg border border-border bg-muted/30 p-2">
+                                            <div className="mb-2 flex items-center justify-between">
+                                                <p className="text-xs font-medium text-muted-foreground">Read-only file preview</p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setCsvPreviewOpen(false)}
+                                                    className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-background/60 hover:text-foreground"
+                                                >
+                                                    Hide preview
+                                                </button>
+                                            </div>
+                                            <div className="h-44 w-full rounded-md border border-border overflow-hidden">
+                                                <EditorComponent
+                                                    className="SofiaSans"
+                                                    language="plaintext"
+                                                    themeName="selector-theme"
+                                                    value={csvPreviewContent}
+                                                    readOnly
+                                                    options={{
+                                                        minimap: { enabled: false },
+                                                        lineNumbersMinChars: 3,
+                                                        quickSuggestions: false,
+                                                        suggestOnTriggerCharacters: false,
+                                                        renderWhitespace: "none",
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Editable LOAD CSV query */}
+                                    <div className="flex flex-col gap-1.5">
+                                        <label htmlFor="loadCsvQuery" className="text-sm font-medium">
+                                            Cypher query
+                                        </label>
+                                        <label
+                                            htmlFor="loadCsvWithHeaders"
+                                            className="inline-flex items-center gap-2 text-xs text-muted-foreground"
+                                        >
+                                            <input
+                                                id="loadCsvWithHeaders"
+                                                type="checkbox"
+                                                checked={csvWithHeaders}
+                                                onChange={(e) => setCsvWithHeaders(e.target.checked)}
+                                                disabled={isLoading}
+                                                className="h-4 w-4 rounded border border-border bg-background align-middle"
+                                            />
+                                            Use CSV headers
+                                        </label>
+                                        <div className="rounded-md border bg-muted/40 px-3 py-2">
+                                            <code className="font-mono text-xs">{loadCsvPrefix}</code>
+                                        </div>
+                                        <div className="h-36 w-full rounded-lg border border-border overflow-hidden" data-testid="loadCsvQuery">
+                                            <EditorComponent
+                                                className="SofiaSans"
+                                                height="100%"
+                                                language={CYPHER_LANGUAGE_NAME}
+                                                languageConfig={editorLanguageConfig}
+                                                themeName="selector-theme"
+                                                options={{
+                                                    lineHeight: 22,
+                                                    fontSize: 14,
+                                                    lineNumbersMinChars: 3,
+                                                    quickSuggestions: true,
+                                                    suggestOnTriggerCharacters: true,
+                                                    scrollBeyondLastLine: false,
+                                                    wordWrap: "on",
+                                                    renderWhitespace: "none"
+                                                }}
+                                                value={csvQuery}
+                                                onChange={(value) => setCsvQuery(value ?? "")}
+                                                onMount={handleLoadCsvEditorDidMount}
+                                                readOnly={isLoading}
+                                            />
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            {csvWithHeaders ? (
+                                                <>
+                                                    Each CSV column is available as{" "}
+                                                    <code className="rounded bg-muted px-1 py-0.5">row.columnName</code>.
+                                                </>
+                                            ) : (
+                                                <>
+                                                    Without headers, columns are available as{" "}
+                                                    <code className="rounded bg-muted px-1 py-0.5">row[0]</code>,{" "}
+                                                    <code className="rounded bg-muted px-1 py-0.5">row[1]</code>, ...
+                                                </>
+                                            )}
+                                        </p>
+                                    </div>
+
+                                </form>
+                            )}
+                        </TabsContent>
                     )}
                 </Tabs>
+                {progressBar}
+                {mode === "load-csv" && (
+                    <div className="rounded-lg border border-border/80 bg-secondary/20 px-3 py-2">
+                        <div className="flex items-center gap-2" aria-label="Load CSV steps">
+                            {[
+                                { id: 1, label: "Upload CSV" },
+                                { id: 2, label: "Review & Run" },
+                            ].map((step, index, allSteps) => {
+                                const isDone = loadCsvStep > step.id;
+                                const isActive = loadCsvStep === step.id;
+
+                                return (
+                                    <div key={step.id} className="flex min-w-0 flex-1 items-center gap-2">
+                                        <span
+                                            className={cn(
+                                                "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold",
+                                                isDone
+                                                    ? "border-primary bg-primary text-primary-foreground"
+                                                    : isActive
+                                                        ? "border-primary text-primary"
+                                                        : "border-border text-muted-foreground"
+                                            )}
+                                        >
+                                            {isDone ? "✓" : step.id}
+                                        </span>
+                                        <span
+                                            className={cn(
+                                                "truncate text-xs font-medium",
+                                                isActive ? "text-foreground" : "text-muted-foreground"
+                                            )}
+                                        >
+                                            {step.label}
+                                        </span>
+                                        {index < allSteps.length - 1 && (
+                                            <span
+                                                className={cn(
+                                                    "mx-1 h-px flex-1",
+                                                    loadCsvStep > step.id ? "bg-primary/60" : "bg-border"
+                                                )}
+                                            />
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+                <div className="mt-3 border-t border-border/60" />
+                <div className="mt-3 flex justify-end gap-3">
+                    {
+                        footerViewAction && (
+                            <Button
+                                type="button"
+                                label="View file"
+                                title={footerViewAction.title}
+                                className="rounded-lg border border-border px-4 py-[10px] hover:bg-background/60"
+                                disabled={footerViewAction.disabled}
+                                isLoading={footerViewAction.loading}
+                                onClick={() => {
+                                    if (footerViewAction.file) {
+                                        void openFilePreview(footerViewAction.file, footerViewAction.uploadMode);
+                                    }
+                                }}
+                            />
+                        )
+                    }
+                    <CloseDialog label="Cancel" title="Cancel upload" data-testid="uploadGraphCancel" disabled={isLoading} onClick={() => handleOpenChange(false)} />
+                    <Button
+                        type="button"
+                        label={primaryAction.label}
+                        title={primaryAction.title}
+                        variant="Primary"
+                        isLoading={isLoading}
+                        indicator={indicator}
+                        disabled={primaryAction.disabled}
+                        data-testid={primaryAction.testId}
+                        onClick={submitActiveForm}
+                    />
+                </div>
             </div>
         </DialogComponent>
     );

@@ -1,12 +1,12 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { fetchOptions, getMemoryUsage, getSSEGraphResult, prepareArg, Row, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
-import { ChevronDown, ChevronUp, Settings, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2, Settings, X } from "lucide-react";
 import Button from "../components/ui/Button";
 import { IndicatorContext, BrowserSettingsContext, ConnectionContext } from "../components/provider";
 import PaginationList from "../components/PaginationList";
@@ -18,10 +18,11 @@ import UploadGraph from "../components/graph/UploadGraph";
 import { Graph } from "../api/graph/model";
 import ResizableBox from "@/components/ui/ResizableBox";
 import { useResizableSize } from "@/lib/useResizableSize";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Props {
-    options: string[],
-    setOptions: (options: string[]) => void
+    options: string[] | undefined,
+    setOptions: (options: string[] | undefined) => void
     selectedValue: string
     setSelectedValue: (value: string) => void
     setGraph: (graph: Graph) => void
@@ -40,6 +41,7 @@ interface Props {
  * @returns The component's rendered JSX element.
  */
 export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, setGraph }: Props) {
+    const safeOptions = useMemo(() => options ?? [], [options]);
 
     const { indicator, setIndicator } = useContext(IndicatorContext);
     const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
@@ -71,7 +73,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
 
     const getOptions = useCallback(async () =>
-        fetchOptions(toast, setIndicator, indicator, setSelectedValue, setOptions)
+        fetchOptions(toast, setIndicator, indicator, setSelectedValue, opts => setOptions(opts))
         , [toast, setIndicator, indicator, setSelectedValue, setOptions]);
 
     const loadMemory = useCallback((opt: string) =>
@@ -123,7 +125,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         );
 
         if (result.ok) {
-            const newOptions = options.map((opt) => (opt === optionName ? option : opt));
+            const newOptions = safeOptions.map((opt) => (opt === optionName ? option : opt));
             setOptions!(newOptions);
 
             if (setSelectedValue && optionName === selectedValue) setSelectedValue(option);
@@ -154,7 +156,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         }
 
         return result.ok;
-    }, [toast, setIndicator, options, setOptions, setSelectedValue, selectedValue, sessionRole, showMemoryUsage, loadNodesCount, loadEdgesCount, loadMemory]);
+    }, [toast, setIndicator, safeOptions, setOptions, setSelectedValue, selectedValue, sessionRole, showMemoryUsage, loadNodesCount, loadEdgesCount, loadMemory]);
 
     const handleSetRows = useCallback((opts: string[]) => {
         setRows(opts.map((opt) => {
@@ -183,14 +185,13 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     useEffect(() => {
         if (!openMenage) {
-            setOpenDuplicate(false);
-            handleSetRows(options);
+            if (openDuplicate) setOpenDuplicate(false);
         }
-    }, [openMenage, handleSetRows, options]);
+    }, [openMenage, openDuplicate]);
 
     useEffect(() => {
-        handleSetRows(options);
-    }, [options, handleSetRows]);
+        handleSetRows(safeOptions);
+    }, [safeOptions, handleSetRows]);
 
     const handleOpenChange = async (o: boolean) => {
         setOpen(o);
@@ -199,6 +200,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
         try {
             setIsLoading(true);
+            setOptions(undefined);
             await getOptions();
         } finally {
             setIsLoading(false);
@@ -228,11 +230,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     return (
         <>
             <Popover open={open} onOpenChange={handleOpenChange}>
-                <PopoverTrigger disabled={options.length === 0 || indicator === "offline"} asChild>
+                <PopoverTrigger disabled={safeOptions.length === 0 || indicator === "offline"} asChild>
                     <Button
                         className="min-w-0 basis-0 grow bg-background rounded-lg border border-border p-2 justify-left disabled:text-gray-400 disabled:opacity-100 p-1 text-sm"
                         label={selectedValue || "Select Graph"}
-                        title={options.length === 0 ? "There are no Graphs" : undefined}
+                        title={safeOptions.length === 0 ? "There are no Graphs" : undefined}
                         indicator={indicator}
                         data-testid="selectGraph"
                     >
@@ -251,7 +253,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 >
                     <PaginationList
                         className="basis-0 grow min-h-fit p-0"
-                        list={options}
+                        list={safeOptions}
                         onClick={handleClick}
                         dataTestId="selectGraph"
                         label="Graph"
@@ -291,17 +293,27 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                             className="h-full w-full flex flex-col gap-2"
                         >
                             <div className="flex flex-row justify-between items-center border-b border-border pb-1">
-                                <h2 className="text-2xl font-medium flex items-center gap-2">
-                                    Manage Graphs
+                                <div className="flex items-center gap-2">
+                                    <h2 className="text-2xl font-medium">Manage Graphs</h2>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <span>({options ? options.length : <Loader2 className="inline animate-spin" />})</span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p> Graphs Count</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </div>
+                                <div className="flex gap-2 items-center">
                                     <Settings size={22} className="text-foreground/60" />
-                                </h2>
-                                <Button
-                                    aria-label="Close"
-                                    data-testid="closeManage"
-                                    onClick={() => setOpenMenage(false)}
-                                >
-                                    <X />
-                                </Button>
+                                    <Button
+                                        aria-label="Close"
+                                        data-testid="closeManage"
+                                        onClick={() => setOpenMenage(false)}
+                                    >
+                                        <X />
+                                    </Button>
+                                </div>
                             </div>
                             <TableComponent
                                 className="grow overflow-hidden gap-2"
@@ -327,12 +339,12 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                             setGraphName={setSelectedValue}
                                             setGraph={setGraph}
                                             setOpenMenage={setOpenMenage}
-                                            graphNames={options}
-                                            setGraphNames={setOptions}
+                                            graphNames={safeOptions}
+                                            setGraphNames={opts => setOptions(opts)}
                                         />
                                         <ExportGraph
                                             selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
-                                             
+
                                         />
                                         {(() => {
                                             const selectedGraphNames = rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string);
@@ -349,12 +361,12 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                         })()}
                                         <DuplicateGraph
                                             selectedValue={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)[0]}
-                                             
+
                                             open={openDuplicate}
                                             onOpenChange={setOpenDuplicate}
                                             onDuplicate={(duplicateName) => {
                                                 setSelectedValue(duplicateName);
-                                                setOptions!([...options, duplicateName]);
+                                                setOptions!([...safeOptions, duplicateName]);
                                             }}
                                             disabled={rows.filter(opt => opt.checked).length !== 1}
                                         />
@@ -362,7 +374,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                 }
                             </TableComponent>
                         </div>
-                    </ResizableBox>,
+                    </ResizableBox >,
                     document.body
                 )
             }

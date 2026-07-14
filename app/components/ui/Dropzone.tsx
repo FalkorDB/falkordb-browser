@@ -48,7 +48,7 @@ function Dropzone({ title = "Upload File", filesCount = false, className = "", w
     const { getRootProps, getInputProps } = useDropzone({ onDrop, onDropRejected, disabled, accept, maxFiles });
 
     return (
-        <div className={cn('flex gap-4 grow', className)}>
+        <div className={cn('flex gap-4', withTable && 'grow', className)}>
             {/* eslint-disable-next-line react/jsx-props-no-spreading */}
             <div {...getRootProps(withTable ? { className: cn("Dropzone", filesCount && "py-20 px-40") } : {})}>
                 {/* eslint-disable-next-line react/jsx-props-no-spreading */}

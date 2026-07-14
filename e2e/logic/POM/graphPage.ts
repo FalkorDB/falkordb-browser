@@ -1518,9 +1518,15 @@ export default class GraphPage extends BasePage {
       isEnabled = await waitForElementToBeEnabled(this.select("Graph"), 1000, 30);
     }
     if (!isEnabled) throw new Error("Graph selector is not enabled after reloading the graph list");
+
+    const graphListResponse = this.page.waitForResponse(
+      (response) => response.url().includes("/api/graph") && response.request().method() === "GET"
+    );
+
     await this.clickSelect();
+    await graphListResponse;
     await this.fillSearch(graphName);
-    await this.page.waitForTimeout(500); // wait for the search results to be populated
+    await waitForElementToBeVisible(this.selectItem("Graph", graphName), 500, 20);
     await this.clickSelectItem(graphName); // selecting the first item in list after search
   }
 
