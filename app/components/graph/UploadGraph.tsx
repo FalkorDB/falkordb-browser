@@ -31,6 +31,8 @@ const ACCEPTED_CSV = {
     "text/plain": [".csv"],
 };
 
+const PREVIEW_MAX_CHARS = 250_000;
+
 const CSV_URL_PLACEHOLDER = "$csvUrl";
 
 function buildLoadCsvPrefix(withHeaders: boolean): string {
@@ -55,7 +57,6 @@ function formatFileSize(bytes: number): string {
 }
 
 export default function UploadGraph({ graphName, disabled, open, onOpenChange, onSuccess }: {
-    /* eslint-disable react/require-default-props */
     graphName: string
     disabled?: boolean
     open?: boolean
@@ -90,6 +91,11 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
     const [csvFileName, setCsvFileName] = useState("");
     const [csvQuery, setCsvQuery] = useState("");
     const [csvWithHeaders, setCsvWithHeaders] = useState(true);
+    const [cypherPreviewOpen, setCypherPreviewOpen] = useState(false);
+    const [cypherPreviewContent, setCypherPreviewContent] = useState("");
+    const [csvPreviewOpen, setCsvPreviewOpen] = useState(false);
+    const [csvPreviewContent, setCsvPreviewContent] = useState("");
+    const [previewLoadingMode, setPreviewLoadingMode] = useState<UploadMode | null>(null);
     const loadCsvFormRef = useRef<HTMLFormElement>(null);
     // Synchronous re-entrancy guard shared by all three ingestion handlers.
     // `isLoading` is async React state, but Monaco's Enter keybinding calls
@@ -151,6 +157,42 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
         }).catch(() => undefined);
     }, []);
 
+    const openFilePreview = useCallback(async (file: File, uploadMode: UploadMode) => {
+        try {
+            setPreviewLoadingMode(uploadMode);
+
+            let fileText = await file.text();
+            let wasTruncated = false;
+            if (fileText.length > PREVIEW_MAX_CHARS) {
+                fileText = fileText.slice(0, PREVIEW_MAX_CHARS);
+                wasTruncated = true;
+            }
+
+            if (uploadMode === "cypher") {
+                setCypherPreviewContent(fileText);
+                setCypherPreviewOpen(true);
+            } else {
+                setCsvPreviewContent(fileText);
+                setCsvPreviewOpen(true);
+            }
+
+            if (wasTruncated) {
+                toast({
+                    title: "Preview truncated",
+                    description: `Showing the first ${PREVIEW_MAX_CHARS.toLocaleString()} characters.`,
+                });
+            }
+        } catch {
+            toast({
+                title: "Preview unavailable",
+                description: "Could not read this file for preview.",
+                variant: "destructive",
+            });
+        } finally {
+            setPreviewLoadingMode(null);
+        }
+    }, [toast]);
+
     const handleOpenChange = (nextOpen: boolean, force = false) => {
         if (!nextOpen && (isLoading || inFlightRef.current) && !force) return;
 
@@ -175,6 +217,11 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             setCsvFileName("");
             setCsvQuery("");
             setCsvWithHeaders(true);
+            setCypherPreviewOpen(false);
+            setCypherPreviewContent("");
+            setCsvPreviewOpen(false);
+            setCsvPreviewContent("");
+            setPreviewLoadingMode(null);
             setIsLoading(false);
             setPhase(null);
             setUploadPct(0);
@@ -191,6 +238,11 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
         setCsvFileName("");
         setCsvQuery("");
         setCsvWithHeaders(true);
+        setCypherPreviewOpen(false);
+        setCypherPreviewContent("");
+        setCsvPreviewOpen(false);
+        setCsvPreviewContent("");
+        setPreviewLoadingMode(null);
         setPhase(null);
         setUploadPct(0);
     }, [csvKey, cleanupUploadedCsv]);
@@ -479,7 +531,6 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
         });
 
         // Ctrl/Cmd+Enter inserts a raw newline in the Upload editor.
-        // eslint-disable-next-line no-bitwise
         editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
             editor.trigger("keyboard", "type", { text: "\n" });
         });
@@ -596,8 +647,50 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                                     </div>
                                 </div>
                             )}
+                            {cypherPreviewOpen && (
+                                <div className="rounded-lg border border-border bg-muted/30 p-2">
+                                    <div className="mb-2 flex items-center justify-between">
+                                        <p className="text-xs font-medium text-muted-foreground">Read-only file preview</p>
+                                        <button
+                                            type="button"
+                                            onClick={() => setCypherPreviewOpen(false)}
+                                            className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-background/60 hover:text-foreground"
+                                        >
+                                            Hide preview
+                                        </button>
+                                    </div>
+                                    <div className="h-44 w-full rounded-md border border-border overflow-hidden">
+                                        <EditorComponent
+                                            className="SofiaSans"
+                                            language={CYPHER_LANGUAGE_NAME}
+                                            languageConfig={editorLanguageConfig}
+                                            themeName="selector-theme"
+                                            value={cypherPreviewContent}
+                                            readOnly
+                                            options={{
+                                                minimap: { enabled: false },
+                                                lineNumbersMinChars: 3,
+                                                quickSuggestions: false,
+                                                suggestOnTriggerCharacters: false,
+                                                renderWhitespace: "none",
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
                             {progressBar}
                             <div className="flex gap-3 justify-end">
+                                {cypherFiles.length === 1 && (
+                                    <Button
+                                        type="button"
+                                        label="View file"
+                                        title="Preview selected Cypher file"
+                                        className="rounded-lg border border-border px-4 py-[10px] hover:bg-background/60"
+                                        disabled={isLoading}
+                                        isLoading={previewLoadingMode === "cypher"}
+                                        onClick={() => { void openFilePreview(cypherFiles[0], "cypher"); }}
+                                    />
+                                )}
                                 <Button
                                     type="submit"
                                     label="Upload"
@@ -608,7 +701,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                                     disabled={cypherFiles.length !== 1 || isLoading}
                                     data-testid="uploadGraphConfirm"
                                 />
-                                <CloseDialog data-testid="uploadGraphCancel" disabled={isLoading} />
+                                <CloseDialog label="Cancel" data-testid="uploadGraphCancel" disabled={isLoading} />
                             </div>
                         </form>
                     </TabsContent>
@@ -660,8 +753,49 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                                         </div>
                                     </div>
                                 )}
+                                {csvPreviewOpen && (
+                                    <div className="rounded-lg border border-border bg-muted/30 p-2">
+                                        <div className="mb-2 flex items-center justify-between">
+                                            <p className="text-xs font-medium text-muted-foreground">Read-only file preview</p>
+                                            <button
+                                                type="button"
+                                                onClick={() => setCsvPreviewOpen(false)}
+                                                className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-background/60 hover:text-foreground"
+                                            >
+                                                Hide preview
+                                            </button>
+                                        </div>
+                                        <div className="h-44 w-full rounded-md border border-border overflow-hidden">
+                                            <EditorComponent
+                                                className="SofiaSans"
+                                                language="plaintext"
+                                                themeName="selector-theme"
+                                                value={csvPreviewContent}
+                                                readOnly
+                                                options={{
+                                                    minimap: { enabled: false },
+                                                    lineNumbersMinChars: 3,
+                                                    quickSuggestions: false,
+                                                    suggestOnTriggerCharacters: false,
+                                                    renderWhitespace: "none",
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
                                 {progressBar}
                                 <div className="flex gap-3 justify-end">
+                                    {csvFiles.length === 1 && (
+                                        <Button
+                                            type="button"
+                                            label="View file"
+                                            title="Preview selected CSV file"
+                                            className="rounded-lg border border-border px-4 py-[10px] hover:bg-background/60"
+                                            disabled={isLoading}
+                                            isLoading={previewLoadingMode === "load-csv"}
+                                            onClick={() => { void openFilePreview(csvFiles[0], "load-csv"); }}
+                                        />
+                                    )}
                                     <Button
                                         type="submit"
                                         label="Upload CSV"
@@ -672,7 +806,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                                         disabled={csvFiles.length !== 1 || isLoading}
                                         data-testid="uploadCsvTempConfirm"
                                     />
-                                    <CloseDialog data-testid="uploadGraphCancel" disabled={isLoading} />
+                                    <CloseDialog label="Cancel" data-testid="uploadGraphCancel" disabled={isLoading} />
                                 </div>
                             </form>
                         )}
@@ -690,6 +824,37 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                                     <FileSpreadsheet size={14} className="shrink-0 text-muted-foreground" />
                                     <span className="flex-1 truncate font-mono text-xs" title={csvFileName}>{csvFileName}</span>
                                 </div>
+
+                                {csvPreviewOpen && (
+                                    <div className="rounded-lg border border-border bg-muted/30 p-2">
+                                        <div className="mb-2 flex items-center justify-between">
+                                            <p className="text-xs font-medium text-muted-foreground">Read-only file preview</p>
+                                            <button
+                                                type="button"
+                                                onClick={() => setCsvPreviewOpen(false)}
+                                                className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-background/60 hover:text-foreground"
+                                            >
+                                                Hide preview
+                                            </button>
+                                        </div>
+                                        <div className="h-44 w-full rounded-md border border-border overflow-hidden">
+                                            <EditorComponent
+                                                className="SofiaSans"
+                                                language="plaintext"
+                                                themeName="selector-theme"
+                                                value={csvPreviewContent}
+                                                readOnly
+                                                options={{
+                                                    minimap: { enabled: false },
+                                                    lineNumbersMinChars: 3,
+                                                    quickSuggestions: false,
+                                                    suggestOnTriggerCharacters: false,
+                                                    renderWhitespace: "none",
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Editable LOAD CSV query */}
                                 <div className="flex flex-col gap-1.5">
@@ -755,6 +920,17 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                                 {progressBar}
 
                                 <div className="flex gap-3 justify-end">
+                                    {csvFiles.length === 1 && (
+                                        <Button
+                                            type="button"
+                                            label="View file"
+                                            title="Preview selected CSV file"
+                                            className="rounded-lg border border-border px-4 py-[10px] hover:bg-background/60"
+                                            disabled={isLoading}
+                                            isLoading={previewLoadingMode === "load-csv"}
+                                            onClick={() => { void openFilePreview(csvFiles[0], "load-csv"); }}
+                                        />
+                                    )}
                                     <Button
                                         type="submit"
                                         label="Run"
@@ -765,7 +941,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                                         disabled={!graphName || !csvQuery.trim() || isLoading}
                                         data-testid="loadCsvRunConfirm"
                                     />
-                                    <CloseDialog data-testid="uploadGraphCancel" disabled={isLoading} />
+                                    <CloseDialog label="Cancel" data-testid="uploadGraphCancel" disabled={isLoading} />
                                 </div>
                             </form>
                         )}
