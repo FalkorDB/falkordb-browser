@@ -21,8 +21,10 @@ export type LocalLlmProvider = "ollama" | "lmstudio";
 type BrowserSettingsContextType = {
   newSettings: {
     querySettings: {
-      newLimit: number;
-      setNewLimit: Dispatch<SetStateAction<number>>;
+      limitSettings: {
+        newLimit: number;
+        setNewLimit: Dispatch<SetStateAction<number>>;
+      };
       newTimeout: number;
       setNewTimeout: Dispatch<SetStateAction<number>>;
       newRunDefaultQuery: boolean;
@@ -33,6 +35,8 @@ type BrowserSettingsContextType = {
     userExperienceSettings: {
       newContentPersistence: boolean;
       setNewContentPersistence: Dispatch<SetStateAction<boolean>>;
+      newRefreshInterval: number;
+      setNewRefreshInterval: Dispatch<SetStateAction<number>>;
       captionKeysSettings: {
         newCaptionsKeys: [string, boolean][];
         setNewCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
@@ -47,8 +51,6 @@ type BrowserSettingsContextType = {
         newRowHeightExpandMultiple: number;
         setNewRowHeightExpandMultiple: Dispatch<SetStateAction<number>>;
       };
-      newRefreshInterval: number;
-      setNewRefreshInterval: Dispatch<SetStateAction<number>>;
     };
     chatSettings: {
       newSecretKey: string;
@@ -79,24 +81,18 @@ type BrowserSettingsContextType = {
         lastLimit: number;
         setLastLimit: Dispatch<SetStateAction<number>>;
       };
-      timeoutSettings: {
-        timeout: number;
-        setTimeout: Dispatch<SetStateAction<number>>;
-      };
-      runDefaultQuerySettings: {
-        runDefaultQuery: boolean;
-        setRunDefaultQuery: Dispatch<SetStateAction<boolean>>;
-      };
-      defaultQuerySettings: {
-        defaultQuery: string;
-        setDefaultQuery: Dispatch<SetStateAction<string>>;
-      };
+      timeout: number;
+      setTimeout: Dispatch<SetStateAction<number>>;
+      runDefaultQuery: boolean;
+      setRunDefaultQuery: Dispatch<SetStateAction<boolean>>;
+      defaultQuery: string;
+      setDefaultQuery: Dispatch<SetStateAction<string>>;
     };
     userExperienceSettings: {
-      contentPersistenceSettings: {
-        contentPersistence: boolean;
-        setContentPersistence: Dispatch<SetStateAction<boolean>>;
-      };
+      contentPersistence: boolean;
+      setContentPersistence: Dispatch<SetStateAction<boolean>>;
+      refreshInterval: number;
+      setRefreshInterval: Dispatch<SetStateAction<number>>;
       captionKeysSettings: {
         captionsKeys: [string, boolean][];
         setCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
@@ -111,48 +107,6 @@ type BrowserSettingsContextType = {
         rowHeightExpandMultiple: number;
         setRowHeightExpandMultiple: Dispatch<SetStateAction<number>>;
       };
-      refreshIntervalSettings: {
-        refreshInterval: number;
-        setRefreshInterval: Dispatch<SetStateAction<number>>;
-      };
-    };
-    limitSettings: {
-      limit: number;
-      setLimit: Dispatch<SetStateAction<number>>;
-      lastLimit: number;
-      setLastLimit: Dispatch<SetStateAction<number>>;
-    };
-    timeoutSettings: {
-      timeout: number;
-      setTimeout: Dispatch<SetStateAction<number>>;
-    };
-    runDefaultQuerySettings: {
-      runDefaultQuery: boolean;
-      setRunDefaultQuery: Dispatch<SetStateAction<boolean>>;
-    };
-    defaultQuerySettings: {
-      defaultQuery: string;
-      setDefaultQuery: Dispatch<SetStateAction<string>>;
-    };
-    contentPersistenceSettings: {
-      contentPersistence: boolean;
-      setContentPersistence: Dispatch<SetStateAction<boolean>>;
-    };
-    showPropertyKeyPrefixSettings: {
-      showPropertyKeyPrefix: boolean;
-      setShowPropertyKeyPrefix: Dispatch<SetStateAction<boolean>>;
-    };
-    captionsKeysSettings: {
-      captionsKeys: [string, boolean][];
-      setCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
-    };
-    tableViewSettings: {
-      columnWidth: number;
-      setColumnWidth: Dispatch<SetStateAction<number>>;
-      rowHeight: number;
-      setRowHeight: Dispatch<SetStateAction<number>>;
-      rowHeightExpandMultiple: number;
-      setRowHeightExpandMultiple: Dispatch<SetStateAction<number>>;
     };
     chatSettings: {
       secretKey: string;
@@ -300,8 +254,10 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
   {
     newSettings: {
       querySettings: {
-        newLimit: 0,
-        setNewLimit: () => { },
+        limitSettings: {
+          newLimit: 0,
+          setNewLimit: () => { },
+        },
         newTimeout: 0,
         setNewTimeout: () => { },
         newRunDefaultQuery: false,
@@ -358,18 +314,18 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
           lastLimit: 0,
           setLastLimit: () => { },
         },
-        timeoutSettings: { timeout: 0, setTimeout: () => { } },
-        runDefaultQuerySettings: {
-          runDefaultQuery: false,
-          setRunDefaultQuery: () => { },
-        },
-        defaultQuerySettings: { defaultQuery: "", setDefaultQuery: () => { } },
+        timeout: 0,
+        setTimeout: () => { },
+        runDefaultQuery: false,
+        setRunDefaultQuery: () => { },
+        defaultQuery: "",
+        setDefaultQuery: () => { },
       },
       userExperienceSettings: {
-        contentPersistenceSettings: {
-          contentPersistence: false,
-          setContentPersistence: () => { },
-        },
+        contentPersistence: false,
+        setContentPersistence: () => { },
+        refreshInterval: 0,
+        setRefreshInterval: () => { },
         captionKeysSettings: {
           captionsKeys: [],
           setCaptionsKeys: () => { },
@@ -384,42 +340,6 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
           rowHeightExpandMultiple: 0,
           setRowHeightExpandMultiple: () => { },
         },
-        refreshIntervalSettings: {
-          refreshInterval: 0,
-          setRefreshInterval: () => { },
-        },
-      },
-      limitSettings: {
-        limit: 0,
-        setLimit: () => { },
-        lastLimit: 0,
-        setLastLimit: () => { },
-      },
-      timeoutSettings: { timeout: 0, setTimeout: () => { } },
-      runDefaultQuerySettings: {
-        runDefaultQuery: false,
-        setRunDefaultQuery: () => { },
-      },
-      defaultQuerySettings: { defaultQuery: "", setDefaultQuery: () => { } },
-      contentPersistenceSettings: {
-        contentPersistence: false,
-        setContentPersistence: () => { },
-      },
-      captionsKeysSettings: {
-        captionsKeys: [],
-        setCaptionsKeys: () => { },
-      },
-      tableViewSettings: {
-        columnWidth: 0,
-        setColumnWidth: () => { },
-        rowHeight: 0,
-        setRowHeight: () => { },
-        rowHeightExpandMultiple: 0,
-        setRowHeightExpandMultiple: () => { },
-      },
-      showPropertyKeyPrefixSettings: {
-        showPropertyKeyPrefix: false,
-        setShowPropertyKeyPrefix: () => { },
       },
       chatSettings: {
         secretKey: "",

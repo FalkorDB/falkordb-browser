@@ -50,7 +50,7 @@ export default function Selector({
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
-    const { settings: { limitSettings: { limit, lastLimit }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } }, tutorialOpen } = useContext(BrowserSettingsContext);
+    const { settings: { querySettings: { limitSettings: { limit, lastLimit } }, userExperienceSettings: { captionKeysSettings: { showPropertyKeyPrefix } } }, tutorialOpen } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
     const { cypherLanguageConfig, setCypherLanguageConfig } = useContext(CypherLanguageContext);
     const { panelOpen, onTogglePanel } = useContext(PanelContext);

@@ -185,6 +185,7 @@ export default function Controls({
             {
                 graph.getElements().length > 0 &&
                 <>
+                    <div className="h-4 w-px bg-border rounded-full" />
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <div data-testid="animationContainer" className="flex items-center gap-2">
@@ -203,6 +204,7 @@ export default function Controls({
                             <p>{animation ? "Pause animation" : "Resume animation"}</p>
                         </TooltipContent>
                     </Tooltip>
+                    <div className="h-4 w-px bg-border rounded-full" />
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <div data-testid="dimContainer" className="flex items-center gap-2">
@@ -220,6 +222,7 @@ export default function Controls({
                             <p>{dimmed ? "Disable focus mode" : "Enable focus mode"}</p>
                         </TooltipContent>
                     </Tooltip>
+                    <div className="h-4 w-px bg-border rounded-full" />
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button

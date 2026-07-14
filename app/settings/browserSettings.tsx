@@ -34,14 +34,16 @@ export default function BrowserSettings() {
     const {
         newSettings: {
             querySettings: {
+                limitSettings: {
+                    newLimit,
+                    setNewLimit,
+                },
                 newRunDefaultQuery,
                 setNewRunDefaultQuery,
                 newDefaultQuery,
                 setNewDefaultQuery,
                 newTimeout,
                 setNewTimeout,
-                newLimit,
-                setNewLimit,
             },
             userExperienceSettings: {
                 newContentPersistence,
@@ -56,15 +58,16 @@ export default function BrowserSettings() {
         },
         settings: {
             querySettings: {
-                runDefaultQuerySettings: { runDefaultQuery },
-                defaultQuerySettings: { defaultQuery, setDefaultQuery },
-                timeoutSettings: { timeout: timeoutValue },
+                runDefaultQuery,
+                defaultQuery,
+                setDefaultQuery,
+                timeout: timeoutValue,
                 limitSettings: { limit },
             },
             userExperienceSettings: {
-                contentPersistenceSettings: { contentPersistence },
+                contentPersistence,
                 captionKeysSettings: { captionsKeys, showPropertyKeyPrefix },
-                refreshIntervalSettings: { refreshInterval },
+                refreshInterval,
                 tableViewSettings: { columnWidth, rowHeight, rowHeightExpandMultiple },
             },
             chatSettings: { secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, model, setModel, setSecretKey, setSelectedChatApiKeyId, setChatApiKeys, maxSavedMessages, cypherOnly, perSourceModels, setPerSourceModels },
@@ -1406,7 +1409,7 @@ export default function BrowserSettings() {
                                             {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                                             <label id="refreshIntervalLabel" htmlFor="refreshInterval" className="text-lg font-semibold">Refresh Interval</label>
                                             <p className="text-sm text-muted-foreground">
-                                                Reload graph info data every {newRefreshInterval} seconds
+                                                Reload data every {newRefreshInterval} seconds (e.g graph info data, db memory usage, etc).
                                             </p>
                                         </div>
                                         <div className="sm:w-64">

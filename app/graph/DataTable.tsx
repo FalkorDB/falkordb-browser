@@ -32,7 +32,7 @@ interface Props {
 export default function DataTable({ object, type, lastObjId, canvasRef, className }: Props) {
 
     const { graph, setGraphInfo } = useContext(GraphContext);
-    const { settings: { captionsKeysSettings: { captionsKeys }} } = useContext(BrowserSettingsContext);
+    const { settings: { userExperienceSettings: { captionKeysSettings: { captionsKeys } } } } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
     const { toast } = useToast();
 

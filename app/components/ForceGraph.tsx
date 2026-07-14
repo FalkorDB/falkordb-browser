@@ -43,7 +43,7 @@ export default function ForceGraph({
 }: Props) {
 
     const { setIndicator } = useContext(IndicatorContext);
-    const { settings: { captionsKeysSettings: { captionsKeys }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
+    const { settings: { userExperienceSettings: { captionKeysSettings: { captionsKeys, showPropertyKeyPrefix } } } } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
     const { layout: ctxLayout, direction: ctxDirection } = useContext(ForceGraphContext);
 
