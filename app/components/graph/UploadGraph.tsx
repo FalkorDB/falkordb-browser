@@ -164,11 +164,11 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
         try {
             setPreviewLoadingMode(uploadMode);
 
-            let fileText = await file.text();
-            let wasTruncated = false;
+            const previewBlob = file.slice(0, PREVIEW_MAX_CHARS);
+            let fileText = await previewBlob.text();
+            const wasTruncated = file.size > PREVIEW_MAX_CHARS || fileText.length > PREVIEW_MAX_CHARS;
             if (fileText.length > PREVIEW_MAX_CHARS) {
                 fileText = fileText.slice(0, PREVIEW_MAX_CHARS);
-                wasTruncated = true;
             }
 
             if (uploadMode === "cypher") {

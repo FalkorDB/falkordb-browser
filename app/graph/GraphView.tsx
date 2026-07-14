@@ -235,13 +235,13 @@ function GraphView({
                     </div>
                     <div className="flex gap-2 items-center font-normal text-muted-foreground">
                         {
-                            historyQuery?.currentQuery?.metadata[1] &&
+                            historyQuery?.currentQuery?.metadata?.[1] &&
                             <>
                                 <p>Nodes: {graph.NodesMap.size}</p>
                                 <div className="h-4 w-px bg-border rounded-full" />
                                 <p>Edges: {graph.LinksMap.size}</p>
                                 <div className="h-4 w-px bg-border rounded-full" />
-                                <p>RT: {(historyQuery?.currentQuery?.metadata[1] || "").split(':')[1]}</p>
+                                <p>RT: {(historyQuery?.currentQuery?.metadata?.[1] || "").split(':')[1]}</p>
                             </>
                         }
                     </div>
