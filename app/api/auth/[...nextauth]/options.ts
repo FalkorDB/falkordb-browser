@@ -1349,50 +1349,11 @@ export async function getClient(
     console.warn("Failed to resolve connection:", connErr);
   }
 
-  // Before returning SESSION_INVALID, attempt a direct reconnect using session
-  // credentials. This handles transient Token DB issues without accumulating
-  // new Token DB entries (the connection is stored in cache only).
-  try {
-    const { user: sessionUser } = session;
-    // Try to resolve password from Token DB (best-effort; works without for
-    // passwordless connections which are common in dev/CI).
-    let reconnectPassword: string | undefined;
-    try {
-      const { decrypt } = await import("../encryption");
-      const storage = StorageFactory.getStorage();
-      const tokenData = await storage.fetchTokenById(connId);
-      if (tokenData?.encrypted_password) {
-        reconnectPassword = decrypt(tokenData.encrypted_password) || undefined;
-      }
-    } catch { /* proceed without password */ }
-    const reconnectUsername = reconnectPassword ? (sessionUser.username || undefined) : undefined;
-    const { client: reconnected, role: reconnectedRole } = await newClient(
-      {
-        host: sessionUser.host,
-        port: sessionUser.port.toString(),
-        username: reconnectUsername,
-        password: reconnectPassword,
-        tls: sessionUser.tls.toString(),
-      },
-      connKey
-    );
-    return {
-      client: reconnected,
-      user: {
-        id,
-        username: sessionUser.username,
-        role: reconnectedRole,
-        host: sessionUser.host,
-        port: sessionUser.port,
-        tls: sessionUser.tls,
-        password: reconnectPassword,
-      },
-    };
-  } catch (reconnectErr) {
-    // eslint-disable-next-line no-console
-    console.warn("connId reconnect fallback failed:", reconnectErr);
-  }
-
+  // Fail closed: the Token DB connection row is the single source of truth for
+  // the connection target. If it can't be resolved to a bound row, we do NOT
+  // reconstruct the connection from JWT/session host fields — doing so would
+  // let the session pointer (connId) and the actual connection target diverge.
+  // Force the client to re-authenticate instead.
   // eslint-disable-next-line no-console
   console.warn("getClient: returning SESSION_INVALID (connId path) for session:", id, "connId:", connId);
   return NextResponse.json(
