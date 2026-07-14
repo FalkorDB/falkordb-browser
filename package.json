@@ -60,7 +60,7 @@
     "d3": "^7.9.0",
     "date-fns": "^4.4.0",
     "depcheck": "^1.4.7",
-    "dompurify": "^3.4.2",
+    "dompurify": "^3.4.12",
     "echarts": "^6.1.0",
     "echarts-for-react": "^3.0.2",
     "embla-carousel-react": "^8.5.2",
@@ -130,7 +130,18 @@
     "refractor": {
       "prismjs": "^1.30.0"
     },
-    "dompurify": "^3.4.2",
-    "prismjs": "^1.30.0"
+    "dompurify": "^3.4.12",
+    "prismjs": "^1.30.0",
+    "postcss": "^8.5.17",
+    "@babel/core": "^7.29.6",
+    "depcheck": {
+      "js-yaml": "^3.15.0"
+    },
+    "swagger-client": {
+      "js-yaml": "^4.2.0"
+    },
+    "@apidevtools/json-schema-ref-parser": {
+      "js-yaml": "^4.2.0"
+    }
   }
 }
