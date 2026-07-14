@@ -669,6 +669,7 @@ export default function Chat({ onClose }: Props) {
                     </ShadTooltip>
                     <Button
                         data-testid="chatSendButton"
+                        type="button"
                         disabled={newMessage.trim() === ""}
                         title={newMessage.trim() === "" ? "Please enter a message" : "Send"}
                         onClick={handleSubmit}

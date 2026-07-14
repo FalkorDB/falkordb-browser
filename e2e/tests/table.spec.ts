@@ -90,6 +90,8 @@ test.describe('Table View Tests', () => {
             await tableView.clickTableTab();
             // Verify exactly one result row belongs to this query before inspecting content.
             expect(await tableView.getRowsCount()).toBe(1);
+            // Object cells render collapsed; expand so the PATH's nodes/edges keys show.
+            await tableView.expandAllCells();
             expect(await tableView.firstCellContains('nodes')).toBe(true);
             expect(await tableView.firstCellContains('edges')).toBe(true);
         } finally {

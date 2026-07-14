@@ -14,6 +14,7 @@ import TableComponent from "../components/TableComponent";
 import ExportGraph from "../components/ExportGraph";
 import DeleteGraph from "../components/graph/DeleteGraph";
 import DuplicateGraph from "../components/graph/DuplicateGraph";
+import UploadGraph from "../components/graph/UploadGraph";
 import { Graph } from "../api/graph/model";
 import ResizableBox from "@/components/ui/ResizableBox";
 import { useResizableSize } from "@/lib/useResizableSize";
@@ -331,11 +332,24 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                         />
                                         <ExportGraph
                                             selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
-                                            
+                                             
                                         />
+                                        {(() => {
+                                            const selectedGraphNames = rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string);
+                                            return (
+                                                <UploadGraph
+                                                    graphName={selectedGraphNames.length === 1 ? selectedGraphNames[0] : ""}
+                                                    disabled={selectedGraphNames.length !== 1}
+                                                    onSuccess={() => {
+                                                        setOpenMenage(false);
+                                                        setOpen(false);
+                                                    }}
+                                                />
+                                            );
+                                        })()}
                                         <DuplicateGraph
                                             selectedValue={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)[0]}
-                                            
+                                             
                                             open={openDuplicate}
                                             onOpenChange={setOpenDuplicate}
                                             onDuplicate={(duplicateName) => {

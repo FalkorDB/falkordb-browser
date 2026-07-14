@@ -20,7 +20,8 @@ import type { Data as CanvasData, HierarchyDirection, LayoutMode, RadialDirectio
 import LoginVerification from "./loginVerification";
 import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
-import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
+import type { LanguageConfig } from "./components/EditorComponent";
+import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, CypherLanguageContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
 import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
@@ -288,6 +289,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0);
   const [isQueryLoading, setIsQueryLoading] = useState(false);
+  const [cypherLanguageConfig, setCypherLanguageConfig] = useState<LanguageConfig | null>(null);
   const [diagnostics, setDiagnostics] = useState<DiagnosticsResult | null>(null);
   const [model, setModel] = useState("");
   const [newModel, setNewModel] = useState("");
@@ -629,6 +631,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setSelectedUdf
   }), [selectedUdf, udfList]);
 
+  const cypherLanguageContext = useMemo(() => ({
+    cypherLanguageConfig,
+    setCypherLanguageConfig,
+  }), [cypherLanguageConfig]);
+
   const fetchCount = useCallback(async (name?: string, options?: { signal?: AbortSignal; connectionId?: string | null; epoch?: number }) => {
     const n = name || graphName;
 
@@ -781,7 +788,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         const newLabels = metaStats?.[0] || [];
         const newRelationships = metaStats?.[1] || [];
         const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
-        // setGraph(g) below already carries gi inside — no separate setGraphInfo needed.
+        // gi is embedded in the graph via Graph.create below and also pushed to
+        // GraphInfoContext through setGraphInfo(g.GraphInfo) after setGraph.
         return gi;
       }).catch((error) => {
         console.error("Failed to fetch graph info:", error);
@@ -812,6 +820,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       };
 
       setGraph(g);
+      // setGraph only updates GraphContext; the GraphInfo panel reads labels,
+      // relationships and property keys from the separate GraphInfoContext, so
+      // sync it here too — otherwise the panel shows stale info until the next
+      // periodic refresh (up to refreshInterval seconds later).
+      setGraphInfo(g.GraphInfo);
       setData({ ...g.Elements });
       fetchCount(n);
       if (!tutorialOpen) {
@@ -863,7 +876,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setIsQueryLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graphName, limit, timeout, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries, showMemoryUsage, captionsKeys, showPropertyKeyPrefix, tutorialOpen, prefixReady]);
+  }, [graphName, limit, timeout, fetchInfo, fetchCount, setGraphInfo, handleCooldown, handelGetNewQueries, showMemoryUsage, captionsKeys, showPropertyKeyPrefix, tutorialOpen, prefixReady]);
 
   const graphNameRef = useRef(graphName);
   graphNameRef.current = graphName;
@@ -1614,19 +1627,21 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                       <TableViewContext.Provider value={tableViewContext}>
                         <ConnectionContext.Provider value={connectionContext}>
                           <UDFContext.Provider value={udfContext}>
-                            <AiFixContext.Provider value={aiFixContext}>
-                              <ProviderLayout
-                                panelRef={panelRef}
-                                tutorialOpen={tutorialOpen}
-                                onCloseTutorial={handleCloseTutorial}
-                                onLoadDemoGraphs={handleLoadDemoGraphs}
-                                onCleanupDemoGraphs={handleCleanupDemoGraphs}
-                                showUDF={showUDF}
-                              >
-                                {children}
-                              </ProviderLayout>
-                              <AiFixDialogs />
-                            </AiFixContext.Provider>
+                            <CypherLanguageContext.Provider value={cypherLanguageContext}>
+                              <AiFixContext.Provider value={aiFixContext}>
+                                <ProviderLayout
+                                  panelRef={panelRef}
+                                  tutorialOpen={tutorialOpen}
+                                  onCloseTutorial={handleCloseTutorial}
+                                  onLoadDemoGraphs={handleLoadDemoGraphs}
+                                  onCleanupDemoGraphs={handleCleanupDemoGraphs}
+                                  showUDF={showUDF}
+                                >
+                                  {children}
+                                </ProviderLayout>
+                                <AiFixDialogs />
+                              </AiFixContext.Provider>
+                            </CypherLanguageContext.Provider>
                           </UDFContext.Provider>
                         </ConnectionContext.Provider>
                       </TableViewContext.Provider>

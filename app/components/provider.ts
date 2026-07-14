@@ -4,6 +4,7 @@ import { ConnectionInfo, ConnectionType, GraphData, GraphRef, HistoryQuery, Labe
 import type { DiagnosticsResult } from "@/lib/cypherDiagnostics";
 import type { Data as CanvasData, LayoutMode, ViewportState } from "@falkordb/canvas";
 import type { SessionConnection } from "next-auth";
+import type { LanguageConfig } from "./EditorComponent";
 import { Graph, GraphInfo } from "../api/graph/model";
 
 export type ChatApiKey = {
@@ -252,6 +253,11 @@ type UDFContextType = {
   setUdfList: Dispatch<SetStateAction<UDFEntry[]>>;
   selectedUdf: UDFEntryWithCode | undefined;
   setSelectedUdf: Dispatch<SetStateAction<UDFEntryWithCode | undefined>>;
+};
+
+type CypherLanguageContextType = {
+  cypherLanguageConfig: LanguageConfig | null;
+  setCypherLanguageConfig: Dispatch<SetStateAction<LanguageConfig | null>>;
 };
 
 export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
@@ -504,6 +510,11 @@ export const UDFContext = createContext<UDFContextType>({
   selectedUdf: undefined,
   setSelectedUdf: () => { },
 }); 
+
+export const CypherLanguageContext = createContext<CypherLanguageContextType>({
+  cypherLanguageConfig: null,
+  setCypherLanguageConfig: () => { },
+});
 
 type DiagnosticsContextType = {
   diagnostics: DiagnosticsResult | null;

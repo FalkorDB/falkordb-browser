@@ -519,6 +519,28 @@ const USER_READABLE_ERROR_PATTERNS = [
   /^cannot connect to falkordb\b/i,
   /^authentication failed\b/i,
   /^connection timed out\b/i,
+  // Data ingestion / file upload (app/api/upload, app/api/graph/[graph]/upload).
+  // These messages are authored for end users, so show them verbatim.
+  /\brequires a (?:\.dump|\.csv|\.txt|\.cql|\.cypher)\b/i,
+  /\bbatch files can be executed\b/i,
+  /\brequires a query\b/i,
+  /^invalid upload mode\b/i,
+  /\btemporarily disabled\b/i,
+  /^invalid request body\b/i,
+  /^(?:invalid|unsupported) file (?:type|name|contents)\b/i,
+  /^file is too large\b/i,
+  /^no file uploaded\b/i,
+  /^request body is missing\b/i,
+  /^uploaded file not found\b/i,
+  /^mode and fileId are required\b/i,
+  /^you do not have permission\b/i,
+  /\bmust be a single cypher statement\b/i,
+  /^the csv query is empty\b/i,
+  /\bis not a valid identifier\b/i,
+  /^duplicate csv column\b/i,
+  /\bfailed to (?:restore the graph dump|process csv rows?|process the csv file|execute cypher statement|execute the cypher batch)\b/i,
+  /\bcan only fetch csv files over https\b/i,
+  /^the csv storage produced an invalid url\b/i,
 ];
 
 function isAllowlistedUserError(message: string): boolean {
@@ -709,6 +731,91 @@ export async function securedFetch(
 
 export function prepareArg(arg: string) {
   return encodeURIComponent(arg.trim());
+}
+
+/**
+ * Upload a single file via XHR so the caller can render real request-body upload
+ * progress (the fetch API can't report it). Mirrors securedFetch's behaviour:
+ * injects X-Connection-Id, surfaces a friendly error toast, and drives the
+ * online/offline indicator. Resolves (never rejects) with the raw response.
+ */
+export function uploadFileWithProgress(
+  input: string,
+  file: File,
+  toast: ToastFn,
+  setIndicator: (indicator: "online" | "offline") => void,
+  onProgress?: (percent: number) => void,
+): Promise<{ ok: boolean; status: number; body: string }> {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", normalizeApiUrl(input));
+    // Keep uploads unbounded client-side; server/proxy limits should enforce
+    // maximum duration/size for large files on slower links.
+    xhr.timeout = 0;
+
+    if (_activeConnectionId) {
+      xhr.setRequestHeader("X-Connection-Id", _activeConnectionId);
+    }
+
+    xhr.upload.onprogress = (event) => {
+      if (onProgress && event.lengthComputable) {
+        onProgress(Math.round((event.loaded / event.total) * 100));
+      }
+    };
+
+    xhr.onload = () => {
+      const { status, responseText: body } = xhr;
+
+      if (status === 401 && xhr.getResponseHeader("X-Session-Invalid") === "1") {
+        triggerSessionInvalidationSignOut();
+        setIndicator("offline");
+        resolve({ ok: false, status, body });
+        return;
+      }
+
+      if (status >= 300) {
+        const friendly = toUserFriendlyMessage(extractResponseErrorMessage(body), status);
+        toast({
+          title: friendly.title,
+          description: friendly.description,
+          variant: "destructive",
+          rawMessage: friendly.rawMessage,
+          hint: friendly.hint,
+          hintLink: friendly.hintLink,
+        });
+        if (status === 401 || status >= 500) setIndicator("offline");
+        resolve({ ok: false, status, body });
+        return;
+      }
+
+      setIndicator("online");
+      resolve({ ok: true, status, body });
+    };
+
+    xhr.onerror = () => {
+      toast({
+        title: "Error",
+        description: "Network error while uploading the file. Please try again.",
+        variant: "destructive",
+      });
+      setIndicator("offline");
+      resolve({ ok: false, status: 0, body: "" });
+    };
+
+    xhr.ontimeout = () => {
+      toast({
+        title: "Error",
+        description: "Upload timed out. Please try again.",
+        variant: "destructive",
+      });
+      setIndicator("offline");
+      resolve({ ok: false, status: 0, body: "" });
+    };
+
+    const formData = new FormData();
+    formData.append("file", file);
+    xhr.send(formData);
+  });
 }
 
 export const between = (hash: number, from: number, to: number) => {
