@@ -53,8 +53,9 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
 
     const filters = useMemo(() => {
         const queries = historyQuery?.queries ?? [];
-        if (graphNames.length + 10 <= queries.length) {
-            return graphNames.filter(name => queries.some(query => query.graphName === name));
+        const availableGraphNames = graphNames ?? [];
+        if (availableGraphNames.length + 10 <= queries.length) {
+            return availableGraphNames.filter(name => queries.some(query => query.graphName === name));
         }
         return Array.from(new Set(queries.map(query => query.graphName).filter(name => !!name)));
     }, [graphNames, historyQuery?.queries]);

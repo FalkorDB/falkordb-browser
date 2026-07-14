@@ -628,8 +628,12 @@ export default function Page() {
         <div className="Page p-3 gap-3">
             <Selector
                 graph={graph}
-                options={graphNames}
-                setOptions={setGraphNames}
+                options={graphNames ?? []}
+                setOptions={next => setGraphNames(prev => (
+                    typeof next === "function"
+                        ? next(prev ?? [])
+                        : next
+                ))}
                 graphName={graphName}
                 setGraphName={handleSetGraphName}
                 setGraph={setGraph}

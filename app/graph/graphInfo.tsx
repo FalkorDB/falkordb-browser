@@ -45,7 +45,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     // Stable callbacks so SelectGraph's handleSetRows useCallback is not
     // invalidated on every GraphInfoContext poll update, which would trigger
     // its useEffect([options, handleSetRows]) and reset checked rows.
-    const handleSetOptions = useCallback((opts: string[]) => {
+    const handleSetOptions = useCallback((opts: string[] | undefined) => {
         setGraphNames(opts);
     }, [setGraphNames]);
 
@@ -84,10 +84,10 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             {
                                 !isReadOnly &&
                                 <CreateGraph
-                                    graphNames={graphNames}
+                                    graphNames={graphNames ?? []}
                                     onSetGraphName={(newGraphName) => {
                                         handleSetGraphName(formatName(newGraphName));
-                                        setGraphNames(prev => [...prev, formatName(newGraphName)]);
+                                        setGraphNames(prev => [...(prev ?? []), formatName(newGraphName)]);
                                     }}
                                     trigger={
                                         <Button
