@@ -296,8 +296,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                 <div className="flex items-center gap-2">
                                     <h2 className="text-2xl font-medium">Manage Graphs</h2>
                                     <Tooltip>
-                                        <TooltipTrigger>
-                                            <p>({options ? options.length : <Loader2 />})</p>
+                                        <TooltipTrigger asChild>
+                                            <span>({options ? options.length : <Loader2 className="inline animate-spin" />})</span>
                                         </TooltipTrigger>
                                         <TooltipContent>
                                             <p> Graphs Count</p>

@@ -69,7 +69,6 @@ test.describe(`Header tests`, () => {
       await navBar.waitForGraphsCountLoader();
 
       releaseGraphRequest();
-      await page.waitForLoadState('networkidle');
       await navBar.waitForGraphsCountValue();
       await context.close();
     } finally {
