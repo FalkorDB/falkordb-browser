@@ -3,7 +3,7 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue } from "@/lib/utils";
+import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue } from "@/lib/utils";
 import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
@@ -20,7 +20,8 @@ import type { Data as CanvasData, HierarchyDirection, LayoutMode, RadialDirectio
 import LoginVerification from "./loginVerification";
 import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
-import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
+import type { LanguageConfig } from "./components/EditorComponent";
+import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, CypherLanguageContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
 import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
@@ -205,11 +206,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [urlQueryText, setUrlQueryText] = useState<string | null>(null);
   const [selectedParam, setSelectedParam] = useState<string>(urlSelected);
   const [runDefaultQuery, setRunDefaultQuery] = useState(false);
-  const [graphNames, setGraphNames] = useState<string[]>([]);
+  const [graphNames, setGraphNames] = useState<string[] | undefined>(undefined);
   // Always-current ref so effects can validate graph names without re-running
   // on every graphNames mutation (prevents spurious URL→state rollbacks).
   const graphNamesRef = useRef<string[]>([]);
-  graphNamesRef.current = graphNames;
+  useEffect(() => {
+    graphNamesRef.current = graphNames ?? [];
+  }, [graphNames]);
   const [graphNamesLoaded, setGraphNamesLoaded] = useState(false);
   const [graph, setGraph] = useState<Graph>(Graph.empty());
   // graphRef always points to the current graph so setGraphInfo can mutate
@@ -288,12 +291,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0);
   const [isQueryLoading, setIsQueryLoading] = useState(false);
+  const [cypherLanguageConfig, setCypherLanguageConfig] = useState<LanguageConfig | null>(null);
   const [diagnostics, setDiagnostics] = useState<DiagnosticsResult | null>(null);
   const [model, setModel] = useState("");
   const [newModel, setNewModel] = useState("");
   const [perSourceModels, setPerSourceModels] = useState<Record<string, string>>({});
   const [tutorialOpen, setTutorialOpen] = useState(false);
-  const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>([]);
+  const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>();
   const [userGraphBeforeTutorial, setUserGraphBeforeTutorial] = useState<string>("");
   const [urlParamsBeforeTutorial, setUrlParamsBeforeTutorial] = useState<string>("");
   const [showMemoryUsage, setShowMemoryUsage] = useState(false);
@@ -340,28 +344,54 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   const browserSettingsContext = useMemo(() => ({
     newSettings: {
-      limitSettings: { newLimit, setNewLimit },
-      timeoutSettings: { newTimeout, setNewTimeout },
-      runDefaultQuerySettings: { newRunDefaultQuery, setNewRunDefaultQuery },
-      defaultQuerySettings: { newDefaultQuery, setNewDefaultQuery },
-      contentPersistenceSettings: { newContentPersistence, setNewContentPersistence },
-      captionsKeysSettings: { newCaptionsKeys, setNewCaptionsKeys },
-      showPropertyKeyPrefixSettings: { newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
+      querySettings: {
+        limitSettings: {
+          newLimit,
+          setNewLimit,
+        },
+        newTimeout,
+        setNewTimeout,
+        newRunDefaultQuery,
+        setNewRunDefaultQuery,
+        newDefaultQuery,
+        setNewDefaultQuery,
+      },
+      userExperienceSettings: {
+        newContentPersistence,
+        setNewContentPersistence,
+        captionKeysSettings: {
+          newCaptionsKeys,
+          setNewCaptionsKeys,
+          newShowPropertyKeyPrefix,
+          setNewShowPropertyKeyPrefix,
+        },
+        tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple },
+        newRefreshInterval,
+        setNewRefreshInterval,
+      },
       chatSettings: { newSecretKey, setNewSecretKey, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly, newChatModelSource, setNewChatModelSource, newLocalLlmProvider, setNewLocalLlmProvider, newLocalLlmEndpoint, setNewLocalLlmEndpoint, newModel, setNewModel },
-      graphInfo: { newRefreshInterval, setNewRefreshInterval, newMaxItemsForSearch, setNewMaxItemsForSearch },
-      tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple }
+      graphInfo: { newMaxItemsForSearch, setNewMaxItemsForSearch },
     },
     settings: {
-      limitSettings: { limit, setLimit, lastLimit, setLastLimit },
-      timeoutSettings: { timeout, setTimeout },
-      runDefaultQuerySettings: { runDefaultQuery, setRunDefaultQuery },
-      defaultQuerySettings: { defaultQuery, setDefaultQuery },
-      contentPersistenceSettings: { contentPersistence, setContentPersistence },
-      captionsKeysSettings: { captionsKeys, setCaptionsKeys },
-      showPropertyKeyPrefixSettings: { showPropertyKeyPrefix, setShowPropertyKeyPrefix },
+      querySettings: {
+        limitSettings: { limit, setLimit, lastLimit, setLastLimit },
+        timeout,
+        setTimeout,
+        runDefaultQuery,
+        setRunDefaultQuery,
+        defaultQuery,
+        setDefaultQuery,
+      },
+      userExperienceSettings: {
+        contentPersistence,
+        setContentPersistence,
+        refreshInterval,
+        setRefreshInterval,
+        captionKeysSettings: { captionsKeys, setCaptionsKeys, showPropertyKeyPrefix, setShowPropertyKeyPrefix },
+        tableViewSettings: { columnWidth, setColumnWidth, rowHeight, setRowHeight, rowHeightExpandMultiple, setRowHeightExpandMultiple },
+      },
       chatSettings: { secretKey, setSecretKey, chatApiKeys, setChatApiKeys, selectedChatApiKeyId, setSelectedChatApiKeyId, chatModelSource, setChatModelSource, localLlmProvider, setLocalLlmProvider, localLlmEndpoint, setLocalLlmEndpoint, model, setModel, maxSavedMessages, setMaxSavedMessages, cypherOnly, setCypherOnly, perSourceModels, setPerSourceModels },
       graphInfo: { showMemoryUsage, refreshInterval, setRefreshInterval, maxItemsForSearch, setMaxItemsForSearch },
-      tableViewSettings: { columnWidth, setColumnWidth, rowHeight, setRowHeight, rowHeightExpandMultiple, setRowHeightExpandMultiple }
     },
     hasChanges,
     setHasChanges,
@@ -562,7 +592,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   }), [aiFixSupported, lastFailure, aiFixResult, pendingConsent, requestAiFix, confirmConsent]);
 
   // Refs so runQuery can always call the latest requestAiFix without being in its
-  // eslint-disable-next-line dependency array (avoids recreating runQuery on every AI-state change).
+  // dependency array (avoids recreating runQuery on every AI-state change).
   const requestAiFixRef = useRef(requestAiFix);
   requestAiFixRef.current = requestAiFix;
   // ---------------------------------------------------------------------------
@@ -602,6 +632,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   isReadOnlyRef.current = isReadOnly;
   const activeGraphNameRef = useRef(graphName);
   activeGraphNameRef.current = graphName;
+  // Ref for the auth status so fetchCount reads the latest value without adding
+  // `status` to its deps (which would churn every consumer of that callback).
+  const statusRef = useRef(status);
+  statusRef.current = status;
 
   const connectionContext = useMemo(() => ({
     connectionType,
@@ -625,24 +659,54 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setSelectedUdf
   }), [selectedUdf, udfList]);
 
-  const fetchCount = useCallback(async (name?: string) => {
+  const cypherLanguageContext = useMemo(() => ({
+    cypherLanguageConfig,
+    setCypherLanguageConfig,
+  }), [cypherLanguageConfig]);
+
+  const fetchCount = useCallback(async (name?: string, options?: { signal?: AbortSignal; connectionId?: string | null; epoch?: number }) => {
     const n = name || graphName;
 
-    if (!n || status === "unauthenticated") return;
+    if (!n || statusRef.current === "unauthenticated") return;
+
+    // Capture the connection this request targets. Prefer the caller's captured
+    // epoch (the epoch when its poll/action began) so a switch between that start
+    // and this call is caught; otherwise capture it now.
+    const connectionId = options?.connectionId !== undefined ? options.connectionId : getActiveConnectionIdGlobal();
+    const startEpoch = options?.epoch !== undefined ? options.epoch : getConnectionEpoch();
+
+    // Already superseded: skip the request entirely so we never query a stale
+    // graph against a switched connection (which could auto-create it).
+    if (getConnectionEpoch() !== startEpoch) return;
+
+    // Suppress the request's toast / indicator side effects if the connection is
+    // switched while it is in flight — getSSEGraphResult fires them internally
+    // before we can inspect the epoch, and not every caller passes an AbortSignal.
+    const guardedToast = ((...args: Parameters<typeof toast>) => {
+      if (getConnectionEpoch() === startEpoch) toast(...args);
+    }) as typeof toast;
+    const guardedSetIndicator = (indicator: "online" | "offline") => {
+      if (getConnectionEpoch() === startEpoch) setIndicator(indicator);
+    };
 
     try {
       const readOnlyParam = isReadOnlyRef.current ? '?readOnly=true' : '';
-      const result = await getSSEGraphResult(`api/graph/${prepareArg(n)}/count${readOnlyParam}`, toast, setIndicator) as { nodes?: number; edges?: number };
+      const result = await getSSEGraphResult(`api/graph/${prepareArg(n)}/count${readOnlyParam}`, guardedToast, guardedSetIndicator, {
+        signal: options?.signal,
+        connectionId,
+      }) as { nodes?: number; edges?: number };
 
       if (!result) return;
 
-      if (n !== activeGraphNameRef.current) return;
+      // Discard if the graph name or the connection changed while in flight.
+      if (n !== activeGraphNameRef.current || getConnectionEpoch() !== startEpoch) return;
 
       const { nodes, edges } = result;
 
       graphInfoSyncRef.current.setEdgesCount(edges);
       graphInfoSyncRef.current.setNodesCount(nodes);
     } catch (error) {
+      if (isAbortError(error)) return;
       console.error(error);
     }
   }, [graphName, toast]);
@@ -752,7 +816,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         const newLabels = metaStats?.[0] || [];
         const newRelationships = metaStats?.[1] || [];
         const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
-        // setGraph(g) below already carries gi inside — no separate setGraphInfo needed.
+        // gi is embedded in the graph via Graph.create below and also pushed to
+        // GraphInfoContext through setGraphInfo(g.GraphInfo) after setGraph.
         return gi;
       }).catch((error) => {
         console.error("Failed to fetch graph info:", error);
@@ -783,6 +848,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       };
 
       setGraph(g);
+      // setGraph only updates GraphContext; the GraphInfo panel reads labels,
+      // relationships and property keys from the separate GraphInfoContext, so
+      // sync it here too — otherwise the panel shows stale info until the next
+      // periodic refresh (up to refreshInterval seconds later).
+      setGraphInfo(g.GraphInfo);
       setData({ ...g.Elements });
       fetchCount(n);
       if (!tutorialOpen) {
@@ -834,7 +904,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setIsQueryLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graphName, limit, timeout, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries, showMemoryUsage, captionsKeys, showPropertyKeyPrefix, tutorialOpen, prefixReady]);
+  }, [graphName, limit, timeout, fetchInfo, fetchCount, setGraphInfo, handleCooldown, handelGetNewQueries, showMemoryUsage, captionsKeys, showPropertyKeyPrefix, tutorialOpen, prefixReady]);
 
   const graphNameRef = useRef(graphName);
   graphNameRef.current = graphName;
@@ -1300,10 +1370,17 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const handleFetchOptions = useCallback(async () => {
     if (indicator === "offline" || tutorialOpen) return;
 
-    await fetchOptions(toast, setIndicator, indicator, setGraphName, setGraphNames);
+    setGraphNames(undefined);
+    let fetched = false;
+    await fetchOptions(toast, setIndicator, indicator, setGraphName, opts => {
+      fetched = true;
+      setGraphNames(opts);
+    });
+    if (!fetched) {
+      setGraphNames([]);
+    }
     setGraphNamesLoaded(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toast, tutorialOpen]);
+  }, [toast, setIndicator, indicator, tutorialOpen]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -1369,7 +1446,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   // Restore content persistence once on app mount (after auth + settings + graph names loaded)
   useEffect(() => {
-    if (contentRestoredRef.current || !prefixReady || !contentPersistence || graphNames.length === 0) return;
+    if (contentRestoredRef.current || !prefixReady || !contentPersistence || !graphNames || graphNames.length === 0) return;
 
     // If a graph is already loaded, mark as restored and skip
     if (graph.Id) {
@@ -1383,7 +1460,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Use the ref captured at render time: by the time this effect fires,
     // syncRouteUrlParams may have already stripped ?graph= from window.location.
     const urlGraph = initialUrlGraphNameRef.current;
-    if (urlGraph && graphNames.includes(urlGraph)) {
+    if (urlGraph && graphNames?.includes(urlGraph)) {
       contentRestoredRef.current = true;
       return;
     }
@@ -1393,7 +1470,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     try {
       const { graphName: name, query } = JSON.parse(content);
-      if (graphNames.includes(name)) {
+      if (graphNames?.includes(name)) {
         contentRestoredRef.current = true;
         handleSetGraphName(name);
         runQuery(query, name);
@@ -1421,7 +1498,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setGraphName("");
     setSelectedParam("");
     setGraphNamesLoaded(false);
-    setGraphNames([]);
+    setGraphNames(undefined);
     graphInfoSyncRef.current.setNodesCount(undefined);
     graphInfoSyncRef.current.setEdgesCount(undefined);
     setHistoryQuery(h => ({ ...h, query: "", currentQuery: defaultQueryHistory.currentQuery }));
@@ -1431,7 +1508,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Re-fetch graph list for the new connection
     connectionSwitchFetchedRef.current = true;
     handleFetchOptions();
-  }, [activeConnectionId, handleFetchOptions]);
+  }, [activeConnectionId, toast, setIndicator, handleFetchOptions]);
 
   const handleCloseTutorial = () => {
     setTutorialOpen(false);
@@ -1541,10 +1618,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setGraph(Graph.empty(undefined, undefined, undefined, GraphInfo.empty(toast, setIndicator)));
     setData({ nodes: [], links: [] });
 
-    if (userGraphBeforeTutorial && userGraphsBeforeTutorial.includes(userGraphBeforeTutorial)) {
+    if (userGraphBeforeTutorial && userGraphsBeforeTutorial?.includes(userGraphBeforeTutorial)) {
       handleSetGraphName(userGraphBeforeTutorial);
       setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }));
-    } else if (userGraphsBeforeTutorial.length === 1) {
+    } else if (userGraphsBeforeTutorial?.length === 1) {
       handleSetGraphName(userGraphsBeforeTutorial[0]);
 
       // Run default query for the graph if enabled
@@ -1578,34 +1655,36 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
           <GraphContext.Provider value={graphContext}>
             <GraphInfoProvider syncRef={graphInfoSyncRef} pendingRef={graphInfoPendingRef}>
               <HistoryQueryContext.Provider value={historyQueryContext}>
-              <IndicatorContext.Provider value={indicatorContext}>
-                <QueryLoadingContext.Provider value={queryLoadingContext}>
-                  <DiagnosticsContext.Provider value={diagnosticsContext}>
-                    <ForceGraphContext.Provider value={forceGraphContext}>
-                      <TableViewContext.Provider value={tableViewContext}>
-                        <ConnectionContext.Provider value={connectionContext}>
-                          <UDFContext.Provider value={udfContext}>
-                            <AiFixContext.Provider value={aiFixContext}>
-                              <ProviderLayout
-                                panelRef={panelRef}
-                                tutorialOpen={tutorialOpen}
-                                onCloseTutorial={handleCloseTutorial}
-                                onLoadDemoGraphs={handleLoadDemoGraphs}
-                                onCleanupDemoGraphs={handleCleanupDemoGraphs}
-                                showUDF={showUDF}
-                              >
-                                {children}
-                              </ProviderLayout>
-                              <AiFixDialogs />
-                            </AiFixContext.Provider>
-                          </UDFContext.Provider>
-                        </ConnectionContext.Provider>
-                      </TableViewContext.Provider>
-                    </ForceGraphContext.Provider>
-                  </DiagnosticsContext.Provider>
-                </QueryLoadingContext.Provider>
-              </IndicatorContext.Provider>
-            </HistoryQueryContext.Provider>
+                <IndicatorContext.Provider value={indicatorContext}>
+                  <QueryLoadingContext.Provider value={queryLoadingContext}>
+                    <DiagnosticsContext.Provider value={diagnosticsContext}>
+                      <ForceGraphContext.Provider value={forceGraphContext}>
+                        <TableViewContext.Provider value={tableViewContext}>
+                          <ConnectionContext.Provider value={connectionContext}>
+                            <UDFContext.Provider value={udfContext}>
+                              <CypherLanguageContext.Provider value={cypherLanguageContext}>
+                                <AiFixContext.Provider value={aiFixContext}>
+                                  <ProviderLayout
+                                    panelRef={panelRef}
+                                    tutorialOpen={tutorialOpen}
+                                    onCloseTutorial={handleCloseTutorial}
+                                    onLoadDemoGraphs={handleLoadDemoGraphs}
+                                    onCleanupDemoGraphs={handleCleanupDemoGraphs}
+                                    showUDF={showUDF}
+                                  >
+                                    {children}
+                                  </ProviderLayout>
+                                  <AiFixDialogs />
+                                </AiFixContext.Provider>
+                              </CypherLanguageContext.Provider>
+                            </UDFContext.Provider>
+                          </ConnectionContext.Provider>
+                        </TableViewContext.Provider>
+                      </ForceGraphContext.Provider>
+                    </DiagnosticsContext.Provider>
+                  </QueryLoadingContext.Provider>
+                </IndicatorContext.Provider>
+              </HistoryQueryContext.Provider>
             </GraphInfoProvider>
           </GraphContext.Provider>
         </BrowserSettingsContext.Provider>

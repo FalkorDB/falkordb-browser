@@ -3,7 +3,7 @@
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSettingsParams } from "@/lib/useUrlParams";
-import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2, Info, Eye, EyeOff, Pencil, KeyRound, CheckCircle2, Loader2, Cloud, Laptop, Server } from "lucide-react";
+import { RotateCcw, MonitorPlay, ChevronRight, PlusCircle, Trash2, Info, Eye, EyeOff, Pencil, KeyRound, CheckCircle2, Loader2, Cloud, Laptop, Server, Minus, Plus } from "lucide-react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
 import { areCaptionKeysEqual, cn, getDefaultQuery } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
@@ -33,28 +33,45 @@ const LOCAL_LLM_LABELS: Record<LocalLlmProvider, string> = {
 export default function BrowserSettings() {
     const {
         newSettings: {
-            contentPersistenceSettings: { newContentPersistence, setNewContentPersistence },
-            runDefaultQuerySettings: { newRunDefaultQuery, setNewRunDefaultQuery },
-            defaultQuerySettings: { newDefaultQuery, setNewDefaultQuery },
-            timeoutSettings: { newTimeout, setNewTimeout },
-            limitSettings: { newLimit, setNewLimit },
-            captionsKeysSettings: { newCaptionsKeys, setNewCaptionsKeys },
-            showPropertyKeyPrefixSettings: { newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
+            querySettings: {
+                limitSettings: {
+                    newLimit,
+                    setNewLimit,
+                },
+                newRunDefaultQuery,
+                setNewRunDefaultQuery,
+                newDefaultQuery,
+                setNewDefaultQuery,
+                newTimeout,
+                setNewTimeout,
+            },
+            userExperienceSettings: {
+                newContentPersistence,
+                setNewContentPersistence,
+                captionKeysSettings: { newCaptionsKeys, setNewCaptionsKeys, newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
+                tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple },
+                newRefreshInterval,
+                setNewRefreshInterval,
+            },
             chatSettings: { setNewSecretKey, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly, newChatModelSource, setNewChatModelSource, newLocalLlmProvider, setNewLocalLlmProvider, newLocalLlmEndpoint, setNewLocalLlmEndpoint, newModel, setNewModel },
-            graphInfo: { newRefreshInterval, setNewRefreshInterval, newMaxItemsForSearch, setNewMaxItemsForSearch },
-            tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple }
+            graphInfo: { newMaxItemsForSearch, setNewMaxItemsForSearch },
         },
         settings: {
-            contentPersistenceSettings: { contentPersistence },
-            runDefaultQuerySettings: { runDefaultQuery },
-            defaultQuerySettings: { defaultQuery, setDefaultQuery },
-            timeoutSettings: { timeout: timeoutValue },
-            limitSettings: { limit },
-            captionsKeysSettings: { captionsKeys },
-            showPropertyKeyPrefixSettings: { showPropertyKeyPrefix },
+            querySettings: {
+                runDefaultQuery,
+                defaultQuery,
+                setDefaultQuery,
+                timeout: timeoutValue,
+                limitSettings: { limit },
+            },
+            userExperienceSettings: {
+                contentPersistence,
+                captionKeysSettings: { captionsKeys, showPropertyKeyPrefix },
+                refreshInterval,
+                tableViewSettings: { columnWidth, rowHeight, rowHeightExpandMultiple },
+            },
             chatSettings: { secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, model, setModel, setSecretKey, setSelectedChatApiKeyId, setChatApiKeys, maxSavedMessages, cypherOnly, perSourceModels, setPerSourceModels },
-            graphInfo: { refreshInterval, maxItemsForSearch },
-            tableViewSettings: { columnWidth, rowHeight, rowHeightExpandMultiple }
+            graphInfo: { maxItemsForSearch },
         },
         hasChanges,
         setHasChanges,
@@ -127,6 +144,18 @@ export default function BrowserSettings() {
 
     const toggleSection = (section: keyof typeof expandedSections) => {
         setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+    };
+
+    const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+    const nudgeSlider = (
+        current: number,
+        delta: number,
+        min: number,
+        max: number,
+        setter: (value: number) => void,
+        elementId: string,
+    ) => {
+        createChangeHandler(setter)(clamp(current + delta, min, max), elementId);
     };
 
     const selectedChatApiKey = chatApiKeys.find(({ id }) => id === activeSelectedChatApiKeyId) ?? chatApiKeys[0];
@@ -275,7 +304,7 @@ export default function BrowserSettings() {
         setNewLocalLlmProvider(localLlmProvider);
         setNewLocalLlmEndpoint(localLlmEndpoint);
         setNewModel(model);
-    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewRefreshInterval, refreshInterval, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch, chatModelSource, localLlmProvider, localLlmEndpoint, model, setNewChatModelSource, setNewLocalLlmProvider, setNewLocalLlmEndpoint, setNewModel]);
+    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewRefreshInterval, refreshInterval, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch, chatModelSource, localLlmProvider, localLlmEndpoint, model, setNewChatModelSource, setNewLocalLlmProvider, setNewLocalLlmEndpoint, setNewModel, rowHeight]);
 
     useEffect(() => {
         setHasChanges(
@@ -1064,31 +1093,6 @@ export default function BrowserSettings() {
                     {expandedSections.graphInfo && (
                         <CardContent>
                             <div className="flex flex-col sm:flex-row gap-2">
-                                {/* Refresh Interval */}
-                                <div className="basis-0 grow flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 p-2 bg-muted/10 rounded-lg">
-                                    <div className="flex flex-col gap-2 flex-1">
-                                        {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                                        <label id="refreshIntervalLabel" htmlFor="refreshInterval" className="text-lg font-semibold">Refresh Interval</label>
-                                        <p className="text-sm text-muted-foreground">
-                                            Reload graph info data every {newRefreshInterval} seconds
-                                        </p>
-                                    </div>
-                                    <div className="w-full sm:w-64">
-                                        <Slider
-                                            id="refreshInterval"
-                                            aria-labelledby="refreshIntervalLabel"
-                                            className="w-full"
-                                            min={5}
-                                            max={60}
-                                            value={[newRefreshInterval]}
-                                            onValueChange={(value) => createChangeHandler(setNewRefreshInterval)(value[value.length - 1], "refreshInterval")}
-                                        />
-                                        <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                                            <span>5s</span>
-                                            <span>60s</span>
-                                        </div>
-                                    </div>
-                                </div>
                                 {/* Max Items For Search */}
                                 <div className="basis-0 grow flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 p-2 bg-muted/10 rounded-lg">
                                     <div className="flex flex-col gap-2 flex-1">
@@ -1099,16 +1103,34 @@ export default function BrowserSettings() {
                                         </p>
                                     </div>
                                     <div className="w-full sm:w-64">
-                                        <Slider
-                                            id="maxItemsForSearch"
-                                            aria-labelledby="maxItemsForSearchLabel"
-                                            className="w-full"
-                                            min={10}
-                                            max={50}
-                                            type="items"
-                                            value={[newMaxItemsForSearch]}
-                                            onValueChange={(value) => createChangeHandler(setNewMaxItemsForSearch)(value[value.length - 1], "maxItemsForSearch")}
-                                        />
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                aria-label="Decrease max items for search"
+                                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background hover:bg-muted"
+                                                onClick={() => nudgeSlider(newMaxItemsForSearch, -1, 10, 50, setNewMaxItemsForSearch, "maxItemsForSearch")}
+                                            >
+                                                <Minus className="h-4 w-4" />
+                                            </button>
+                                            <Slider
+                                                id="maxItemsForSearch"
+                                                aria-labelledby="maxItemsForSearchLabel"
+                                                className="w-full"
+                                                min={10}
+                                                max={50}
+                                                type="items"
+                                                value={[newMaxItemsForSearch]}
+                                                onValueChange={(value) => createChangeHandler(setNewMaxItemsForSearch)(value[value.length - 1], "maxItemsForSearch")}
+                                            />
+                                            <button
+                                                type="button"
+                                                aria-label="Increase max items for search"
+                                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background hover:bg-muted"
+                                                onClick={() => nudgeSlider(newMaxItemsForSearch, 1, 10, 50, setNewMaxItemsForSearch, "maxItemsForSearch")}
+                                            >
+                                                <Plus className="h-4 w-4" />
+                                            </button>
+                                        </div>
                                         <div className="flex justify-between text-xs text-muted-foreground mt-2">
                                             <span>10 Items</span>
                                             <span>50 Items</span>
@@ -1299,7 +1321,7 @@ export default function BrowserSettings() {
                                     </div>
 
                                     {/* Captions Keys */}
-                                    <div className="flex flex-col gap-2 p-2 bg-muted/10 rounded-lg">
+                                    <div className="flex-1 basis-0 flex flex-col gap-2 p-2 bg-muted/10 rounded-lg">
                                         <div className="flex flex-col gap-2">
                                             <h3 className="text-lg font-semibold">Captions Keys</h3>
                                             <p className="text-sm text-muted-foreground">Manage the caption: propertyKeys used for displaying captions on nodes.</p>
@@ -1380,89 +1402,189 @@ export default function BrowserSettings() {
                                     </div>
                                 </div>
 
-                                {/* Query Result Table View Preferences */}
-                                <div className="flex-1 basis-0 flex flex-col gap-2 p-2 bg-muted/10 rounded-lg">
-                                    <h3 className="font-semibold">Query Result Table View Preferences</h3>
-                                    <p>Customize the appearance of the table view.</p>
-                                    <form className="flex flex-col gap-2 p-2" onSubmit={saveSettings}>
-                                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
-                                            <div className="flex flex-col gap-2 flex-1">
-                                                {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                                                <label id="columnWidthLabel" htmlFor="columnWidth" className="font-semibold">Column Width</label>
-                                                <p className="text-sm text-muted-foreground">
-                                                    Set the width of the table columns.
-                                                </p>
-                                            </div>
-                                            <div className="w-full sm:w-64">
+                                <div className="flex-1 basis-0 flex flex-col gap-2">
+                                    {/* Refresh Interval */}
+                                    <div className="basis-0 grow flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 p-2 bg-muted/10 rounded-lg">
+                                        <div className="flex flex-col gap-2 flex-1">
+                                            {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+                                            <label id="refreshIntervalLabel" htmlFor="refreshInterval" className="text-lg font-semibold">Refresh Interval</label>
+                                            <p className="text-sm text-muted-foreground">
+                                                Reload data every {newRefreshInterval} seconds (e.g graph info data, db memory usage, etc).
+                                            </p>
+                                        </div>
+                                        <div className="sm:w-64">
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    aria-label="Decrease refresh interval"
+                                                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background hover:bg-muted"
+                                                    onClick={() => nudgeSlider(newRefreshInterval, -1, 5, 60, setNewRefreshInterval, "refreshInterval")}
+                                                >
+                                                    <Minus className="h-4 w-4" />
+                                                </button>
                                                 <Slider
-                                                    id="columnWidth"
-                                                    aria-labelledby="columnWidthLabel"
+                                                    id="refreshInterval"
+                                                    aria-labelledby="refreshIntervalLabel"
                                                     className="w-full"
-                                                    type="%"
-                                                    min={20}
-                                                    max={80}
-                                                    step={5}
-                                                    value={[newColumnWidth]}
-                                                    onValueChange={(value) => createChangeHandler(setNewColumnWidth)(value[value.length - 1], "columnWidth")}
+                                                    min={5}
+                                                    max={60}
+                                                    value={[newRefreshInterval]}
+                                                    onValueChange={(value) => createChangeHandler(setNewRefreshInterval)(value[value.length - 1], "refreshInterval")}
                                                 />
-                                                <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                                                    <span>20%</span>
-                                                    <span>80%</span>
-                                                </div>
+                                                <button
+                                                    type="button"
+                                                    aria-label="Increase refresh interval"
+                                                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background hover:bg-muted"
+                                                    onClick={() => nudgeSlider(newRefreshInterval, 1, 5, 60, setNewRefreshInterval, "refreshInterval")}
+                                                >
+                                                    <Plus className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                            <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                                                <span>5s</span>
+                                                <span>60s</span>
                                             </div>
                                         </div>
-                                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
-                                            <div className="flex flex-col gap-2 flex-1">
-                                                {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                                                <label id="rowHeightLabel" htmlFor="rowHeight" className="font-semibold">Row Height</label>
-                                                <p className="text-sm text-muted-foreground">
-                                                    Set the height of the table rows.
-                                                </p>
-                                            </div>
-                                            <div className="w-full sm:w-64">
-                                                <Slider
-                                                    id="rowHeight"
-                                                    aria-labelledby="rowHeightLabel"
-                                                    className="w-full"
-                                                    type="px"
-                                                    min={40}
-                                                    max={80}
-                                                    value={[newRowHeight]}
-                                                    onValueChange={(value) => createChangeHandler(setNewRowHeight)(value[value.length - 1], "rowHeight")}
-                                                />
-                                                <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                                                    <span>40px</span>
-                                                    <span>80px</span>
+                                    </div>
+
+                                    {/* Query Result Table View Preferences */}
+                                    <div className="flex-1 basis-0 flex flex-col gap-2 p-2 bg-muted/10 rounded-lg">
+                                        <h3 className="font-semibold">Query Result Table View Preferences</h3>
+                                        <p>Customize the appearance of the table view.</p>
+                                        <form className="flex flex-col gap-2 p-2" onSubmit={saveSettings}>
+                                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                                                <div className="flex flex-col gap-2 flex-1">
+                                                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+                                                    <label id="columnWidthLabel" htmlFor="columnWidth" className="font-semibold">Column Width</label>
+                                                    <p className="text-sm text-muted-foreground">
+                                                        Set the width of the table columns.
+                                                    </p>
+                                                </div>
+                                                <div className="w-full sm:w-64">
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            aria-label="Decrease column width"
+                                                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background hover:bg-muted"
+                                                            onClick={() => nudgeSlider(newColumnWidth, -5, 20, 80, setNewColumnWidth, "columnWidth")}
+                                                        >
+                                                            <Minus className="h-4 w-4" />
+                                                        </button>
+                                                        <Slider
+                                                            id="columnWidth"
+                                                            aria-labelledby="columnWidthLabel"
+                                                            className="w-full"
+                                                            type="%"
+                                                            min={20}
+                                                            max={80}
+                                                            step={5}
+                                                            value={[newColumnWidth]}
+                                                            onValueChange={(value) => createChangeHandler(setNewColumnWidth)(value[value.length - 1], "columnWidth")}
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            aria-label="Increase column width"
+                                                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background hover:bg-muted"
+                                                            onClick={() => nudgeSlider(newColumnWidth, 5, 20, 80, setNewColumnWidth, "columnWidth")}
+                                                        >
+                                                            <Plus className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
+                                                    <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                                                        <span>20%</span>
+                                                        <span>80%</span>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
-                                            <div className="flex flex-col gap-2 flex-1">
-                                                {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                                                <label id="rowHeightExpandMultipleLabel" htmlFor="rowHeightExpandMultiple" className="font-semibold">Row Height Expand Multiplier</label>
-                                                <p className="text-sm text-muted-foreground">
-                                                    Height multiplier for expanded rows.
-                                                </p>
-                                            </div>
-                                            <div className="w-full sm:w-64">
-                                                <Slider
-                                                    id="rowHeightExpandMultiple"
-                                                    aria-labelledby="rowHeightExpandMultipleLabel"
-                                                    className="w-full"
-                                                    type="px"
-                                                    min={2}
-                                                    max={8}
-                                                    step={1}
-                                                    value={[newRowHeightExpandMultiple]}
-                                                    onValueChange={(value) => createChangeHandler(setNewRowHeightExpandMultiple)(value[value.length - 1], "rowHeightExpandMultiple")}
-                                                />
-                                                <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                                                    <span>2X</span>
-                                                    <span>8X</span>
+                                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                                                <div className="flex flex-col gap-2 flex-1">
+                                                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+                                                    <label id="rowHeightLabel" htmlFor="rowHeight" className="font-semibold">Row Height</label>
+                                                    <p className="text-sm text-muted-foreground">
+                                                        Set the height of the table rows.
+                                                    </p>
+                                                </div>
+                                                <div className="w-full sm:w-64">
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            aria-label="Decrease row height"
+                                                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background hover:bg-muted"
+                                                            onClick={() => nudgeSlider(newRowHeight, -1, 40, 80, setNewRowHeight, "rowHeight")}
+                                                        >
+                                                            <Minus className="h-4 w-4" />
+                                                        </button>
+                                                        <Slider
+                                                            id="rowHeight"
+                                                            aria-labelledby="rowHeightLabel"
+                                                            className="w-full"
+                                                            type="px"
+                                                            min={40}
+                                                            max={80}
+                                                            value={[newRowHeight]}
+                                                            onValueChange={(value) => createChangeHandler(setNewRowHeight)(value[value.length - 1], "rowHeight")}
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            aria-label="Increase row height"
+                                                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background hover:bg-muted"
+                                                            onClick={() => nudgeSlider(newRowHeight, 1, 40, 80, setNewRowHeight, "rowHeight")}
+                                                        >
+                                                            <Plus className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
+                                                    <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                                                        <span>40px</span>
+                                                        <span>80px</span>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </form>
+                                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                                                <div className="flex flex-col gap-2 flex-1">
+                                                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+                                                    <label id="rowHeightExpandMultipleLabel" htmlFor="rowHeightExpandMultiple" className="font-semibold">Row Height Expand Multiplier</label>
+                                                    <p className="text-sm text-muted-foreground">
+                                                        Height multiplier for expanded rows.
+                                                    </p>
+                                                </div>
+                                                <div className="w-full sm:w-64">
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            aria-label="Decrease row height expand multiplier"
+                                                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background hover:bg-muted"
+                                                            onClick={() => nudgeSlider(newRowHeightExpandMultiple, -1, 2, 8, setNewRowHeightExpandMultiple, "rowHeightExpandMultiple")}
+                                                        >
+                                                            <Minus className="h-4 w-4" />
+                                                        </button>
+                                                        <Slider
+                                                            id="rowHeightExpandMultiple"
+                                                            aria-labelledby="rowHeightExpandMultipleLabel"
+                                                            className="w-full"
+                                                            type="px"
+                                                            min={2}
+                                                            max={8}
+                                                            step={1}
+                                                            value={[newRowHeightExpandMultiple]}
+                                                            onValueChange={(value) => createChangeHandler(setNewRowHeightExpandMultiple)(value[value.length - 1], "rowHeightExpandMultiple")}
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            aria-label="Increase row height expand multiplier"
+                                                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background hover:bg-muted"
+                                                            onClick={() => nudgeSlider(newRowHeightExpandMultiple, 1, 2, 8, setNewRowHeightExpandMultiple, "rowHeightExpandMultiple")}
+                                                        >
+                                                            <Plus className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
+                                                    <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                                                        <span>2X</span>
+                                                        <span>8X</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </form>
+                                    </div>
                                 </div>
                             </div>
                         </CardContent>

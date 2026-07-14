@@ -259,36 +259,71 @@ export async function getSSEGraphResult(
   url: string,
   toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void,
-  errorContext?: { query?: string }
+  options?: { query?: string; signal?: AbortSignal; connectionId?: string | null }
 ): Promise<unknown> {
+  const signal = options?.signal;
+  // Already superseded before we even open the stream.
+  if (signal?.aborted) return Promise.reject(createAbortError());
+
   return new Promise((resolve, reject) => {
-    let handled = false;
+    let settled = false;
+
+    // Route through an explicit connection id when provided, so every request in
+    // a batch targets the same connection even if the global changes mid-flight.
+    const connId = options?.connectionId !== undefined ? options.connectionId : _activeConnectionId;
 
     // EventSource doesn't support headers — inject connectionId as a query param.
     let effectiveUrl = normalizeApiUrl(url);
-    if (_activeConnectionId) {
+    if (connId) {
       const sep = effectiveUrl.includes("?") ? "&" : "?";
-      effectiveUrl += `${sep}connectionId=${encodeURIComponent(_activeConnectionId)}`;
+      effectiveUrl += `${sep}connectionId=${encodeURIComponent(connId)}`;
     }
 
     const evtSource = new EventSource(effectiveUrl);
+
+    const onAbort = () => {
+      // Superseded (e.g. graph/connection switch): close silently — no toast, no
+      // indicator change — and reject so callers can drop the result.
+      finishReject(createAbortError());
+    };
+
+    function cleanup() {
+      if (signal) signal.removeEventListener("abort", onAbort);
+      evtSource.close();
+    }
+    function finishResolve(value: unknown) {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(value);
+    }
+    function finishReject(error: Error) {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(error);
+    }
+
+    if (signal) signal.addEventListener("abort", onAbort);
+
     evtSource.addEventListener("result", (event: MessageEvent) => {
+      if (settled) return;
       const payloadText = typeof event.data === "string" ? event.data : "";
 
       try {
         const result = JSON.parse(payloadText);
-        evtSource.close();
         setIndicator("online");
-        resolve(result);
+        finishResolve(result);
       } catch (error) {
         console.error("Failed to parse SSE result event:", error);
-        evtSource.close();
         setIndicator("offline");
-        reject(new Error("Invalid server response"));
+        finishReject(new Error("Invalid server response"));
       }
     });
 
     evtSource.addEventListener("error", (event: MessageEvent) => {
+      if (settled) return;
+
       const eventData = typeof (event as { data?: unknown }).data === "string"
         ? (event as { data?: string }).data
         : "";
@@ -298,7 +333,12 @@ export async function getSSEGraphResult(
       // offline/network error instead of a generic "Request failed".
       if (!eventData) return;
 
-      handled = true;
+      // Superseded while the error was arriving — drop it without a toast.
+      if (signal?.aborted) {
+        finishReject(createAbortError());
+        return;
+      }
+
       let rawMessage: unknown = "";
       let rawStatus: unknown = 0;
       let code: string | undefined;
@@ -325,34 +365,37 @@ export async function getSSEGraphResult(
       const parsedStatus = Number(rawStatus);
       const status = Number.isFinite(parsedStatus) ? parsedStatus : 0;
 
-      evtSource.close();
-
       if (status === 401 && code === "SESSION_INVALID") {
         triggerSessionInvalidationSignOut();
         setIndicator("offline");
-        reject(new Error(message));
+        finishReject(new Error(message));
         return;
       }
 
-      const friendly = toUserFriendlyMessage(message, status, errorContext);
-      toast({ title: friendly.title, description: friendly.description, variant: "destructive", rawMessage: friendly.rawMessage, hint: friendly.hint, hintLink: friendly.hintLink, query: errorContext?.query });
+      const friendly = toUserFriendlyMessage(message, status, options?.query ? { query: options.query } : undefined);
+      toast({ title: friendly.title, description: friendly.description, variant: "destructive", rawMessage: friendly.rawMessage, hint: friendly.hint, hintLink: friendly.hintLink, query: options?.query });
 
       if (status === 401 || status >= 500) setIndicator("offline");
 
-      reject(new Error(message));
+      finishReject(new Error(message));
     });
 
     evtSource.onerror = () => {
-      if (handled) return;
+      if (settled) return;
 
-      evtSource.close();
+      // Superseded — drop it without a toast / offline flip.
+      if (signal?.aborted) {
+        finishReject(createAbortError());
+        return;
+      }
+
       toast({
         title: "Error",
         description: "Network or server error",
         variant: "destructive",
       });
       setIndicator("offline");
-      reject(new Error("Network or server error"));
+      finishReject(new Error("Network or server error"));
     };
   });
 }
@@ -476,6 +519,28 @@ const USER_READABLE_ERROR_PATTERNS = [
   /^cannot connect to falkordb\b/i,
   /^authentication failed\b/i,
   /^connection timed out\b/i,
+  // Data ingestion / file upload (app/api/upload, app/api/graph/[graph]/upload).
+  // These messages are authored for end users, so show them verbatim.
+  /\brequires a (?:\.dump|\.csv|\.txt|\.cql|\.cypher)\b/i,
+  /\bbatch files can be executed\b/i,
+  /\brequires a query\b/i,
+  /^invalid upload mode\b/i,
+  /\btemporarily disabled\b/i,
+  /^invalid request body\b/i,
+  /^(?:invalid|unsupported) file (?:type|name|contents)\b/i,
+  /^file is too large\b/i,
+  /^no file uploaded\b/i,
+  /^request body is missing\b/i,
+  /^uploaded file not found\b/i,
+  /^mode and fileId are required\b/i,
+  /^you do not have permission\b/i,
+  /\bmust be a single cypher statement\b/i,
+  /^the csv query is empty\b/i,
+  /\bis not a valid identifier\b/i,
+  /^duplicate csv column\b/i,
+  /\bfailed to (?:restore the graph dump|process csv rows?|process the csv file|execute cypher statement|execute the cypher batch)\b/i,
+  /\bcan only fetch csv files over https\b/i,
+  /^the csv storage produced an invalid url\b/i,
 ];
 
 function isAllowlistedUserError(message: string): boolean {
@@ -571,13 +636,43 @@ function triggerSessionInvalidationSignOut(): void {
 // Not initialised from localStorage to avoid overriding restricted-user sessions.
 // providers.tsx keeps it in sync after every render.
 let _activeConnectionId: string | null = null;
+// Monotonic counter bumped whenever the active connection id actually changes.
+// Async callers can capture it before a request and re-check it before applying
+// results, so a switch (including A→B→A, where the id repeats) is still detected.
+let _connectionEpoch = 0;
 
 export function setActiveConnectionIdGlobal(id: string | null) {
+  if (id !== _activeConnectionId) _connectionEpoch += 1;
   _activeConnectionId = id;
 }
 
 export function getActiveConnectionIdGlobal(): string | null {
   return _activeConnectionId;
+}
+
+export function getConnectionEpoch(): number {
+  return _connectionEpoch;
+}
+
+/** Error thrown when an in-flight request is superseded (e.g. a graph/connection
+ *  switch aborts its AbortSignal). Callers should treat it as a no-op, not a
+ *  failure — it must never surface a toast. */
+export function createAbortError(): Error {
+  const err = new Error("The operation was aborted.");
+  err.name = "AbortError";
+  return err;
+}
+
+/** True when the given error is an abort (from createAbortError or a native
+ *  fetch/AbortController abort). Native aborts reject with a DOMException named
+ *  "AbortError", which is NOT an `instanceof Error` in browsers — so match on
+ *  the `name` of any object rather than the Error prototype. */
+export function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { name?: unknown }).name === "AbortError"
+  );
 }
 
 function normalizeApiUrl(input: string): string {
@@ -638,6 +733,91 @@ export function prepareArg(arg: string) {
   return encodeURIComponent(arg.trim());
 }
 
+/**
+ * Upload a single file via XHR so the caller can render real request-body upload
+ * progress (the fetch API can't report it). Mirrors securedFetch's behaviour:
+ * injects X-Connection-Id, surfaces a friendly error toast, and drives the
+ * online/offline indicator. Resolves (never rejects) with the raw response.
+ */
+export function uploadFileWithProgress(
+  input: string,
+  file: File,
+  toast: ToastFn,
+  setIndicator: (indicator: "online" | "offline") => void,
+  onProgress?: (percent: number) => void,
+): Promise<{ ok: boolean; status: number; body: string }> {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", normalizeApiUrl(input));
+    // Keep uploads unbounded client-side; server/proxy limits should enforce
+    // maximum duration/size for large files on slower links.
+    xhr.timeout = 0;
+
+    if (_activeConnectionId) {
+      xhr.setRequestHeader("X-Connection-Id", _activeConnectionId);
+    }
+
+    xhr.upload.onprogress = (event) => {
+      if (onProgress && event.lengthComputable) {
+        onProgress(Math.round((event.loaded / event.total) * 100));
+      }
+    };
+
+    xhr.onload = () => {
+      const { status, responseText: body } = xhr;
+
+      if (status === 401 && xhr.getResponseHeader("X-Session-Invalid") === "1") {
+        triggerSessionInvalidationSignOut();
+        setIndicator("offline");
+        resolve({ ok: false, status, body });
+        return;
+      }
+
+      if (status >= 300) {
+        const friendly = toUserFriendlyMessage(extractResponseErrorMessage(body), status);
+        toast({
+          title: friendly.title,
+          description: friendly.description,
+          variant: "destructive",
+          rawMessage: friendly.rawMessage,
+          hint: friendly.hint,
+          hintLink: friendly.hintLink,
+        });
+        if (status === 401 || status >= 500) setIndicator("offline");
+        resolve({ ok: false, status, body });
+        return;
+      }
+
+      setIndicator("online");
+      resolve({ ok: true, status, body });
+    };
+
+    xhr.onerror = () => {
+      toast({
+        title: "Error",
+        description: "Network error while uploading the file. Please try again.",
+        variant: "destructive",
+      });
+      setIndicator("offline");
+      resolve({ ok: false, status: 0, body: "" });
+    };
+
+    xhr.ontimeout = () => {
+      toast({
+        title: "Error",
+        description: "Upload timed out. Please try again.",
+        variant: "destructive",
+      });
+      setIndicator("offline");
+      resolve({ ok: false, status: 0, body: "" });
+    };
+
+    const formData = new FormData();
+    formData.append("file", file);
+    xhr.send(formData);
+  });
+}
+
 export const between = (hash: number, from: number, to: number) => {
   if (to <= from) return from;
   return (Math.abs(hash) % (to - from)) + from;
@@ -646,14 +826,25 @@ export const between = (hash: number, from: number, to: number) => {
 export const getDefaultQuery = (q?: string) =>
   q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN * LIMIT 100";
 
-export const getMetaStats = async (name: string, toast: ToastFn, setIndicator: (indicator: "online" | "offline") => void, isReadOnly?: boolean) => {
+export const getMetaStats = async (
+  name: string,
+  toast: ToastFn,
+  setIndicator: (indicator: "online" | "offline") => void,
+  isReadOnly?: boolean,
+  options?: { signal?: AbortSignal; connectionId?: string | null },
+) => {
   if (!name) return undefined;
 
   const q = "CALL db.meta.stats() YIELD labels, relTypes RETURN labels, relTypes as relationships";
   const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
 
   try {
-    const result = await getSSEGraphResult(`/api/graph/${prepareArg(name)}?query=${encodeURIComponent(q)}${readOnlyParam}`, toast, setIndicator) as { data: { labels: { [key: string]: number }, relationships: { [key: string]: number } }[] };
+    const result = await getSSEGraphResult(
+      `/api/graph/${prepareArg(name)}?query=${encodeURIComponent(q)}${readOnlyParam}`,
+      toast,
+      setIndicator,
+      { signal: options?.signal, connectionId: options?.connectionId },
+    ) as { data: { labels: { [key: string]: number }, relationships: { [key: string]: number } }[] };
 
     if (!result) return undefined;
 
@@ -671,6 +862,8 @@ export const getMetaStats = async (name: string, toast: ToastFn, setIndicator: (
 
     return [l, r];
   } catch (error) {
+    // A superseded request (graph/connection switch) is not a real failure.
+    if (isAbortError(error)) return undefined;
     console.error("Failed to fetch meta stats:", error);
     return undefined;
   }
@@ -747,7 +940,8 @@ export const getMemoryUsage = async (
   // Pass activeConnectionId explicitly from React context/closure.
   // This avoids relying on the module-level global _activeConnectionId
   // which can be reset to null by Next.js HMR between renders.
-  connectionId?: string | null
+  connectionId?: string | null,
+  signal?: AbortSignal,
 ): Promise<Map<string, MemoryValue>> => {
   // Use plain fetch (not securedFetch) so NOPERM / version-too-low 400 errors
   // from restricted users don't produce error toasts — memory usage is an
@@ -758,11 +952,12 @@ export const getMemoryUsage = async (
     if (effectiveConnId) {
       headers.set("X-Connection-Id", effectiveConnId);
     }
-    const result = await fetch(`/api/graph/${prepareArg(name)}/memory`, { headers });
+    const result = await fetch(`/api/graph/${prepareArg(name)}/memory`, { headers, signal });
     if (!result.ok) return new Map();
     const json = await result.json();
     return processEntries(json.result);
   } catch {
+    // Includes AbortError when superseded — treat as "no memory info".
     return new Map();
   }
 };

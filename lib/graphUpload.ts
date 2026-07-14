@@ -1,0 +1,219 @@
+/**
+ * Browser-safe helpers and feature flags for the Manage Graph → Upload Data flow.
+ *
+ * This module is intentionally free of server-only dependencies (no FalkorDB
+ * driver, `fs`, or redis client) so it can be imported by both the client
+ * component (`UploadGraph.tsx`) and the API routes without coupling the browser
+ * bundle to server ingestion logic. The graph-executing functions live in the
+ * API route's `upload-utils.ts` sibling module.
+ */
+
+/**
+ * Dump restore is temporarily disabled: a FalkorDB server-side bug can corrupt
+ * the target graph on RESTORE. The API (`/api/upload`) and the UI (`UploadGraph`
+ * / `CreateGraph`) read this flag to keep the feature non-accessible without
+ * removing the restore UI code.
+ *
+ * Note: flipping this flag alone does NOT re-enable restore — there is currently
+ * no dump-restore execution route (`/api/graph/[graph]/upload` runs Cypher
+ * batches only). A dedicated restore endpoint must also be (re)added once the
+ * database issue is fixed.
+ */
+export const DUMP_RESTORE_ENABLED: boolean = false;
+
+/**
+ * LOAD CSV upload feature flag.
+ *
+ * When enabled, the UI exposes the "Load CSV" tab and server routes
+ * (`/api/csv-temp`, `/api/graph/[graph]/load-csv`) accept requests.
+ * Set to `false` only when intentionally disabling the end-to-end flow.
+ */
+export const CSV_UPLOAD_ENABLED: boolean = true;
+
+/**
+ * Split a Cypher batch file into individual statements on top-level `;`,
+ * ignoring separators inside string/backtick literals and `//` or `/* *\/`
+ * comments. Pure and side-effect free so it can be unit tested in isolation.
+ */
+export function splitCypherStatements(cypherBatch: string): string[] {
+  const queries: string[] = [];
+  let current = "";
+  let quote: "'" | "\"" | "`" | null = null;
+  let escaped = false;
+  let lineComment = false;
+  let blockComment = false;
+  let blockCommentText = "";
+
+  for (let i = 0; i < cypherBatch.length; i += 1) {
+    const char = cypherBatch[i];
+    const next = cypherBatch[i + 1];
+
+    if (lineComment) {
+      if (char === "\n" || char === "\r") {
+        lineComment = false;
+        current += char;
+      }
+      continue;
+    }
+
+    if (blockComment) {
+      if (char === "*" && next === "/") {
+        blockComment = false;
+        blockCommentText = "";
+        current += " ";
+        i += 1;
+      } else {
+        blockCommentText += char;
+      }
+      continue;
+    }
+
+    if (escaped) {
+      current += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\" && (quote === "'" || quote === "\"")) {
+      current += char;
+      escaped = true;
+      continue;
+    }
+
+    if (quote) {
+      current += char;
+      if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+
+    if (char === "/" && next === "/") {
+      lineComment = true;
+      i += 1;
+      continue;
+    }
+
+    if (char === "/" && next === "*") {
+      blockComment = true;
+      blockCommentText = "/*";
+      i += 1;
+      continue;
+    }
+
+    if (char === "'" || char === "\"" || char === "`") {
+      quote = char;
+      current += char;
+      continue;
+    }
+
+    if (char === ";") {
+      const query = current.trim();
+      if (query) queries.push(query);
+      current = "";
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (blockComment && blockCommentText) {
+    current += blockCommentText;
+  }
+
+  const finalQuery = current.trim();
+  if (finalQuery) queries.push(finalQuery);
+
+  return queries;
+}
+
+/**
+ * Replace the content of string/backtick literals and `//` or `/* *\/` comments
+ * with spaces, preserving overall length. Lets keyword scanning (e.g.
+ * `containsLoadCsv`) ignore keywords that appear inside literals/comments.
+ */
+export function stripCypherStringsAndComments(cypher: string): string {
+  let out = "";
+  let quote: "'" | "\"" | "`" | null = null;
+  let escaped = false;
+  let lineComment = false;
+  let blockComment = false;
+
+  for (let i = 0; i < cypher.length; i += 1) {
+    const char = cypher[i];
+    const next = cypher[i + 1];
+
+    if (lineComment) {
+      if (char === "\n" || char === "\r") {
+        lineComment = false;
+        out += char;
+      } else {
+        out += " ";
+      }
+      continue;
+    }
+
+    if (blockComment) {
+      if (char === "*" && next === "/") {
+        blockComment = false;
+        out += "  ";
+        i += 1;
+      } else {
+        out += " ";
+      }
+      continue;
+    }
+
+    if (escaped) {
+      out += " ";
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\" && (quote === "'" || quote === "\"")) {
+      out += " ";
+      escaped = true;
+      continue;
+    }
+
+    if (quote) {
+      out += char === quote ? char : " ";
+      if (char === quote) quote = null;
+      continue;
+    }
+
+    if (char === "/" && next === "/") {
+      lineComment = true;
+      out += "  ";
+      i += 1;
+      continue;
+    }
+
+    if (char === "/" && next === "*") {
+      blockComment = true;
+      out += "  ";
+      i += 1;
+      continue;
+    }
+
+    if (char === "'" || char === "\"" || char === "`") {
+      quote = char;
+      out += char;
+      continue;
+    }
+
+    out += char;
+  }
+
+  return out;
+}
+
+/**
+ * True if `cypher` contains a `LOAD CSV` clause outside of string/backtick
+ * literals and comments. Used to reject a user-supplied query body that tries to
+ * smuggle a second (attacker-controlled) `LOAD CSV FROM '...'` URL past the
+ * server-owned one.
+ */
+export function containsLoadCsv(cypher: string): boolean {
+  return /\bLOAD\s+CSV\b/i.test(stripCypherStringsAndComments(cypher));
+}

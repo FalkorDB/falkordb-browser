@@ -176,63 +176,69 @@ function GraphView({
                         </>
                     }
                 </div>
-                <div className="flex flex-col gap-4">
-                    <div className="flex gap-2 items-center">
-                        <TabsList className="bg-transparent flex gap-2 pointer-events-auto p-0">
-                            <TabsTrigger
-                                data-testid="graphTab"
-                                asChild
-                                value="Graph"
+                <div className="flex gap-2 items-center">
+                    <TabsList className="bg-transparent flex gap-2 pointer-events-auto p-0">
+                        <TabsTrigger
+                            data-testid="graphTab"
+                            asChild
+                            value="Graph"
+                        >
+                            <Button
+                                className="tabs-trigger"
+                                title="Graph"
                             >
-                                <Button
-                                    className="tabs-trigger"
-                                    title="Graph"
-                                >
-                                    <GitGraph />
-                                </Button>
-                            </TabsTrigger>
-                            <TabsTrigger
-                                data-testid="tableTab"
-                                asChild
-                                value="Table"
+                                <GitGraph />
+                            </Button>
+                        </TabsTrigger>
+                        <TabsTrigger
+                            data-testid="tableTab"
+                            asChild
+                            value="Table"
+                        >
+                            <Button
+                                disabled={!isTabEnabled("Table")}
+                                className="tabs-trigger"
+                                title={!isTabEnabled("Table") ? "No Data" : "Table"}
                             >
-                                <Button
-                                    disabled={!isTabEnabled("Table")}
-                                    className="tabs-trigger"
-                                    title={!isTabEnabled("Table") ? "No Data" : "Table"}
-                                >
-                                    <Table />
-                                </Button>
-                            </TabsTrigger>
-                            <TabsTrigger
-                                data-testid="metadataTab"
-                                asChild
-                                value="Metadata"
+                                <Table />
+                            </Button>
+                        </TabsTrigger>
+                        <TabsTrigger
+                            data-testid="metadataTab"
+                            asChild
+                            value="Metadata"
+                        >
+                            <Button
+                                disabled={!isTabEnabled("Metadata")}
+                                className="tabs-trigger"
+                                title={!isTabEnabled("Metadata") ? "No Metadata" : "Metadata"}
                             >
-                                <Button
-                                    disabled={!isTabEnabled("Metadata")}
-                                    className="tabs-trigger"
-                                    title={!isTabEnabled("Metadata") ? "No Metadata" : "Metadata"}
-                                >
-                                    <ScrollText />
-                                </Button>
-                            </TabsTrigger>
-                        </TabsList>
-                        {
-                            graph.getElements().length > 0 && currentTab === "Graph" && !isLoading &&
-                            <>
-                                <div className="h-full w-px bg-border rounded-full" />
-                                <Controls
-                                    graph={graph}
-                                    canvasRef={canvasRef}
-                                    disabled={graph.getElements().length === 0}
-                                    dimmed={dimmed}
-                                    setDimmed={setDimmed}
-                                    selectedElements={selectedElements}
-                                />
-                            </>
-                        }
-                    </div>
+                                <ScrollText />
+                            </Button>
+                        </TabsTrigger>
+                    </TabsList>
+                    {
+                        graph.getElements().length > 0 && currentTab === "Graph" && !isLoading &&
+                            <Controls
+                                graph={graph}
+                                canvasRef={canvasRef}
+                                disabled={graph.getElements().length === 0}
+                                dimmed={dimmed}
+                                setDimmed={setDimmed}
+                                selectedElements={selectedElements}
+                            />
+                    }
+                    {
+                        historyQuery?.currentQuery?.metadata?.[1] &&
+                        <>
+                            <div className="h-4 w-px bg-border rounded-full" />
+                            <p>Nodes: {graph.NodesMap.size}</p>
+                            <div className="h-4 w-px bg-border rounded-full" />
+                            <p>Edges: {graph.LinksMap.size}</p>
+                            <div className="h-4 w-px bg-border rounded-full" />
+                            <p>RT: {(historyQuery?.currentQuery?.metadata?.[1] || "").split(':')[1]}</p>
+                        </>
+                    }
                 </div>
             </div>
             <TabsContent data-testid="graphView" value="Graph" className="h-full w-full mt-0 overflow-hidden">

@@ -3,14 +3,17 @@
 "use client";
 
 import React, { useState, useContext, useEffect } from "react";
-import { InfoIcon, Plus } from "lucide-react";
-import { prepareArg, securedFetch } from "@/lib/utils";
+import { InfoIcon, Plus, File as FileIcon, X } from "lucide-react";
+import { prepareArg, securedFetch, uploadFileWithProgress } from "@/lib/utils";
+import { DUMP_RESTORE_ENABLED } from "@/lib/graphUpload";
 import { useToast } from "@/components/ui/use-toast";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import DialogComponent from "./DialogComponent";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
 import Input from "./ui/Input";
+import Dropzone from "./ui/Dropzone";
+import { Progress } from "@/components/ui/progress";
 import { IndicatorContext, ConnectionContext } from "./provider";
 
 interface Props {
@@ -44,11 +47,17 @@ export default function CreateGraph({
     const [isLoading, setIsLoading] = useState(false);
     const [graphName, setGraphName] = useState("");
     const [open, setOpen] = useState(false);
+    const [files, setFiles] = useState<globalThis.File[]>([]);
+    const [phase, setPhase] = useState<"uploading" | "processing" | null>(null);
+    const [uploadPct, setUploadPct] = useState(0);
 
     useEffect(() => {
         if (!open) {
             setGraphName("");
             setIsLoading(false);
+            setFiles([]);
+            setPhase(null);
+            setUploadPct(0);
         }
     }, [open]);
 
@@ -65,36 +74,86 @@ export default function CreateGraph({
                 });
                 return;
             }
+
+            const hasDump = DUMP_RESTORE_ENABLED && files.length === 1;
+
             if (graphNames.includes(name)) {
                 toast({
                     title: "Error",
-                    description: "Graph name already exists",
+                    description: hasDump
+                        ? `A graph named "${name}" already exists. Choose a different name, or use Upload Data → Restore to replace it.`
+                        : "Graph name already exists",
                     variant: "destructive"
                 });
                 return;
             }
-            const result = await securedFetch(`api/graph/${prepareArg(name)}${isReadOnly ? '?readOnly=true' : ''}`, {
-                method: "POST",
-            }, toast, setIndicator);
 
-            if (!result.ok) return;
+            if (!hasDump) {
+                const result = await securedFetch(`api/graph/${prepareArg(name)}${isReadOnly ? '?readOnly=true' : ''}`, {
+                    method: "POST",
+                }, toast, setIndicator);
+
+                if (!result.ok) return;
+            } else {
+                setPhase("uploading");
+                setUploadPct(0);
+
+                const uploadResult = await uploadFileWithProgress(
+                    "api/upload",
+                    files[0],
+                    toast,
+                    setIndicator,
+                    setUploadPct
+                );
+
+                if (!uploadResult.ok) return;
+
+                let id: string;
+                try {
+                    const parsed = JSON.parse(uploadResult.body) as { id?: string };
+                    if (!parsed.id) throw new Error("Missing id in upload response");
+                    id = parsed.id;
+                } catch {
+                    toast({ title: "Upload failed", description: "Unexpected response from server.", variant: "destructive" });
+                    return;
+                }
+
+                setPhase("processing");
+
+                const processResult = await securedFetch(
+                    `api/graph/${prepareArg(name)}/upload`,
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ mode: "dump", fileId: id })
+                    },
+                    toast,
+                    setIndicator
+                );
+
+                if (!processResult.ok) return;
+            }
 
             onSetGraphName(name);
             setGraphName("");
             setOpen(false);
             toast({
-                title: "Graph created successfully",
-                description: "The graph has been created successfully",
+                title: hasDump ? "Graph restored successfully" : "Graph created successfully",
+                description: hasDump
+                    ? "The graph data has been restored from the dump file"
+                    : "The graph has been created successfully",
             });
         } finally {
             setIsLoading(false);
+            setPhase(null);
+            setUploadPct(0);
         }
     };
 
     return (
         <DialogComponent
             open={open}
-            onOpenChange={setOpen}
+            onOpenChange={(next) => { if (next || !isLoading) setOpen(next); }}
             trigger={trigger}
             title={"Create New Graph"}
         >
@@ -116,13 +175,58 @@ export default function CreateGraph({
                         onChange={(e) => setGraphName(e.target.value)}
                     />
                 </div>
+                {DUMP_RESTORE_ENABLED && (
+                <div className="flex flex-col gap-2">
+                    <p className="text-sm text-muted-foreground">
+                        Optionally drop a .dump file exported via the Export button to restore a graph. Leave empty to create a new empty graph.
+                    </p>
+                    <Dropzone
+                        className="flex-col"
+                        maxFiles={1}
+                        disabled={isLoading}
+                        onFileDrop={setFiles}
+                        onDropRejected={() => toast({
+                            title: "Couldn't add file",
+                            description: "Please drop a single .dump file.",
+                            variant: "destructive"
+                        })}
+                        accept={{ "application/octet-stream": [".dump"] }}
+                    />
+                    {files.length === 1 && (
+                        <div className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm">
+                            <FileIcon size={14} className="shrink-0 text-muted-foreground" />
+                            <span className="truncate flex-1">{files[0].name}</span>
+                            <button
+                                type="button"
+                                onClick={() => setFiles([])}
+                                className="shrink-0 text-muted-foreground hover:text-foreground"
+                                title="Remove file"
+                            >
+                                <X size={14} />
+                            </button>
+                        </div>
+                    )}
+                </div>
+                )}
+                {phase && (
+                    <div className="flex flex-col gap-1" data-testid="createGraphProgress">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>{phase === "uploading" ? "Uploading file…" : "Restoring…"}</span>
+                            {phase === "uploading" && <span>{uploadPct}%</span>}
+                        </div>
+                        <Progress
+                            value={phase === "uploading" ? uploadPct : 100}
+                            className={phase === "processing" ? "animate-pulse" : undefined}
+                        />
+                    </div>
+                )}
                 <div className="flex gap-4 justify-end">
                     <Button
                         data-testid={"createGraphConfirm"}
                         indicator={indicator}
                         variant="Primary"
-                        label={"Create your Graph"}
-                        title={"Build and customize your Graph"}
+                        label={files.length === 1 ? "Restore Graph" : "Create your Graph"}
+                        title={files.length === 1 ? "Restore graph from dump file" : "Build and customize your Graph"}
                         type="submit"
                         isLoading={isLoading}
                     />
@@ -131,6 +235,7 @@ export default function CreateGraph({
                         variant="Cancel"
                         label="Cancel"
                         type="button"
+                        disabled={isLoading}
                     />
                 </div>
             </form>

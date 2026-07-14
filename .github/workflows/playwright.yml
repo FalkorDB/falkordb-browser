@@ -38,8 +38,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-      with:
-        persist-credentials: false
         with:
           persist-credentials: false
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
@@ -114,11 +112,14 @@ jobs:
 
     services:
       falkordb:
-        image: falkordb/falkordb:latest
+        image: falkordb/falkordb:v4.18.10
         ports:
           - 6379:6379
+        # Shared IMPORT_FOLDER so Load CSV (file:// mode) can hand files to the DB.
+        volumes:
+          - /tmp/fdb-import:/var/lib/FalkorDB/import
       falkordb-pat:
-        image: falkordb/falkordb:latest
+        image: falkordb/falkordb:v4.18.10
         ports:
           - 6380:6379
 
@@ -157,6 +158,11 @@ jobs:
         env:
           OPENAI_TOKEN: ${{ secrets.OPENAI_TOKEN }}
         run: |
+          # Shared IMPORT_FOLDER for Load CSV file:// mode. The falkordb service
+          # bind-mounts /tmp/fdb-import (created by Docker as root); make it
+          # writable by the runner user so the app can stream CSV files there.
+          sudo mkdir -p /tmp/fdb-import
+          sudo chmod 777 /tmp/fdb-import
           export CHAT_URL="http://localhost:8080/"
           export NEXTAUTH_URL="http://localhost:3000/"
           export NEXTAUTH_SECRET=SECRET
@@ -166,6 +172,10 @@ jobs:
           export PAT_FALKORDB_USERNAME=default
           export PAT_FALKORDB_PASSWORD=""
           export PAT_FALKORDB_GRAPH_NAME=token_management
+          export CSV_STORAGE=local
+          export CSV_LOCAL_TEMP_DIR=/tmp/fdb-import
+          export CSV_LOCAL_LOAD_URI_MODE=file
+          export CSV_TEMP_SIGNING_SECRET=SECRET
           npm start > nextjs.log 2>&1 &
           timeout 60s bash -c 'while !</dev/tcp/localhost/3000; do sleep 1; done'
           npx playwright test \
@@ -175,7 +185,7 @@ jobs:
             --project="[Read-Only] - Chromium" \
             --project="[Admin: Settings - Chromium]" \
             --shard=${{ matrix.shard }}/6 \
-            --workers=4 \
+            --workers=2 \
             --reporter=dot,list
       - name: Upload test results
         if: always()
@@ -237,7 +247,7 @@ jobs:
         run: |
           mkdir -p tls
           # Start container in background and wait for certificate generation
-          CONTAINER_ID=$(docker run --rm -d -e TLS=1 -v $(pwd)/tls:/var/lib/falkordb/tls falkordb/falkordb:latest)
+          CONTAINER_ID=$(docker run --rm -d -e TLS=1 -v $(pwd)/tls:/var/lib/falkordb/tls falkordb/falkordb:v4.18.10)
           echo "Started certificate generation container: $CONTAINER_ID"
           
           # Wait for certificates to be generated (look for "Ready to accept connections tls")
@@ -272,7 +282,7 @@ jobs:
             -v $(pwd)/redis.conf:/var/lib/falkordb/data/redis.conf \
             -e REDIS_ARGS="/var/lib/falkordb/data/redis.conf" \
             -v $(pwd)/tls:/var/lib/falkordb/tls \
-            falkordb/falkordb:latest
+            falkordb/falkordb:v4.18.10
           echo "Container started with ID: $(docker ps -q -f name=falkordb-tls)"
       - name: Wait for FalkorDB TLS to be ready
         run: |
@@ -382,7 +392,7 @@ jobs:
             -p 6380:6379 \
             -e BROWSER=0 \
             -e "REDIS_ARGS=--protected-mode no" \
-            falkordb/falkordb
+            falkordb/falkordb:v4.18.10
           
           # Start node2 on port 6381  
           docker run -d \
@@ -390,7 +400,7 @@ jobs:
             -p 6381:6379 \
             -e BROWSER=0 \
             -e "REDIS_ARGS=--protected-mode no" \
-            falkordb/falkordb
+            falkordb/falkordb:v4.18.10
           
           # Start node3 on port 6382
           docker run -d \
@@ -398,7 +408,7 @@ jobs:
             -p 6382:6379 \
             -e BROWSER=0 \
             -e "REDIS_ARGS=--protected-mode no" \
-            falkordb/falkordb
+            falkordb/falkordb:v4.18.10
             
           echo "All cluster nodes started"
       - name: Wait for cluster nodes to be ready
@@ -522,7 +532,7 @@ jobs:
         run: |
           docker run -d --name falkordb-core -p 6379:6379 \
             -e "REDIS_ARGS=--protected-mode no" \
-            falkordb/falkordb:latest
+            falkordb/falkordb:v4.18.10
       - name: Start locally-built browser container
         run: |
           docker run -d --name falkordb-browser --network=host \

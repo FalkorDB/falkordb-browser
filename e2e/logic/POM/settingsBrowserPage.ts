@@ -289,11 +289,13 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   private getChatApiKeyCard(apiKey: string): Locator {
-    return this.chatApiKeyCards.filter({ hasText: new RegExp(`^${apiKey}$`) }).first();
+    // The card also contains the provider name and Show/Edit/Delete buttons, so
+    // match the key as a substring of the card text rather than the whole card.
+    return this.chatApiKeyCards.filter({ hasText: apiKey }).first();
   }
 
   private getMaskedChatApiKeyCard(apiKey: string): Locator {
-    return this.chatApiKeyCards.filter({ hasText: new RegExp(`^${this.getMaskedApiKey(apiKey)}$`) }).first();
+    return this.chatApiKeyCards.filter({ hasText: this.getMaskedApiKey(apiKey) }).first();
   }
 
   async addChatApiKey(apiKey: string): Promise<void> {
@@ -737,15 +739,17 @@ export default class SettingsBrowserPage extends BasePage {
     const isExpanded = await this.graphInfoSectionHeader.getAttribute('aria-expanded');
     if (isExpanded !== 'true') {
       await this.graphInfoSectionHeader.click();
-      await this.refreshIntervalSlider.waitFor({ state: 'visible', timeout: 5000 });
+      await this.maxItemsForSearchSlider.waitFor({ state: 'visible', timeout: 5000 });
     }
   }
 
   async setRefreshIntervalSlider(value: number): Promise<void> {
+    await this.expandUserExperienceSection();
     await this.setSliderByStep(this.refreshIntervalSlider, value, 1);
   }
 
   async getRefreshIntervalValue(): Promise<number> {
+    await this.expandUserExperienceSection();
     return this.getSliderValue(this.refreshIntervalSlider);
   }
 

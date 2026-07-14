@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { cn, convertToCanvasData, getMemoryUsage, getMetaStats, getSSEGraphResult, isTwoNodes, Link, MemoryValue, Node, prepareArg, securedFetch, Value } from "@/lib/utils";
+import { cn, convertToCanvasData, getConnectionEpoch, getMemoryUsage, getMetaStats, getSSEGraphResult, isAbortError, isTwoNodes, Link, MemoryValue, Node, prepareArg, securedFetch, Value } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamicImport from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -76,8 +76,7 @@ export default function Page() {
     } = useContext(GraphContext);
     const {
         settings: {
-            runDefaultQuerySettings: { runDefaultQuery },
-            defaultQuerySettings: { defaultQuery },
+            querySettings: { runDefaultQuery, defaultQuery },
             graphInfo: { showMemoryUsage, refreshInterval }
         }
     } = useContext(BrowserSettingsContext);
@@ -170,7 +169,7 @@ export default function Page() {
         }
     }, [currentTab, panel, selectedElements.length, setPanel]);
 
-    const fetchInfo = useCallback(async (type: string) => {
+    const fetchInfo = useCallback(async (type: string, options?: { signal?: AbortSignal; connectionId?: string | null }) => {
         if (!graphName) return [];
 
         if (type === "(property key)") {
@@ -180,6 +179,7 @@ export default function Page() {
                 `/api/graph/${prepareArg(graphName)}?query=${prepareArg(query)}${readOnlyParam}`,
                 toast,
                 setIndicator,
+                { signal: options?.signal, connectionId: options?.connectionId },
             ) as { data?: Array<{ info?: unknown }> };
 
             if (!sse || !Array.isArray(sse.data)) return [];
@@ -190,8 +190,12 @@ export default function Page() {
         }
 
         const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
+        const headers = new Headers();
+        if (options?.connectionId) headers.set("X-Connection-Id", options.connectionId);
         const result = await securedFetch(`/api/graph/${prepareArg(graphName)}/info?type=${prepareArg(type)}${readOnlyParam}`, {
             method: "GET",
+            headers,
+            signal: options?.signal,
         }, toast, setIndicator);
 
         if (!result.ok) return [];
@@ -219,7 +223,7 @@ export default function Page() {
             .filter((value): value is string => typeof value === "string");
     }, [graphName, setIndicator, toast]);
 
-    const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator, isReadOnlyRef.current), [setIndicator, toast]);
+    const fetchMetaStats = useCallback((name: string, options?: { signal?: AbortSignal; connectionId?: string | null }) => getMetaStats(name, toast, setIndicator, isReadOnlyRef.current, options), [setIndicator, toast]);
 
     useEffect(() => {
         if (!graphName) {
@@ -230,18 +234,43 @@ export default function Page() {
         const graphNameJustChanged = prevGraphNameRef.current !== graphName;
         prevGraphNameRef.current = graphName;
 
+        // Neutralizes in-flight polls when the effect re-runs (graph/connection
+        // change) or unmounts, so a late poll can't write stale metadata onto the
+        // graph that is now active (setGraphInfo mutates the current graph).
+        let cancelled = false;
+        // AbortController closes in-flight EventSource/fetch requests on cleanup so
+        // a superseded poll can't surface a stale error toast or flip the
+        // indicator offline for the connection that is now active.
+        const controller = new AbortController();
+        const { signal } = controller;
+        // Pin every request in this run to the connection active at start, so the
+        // whole poll targets one connection even if the global changes mid-flight.
+        // activeConnectionId is intentionally NOT an effect dependency: a
+        // connection switch always resets graphName (providers.tsx), which re-runs
+        // this effect and aborts the old poll. Re-running on activeConnectionId
+        // directly would fire a query for the *previous* graph against the *new*
+        // connection (auto-creating it) before graphName is cleared.
+        const pollConnectionId = activeConnectionId;
+        const pollEpoch = getConnectionEpoch();
+        const requestOptions = { signal, connectionId: pollConnectionId, epoch: pollEpoch };
+
         const handleSetInfo = () => Promise.all([
-            fetchMetaStats(graphName),
-            fetchInfo("(property key)"),
+            fetchMetaStats(graphName, requestOptions),
+            fetchInfo("(property key)", requestOptions),
         ]).then(async ([newDataStats, newPropertyKeys]) => {
-            const memoryUsage = showMemoryUsage ? await getMemoryUsage(graphName, toast, setIndicator, activeConnectionId) : new Map<string, MemoryValue>();
+            if (cancelled) return;
+
+            const memoryUsage = showMemoryUsage ? await getMemoryUsage(graphName, toast, setIndicator, pollConnectionId, signal) : new Map<string, MemoryValue>();
             const newLabels = newDataStats?.[0] || [];
             const newRelationships = newDataStats?.[1] || [];
 
             const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
+            if (cancelled) return;
+
             setGraphInfo(gi);
-            fetchCount(graphName);
+            fetchCount(graphName, requestOptions);
         }).catch((error) => {
+            if (cancelled || isAbortError(error)) return;
             toast({
                 title: "Error",
                 description: (error as Error).message || "Failed to fetch graph info",
@@ -263,6 +292,8 @@ export default function Page() {
         const interval = setInterval(handleSetInfo, refreshInterval * 1000);
 
         return () => {
+            cancelled = true;
+            controller.abort();
             clearInterval(interval);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -596,8 +627,12 @@ export default function Page() {
         <div className="Page p-3 gap-3">
             <Selector
                 graph={graph}
-                options={graphNames}
-                setOptions={setGraphNames}
+                options={graphNames ?? []}
+                setOptions={next => setGraphNames(prev => (
+                    typeof next === "function"
+                        ? next(prev ?? [])
+                        : next
+                ))}
                 graphName={graphName}
                 setGraphName={handleSetGraphName}
                 setGraph={setGraph}
@@ -651,7 +686,7 @@ export default function Page() {
                 </ResizablePanel>
                 {
                     chatOpen && graphName &&
-                    <div className="absolute bottom-3 right-3 z-30">
+                    <div className="absolute bottom-12 right-3 z-30">
                         <ResizableBox
                             width={chatSize.width}
                             height={chatSize.height}

@@ -27,6 +27,22 @@ export function normalizeUrl(url: string | null | undefined): string {
 }
 
 /**
+ * Origin + pathname of a URL, discarding the query string and hash. Use this
+ * when asserting that navigation landed on a given page (e.g. `/graph`): the app
+ * legitimately appends a `?graph=<name>` param when a graph is auto-selected, so
+ * an exact full-URL match is order-dependent and flaky.
+ */
+export function urlPath(url: string | null | undefined): string {
+  if (!url) return '';
+  try {
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}`.replace(/\/$/, '');
+  } catch {
+    return normalizeUrl(url);
+  }
+}
+
+/**
  * Initialize localStorage with default values required by the application.
  * Global user preferences use plain keys. Per-connection data (e.g. query history)
  * is prefixed with host:port: to match the runtime connection-scoped storage.
