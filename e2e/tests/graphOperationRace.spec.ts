@@ -34,31 +34,37 @@ test.describe("Graph operation race conditions", () => {
       const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
       const page = await browser.getPage();
 
-      // Hold graph A's query in-flight until we release it, so it is still
-      // pending when we switch to graph B.
+      // Hold graph A's runQuery at its /explain step — a regular fetch (reliably
+      // interceptable, unlike the SSE query). At that point A's result has NOT
+      // been applied yet, so A is genuinely in-flight when we switch to B.
       let releaseA: () => void = () => { };
       const heldA = new Promise<void>((resolve) => { releaseA = resolve; });
-      const holdPattern = `**/api/graph/${graphA}?query=**`;
+      const holdPattern = `**/api/graph/${graphA}/explain**`;
       await page.route(holdPattern, async (route) => {
         await heldA;
-        await route.continue();
+        // The page may be tearing down by the time we release — ignore that.
+        await route.continue().catch(() => undefined);
       });
 
-      // Selecting A auto-runs its default query, which is now held in-flight.
+      // Select A (no auto-run), then fire a query and let it block at /explain.
       await graph.selectGraphByName(graphA);
+      await graph.insertQuery("MATCH (n) RETURN n");
+      await graph.clickEditorRun(); // fire-and-forget — the result is held at /explain
+      // Wait until A's runQuery has actually reached (and is paused at) /explain.
+      await page.waitForRequest(holdPattern, { timeout: 30000 });
 
-      // Switch to B while A's query is still pending — B loads normally (1 node).
+      // Switch to B while A is still in-flight — B's node count (1) loads.
       await graph.selectGraphByName(graphB);
       expect(await graph.getNodesCount()).toBe("1");
 
       // Release A's stale (3-node) result; the guard must discard it rather than
       // apply it over B.
       releaseA();
-      await page.unroute(holdPattern);
       await page.waitForTimeout(2000);
 
       // Still B's data — A's stale result was NOT applied.
       expect(await graph.getNodesCount()).toBe("1");
+      await page.unroute(holdPattern).catch(() => undefined);
     } finally {
       await apiCall.removeGraph(graphA).catch(() => undefined);
       await apiCall.removeGraph(graphB).catch(() => undefined);
