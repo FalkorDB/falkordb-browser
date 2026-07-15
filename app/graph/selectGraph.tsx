@@ -3,7 +3,7 @@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { fetchOptions, getMemoryUsage, getSSEGraphResult, prepareArg, Row, securedFetch } from "@/lib/utils";
+import { fetchOptions, getActiveConnectionIdGlobal, getConnectionEpoch, getMemoryUsage, getSSEGraphResult, prepareArg, Row, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
 import { ChevronDown, ChevronUp, Loader2, Settings, X } from "lucide-react";
@@ -72,9 +72,17 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
 
 
-    const getOptions = useCallback(async () =>
-        fetchOptions(toast, setIndicator, indicator, setSelectedValue, opts => setOptions(opts))
-        , [toast, setIndicator, indicator, setSelectedValue, setOptions]);
+    const getOptions = useCallback(async () => {
+        // Pin the refresh to the connection active when it started and discard a
+        // stale result if the connection changed mid-flight, so an old list/
+        // selection can't overwrite the new connection's.
+        const startEpoch = getConnectionEpoch();
+        const cid = getActiveConnectionIdGlobal();
+        const res = await fetchOptions(toast, setIndicator, indicator, cid);
+        if (getConnectionEpoch() !== startEpoch || !res) return;
+        setOptions(res.opts);
+        if (res.autoSelect) setSelectedValue(res.autoSelect);
+    }, [toast, setIndicator, indicator, setSelectedValue, setOptions]);
 
     const loadMemory = useCallback((opt: string) =>
         async () => {

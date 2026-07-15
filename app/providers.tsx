@@ -330,6 +330,39 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const prevActiveConnectionIdRef = useRef<string | null>(null);
   const connectionSwitchFetchedRef = useRef(false);
 
+  // ── Graph-operation ownership guards (see idea-6 plan) ──────────────────────
+  // contextGen: "what connection + graph the UI represents" — bumped on a
+  // connection-switch begin, a connection reset, and a graph-name change.
+  const contextGenRef = useRef(0);
+  // querySeq / optionsSeq: the newest query / newest graph-list refresh wins.
+  const querySeqRef = useRef(0);
+  const optionsSeqRef = useRef(0);
+  // loadingOwnerRef: the querySeq that currently owns the isQueryLoading spinner.
+  const loadingOwnerRef = useRef<number | null>(null);
+  // switchingRef: true while a user connection switch is mid-flight (its global id
+  // and React state may briefly disagree); graph ops are rejected until it clears.
+  const switchingRef = useRef(false);
+
+  const bumpContextGen = useCallback(() => {
+    contextGenRef.current += 1;
+    // A superseded in-flight query can no longer own the spinner — release it so
+    // it isn't left stuck; a fresh query re-claims it immediately.
+    if (loadingOwnerRef.current !== null) {
+      loadingOwnerRef.current = null;
+      setIsQueryLoading(false);
+    }
+    return contextGenRef.current;
+  }, []);
+
+  const beginConnectionSwitch = useCallback(() => {
+    switchingRef.current = true;
+    bumpContextGen();
+  }, [bumpContextGen]);
+
+  const endConnectionSwitch = useCallback(() => {
+    switchingRef.current = false;
+  }, []);
+
   const replayTutorial = useCallback(() => {
     router.push("/graph");
     localStorage.removeItem("tutorial");
@@ -650,7 +683,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     activeConnectionId,
     setActiveConnectionId,
     updateSession,
-  }), [connectionType, connectionInfo, dbVersion, isReadOnly, additionalConnections, activeConnectionId, updateSession]);
+    beginConnectionSwitch,
+    endConnectionSwitch,
+  }), [connectionType, connectionInfo, dbVersion, isReadOnly, additionalConnections, activeConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch]);
 
   const udfContext = useMemo(() => ({
     udfList,
@@ -664,10 +699,15 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setCypherLanguageConfig,
   }), [cypherLanguageConfig]);
 
-  const fetchCount = useCallback(async (name?: string, options?: { signal?: AbortSignal; connectionId?: string | null; epoch?: number }) => {
+  const fetchCount = useCallback(async (name?: string, options?: { signal?: AbortSignal; connectionId?: string | null; epoch?: number; isCurrent?: () => boolean }) => {
     const n = name || graphName;
 
     if (!n || statusRef.current === "unauthenticated") return;
+
+    // Don't start a count while a connection switch is mid-flight — the global id
+    // and React state may disagree, so this could query (and auto-create) the
+    // old graph on the new connection.
+    if (switchingRef.current) return;
 
     // Capture the connection this request targets. Prefer the caller's captured
     // epoch (the epoch when its poll/action began) so a switch between that start
@@ -698,8 +738,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
       if (!result) return;
 
-      // Discard if the graph name or the connection changed while in flight.
+      // Discard if the graph name or the connection changed while in flight, or
+      // the caller's operation was superseded (e.g. an older query on the same
+      // graph whose count would otherwise overwrite a newer one).
       if (n !== activeGraphNameRef.current || getConnectionEpoch() !== startEpoch) return;
+      if (options?.isCurrent && !options.isCurrent()) return;
 
       const { nodes, edges } = result;
 
@@ -717,8 +760,14 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     }
   }, []);
 
-  const fetchInfo = useCallback(async (type: string, name: string) => {
+  const fetchInfo = useCallback(async (type: string, name: string, pin?: { connectionId?: string | null; epoch?: number }) => {
     if (!name) return [];
+
+    // Pin to the caller's connection (routing) and epoch (so a stale result is
+    // dropped after a connection switch). `!== undefined` honours an explicit null.
+    const cid = pin?.connectionId !== undefined ? pin.connectionId : getActiveConnectionIdGlobal();
+    const startEpoch = pin?.epoch !== undefined ? pin.epoch : getConnectionEpoch();
+    const superseded = () => getConnectionEpoch() !== startEpoch;
 
     if (type === "(property key)") {
       const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
@@ -727,9 +776,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         `/api/graph/${prepareArg(name)}?query=${prepareArg(query)}${readOnlyParam}`,
         toast,
         setIndicator,
+        { connectionId: cid },
       ) as { data?: Array<{ info?: unknown }> };
 
-      if (!sse || !Array.isArray(sse.data)) return [];
+      if (superseded() || !sse || !Array.isArray(sse.data)) return [];
 
       return sse.data
         .map((entry) => (typeof entry?.info === "string" ? entry.info : undefined))
@@ -739,11 +789,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
     const result = await securedFetch(`/api/graph/${prepareArg(name)}/info?type=${prepareArg(type)}${readOnlyParam}`, {
       method: "GET",
-    }, toast, setIndicator);
+    }, toast, setIndicator, cid);
 
-    if (!result.ok) return [];
+    if (!result.ok || superseded()) return [];
 
     const bodyText = await result.text();
+    if (superseded()) return [];
     let json: unknown;
 
     try {
@@ -766,7 +817,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       .filter((value): value is string => typeof value === "string");
   }, [toast, setIndicator]);
 
-  const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator, isReadOnlyRef.current), [toast, setIndicator]);
+  const fetchMetaStats = useCallback((name: string, options?: { signal?: AbortSignal; connectionId?: string | null; isCurrent?: () => boolean }) => {
+    const isCurrent = options?.isCurrent;
+    const gToast = isCurrent ? (((...a: Parameters<typeof toast>) => { if (isCurrent()) toast(...a); }) as typeof toast) : toast;
+    const gInd = isCurrent ? ((i: "online" | "offline") => { if (isCurrent()) setIndicator(i); }) : setIndicator;
+    return getMetaStats(name, gToast, gInd, isReadOnlyRef.current, { signal: options?.signal, connectionId: options?.connectionId });
+  }, [toast, setIndicator]);
 
   const handelGetNewQueries = useCallback((newQuery: Query) => {
     const existing = historyQuery.queries.find(qu => qu.text === newQuery.text);
@@ -775,7 +831,24 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   }, [historyQuery.queries]);
 
   const runQuery = useCallback(async (q: string, name?: string): Promise<void> => {
-    const n = name || graphName;
+    const n = name || activeGraphNameRef.current;
+
+    // Reject while a connection switch is mid-flight — its global id and React
+    // state may still disagree, so starting here could hit the wrong DB.
+    if (switchingRef.current) return;
+
+    // Capture ownership once: this is the newest query for the current
+    // connection + graph. `isCurrent()` gates every later apply so a switch, a
+    // graph change, or a newer query discards this run's results.
+    const seq = (querySeqRef.current += 1);
+    const ctx = contextGenRef.current;
+    const cid = getActiveConnectionIdGlobal();
+    const epoch = getConnectionEpoch();
+    const isCurrent = () => querySeqRef.current === seq && contextGenRef.current === ctx;
+    loadingOwnerRef.current = seq;
+    const guardedToast = ((...a: Parameters<typeof toast>) => { if (isCurrent()) toast(...a); }) as typeof toast;
+    const guardedSetIndicator = (i: "online" | "offline") => { if (isCurrent()) setIndicator(i); };
+
     let newQuery: Query = {
       elementsCount: 0,
       explain: [],
@@ -802,26 +875,29 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
     const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}${readOnlyParam}`;
     try {
-      const result = await getSSEGraphResult(url, toast, setIndicator, {
+      const result = await getSSEGraphResult(url, guardedToast, guardedSetIndicator, {
         query: q,
+        connectionId: cid,
       }) as { data: Data; metadata: string[] };
 
       if (!result) throw new Error("Failed to execute query");
+      if (!isCurrent()) return;
 
       const graphI = await Promise.all([
-        fetchMetaStats(n),
-        fetchInfo("(property key)", n),
+        fetchMetaStats(n, { connectionId: cid, isCurrent }),
+        fetchInfo("(property key)", n, { connectionId: cid, epoch }),
       ]).then(async ([metaStats, newPropertyKeys]) => {
-        const memoryUsage = showMemoryUsage ? await getMemoryUsage(n, toast, setIndicator, getActiveConnectionIdGlobal()) : new Map<string, MemoryValue>();
+        const memoryUsage = showMemoryUsage ? await getMemoryUsage(n, guardedToast, guardedSetIndicator, cid) : new Map<string, MemoryValue>();
         const newLabels = metaStats?.[0] || [];
         const newRelationships = metaStats?.[1] || [];
-        const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
+        // Pin the GraphInfo's fallback metadata queries to this connection too.
+        const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, guardedToast, guardedSetIndicator, cid);
         // gi is embedded in the graph via Graph.create below and also pushed to
         // GraphInfoContext through setGraphInfo(g.GraphInfo) after setGraph.
         return gi;
       }).catch((error) => {
         console.error("Failed to fetch graph info:", error);
-        toast({
+        if (isCurrent()) toast({
           title: "Error",
           description: "Failed to fetch graph info",
           variant: "destructive",
@@ -829,13 +905,20 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         return undefined;
       });
 
+      if (!isCurrent()) return;
+
       const explain = await securedFetch(`api/graph/${prepareArg(n)}/explain?query=${prepareArg(query)}${readOnlyParam}`, {
         method: "GET"
-      }, toast, setIndicator);
+      }, guardedToast, guardedSetIndicator, cid);
 
       if (!explain.ok) throw new Error("Failed to fetch explain plan");
 
       const explainJson = await explain.json();
+
+      // Guard before Graph.create so its (now connection-pinned) metadata
+      // fallbacks don't fire after a switch.
+      if (!isCurrent()) return;
+
       const g = await Graph.create(n, result, showPropertyKeyPrefix, existingLimit, graphI);
 
       newQuery = {
@@ -847,6 +930,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         status: "Success",
       };
 
+      // Final ownership check before applying any state.
+      if (!isCurrent()) return;
+
       setGraph(g);
       // setGraph only updates GraphContext; the GraphInfo panel reads labels,
       // relationships and property keys from the separate GraphInfoContext, so
@@ -854,7 +940,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       // periodic refresh (up to refreshInterval seconds later).
       setGraphInfo(g.GraphInfo);
       setData({ ...g.Elements });
-      fetchCount(n);
+      fetchCount(n, { connectionId: cid, epoch, isCurrent });
       if (!tutorialOpen) {
         setCurrentTab(g.getElements().length === 0 && g.Data.length !== 0 ? "Table" : "Graph");
       }
@@ -882,35 +968,49 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setScrollPosition(0);
       handleCooldown(-1);
     } catch (err) {
-      // Errors from getSSEGraphResult are already surfaced via toast
-      const errorMessage = (err as Error).message || "";
-      setDiagnostics(computeEditorDiagnostics(newQuery.text, errorMessage));
-      setLastFailure({ query: newQuery.text, errorMessage });
+      // Discard a superseded failure so it can't overwrite the active graph's
+      // diagnostics/history/URL after a switch or a newer query.
+      if (isCurrent()) {
+        // Errors from getSSEGraphResult are already surfaced via toast
+        const errorMessage = (err as Error).message || "";
+        setDiagnostics(computeEditorDiagnostics(newQuery.text, errorMessage));
+        setLastFailure({ query: newQuery.text, errorMessage });
 
-      // Save failed query to history with the error message
-      newQuery = { ...newQuery, errorMessage };
-      const failedQueries = handelGetNewQueries(newQuery);
-      if (prefixReady) {
-        setConnectionItem("query history", JSON.stringify(failedQueries));
+        // Save failed query to history with the error message
+        newQuery = { ...newQuery, errorMessage };
+        const failedQueries = handelGetNewQueries(newQuery);
+        if (prefixReady) {
+          setConnectionItem("query history", JSON.stringify(failedQueries));
+        }
+        setHistoryQuery(prev => ({
+          ...prev,
+          queries: failedQueries,
+          currentQuery: newQuery,
+          counter: 0
+        }));
       }
-      setHistoryQuery(prev => ({
-        ...prev,
-        queries: failedQueries,
-        currentQuery: newQuery,
-        counter: 0
-      }));
     } finally {
-      setUrlQueryText(newQuery.text);
-      setIsQueryLoading(false);
+      if (isCurrent()) setUrlQueryText(newQuery.text);
+      // Only the run that still owns the spinner may clear it — a newer query or
+      // a switch/graph change may have taken (or released) ownership.
+      if (loadingOwnerRef.current === seq) {
+        loadingOwnerRef.current = null;
+        setIsQueryLoading(false);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graphName, limit, timeout, fetchInfo, fetchCount, setGraphInfo, handleCooldown, handelGetNewQueries, showMemoryUsage, captionsKeys, showPropertyKeyPrefix, tutorialOpen, prefixReady]);
+  }, [limit, timeout, fetchInfo, fetchMetaStats, fetchCount, setGraphInfo, handleCooldown, handelGetNewQueries, showMemoryUsage, captionsKeys, showPropertyKeyPrefix, tutorialOpen, prefixReady]);
 
   const graphNameRef = useRef(graphName);
   graphNameRef.current = graphName;
 
   const handleSetGraphName = useCallback((name: string) => {
     if (graphNameRef.current === name) return;
+    // Make the new graph name authoritative immediately (both refs otherwise only
+    // refresh at render) and supersede any in-flight op targeting the old graph.
+    graphNameRef.current = name;
+    activeGraphNameRef.current = name;
+    bumpContextGen();
     // Clear stale state from the previous graph so old data doesn't linger
     setGraphName(name);
     setSelectedParam("");
@@ -925,7 +1025,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setDiagnostics(null);
     setHistoryQuery(h => ({ ...h, query: "", currentQuery: defaultQueryHistory.currentQuery }));
     setUrlQueryText(null);
-  }, [toast, setIndicator]);
+  }, [toast, setIndicator, bumpContextGen]);
 
   const graphContext = useMemo(() => ({
     graph,
@@ -1367,20 +1467,28 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     return () => clearInterval(interval);
   }, [checkStatus, status]);
 
-  const handleFetchOptions = useCallback(async () => {
+  const handleFetchOptions = useCallback(async (options?: { clear?: boolean }) => {
     if (indicator === "offline" || tutorialOpen) return;
 
-    setGraphNames(undefined);
-    let fetched = false;
-    await fetchOptions(toast, setIndicator, indicator, setGraphName, opts => {
-      fetched = true;
-      setGraphNames(opts);
-    });
-    if (!fetched) {
-      setGraphNames([]);
-    }
+    const oseq = (optionsSeqRef.current += 1);
+    const ctx = contextGenRef.current;
+    const cid = getActiveConnectionIdGlobal();
+    const epoch = getConnectionEpoch();
+
+    // Only the connection-reset path clears the list; an ordinary refresh keeps
+    // the last good list so a failed/slow refresh can't empty the selector.
+    if (options?.clear) setGraphNames(undefined);
+
+    const res = await fetchOptions(toast, setIndicator, indicator, cid);
+
+    // The list is connection-scoped: apply only if this is still the newest
+    // refresh for the same connection (a later switch/refresh owns it otherwise).
+    if (getConnectionEpoch() !== epoch || optionsSeqRef.current !== oseq) return;
+    setGraphNames(res?.opts ?? []);
     setGraphNamesLoaded(true);
-  }, [toast, setIndicator, indicator, tutorialOpen]);
+    // Auto-select is graph-scoped: only apply if the graph context is unchanged.
+    if (res?.autoSelect && contextGenRef.current === ctx) handleSetGraphName(res.autoSelect);
+  }, [toast, setIndicator, indicator, tutorialOpen, handleSetGraphName]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -1490,6 +1598,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Skip if unchanged
     if (prev === activeConnectionId) return;
 
+    // The connection actually changed and React state now agrees: supersede any
+    // in-flight graph op and end the switch gate so new ops are accepted again.
+    bumpContextGen();
+    activeGraphNameRef.current = "";
+    endConnectionSwitch();
+
     // Clear graph data so stale results from the old connection are gone.
     // Build the empty graph with the real toast/setIndicator callbacks up front
     // so its GraphInfo isn't left with Graph.empty()'s console.error fallbacks
@@ -1498,17 +1612,16 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setGraphName("");
     setSelectedParam("");
     setGraphNamesLoaded(false);
-    setGraphNames(undefined);
     graphInfoSyncRef.current.setNodesCount(undefined);
     graphInfoSyncRef.current.setEdgesCount(undefined);
     setHistoryQuery(h => ({ ...h, query: "", currentQuery: defaultQueryHistory.currentQuery }));
     setLabels([]);
     setRelationships([]);
 
-    // Re-fetch graph list for the new connection
+    // Re-fetch graph list for the new connection (clearing the old list).
     connectionSwitchFetchedRef.current = true;
-    handleFetchOptions();
-  }, [activeConnectionId, toast, setIndicator, handleFetchOptions]);
+    handleFetchOptions({ clear: true });
+  }, [activeConnectionId, toast, setIndicator, handleFetchOptions, bumpContextGen, endConnectionSwitch]);
 
   const handleCloseTutorial = () => {
     setTutorialOpen(false);

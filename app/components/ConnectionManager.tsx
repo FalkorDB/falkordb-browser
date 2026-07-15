@@ -24,6 +24,8 @@ export default function ConnectionManager() {
     activeConnectionId,
     setActiveConnectionId,
     updateSession,
+    beginConnectionSwitch,
+    endConnectionSwitch,
   } = useContext(ConnectionContext);
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -31,6 +33,11 @@ export default function ConnectionManager() {
   const [removing, setRemoving] = useState(false);
 
   const handleSelect = useCallback(async (connId: string) => {
+    // Clicking the already-active connection is a no-op (avoids a stuck gate).
+    if (connId === activeConnectionId) return;
+    // Block/supersede graph ops while the switch is mid-flight (its global id and
+    // React state briefly disagree).
+    beginConnectionSwitch();
     // Set the global ID immediately so periodic timers (memory, count, etc.)
     // that fire DURING the updateSession await use the correct connection and
     // don't fall back to Token DB which might pick the wrong entry.
@@ -39,11 +46,20 @@ export default function ConnectionManager() {
     // Update the JWT so session.user.role is correct before React effects
     // (graph-list reload, query execution) fire. The JWT callback looks up
     // the connection details from Token DB.
-    await updateSession({ activeConnectionId: connId });
+    try {
+      await updateSession({ activeConnectionId: connId });
+    } catch (error) {
+      // Roll back so ids stay consistent and graph ops are unblocked again.
+      setActiveConnectionIdGlobal(activeConnectionId);
+      endConnectionSwitch();
+      console.error("Failed to switch connection:", error);
+      return;
+    }
     // Update React state AFTER the JWT is updated so the prevActiveConnectionId
-    // effect fires with the correct role already in sessionData.
+    // effect fires with the correct role already in sessionData; that reset
+    // effect also clears the switch gate.
     setActiveConnectionId(connId);
-  }, [setActiveConnectionId, updateSession]);
+  }, [activeConnectionId, setActiveConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch]);
 
   // Determine whether the user only has one connection. The session always
   // has at least one (the primary), so we treat an empty additionalConnections
@@ -83,6 +99,7 @@ export default function ConnectionManager() {
           // If we removed the active connection, switch to the last remaining one
           if (activeConnectionId === connId && remaining.length > 0) {
             const newActive = remaining[remaining.length - 1].id;
+            beginConnectionSwitch();
             setActiveConnectionId(newActive);
             setActiveConnectionIdGlobal(newActive);
             localStorage.setItem("lastActiveConnectionId", newActive);
@@ -101,7 +118,7 @@ export default function ConnectionManager() {
     } finally {
       setRemoving(false);
     }
-  }, [removeTarget, toast, setAdditionalConnections, activeConnectionId, setActiveConnectionId, setIndicator, updateSession]);
+  }, [removeTarget, toast, setAdditionalConnections, activeConnectionId, setActiveConnectionId, setIndicator, updateSession, beginConnectionSwitch]);
 
   const handleAddConnection = useCallback(async (credentials: LoginFormCredentials) => {
     const result = await securedFetch("/api/connections", {
@@ -122,6 +139,7 @@ export default function ConnectionManager() {
       const newConn = json.connection;
       setAdditionalConnections((prev) => [...prev, newConn]);
       // Auto-switch to the newly added connection
+      beginConnectionSwitch();
       setActiveConnectionId(newConn.id);
       setActiveConnectionIdGlobal(newConn.id);
       localStorage.setItem("lastActiveConnectionId", newConn.id);
@@ -131,7 +149,7 @@ export default function ConnectionManager() {
     } else {
       throw new Error("Failed to add connection");
     }
-  }, [toast, setAdditionalConnections, setIndicator, setActiveConnectionId, updateSession]);
+  }, [toast, setAdditionalConnections, setIndicator, setActiveConnectionId, updateSession, beginConnectionSwitch]);
 
   // Use the explicitly active connection, or fall back to the first one while
   // activeConnectionId is still being resolved (e.g. on initial page load).

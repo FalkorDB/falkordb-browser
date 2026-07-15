@@ -236,6 +236,10 @@ type ConnectionContextType = {
   activeConnectionId: string | null;
   setActiveConnectionId: Dispatch<SetStateAction<string | null>>;
   updateSession: (data: { activeConnectionId?: string | null }) => Promise<unknown>;
+  // Mark a user connection switch as in-progress (blocks graph ops + supersedes
+  // in-flight ones) and clear it once the switch settles.
+  beginConnectionSwitch: () => void;
+  endConnectionSwitch: () => void;
 };
 
 type UDFContextType = {
@@ -494,6 +498,8 @@ export const ConnectionContext = createContext<ConnectionContextType>({
   activeConnectionId: null,
   setActiveConnectionId: () => { },
   updateSession: async () => { },
+  beginConnectionSwitch: () => { },
+  endConnectionSwitch: () => { },
 });
 
 export const UDFContext = createContext<UDFContextType>({
