@@ -50,7 +50,7 @@
     "@types/date-fns": "^2.6.3",
     "@types/node-cache": "^4.2.5",
     "@vercel/blob": "^2.6.1",
-    "autoprefixer": "^10.5.2",
+    "autoprefixer": "^10.5.3",
     "busboy": "^1.6.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
