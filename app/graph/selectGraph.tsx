@@ -82,8 +82,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         const seq = (optionsSeqRef.current += 1);
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
-        const res = await fetchOptions(toast, setIndicator, indicator, cid);
-        if (getConnectionEpoch() !== startEpoch || optionsSeqRef.current !== seq || !res) return;
+        const isCurrent = () => getConnectionEpoch() === startEpoch && optionsSeqRef.current === seq;
+        const gToast = ((...a: Parameters<typeof toast>) => { if (isCurrent()) toast(...a); }) as typeof toast;
+        const gInd = (i: "online" | "offline") => { if (isCurrent()) setIndicator(i); };
+        const res = await fetchOptions(gToast, gInd, indicator, cid);
+        if (!isCurrent() || !res) return;
         setOptions(res.opts);
         if (res.autoSelect) setSelectedValue(res.autoSelect);
     }, [toast, setIndicator, indicator, setSelectedValue, setOptions]);

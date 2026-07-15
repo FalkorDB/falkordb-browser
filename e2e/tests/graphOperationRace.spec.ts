@@ -24,13 +24,14 @@ test.describe("Graph operation race conditions", () => {
   test(`@admin a query held in-flight is discarded after switching graph (no stale apply)`, async () => {
     const graphA = getRandomString("raceA");
     const graphB = getRandomString("raceB");
-    // Distinct node counts so a stale apply is detectable: A=3, B=1.
-    await apiCall.addGraph(graphA);
-    await apiCall.runQuery(graphA, "CREATE (:N), (:N), (:N)");
-    await apiCall.addGraph(graphB);
-    await apiCall.runQuery(graphB, "CREATE (:N)");
 
     try {
+      // Distinct node counts so a stale apply is detectable: A=3, B=1.
+      await apiCall.addGraph(graphA);
+      await apiCall.runQuery(graphA, "CREATE (:N), (:N), (:N)");
+      await apiCall.addGraph(graphB);
+      await apiCall.runQuery(graphB, "CREATE (:N)");
+
       const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
       const page = await browser.getPage();
 
@@ -59,8 +60,11 @@ test.describe("Graph operation race conditions", () => {
 
       // Release A's stale (3-node) result; the guard must discard it rather than
       // apply it over B.
+      const responsePromise = page.waitForResponse((response) => response.url().includes(`/api/graph/${graphA}/explain`));
       releaseA();
-      await page.waitForTimeout(2000);
+      await responsePromise;
+      // Small buffer to allow client-side state update scheduling.
+      await page.waitForTimeout(200);
 
       // Still B's data — A's stale result was NOT applied.
       expect(await graph.getNodesCount()).toBe("1");

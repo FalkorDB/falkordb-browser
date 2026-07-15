@@ -102,19 +102,35 @@ export default function ConnectionManager() {
       }, toast, setIndicator);
 
       if (result.ok) {
-        setAdditionalConnections((prev: SessionConnection[]) => {
-          const remaining = prev.filter(c => c.id !== connId);
-          // If we removed the active connection, switch to the last remaining one
-          if (activeConnectionId === connId && remaining.length > 0) {
-            const newActive = remaining[remaining.length - 1].id;
-            beginConnectionSwitch();
-            setActiveConnectionId(newActive);
-            setActiveConnectionIdGlobal(newActive);
-            localStorage.setItem("lastActiveConnectionId", newActive);
-            updateSession({ activeConnectionId: newActive });
+        const remaining = additionalConnections.filter(c => c.id !== connId);
+        setAdditionalConnections(remaining);
+
+        // If we removed the active connection, switch to the last remaining one.
+        if (activeConnectionId === connId && remaining.length > 0) {
+          const newActive = remaining[remaining.length - 1].id;
+          const ticket = beginConnectionSwitch();
+          setActiveConnectionIdGlobal(newActive);
+          localStorage.setItem("lastActiveConnectionId", newActive);
+          try {
+            await updateSession({ activeConnectionId: newActive });
+          } catch (error) {
+            if (isLatestSwitch(ticket)) setActiveConnectionIdGlobal(activeConnectionId);
+            endConnectionSwitch();
+            console.error("Failed to switch connection after removal:", error);
+            toast({ title: "Failed to switch to remaining connection", variant: "destructive" });
+            setRemoveTarget(null);
+            return;
           }
-          return remaining;
-        });
+
+          if (!isLatestSwitch(ticket)) {
+            endConnectionSwitch();
+            setRemoveTarget(null);
+            return;
+          }
+
+          setActiveConnectionId(newActive);
+        }
+
         toast({ title: "Connection removed" });
       } else {
         toast({ title: "Failed to remove connection", variant: "destructive" });
@@ -126,7 +142,7 @@ export default function ConnectionManager() {
     } finally {
       setRemoving(false);
     }
-  }, [removeTarget, toast, setAdditionalConnections, activeConnectionId, setActiveConnectionId, setIndicator, updateSession, beginConnectionSwitch]);
+  }, [removeTarget, toast, additionalConnections, setAdditionalConnections, activeConnectionId, setActiveConnectionId, setIndicator, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
 
   const handleAddConnection = useCallback(async (credentials: LoginFormCredentials) => {
     const result = await securedFetch("/api/connections", {
@@ -147,17 +163,31 @@ export default function ConnectionManager() {
       const newConn = json.connection;
       setAdditionalConnections((prev) => [...prev, newConn]);
       // Auto-switch to the newly added connection
-      beginConnectionSwitch();
-      setActiveConnectionId(newConn.id);
+      const ticket = beginConnectionSwitch();
       setActiveConnectionIdGlobal(newConn.id);
       localStorage.setItem("lastActiveConnectionId", newConn.id);
-      updateSession({ activeConnectionId: newConn.id });
+      try {
+        await updateSession({ activeConnectionId: newConn.id });
+      } catch (error) {
+        if (isLatestSwitch(ticket)) setActiveConnectionIdGlobal(activeConnectionId);
+        endConnectionSwitch();
+        console.error("Failed to switch to new connection:", error);
+        toast({ title: "Connection added but switch failed", variant: "destructive" });
+        return;
+      }
+
+      if (!isLatestSwitch(ticket)) {
+        endConnectionSwitch();
+        return;
+      }
+
+      setActiveConnectionId(newConn.id);
       toast({ title: `Connection added for ${credentials.username}` });
       setDialogOpen(false);
     } else {
       throw new Error("Failed to add connection");
     }
-  }, [toast, setAdditionalConnections, setIndicator, setActiveConnectionId, updateSession, beginConnectionSwitch]);
+  }, [toast, setAdditionalConnections, setIndicator, setActiveConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch, activeConnectionId]);
 
   // Use the explicitly active connection, or fall back to the first one while
   // activeConnectionId is still being resolved (e.g. on initial page load).

@@ -772,22 +772,24 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     }
   }, []);
 
-  const fetchInfo = useCallback(async (type: string, name: string, pin?: { connectionId?: string | null; epoch?: number }) => {
+  const fetchInfo = useCallback(async (type: string, name: string, pin?: { connectionId?: string | null; epoch?: number; isCurrent?: () => boolean }) => {
     if (!name) return [];
 
     // Pin to the caller's connection (routing) and epoch (so a stale result is
     // dropped after a connection switch). `!== undefined` honours an explicit null.
     const cid = pin?.connectionId !== undefined ? pin.connectionId : getActiveConnectionIdGlobal();
     const startEpoch = pin?.epoch !== undefined ? pin.epoch : getConnectionEpoch();
-    const superseded = () => getConnectionEpoch() !== startEpoch;
+    const superseded = () => getConnectionEpoch() !== startEpoch || (pin?.isCurrent ? !pin.isCurrent() : false);
+    const gToast = pin?.isCurrent ? (((...a: Parameters<typeof toast>) => { if (!superseded()) toast(...a); }) as typeof toast) : toast;
+    const gInd = pin?.isCurrent ? ((i: "online" | "offline") => { if (!superseded()) setIndicator(i); }) : setIndicator;
 
     if (type === "(property key)") {
       const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
       const query = "CALL db.propertyKeys() YIELD propertyKey as info";
       const sse = await getSSEGraphResult(
         `/api/graph/${prepareArg(name)}?query=${prepareArg(query)}${readOnlyParam}`,
-        toast,
-        setIndicator,
+        gToast,
+        gInd,
         { connectionId: cid },
       ) as { data?: Array<{ info?: unknown }> };
 
@@ -801,7 +803,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
     const result = await securedFetch(`/api/graph/${prepareArg(name)}/info?type=${prepareArg(type)}${readOnlyParam}`, {
       method: "GET",
-    }, toast, setIndicator, cid);
+    }, gToast, gInd, cid);
 
     if (!result.ok || superseded()) return [];
 
@@ -897,7 +899,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
       const graphI = await Promise.all([
         fetchMetaStats(n, { connectionId: cid, isCurrent }),
-        fetchInfo("(property key)", n, { connectionId: cid, epoch }),
+        fetchInfo("(property key)", n, { connectionId: cid, epoch, isCurrent }),
       ]).then(async ([metaStats, newPropertyKeys]) => {
         const memoryUsage = showMemoryUsage ? await getMemoryUsage(n, guardedToast, guardedSetIndicator, cid) : new Map<string, MemoryValue>();
         const newLabels = metaStats?.[0] || [];
@@ -1014,7 +1016,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   }, [limit, timeout, fetchInfo, fetchMetaStats, fetchCount, setGraphInfo, handleCooldown, handelGetNewQueries, showMemoryUsage, captionsKeys, showPropertyKeyPrefix, tutorialOpen, prefixReady]);
 
   const graphNameRef = useRef(graphName);
-  graphNameRef.current = graphName;
+
+  useEffect(() => {
+    graphNameRef.current = graphName;
+  }, [graphName]);
 
   const handleSetGraphName = useCallback((name: string) => {
     if (graphNameRef.current === name) return;
@@ -1486,20 +1491,27 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const ctx = contextGenRef.current;
     const cid = getActiveConnectionIdGlobal();
     const epoch = getConnectionEpoch();
+    const isCurrent = () => getConnectionEpoch() === epoch && optionsSeqRef.current === oseq;
+    const gToast = ((...a: Parameters<typeof toast>) => { if (isCurrent()) toast(...a); }) as typeof toast;
+    const gInd = (i: "online" | "offline") => { if (isCurrent()) setIndicator(i); };
 
     // Only the connection-reset path clears the list; an ordinary refresh keeps
     // the last good list so a failed/slow refresh can't empty the selector.
     if (options?.clear) setGraphNames(undefined);
 
-    const res = await fetchOptions(toast, setIndicator, indicator, cid);
+    const res = await fetchOptions(gToast, gInd, indicator, cid);
 
     // The list is connection-scoped: apply only if this is still the newest
     // refresh for the same connection (a later switch/refresh owns it otherwise).
-    if (getConnectionEpoch() !== epoch || optionsSeqRef.current !== oseq) return;
-    setGraphNames(res?.opts ?? []);
+    if (!isCurrent()) return;
+    if (res) {
+      setGraphNames(res.opts);
+    } else if (options?.clear) {
+      setGraphNames([]);
+    }
     setGraphNamesLoaded(true);
     // Auto-select is graph-scoped: only apply if the graph context is unchanged.
-    if (res?.autoSelect && contextGenRef.current === ctx) handleSetGraphName(res.autoSelect);
+    if (res?.autoSelect && contextGenRef.current === ctx && isCurrent()) handleSetGraphName(res.autoSelect);
   }, [toast, setIndicator, indicator, tutorialOpen, handleSetGraphName]);
 
   useEffect(() => {
