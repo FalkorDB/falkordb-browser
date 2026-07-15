@@ -1,5 +1,5 @@
 import { useToast } from "@/components/ui/use-toast";
-import { prepareArg, securedFetch, Row } from "@/lib/utils";
+import { getActiveConnectionIdGlobal, getConnectionEpoch, prepareArg, securedFetch, Row } from "@/lib/utils";
 import React, { useContext, useEffect, useState } from "react";
 import { Graph } from "@/app/api/graph/model";
 import DialogComponent from "../DialogComponent";
@@ -48,6 +48,8 @@ export default function DeleteGraph({
   }, [open]);
 
   const handleDelete = async (deleteGraphNames: string[]) => {
+    const startEpoch = getConnectionEpoch();
+    const cid = getActiveConnectionIdGlobal();
     setIsLoading(true);
     let newGraphNames;
     try {
@@ -55,13 +57,15 @@ export default function DeleteGraph({
         .map(async (name) => {
           const result = await securedFetch(`api/graph/${prepareArg(name)}`, {
             method: "DELETE"
-          }, toast, setIndicator);
+          }, toast, setIndicator, cid);
 
           if (result.ok) return "";
 
           return name;
 
         })).then(result => [result.filter(n => n !== ""), deleteGraphNames.filter(n => !result.includes(n))]);
+
+      if (getConnectionEpoch() !== startEpoch) return;
 
       newGraphNames = graphNames.filter(n => !successDeletedGraphs.includes(n));
 

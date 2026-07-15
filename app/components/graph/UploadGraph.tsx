@@ -9,7 +9,7 @@ import Button from "../ui/Button";
 import CloseDialog from "../CloseDialog";
 import { BrowserSettingsContext, ConnectionContext, CypherLanguageContext, ForceGraphContext, GraphContext, HistoryQueryContext, IndicatorContext, TableViewContext, UDFContext } from "../provider";
 import DialogComponent from "../DialogComponent";
-import { cn, Data, getMemoryUsage, getMetaStats, MemoryValue, prepareArg, securedFetch, toUserFriendlyMessage, uploadFileWithProgress } from "@/lib/utils";
+import { cn, Data, getConnectionEpoch, getMemoryUsage, getMetaStats, MemoryValue, prepareArg, securedFetch, toUserFriendlyMessage, uploadFileWithProgress } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import type { FileRejection } from "react-dropzone";
 import EditorComponent, { LanguageConfig } from "../EditorComponent";
@@ -351,6 +351,9 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             setPhase("uploading");
             setUploadPct(0);
 
+            // Pin the graph mutation to the connection active when the upload began.
+            const cid = activeConnectionId;
+
             const uploadResult = await uploadFileWithProgress("api/upload", cypherFiles[0], toast, setIndicator, setUploadPct);
             if (!uploadResult.ok) return;
 
@@ -369,7 +372,8 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                 `api/graph/${prepareArg(graphName)}/upload`,
                 { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fileId: id }) },
                 toast,
-                setIndicator
+                setIndicator,
+                cid
             );
             if (!processResult.ok) return;
 
@@ -468,6 +472,11 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
         if (inFlightRef.current) return;
         inFlightRef.current = true;
 
+        // Pin the whole ingestion to the connection active when it started, so a
+        // mid-flight switch can't run it against another DB or apply stale results.
+        const cid = activeConnectionId;
+        const startEpoch = getConnectionEpoch();
+
         try {
             setIsLoading(true);
             setPhase("processing");
@@ -476,7 +485,8 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                 `api/graph/${prepareArg(graphName)}/load-csv`,
                 { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: csvKey, withHeaders: csvWithHeaders, body: csvQuery }) },
                 toast,
-                setIndicator
+                setIndicator,
+                cid
             );
             if (!result.ok) return;
 
@@ -512,12 +522,13 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                 let graphInfo: GraphInfo | undefined;
                 try {
                     const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
-                    const metaStats = await getMetaStats(graphName, toast, setIndicator, isReadOnly);
+                    const metaStats = await getMetaStats(graphName, toast, setIndicator, isReadOnly, { connectionId: cid });
                     const propertyInfo = await securedFetch(
                         `api/graph/${prepareArg(graphName)}/info?type=${prepareArg("(property key)")}${readOnlyParam}`,
                         { method: "GET" },
                         toast,
-                        setIndicator
+                        setIndicator,
+                        cid
                     );
                     const propertyJson = propertyInfo.ok
                         ? await propertyInfo.json() as { result?: { data?: Array<{ info?: unknown }> } }
@@ -526,7 +537,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                         .map((entry) => (typeof entry?.info === "string" ? entry.info : undefined))
                         .filter((value): value is string => typeof value === "string");
                     const memoryUsage = showMemoryUsage
-                        ? await getMemoryUsage(graphName, toast, setIndicator, activeConnectionId)
+                        ? await getMemoryUsage(graphName, toast, setIndicator, cid)
                         : new Map<string, MemoryValue>();
 
                     graphInfo = await GraphInfo.create(
@@ -535,7 +546,8 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                         metaStats?.[1] ?? [],
                         memoryUsage,
                         toast,
-                        setIndicator
+                        setIndicator,
+                        cid
                     );
                 } catch {
                     graphInfo = graph.Id === graphName
@@ -551,6 +563,8 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                     graphInfo
                 );
 
+                if (getConnectionEpoch() !== startEpoch) return;
+
                 setGraph(nextGraph);
                 setGraphInfo(nextGraph.GraphInfo);
                 setData({ ...nextGraph.Elements });
@@ -558,7 +572,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                 setGraphData(undefined);
                 setSearch("");
                 setScrollPosition(0);
-                await fetchCount(graphName);
+                await fetchCount(graphName, { connectionId: cid, epoch: startEpoch });
                 if (!tutorialOpen) {
                     setCurrentTab(nextGraph.getElements().length === 0 && nextGraph.Data.length !== 0 ? "Table" : "Graph");
                 }

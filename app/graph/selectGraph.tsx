@@ -3,7 +3,7 @@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { fetchOptions, getMemoryUsage, getSSEGraphResult, prepareArg, Row, securedFetch } from "@/lib/utils";
+import { fetchOptions, getActiveConnectionIdGlobal, getConnectionEpoch, getMemoryUsage, getSSEGraphResult, prepareArg, Row, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
 import { ChevronDown, ChevronUp, Loader2, Settings, X } from "lucide-react";
@@ -44,7 +44,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const safeOptions = useMemo(() => options ?? [], [options]);
 
     const { indicator, setIndicator } = useContext(IndicatorContext);
-    const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
+    const { isReadOnly } = useContext(ConnectionContext);
     const {
         settings: {
             graphInfo: { showMemoryUsage }
@@ -53,6 +53,9 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     } = useContext(BrowserSettingsContext);
 
     const inputRef = useRef<HTMLInputElement>(null);
+    // Monotonic sequence so two overlapping graph-list refreshes on the SAME
+    // connection can't apply out of order (the newest refresh wins).
+    const optionsSeqRef = useRef(0);
 
     const { toast } = useToast();
     const { data: session } = useSession();
@@ -72,23 +75,41 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
 
 
-    const getOptions = useCallback(async () =>
-        fetchOptions(toast, setIndicator, indicator, setSelectedValue, opts => setOptions(opts))
-        , [toast, setIndicator, indicator, setSelectedValue, setOptions]);
+    const getOptions = useCallback(async () => {
+        // Pin the refresh to the connection active when it started and discard a
+        // stale result if the connection changed mid-flight (epoch) or a newer
+        // refresh on the same connection started (optionsSeq) — the newest wins.
+        const seq = (optionsSeqRef.current += 1);
+        const startEpoch = getConnectionEpoch();
+        const cid = getActiveConnectionIdGlobal();
+        const isCurrent = () => getConnectionEpoch() === startEpoch && optionsSeqRef.current === seq;
+        const gToast = ((...a: Parameters<typeof toast>) => { if (isCurrent()) toast(...a); }) as typeof toast;
+        const gInd = (i: "online" | "offline") => { if (isCurrent()) setIndicator(i); };
+        const res = await fetchOptions(gToast, gInd, indicator, cid);
+        if (!isCurrent() || !res) return;
+        setOptions(res.opts);
+        if (res.autoSelect) setSelectedValue(res.autoSelect);
+    }, [toast, setIndicator, indicator, setSelectedValue, setOptions]);
 
     const loadMemory = useCallback((opt: string) =>
         async () => {
-            const memoryMap = await getMemoryUsage(opt, toast, setIndicator, activeConnectionId);
+            const startEpoch = getConnectionEpoch();
+            const cid = getActiveConnectionIdGlobal();
+            const memoryMap = await getMemoryUsage(opt, toast, setIndicator, cid);
+            if (getConnectionEpoch() !== startEpoch) return "";
             const memoryValue = memoryMap.get("total_graph_sz_mb") || '<1';
 
             return `${memoryValue} MB`;
-        }, [toast, setIndicator, activeConnectionId]);
+        }, [toast, setIndicator]);
 
     const loadNodesCount = useCallback((opt: string) =>
         async () => {
             try {
+                const startEpoch = getConnectionEpoch();
+                const cid = getActiveConnectionIdGlobal();
                 const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
-                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes${readOnlyParam}`, toast, setIndicator) as { nodes?: number };
+                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes${readOnlyParam}`, toast, setIndicator, { connectionId: cid }) as { nodes?: number };
+                if (getConnectionEpoch() !== startEpoch) return "";
 
                 if (result.nodes == null || !Number.isFinite(Number(result.nodes))) return "";
 
@@ -101,8 +122,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const loadEdgesCount = useCallback((opt: string) =>
         async () => {
             try {
+                const startEpoch = getConnectionEpoch();
+                const cid = getActiveConnectionIdGlobal();
                 const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
-                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges${readOnlyParam}`, toast, setIndicator) as { edges?: number };
+                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges${readOnlyParam}`, toast, setIndicator, { connectionId: cid }) as { edges?: number };
+                if (getConnectionEpoch() !== startEpoch) return "";
 
                 if (result.edges == null || !Number.isFinite(Number(result.edges))) return "";
 
@@ -113,6 +137,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         }, [toast, setIndicator, isReadOnly]);
 
     const handleSetOption = useCallback(async (option: string, optionName: string) => {
+        const startEpoch = getConnectionEpoch();
+        const cid = getActiveConnectionIdGlobal();
         const result = await securedFetch(
             `api/graph/${prepareArg(option)}`,
             {
@@ -121,8 +147,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 body: JSON.stringify({ sourceName: optionName })
             },
             toast,
-            setIndicator
+            setIndicator,
+            cid
         );
+
+        if (getConnectionEpoch() !== startEpoch) return false;
 
         if (result.ok) {
             const newOptions = safeOptions.map((opt) => (opt === optionName ? option : opt));

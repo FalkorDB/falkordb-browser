@@ -642,7 +642,11 @@ let _activeConnectionId: string | null = null;
 let _connectionEpoch = 0;
 
 export function setActiveConnectionIdGlobal(id: string | null) {
-  if (id !== _activeConnectionId) _connectionEpoch += 1;
+  // Bump only when switching AWAY from an already-established connection (the old
+  // id is non-null). The initial null→id establishment on every page load is not
+  // a "switch" and must not discard the first graph-list load / query, which
+  // capture the epoch before the connection id settles.
+  if (_activeConnectionId !== null && id !== _activeConnectionId) _connectionEpoch += 1;
   _activeConnectionId = id;
 }
 
@@ -1147,10 +1151,9 @@ export async function fetchOptions(
   toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void,
   indicator: "online" | "offline",
-  setSelectedValue: (value: string) => void,
-  setOptions: (options: string[]) => void,
-) {
-  if (indicator === "offline") return;
+  connectionId?: string | null,
+): Promise<{ opts: string[]; autoSelect: string | null } | null> {
+  if (indicator === "offline") return null;
 
   const result = await securedFetch(
     `/api/graph`,
@@ -1158,17 +1161,17 @@ export async function fetchOptions(
       method: "GET",
     },
     toast,
-    setIndicator
+    setIndicator,
+    connectionId,
   );
 
-  if (!result.ok) return;
-
+  if (!result.ok) return null;
 
   const { opts } = (await result.json()) as { opts: string[] };
 
-  setOptions(opts);
-
-  if (opts.length === 1) setSelectedValue(formatName(opts[0]));
+  // Return the data so callers can apply it under their own ownership guard
+  // (a stale refresh must not overwrite the list/selection after a switch).
+  return { opts, autoSelect: opts.length === 1 ? formatName(opts[0]) : null };
 }
 
 export const areCaptionKeysEqual = (left: [string, boolean][], right: [string, boolean][]) =>
