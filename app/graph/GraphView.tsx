@@ -236,7 +236,7 @@ function GraphView({
                             <div className="h-4 w-px bg-border rounded-full" />
                             <p>Edges: {graph.LinksMap.size}</p>
                             <div className="h-4 w-px bg-border rounded-full" />
-                            <p>RT: {(historyQuery?.currentQuery?.metadata?.[1] || "").split(':')[1]}</p>
+                            <p>RT: {(historyQuery?.currentQuery?.metadata?.[1] || "").split(':')[1]?.trim() ?? "N/A"}</p>
                         </>
                     }
                 </div>

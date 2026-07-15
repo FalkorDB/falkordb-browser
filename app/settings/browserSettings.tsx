@@ -1561,7 +1561,7 @@ export default function BrowserSettings() {
                                                             id="rowHeightExpandMultiple"
                                                             aria-labelledby="rowHeightExpandMultipleLabel"
                                                             className="w-full"
-                                                            type="px"
+                                                            type="multiplier"
                                                             min={2}
                                                             max={8}
                                                             step={1}

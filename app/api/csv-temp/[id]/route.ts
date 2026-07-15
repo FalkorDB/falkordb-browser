@@ -37,7 +37,15 @@ export async function GET(
         return new NextResponse("Not found.", { status: 404 });
     }
 
-    const stream = openLocalCsvReadStream(owner, key);
+    // `openLocalCsvReadStream` throws for a malformed owner (via safeFilePath).
+    // `verifyCsvCapability` should already reject illegitimate owner/token pairs,
+    // but guard anyway so the failure mode stays a consistent 404 rather than 500.
+    let stream: ReturnType<typeof openLocalCsvReadStream>;
+    try {
+        stream = openLocalCsvReadStream(owner, key);
+    } catch {
+        stream = null;
+    }
     if (!stream) {
         return new NextResponse("Not found.", { status: 404 });
     }

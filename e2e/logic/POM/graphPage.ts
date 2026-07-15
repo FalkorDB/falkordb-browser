@@ -79,10 +79,6 @@ export default class GraphPage extends BasePage {
     return this.page.locator('input[type="file"]');
   }
 
-  public get uploadCsvQueryTextarea(): Locator {
-    return this.page.getByTestId("uploadCsvQuery");
-  }
-
   public get loadCsvTabTrigger(): Locator {
     return this.page.getByRole("tab", { name: "Load CSV" });
   }
@@ -1383,15 +1379,6 @@ export default class GraphPage extends BasePage {
     await this.uploadFileInput.setInputFiles(absoluteFilePath);
   }
 
-  /** Fill the CSV query textarea. */
-  async setUploadCsvQuery(query: string): Promise<void> {
-    await interactWhenVisible(
-      this.uploadCsvQueryTextarea,
-      (el) => el.fill(query),
-      "Upload CSV Query"
-    );
-  }
-
   /** Submit the upload form and wait for the dialog to close. */
   async clickUploadConfirm(): Promise<void> {
     await interactWhenVisible(
@@ -1399,27 +1386,26 @@ export default class GraphPage extends BasePage {
       (el) => el.click(),
       "Upload Confirm"
     );
-    await waitForElementToNotBeVisible(this.uploadConfirm);
+    // Larger CSV/dump uploads can take well over the default ~5s budget to close
+    // the dialog, so wait up to ~15s before falling through to the toast wait.
+    await waitForElementToNotBeVisible(this.uploadConfirm, 500, 30);
   }
 
   /**
    * Full upload flow: open Manage, select graph, open dialog, switch to the tab
-   * for `mode`, attach the file, submit and wait for the success toast.
+   * for `mode`, attach the file, submit and wait for the success toast. CSV uses
+   * a dedicated multi-step flow (see `loadCsvData`) and is intentionally excluded.
    */
   async uploadGraphData(
     graphName: string,
-    mode: UploadMode,
-    absoluteFilePath: string,
-    csvQuery?: string
+    mode: Exclude<UploadMode, "csv">,
+    absoluteFilePath: string
   ): Promise<void> {
     await this.openUploadDialog(graphName);
     // Select the tab for the requested mode. Cypher batch is the default active
     // tab, but selecting it explicitly keeps the helper correct for every mode.
     await this.selectUploadTab(mode);
     await this.setUploadFile(absoluteFilePath);
-    if (mode === "csv" && csvQuery !== undefined) {
-      await this.setUploadCsvQuery(csvQuery);
-    }
     await this.clickUploadConfirm();
     await waitForElementToBeVisible(this.toast);
   }
@@ -1520,7 +1506,12 @@ export default class GraphPage extends BasePage {
     if (!isEnabled) throw new Error("Graph selector is not enabled after reloading the graph list");
 
     const graphListResponse = this.page.waitForResponse(
-      (response) => response.url().includes("/api/graph") && response.request().method() === "GET"
+      (response) => {
+        const { pathname } = new URL(response.url());
+        // Match only the graph-list endpoint, not nested requests such as
+        // /api/graph/<name>?query=... or /api/graph/<name>/memory.
+        return /^\/api\/graph\/?$/.test(pathname) && response.request().method() === "GET";
+      }
     );
 
     await this.clickSelect();

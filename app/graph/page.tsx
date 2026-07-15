@@ -190,13 +190,10 @@ export default function Page() {
         }
 
         const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
-        const headers = new Headers();
-        if (options?.connectionId) headers.set("X-Connection-Id", options.connectionId);
         const result = await securedFetch(`/api/graph/${prepareArg(graphName)}/info?type=${prepareArg(type)}${readOnlyParam}`, {
             method: "GET",
-            headers,
             signal: options?.signal,
-        }, toast, setIndicator);
+        }, toast, setIndicator, options?.connectionId);
 
         if (!result.ok) return [];
 

@@ -11,8 +11,11 @@ export type CsvUploadResult = { ok: true } | { ok: false; error: string; status:
 /**
  * Stream a multipart request's single `file` part to storage via the `store`
  * callback, without ever buffering the whole file in memory. The upload is:
- *   - bounded (`files:1, fields:0, parts:10`) and size-capped (`getCsvMaxUploadBytes`,
- *     rejected with 413), with all busboy limit events rejected, and
+ *   - bounded (`files:2, fields:0, parts:10`) and size-capped (`getCsvMaxUploadBytes`,
+ *     rejected with 413), with all busboy limit events rejected. The file limit is
+ *     2 rather than 1 so a stray second file surfaces as a normal `file` event we
+ *     can reject gracefully (destroying busboy mid-stream corrupts the undici
+ *     body); a third file trips `filesLimit`, which is likewise rejected, and
  *   - piped through `CsvHeadTransform`, which strips a BOM and rejects binary
  *     input (400) before anything is persisted.
  *
@@ -170,6 +173,10 @@ export async function streamCsvUpload(
             });
 
             validatorStream = new CsvHeadTransform();
+            // Always handle the validator's error so a destroy() (e.g. from
+            // abortActiveStore) before the deferred store() attaches its own
+            // consumer can't crash the process with an unhandled "error" event.
+            validatorStream.on("error", () => undefined);
             storeStarted = true;
             // Defer so a synchronous throw from `store` is caught here too.
             Promise.resolve()
@@ -196,6 +203,10 @@ export async function streamCsvUpload(
 
         busboy.on("fieldsLimit", () => abortParser(400, "Unexpected form fields."));
         busboy.on("partsLimit", () => abortParser(400, "Too many form parts."));
+        // A third file part (files limit is 2) can trip this without a matching
+        // `file` event, so record the rejection here too; busboy still reaches
+        // `close` on its own, where settleIfReady finalizes with this error.
+        busboy.on("filesLimit", () => recordError(400, "Only a single file may be uploaded."));
 
         busboy.on("close", () => {
             busboyClosed = true;

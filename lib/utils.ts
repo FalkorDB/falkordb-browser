@@ -688,12 +688,18 @@ export async function securedFetch(
   init: RequestInit,
   toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void,
+  // Pin the request to a specific connection. `undefined` falls back to the
+  // active global connection (default behaviour); an explicit `null` forces
+  // "no connection", so a poll that captured null at start can't be silently
+  // re-pinned to whatever connection later becomes active.
+  connectionId?: string | null,
 ): Promise<Response> {
   // Callers that set X-Connection-Id explicitly take priority over the global.
   const effectiveInit = { ...init };
   const existingHeaders = new Headers(effectiveInit.headers);
-  if (_activeConnectionId && !existingHeaders.has("X-Connection-Id")) {
-    existingHeaders.set("X-Connection-Id", _activeConnectionId);
+  const effectiveConnId = connectionId !== undefined ? connectionId : _activeConnectionId;
+  if (effectiveConnId && !existingHeaders.has("X-Connection-Id")) {
+    existingHeaders.set("X-Connection-Id", effectiveConnId);
   }
   effectiveInit.headers = existingHeaders;
 
@@ -745,17 +751,27 @@ export function uploadFileWithProgress(
   toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void,
   onProgress?: (percent: number) => void,
+  // Optional cancellation. Aborting rejects the (never-thrown) promise with an
+  // ok:false result so a stalled/long upload can be cancelled instead of hanging.
+  signal?: AbortSignal,
 ): Promise<{ ok: boolean; status: number; body: string }> {
   return new Promise((resolve) => {
+    if (signal?.aborted) {
+      setIndicator("offline");
+      resolve({ ok: false, status: 0, body: "" });
+      return;
+    }
+
     const xhr = new XMLHttpRequest();
     xhr.open("POST", normalizeApiUrl(input));
-    // Keep uploads unbounded client-side; server/proxy limits should enforce
-    // maximum duration/size for large files on slower links.
-    xhr.timeout = 0;
 
     if (_activeConnectionId) {
       xhr.setRequestHeader("X-Connection-Id", _activeConnectionId);
     }
+
+    const onAbort = () => xhr.abort();
+    const cleanupSignal = () => signal?.removeEventListener("abort", onAbort);
+    signal?.addEventListener("abort", onAbort);
 
     xhr.upload.onprogress = (event) => {
       if (onProgress && event.lengthComputable) {
@@ -764,6 +780,7 @@ export function uploadFileWithProgress(
     };
 
     xhr.onload = () => {
+      cleanupSignal();
       const { status, responseText: body } = xhr;
 
       if (status === 401 && xhr.getResponseHeader("X-Session-Invalid") === "1") {
@@ -793,6 +810,7 @@ export function uploadFileWithProgress(
     };
 
     xhr.onerror = () => {
+      cleanupSignal();
       toast({
         title: "Error",
         description: "Network error while uploading the file. Please try again.",
@@ -802,7 +820,14 @@ export function uploadFileWithProgress(
       resolve({ ok: false, status: 0, body: "" });
     };
 
+    xhr.onabort = () => {
+      cleanupSignal();
+      setIndicator("offline");
+      resolve({ ok: false, status: 0, body: "" });
+    };
+
     xhr.ontimeout = () => {
+      cleanupSignal();
       toast({
         title: "Error",
         description: "Upload timed out. Please try again.",

@@ -200,7 +200,6 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
         try {
             setIsLoading(true);
-            setOptions(undefined);
             await getOptions();
         } finally {
             setIsLoading(false);
@@ -297,7 +296,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                     <h2 className="font-medium">Manage Graphs</h2>
                                     <Tooltip>
                                         <TooltipTrigger asChild>
-                                            <span>[{options ? options.length : <Loader2 className="inline animate-spin" />}]</span>
+                                            <button type="button" className="cursor-default bg-transparent">[{isLoading ? <Loader2 className="inline animate-spin" /> : safeOptions.length}]</button>
                                         </TooltipTrigger>
                                         <TooltipContent>
                                             <p> Graphs Count</p>

@@ -1,5 +1,6 @@
 import type { Graph } from "falkordb";
 import {
+  containsLoadCsv,
   splitCypherStatements,
 } from "../../../../../lib/graphUpload.ts";
 
@@ -10,6 +11,15 @@ import {
  */
 export async function executeCypherBatch(graph: Graph, batchText: string): Promise<number> {
   const statements = splitCypherStatements(batchText);
+
+  // Reject the whole batch before executing anything if any statement smuggles
+  // its own `LOAD CSV` clause, so an uploaded batch can never trigger an
+  // attacker-controlled outbound fetch.
+  statements.forEach((statement, index) => {
+    if (containsLoadCsv(statement)) {
+      throw new Error(`Cypher statement ${index + 1} must not contain a LOAD CSV clause.`);
+    }
+  });
 
   for (let index = 0; index < statements.length; index += 1) {
     try {

@@ -9,7 +9,7 @@ import Button from "../ui/Button";
 import CloseDialog from "../CloseDialog";
 import { BrowserSettingsContext, ConnectionContext, CypherLanguageContext, ForceGraphContext, GraphContext, HistoryQueryContext, IndicatorContext, TableViewContext, UDFContext } from "../provider";
 import DialogComponent from "../DialogComponent";
-import { cn, Data, getActiveConnectionIdGlobal, getMemoryUsage, getMetaStats, MemoryValue, prepareArg, securedFetch, toUserFriendlyMessage, uploadFileWithProgress } from "@/lib/utils";
+import { cn, Data, getMemoryUsage, getMetaStats, MemoryValue, prepareArg, securedFetch, toUserFriendlyMessage, uploadFileWithProgress } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import type { FileRejection } from "react-dropzone";
 import EditorComponent, { LanguageConfig } from "../EditorComponent";
@@ -73,7 +73,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
     const [internalOpen, setInternalOpen] = useState(false);
     const { toast } = useToast();
     const { settings: { userExperienceSettings: { captionKeysSettings: { showPropertyKeyPrefix } }, graphInfo: { showMemoryUsage } }, tutorialOpen } = useContext(BrowserSettingsContext);
-    const { isReadOnly } = useContext(ConnectionContext);
+    const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
     const { setData, setViewport, setGraphData } = useContext(ForceGraphContext);
     const { setSearch, setScrollPosition } = useContext(TableViewContext);
     const { graph, setGraph, setGraphInfo, fetchCount, setCurrentTab } = useContext(GraphContext);
@@ -306,8 +306,6 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
         if (csvKey) {
             cleanupUploadedCsv(csvKey);
         }
-        setCypherFiles([]);
-        setCsvFiles([]);
         setCsvKey(null);
         setCsvFileName("");
         setCsvQuery("");
@@ -526,7 +524,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                         .map((entry) => (typeof entry?.info === "string" ? entry.info : undefined))
                         .filter((value): value is string => typeof value === "string");
                     const memoryUsage = showMemoryUsage
-                        ? await getMemoryUsage(graphName, toast, setIndicator, getActiveConnectionIdGlobal())
+                        ? await getMemoryUsage(graphName, toast, setIndicator, activeConnectionId)
                         : new Map<string, MemoryValue>();
 
                     graphInfo = await GraphInfo.create(
@@ -904,7 +902,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                                         <div className="rounded-md border bg-muted/40 px-3 py-2">
                                             <code className="font-mono text-xs">{loadCsvPrefix}</code>
                                         </div>
-                                        <div className="h-36 w-full rounded-lg border border-border overflow-hidden" data-testid="loadCsvQuery">
+                                        <div id="loadCsvQuery" className="h-36 w-full rounded-lg border border-border overflow-hidden" data-testid="loadCsvQuery">
                                             <EditorComponent
                                                 className="SofiaSans"
                                                 height="100%"

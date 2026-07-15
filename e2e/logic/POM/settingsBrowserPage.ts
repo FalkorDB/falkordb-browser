@@ -289,13 +289,25 @@ export default class SettingsBrowserPage extends BasePage {
   }
 
   private getChatApiKeyCard(apiKey: string): Locator {
-    // The card also contains the provider name and Show/Edit/Delete buttons, so
-    // match the key as a substring of the card text rather than the whole card.
-    return this.chatApiKeyCards.filter({ hasText: apiKey }).first();
+    // Scope to the card whose chatApiKeyValue text equals the key exactly, so a
+    // key that is a substring of another key never selects the wrong card.
+    return this.chatApiKeyCards
+      .filter({
+        has: this.page
+          .getByTestId("chatApiKeyValue")
+          .and(this.page.getByText(apiKey, { exact: true })),
+      })
+      .first();
   }
 
   private getMaskedChatApiKeyCard(apiKey: string): Locator {
-    return this.chatApiKeyCards.filter({ hasText: this.getMaskedApiKey(apiKey) }).first();
+    return this.chatApiKeyCards
+      .filter({
+        has: this.page
+          .getByTestId("chatApiKeyValue")
+          .and(this.page.getByText(this.getMaskedApiKey(apiKey), { exact: true })),
+      })
+      .first();
   }
 
   async addChatApiKey(apiKey: string): Promise<void> {

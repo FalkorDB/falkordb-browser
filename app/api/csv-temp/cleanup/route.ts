@@ -59,6 +59,11 @@ async function runCleanup(request: NextRequest) {
     }
 }
 
+// Vercel Cron invokes this route with GET; force dynamic so it is never
+// statically cached at build time (e.g. when CSV_UPLOAD_ENABLED is false) and
+// always evaluates the auth + cleanup logic at runtime.
+export const dynamic = "force-dynamic";
+
 export async function POST(request: NextRequest) {
     return runCleanup(request);
 }

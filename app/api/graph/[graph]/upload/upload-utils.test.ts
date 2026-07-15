@@ -52,3 +52,17 @@ test("executeCypherBatch annotates failures with the statement number and stops"
   );
   assert.equal(querySpy.mock.callCount(), 2);
 });
+
+test("executeCypherBatch rejects a batch containing LOAD CSV without executing anything", async () => {
+  const { graph, querySpy } = makeGraph();
+
+  await assert.rejects(
+    () =>
+      executeCypherBatch(
+        graph,
+        "CREATE (:A); LOAD CSV FROM 'http://evil.example/x' AS row RETURN row"
+      ),
+    /Cypher statement 2 must not contain a LOAD CSV clause\./
+  );
+  assert.equal(querySpy.mock.callCount(), 0);
+});

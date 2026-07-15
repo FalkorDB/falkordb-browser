@@ -31,6 +31,7 @@ export const CYPHER_KEYWORDS = [
   "ASC",
   "DESC",
   "ORDER BY",
+  "ORDER",
   "SKIP",
   "LIMIT",
   "MERGE",

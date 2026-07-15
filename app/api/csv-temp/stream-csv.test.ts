@@ -184,6 +184,31 @@ test("streamCsvUpload rejects a second large file part without hanging", async (
     }
 });
 
+test("streamCsvUpload rejects when the files limit is exceeded by extra file parts", async () => {
+    // First part is the accepted file; the next two are extra file parts under a
+    // different fieldname. The third trips busboy's filesLimit (files:2) without a
+    // matching `file` event, so the filesLimit handler must record the rejection
+    // instead of the upload silently resolving ok.
+    const sink = collectingStore();
+    const result = await withTimeout(
+        run(
+            [
+                { field: "file", filename: "first.csv", content: "a,b\n1,2\n" },
+                { field: "extra", filename: "second.csv", content: "c,d\n3,4\n" },
+                { field: "extra", filename: "third.csv", content: "e,f\n5,6\n" },
+            ],
+            sink.store
+        ),
+        5000
+    );
+
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+        assert.equal(result.status, 400);
+        assert.match(result.error, /single file/i);
+    }
+});
+
 test("streamCsvUpload settles (500) without crashing when the source errors mid-store", async () => {
     // Build a raw multipart body that starts a file part (so the store begins),
     // then the underlying source stream errors before the closing boundary. The

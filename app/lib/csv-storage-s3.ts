@@ -27,10 +27,18 @@ function buildClient(): S3Client {
     return new S3Client({
         region: process.env.S3_REGION ?? "us-east-1",
         ...(process.env.S3_ENDPOINT ? { endpoint: process.env.S3_ENDPOINT } : {}),
-        credentials: {
-            accessKeyId: process.env.S3_ACCESS_KEY_ID!,
-            secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
-        },
+        // Only pass static credentials when both are configured; otherwise omit
+        // them so the AWS SDK's default credential provider chain (IAM role /
+        // instance profile / ECS task role) stays enabled instead of being
+        // disabled by `credentials: { accessKeyId: undefined, ... }`.
+        ...(process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY
+            ? {
+                credentials: {
+                    accessKeyId: process.env.S3_ACCESS_KEY_ID,
+                    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+                },
+            }
+            : {}),
         ...(process.env.S3_FORCE_PATH_STYLE === "true" ? { forcePathStyle: true } : {}),
     });
 }
@@ -124,7 +132,7 @@ export class S3CsvStorage implements CsvStorageProvider {
             if (staleKeys.length > 0) {
                 // eslint-disable-next-line no-await-in-loop
                 const result = await this.client.send(
-                    new DeleteObjectsCommand({ Bucket: b, Delete: { Objects: staleKeys, Quiet: true } })
+                    new DeleteObjectsCommand({ Bucket: b, Delete: { Objects: staleKeys } })
                 );
                 deleted += result.Deleted?.length ?? 0;
             }
