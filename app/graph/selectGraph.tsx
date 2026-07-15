@@ -53,6 +53,9 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     } = useContext(BrowserSettingsContext);
 
     const inputRef = useRef<HTMLInputElement>(null);
+    // Monotonic sequence so two overlapping graph-list refreshes on the SAME
+    // connection can't apply out of order (the newest refresh wins).
+    const optionsSeqRef = useRef(0);
 
     const { toast } = useToast();
     const { data: session } = useSession();
@@ -74,12 +77,13 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const getOptions = useCallback(async () => {
         // Pin the refresh to the connection active when it started and discard a
-        // stale result if the connection changed mid-flight, so an old list/
-        // selection can't overwrite the new connection's.
+        // stale result if the connection changed mid-flight (epoch) or a newer
+        // refresh on the same connection started (optionsSeq) — the newest wins.
+        const seq = (optionsSeqRef.current += 1);
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
         const res = await fetchOptions(toast, setIndicator, indicator, cid);
-        if (getConnectionEpoch() !== startEpoch || !res) return;
+        if (getConnectionEpoch() !== startEpoch || optionsSeqRef.current !== seq || !res) return;
         setOptions(res.opts);
         if (res.autoSelect) setSelectedValue(res.autoSelect);
     }, [toast, setIndicator, indicator, setSelectedValue, setOptions]);

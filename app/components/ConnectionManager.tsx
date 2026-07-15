@@ -26,6 +26,7 @@ export default function ConnectionManager() {
     updateSession,
     beginConnectionSwitch,
     endConnectionSwitch,
+    isLatestSwitch,
   } = useContext(ConnectionContext);
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -36,8 +37,9 @@ export default function ConnectionManager() {
     // Clicking the already-active connection is a no-op (avoids a stuck gate).
     if (connId === activeConnectionId) return;
     // Block/supersede graph ops while the switch is mid-flight (its global id and
-    // React state briefly disagree).
-    beginConnectionSwitch();
+    // React state briefly disagree). The ticket lets us ignore a stale completion
+    // if the user starts a newer switch before this one resolves.
+    const ticket = beginConnectionSwitch();
     // Set the global ID immediately so periodic timers (memory, count, etc.)
     // that fire DURING the updateSession await use the correct connection and
     // don't fall back to Token DB which might pick the wrong entry.
@@ -50,16 +52,22 @@ export default function ConnectionManager() {
       await updateSession({ activeConnectionId: connId });
     } catch (error) {
       // Roll back so ids stay consistent and graph ops are unblocked again.
-      setActiveConnectionIdGlobal(activeConnectionId);
+      if (isLatestSwitch(ticket)) setActiveConnectionIdGlobal(activeConnectionId);
       endConnectionSwitch();
       console.error("Failed to switch connection:", error);
       return;
     }
+    if (!isLatestSwitch(ticket)) {
+      // A newer switch superseded this one — don't publish this (older) target as
+      // active; just release this switch's gate slot.
+      endConnectionSwitch();
+      return;
+    }
     // Update React state AFTER the JWT is updated so the prevActiveConnectionId
     // effect fires with the correct role already in sessionData; that reset
-    // effect also clears the switch gate.
+    // effect also clears this switch's gate slot.
     setActiveConnectionId(connId);
-  }, [activeConnectionId, setActiveConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch]);
+  }, [activeConnectionId, setActiveConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
 
   // Determine whether the user only has one connection. The session always
   // has at least one (the primary), so we treat an empty additionalConnections

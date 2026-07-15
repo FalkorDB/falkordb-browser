@@ -339,9 +339,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const optionsSeqRef = useRef(0);
   // loadingOwnerRef: the querySeq that currently owns the isQueryLoading spinner.
   const loadingOwnerRef = useRef<number | null>(null);
-  // switchingRef: true while a user connection switch is mid-flight (its global id
-  // and React state may briefly disagree); graph ops are rejected until it clears.
-  const switchingRef = useRef(false);
+  // Connection-switch gate. `pendingSwitches` counts in-flight switches (graph ops
+  // are rejected while > 0); `switchTicket` is monotonic so a completing switch
+  // can tell whether it is still the latest (out-of-order completions are ignored).
+  const pendingSwitchesRef = useRef(0);
+  const switchTicketRef = useRef(0);
 
   const bumpContextGen = useCallback(() => {
     contextGenRef.current += 1;
@@ -354,14 +356,23 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     return contextGenRef.current;
   }, []);
 
+  // Returns a ticket for this switch. Every begin must be matched by exactly one
+  // end (on success via the reset effect, on failure/supersession by the caller),
+  // so the counter can never get stuck above 0.
   const beginConnectionSwitch = useCallback(() => {
-    switchingRef.current = true;
+    pendingSwitchesRef.current += 1;
+    switchTicketRef.current += 1;
     bumpContextGen();
+    return switchTicketRef.current;
   }, [bumpContextGen]);
 
   const endConnectionSwitch = useCallback(() => {
-    switchingRef.current = false;
+    pendingSwitchesRef.current = Math.max(0, pendingSwitchesRef.current - 1);
   }, []);
+
+  // True if `ticket` is still the most recently started switch (so a stale,
+  // out-of-order completion doesn't publish an older connection as active).
+  const isLatestSwitch = useCallback((ticket: number) => switchTicketRef.current === ticket, []);
 
   const replayTutorial = useCallback(() => {
     router.push("/graph");
@@ -685,7 +696,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     updateSession,
     beginConnectionSwitch,
     endConnectionSwitch,
-  }), [connectionType, connectionInfo, dbVersion, isReadOnly, additionalConnections, activeConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch]);
+    isLatestSwitch,
+  }), [connectionType, connectionInfo, dbVersion, isReadOnly, additionalConnections, activeConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
 
   const udfContext = useMemo(() => ({
     udfList,
@@ -707,7 +719,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Don't start a count while a connection switch is mid-flight — the global id
     // and React state may disagree, so this could query (and auto-create) the
     // old graph on the new connection.
-    if (switchingRef.current) return;
+    if (pendingSwitchesRef.current > 0) return;
 
     // Capture the connection this request targets. Prefer the caller's captured
     // epoch (the epoch when its poll/action began) so a switch between that start
@@ -835,7 +847,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     // Reject while a connection switch is mid-flight — its global id and React
     // state may still disagree, so starting here could hit the wrong DB.
-    if (switchingRef.current) return;
+    if (pendingSwitchesRef.current > 0) return;
 
     // Capture ownership once: this is the newest query for the current
     // connection + graph. `isCurrent()` gates every later apply so a switch, a
@@ -1601,10 +1613,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (prev === activeConnectionId) return;
 
     // The connection actually changed and React state now agrees: supersede any
-    // in-flight graph op and end the switch gate so new ops are accepted again.
+    // in-flight graph op and fully release the switch gate so new ops are accepted
+    // again (any still-pending older switch is no longer latest, so it's a no-op).
     bumpContextGen();
     activeGraphNameRef.current = "";
-    endConnectionSwitch();
+    pendingSwitchesRef.current = 0;
 
     // Clear graph data so stale results from the old connection are gone.
     // Build the empty graph with the real toast/setIndicator callbacks up front
@@ -1623,7 +1636,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Re-fetch graph list for the new connection (clearing the old list).
     connectionSwitchFetchedRef.current = true;
     handleFetchOptions({ clear: true });
-  }, [activeConnectionId, toast, setIndicator, handleFetchOptions, bumpContextGen, endConnectionSwitch]);
+  }, [activeConnectionId, toast, setIndicator, handleFetchOptions, bumpContextGen]);
 
   const handleCloseTutorial = () => {
     setTutorialOpen(false);

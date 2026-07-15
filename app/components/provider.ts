@@ -237,9 +237,12 @@ type ConnectionContextType = {
   setActiveConnectionId: Dispatch<SetStateAction<string | null>>;
   updateSession: (data: { activeConnectionId?: string | null }) => Promise<unknown>;
   // Mark a user connection switch as in-progress (blocks graph ops + supersedes
-  // in-flight ones) and clear it once the switch settles.
-  beginConnectionSwitch: () => void;
+  // in-flight ones) and clear it once the switch settles. `beginConnectionSwitch`
+  // returns a ticket; `isLatestSwitch(ticket)` reports whether it is still the
+  // newest switch, so out-of-order completions don't publish a stale connection.
+  beginConnectionSwitch: () => number;
   endConnectionSwitch: () => void;
+  isLatestSwitch: (ticket: number) => boolean;
 };
 
 type UDFContextType = {
@@ -498,8 +501,9 @@ export const ConnectionContext = createContext<ConnectionContextType>({
   activeConnectionId: null,
   setActiveConnectionId: () => { },
   updateSession: async () => { },
-  beginConnectionSwitch: () => { },
+  beginConnectionSwitch: () => 0,
   endConnectionSwitch: () => { },
+  isLatestSwitch: () => true,
 });
 
 export const UDFContext = createContext<UDFContextType>({
