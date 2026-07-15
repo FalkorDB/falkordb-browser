@@ -18,9 +18,9 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1085.0",
-    "@aws-sdk/lib-storage": "^3.1085.0",
-    "@aws-sdk/s3-request-presigner": "^3.1085.0",
+    "@aws-sdk/client-s3": "^3.1087.0",
+    "@aws-sdk/lib-storage": "^3.1087.0",
+    "@aws-sdk/s3-request-presigner": "^3.1087.0",
     "@falkordb/canvas": "^0.2.5",
     "@falkordb/text-to-cypher": "^0.2.3",
     "@hookform/resolvers": "^5.4.0",
@@ -50,7 +50,7 @@
     "@types/date-fns": "^2.6.3",
     "@types/node-cache": "^4.2.5",
     "@vercel/blob": "^2.6.1",
-    "autoprefixer": "^10.5.2",
+    "autoprefixer": "^10.5.3",
     "busboy": "^1.6.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
