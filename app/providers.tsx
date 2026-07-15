@@ -1511,8 +1511,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (!graphNamesLoaded) return;
 
     if (urlGraphName && !graphNamesRef.current.includes(urlGraphName)) {
-      // URL graph does not exist in DB — strip all related URL params
-      setGraphName("");
+      // URL graph does not exist in DB — strip all related URL params. Route the
+      // name change through handleSetGraphName so any in-flight query for the old
+      // graph is superseded (bumps contextGen).
+      handleSetGraphName("");
       setSelectedParam("");
       setUrlQueryText(null);
       return;
@@ -1522,7 +1524,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // When urlGraphName is empty, fetchOptions may have already auto-selected
     // a graph (e.g. single-graph DB) — don't clobber that with an empty string.
     if (urlGraphName) {
-      setGraphName(urlGraphName);
+      handleSetGraphName(urlGraphName);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlGraphName, graphNamesLoaded]);
