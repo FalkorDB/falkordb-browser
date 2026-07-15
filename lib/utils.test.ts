@@ -256,8 +256,8 @@ describe("getMetaStats", () => {
 describe("connection epoch", () => {
   afterEach(() => setActiveConnectionIdGlobal(null));
 
-  it("increments only when the active connection id actually changes", () => {
-    setActiveConnectionIdGlobal("a");
+  it("increments only when switching away from an established connection", () => {
+    setActiveConnectionIdGlobal("a"); // null→id establishment → no bump
     const e1 = getConnectionEpoch();
     setActiveConnectionIdGlobal("a"); // same id → no bump
     assert.equal(getConnectionEpoch(), e1);
@@ -265,6 +265,15 @@ describe("connection epoch", () => {
     assert.equal(getConnectionEpoch(), e1 + 1);
     setActiveConnectionIdGlobal(null); // change → bump
     assert.equal(getConnectionEpoch(), e1 + 2);
+  });
+
+  it("does not bump on the initial null -> id establishment (first page load)", () => {
+    setActiveConnectionIdGlobal(null);
+    const e0 = getConnectionEpoch();
+    setActiveConnectionIdGlobal("a"); // establish → no bump, so the first load isn't discarded
+    assert.equal(getConnectionEpoch(), e0);
+    setActiveConnectionIdGlobal("b"); // real switch → bump
+    assert.equal(getConnectionEpoch(), e0 + 1);
   });
 
   it("detects A -> B -> A as a change (epoch differs from the first A)", () => {

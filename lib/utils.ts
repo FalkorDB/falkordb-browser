@@ -642,7 +642,11 @@ let _activeConnectionId: string | null = null;
 let _connectionEpoch = 0;
 
 export function setActiveConnectionIdGlobal(id: string | null) {
-  if (id !== _activeConnectionId) _connectionEpoch += 1;
+  // Bump only when switching AWAY from an already-established connection (the old
+  // id is non-null). The initial null→id establishment on every page load is not
+  // a "switch" and must not discard the first graph-list load / query, which
+  // capture the epoch before the connection id settles.
+  if (_activeConnectionId !== null && id !== _activeConnectionId) _connectionEpoch += 1;
   _activeConnectionId = id;
 }
 
