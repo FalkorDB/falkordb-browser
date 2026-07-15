@@ -4,7 +4,7 @@ import { getCsvStorageProvider } from "@/app/lib/csv-storage";
 import { openLocalCsvReadStream } from "@/app/lib/csv-storage-local";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { getCorsHeaders, resolveReadOnly } from "@/app/api/utils";
-import { hashOwner, isValidCsvKey, normalizeCsvKey, verifyCsvCapability } from "@/app/lib/csv-key";
+import { hashOwner, isValidCsvKey, isValidOwner, normalizeCsvKey, verifyCsvCapability } from "@/app/lib/csv-key";
 import { CSV_UPLOAD_ENABLED } from "@/lib/graphUpload";
 
 /**
@@ -33,19 +33,18 @@ export async function GET(
     const owner = url.searchParams.get("o") ?? "";
     const token = url.searchParams.get("t") ?? "";
 
+    // Validate the untrusted `o` (owner) format before doing any HMAC work, and
+    // so `openLocalCsvReadStream` (via safeFilePath) can't throw on a malformed
+    // owner — keeping the failure mode a consistent 404.
+    if (!isValidOwner(owner)) {
+        return new NextResponse("Not found.", { status: 404 });
+    }
+
     if (!verifyCsvCapability(owner, key, token)) {
         return new NextResponse("Not found.", { status: 404 });
     }
 
-    // `openLocalCsvReadStream` throws for a malformed owner (via safeFilePath).
-    // `verifyCsvCapability` should already reject illegitimate owner/token pairs,
-    // but guard anyway so the failure mode stays a consistent 404 rather than 500.
-    let stream: ReturnType<typeof openLocalCsvReadStream>;
-    try {
-        stream = openLocalCsvReadStream(owner, key);
-    } catch {
-        stream = null;
-    }
+    const stream = openLocalCsvReadStream(owner, key);
     if (!stream) {
         return new NextResponse("Not found.", { status: 404 });
     }

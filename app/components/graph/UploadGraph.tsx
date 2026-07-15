@@ -276,11 +276,13 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             cleanupUploadedCsv(csvKey);
         }
 
-        if (onOpenChange) {
-            onOpenChange(nextOpen);
-        } else {
+        // Update internal state for every uncontrolled configuration (including a
+        // callback-only consumer that passes onOpenChange but no `open`), and
+        // always forward to onOpenChange when provided.
+        if (!isControlled) {
             setInternalOpen(nextOpen);
         }
+        onOpenChange?.(nextOpen);
     };
 
     useEffect(() => {
@@ -882,9 +884,9 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
 
                                     {/* Editable LOAD CSV query */}
                                     <div className="flex flex-col gap-1.5">
-                                        <label htmlFor="loadCsvQuery" className="text-sm font-medium">
+                                        <span className="text-sm font-medium">
                                             Cypher query
-                                        </label>
+                                        </span>
                                         <label
                                             htmlFor="loadCsvWithHeaders"
                                             className="inline-flex items-center gap-2 text-xs text-muted-foreground"
@@ -902,7 +904,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                                         <div className="rounded-md border bg-muted/40 px-3 py-2">
                                             <code className="font-mono text-xs">{loadCsvPrefix}</code>
                                         </div>
-                                        <div id="loadCsvQuery" className="h-36 w-full rounded-lg border border-border overflow-hidden" data-testid="loadCsvQuery">
+                                        <div className="h-36 w-full rounded-lg border border-border overflow-hidden" data-testid="loadCsvQuery">
                                             <EditorComponent
                                                 className="SofiaSans"
                                                 height="100%"
@@ -910,6 +912,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                                                 languageConfig={editorLanguageConfig}
                                                 themeName="selector-theme"
                                                 options={{
+                                                    ariaLabel: "Cypher query",
                                                     lineHeight: 22,
                                                     fontSize: 14,
                                                     lineNumbersMinChars: 3,

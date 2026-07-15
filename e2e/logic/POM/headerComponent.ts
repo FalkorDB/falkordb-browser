@@ -209,6 +209,10 @@ export default class HeaderComponent extends BasePage {
 
     async getGraphsCountValue(): Promise<number> {
         const text = await this.graphsCountValue.textContent();
-        return Number(text ?? 0);
+        const value = text?.trim();
+        if (!value || !/^\d+$/.test(value)) {
+            throw new Error(`Invalid graphs count text: ${JSON.stringify(text)}`);
+        }
+        return Number.parseInt(value, 10);
     }
 }

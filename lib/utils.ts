@@ -757,7 +757,7 @@ export function uploadFileWithProgress(
 ): Promise<{ ok: boolean; status: number; body: string }> {
   return new Promise((resolve) => {
     if (signal?.aborted) {
-      setIndicator("offline");
+      // A pre-aborted signal is a local cancellation/supersession, not an outage.
       resolve({ ok: false, status: 0, body: "" });
       return;
     }
@@ -822,7 +822,8 @@ export function uploadFileWithProgress(
 
     xhr.onabort = () => {
       cleanupSignal();
-      setIndicator("offline");
+      // Abort is a local cancellation/supersession, not a server outage — settle
+      // silently without flipping the indicator offline.
       resolve({ ok: false, status: 0, body: "" });
     };
 

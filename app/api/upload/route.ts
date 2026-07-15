@@ -47,12 +47,44 @@ async function streamToDisk(
   return new Promise((resolve) => {
     let settled = false;
     let fileSeen = false;
+    let busboyClosed = false;
+    let storePending = false;
+    let storeSettled = false;
+    let storedFilename: string | null = null;
+    let terminalError: { error: string; status: number } | null = null;
 
     const done = (result: StreamResult) => {
       if (!settled) {
         settled = true;
         resolve(result);
       }
+    };
+
+    // Record the first terminal problem; later ones don't override it.
+    const recordError = (status: number, error: string) => {
+      if (!terminalError) terminalError = { error, status };
+    };
+
+    // Resolve only once busboy has closed AND any in-flight store has settled, so
+    // a late partsLimit/filesLimit/fieldsLimit or parse error isn't missed by
+    // returning success the moment the file stream ends.
+    const settleIfReady = () => {
+      if (!busboyClosed || (storePending && !storeSettled)) return;
+      if (terminalError) {
+        // A file may have been fully stored before a later part tripped a limit
+        // (or a parse error occurred) — don't leave it orphaned on a failure.
+        if (storedFilename) {
+          const orphan = getUploadFilePath(storedFilename, userId);
+          if (orphan) fs.unlink(orphan, () => {});
+        }
+        done({ ok: false, ...terminalError });
+        return;
+      }
+      if (storedFilename) {
+        done({ ok: true, filename: storedFilename });
+        return;
+      }
+      done({ ok: false, error: "No file uploaded.", status: 400 });
     };
 
     let busboy: ReturnType<typeof Busboy>;
@@ -93,7 +125,7 @@ async function streamToDisk(
       // consumer for it and it would otherwise allow large files onto disk.
       if (extension === ".dump" && !DUMP_RESTORE_ENABLED) {
         fileStream.resume();
-        done({ ok: false, error: "Dump restore is temporarily disabled.", status: 403 });
+        recordError(403, "Dump restore is temporarily disabled.");
         return;
       }
 
@@ -101,7 +133,7 @@ async function streamToDisk(
 
       if (!allowedFileType || !allowedFileType.mimeTypes.includes(mimeType)) {
         fileStream.resume(); // drain so busboy can finish cleanly
-        done({ ok: false, error: "Invalid file type.", status: 400 });
+        recordError(400, "Invalid file type.");
         return;
       }
 
@@ -111,7 +143,7 @@ async function streamToDisk(
 
       if (!filePath) {
         fileStream.resume();
-        done({ ok: false, error: "Invalid file name.", status: 400 });
+        recordError(400, "Invalid file name.");
         return;
       }
 
@@ -131,7 +163,7 @@ async function streamToDisk(
         sizeLimitHit = true;
         writeStream.destroy();
         fs.unlink(tempFilePath, () => {});
-        done({ ok: false, error: "File is too large.", status: 413 });
+        recordError(413, "File is too large.");
       });
 
       fileStream.on("data", (chunk: Buffer) => {
@@ -141,35 +173,47 @@ async function streamToDisk(
           fileStream.destroy();
           writeStream.destroy();
           fs.unlink(tempFilePath, () => {});
-          done({ ok: false, error: "File is too large.", status: 413 });
+          recordError(413, "File is too large.");
         }
       });
 
+      storePending = true;
       pipeline(fileStream, writeStream)
         .then(async () => {
-          if (sizeLimitHit) return;
-          await fs.promises.rename(tempFilePath, filePath);
-          done({ ok: true, filename });
+          if (!sizeLimitHit) {
+            await fs.promises.rename(tempFilePath, filePath);
+            storedFilename = filename;
+          }
+          storeSettled = true;
+          settleIfReady();
         })
         .catch((err: unknown) => {
           fs.unlink(tempFilePath, () => {});
           console.error("Stream pipeline error:", err);
-          done({ ok: false, error: "Failed to store uploaded file.", status: 500 });
+          recordError(500, "Failed to store uploaded file.");
+          storeSettled = true;
+          settleIfReady();
         });
     });
 
-    // Fires once the whole multipart body has been parsed. If no acceptable file
-    // part was received, resolve with a 400 instead of leaving the request to
-    // hang forever.
+    // Any busboy limit tripped while draining the rest of the body is a failure,
+    // even after the accepted file part finished — settleIfReady applies it on close.
+    busboy.on("filesLimit", () => recordError(400, "Only a single file may be uploaded."));
+    busboy.on("fieldsLimit", () => recordError(400, "Unexpected form fields."));
+    busboy.on("partsLimit", () => recordError(400, "Too many form parts."));
+
+    // Fires once the whole multipart body has been parsed. Settle success only
+    // now (and only if the store finished), so a late limit/parse error wins.
     busboy.on("close", () => {
-      if (!fileSeen) {
-        done({ ok: false, error: "No file uploaded.", status: 400 });
-      }
+      busboyClosed = true;
+      settleIfReady();
     });
 
     busboy.on("error", (err) => {
       console.error("Busboy error:", err);
-      done({ ok: false, error: "Failed to parse upload.", status: 500 });
+      recordError(500, "Failed to parse upload.");
+      busboyClosed = true;
+      settleIfReady();
     });
 
     // Stream request.body → busboy without buffering the full body in memory.
@@ -181,7 +225,9 @@ async function streamToDisk(
       busboy
     ).catch((err: unknown) => {
       console.error("Upload stream error:", err);
-      done({ ok: false, error: "Failed to parse upload.", status: 500 });
+      recordError(500, "Failed to parse upload.");
+      busboyClosed = true;
+      settleIfReady();
     });
   });
 }

@@ -60,7 +60,7 @@ describe("parseStoredMessages", () => {
         assert.equal(parsed[0].confidence, 80);
     });
 
-    it("keeps valid messages with null/absent optional numeric fields", () => {
+    it("normalizes null/absent optional numeric fields to undefined", () => {
         const raw = JSON.stringify([
             { role: "user", content: "hi", type: "Text" },
             { role: "assistant", content: "a", type: "Result", confidence: null, tokenUsage: null },
@@ -69,8 +69,21 @@ describe("parseStoredMessages", () => {
         const parsed = parseStoredMessages(raw);
         assert.equal(parsed.length, 3);
         assert.equal(parsed[0].confidence, undefined);
-        assert.equal(parsed[1].confidence, null);
+        assert.equal(parsed[1].confidence, undefined);
+        assert.equal(parsed[1].tokenUsage, undefined);
         assert.equal(parsed[2].confidence, 90);
+        assert.equal(parsed[2].tokenUsage, 5);
+    });
+
+    it("normalizes null optional numeric fields inside a versioned payload", () => {
+        const raw = JSON.stringify({
+            version: CHAT_HISTORY_VERSION,
+            messages: [{ role: "assistant", content: "a", type: "Result", confidence: 90, tokenUsage: null }],
+        });
+        const parsed = parseStoredMessages(raw);
+        assert.equal(parsed.length, 1);
+        assert.equal(parsed[0].confidence, 90);
+        assert.equal(parsed[0].tokenUsage, undefined);
     });
 
     it("uses versioned payloads as-is without rescaling", () => {

@@ -9,7 +9,7 @@
  * Selection logic (checked once per request, process.env is stable):
  *   1. CSV_STORAGE=local|s3|blob  → explicit provider (always wins)
  *   2. both S3 + Blob present     → S3 (preferred)
- *   3. only S3 creds present      → S3
+ *   3. only S3 bucket present     → S3 (credentials may come from the AWS default chain)
  *   4. only Blob creds present    → Blob
  *   5. otherwise                  → local (default)
  *
@@ -51,11 +51,10 @@ export interface CsvStorageProvider {
 let _provider: CsvStorageProvider | undefined;
 
 function hasS3Config(): boolean {
-    return Boolean(
-        process.env.S3_ACCESS_KEY_ID
-        && process.env.S3_SECRET_ACCESS_KEY
-        && process.env.S3_BUCKET
-    );
+    // S3_BUCKET is the only hard requirement to auto-detect S3: credentials can
+    // come from static keys OR the AWS SDK default provider chain (IAM role /
+    // instance profile / ECS task role), which S3CsvStorage.buildClient() supports.
+    return Boolean(process.env.S3_BUCKET);
 }
 
 function hasBlobConfig(): boolean {

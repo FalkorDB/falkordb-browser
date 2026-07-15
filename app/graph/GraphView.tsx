@@ -229,14 +229,14 @@ function GraphView({
                             />
                     }
                     {
-                        historyQuery?.currentQuery?.metadata?.[1] &&
+                        (historyQuery?.currentQuery?.metadata?.length ?? 0) > 0 &&
                         <>
                             <div className="h-4 w-px bg-border rounded-full" />
                             <p>Nodes: {graph.NodesMap.size}</p>
                             <div className="h-4 w-px bg-border rounded-full" />
                             <p>Edges: {graph.LinksMap.size}</p>
                             <div className="h-4 w-px bg-border rounded-full" />
-                            <p>RT: {(historyQuery?.currentQuery?.metadata?.[1] || "").split(':')[1]?.trim() ?? "N/A"}</p>
+                            <p>RT: {historyQuery?.currentQuery?.metadata?.find(v => v.startsWith("Query internal execution time:"))?.split(":")[1]?.trim().replace(" milliseconds", "ms") ?? "N/A"}</p>
                         </>
                     }
                 </div>
