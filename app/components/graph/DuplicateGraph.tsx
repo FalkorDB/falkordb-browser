@@ -1,5 +1,5 @@
 import { FormEvent, useContext, useEffect, useState } from "react";
-import { prepareArg, securedFetch } from "@/lib/utils";
+import { getActiveConnectionIdGlobal, getConnectionEpoch, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import DialogComponent from "../DialogComponent";
 import Button from "../ui/Button";
@@ -28,6 +28,8 @@ export default function DuplicateGraph({ open, onOpenChange, selectedValue, onDu
 
     const handleDuplicate = async (e: FormEvent) => {
         e.preventDefault();
+        const startEpoch = getConnectionEpoch();
+        const cid = getActiveConnectionIdGlobal();
 
         if (duplicateName === "") {
             toast({
@@ -43,8 +45,9 @@ export default function DuplicateGraph({ open, onOpenChange, selectedValue, onDu
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ sourceName: selectedValue })
-            }, toast, setIndicator);
+            }, toast, setIndicator, cid);
 
+            if (getConnectionEpoch() !== startEpoch) return;
             if (!result.ok) return;
 
             onDuplicate(duplicateName);

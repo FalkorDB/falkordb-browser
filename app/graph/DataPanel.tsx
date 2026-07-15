@@ -1,10 +1,6 @@
-/* eslint-disable @typescript-eslint/no-use-before-define */
-/* eslint-disable no-param-reassign */
-/* eslint-disable react/require-default-props */
-
 'use client';
 
-import { prepareArg, securedFetch, GraphRef, Node, Link, Label } from "@/lib/utils";
+import { getActiveConnectionIdGlobal, getConnectionEpoch, prepareArg, securedFetch, GraphRef, Node, Link, Label } from "@/lib/utils";
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Pencil, TableProperties, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
@@ -58,6 +54,8 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
     }, [object, type]);
 
     const handleAddLabel = async (newLabel: string) => {
+        const startEpoch = getConnectionEpoch();
+        const cid = getActiveConnectionIdGlobal();
         const node = object as Node;
         if (newLabel === "") {
             toast({
@@ -80,10 +78,12 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
             body: JSON.stringify({
                 label: newLabel
             })
-        }, toast, setIndicator);
+        }, toast, setIndicator, cid);
 
+        if (getConnectionEpoch() !== startEpoch) return false;
         if (result.ok) {
             setLabels([...await graph.addLabel(newLabel, node)]);
+            if (getConnectionEpoch() !== startEpoch) return false;
             setLabel([...node.labels]);
             const newGraphInfo = graph.GraphInfo.clone();
             setGraphInfo(newGraphInfo);
@@ -112,6 +112,8 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
     };
 
     const handleRemoveLabel = async (removeLabel: string) => {
+        const startEpoch = getConnectionEpoch();
+        const cid = getActiveConnectionIdGlobal();
         const node = object as Node;
 
         if (removeLabel === "") {
@@ -128,10 +130,12 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
             body: JSON.stringify({
                 label: removeLabel
             })
-        }, toast, setIndicator);
+        }, toast, setIndicator, cid);
 
+        if (getConnectionEpoch() !== startEpoch) return false;
         if (result.ok) {
             await graph.removeLabel(removeLabel, node);
+            if (getConnectionEpoch() !== startEpoch) return false;
             setLabels([...graph.Labels]);
             setLabel([...node.labels]);
             const newGraphInfo = graph.GraphInfo.clone();

@@ -4,7 +4,7 @@
 
 import React, { useState, useContext, useEffect } from "react";
 import { InfoIcon, Plus, File as FileIcon, X } from "lucide-react";
-import { prepareArg, securedFetch, uploadFileWithProgress } from "@/lib/utils";
+import { getActiveConnectionIdGlobal, getConnectionEpoch, prepareArg, securedFetch, uploadFileWithProgress } from "@/lib/utils";
 import { DUMP_RESTORE_ENABLED } from "@/lib/graphUpload";
 import { useToast } from "@/components/ui/use-toast";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -63,6 +63,8 @@ export default function CreateGraph({
 
     const handleCreateGraph = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        const startEpoch = getConnectionEpoch();
+        const cid = getActiveConnectionIdGlobal();
         try {
             setIsLoading(true);
             const name = graphName.trim();
@@ -91,7 +93,7 @@ export default function CreateGraph({
             if (!hasDump) {
                 const result = await securedFetch(`api/graph/${prepareArg(name)}${isReadOnly ? '?readOnly=true' : ''}`, {
                     method: "POST",
-                }, toast, setIndicator);
+                }, toast, setIndicator, cid);
 
                 if (!result.ok) return;
             } else {
@@ -128,11 +130,14 @@ export default function CreateGraph({
                         body: JSON.stringify({ mode: "dump", fileId: id })
                     },
                     toast,
-                    setIndicator
+                    setIndicator,
+                    cid
                 );
 
                 if (!processResult.ok) return;
             }
+
+            if (getConnectionEpoch() !== startEpoch) return;
 
             onSetGraphName(name);
             setGraphName("");

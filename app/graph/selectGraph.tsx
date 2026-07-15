@@ -44,7 +44,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const safeOptions = useMemo(() => options ?? [], [options]);
 
     const { indicator, setIndicator } = useContext(IndicatorContext);
-    const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
+    const { isReadOnly } = useContext(ConnectionContext);
     const {
         settings: {
             graphInfo: { showMemoryUsage }
@@ -90,17 +90,23 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const loadMemory = useCallback((opt: string) =>
         async () => {
-            const memoryMap = await getMemoryUsage(opt, toast, setIndicator, activeConnectionId);
+            const startEpoch = getConnectionEpoch();
+            const cid = getActiveConnectionIdGlobal();
+            const memoryMap = await getMemoryUsage(opt, toast, setIndicator, cid);
+            if (getConnectionEpoch() !== startEpoch) return "";
             const memoryValue = memoryMap.get("total_graph_sz_mb") || '<1';
 
             return `${memoryValue} MB`;
-        }, [toast, setIndicator, activeConnectionId]);
+        }, [toast, setIndicator]);
 
     const loadNodesCount = useCallback((opt: string) =>
         async () => {
             try {
+                const startEpoch = getConnectionEpoch();
+                const cid = getActiveConnectionIdGlobal();
                 const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
-                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes${readOnlyParam}`, toast, setIndicator) as { nodes?: number };
+                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes${readOnlyParam}`, toast, setIndicator, { connectionId: cid }) as { nodes?: number };
+                if (getConnectionEpoch() !== startEpoch) return "";
 
                 if (result.nodes == null || !Number.isFinite(Number(result.nodes))) return "";
 
@@ -113,8 +119,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const loadEdgesCount = useCallback((opt: string) =>
         async () => {
             try {
+                const startEpoch = getConnectionEpoch();
+                const cid = getActiveConnectionIdGlobal();
                 const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
-                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges${readOnlyParam}`, toast, setIndicator) as { edges?: number };
+                const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges${readOnlyParam}`, toast, setIndicator, { connectionId: cid }) as { edges?: number };
+                if (getConnectionEpoch() !== startEpoch) return "";
 
                 if (result.edges == null || !Number.isFinite(Number(result.edges))) return "";
 
@@ -125,6 +134,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         }, [toast, setIndicator, isReadOnly]);
 
     const handleSetOption = useCallback(async (option: string, optionName: string) => {
+        const startEpoch = getConnectionEpoch();
+        const cid = getActiveConnectionIdGlobal();
         const result = await securedFetch(
             `api/graph/${prepareArg(option)}`,
             {
@@ -133,8 +144,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 body: JSON.stringify({ sourceName: optionName })
             },
             toast,
-            setIndicator
+            setIndicator,
+            cid
         );
+
+        if (getConnectionEpoch() !== startEpoch) return false;
 
         if (result.ok) {
             const newOptions = safeOptions.map((opt) => (opt === optionName ? option : opt));

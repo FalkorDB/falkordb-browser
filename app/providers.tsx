@@ -1643,6 +1643,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   };
 
   const handleLoadDemoGraphs = useCallback(async () => {
+    const startEpoch = getConnectionEpoch();
+    const cid = getActiveConnectionIdGlobal();
+
     try {
       // Store current user graphs and URL params
       setUserGraphsBeforeTutorial(graphNames);
@@ -1694,18 +1697,20 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       `;
 
       await Promise.all([
-        getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, toast, setIndicator),
-        getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, toast, setIndicator)
+        getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, toast, setIndicator, { connectionId: cid }),
+        getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, toast, setIndicator, { connectionId: cid })
       ]).catch(async () => {
         await Promise.all([
           securedFetch("/api/graph/social-demo", {
             method: "DELETE",
-          }, toast, setIndicator),
+          }, toast, setIndicator, cid),
           securedFetch("/api/graph/social-demo-test", {
             method: "DELETE",
-          }, toast, setIndicator)
+          }, toast, setIndicator, cid)
         ]);
       });
+
+      if (getConnectionEpoch() !== startEpoch) return;
 
       // Update graph list to only show demo graphs
       setGraphNames(["social-demo", "social-demo-test"]);
@@ -1725,19 +1730,24 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   }, [graphName, graphNames, toast]);
 
   const handleCleanupDemoGraphs = useCallback(async () => {
+    const startEpoch = getConnectionEpoch();
+    const cid = getActiveConnectionIdGlobal();
+
     try {
       await Promise.all([
         securedFetch("/api/graph/social-demo", {
           method: "DELETE",
-        }, toast, setIndicator),
+        }, toast, setIndicator, cid),
         securedFetch("/api/graph/social-demo-test", {
           method: "DELETE",
-        }, toast, setIndicator)
+        }, toast, setIndicator, cid)
       ]);
     } catch (error) {
 
       console.error("Failed to cleanup demo graphs", error);
     }
+
+    if (getConnectionEpoch() !== startEpoch) return;
 
     // Clear current graph to avoid showing deleted demo graph. Build the empty
     // graph with the real toast/setIndicator callbacks up front so its GraphInfo

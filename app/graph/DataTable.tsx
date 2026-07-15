@@ -1,10 +1,7 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable no-param-reassign */
-
 'use client';
 
 import { Check, CirclePlus, Info, Pencil, Trash2, X } from "lucide-react";
-import { cn, prepareArg, securedFetch, GraphRef, Link, Node, Value } from "@/lib/utils";
+import { cn, getActiveConnectionIdGlobal, getConnectionEpoch, prepareArg, securedFetch, GraphRef, Link, Node, Value } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Fragment, MutableRefObject, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Switch } from "@/components/ui/switch";
@@ -198,6 +195,8 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
     };
 
     const setProperty = async (key: string, val: Value, isUndo: boolean, actionType: ("added" | "set") = "set") => {
+        const startEpoch = getConnectionEpoch();
+        const cid = getActiveConnectionIdGlobal();
         const { id } = object;
         if (val === "") {
             toast({
@@ -215,8 +214,9 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                     value: val,
                     type
                 })
-            }, toast, setIndicator);
+            }, toast, setIndicator, cid);
 
+            if (getConnectionEpoch() !== startEpoch) return false;
             if (result.ok) {
                 const value = object.data[key];
 
@@ -301,13 +301,17 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
     };
 
     const removeProperty = async (key: string) => {
+        const startEpoch = getConnectionEpoch();
+        const cid = getActiveConnectionIdGlobal();
         try {
             setIsRemoveLoading(true);
             const { id } = object;
             const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${key}${isReadOnly ? '?readOnly=true' : ''}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type }),
-            }, toast, setIndicator)).ok;
+            }, toast, setIndicator, cid)).ok;
+
+            if (getConnectionEpoch() !== startEpoch) return;
 
             if (success) {
                 const value = object.data[key];
