@@ -2,9 +2,8 @@ import { expect, test } from "@playwright/test";
 import urls from "../config/urls.json";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import NavBarComponent from "../logic/POM/headerComponent";
-import { initializeLocalStorage } from "../infra/utils";
+import { initializeLocalStorage, normalizeUrl, urlPath } from "../infra/utils";
 import ApiCalls from "../logic/api/apiCalls";
-import { normalizeUrl, urlPath } from "../infra/utils";
 
 test.describe(`Header tests`, () => {
   let browser: BrowserWrapper;
