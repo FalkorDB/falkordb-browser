@@ -15,6 +15,7 @@ import { setFunctionCandidates } from "@/lib/cypherSuggestions";
 import { udfFunctionNames } from "@/lib/cypherLang";
 import { computeEditorDiagnostics, type DiagnosticsResult } from "@/lib/cypherDiagnostics";
 import { isAiFixSupported } from "@/lib/aiFix";
+import { createSerializedRunner, commitWithValidation } from "./components/serializedRunner";
 import { PanelImperativeHandle } from "react-resizable-panels";
 import type { Data as CanvasData, HierarchyDirection, LayoutMode, RadialDirection, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
@@ -339,11 +340,16 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const optionsSeqRef = useRef(0);
   // loadingOwnerRef: the querySeq that currently owns the isQueryLoading spinner.
   const loadingOwnerRef = useRef<number | null>(null);
-  // Connection-switch gate. `pendingSwitches` counts in-flight switches (graph ops
-  // are rejected while > 0); `switchTicket` is monotonic so a completing switch
-  // can tell whether it is still the latest (out-of-order completions are ignored).
-  const pendingSwitchesRef = useRef(0);
+  // Connection-switch gate. `pendingSwitchTickets` holds the tickets of in-flight
+  // switches (graph ops are rejected while the set is non-empty); `switchTicket` is
+  // monotonic so a completing switch can tell whether it is still the latest.
+  // `committedSwitch` is the winning/rollback ticket handed to the reset effect,
+  // keyed by target so a batched-away intermediate state can't release the wrong
+  // ticket. `lastCommittedConnId` is the newest connection whose JWT commit validated.
+  const pendingSwitchTicketsRef = useRef<Set<number>>(new Set());
   const switchTicketRef = useRef(0);
+  const committedSwitchRef = useRef<{ ticket: number; targetId: string | null } | null>(null);
+  const lastCommittedConnIdRef = useRef<string | null>(null);
 
   const bumpContextGen = useCallback(() => {
     contextGenRef.current += 1;
@@ -356,19 +362,33 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     return contextGenRef.current;
   }, []);
 
-  // Returns a ticket for this switch. Every begin must be matched by exactly one
-  // end (on success via the reset effect, on failure/supersession by the caller),
-  // so the counter can never get stuck above 0.
+  // Returns a ticket for this switch. Every begin is matched by exactly one release
+  // (the winning/rollback ticket via the reset effect, others via the caller's
+  // finally), so the gate set can never get stuck non-empty.
   const beginConnectionSwitch = useCallback(() => {
-    pendingSwitchesRef.current += 1;
     switchTicketRef.current += 1;
+    pendingSwitchTicketsRef.current.add(switchTicketRef.current);
     bumpContextGen();
     return switchTicketRef.current;
   }, [bumpContextGen]);
 
-  const endConnectionSwitch = useCallback(() => {
-    pendingSwitchesRef.current = Math.max(0, pendingSwitchesRef.current - 1);
+  const endConnectionSwitch = useCallback((ticket: number) => {
+    pendingSwitchTicketsRef.current.delete(ticket);
   }, []);
+
+  // Hand the winning (or state-changing rollback) ticket to the reset effect, which
+  // releases it only once React reaches `targetId`. Retire any prior handed-off
+  // ticket first (its own newer live ticket keeps the gate closed) so the ref can't
+  // leak a superseded handoff.
+  const handoffConnectionSwitch = useCallback((ticket: number, targetId: string | null) => {
+    const prev = committedSwitchRef.current;
+    if (prev && prev.ticket !== ticket) pendingSwitchTicketsRef.current.delete(prev.ticket);
+    committedSwitchRef.current = { ticket, targetId };
+  }, []);
+
+  const isConnectionSwitchInProgress = useCallback(() => pendingSwitchTicketsRef.current.size > 0, []);
+
+  const getLastCommittedConnId = useCallback(() => lastCommittedConnIdRef.current, []);
 
   // True if `ticket` is still the most recently started switch (so a stale,
   // out-of-order completion doesn't publish an older connection as active).
@@ -681,6 +701,32 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const statusRef = useRef(status);
   statusRef.current = status;
 
+  // Serialized + validated session-commit (idea-7 §3a): wraps the raw next-auth
+  // update so overlapping switches commit to the JWT cookie in submission order, and
+  // only a validated commit (returned session actually reflects the target) counts.
+  // Created once so its FIFO chain persists across renders.
+  const commitRunnerRef = useRef<((data: { activeConnectionId?: string | null }) => Promise<unknown>) | undefined>(undefined);
+  if (!commitRunnerRef.current) {
+    commitRunnerRef.current = createSerializedRunner((data: { activeConnectionId?: string | null }) =>
+      commitWithValidation(data.activeConnectionId ?? null, {
+        update: (d) => updateSessionRef.current(d),
+        getStatus: () => statusRef.current,
+        onCommitted: (id) => { lastCommittedConnIdRef.current = id; },
+      }));
+  }
+  const commitActiveConnection = useCallback((data: { activeConnectionId?: string | null }) => {
+    const runner = commitRunnerRef.current;
+    return runner ? runner(data) : Promise.resolve(undefined);
+  }, []);
+
+  // Seed the last-good connection from the authenticated session so a rollback can
+  // converge with the existing JWT even before the first user switch commits.
+  useEffect(() => {
+    if (status === "authenticated" && lastCommittedConnIdRef.current === null && sessionData?.activeConnectionId != null) {
+      lastCommittedConnIdRef.current = sessionData.activeConnectionId;
+    }
+  }, [status, sessionData]);
+
   const connectionContext = useMemo(() => ({
     connectionType,
     setConnectionType,
@@ -693,11 +739,14 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setAdditionalConnections,
     activeConnectionId,
     setActiveConnectionId,
-    updateSession,
+    updateSession: commitActiveConnection,
     beginConnectionSwitch,
     endConnectionSwitch,
+    handoffConnectionSwitch,
+    isConnectionSwitchInProgress,
+    getLastCommittedConnId,
     isLatestSwitch,
-  }), [connectionType, connectionInfo, dbVersion, isReadOnly, additionalConnections, activeConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
+  }), [connectionType, connectionInfo, dbVersion, isReadOnly, additionalConnections, activeConnectionId, commitActiveConnection, beginConnectionSwitch, endConnectionSwitch, handoffConnectionSwitch, isConnectionSwitchInProgress, getLastCommittedConnId, isLatestSwitch]);
 
   const udfContext = useMemo(() => ({
     udfList,
@@ -719,7 +768,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Don't start a count while a connection switch is mid-flight — the global id
     // and React state may disagree, so this could query (and auto-create) the
     // old graph on the new connection.
-    if (pendingSwitchesRef.current > 0) return;
+    if (pendingSwitchTicketsRef.current.size > 0) return;
 
     // Capture the connection this request targets. Prefer the caller's captured
     // epoch (the epoch when its poll/action began) so a switch between that start
@@ -849,7 +898,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     // Reject while a connection switch is mid-flight — its global id and React
     // state may still disagree, so starting here could hit the wrong DB.
-    if (pendingSwitchesRef.current > 0) return;
+    if (pendingSwitchTicketsRef.current.size > 0) return;
 
     // Capture ownership once: this is the newest query for the current
     // connection + graph. `isCurrent()` gates every later apply so a switch, a
@@ -1174,6 +1223,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         setActiveConnectionId(null);
         setActiveConnectionIdGlobal(null);
         sessionSyncedRef.current = false;
+        pendingSwitchTicketsRef.current.clear();
+        committedSwitchRef.current = null;
+        lastCommittedConnIdRef.current = null;
       }
       return;
     }
@@ -1213,9 +1265,14 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             // the correct connection's role/host/port. The JWT callback looks
             // up the full connection details from Token DB.
             if (!cancelled) {
-              await updateSessionRef.current({
-                activeConnectionId: target,
-              });
+              // Route through the serialized commit so a concurrent user switch
+              // can't be reordered against this establishment write; best-effort
+              // (a failed commit must not abort establishment).
+              try {
+                await commitActiveConnection({ activeConnectionId: target });
+              } catch (commitErr) {
+                console.warn("Initial session commit failed:", commitErr);
+              }
             }
 
           } else {
@@ -1250,9 +1307,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                 setActiveConnectionId(migratedConn.id);
                 setActiveConnectionIdGlobal(migratedConn.id);
                 if (!cancelled) {
-                  await updateSessionRef.current({
-                    activeConnectionId: migratedConn.id,
-                  });
+                  try {
+                    await commitActiveConnection({ activeConnectionId: migratedConn.id });
+                  } catch (commitErr) {
+                    console.warn("Migrated session commit failed:", commitErr);
+                  }
                 }
               }
             }
@@ -1265,7 +1324,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     })();
 
     return () => { cancelled = true; };
-  }, [status, toast]);
+  }, [status, toast, commitActiveConnection]);
 
   useEffect(() => {
     if (status !== "authenticated" || !prefixReady) return;
@@ -1619,17 +1678,29 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const prev = prevActiveConnectionIdRef.current;
     prevActiveConnectionIdRef.current = activeConnectionId;
 
+    // Release a handed-off switch ticket once React reaches its target — even for a
+    // rollback to the same id or the first establishment (which skip the reset
+    // below) — so its gate ticket doesn't leak. On a real change we release only
+    // AFTER graph state is reset (at the end), so no graph op runs against a
+    // mismatched connection/graph in between.
+    const releaseHandoff = () => {
+      const h = committedSwitchRef.current;
+      if (h && h.targetId === activeConnectionId) {
+        endConnectionSwitch(h.ticket);
+        committedSwitchRef.current = null;
+      }
+    };
+
     // Skip the very first selection (initial mount / login) and null resets
-    if (prev === null || activeConnectionId === null) return;
+    if (prev === null || activeConnectionId === null) { releaseHandoff(); return; }
     // Skip if unchanged
-    if (prev === activeConnectionId) return;
+    if (prev === activeConnectionId) { releaseHandoff(); return; }
 
     // The connection actually changed and React state now agrees: supersede any
-    // in-flight graph op and fully release the switch gate so new ops are accepted
-    // again (any still-pending older switch is no longer latest, so it's a no-op).
+    // in-flight graph op. The switch gate is released via the handed-off ticket at
+    // the end of this effect (after graph state is reset), not by zeroing the gate.
     bumpContextGen();
     activeGraphNameRef.current = "";
-    pendingSwitchesRef.current = 0;
 
     // Clear graph data so stale results from the old connection are gone.
     // Build the empty graph with the real toast/setIndicator callbacks up front
@@ -1648,7 +1719,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Re-fetch graph list for the new connection (clearing the old list).
     connectionSwitchFetchedRef.current = true;
     handleFetchOptions({ clear: true });
-  }, [activeConnectionId, toast, setIndicator, handleFetchOptions, bumpContextGen]);
+
+    // Graph state is reset above → now release this switch's gate ticket so new
+    // ops are accepted again for the new connection.
+    releaseHandoff();
+  }, [activeConnectionId, toast, setIndicator, handleFetchOptions, bumpContextGen, endConnectionSwitch]);
 
   const handleCloseTutorial = () => {
     setTutorialOpen(false);

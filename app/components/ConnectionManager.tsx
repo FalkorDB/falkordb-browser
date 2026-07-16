@@ -26,6 +26,9 @@ export default function ConnectionManager() {
     updateSession,
     beginConnectionSwitch,
     endConnectionSwitch,
+    handoffConnectionSwitch,
+    isConnectionSwitchInProgress,
+    getLastCommittedConnId,
     isLatestSwitch,
   } = useContext(ConnectionContext);
 
@@ -41,33 +44,42 @@ export default function ConnectionManager() {
     // if the user starts a newer switch before this one resolves.
     const ticket = beginConnectionSwitch();
     // Set the global ID immediately so periodic timers (memory, count, etc.)
-    // that fire DURING the updateSession await use the correct connection and
-    // don't fall back to Token DB which might pick the wrong entry.
+    // that fire DURING the commit use the correct connection.
     setActiveConnectionIdGlobal(connId);
     localStorage.setItem("lastActiveConnectionId", connId);
-    // Update the JWT so session.user.role is correct before React effects
-    // (graph-list reload, query execution) fire. The JWT callback looks up
-    // the connection details from Token DB.
+    let handedOff = false;
     try {
+      // Commit the JWT (serialized + validated). Throws on failure so we roll back.
       await updateSession({ activeConnectionId: connId });
+      if (!isLatestSwitch(ticket)) {
+        // A newer switch superseded this one — don't publish this (older) target;
+        // the finally releases this switch's gate ticket.
+        return;
+      }
+      // Publish React state AFTER the JWT commit, and hand this ticket to the reset
+      // effect so the gate stays closed until graph state is re-pinned.
+      handoffConnectionSwitch(ticket, connId);
+      handedOff = true;
+      setActiveConnectionId(connId);
     } catch (error) {
-      // Roll back so ids stay consistent and graph ops are unblocked again.
-      if (isLatestSwitch(ticket)) setActiveConnectionIdGlobal(activeConnectionId);
-      endConnectionSwitch();
       console.error("Failed to switch connection:", error);
-      return;
+      if (isLatestSwitch(ticket)) {
+        // Converge all three states on the last validated connection (which
+        // exists), not on this failed target.
+        const rollbackId = getLastCommittedConnId() ?? activeConnectionId;
+        setActiveConnectionIdGlobal(rollbackId);
+        if (rollbackId !== null) localStorage.setItem("lastActiveConnectionId", rollbackId);
+        if (rollbackId !== activeConnectionId) {
+          // The rollback changes React state → release via that reset effect too.
+          handoffConnectionSwitch(ticket, rollbackId);
+          handedOff = true;
+          setActiveConnectionId(rollbackId);
+        }
+      }
+    } finally {
+      if (!handedOff) endConnectionSwitch(ticket);
     }
-    if (!isLatestSwitch(ticket)) {
-      // A newer switch superseded this one — don't publish this (older) target as
-      // active; just release this switch's gate slot.
-      endConnectionSwitch();
-      return;
-    }
-    // Update React state AFTER the JWT is updated so the prevActiveConnectionId
-    // effect fires with the correct role already in sessionData; that reset
-    // effect also clears this switch's gate slot.
-    setActiveConnectionId(connId);
-  }, [activeConnectionId, setActiveConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
+  }, [activeConnectionId, setActiveConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, handoffConnectionSwitch, getLastCommittedConnId, isLatestSwitch]);
 
   // Determine whether the user only has one connection. The session always
   // has at least one (the primary), so we treat an empty additionalConnections
@@ -89,48 +101,86 @@ export default function ConnectionManager() {
     const { conn, isLast } = removeTarget;
     const connId = conn.id;
 
+    // If this is the last connection, sign out instead (before any switch/ticket).
+    if (isLast) {
+      setRemoving(true);
+      try {
+        await signOut({ callbackUrl: "/login" });
+      } finally {
+        setRemoving(false);
+      }
+      return;
+    }
+
+    // Don't remove while a connection switch is mid-flight — the gate set can't
+    // identify the in-flight target, so block all removals (safe + simple).
+    if (isConnectionSwitchInProgress()) {
+      toast({ title: "Please wait for the connection switch to finish", variant: "destructive" });
+      return;
+    }
+
     setRemoving(true);
     try {
-      // If this is the last connection, sign out instead.
-      if (isLast) {
-        await signOut({ callbackUrl: "/login" });
+      const removingActive = activeConnectionId === connId;
+      const remaining = additionalConnections.filter(c => c.id !== connId);
+
+      if (removingActive && remaining.length > 0) {
+        // Commit-before-delete: move the session to a valid replacement BEFORE
+        // deleting the old row, so the JWT never points at a deleted connection.
+        const newActive = remaining[remaining.length - 1].id;
+        const ticket = beginConnectionSwitch();
+        setActiveConnectionIdGlobal(newActive);
+        localStorage.setItem("lastActiveConnectionId", newActive);
+        let handedOff = false;
+        try {
+          await updateSession({ activeConnectionId: newActive });
+          if (!isLatestSwitch(ticket)) { setRemoveTarget(null); return; }
+          handoffConnectionSwitch(ticket, newActive);
+          handedOff = true;
+          setActiveConnectionId(newActive);
+        } catch (error) {
+          console.error("Failed to switch connection after removal:", error);
+          toast({ title: "Failed to switch to remaining connection", variant: "destructive" });
+          if (isLatestSwitch(ticket)) {
+            const rollbackId = getLastCommittedConnId() ?? activeConnectionId;
+            setActiveConnectionIdGlobal(rollbackId);
+            if (rollbackId !== null) localStorage.setItem("lastActiveConnectionId", rollbackId);
+            if (rollbackId !== activeConnectionId) {
+              handoffConnectionSwitch(ticket, rollbackId);
+              handedOff = true;
+              setActiveConnectionId(rollbackId);
+            }
+          }
+          setRemoveTarget(null);
+          return;   // nothing deleted — the old connection is still valid
+        } finally {
+          if (!handedOff) endConnectionSwitch(ticket);
+        }
+      }
+
+      // Only now delete the (no-longer-active) old connection.
+      let result: Response;
+      try {
+        result = await securedFetch(`/api/connections/${encodeURIComponent(connId)}`, {
+          method: "DELETE",
+        }, toast, setIndicator);
+      } catch (error) {
+        // Ambiguous network failure — don't assume the row survived; refetch the list.
+        console.error("Failed to remove connection:", error);
+        try {
+          const listRes = await securedFetch("/api/connections", { method: "GET" }, toast, setIndicator);
+          if (listRes.ok) {
+            const listJson = await listRes.json();
+            if (listJson?.connections) setAdditionalConnections(listJson.connections);
+          }
+        } catch { /* best-effort refresh */ }
+        setRemoveTarget(null);
         return;
       }
 
-      const result = await securedFetch(`/api/connections/${encodeURIComponent(connId)}`, {
-        method: "DELETE",
-      }, toast, setIndicator);
-
       if (result.ok) {
-        const remaining = additionalConnections.filter(c => c.id !== connId);
+        // Update the list only after a successful DELETE.
         setAdditionalConnections(remaining);
-
-        // If we removed the active connection, switch to the last remaining one.
-        if (activeConnectionId === connId && remaining.length > 0) {
-          const newActive = remaining[remaining.length - 1].id;
-          const ticket = beginConnectionSwitch();
-          setActiveConnectionIdGlobal(newActive);
-          localStorage.setItem("lastActiveConnectionId", newActive);
-          try {
-            await updateSession({ activeConnectionId: newActive });
-          } catch (error) {
-            if (isLatestSwitch(ticket)) setActiveConnectionIdGlobal(activeConnectionId);
-            endConnectionSwitch();
-            console.error("Failed to switch connection after removal:", error);
-            toast({ title: "Failed to switch to remaining connection", variant: "destructive" });
-            setRemoveTarget(null);
-            return;
-          }
-
-          if (!isLatestSwitch(ticket)) {
-            endConnectionSwitch();
-            setRemoveTarget(null);
-            return;
-          }
-
-          setActiveConnectionId(newActive);
-        }
-
         toast({ title: "Connection removed" });
       } else {
         toast({ title: "Failed to remove connection", variant: "destructive" });
@@ -142,7 +192,7 @@ export default function ConnectionManager() {
     } finally {
       setRemoving(false);
     }
-  }, [removeTarget, toast, additionalConnections, setAdditionalConnections, activeConnectionId, setActiveConnectionId, setIndicator, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
+  }, [removeTarget, toast, additionalConnections, setAdditionalConnections, activeConnectionId, setActiveConnectionId, setIndicator, updateSession, beginConnectionSwitch, endConnectionSwitch, handoffConnectionSwitch, isConnectionSwitchInProgress, getLastCommittedConnId, isLatestSwitch]);
 
   const handleAddConnection = useCallback(async (credentials: LoginFormCredentials) => {
     const result = await securedFetch("/api/connections", {
@@ -162,32 +212,39 @@ export default function ConnectionManager() {
       const json = await result.json();
       const newConn = json.connection;
       setAdditionalConnections((prev) => [...prev, newConn]);
-      // Auto-switch to the newly added connection
+      // Auto-switch to the newly added connection.
       const ticket = beginConnectionSwitch();
       setActiveConnectionIdGlobal(newConn.id);
       localStorage.setItem("lastActiveConnectionId", newConn.id);
+      let handedOff = false;
       try {
         await updateSession({ activeConnectionId: newConn.id });
+        if (!isLatestSwitch(ticket)) return;
+        handoffConnectionSwitch(ticket, newConn.id);
+        handedOff = true;
+        setActiveConnectionId(newConn.id);
+        toast({ title: `Connection added for ${credentials.username}` });
+        setDialogOpen(false);
       } catch (error) {
-        if (isLatestSwitch(ticket)) setActiveConnectionIdGlobal(activeConnectionId);
-        endConnectionSwitch();
         console.error("Failed to switch to new connection:", error);
         toast({ title: "Connection added but switch failed", variant: "destructive" });
-        return;
+        if (isLatestSwitch(ticket)) {
+          const rollbackId = getLastCommittedConnId() ?? activeConnectionId;
+          setActiveConnectionIdGlobal(rollbackId);
+          if (rollbackId !== null) localStorage.setItem("lastActiveConnectionId", rollbackId);
+          if (rollbackId !== activeConnectionId) {
+            handoffConnectionSwitch(ticket, rollbackId);
+            handedOff = true;
+            setActiveConnectionId(rollbackId);
+          }
+        }
+      } finally {
+        if (!handedOff) endConnectionSwitch(ticket);
       }
-
-      if (!isLatestSwitch(ticket)) {
-        endConnectionSwitch();
-        return;
-      }
-
-      setActiveConnectionId(newConn.id);
-      toast({ title: `Connection added for ${credentials.username}` });
-      setDialogOpen(false);
     } else {
       throw new Error("Failed to add connection");
     }
-  }, [toast, setAdditionalConnections, setIndicator, setActiveConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch, activeConnectionId]);
+  }, [toast, setAdditionalConnections, setIndicator, setActiveConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, handoffConnectionSwitch, getLastCommittedConnId, isLatestSwitch, activeConnectionId]);
 
   // Use the explicitly active connection, or fall back to the first one while
   // activeConnectionId is still being resolved (e.g. on initial page load).

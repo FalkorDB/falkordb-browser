@@ -237,11 +237,18 @@ type ConnectionContextType = {
   setActiveConnectionId: Dispatch<SetStateAction<string | null>>;
   updateSession: (data: { activeConnectionId?: string | null }) => Promise<unknown>;
   // Mark a user connection switch as in-progress (blocks graph ops + supersedes
-  // in-flight ones) and clear it once the switch settles. `beginConnectionSwitch`
+  // in-flight ones) and release it once the switch settles. `beginConnectionSwitch`
   // returns a ticket; `isLatestSwitch(ticket)` reports whether it is still the
   // newest switch, so out-of-order completions don't publish a stale connection.
+  // The winning/rollback ticket is handed to the reset effect via
+  // `handoffConnectionSwitch` (keyed by target); others are released by the caller
+  // via `endConnectionSwitch(ticket)`. `isConnectionSwitchInProgress` gates graph
+  // ops and blocks removals; `getLastCommittedConnId` is the last validated commit.
   beginConnectionSwitch: () => number;
-  endConnectionSwitch: () => void;
+  endConnectionSwitch: (ticket: number) => void;
+  handoffConnectionSwitch: (ticket: number, targetId: string | null) => void;
+  isConnectionSwitchInProgress: () => boolean;
+  getLastCommittedConnId: () => string | null;
   isLatestSwitch: (ticket: number) => boolean;
 };
 
@@ -503,6 +510,9 @@ export const ConnectionContext = createContext<ConnectionContextType>({
   updateSession: async () => { },
   beginConnectionSwitch: () => 0,
   endConnectionSwitch: () => { },
+  handoffConnectionSwitch: () => { },
+  isConnectionSwitchInProgress: () => false,
+  getLastCommittedConnId: () => null,
   isLatestSwitch: () => true,
 });
 
