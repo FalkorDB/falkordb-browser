@@ -20,6 +20,9 @@ const DEFAULT_CONNECT_SRC = [
     "https://*.google-analytics.com",
     "https://*.analytics.google.com",
     "https://*.googletagmanager.com",
+    // Required by @vercel/blob/client multipart upload control-plane calls.
+    "https://vercel.com",
+    "https://*.vercel.com",
 ];
 
 // Parse and cache CSP_CONNECT_SRC once at module load time

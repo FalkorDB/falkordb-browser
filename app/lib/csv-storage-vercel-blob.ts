@@ -1,11 +1,12 @@
 import { del, issueSignedToken, list, presignUrl, put } from "@vercel/blob";
+import { generateClientTokenFromReadWriteToken } from "@vercel/blob/client";
 import type { Readable } from "stream";
-import type { CsvStorageProvider } from "./csv-storage";
+import type { CsvDirectUploadRequest, CsvDirectUploadTarget, CsvStorageProvider } from "./csv-storage";
 import { isValidOwner, normalizeCsvKey } from "./csv-key";
 
 /**
- * Stores CSV files in Vercel Blob under owner-scoped pathnames
- * (`<prefix>/<owner>/<uuid>.csv`). A fresh short-lived presigned GET URL is
+ * Stores CSV files in Vercel Blob under flat owner-scoped pathnames
+ * (`<prefix>/<owner>-<uuid>.csv`). A fresh short-lived presigned GET URL is
  * generated at execution time for private stores; public stores return the
  * blob URL. Cleanup only removes exact owner/uuid leaves under the prefix.
  */
@@ -14,7 +15,7 @@ type BlobAccessMode = "public" | "private";
 const DEFAULT_PRIVATE_BLOB_URL_TTL_MS = 15 * 60 * 1000;
 
 const OWNED_LEAF =
-    /\/[0-9a-f]{32}\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.csv$/;
+    /\/(?:[0-9a-f]{32}\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-9a-f]{32}-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.csv$/;
 
 function buildPrefix(): string {
     return (process.env.BLOB_KEY_PREFIX ?? "csv-temp").replace(/^\/+|\/+$/g, "");
@@ -26,7 +27,7 @@ function requireOwner(owner: string): string {
 }
 
 function buildPathname(owner: string, key: string): string {
-    return `${buildPrefix()}/${requireOwner(owner)}/${normalizeCsvKey(key)}.csv`;
+    return `${buildPrefix()}/${requireOwner(owner)}-${normalizeCsvKey(key)}.csv`;
 }
 
 function getBlobAccessMode(): BlobAccessMode {
@@ -94,7 +95,6 @@ export class VercelBlobCsvStorage implements CsvStorageProvider {
         const prefix = `${buildPrefix()}/`;
 
         do {
-            // eslint-disable-next-line no-await-in-loop
             const result = await list({ prefix, cursor, limit: 1000 });
             const stale = result.blobs.filter((blob) => {
                 if (!OWNED_LEAF.test(blob.pathname)) return false;
@@ -104,7 +104,6 @@ export class VercelBlobCsvStorage implements CsvStorageProvider {
 
             for (const blob of stale) {
                 try {
-                    // eslint-disable-next-line no-await-in-loop
                     await del(blob.url);
                     deleted += 1;
                 } catch {
@@ -116,5 +115,33 @@ export class VercelBlobCsvStorage implements CsvStorageProvider {
         } while (cursor);
 
         return deleted;
+    }
+
+    async createDirectUploadTarget(
+        owner: string,
+        key: string,
+        request: CsvDirectUploadRequest
+    ): Promise<CsvDirectUploadTarget | null> {
+        const pathname = buildPathname(owner, key);
+        const access = getBlobAccessMode();
+        const contentType = request.contentType || "text/csv";
+
+        const token = await generateClientTokenFromReadWriteToken({
+            pathname,
+            addRandomSuffix: false,
+            // Never replace an existing CSV temp object if a pathname is reused.
+            allowOverwrite: false,
+            allowedContentTypes: [contentType],
+            maximumSizeInBytes: request.sizeBytes,
+        });
+
+        return {
+            type: "blob-client-token",
+            pathname,
+            token,
+            access,
+            multipart: true,
+            contentType,
+        };
     }
 }

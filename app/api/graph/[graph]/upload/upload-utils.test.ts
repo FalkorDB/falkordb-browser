@@ -66,3 +66,42 @@ test("executeCypherBatch rejects a batch containing LOAD CSV without executing a
   );
   assert.equal(querySpy.mock.callCount(), 0);
 });
+
+test("executeCypherBatch (.txt) ignores markdown fences, directives, and non-Cypher full-line comments", async () => {
+  const { graph, querySpy } = makeGraph();
+
+  const count = await executeCypherBatch(
+    graph,
+    `
+\uFEFF
+```cypher
+// comment line
+-- another comment
+# heading/comment
+:begin
+CREATE (:A);
+MATCH (n) RETURN n;
+```
+`,
+    { sourceExtension: ".txt" }
+  );
+
+  assert.equal(count, 2);
+  assert.equal(querySpy.mock.callCount(), 2);
+  assert.equal(querySpy.mock.calls[0].arguments[0], "CREATE (:A)");
+  assert.equal(querySpy.mock.calls[1].arguments[0], "MATCH (n) RETURN n");
+});
+
+test("executeCypherBatch (.cypher) does not apply txt normalization", async () => {
+  const { graph } = makeGraph(async (query) => {
+    if (String(query).includes("# comment")) {
+      throw new Error("syntax error at #");
+    }
+    return { data: [] };
+  });
+
+  await assert.rejects(
+    () => executeCypherBatch(graph, "# comment\nCREATE (:A);", { sourceExtension: ".cypher" }),
+    /Failed to execute Cypher statement 1: syntax error at #/
+  );
+});

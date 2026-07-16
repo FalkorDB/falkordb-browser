@@ -4,13 +4,47 @@ import {
   splitCypherStatements,
 } from "../../../../../lib/graphUpload.ts";
 
+type CypherUploadExtension = ".txt" | ".cql" | ".cypher";
+
+interface ExecuteCypherBatchOptions {
+  sourceExtension?: CypherUploadExtension;
+}
+
 /**
- * Split a Cypher batch file into statements and execute them sequentially.
- * Returns the number of statements executed. Failures are annotated with the
- * statement number so partial-batch errors are actionable.
+ * .txt uploads are often copied from docs/issues and may include markdown
+ * fences, shell directives, or full-line comments. Strip only obvious non-Cypher
+ * lines to make uploads more forgiving without changing trusted .cypher/.cql.
+ *
+ * Note: FalkorDB executes Cypher only. This does not add SQL support; it only
+ * discards non-Cypher noise in loose text files before Cypher splitting.
  */
-export async function executeCypherBatch(graph: Graph, batchText: string): Promise<number> {
-  const statements = splitCypherStatements(batchText);
+function normalizeTxtBatch(batchText: string): string {
+  const withoutBom = batchText.replace(/^\uFEFF/, "");
+  const lines = withoutBom.split(/\r?\n/);
+
+  const kept = lines.filter((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return true;
+
+    if (trimmed.startsWith("```")) return false;
+    if (trimmed.startsWith("//")) return false;
+    if (trimmed.startsWith("--")) return false;
+    if (trimmed.startsWith("#")) return false;
+    if (trimmed.startsWith(":")) return false;
+
+    return true;
+  });
+
+  return kept.join("\n");
+}
+
+export async function executeCypherBatch(
+  graph: Graph,
+  batchText: string,
+  options: ExecuteCypherBatchOptions = {}
+): Promise<number> {
+  const normalizedBatch = options.sourceExtension === ".txt" ? normalizeTxtBatch(batchText) : batchText;
+  const statements = splitCypherStatements(normalizedBatch);
 
   // Reject the whole batch before executing anything if any statement smuggles
   // its own `LOAD CSV` clause, so an uploaded batch can never trigger an
