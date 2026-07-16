@@ -17,6 +17,8 @@ import {
 } from "./file-validation";
 import { DUMP_RESTORE_ENABLED } from "@/lib/graphUpload";
 
+export const runtime = "nodejs";
+
 // Small text/CSV/Cypher uploads are capped tightly (MAX_FILE_SIZE). A .dump is a
 // binary blob that streams straight to disk and can legitimately be large, so it
 // gets a separate, larger cap instead of being uncapped — an uncapped stream
@@ -42,8 +44,17 @@ function parseUploadErrorMessage(error: unknown): string {
   if (normalized.includes("unexpected end of form")) {
     return "Malformed multipart body: upload ended before the form was complete.";
   }
+  if (normalized.includes("unexpected end of multipart")) {
+    return "Malformed multipart body: upload ended before all multipart data arrived.";
+  }
   if (normalized.includes("unexpected end of file")) {
     return "Malformed multipart body: upload ended unexpectedly.";
+  }
+  if (normalized.includes("malformed part header")) {
+    return "Malformed multipart body: invalid part headers.";
+  }
+  if (normalized.includes("unexpected token") || normalized.includes("invalid state")) {
+    return "Malformed multipart body: request stream could not be parsed.";
   }
 
   return "Failed to parse upload.";
