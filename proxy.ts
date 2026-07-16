@@ -128,7 +128,7 @@ export function proxy(request: NextRequest) {
         return NextResponse.next();
     }
 
-    // --- CSP with nonce (all routes) ---
+    // --- CSP with nonce (non-API routes) ---
     const nonce = btoa(crypto.randomUUID());
     const isDev = process.env.NODE_ENV === "development";
 

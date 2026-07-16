@@ -12,7 +12,7 @@ interface ExecuteCypherBatchOptions {
 
 /**
  * .txt uploads are often copied from docs/issues and may include markdown
- * fences, shell directives, or full-line comments. Strip only obvious non-Cypher
+ * fences, wrappers, or full-line comments. Strip only obvious non-Cypher
  * lines to make uploads more forgiving without changing trusted .cypher/.cql.
  *
  * Note: FalkorDB executes Cypher only. This does not add SQL support; it only
@@ -30,7 +30,9 @@ function normalizeTxtBatch(batchText: string): string {
     if (trimmed.startsWith("//")) return false;
     if (trimmed.startsWith("--")) return false;
     if (trimmed.startsWith("#")) return false;
-    if (trimmed.startsWith(":")) return false;
+    // Keep arbitrary ":..." lines (for fail-loud behavior) and only drop
+    // known transaction wrappers often copied from cypher-shell snippets.
+    if (/^:(begin|commit)\b/i.test(trimmed)) return false;
 
     return true;
   });

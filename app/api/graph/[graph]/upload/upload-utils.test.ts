@@ -74,14 +74,14 @@ test("executeCypherBatch (.txt) ignores markdown fences, directives, and non-Cyp
     graph,
     `
 \uFEFF
-```cypher
+\`\`\`cypher
 // comment line
 -- another comment
 # heading/comment
 :begin
 CREATE (:A);
 MATCH (n) RETURN n;
-```
+\`\`\`
 `,
     { sourceExtension: ".txt" }
   );
@@ -103,5 +103,19 @@ test("executeCypherBatch (.cypher) does not apply txt normalization", async () =
   await assert.rejects(
     () => executeCypherBatch(graph, "# comment\nCREATE (:A);", { sourceExtension: ".cypher" }),
     /Failed to execute Cypher statement 1: syntax error at #/
+  );
+});
+
+test("executeCypherBatch (.txt) keeps unknown colon directives so they fail loudly", async () => {
+  const { graph } = makeGraph(async (query) => {
+    if (String(query).startsWith(":param")) {
+      throw new Error("syntax error at :");
+    }
+    return { data: [] };
+  });
+
+  await assert.rejects(
+    () => executeCypherBatch(graph, ":param x => 1\nCREATE (:A);", { sourceExtension: ".txt" }),
+    /Failed to execute Cypher statement 1: syntax error at :/
   );
 });

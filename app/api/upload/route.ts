@@ -32,18 +32,6 @@ type StreamResult =
   | { ok: true; filename: string }
   | { ok: false; error: string; status: number };
 
-function isMultipartParseFailure(result: StreamResult): result is { ok: false; error: string; status: number } {
-  return (
-    !result.ok &&
-    result.status === 400 &&
-    (
-      result.error === "Failed to parse upload." ||
-      result.error.startsWith("Expected multipart/form-data") ||
-      result.error.startsWith("Malformed multipart body")
-    )
-  );
-}
-
 function parseUploadErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error ?? "");
   const normalized = message.toLowerCase();
@@ -229,8 +217,10 @@ async function streamToDisk(
         })
         .catch((err: unknown) => {
           fs.unlink(tempFilePath, () => {});
-          console.error("Stream pipeline error:", err);
-          recordError(500, "Failed to store uploaded file.");
+          if (!sizeLimitHit) {
+            console.error("Stream pipeline error:", err);
+            recordError(500, "Failed to store uploaded file.");
+          }
           storeSettled = true;
           settleIfReady();
         });
@@ -272,84 +262,9 @@ async function streamToDisk(
   });
 }
 
-async function storeUploadedFile(
-  file: File,
-  userId: string
-): Promise<StreamResult> {
-  const originalName = file.name || "";
-  const mimeType = file.type || "application/octet-stream";
-  const extension = path.extname(originalName).toLowerCase();
-
-  if (extension === ".dump" && !DUMP_RESTORE_ENABLED) {
-    return { ok: false, error: "Dump restore is temporarily disabled.", status: 403 };
-  }
-
-  const allowedFileType = getAllowedFileType(extension);
-  if (!allowedFileType || !allowedFileType.mimeTypes.includes(mimeType)) {
-    return { ok: false, error: "Invalid file type.", status: 400 };
-  }
-
-  const sizeLimit = BINARY_EXTENSIONS.has(extension) ? MAX_DUMP_SIZE : MAX_FILE_SIZE;
-  if (file.size > sizeLimit) {
-    return { ok: false, error: "File is too large.", status: 413 };
-  }
-
-  const filename = `${randomUUID()}${extension}`;
-  const uploadsDir = getUploadsDirectory(userId);
-  const filePath = getUploadFilePath(filename, userId);
-
-  if (!filePath) {
-    return { ok: false, error: "Invalid file name.", status: 400 };
-  }
-
-  fs.mkdirSync(uploadsDir, { recursive: true });
-
-  try {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    await fs.promises.writeFile(filePath, buffer);
-    return { ok: true, filename };
-  } catch (err) {
-    console.error("Fallback formData store error:", err);
-    await fs.promises.unlink(filePath).catch(() => undefined);
-    return { ok: false, error: "Failed to store uploaded file.", status: 500 };
-  }
-}
-
-async function formDataToDisk(request: Request, userId: string): Promise<StreamResult> {
-  let formData: FormData;
-  try {
-    formData = await request.formData();
-  } catch (err) {
-    console.error("formData parse error:", err);
-    return { ok: false, error: parseUploadErrorMessage(err), status: 400 };
-  }
-
-  const entries = Array.from(formData.entries());
-  const hasUnexpectedField = entries.some(([key]) => key !== "file");
-  if (hasUnexpectedField) {
-    return { ok: false, error: "Unexpected form fields.", status: 400 };
-  }
-
-  const files = entries
-    .filter(([key, value]) => key === "file" && value instanceof File)
-    .map(([, value]) => value as File);
-
-  if (files.length === 0) {
-    return { ok: false, error: "No file uploaded.", status: 400 };
-  }
-  if (files.length > 1) {
-    return { ok: false, error: "Only a single file may be uploaded.", status: 400 };
-  }
-
-  return storeUploadedFile(files[0], userId);
-}
-
 export async function POST(request: NextRequest) {
   try {
     const corsHeaders = getCorsHeaders(request);
-    // Clone once up-front so we can retry multipart parsing with the built-in
-    // Request.formData() parser if Busboy fails on this runtime.
-    const fallbackRequest = request.clone();
     const session = await getClient(request);
 
     if (session instanceof NextResponse) {
@@ -366,11 +281,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let result = await streamToDisk(request, session.user.id);
-
-    if (isMultipartParseFailure(result)) {
-      result = await formDataToDisk(fallbackRequest, session.user.id);
-    }
+    const result = await streamToDisk(request, session.user.id);
 
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: result.status, headers: corsHeaders });
