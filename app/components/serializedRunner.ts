@@ -18,9 +18,11 @@ export const delay = (ms: number): Promise<void> =>
 export function createSerializedRunner<A extends unknown[], R>(
   fn: (...args: A) => Promise<R>,
 ): (...args: A) => Promise<R> {
+  // `tail` is kept non-rejecting (its assignment below always ends in `.catch`),
+  // so we can chain `.then` onto it directly without another guard.
   let tail: Promise<unknown> = Promise.resolve();
   return (...args: A): Promise<R> => {
-    const run = tail.catch(() => undefined).then(() => fn(...args));
+    const run = tail.then(() => fn(...args));
     // Advance the chain tail without letting a rejection break ordering.
     tail = run.catch(() => undefined);
     return run;

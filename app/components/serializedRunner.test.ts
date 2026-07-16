@@ -238,6 +238,17 @@ describe("commitWithValidation", () => {
     assert.deepEqual(result, { activeConnectionId: null });
   });
 
+  it("labels the error 'null' when a null-target commit exhausts its retries", async () => {
+    await assert.rejects(
+      () => commitWithValidation(
+        null,
+        makeDeps({ update: async () => ({ activeConnectionId: "conn-x" }) }),
+        { ...fastOpts, maxAttempts: 2 },
+      ),
+      /Failed to commit active connection null to session/,
+    );
+  });
+
   it("uses default options when none are provided", async () => {
     const result = await commitWithValidation(
       "conn-A",
