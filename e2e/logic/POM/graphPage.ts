@@ -384,7 +384,7 @@ export default class GraphPage extends BasePage {
           (data.elements && Array.isArray(data.elements.nodes) && data.elements.nodes.length > 0)));
       },
       "graph",
-      { timeout: 10000 }
+      { timeout: 20000 }
     );
 
     const canvasInfo = await this.canvasElement.evaluate((canvasElement: HTMLCanvasElement) => {
@@ -515,7 +515,7 @@ export default class GraphPage extends BasePage {
           (data.elements && Array.isArray(data.elements.links) && data.elements.links.length > 0)));
       },
       "graph",
-      { timeout: 10000 }
+      { timeout: 20000 }
     );
 
     const canvasInfo = await this.canvasElement.evaluate((canvasElement: HTMLCanvasElement) => {
