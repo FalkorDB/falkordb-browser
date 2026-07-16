@@ -18,8 +18,8 @@ services:
     depends_on:
       - minio
     ports:
-      - "443:9443"
-      - "444:9443"
+      - "443:443"
+      - "444:443"
       - "9443:9443"
     volumes:
       - ./docker/minio-tls/Caddyfile:/etc/caddy/Caddyfile:ro

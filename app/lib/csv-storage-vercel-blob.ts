@@ -42,6 +42,14 @@ function getPrivateBlobUrlTtlMs(): number {
     return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_PRIVATE_BLOB_URL_TTL_MS;
 }
 
+function getAllowedCsvContentTypes(contentType: string): string[] {
+    const normalized = contentType.split(";")[0]?.trim().toLowerCase() || "text/csv";
+    const known = ["text/csv", "application/vnd.ms-excel", "text/plain"];
+    return known.includes(normalized)
+        ? [normalized, ...known.filter((value) => value !== normalized)]
+        : known;
+}
+
 async function createPrivatePresignedGetUrl(pathname: string): Promise<string> {
     const validUntil = Date.now() + getPrivateBlobUrlTtlMs();
     const signedToken = await issueSignedToken({ pathname, operations: ["get"], validUntil });
@@ -125,13 +133,14 @@ export class VercelBlobCsvStorage implements CsvStorageProvider {
         const pathname = buildPathname(owner, key);
         const access = getBlobAccessMode();
         const contentType = request.contentType || "text/csv";
+        const allowedContentTypes = getAllowedCsvContentTypes(contentType);
 
         const token = await generateClientTokenFromReadWriteToken({
             pathname,
             addRandomSuffix: false,
             // Never replace an existing CSV temp object if a pathname is reused.
             allowOverwrite: false,
-            allowedContentTypes: [contentType],
+            allowedContentTypes,
             maximumSizeInBytes: request.sizeBytes,
         });
 

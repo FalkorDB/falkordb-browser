@@ -6,19 +6,22 @@
 https://127.0.0.1, https://localhost, https://minio.localhost, https://172.17.0.1, https://127.0.0.1:443, https://localhost:443, https://minio.localhost:443, https://172.17.0.1:443 {
     log
 
-    @hasOrigin header Origin *
+    @allowedOrigin header_regexp Origin ^https?://(localhost|127\.0\.0\.1)(:3000)?$
 
     @preflight method OPTIONS
     handle @preflight {
-        header {
-            Access-Control-Allow-Origin {http.request.header.Origin}
-            Access-Control-Allow-Methods "GET, PUT, POST, DELETE, HEAD, OPTIONS"
-            Access-Control-Allow-Headers *
-            Access-Control-Expose-Headers "ETag, x-amz-request-id, x-amz-id-2"
-            Access-Control-Max-Age 3600
-            Vary Origin
+        handle @allowedOrigin {
+            header {
+                Access-Control-Allow-Origin {http.request.header.Origin}
+                Access-Control-Allow-Methods "GET, PUT, POST, DELETE, HEAD, OPTIONS"
+                Access-Control-Allow-Headers *
+                Access-Control-Expose-Headers "ETag, x-amz-request-id, x-amz-id-2"
+                Access-Control-Max-Age 3600
+                Vary Origin
+            }
+            respond 204
         }
-        respond 204
+        respond 403
     }
 
     reverse_proxy minio:9000 {
@@ -34,7 +37,7 @@ https://127.0.0.1, https://localhost, https://minio.localhost, https://172.17.0.
         header_down -Vary
     }
 
-    header @hasOrigin {
+    header @allowedOrigin {
         Access-Control-Allow-Origin {http.request.header.Origin}
         Access-Control-Allow-Methods "GET, PUT, POST, DELETE, HEAD, OPTIONS"
         Access-Control-Allow-Headers *
@@ -47,19 +50,22 @@ https://127.0.0.1, https://localhost, https://minio.localhost, https://172.17.0.
 https://127.0.0.1:9443, https://localhost:9443, https://minio.localhost:9443, https://172.17.0.1:9443 {
     log
 
-    @hasOrigin header Origin *
+    @allowedOrigin header_regexp Origin ^https?://(localhost|127\.0\.0\.1)(:3000)?$
 
     @preflight method OPTIONS
     handle @preflight {
-        header {
-            Access-Control-Allow-Origin {http.request.header.Origin}
-            Access-Control-Allow-Methods "GET, PUT, POST, DELETE, HEAD, OPTIONS"
-            Access-Control-Allow-Headers *
-            Access-Control-Expose-Headers "ETag, x-amz-request-id, x-amz-id-2"
-            Access-Control-Max-Age 3600
-            Vary Origin
+        handle @allowedOrigin {
+            header {
+                Access-Control-Allow-Origin {http.request.header.Origin}
+                Access-Control-Allow-Methods "GET, PUT, POST, DELETE, HEAD, OPTIONS"
+                Access-Control-Allow-Headers *
+                Access-Control-Expose-Headers "ETag, x-amz-request-id, x-amz-id-2"
+                Access-Control-Max-Age 3600
+                Vary Origin
+            }
+            respond 204
         }
-        respond 204
+        respond 403
     }
 
     reverse_proxy minio:9000 {
@@ -72,7 +78,7 @@ https://127.0.0.1:9443, https://localhost:9443, https://minio.localhost:9443, ht
         header_down -Vary
     }
 
-    header @hasOrigin {
+    header @allowedOrigin {
         Access-Control-Allow-Origin {http.request.header.Origin}
         Access-Control-Allow-Methods "GET, PUT, POST, DELETE, HEAD, OPTIONS"
         Access-Control-Allow-Headers *

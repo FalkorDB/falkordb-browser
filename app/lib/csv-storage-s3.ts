@@ -1,5 +1,6 @@
 import {
     S3Client,
+    HeadObjectCommand,
     GetObjectCommand,
     PutObjectCommand,
     DeleteObjectCommand,
@@ -43,8 +44,11 @@ function resolveReadEndpoint(): string | undefined {
     const explicitPort = process.env.S3_READ_URL_PORT?.trim();
     const explicitProtocol = process.env.S3_READ_URL_PROTOCOL?.trim();
 
+    const autoGatewayRewriteEnabled = process.env.S3_READ_URL_AUTO_DOCKER_GATEWAY === "true";
     const autoHost =
-        !explicitHost && /^(localhost|127\.0\.0\.1)$/i.test(parsed.hostname)
+        autoGatewayRewriteEnabled
+        && !explicitHost
+        && /^(localhost|127\.0\.0\.1)$/i.test(parsed.hostname)
             ? (process.env.S3_READ_URL_DOCKER_GATEWAY?.trim() || "172.17.0.1")
             : "";
 
@@ -152,10 +156,23 @@ export class S3CsvStorage implements CsvStorageProvider {
 
     async resolveReadUrl(owner: string, key: string): Promise<string> {
         const s3Key = objectKey(owner, key);
-        // Don't preflight with HeadObject: on local/self-signed TLS setups the
-        // backend HEAD can fail even though FalkorDB can fetch the presigned
-        // URL directly. Let LOAD CSV surface a fetch/read error if the object
-        // is truly missing.
+        // Optional existence check for early, deterministic 404s before LOAD CSV.
+        if (process.env.S3_VERIFY_OBJECT_EXISTS === "true") {
+            try {
+                await this.readClient.send(new HeadObjectCommand({ Bucket: bucket(), Key: s3Key }));
+            } catch (err) {
+                const asObj = err as { name?: string; $metadata?: { httpStatusCode?: number } };
+                if (
+                    asObj?.name === "NotFound"
+                    || asObj?.name === "NoSuchKey"
+                    || asObj?.$metadata?.httpStatusCode === 404
+                ) {
+                    throw new Error("CSV temp object not found.");
+                }
+                throw err;
+            }
+        }
+
         return getSignedUrl(
             this.readClient,
             new GetObjectCommand({ Bucket: bucket(), Key: s3Key }),

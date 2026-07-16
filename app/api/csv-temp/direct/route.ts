@@ -17,23 +17,30 @@ interface DirectUploadBody {
     sizeBytes?: number;
 }
 
-function sanitizeDirectUploadRequest(body: DirectUploadBody): CsvDirectUploadRequest | null {
-    if (typeof body.filename !== "string" || !body.filename.trim()) return null;
-    if (typeof body.sizeBytes !== "number" || !Number.isFinite(body.sizeBytes) || body.sizeBytes <= 0) return null;
+function sanitizeDirectUploadRequest(body: unknown): CsvDirectUploadRequest | null {
+    if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+
+    const input = body as Record<string, unknown>;
+    if (typeof input.filename !== "string" || !input.filename.trim()) return null;
+    if (typeof input.sizeBytes !== "number" || !Number.isFinite(input.sizeBytes) || input.sizeBytes <= 0) return null;
+    if (input.contentType !== undefined && typeof input.contentType !== "string") return null;
 
     const maxBytes = getCsvMaxUploadBytes();
-    if (body.sizeBytes > maxBytes) {
+    const filename = input.filename.trim();
+    const contentType = (typeof input.contentType === "string" ? input.contentType : "text/csv").trim() || "text/csv";
+
+    if (input.sizeBytes > maxBytes) {
         return {
-            filename: body.filename.trim(),
-            contentType: (body.contentType || "text/csv").trim() || "text/csv",
+            filename,
+            contentType,
             sizeBytes: Number.POSITIVE_INFINITY,
         };
     }
 
     return {
-        filename: body.filename.trim(),
-        contentType: (body.contentType || "text/csv").trim() || "text/csv",
-        sizeBytes: Math.floor(body.sizeBytes),
+        filename,
+        contentType,
+        sizeBytes: Math.floor(input.sizeBytes),
     };
 }
 
@@ -59,9 +66,9 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    let body: DirectUploadBody;
+    let body: unknown;
     try {
-        body = (await request.json()) as DirectUploadBody;
+        body = await request.json();
     } catch {
         return NextResponse.json(
             { message: "Invalid request body." },

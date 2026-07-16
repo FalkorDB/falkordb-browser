@@ -76,6 +76,29 @@ interface BlobDirectUploadTarget {
 
 type CsvDirectUploadTarget = S3DirectUploadTarget | BlobDirectUploadTarget;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isS3DirectUploadTarget(value: unknown): value is S3DirectUploadTarget {
+    if (!isRecord(value)) return false;
+    return value.type === "s3-presigned-put"
+        && value.method === "PUT"
+        && typeof value.url === "string"
+        && isRecord(value.headers)
+        && Object.values(value.headers).every((headerValue) => typeof headerValue === "string");
+}
+
+function isBlobDirectUploadTarget(value: unknown): value is BlobDirectUploadTarget {
+    if (!isRecord(value)) return false;
+    return value.type === "blob-client-token"
+        && typeof value.pathname === "string"
+        && typeof value.token === "string"
+        && (value.access === "public" || value.access === "private")
+        && typeof value.multipart === "boolean"
+        && typeof value.contentType === "string";
+}
+
 async function uploadCsvToS3PresignedUrl(
     file: File,
     target: S3DirectUploadTarget,
@@ -496,24 +519,25 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
 
             let key: string | null = null;
             if (directInit.ok) {
-                const parsed = (await directInit.json()) as {
-                    key?: string;
-                    upload?: CsvDirectUploadTarget;
-                };
-
-                if (!parsed.key || !parsed.upload) {
+                const parsedRaw = await directInit.json() as unknown;
+                if (!isRecord(parsedRaw) || typeof parsedRaw.key !== "string") {
+                    toast({ title: "Upload failed", description: "Unexpected direct-upload response.", variant: "destructive" });
+                    return;
+                }
+                const uploadTarget = parsedRaw.upload;
+                if (!isS3DirectUploadTarget(uploadTarget) && !isBlobDirectUploadTarget(uploadTarget)) {
                     toast({ title: "Upload failed", description: "Unexpected direct-upload response.", variant: "destructive" });
                     return;
                 }
 
-                if (parsed.upload.type === "s3-presigned-put") {
-                    await uploadCsvToS3PresignedUrl(file, parsed.upload, setUploadPct);
+                if (uploadTarget.type === "s3-presigned-put") {
+                    await uploadCsvToS3PresignedUrl(file, uploadTarget, setUploadPct);
                 } else {
-                    await putBlob(parsed.upload.pathname, file, {
-                        access: parsed.upload.access,
-                        token: parsed.upload.token,
-                        contentType: parsed.upload.contentType,
-                        multipart: parsed.upload.multipart,
+                    await putBlob(uploadTarget.pathname, file, {
+                        access: uploadTarget.access,
+                        token: uploadTarget.token,
+                        contentType: uploadTarget.contentType,
+                        multipart: uploadTarget.multipart,
                         onUploadProgress: (event) => {
                             setUploadPct(Math.min(100, Math.round(event.percentage)));
                         },
@@ -521,25 +545,27 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                     setUploadPct(100);
                 }
 
-                key = parsed.key;
+                key = parsedRaw.key;
             } else {
-                if (directInit.status !== 409) {
-                    let message = "Failed to prepare direct upload.";
-                    try {
-                        const errorBody = (await directInit.json()) as { message?: string };
-                        if (typeof errorBody?.message === "string" && errorBody.message.trim()) {
-                            message = errorBody.message;
-                        }
-                    } catch {
-                        // keep default message
+                let directInitMessage = "Failed to prepare direct upload.";
+                try {
+                    const errorBody = (await directInit.json()) as { message?: string };
+                    if (typeof errorBody?.message === "string" && errorBody.message.trim()) {
+                        directInitMessage = errorBody.message;
                     }
-                    toast({ title: "Upload failed", description: message, variant: "destructive" });
-                    return;
+                } catch {
+                    // keep default message
                 }
 
-                // Local mode only: use existing proxied upload.
+                // Fallback to proxied upload. This keeps local mode resilient when
+                // /api/csv-temp/direct fails transiently (auth/CORS/network).
                 const uploadResult = await uploadFileWithProgress("api/csv-temp", file, toast, setIndicator, setUploadPct);
-                if (!uploadResult.ok) return;
+                if (!uploadResult.ok) {
+                    if (directInit.status !== 409) {
+                        toast({ title: "Upload failed", description: directInitMessage, variant: "destructive" });
+                    }
+                    return;
+                }
                 try {
                     const parsed = JSON.parse(uploadResult.body) as { key?: string };
                     if (!parsed.key) throw new Error("Missing key in upload response");
