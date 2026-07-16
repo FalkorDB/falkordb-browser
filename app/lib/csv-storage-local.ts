@@ -2,7 +2,7 @@ import path from "path";
 import fs from "fs";
 import { pipeline } from "stream/promises";
 import type { Readable } from "stream";
-import type { CsvStorageProvider } from "./csv-storage";
+import type { CsvDirectUploadRequest, CsvDirectUploadTarget, CsvStorageProvider } from "./csv-storage";
 import { isValidOwner, normalizeCsvKey, signCsvCapability } from "./csv-key.ts";
 
 /**
@@ -163,5 +163,13 @@ export class LocalCsvStorage implements CsvStorageProvider {
         }
 
         return deleted;
+    }
+
+    async createDirectUploadTarget(
+        _owner: string,
+        _key: string,
+        _request: CsvDirectUploadRequest
+    ): Promise<CsvDirectUploadTarget | null> {
+        return null;
     }
 }

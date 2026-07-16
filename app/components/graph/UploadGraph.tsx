@@ -4,6 +4,7 @@ import { type FormEvent, useCallback, useContext, useEffect, useMemo, useRef, us
 import { FileSpreadsheet, X } from "lucide-react";
 import { Monaco } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
+import { put as putBlob } from "@vercel/blob/client";
 import Dropzone from "../ui/Dropzone";
 import Button from "../ui/Button";
 import CloseDialog from "../CloseDialog";
@@ -55,6 +56,57 @@ function formatFileSize(bytes: number): string {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+interface S3DirectUploadTarget {
+    type: "s3-presigned-put";
+    method: "PUT";
+    url: string;
+    headers: Record<string, string>;
+}
+
+interface BlobDirectUploadTarget {
+    type: "blob-client-token";
+    pathname: string;
+    token: string;
+    access: "public" | "private";
+    multipart: boolean;
+    contentType: string;
+}
+
+type CsvDirectUploadTarget = S3DirectUploadTarget | BlobDirectUploadTarget;
+
+async function uploadCsvToS3PresignedUrl(
+    file: File,
+    target: S3DirectUploadTarget,
+    setUploadPct: (value: number) => void
+): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open(target.method, target.url, true);
+        Object.entries(target.headers).forEach(([name, value]) => {
+            xhr.setRequestHeader(name, value);
+        });
+
+        xhr.upload.onprogress = (event) => {
+            if (!event.lengthComputable || event.total <= 0) return;
+            setUploadPct(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+        };
+
+        xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                setUploadPct(100);
+                resolve();
+                return;
+            }
+            const details = xhr.responseText?.trim();
+            reject(new Error(`S3 upload failed (${xhr.status})${details ? `: ${details}` : ""}.`));
+        };
+
+        xhr.onerror = () => reject(new Error("S3 upload failed: network/CORS/TLS error while calling the presigned URL."));
+        xhr.onabort = () => reject(new Error("S3 upload aborted."));
+        xhr.send(file);
+    });
 }
 
 export default function UploadGraph({ graphName, disabled, open, onOpenChange, onSuccess }: {
@@ -426,30 +478,95 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             setPhase("uploading");
             setUploadPct(0);
 
-            // Upload CSV to per-user temp storage — returns an opaque { key }.
-            // The client never receives/handles the storage URL (SSRF-safe): the
-            // server resolves the owner-scoped URL when running LOAD CSV.
-            const fileName = csvFiles[0].name;
-            const uploadResult = await uploadFileWithProgress("api/csv-temp", csvFiles[0], toast, setIndicator, setUploadPct);
-            if (!uploadResult.ok) return;
+            const file = csvFiles[0];
+            const fileName = file.name;
 
-            let key: string;
-            try {
-                const parsed = JSON.parse(uploadResult.body) as { key?: string };
-                if (!parsed.key) throw new Error("Missing key in upload response");
+            // Cloud mode: request a direct upload target and send bytes straight
+            // to storage (S3/Blob) without proxying through /api/csv-temp.
+            const directInit = await fetch("/api/csv-temp/direct", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    filename: file.name,
+                    contentType: file.type || "text/csv",
+                    sizeBytes: file.size,
+                }),
+            });
+
+            let key: string | null = null;
+            if (directInit.ok) {
+                const parsed = (await directInit.json()) as {
+                    key?: string;
+                    upload?: CsvDirectUploadTarget;
+                };
+
+                if (!parsed.key || !parsed.upload) {
+                    toast({ title: "Upload failed", description: "Unexpected direct-upload response.", variant: "destructive" });
+                    return;
+                }
+
+                if (parsed.upload.type === "s3-presigned-put") {
+                    await uploadCsvToS3PresignedUrl(file, parsed.upload, setUploadPct);
+                } else {
+                    await putBlob(parsed.upload.pathname, file, {
+                        access: parsed.upload.access,
+                        token: parsed.upload.token,
+                        contentType: parsed.upload.contentType,
+                        multipart: parsed.upload.multipart,
+                        onUploadProgress: (event) => {
+                            setUploadPct(Math.min(100, Math.round(event.percentage)));
+                        },
+                    });
+                    setUploadPct(100);
+                }
+
                 key = parsed.key;
-            } catch {
-                toast({ title: "Upload failed", description: "Unexpected response from server.", variant: "destructive" });
+            } else {
+                if (directInit.status !== 409) {
+                    let message = "Failed to prepare direct upload.";
+                    try {
+                        const errorBody = (await directInit.json()) as { message?: string };
+                        if (typeof errorBody?.message === "string" && errorBody.message.trim()) {
+                            message = errorBody.message;
+                        }
+                    } catch {
+                        // keep default message
+                    }
+                    toast({ title: "Upload failed", description: message, variant: "destructive" });
+                    return;
+                }
+
+                // Local mode only: use existing proxied upload.
+                const uploadResult = await uploadFileWithProgress("api/csv-temp", file, toast, setIndicator, setUploadPct);
+                if (!uploadResult.ok) return;
+                try {
+                    const parsed = JSON.parse(uploadResult.body) as { key?: string };
+                    if (!parsed.key) throw new Error("Missing key in upload response");
+                    key = parsed.key;
+                } catch {
+                    toast({ title: "Upload failed", description: "Unexpected response from server.", variant: "destructive" });
+                    return;
+                }
+            }
+
+            if (!key) {
+                toast({ title: "Upload failed", description: "Failed to obtain upload key.", variant: "destructive" });
                 return;
             }
+
             setCsvKey(key);
             setCsvFileName(fileName);
             setCsvQuery(buildLoadCsvBodyStarter());
             setCsvPreviewOpen(false);
-        } catch {
+        } catch (error) {
+            const rawMessage = error instanceof Error ? error.message : "";
+            const cspBlocked = /content security policy|csp|connect-src|blocked/i.test(rawMessage);
             toast({
-                title: "Upload state uncertain",
-                description: "The request may have completed. Refresh and verify before retrying.",
+                title: cspBlocked ? "Upload blocked by browser policy" : "Upload failed",
+                description: cspBlocked
+                    ? "Direct upload was blocked by Content-Security-Policy. Allow Blob/S3 host in connect-src (CSP_CONNECT_SRC) and retry."
+                    : (rawMessage || "The request may have completed. Refresh and verify before retrying."),
                 variant: "destructive",
             });
         } finally {

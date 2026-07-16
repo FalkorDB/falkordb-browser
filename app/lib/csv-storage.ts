@@ -21,6 +21,30 @@
 
 import type { Readable } from "stream";
 
+export type CsvStorageMode = "local" | "s3" | "blob";
+
+export interface CsvDirectUploadRequest {
+    filename: string;
+    contentType: string;
+    sizeBytes: number;
+}
+
+export type CsvDirectUploadTarget =
+    | {
+        type: "s3-presigned-put";
+        method: "PUT";
+        url: string;
+        headers: Record<string, string>;
+    }
+    | {
+        type: "blob-client-token";
+        pathname: string;
+        token: string;
+        access: "public" | "private";
+        multipart: boolean;
+        contentType: string;
+    };
+
 export interface CsvStorageProvider {
     /**
      * Persist the CSV `body` stream for `(owner, key)`, without buffering the
@@ -46,9 +70,21 @@ export interface CsvStorageProvider {
      * Returns the number of deleted entries.
      */
     cleanupExpired(olderThanMs: number): Promise<number>;
+
+    /**
+     * Optional direct-upload target generation for cloud providers. When this
+     * returns a value, the browser uploads file bytes directly to storage
+     * without proxying through the backend.
+     */
+    createDirectUploadTarget?(
+        owner: string,
+        key: string,
+        request: CsvDirectUploadRequest
+    ): Promise<CsvDirectUploadTarget | null>;
 }
 
 let _provider: CsvStorageProvider | undefined;
+let _providerSignature: string | undefined;
 
 function hasS3Config(): boolean {
     // S3_BUCKET is the only hard requirement to auto-detect S3: credentials can
@@ -61,11 +97,8 @@ function hasBlobConfig(): boolean {
     return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 }
 
-/** Returns the singleton storage provider for this process. */
-export function getCsvStorageProvider(): CsvStorageProvider {
-    if (_provider) return _provider;
-
-    const storageMode = process.env.CSV_STORAGE?.toLowerCase();
+function resolveStorageMode(): { mode: CsvStorageMode; explicit: boolean } {
+    const storageMode = process.env.CSV_STORAGE?.trim().toLowerCase();
 
     if (storageMode && !["local", "s3", "blob"].includes(storageMode)) {
         throw new Error(`Invalid CSV_STORAGE value \"${process.env.CSV_STORAGE}\". Expected one of: local, s3, blob.`);
@@ -74,33 +107,71 @@ export function getCsvStorageProvider(): CsvStorageProvider {
     const s3Configured = hasS3Config();
     const blobConfigured = hasBlobConfig();
 
-    let resolvedMode: "local" | "s3" | "blob";
     if (storageMode) {
-        resolvedMode = storageMode as "local" | "s3" | "blob";
-    } else if (s3Configured && blobConfigured) {
-        resolvedMode = "s3";
-    } else if (s3Configured) {
-        resolvedMode = "s3";
-    } else if (blobConfigured) {
-        resolvedMode = "blob";
-    } else {
-        resolvedMode = "local";
+        const explicitMode = storageMode as CsvStorageMode;
+        if (explicitMode === "s3" && !s3Configured) {
+            throw new Error("CSV_STORAGE is set to \"s3\" but S3_BUCKET is not configured.");
+        }
+        if (explicitMode === "blob" && !blobConfigured) {
+            throw new Error("CSV_STORAGE is set to \"blob\" but BLOB_READ_WRITE_TOKEN is not configured.");
+        }
+        return { mode: explicitMode, explicit: true };
     }
 
-    if (resolvedMode === "local") {
+    if (s3Configured && blobConfigured) return { mode: "s3", explicit: false };
+    if (s3Configured) return { mode: "s3", explicit: false };
+    if (blobConfigured) return { mode: "blob", explicit: false };
+    return { mode: "local", explicit: false };
+}
+
+function providerSignature(mode: CsvStorageMode): string {
+    // Include relevant env values so a provider selected in dev does not stay
+    // pinned after env changes (e.g. switching from local to blob without a
+    // full process restart).
+    return [
+        mode,
+        process.env.CSV_STORAGE ?? "",
+        process.env.S3_BUCKET ?? "",
+        process.env.S3_REGION ?? "",
+        process.env.S3_ENDPOINT ?? "",
+        process.env.S3_ACCESS_KEY_ID ?? "",
+        process.env.S3_SECRET_ACCESS_KEY ?? "",
+        process.env.S3_FORCE_PATH_STYLE ?? "",
+        process.env.S3_READ_ENDPOINT ?? "",
+        process.env.S3_READ_URL_HOST ?? "",
+        process.env.S3_READ_URL_PORT ?? "",
+        process.env.S3_READ_URL_PROTOCOL ?? "",
+        process.env.S3_READ_URL_DOCKER_GATEWAY ?? "",
+        process.env.BLOB_READ_WRITE_TOKEN ?? "",
+        process.env.BLOB_ACCESS ?? "",
+        process.env.BLOB_KEY_PREFIX ?? "",
+    ].join("|");
+}
+
+/** Returns the currently resolved CSV storage mode (after env/config checks). */
+export function getResolvedCsvStorageMode(): CsvStorageMode {
+    return resolveStorageMode().mode;
+}
+
+/** Returns the singleton storage provider for this process. */
+export function getCsvStorageProvider(): CsvStorageProvider {
+    const { mode } = resolveStorageMode();
+    const signature = providerSignature(mode);
+    if (_provider && _providerSignature === signature) return _provider;
+
+    if (mode === "local") {
         // Lazy-require to keep S3 SDK out of the local bundle.
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { LocalCsvStorage } = require("./csv-storage-local") as typeof import("./csv-storage-local");
         _provider = new LocalCsvStorage();
-    } else if (resolvedMode === "s3") {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
+    } else if (mode === "s3") {
         const { S3CsvStorage } = require("./csv-storage-s3") as typeof import("./csv-storage-s3");
         _provider = new S3CsvStorage();
     } else {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { VercelBlobCsvStorage } = require("./csv-storage-vercel-blob") as typeof import("./csv-storage-vercel-blob");
         _provider = new VercelBlobCsvStorage();
     }
+
+    _providerSignature = signature;
 
     return _provider;
 }

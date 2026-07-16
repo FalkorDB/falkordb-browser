@@ -12,6 +12,20 @@ services:
     volumes:
       - minio-data:/data
 
+  minio-tls:
+    image: caddy:2
+    container_name: falkordb-browser-minio-tls
+    depends_on:
+      - minio
+    ports:
+      - "443:9443"
+      - "444:9443"
+      - "9443:9443"
+    volumes:
+      - ./docker/minio-tls/Caddyfile:/etc/caddy/Caddyfile:ro
+      - minio-tls-data:/data
+      - minio-tls-config:/config
+
   minio-init:
     image: minio/mc:latest
     container_name: falkordb-browser-minio-init
@@ -30,3 +44,5 @@ services:
 
 volumes:
   minio-data:
+  minio-tls-data:
+  minio-tls-config:

@@ -531,6 +531,7 @@ const USER_READABLE_ERROR_PATTERNS = [
   /^file is too large\b/i,
   /^no file uploaded\b/i,
   /^request body is missing\b/i,
+  /^expected multipart\/form-data with a boundary\.?$/i,
   /^uploaded file not found\b/i,
   /^mode and fileId are required\b/i,
   /^you do not have permission\b/i,

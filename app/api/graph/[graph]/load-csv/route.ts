@@ -169,8 +169,20 @@ export async function POST(
                     const raw = (queryError as Error).message || "Failed to execute the LOAD CSV query.";
                     const isHeaderError = /failed reading csv header row/i.test(raw);
                     const isFetchError = /(unsupported uri|error opening csv uri)/i.test(raw);
+                    const csvUrlHost = (() => {
+                        try {
+                            return new URL(csvUrl).host;
+                        } catch {
+                            return "unknown";
+                        }
+                    })();
+                    const isLikelyLocalEndpoint = /localhost:|127\.0\.0\.1:/i.test(csvUrl);
                     const message = isHeaderError
-                        ? "Failed reading CSV header row. Verify the file has a valid header row, or turn off 'Use CSV headers' and access columns as row[0], row[1], ..."
+                        ? (
+                            isLikelyLocalEndpoint
+                                ? `Failed reading CSV header row. The uploaded file is valid, but FalkorDB likely cannot reach the storage URL from inside its container (host: ${csvUrlHost}). Set S3_READ_URL_HOST to a host reachable by FalkorDB (for example 172.17.0.1) and retry, or run FalkorDB on the host network.`
+                                : `Failed reading CSV header row. Verify the file has a valid header row, or turn off 'Use CSV headers' and access columns as row[0], row[1], ... (resolved storage host: ${csvUrlHost}).`
+                        )
                         : isFetchError
                             ? "FalkorDB could not fetch the uploaded CSV. Check the CSV storage configuration (CSV_STORAGE / CSV_SERVE_BASE_URL / IMPORT_FOLDER) so the database can reach the file."
                             : raw;

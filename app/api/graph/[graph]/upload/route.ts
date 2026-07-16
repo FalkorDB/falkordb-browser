@@ -85,7 +85,9 @@ export async function POST(
     const batchText = await fs.promises.readFile(storedUpload.filePath, "utf-8");
 
     try {
-      const count = await executeCypherBatch(graph, batchText);
+      const count = await executeCypherBatch(graph, batchText, {
+        sourceExtension: extension as ".txt" | ".cql" | ".cypher",
+      });
 
       return NextResponse.json(
         { message: `Executed ${count} Cypher statement(s).` },

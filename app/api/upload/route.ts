@@ -32,6 +32,23 @@ type StreamResult =
   | { ok: true; filename: string }
   | { ok: false; error: string; status: number };
 
+function parseUploadErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("boundary not found")) {
+    return "Expected multipart/form-data with a boundary.";
+  }
+  if (normalized.includes("unexpected end of form")) {
+    return "Malformed multipart body: upload ended before the form was complete.";
+  }
+  if (normalized.includes("unexpected end of file")) {
+    return "Malformed multipart body: upload ended unexpectedly.";
+  }
+
+  return "Failed to parse upload.";
+}
+
 /** Stream the multipart body through busboy directly to disk. */
 async function streamToDisk(
   request: NextRequest,
@@ -43,6 +60,14 @@ async function streamToDisk(
   }
 
   const contentType = request.headers.get("content-type") ?? "";
+
+  if (!/^multipart\/form-data\s*;\s*boundary=/i.test(contentType)) {
+    return {
+      ok: false,
+      error: "Expected multipart/form-data with a boundary.",
+      status: 400,
+    };
+  }
 
   return new Promise((resolve) => {
     let settled = false;
@@ -101,7 +126,7 @@ async function streamToDisk(
       // A malformed/missing multipart content-type makes the parser throw on
       // construction — that's a bad request, not a server error.
       console.error("Busboy init error:", err);
-      done({ ok: false, error: "Failed to parse upload.", status: 400 });
+      done({ ok: false, error: parseUploadErrorMessage(err), status: 400 });
       return;
     }
 
@@ -211,7 +236,7 @@ async function streamToDisk(
 
     busboy.on("error", (err) => {
       console.error("Busboy error:", err);
-      recordError(500, "Failed to parse upload.");
+      recordError(400, parseUploadErrorMessage(err));
       busboyClosed = true;
       settleIfReady();
     });
@@ -225,7 +250,7 @@ async function streamToDisk(
       busboy
     ).catch((err: unknown) => {
       console.error("Upload stream error:", err);
-      recordError(500, "Failed to parse upload.");
+      recordError(400, parseUploadErrorMessage(err));
       busboyClosed = true;
       settleIfReady();
     });
