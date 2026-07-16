@@ -57,7 +57,82 @@ function parseUploadErrorMessage(error: unknown): string {
     return "Malformed multipart body: request stream could not be parsed.";
   }
 
+  const compact = message.replace(/\s+/g, " ").trim();
+  if (compact) {
+    return `Failed to parse upload: ${compact.slice(0, 200)}`;
+  }
+
   return "Failed to parse upload.";
+}
+
+async function uploadSmallFileFromFormData(
+  request: NextRequest,
+  userId: string
+): Promise<StreamResult> {
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch (err) {
+    console.error("formData parse error:", err);
+    return { ok: false, error: parseUploadErrorMessage(err), status: 400 };
+  }
+
+  const entries = Array.from(formData.entries());
+  const fileEntries = entries.filter(([key, value]) => key === "file" && value instanceof File);
+  const hasUnexpectedField = entries.some(([key]) => key !== "file");
+
+  if (hasUnexpectedField) {
+    return { ok: false, error: "Unexpected form fields.", status: 400 };
+  }
+  if (fileEntries.length === 0) {
+    return { ok: false, error: "No file uploaded.", status: 400 };
+  }
+  if (fileEntries.length > 1) {
+    return { ok: false, error: "Only a single file may be uploaded.", status: 400 };
+  }
+
+  const [, fileValue] = fileEntries[0];
+  if (typeof fileValue === "string") {
+    return { ok: false, error: "No file uploaded.", status: 400 };
+  }
+  const file = fileValue as File;
+  const originalName = file.name || "";
+  const mimeType = file.type || "application/octet-stream";
+  const extension = path.extname(originalName).toLowerCase();
+
+  if (extension === ".dump" && !DUMP_RESTORE_ENABLED) {
+    return { ok: false, error: "Dump restore is temporarily disabled.", status: 403 };
+  }
+
+  const allowedFileType = getAllowedFileType(extension);
+  if (!allowedFileType || !allowedFileType.mimeTypes.includes(mimeType)) {
+    return { ok: false, error: "Invalid file type.", status: 400 };
+  }
+
+  const sizeLimit = BINARY_EXTENSIONS.has(extension) ? MAX_DUMP_SIZE : MAX_FILE_SIZE;
+  if (file.size > sizeLimit) {
+    return { ok: false, error: "File is too large.", status: 413 };
+  }
+
+  const filename = `${randomUUID()}${extension}`;
+  const uploadsDir = getUploadsDirectory(userId);
+  const filePath = getUploadFilePath(filename, userId);
+
+  if (!filePath) {
+    return { ok: false, error: "Invalid file name.", status: 400 };
+  }
+
+  fs.mkdirSync(uploadsDir, { recursive: true });
+
+  try {
+    const bytes = Buffer.from(await file.arrayBuffer());
+    await fs.promises.writeFile(filePath, bytes);
+    return { ok: true, filename };
+  } catch (err) {
+    console.error("store formData upload error:", err);
+    await fs.promises.unlink(filePath).catch(() => undefined);
+    return { ok: false, error: "Failed to store uploaded file.", status: 500 };
+  }
 }
 
 /** Stream the multipart body through busboy directly to disk. */
@@ -292,7 +367,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await streamToDisk(request, session.user.id);
+    // In production runtimes, multipart streaming via Busboy can behave
+    // differently for small text uploads. Prefer the built-in formData parser
+    // for regular uploads (max 5MB), and keep Busboy for dump-enabled mode.
+    const result = DUMP_RESTORE_ENABLED
+      ? await streamToDisk(request, session.user.id)
+      : await uploadSmallFileFromFormData(request, session.user.id);
 
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: result.status, headers: corsHeaders });
