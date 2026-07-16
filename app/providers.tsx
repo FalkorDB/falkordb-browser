@@ -350,6 +350,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const switchTicketRef = useRef(0);
   const committedSwitchRef = useRef<{ ticket: number; targetId: string | null } | null>(null);
   const lastCommittedConnIdRef = useRef<string | null>(null);
+  // Bumped on auth reset (sign-out) so a queued session commit from a previous
+  // session is abandoned instead of committing into a later (re-login) session.
+  const authGenRef = useRef(0);
 
   const bumpContextGen = useCallback(() => {
     contextGenRef.current += 1;
@@ -705,18 +708,23 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // update so overlapping switches commit to the JWT cookie in submission order, and
   // only a validated commit (returned session actually reflects the target) counts.
   // Created once so its FIFO chain persists across renders.
-  const commitRunnerRef = useRef<((data: { activeConnectionId?: string | null }) => Promise<unknown>) | undefined>(undefined);
+  const commitRunnerRef = useRef<((data: { activeConnectionId?: string | null }, isCancelled: () => boolean) => Promise<unknown>) | undefined>(undefined);
   if (!commitRunnerRef.current) {
-    commitRunnerRef.current = createSerializedRunner((data: { activeConnectionId?: string | null }) =>
+    commitRunnerRef.current = createSerializedRunner((data: { activeConnectionId?: string | null }, isCancelled: () => boolean) =>
       commitWithValidation(data.activeConnectionId ?? null, {
         update: (d) => updateSessionRef.current(d),
         getStatus: () => statusRef.current,
         onCommitted: (id) => { lastCommittedConnIdRef.current = id; },
+        isCancelled,
       }));
   }
   const commitActiveConnection = useCallback((data: { activeConnectionId?: string | null }) => {
     const runner = commitRunnerRef.current;
-    return runner ? runner(data) : Promise.resolve(undefined);
+    if (!runner) return Promise.resolve(undefined);
+    // Pin this commit to the current auth session; if a sign-out bumps the auth
+    // generation while it is queued, it aborts instead of committing cross-session.
+    const gen = authGenRef.current;
+    return runner(data, () => authGenRef.current !== gen);
   }, []);
 
   // Seed the last-good connection from the authenticated session so a rollback can
@@ -1226,6 +1234,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         pendingSwitchTicketsRef.current.clear();
         committedSwitchRef.current = null;
         lastCommittedConnIdRef.current = null;
+        // Abandon any queued session commits from this (now ended) session.
+        authGenRef.current += 1;
       }
       return;
     }
@@ -1259,19 +1269,19 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
             const target = lastId && conns.find(c => c.id === lastId)
               ? lastId
               : conns[0].id;
-            setActiveConnectionId(target);
+            // Pin the global so the commit's own request routes to `target`, but
+            // publish React state only AFTER the JWT commit validates — a failed
+            // commit must not leave the UI on a connection the session doesn't
+            // reflect. Route through the serialized commit so a concurrent user
+            // switch can't be reordered against this establishment write.
             setActiveConnectionIdGlobal(target);
-            // Sync activeConnectionId into the JWT so session.user reflects
-            // the correct connection's role/host/port. The JWT callback looks
-            // up the full connection details from Token DB.
             if (!cancelled) {
-              // Route through the serialized commit so a concurrent user switch
-              // can't be reordered against this establishment write; best-effort
-              // (a failed commit must not abort establishment).
               try {
                 await commitActiveConnection({ activeConnectionId: target });
+                if (!cancelled) setActiveConnectionId(target);
               } catch (commitErr) {
                 console.warn("Initial session commit failed:", commitErr);
+                if (!cancelled) setActiveConnectionIdGlobal(null);
               }
             }
 
@@ -1304,13 +1314,15 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                 const migratedConn: SessionConnection = migrateJson.connection;
                 const migratedConns = [migratedConn];
                 setAdditionalConnections(migratedConns);
-                setActiveConnectionId(migratedConn.id);
+                // Publish React state only after the commit validates (see above).
                 setActiveConnectionIdGlobal(migratedConn.id);
                 if (!cancelled) {
                   try {
                     await commitActiveConnection({ activeConnectionId: migratedConn.id });
+                    if (!cancelled) setActiveConnectionId(migratedConn.id);
                   } catch (commitErr) {
                     console.warn("Migrated session commit failed:", commitErr);
+                    if (!cancelled) setActiveConnectionIdGlobal(null);
                   }
                 }
               }

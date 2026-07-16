@@ -67,6 +67,9 @@ export interface CommitDeps {
   getStatus: () => string;
   /** Called with the target once a commit is validated as successful. */
   onCommitted?: (targetId: string | null) => void;
+  /** Abort the commit (without a write) when it becomes stale — e.g. the auth
+   * session changed (sign-out / re-login) while this commit was queued. */
+  isCancelled?: () => boolean;
 }
 
 export interface CommitOptions {
@@ -98,6 +101,11 @@ export async function commitWithValidation(
   const sleep = opts.sleep ?? delay;
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    // Abandon a queued commit whose session is no longer current (e.g. the user
+    // signed out and back in while it waited) so it can't commit cross-session.
+    if (deps.isCancelled?.()) {
+      throw new Error(`Commit for ${targetId} cancelled (auth changed)`);
+    }
     const ready = await waitUntil(() => deps.getStatus() === "authenticated", readyTimeoutMs, {
       now: opts.now,
       sleep,

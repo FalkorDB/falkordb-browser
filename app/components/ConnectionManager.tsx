@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useContext, useState } from "react";
+import { useCallback, useContext, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import { Check, ChevronDown, LogOut, Plus } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -35,10 +35,19 @@ export default function ConnectionManager() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<{ conn: SessionConnection; isLast: boolean } | null>(null);
   const [removing, setRemoving] = useState(false);
+  // Mirrors `removing` synchronously so handleSelect can block a switch while a
+  // removal (commit + DELETE) is mid-flight — the two must be mutually exclusive
+  // so a select can't target a connection that is being deleted.
+  const removingRef = useRef(false);
 
   const handleSelect = useCallback(async (connId: string) => {
-    // Clicking the already-active connection is a no-op (avoids a stuck gate).
-    if (connId === activeConnectionId) return;
+    // A no-op only when nothing is pending; while a switch is in flight, re-selecting
+    // the displayed connection must be allowed so it can supersede the pending one
+    // (e.g. A→B→A must end on A, not B).
+    if (connId === activeConnectionId && !isConnectionSwitchInProgress()) return;
+    // Mutually exclusive with a removal: don't switch onto a connection whose DELETE
+    // may be in flight.
+    if (removingRef.current) return;
     // Block/supersede graph ops while the switch is mid-flight (its global id and
     // React state briefly disagree). The ticket lets us ignore a stale completion
     // if the user starts a newer switch before this one resolves.
@@ -56,11 +65,20 @@ export default function ConnectionManager() {
         // the finally releases this switch's gate ticket.
         return;
       }
-      // Publish React state AFTER the JWT commit, and hand this ticket to the reset
-      // effect so the gate stays closed until graph state is re-pinned.
-      handoffConnectionSwitch(ticket, connId);
-      handedOff = true;
-      setActiveConnectionId(connId);
+      if (connId === activeConnectionId) {
+        // React already shows this connection (A→B→A): setActiveConnectionId would
+        // be a no-op so the reset effect won't fire — release the ticket directly
+        // and re-pin the global rather than handing off to an effect that won't run.
+        setActiveConnectionIdGlobal(connId);
+        endConnectionSwitch(ticket);
+        handedOff = true;
+      } else {
+        // Publish React state AFTER the JWT commit, and hand this ticket to the reset
+        // effect so the gate stays closed until graph state is re-pinned.
+        handoffConnectionSwitch(ticket, connId);
+        handedOff = true;
+        setActiveConnectionId(connId);
+      }
     } catch (error) {
       console.error("Failed to switch connection:", error);
       if (isLatestSwitch(ticket)) {
@@ -69,6 +87,7 @@ export default function ConnectionManager() {
         const rollbackId = getLastCommittedConnId() ?? activeConnectionId;
         setActiveConnectionIdGlobal(rollbackId);
         if (rollbackId !== null) localStorage.setItem("lastActiveConnectionId", rollbackId);
+        else localStorage.removeItem("lastActiveConnectionId");
         if (rollbackId !== activeConnectionId) {
           // The rollback changes React state → release via that reset effect too.
           handoffConnectionSwitch(ticket, rollbackId);
@@ -79,7 +98,7 @@ export default function ConnectionManager() {
     } finally {
       if (!handedOff) endConnectionSwitch(ticket);
     }
-  }, [activeConnectionId, setActiveConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, handoffConnectionSwitch, getLastCommittedConnId, isLatestSwitch]);
+  }, [activeConnectionId, setActiveConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, handoffConnectionSwitch, isConnectionSwitchInProgress, getLastCommittedConnId, isLatestSwitch]);
 
   // Determine whether the user only has one connection. The session always
   // has at least one (the primary), so we treat an empty additionalConnections
@@ -104,10 +123,12 @@ export default function ConnectionManager() {
     // If this is the last connection, sign out instead (before any switch/ticket).
     if (isLast) {
       setRemoving(true);
+      removingRef.current = true;
       try {
         await signOut({ callbackUrl: "/login" });
       } finally {
         setRemoving(false);
+        removingRef.current = false;
       }
       return;
     }
@@ -120,6 +141,9 @@ export default function ConnectionManager() {
     }
 
     setRemoving(true);
+    // Held through the whole commit + DELETE so handleSelect can't switch onto the
+    // connection being deleted (mutual exclusion).
+    removingRef.current = true;
     try {
       const removingActive = activeConnectionId === connId;
       const remaining = additionalConnections.filter(c => c.id !== connId);
@@ -145,6 +169,7 @@ export default function ConnectionManager() {
             const rollbackId = getLastCommittedConnId() ?? activeConnectionId;
             setActiveConnectionIdGlobal(rollbackId);
             if (rollbackId !== null) localStorage.setItem("lastActiveConnectionId", rollbackId);
+            else localStorage.removeItem("lastActiveConnectionId");
             if (rollbackId !== activeConnectionId) {
               handoffConnectionSwitch(ticket, rollbackId);
               handedOff = true;
@@ -191,6 +216,7 @@ export default function ConnectionManager() {
       setRemoveTarget(null);
     } finally {
       setRemoving(false);
+      removingRef.current = false;
     }
   }, [removeTarget, toast, additionalConnections, setAdditionalConnections, activeConnectionId, setActiveConnectionId, setIndicator, updateSession, beginConnectionSwitch, endConnectionSwitch, handoffConnectionSwitch, isConnectionSwitchInProgress, getLastCommittedConnId, isLatestSwitch]);
 
@@ -232,6 +258,7 @@ export default function ConnectionManager() {
           const rollbackId = getLastCommittedConnId() ?? activeConnectionId;
           setActiveConnectionIdGlobal(rollbackId);
           if (rollbackId !== null) localStorage.setItem("lastActiveConnectionId", rollbackId);
+          else localStorage.removeItem("lastActiveConnectionId");
           if (rollbackId !== activeConnectionId) {
             handoffConnectionSwitch(ticket, rollbackId);
             handedOff = true;

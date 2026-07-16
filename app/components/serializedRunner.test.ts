@@ -137,6 +137,7 @@ function makeDeps(overrides: Partial<CommitDeps> & { committed?: string[] } = {}
     update: overrides.update ?? (async () => ({ activeConnectionId: null })),
     getStatus: overrides.getStatus ?? (() => "authenticated"),
     onCommitted: overrides.onCommitted ?? ((id) => { committed.push(id ?? "null"); }),
+    isCancelled: overrides.isCancelled,
   };
 }
 
@@ -148,11 +149,24 @@ describe("commitWithValidation", () => {
     const result = await commitWithValidation(
       "conn-C",
       makeDeps({ update: async () => ({ activeConnectionId: "conn-C" }), committed,
-        onCommitted: (id) => { committed.push(id ?? "null"); } }),
+        onCommitted: (id) => { committed.push(id ?? "null"); }, isCancelled: () => false }),
       fastOpts,
     );
     assert.deepEqual(result, { activeConnectionId: "conn-C" });
     assert.deepEqual(committed, ["conn-C"]);
+  });
+
+  it("aborts a cancelled commit without calling update", async () => {
+    let updateCalls = 0;
+    await assert.rejects(
+      () => commitWithValidation(
+        "conn-C",
+        makeDeps({ isCancelled: () => true, update: async () => { updateCalls += 1; return { activeConnectionId: "conn-C" }; } }),
+        fastOpts,
+      ),
+      /Commit for conn-C cancelled \(auth changed\)/,
+    );
+    assert.equal(updateCalls, 0, "a cancelled commit never performs a write");
   });
 
   it("retries past a no-op (undefined) result then commits", async () => {
