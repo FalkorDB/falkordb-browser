@@ -61,7 +61,10 @@ async function streamToDisk(
 
   const contentType = request.headers.get("content-type") ?? "";
 
-  if (!/^multipart\/form-data\s*;\s*boundary=/i.test(contentType)) {
+  const isMultipart = /^multipart\/form-data\b/i.test(contentType);
+  const hasBoundary = /;\s*boundary=/i.test(contentType);
+
+  if (!isMultipart || !hasBoundary) {
     return {
       ok: false,
       error: "Expected multipart/form-data with a boundary.",

@@ -120,6 +120,14 @@ export function proxy(request: NextRequest) {
         }
     }
 
+    // Do not mutate request headers for API routes. On some production edge
+    // paths this can interfere with streaming multipart parsing (Busboy) and
+    // surface as "Failed to parse upload." while localhost still works.
+    // Keep API rate limiting above, but skip CSP nonce/header mutation here.
+    if (pathname.startsWith("/api/")) {
+        return NextResponse.next();
+    }
+
     // --- CSP with nonce (all routes) ---
     const nonce = btoa(crypto.randomUUID());
     const isDev = process.env.NODE_ENV === "development";
