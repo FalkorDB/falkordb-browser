@@ -1281,7 +1281,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                 if (!cancelled) setActiveConnectionId(target);
               } catch (commitErr) {
                 console.warn("Initial session commit failed:", commitErr);
-                if (!cancelled) setActiveConnectionIdGlobal(null);
+                // Only roll back the global if a newer action hasn't moved it.
+                if (!cancelled && getActiveConnectionIdGlobal() === target) setActiveConnectionIdGlobal(null);
               }
             }
 
@@ -1322,7 +1323,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                     if (!cancelled) setActiveConnectionId(migratedConn.id);
                   } catch (commitErr) {
                     console.warn("Migrated session commit failed:", commitErr);
-                    if (!cancelled) setActiveConnectionIdGlobal(null);
+                    // Only roll back the global if a newer action hasn't moved it.
+                    if (!cancelled && getActiveConnectionIdGlobal() === migratedConn.id) setActiveConnectionIdGlobal(null);
                   }
                 }
               }
