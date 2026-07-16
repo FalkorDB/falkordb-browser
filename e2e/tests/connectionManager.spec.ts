@@ -50,52 +50,68 @@ test.describe("Connection Manager Tests", () => {
     const page = await browser.getPage();
     const origin = new URL(page.url()).origin;
 
+    // The originally-active connection (A) — we switch A→B→C among the two we add.
+    const activeId = (await (await page.request.get(`${origin}/api/auth/session`)).json()).activeConnectionId as string;
+
     // Need ≥3 connections to do A→B→C (selecting the active one is a no-op). Add two
-    // extra connections to the same local FalkorDB via the API.
+    // extra connections to the same local FalkorDB via the API, capturing their ids.
+    const added: string[] = [];
     for (let i = 0; i < 2; i += 1) {
       const res = await page.request.post(`${origin}/api/connections`, {
         data: { host: "localhost", port: "6379" },
       });
       expect(res.ok()).toBe(true);
+      added.push((await res.json()).connection.id as string);
     }
-    await page.reload();
-    await connManager.waitForPageIdle();
+    const [connB, connC] = added;
 
-    const ids = await connManager.getConnectionIds();
-    expect(ids.length).toBeGreaterThanOrEqual(3);
+    try {
+      await page.reload();
+      await connManager.waitForPageIdle();
 
-    // Pick two targets distinct from the currently-active connection.
-    const activeRes = await page.request.get(`${origin}/api/auth/session`);
-    const activeId = (await activeRes.json()).activeConnectionId as string;
-    const [connB, connC] = ids.filter((id) => id !== activeId);
-    expect(connB).toBeTruthy();
-    expect(connC).toBeTruthy();
+      // Hold B's session-update POST in-flight until C has also been triggered.
+      let releaseFirst: () => void = () => {};
+      const firstHeld = new Promise<void>((resolve) => { releaseFirst = resolve; });
+      let heldOnce = false;
+      await page.route("**/api/auth/session", async (route) => {
+        const req = route.request();
+        if (req.method() === "POST" && !heldOnce && (req.postData() || "").includes(connB)) {
+          heldOnce = true;
+          await firstHeld;
+        }
+        await route.continue();
+      });
 
-    // Hold B's session-update POST in-flight until C has also been triggered.
-    let releaseFirst: () => void = () => {};
-    const firstHeld = new Promise<void>((resolve) => { releaseFirst = resolve; });
-    let heldOnce = false;
-    await page.route("**/api/auth/session", async (route) => {
-      const req = route.request();
-      if (req.method() === "POST" && !heldOnce && (req.postData() || "").includes(connB)) {
-        heldOnce = true;
-        await firstHeld;
+      // Switch to B (its update is held), then to C (queued behind B by the serializer).
+      await connManager.selectConnectionById(connB);
+      await connManager.selectConnectionById(connC);
+
+      // Release B's update; the serializer then runs C's update, so the JWT ends on C.
+      releaseFirst();
+
+      await expect.poll(async () => {
+        const res = await page.request.get(`${origin}/api/auth/session`);
+        return (await res.json()).activeConnectionId;
+      }, { timeout: 15000 }).toBe(connC);
+
+      await page.unroute("**/api/auth/session");
+    } finally {
+      // Cleanup: move the session back to the original connection (so we don't delete
+      // the active row), then remove the two temporary connections from the shared
+      // session so they don't accumulate across tests/runs.
+      try {
+        await page.unroute("**/api/auth/session").catch(() => {});
+        await connManager.selectConnectionById(activeId);
+        await expect.poll(async () => {
+          const res = await page.request.get(`${origin}/api/auth/session`);
+          return (await res.json()).activeConnectionId;
+        }, { timeout: 15000 }).toBe(activeId);
+      } catch {
+        // best-effort — still attempt to delete the temporary connections below
       }
-      await route.continue();
-    });
-
-    // Switch to B (its update is held), then to C (queued behind B by the serializer).
-    await connManager.selectConnectionById(connB);
-    await connManager.selectConnectionById(connC);
-
-    // Release B's update; the serializer then runs C's update, so the JWT ends on C.
-    releaseFirst();
-
-    await expect.poll(async () => {
-      const res = await page.request.get(`${origin}/api/auth/session`);
-      return (await res.json()).activeConnectionId;
-    }, { timeout: 15000 }).toBe(connC);
-
-    await page.unroute("**/api/auth/session");
+      for (const id of added) {
+        await page.request.delete(`${origin}/api/connections/${id}`).catch(() => {});
+      }
+    }
   });
 });

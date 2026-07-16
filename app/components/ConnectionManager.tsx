@@ -192,6 +192,8 @@ export default function ConnectionManager() {
       } catch (error) {
         // Ambiguous network failure — don't assume the row survived; refetch the list.
         console.error("Failed to remove connection:", error);
+        // securedFetch only toasts for HTTP responses, so surface the thrown error.
+        toast({ title: "Failed to remove connection", variant: "destructive" });
         try {
           const listRes = await securedFetch("/api/connections", { method: "GET" }, toast, setIndicator);
           if (listRes.ok) {
