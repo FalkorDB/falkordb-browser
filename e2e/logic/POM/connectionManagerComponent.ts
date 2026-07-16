@@ -50,6 +50,31 @@ export default class ConnectionManagerComponent extends BasePage {
         return labels;
     }
 
+    async getConnectionIds(): Promise<string[]> {
+        await this.waitForPageIdle();
+        if (!await this.dropdownContent.isVisible()) {
+            await this.openDropdown();
+        }
+        const items = await this.connectionItems.all();
+        const ids: string[] = [];
+        for (const item of items) {
+            const testId = await item.getAttribute("data-testid");
+            if (testId) ids.push(testId.replace("connection-item-", ""));
+        }
+        return ids;
+    }
+
+    async selectConnectionById(id: string): Promise<void> {
+        if (!await this.dropdownContent.isVisible()) {
+            await this.openDropdown();
+        }
+        await interactWhenVisible(
+            this.page.getByTestId(`connection-item-${id}`),
+            (el) => el.click(),
+            `Select connection ${id}`,
+        );
+    }
+
     async hasActiveConnection(): Promise<boolean> {
         if (!await this.dropdownContent.isVisible()) {
             await this.openDropdown();
