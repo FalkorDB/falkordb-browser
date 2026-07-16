@@ -80,6 +80,94 @@ So the finding is real (persisted session + UI diverge from the user's last choi
 
 ---
 
+## 1a. Worked examples — the race, step by step
+
+Setup: a user has three connections `A`, `B`, `C` (ids `conn-A`, `conn-B`, `conn-C`). They click the
+connection dropdown quickly — A→B, then immediately B→C. Each click runs a switch site that calls
+`updateSession({ activeConnectionId })`, which is **one HTTP POST** to `/api/auth/session` returning a
+fresh JWT cookie. Legend: **cookie** = the JWT the browser holds · **UI** = React `activeConnectionId`
+· **global** = `_activeConnectionId` (the `X-Connection-Id` header source, set synchronously).
+
+### Example 1 — network reordering strands the JWT on the superseded connection (the core bug)
+
+```
+t0  click B:  beginConnectionSwitch()→ticket#1   global=B   POST update(B) ──┐ (in flight)
+t1  click C:  beginConnectionSwitch()→ticket#2   global=C   POST update(C) ─┐│ (in flight)
+t2  server handles update(C)  → Set-Cookie jwt(active=conn-C)               ││
+t3  server handles update(B)  → Set-Cookie jwt(active=conn-B)               ││
+t4  update(C) response arrives → browser cookie=C   handleSelect(C): isLatestSwitch(#2)=true  → UI=C
+t5  update(B) response arrives → browser cookie=B   handleSelect(B): isLatestSwitch(#1)=false → no publish
+```
+
+**End state: UI = C, cookie = B.** `isLatestSwitch` kept the *UI* on C but cannot control which
+`Set-Cookie` the browser applies last; `update(B)`'s response simply landed after `update(C)`'s
+(ordinary jitter). Header-routed graph queries still hit C (global=C), but `session.user.role/host/
+port` now reflect **B**, and any header-less request (`options.ts:1112` fallback) resolves to **B**.
+
+**With the fix (§3a)** `update(C)` is chained after `update(B)` and does not even start until
+`update(B)`'s response — and its `Set-Cookie` — has been received:
+
+```
+t0  click B:  ticket#1   POST update(B) ─── … ─── response, cookie=B
+t1  click C:  ticket#2   (queued — not sent yet)
+t2  update(B) settles → chain advances → POST update(C) ─── response, cookie=C
+```
+
+Only one update is ever in flight, so the final cookie is deterministically **C** — immune to
+reordering.
+
+### Example 2 — why naïve chaining alone is *not* enough (`update()` no-ops while loading)
+
+If we chain but call the raw `useSession().update` closure at microtask time:
+
+```
+update(B) resolves → next-auth setLoading(true)→setLoading(false), a re-render is SCHEDULED
+chained update(C) fires on the SAME microtask flush, BEFORE that re-render commits
+  → the closure it reads still has loading=true
+  → next-auth `if (loading) return;`  → update(C) returns undefined, performs NO HTTP write
+  → C's promise resolves(undefined) → naïve code treats it as success → UI=C, cookie STILL B
+```
+
+The fix therefore **validates** the result: `commitActiveConnection` waits for `status ===
+"authenticated"` and accepts a commit only when the returned session reports
+`activeConnectionId === conn-C`, else it retries. `undefined`/`null` are never treated as success.
+
+### Example 3 — failure rollback must converge all three states
+
+```
+click B → commit(B) succeeds, cookie=B, but superseded by C → B never publishes (UI stays A). lastCommitted=B.
+click C → commit(C) fails (transport error → next-auth returns null → we throw after bounded retries)
+```
+
+Naïve rollback (global only) → UI=A, global/cookie=B → **divergent**. The fix (§3c) rolls back **both**
+React and global/localStorage to the last-committed id (`conn-B`), so all three converge on **B** — the
+connection the session is actually on.
+
+### Example 4 — zeroing the gate clobbers a newer switch
+
+```
+click C → commit(C) ok → setActiveConnectionId(C) scheduled
+click D → beginConnectionSwitch()→ticket#3   (D now pending; graph ops must stay blocked)
+C's reset effect runs → OLD code: pendingSwitchesRef.current = 0  → gate OPEN while D still in flight
+  → a graph op (runQuery/fetchCount) starts mid-D → can query/auto-create the wrong graph on conn-D
+```
+
+The fix (§3b) makes the gate a **set** of tickets released per-ticket via a target-keyed handoff; C's
+reset effect releases only C's ticket, and D's ticket keeps the gate closed.
+
+### Example 5 — removing the active connection must never point the session at a deleted row
+
+```
+OLD confirmRemove: DELETE conn-A → then commit(newActive) fails
+  → the JWT cookie still points at the now-deleted conn-A
+  → next getClient() fallback can 401 / SESSION_INVALID → the user is bounced
+```
+
+The fix (§3c) **commits the replacement before deleting**, and updates `additionalConnections` only
+after the DELETE succeeds — the session is always on a live connection.
+
+---
+
 ## 2. Why the naïve serializer is insufficient (both rubber-duck rounds)
 
 1. **`update()` no-ops while loading** → a microtask-chained call reads the still-`loading` closure,
