@@ -20,6 +20,9 @@ const DEFAULT_CONNECT_SRC = [
     "https://*.google-analytics.com",
     "https://*.analytics.google.com",
     "https://*.googletagmanager.com",
+    // Required by @vercel/blob/client multipart upload control-plane calls.
+    "https://vercel.com",
+    "https://*.vercel.com",
 ];
 
 // Parse and cache CSP_CONNECT_SRC once at module load time
@@ -117,7 +120,15 @@ export function proxy(request: NextRequest) {
         }
     }
 
-    // --- CSP with nonce (all routes) ---
+    // Do not mutate request headers for API routes. On some production edge
+    // paths this can interfere with streaming multipart parsing (Busboy) and
+    // surface as "Failed to parse upload." while localhost still works.
+    // Keep API rate limiting above, but skip CSP nonce/header mutation here.
+    if (pathname.startsWith("/api/")) {
+        return NextResponse.next();
+    }
+
+    // --- CSP with nonce (non-API routes) ---
     const nonce = btoa(crypto.randomUUID());
     const isDev = process.env.NODE_ENV === "development";
 

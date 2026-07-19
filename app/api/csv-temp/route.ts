@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCorsHeaders, resolveReadOnly } from "../utils";
 import { getClient } from "../auth/[...nextauth]/options";
-import { getCsvStorageProvider } from "@/app/lib/csv-storage";
+import { getCsvStorageProvider, getResolvedCsvStorageMode } from "@/app/lib/csv-storage";
 import { generateCsvKey, hashOwner } from "@/app/lib/csv-key";
 import { CSV_UPLOAD_ENABLED } from "@/lib/graphUpload";
 import { streamCsvUpload } from "./stream-csv";
@@ -44,6 +44,17 @@ export async function POST(request: NextRequest) {
 
     const owner = hashOwner(session.user.id);
     const key = generateCsvKey();
+
+    // In cloud modes, CSV bytes must go directly from browser -> storage via
+    // /api/csv-temp/direct. Reject proxied multipart uploads here to prevent
+    // accidental backend buffering/streaming fallback.
+    if (getResolvedCsvStorageMode() !== "local") {
+        return NextResponse.json(
+            { message: "Direct upload required: use /api/csv-temp/direct for cloud CSV storage." },
+            { status: 409, headers: getCorsHeaders(request) }
+        );
+    }
+
     const provider = getCsvStorageProvider();
 
     const result = await streamCsvUpload(request, (body) => provider.store(owner, key, body));

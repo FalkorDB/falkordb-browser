@@ -5,12 +5,40 @@ import { getCsvStorageProvider } from "@/app/lib/csv-storage";
 import { hashOwner, isValidCsvKey, normalizeCsvKey } from "@/app/lib/csv-key";
 import { assertFalkorFetchableCsvUrl, CsvUrlConfigError } from "@/app/lib/csv-load-url";
 import { CSV_UPLOAD_ENABLED, containsLoadCsv } from "@/lib/graphUpload";
+import { CSV_HEAD_INSPECT_BYTES, headLooksBinary, stripLeadingBom } from "@/app/api/csv-temp/csv-head";
 
 /**
  * Interval for keep-alive heartbeat bytes streamed while a (potentially long,
  * atomic) LOAD CSV runs, so idle proxies/load balancers don't drop the request.
  */
 const HEARTBEAT_INTERVAL_MS = 15_000;
+
+async function validateCsvHeadFromUrl(csvUrl: string): Promise<string | null> {
+    try {
+        const response = await fetch(csvUrl, {
+            method: "GET",
+            headers: { Range: `bytes=0-${CSV_HEAD_INSPECT_BYTES - 1}` },
+            cache: "no-store",
+        });
+
+        // Let LOAD CSV surface connectivity/auth errors with provider-specific
+        // diagnostics; this pre-check is only for content sanity validation.
+        if (!response.ok) return null;
+
+        const raw = Buffer.from(await response.arrayBuffer());
+        const head = stripLeadingBom(raw);
+
+        if (head.length === 0) {
+            return "The uploaded CSV is empty.";
+        }
+        if (headLooksBinary(head)) {
+            return "The uploaded file does not appear to be a valid CSV (contains binary data).";
+        }
+        return null;
+    } catch {
+        return null;
+    }
+}
 
 interface LoadCsvBody {
     key?: string;
@@ -131,6 +159,14 @@ export async function POST(
             throw configError;
         }
 
+        const csvHeadError = await validateCsvHeadFromUrl(csvUrl);
+        if (csvHeadError) {
+            return NextResponse.json(
+                { message: csvHeadError },
+                { status: 422, headers: getCorsHeaders(request) }
+            );
+        }
+
         const graph = session.client.selectGraph(graphId);
         const withHeadersClause = withHeaders ? "WITH HEADERS " : "";
         const loadCsvQuery = `LOAD CSV ${withHeadersClause}FROM $csvUrl AS row\n${body.trim()}`;
@@ -169,8 +205,20 @@ export async function POST(
                     const raw = (queryError as Error).message || "Failed to execute the LOAD CSV query.";
                     const isHeaderError = /failed reading csv header row/i.test(raw);
                     const isFetchError = /(unsupported uri|error opening csv uri)/i.test(raw);
+                    const csvUrlHost = (() => {
+                        try {
+                            return new URL(csvUrl).host;
+                        } catch {
+                            return "unknown";
+                        }
+                    })();
+                    const isLikelyLocalEndpoint = /localhost:|127\.0\.0\.1:/i.test(csvUrl);
                     const message = isHeaderError
-                        ? "Failed reading CSV header row. Verify the file has a valid header row, or turn off 'Use CSV headers' and access columns as row[0], row[1], ..."
+                        ? (
+                            (isFetchError && isLikelyLocalEndpoint)
+                                ? `Failed reading CSV header row. FalkorDB also reported it could not reach the storage URL from inside its container (host: ${csvUrlHost}). Set S3_READ_URL_HOST to a host reachable by FalkorDB (for example 172.17.0.1) and retry, or run FalkorDB on the host network.`
+                                : `Failed reading CSV header row. Verify the file has a valid header row, or turn off 'Use CSV headers' and access columns as row[0], row[1], ... (resolved storage host: ${csvUrlHost}).`
+                        )
                         : isFetchError
                             ? "FalkorDB could not fetch the uploaded CSV. Check the CSV storage configuration (CSV_STORAGE / CSV_SERVE_BASE_URL / IMPORT_FOLDER) so the database can reach the file."
                             : raw;

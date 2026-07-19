@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Readable } from "stream";
-import { getCsvStorageProvider } from "@/app/lib/csv-storage";
+import { getCsvStorageProvider, getResolvedCsvStorageMode } from "@/app/lib/csv-storage";
 import { openLocalCsvReadStream } from "@/app/lib/csv-storage-local";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { getCorsHeaders, resolveReadOnly } from "@/app/api/utils";
@@ -28,6 +28,12 @@ export async function GET(
         return new NextResponse("Not found.", { status: 404 });
     }
     const key = normalizeCsvKey(id);
+
+    // This endpoint is only for local HTTP-serving mode. If CSV storage is S3
+    // or Blob, do not expose any local read path.
+    if (getResolvedCsvStorageMode() !== "local") {
+        return new NextResponse("Not found.", { status: 404 });
+    }
 
     const url = new URL(request.url);
     const owner = url.searchParams.get("o") ?? "";

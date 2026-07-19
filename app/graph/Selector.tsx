@@ -4,7 +4,7 @@
 
 import { useState, useCallback, useContext, Dispatch, SetStateAction } from "react";
 import { cn, formatName, HistoryQuery } from "@/lib/utils";
-import { History, Info, Network, Sparkles } from "lucide-react";
+import { History, Info, Network, Sparkles, Upload } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Button from "../components/ui/Button";
@@ -12,6 +12,7 @@ import { BrowserSettingsContext, ConnectionContext, CypherLanguageContext, Indic
 import CypherEditor from "../components/CypherEditor";
 import { Graph } from "../api/graph/model";
 import QueryHistoryPanel from "./QueryHistoryPanel";
+import UploadGraph from "../components/graph/UploadGraph";
 import ResizableBox from "@/components/ui/ResizableBox";
 import { useResizableSize } from "@/lib/useResizableSize";
 
@@ -56,6 +57,7 @@ export default function Selector({
     const { panelOpen, onTogglePanel } = useContext(PanelContext);
 
     const [maximize, setMaximize] = useState(false);
+    const [uploadOpen, setUploadOpen] = useState(false);
     const handleLanguageConfig = useCallback((config: NonNullable<typeof cypherLanguageConfig>) => {
         setCypherLanguageConfig(config);
     }, [setCypherLanguageConfig]);
@@ -86,6 +88,24 @@ export default function Selector({
             >
                 <Network size={20} />
             </Button>
+            <Button
+                aria-label="Upload data"
+                className={cn(
+                    "h-full text-foreground p-2 rounded-lg border border-border bg-background hover:bg-secondary"
+                )}
+                title="Upload data"
+                disabled={isReadOnly || !graphName}
+                onClick={() => setUploadOpen(true)}
+                data-testid="uploadGraphToolbarTrigger"
+            >
+                <Upload size={20} />
+            </Button>
+            <UploadGraph
+                graphName={graphName}
+                disabled={isReadOnly || !graphName}
+                open={uploadOpen}
+                onOpenChange={setUploadOpen}
+            />
             <div className="h-full w-1 grow relative overflow-visible">
                 <CypherEditor
                     graph={graph}
