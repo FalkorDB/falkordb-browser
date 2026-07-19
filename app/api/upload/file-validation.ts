@@ -1,6 +1,7 @@
 import path from "path";
 import crypto from "crypto";
 import fs from "fs";
+import os from "os";
 
 export const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -13,7 +14,9 @@ type AllowedFileType = {
 const UUID_FILE_NAME_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.[a-z0-9]+$/;
 
 function getUploadsDir() {
-  return path.join(process.cwd(), "uploads");
+  // Serverless platforms expose a writable temp volume (e.g. /tmp on Vercel),
+  // while the deployed app directory is read-only.
+  return path.join(os.tmpdir(), "uploads");
 }
 
 function getUserUploadsDir(userId: string) {
