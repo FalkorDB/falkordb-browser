@@ -13,12 +13,16 @@ type AllowedFileType = {
 
 const UUID_FILE_NAME_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.[a-z0-9]+$/;
 
-function getUploadsDir() {
+const UPLOADS_BASE_DIR = (() => {
   // Use a per-process random directory inside OS temp storage to avoid
   // predictable temp paths that static analysis flags as insecure.
   const base = fs.mkdtempSync(path.join(os.tmpdir(), "falkordb-uploads-"));
   fs.chmodSync(base, 0o700);
   return base;
+})();
+
+function getUploadsDir() {
+  return UPLOADS_BASE_DIR;
 }
 
 function getUserUploadsDir(userId: string) {
