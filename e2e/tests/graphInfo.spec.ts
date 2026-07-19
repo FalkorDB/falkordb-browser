@@ -209,7 +209,7 @@ test.describe("Graph Info Panel Tests", () => {
     await apiCall.removeGraph(graphName, "admin");
   });
 
-  test(`@readwrite Validate graph info panel shows zero counts when no graph is selected`, async () => {
+  test(`@readwrite Validate graph info panel shows placeholders when no graph is selected`, async () => {
     const graphName1 = getRandomString("graph");
     const graphName2 = getRandomString("graph");
     await apiCall.addGraph(graphName1);
@@ -218,7 +218,7 @@ test.describe("Graph Info Panel Tests", () => {
     await browser.setPageToFullScreen();
     await graph.openGraphInfoButton();
     const nodesCount = await graph.getGraphInfoNodesCount();
-    expect(nodesCount).toBe("0");
+    expect(nodesCount).toBe("-");
     await apiCall.removeGraph(graphName1);
     await apiCall.removeGraph(graphName2);
   });
