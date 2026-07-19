@@ -14,9 +14,11 @@ type AllowedFileType = {
 const UUID_FILE_NAME_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.[a-z0-9]+$/;
 
 function getUploadsDir() {
-  // Serverless platforms expose a writable temp volume (e.g. /tmp on Vercel),
-  // while the deployed app directory is read-only.
-  return path.join(os.tmpdir(), "uploads");
+  // Use a per-process random directory inside OS temp storage to avoid
+  // predictable temp paths that static analysis flags as insecure.
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), "falkordb-uploads-"));
+  fs.chmodSync(base, 0o700);
+  return base;
 }
 
 function getUserUploadsDir(userId: string) {
