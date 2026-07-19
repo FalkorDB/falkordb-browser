@@ -11,12 +11,6 @@ import { generateCsvKey, hashOwner } from "@/app/lib/csv-key";
 import { CSV_UPLOAD_ENABLED } from "@/lib/graphUpload";
 import { getCsvMaxUploadBytes } from "@/app/lib/csv-temp-config";
 
-interface DirectUploadBody {
-    filename?: string;
-    contentType?: string;
-    sizeBytes?: number;
-}
-
 function sanitizeDirectUploadRequest(body: unknown): CsvDirectUploadRequest | null {
     if (!body || typeof body !== "object" || Array.isArray(body)) return null;
 

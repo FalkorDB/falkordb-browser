@@ -153,6 +153,7 @@ function providerSignature(mode: CsvStorageMode): string {
         process.env.S3_READ_URL_PORT ?? "",
         process.env.S3_READ_URL_PROTOCOL ?? "",
         process.env.S3_READ_URL_DOCKER_GATEWAY ?? "",
+        process.env.S3_READ_URL_AUTO_DOCKER_GATEWAY ?? "",
         process.env.BLOB_READ_WRITE_TOKEN ?? "",
         process.env.BLOB_ACCESS ?? "",
         process.env.BLOB_KEY_PREFIX ?? "",

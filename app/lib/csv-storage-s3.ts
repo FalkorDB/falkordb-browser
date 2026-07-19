@@ -236,6 +236,7 @@ export class S3CsvStorage implements CsvStorageProvider {
                 Bucket: bucket(),
                 Key: s3Key,
                 ContentType: contentType,
+                ContentLength: request.sizeBytes,
             }),
             { expiresIn: WRITE_EXPIRES_IN }
         );
