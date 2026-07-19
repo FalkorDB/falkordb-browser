@@ -235,9 +235,15 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
         }).catch(() => undefined);
     }, []);
 
-    const openFilePreview = useCallback(async (file: File, uploadMode: UploadMode) => {
+    const openFilePreview = useCallback(async (
+        file: File,
+        uploadMode: UploadMode,
+        options?: { openDialog?: boolean; showTruncatedToast?: boolean }
+    ) => {
         try {
             setPreviewLoadingMode(uploadMode);
+            const shouldOpenDialog = options?.openDialog ?? true;
+            const showTruncatedToast = options?.showTruncatedToast ?? true;
 
             const previewBlob = file.slice(0, PREVIEW_MAX_CHARS);
             let fileText = await previewBlob.text();
@@ -248,13 +254,13 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
 
             if (uploadMode === "cypher") {
                 setCypherPreviewContent(fileText);
-                setCypherPreviewOpen(true);
+                if (shouldOpenDialog) setCypherPreviewOpen(true);
             } else {
                 setCsvPreviewContent(fileText);
-                setCsvPreviewOpen(true);
+                if (shouldOpenDialog) setCsvPreviewOpen(true);
             }
 
-            if (wasTruncated) {
+            if (wasTruncated && showTruncatedToast) {
                 toast({
                     title: "Preview truncated",
                     description: `Showing the first ${PREVIEW_MAX_CHARS.toLocaleString()} characters.`,
@@ -270,6 +276,16 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
             setPreviewLoadingMode(null);
         }
     }, [toast]);
+
+    useEffect(() => {
+        if (!cypherPreviewOpen || cypherFiles.length !== 1) return;
+        void openFilePreview(cypherFiles[0], "cypher", { openDialog: false, showTruncatedToast: false });
+    }, [cypherFiles, cypherPreviewOpen, openFilePreview]);
+
+    useEffect(() => {
+        if (!csvPreviewOpen || csvFiles.length !== 1) return;
+        void openFilePreview(csvFiles[0], "load-csv", { openDialog: false, showTruncatedToast: false });
+    }, [csvFiles, csvPreviewOpen, openFilePreview]);
 
     const isLoadCsvStepOne = mode === "load-csv" && !csvKey;
     const isLoadCsvStepTwo = mode === "load-csv" && Boolean(csvKey);
