@@ -93,13 +93,17 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const loadMemory = useCallback((opt: string) =>
         async () => {
-            const startEpoch = getConnectionEpoch();
-            const cid = getActiveConnectionIdGlobal();
-            const memoryMap = await getMemoryUsage(opt, toast, setIndicator, cid);
-            if (getConnectionEpoch() !== startEpoch) return undefined;
-            const memoryValue = memoryMap.get("total_graph_sz_mb") || '<1';
+            try {
+                const startEpoch = getConnectionEpoch();
+                const cid = getActiveConnectionIdGlobal();
+                const memoryMap = await getMemoryUsage(opt, toast, setIndicator, cid);
+                if (getConnectionEpoch() !== startEpoch) return undefined;
+                const memoryValue = memoryMap.get("total_graph_sz_mb") || '<1';
 
-            return `${memoryValue} MB`;
+                return `${memoryValue} MB`;
+            } catch {
+                return undefined;
+            }
         }, [toast, setIndicator]);
 
     const loadNodesCount = useCallback((opt: string) =>
@@ -109,7 +113,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 const cid = getActiveConnectionIdGlobal();
                 const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
                 const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes${readOnlyParam}`, toast, setIndicator, { connectionId: cid }) as { nodes?: number };
-                if (getConnectionEpoch() !== startEpoch) return undefined;
+                if (getConnectionEpoch() !== startEpoch) return "N/A";
 
                 if (result.nodes == null || !Number.isFinite(Number(result.nodes))) return "N/A";
 
@@ -126,7 +130,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 const cid = getActiveConnectionIdGlobal();
                 const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
                 const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges${readOnlyParam}`, toast, setIndicator, { connectionId: cid }) as { edges?: number };
-                if (getConnectionEpoch() !== startEpoch) return undefined;
+                if (getConnectionEpoch() !== startEpoch) return "N/A";
 
                 if (result.edges == null || !Number.isFinite(Number(result.edges))) return "N/A";
 
