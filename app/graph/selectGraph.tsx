@@ -97,12 +97,12 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 const startEpoch = getConnectionEpoch();
                 const cid = getActiveConnectionIdGlobal();
                 const memoryMap = await getMemoryUsage(opt, toast, setIndicator, cid);
-                if (getConnectionEpoch() !== startEpoch) return undefined;
+                if (getConnectionEpoch() !== startEpoch) return "N/A";
                 const memoryValue = memoryMap.get("total_graph_sz_mb") || '<1';
 
                 return `${memoryValue} MB`;
             } catch {
-                return undefined;
+                return "N/A";
             }
         }, [toast, setIndicator]);
 
