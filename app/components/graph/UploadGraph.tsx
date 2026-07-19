@@ -23,7 +23,7 @@ type UploadMode = "cypher" | "load-csv";
 
 const ACCEPTED_CYPHER = {
     "text/plain": [".txt", ".cql", ".cypher"],
-    "application/octet-stream": [".cql", ".cypher"],
+    "application/octet-stream": [".txt", ".cql", ".cypher"],
 };
 
 const ACCEPTED_CSV = {

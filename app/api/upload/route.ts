@@ -24,6 +24,7 @@ export const runtime = "nodejs";
 // gets a separate, larger cap instead of being uncapped — an uncapped stream
 // would let an authenticated user fill the disk.
 const BINARY_EXTENSIONS = new Set([".dump"]);
+const TEXT_LIKE_EXTENSIONS = new Set([".txt", ".cql", ".cypher"]);
 const MAX_DUMP_SIZE = 1024 * 1024 * 1024; // 1 GiB
 
 export async function OPTIONS(request: Request) {
@@ -33,6 +34,20 @@ export async function OPTIONS(request: Request) {
 type StreamResult =
   | { ok: true; filename: string }
   | { ok: false; error: string; status: number };
+
+function isMimeAllowed(extension: string, mimeType: string, allowedMimeTypes: readonly string[]): boolean {
+  const normalized = mimeType.split(";")[0].trim().toLowerCase();
+
+  if (allowedMimeTypes.some((allowed) => allowed.toLowerCase() === normalized)) {
+    return true;
+  }
+
+  if (normalized === "application/octet-stream" && TEXT_LIKE_EXTENSIONS.has(extension)) {
+    return true;
+  }
+
+  return false;
+}
 
 function parseUploadErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error ?? "");
@@ -63,76 +78,6 @@ function parseUploadErrorMessage(error: unknown): string {
   }
 
   return "Failed to parse upload.";
-}
-
-async function uploadSmallFileFromFormData(
-  request: NextRequest,
-  userId: string
-): Promise<StreamResult> {
-  let formData: FormData;
-  try {
-    formData = await request.formData();
-  } catch (err) {
-    console.error("formData parse error:", err);
-    return { ok: false, error: parseUploadErrorMessage(err), status: 400 };
-  }
-
-  const entries = Array.from(formData.entries());
-  const fileEntries = entries.filter(([key, value]) => key === "file" && value instanceof File);
-  const hasUnexpectedField = entries.some(([key]) => key !== "file");
-
-  if (hasUnexpectedField) {
-    return { ok: false, error: "Unexpected form fields.", status: 400 };
-  }
-  if (fileEntries.length === 0) {
-    return { ok: false, error: "No file uploaded.", status: 400 };
-  }
-  if (fileEntries.length > 1) {
-    return { ok: false, error: "Only a single file may be uploaded.", status: 400 };
-  }
-
-  const [, fileValue] = fileEntries[0];
-  if (typeof fileValue === "string") {
-    return { ok: false, error: "No file uploaded.", status: 400 };
-  }
-  const file = fileValue as File;
-  const originalName = file.name || "";
-  const mimeType = file.type || "application/octet-stream";
-  const extension = path.extname(originalName).toLowerCase();
-
-  if (extension === ".dump" && !DUMP_RESTORE_ENABLED) {
-    return { ok: false, error: "Dump restore is temporarily disabled.", status: 403 };
-  }
-
-  const allowedFileType = getAllowedFileType(extension);
-  if (!allowedFileType || !allowedFileType.mimeTypes.includes(mimeType)) {
-    return { ok: false, error: "Invalid file type.", status: 400 };
-  }
-
-  const sizeLimit = BINARY_EXTENSIONS.has(extension) ? MAX_DUMP_SIZE : MAX_FILE_SIZE;
-  if (file.size > sizeLimit) {
-    return { ok: false, error: "File is too large.", status: 413 };
-  }
-
-  const filename = `${randomUUID()}${extension}`;
-  const uploadsDir = getUploadsDirectory(userId);
-  const filePath = getUploadFilePath(filename, userId);
-
-  if (!filePath) {
-    return { ok: false, error: "Invalid file name.", status: 400 };
-  }
-
-  fs.mkdirSync(uploadsDir, { recursive: true });
-
-  try {
-    const bytes = Buffer.from(await file.arrayBuffer());
-    await fs.promises.writeFile(filePath, bytes);
-    return { ok: true, filename };
-  } catch (err) {
-    console.error("store formData upload error:", err);
-    await fs.promises.unlink(filePath).catch(() => undefined);
-    return { ok: false, error: "Failed to store uploaded file.", status: 500 };
-  }
 }
 
 /** Stream the multipart body through busboy directly to disk. */
@@ -245,7 +190,7 @@ async function streamToDisk(
 
       const allowedFileType = getAllowedFileType(extension);
 
-      if (!allowedFileType || !allowedFileType.mimeTypes.includes(mimeType)) {
+      if (!allowedFileType || !isMimeAllowed(extension, mimeType, allowedFileType.mimeTypes)) {
         fileStream.resume(); // drain so busboy can finish cleanly
         recordError(400, "Invalid file type.");
         return;
@@ -262,51 +207,61 @@ async function streamToDisk(
       }
 
       const tempFilePath = `${filePath}.tmp`;
-      fs.mkdirSync(uploadsDir, { recursive: true });
-      const writeStream = fs.createWriteStream(tempFilePath);
+      storePending = true;
+      fs.promises
+        .mkdir(uploadsDir, { recursive: true })
+        .then(() => {
+          const writeStream = fs.createWriteStream(tempFilePath);
 
-      const sizeLimit = BINARY_EXTENSIONS.has(extension) ? MAX_DUMP_SIZE : MAX_FILE_SIZE;
-      let bytesWritten = 0;
-      let sizeLimitHit = false;
+          const sizeLimit = BINARY_EXTENSIONS.has(extension) ? MAX_DUMP_SIZE : MAX_FILE_SIZE;
+          let bytesWritten = 0;
+          let sizeLimitHit = false;
 
       // If the busboy fileSize ceiling truncates the stream (an oversized upload
       // right at the ceiling that the strict `>` check below can miss), reject it
       // rather than silently accepting a truncated file.
-      fileStream.on("limit", () => {
-        if (sizeLimitHit) return;
-        sizeLimitHit = true;
-        writeStream.destroy();
-        fs.unlink(tempFilePath, () => {});
-        recordError(413, "File is too large.");
-      });
+          fileStream.on("limit", () => {
+            if (sizeLimitHit) return;
+            sizeLimitHit = true;
+            writeStream.destroy();
+            fs.unlink(tempFilePath, () => {});
+            recordError(413, "File is too large.");
+          });
 
-      fileStream.on("data", (chunk: Buffer) => {
-        bytesWritten += chunk.length;
-        if (bytesWritten > sizeLimit) {
-          sizeLimitHit = true;
-          fileStream.destroy();
-          writeStream.destroy();
-          fs.unlink(tempFilePath, () => {});
-          recordError(413, "File is too large.");
-        }
-      });
+          fileStream.on("data", (chunk: Buffer) => {
+            bytesWritten += chunk.length;
+            if (bytesWritten > sizeLimit) {
+              sizeLimitHit = true;
+              fileStream.destroy();
+              writeStream.destroy();
+              fs.unlink(tempFilePath, () => {});
+              recordError(413, "File is too large.");
+            }
+          });
 
-      storePending = true;
-      pipeline(fileStream, writeStream)
-        .then(async () => {
-          if (!sizeLimitHit) {
-            await fs.promises.rename(tempFilePath, filePath);
-            storedFilename = filename;
-          }
-          storeSettled = true;
-          settleIfReady();
+          pipeline(fileStream, writeStream)
+            .then(async () => {
+              if (!sizeLimitHit) {
+                await fs.promises.rename(tempFilePath, filePath);
+                storedFilename = filename;
+              }
+              storeSettled = true;
+              settleIfReady();
+            })
+            .catch((err: unknown) => {
+              fs.unlink(tempFilePath, () => {});
+              if (!sizeLimitHit) {
+                console.error("Stream pipeline error:", err);
+                recordError(500, "Failed to store uploaded file.");
+              }
+              storeSettled = true;
+              settleIfReady();
+            });
         })
         .catch((err: unknown) => {
-          fs.unlink(tempFilePath, () => {});
-          if (!sizeLimitHit) {
-            console.error("Stream pipeline error:", err);
-            recordError(500, "Failed to store uploaded file.");
-          }
+          fileStream.resume();
+          console.error("mkdir uploads dir error:", err);
+          recordError(500, "Failed to prepare upload directory.");
           storeSettled = true;
           settleIfReady();
         });
@@ -367,12 +322,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // In production runtimes, multipart streaming via Busboy can behave
-    // differently for small text uploads. Prefer the built-in formData parser
-    // for regular uploads (max 5MB), and keep Busboy for dump-enabled mode.
-    const result = DUMP_RESTORE_ENABLED
-      ? await streamToDisk(request, session.user.id)
-      : await uploadSmallFileFromFormData(request, session.user.id);
+    // Always parse multipart and stream file bytes to disk.
+    const result = await streamToDisk(request, session.user.id);
 
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: result.status, headers: corsHeaders });

@@ -531,7 +531,7 @@ const USER_READABLE_ERROR_PATTERNS = [
   /^file is too large\b/i,
   /^no file uploaded\b/i,
   /^request body is missing\b/i,
-  /^failed to parse upload\.?$/i,
+  /^failed to parse upload\b/i,
   /^malformed multipart body\b/i,
   /^expected multipart\/form-data with a boundary\.?$/i,
   /^uploaded file not found\b/i,
