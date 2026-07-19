@@ -505,10 +505,10 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                         cid
                     );
 
-                    if (getConnectionEpoch() !== startEpoch) return;
-
-                    setGraphInfo(nextGraphInfo);
-                    await fetchCount(graphName, { connectionId: cid, epoch: startEpoch });
+                    if (getConnectionEpoch() === startEpoch) {
+                        setGraphInfo(nextGraphInfo);
+                        await fetchCount(graphName, { connectionId: cid, epoch: startEpoch });
+                    }
                 } catch {
                     // Keep upload success behavior even if post-refresh metadata fails.
                 }

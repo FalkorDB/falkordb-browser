@@ -345,6 +345,27 @@ export default function TableComponent({
     }, [rows]);
 
     useEffect(() => {
+        const pendingLoads: Array<{ rowName: string; cellIndex: number; loadCell: () => Promise<any> }> = [];
+
+        visibleRows.forEach((row) => {
+            row.cells.forEach((cell, cellIndex) => {
+                const cellKey = `${row.name}-${cellIndex}`;
+                const isLazyCell = cell.type === "readonly" && "loadCell" in cell && cell.loadCell;
+                const isCellValueMissing = !hasCellValue(cell.value);
+
+                if (isLazyCell && isCellValueMissing && !loadingCells.has(cellKey) && !loadAttemptedRef.current.has(cellKey)) {
+                    pendingLoads.push({ rowName: row.name, cellIndex, loadCell: cell.loadCell });
+                }
+            });
+        });
+
+        pendingLoads.forEach(({ rowName, cellIndex, loadCell }) => {
+            loadAttemptedRef.current.add(`${rowName}-${cellIndex}`);
+            handleLoadLazyCell(rowName, cellIndex, loadCell);
+        });
+    }, [visibleRows, loadingCells, handleLoadLazyCell]);
+
+    useEffect(() => {
         // Restore scroll position on mount
         if (hasRestored || filteredRows.length === 0) return () => { };
 
@@ -646,12 +667,6 @@ export default function TableComponent({
                                             const isCellLoading = loadingCells.has(cellKey);
                                             const isLazyCell = cell.type === "readonly" && "loadCell" in cell && cell.loadCell;
                                             const isCellValueMissing = !hasCellValue(cell.value);
-
-                                            // Only load if it's a lazy cell, has no value, not currently loading, and we haven't attempted to load it yet
-                                            if (isLazyCell && isCellValueMissing && !loadingCells.has(cellKey) && !loadAttemptedRef.current.has(cellKey)) {
-                                                loadAttemptedRef.current.add(cellKey);
-                                                handleLoadLazyCell(row.name, j, cell.loadCell);
-                                            }
 
                                             // Show loader while loading and during the initial lazy-cell paint.
                                             if (isCellLoading || (isLazyCell && isCellValueMissing)) {

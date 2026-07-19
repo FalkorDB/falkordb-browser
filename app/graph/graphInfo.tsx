@@ -35,6 +35,16 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     const [propertyKeysSearch, setPropertyKeysSearch] = useState("");
     const hasSelectedGraph = graphName !== "";
     const memoryValue = MemoryUsage.get("total_graph_sz_mb");
+    const isGraphInfoLoaded =
+        graphInfoVersion > 0
+        || nodesCount !== undefined
+        || edgesCount !== undefined
+        || Labels.size > 0
+        || Relationships.size > 0
+        || (PropertyKeys?.length ?? 0) > 0;
+    const memoryDisplay = memoryValue === undefined
+        ? undefined
+        : `${memoryValue ?? "<1"} MB`;
 
     // Reset searches only when the active graph changes or the display limit
     // changes — not on every periodic poll that refreshes GraphInfoContext.
@@ -111,15 +121,17 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                     {
                                         !hasSelectedGraph
                                             ? <p tabIndex={0} role="text" aria-label="No graph selected" className="truncate pointer-events-auto text-sm font-semibold">-</p>
-                                            : memoryValue !== undefined
+                                            : memoryDisplay !== undefined
                                             ? <Tooltip>
                                                 <TooltipTrigger asChild>
-                                                    <p tabIndex={0} role="text" aria-label={`${memoryValue || "<1"} MB`} className="truncate pointer-events-auto text-sm font-semibold">{`${memoryValue || "<1"} MB`}</p>
+                                                    <p tabIndex={0} role="text" aria-label={memoryDisplay} className="truncate pointer-events-auto text-sm font-semibold">{memoryDisplay}</p>
                                                 </TooltipTrigger>
                                                 <TooltipContent>
-                                                    {`${memoryValue || "<1"} MB`}
+                                                    {memoryDisplay}
                                                 </TooltipContent>
                                             </Tooltip>
+                                            : isGraphInfoLoaded
+                                            ? <p tabIndex={0} role="text" aria-label="Memory unavailable" className="truncate pointer-events-auto text-sm font-semibold">N/A</p>
                                             : <Loader2 className="animate-spin" />
                                     }
                             </div>
