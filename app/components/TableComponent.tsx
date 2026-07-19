@@ -90,6 +90,8 @@ export default function TableComponent({
     onExpandChange
 }: Props) {
 
+    const hasCellValue = (value: unknown) => value !== undefined && value !== null;
+
     const { indicator } = useContext(IndicatorContext);
 
     const { theme } = useTheme();
@@ -308,7 +310,7 @@ export default function TableComponent({
                 validCellKeys.add(cellKey);
 
                 // If cell has a value, keep it as loaded
-                if (cell.value) {
+                if (hasCellValue(cell.value)) {
                     newLoadedCells.add(cellKey);
                     newLoadAttempts.add(cellKey);
                 }
@@ -643,15 +645,16 @@ export default function TableComponent({
                                             const cellTestId = `${label}${row.name}`;
                                             const isCellLoading = loadingCells.has(cellKey);
                                             const isLazyCell = cell.type === "readonly" && "loadCell" in cell && cell.loadCell;
+                                            const isCellValueMissing = !hasCellValue(cell.value);
 
                                             // Only load if it's a lazy cell, has no value, not currently loading, and we haven't attempted to load it yet
-                                            if (isLazyCell && !cell.value && !loadingCells.has(cellKey) && !loadAttemptedRef.current.has(cellKey)) {
+                                            if (isLazyCell && isCellValueMissing && !loadingCells.has(cellKey) && !loadAttemptedRef.current.has(cellKey)) {
                                                 loadAttemptedRef.current.add(cellKey);
                                                 handleLoadLazyCell(row.name, j, cell.loadCell);
                                             }
 
-                                            // Show loader while loading
-                                            if (isCellLoading) {
+                                            // Show loader while loading and during the initial lazy-cell paint.
+                                            if (isCellLoading || (isLazyCell && isCellValueMissing)) {
                                                 return (
                                                     <TableCell
                                                         className={cn(

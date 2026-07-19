@@ -96,7 +96,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             const startEpoch = getConnectionEpoch();
             const cid = getActiveConnectionIdGlobal();
             const memoryMap = await getMemoryUsage(opt, toast, setIndicator, cid);
-            if (getConnectionEpoch() !== startEpoch) return "";
+            if (getConnectionEpoch() !== startEpoch) return undefined;
             const memoryValue = memoryMap.get("total_graph_sz_mb") || '<1';
 
             return `${memoryValue} MB`;
@@ -109,13 +109,13 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 const cid = getActiveConnectionIdGlobal();
                 const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
                 const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes${readOnlyParam}`, toast, setIndicator, { connectionId: cid }) as { nodes?: number };
-                if (getConnectionEpoch() !== startEpoch) return "";
+                if (getConnectionEpoch() !== startEpoch) return undefined;
 
-                if (result.nodes == null || !Number.isFinite(Number(result.nodes))) return "";
+                if (result.nodes == null || !Number.isFinite(Number(result.nodes))) return "N/A";
 
                 return Number(result.nodes).toLocaleString();
             } catch {
-                return "";
+                return "N/A";
             }
         }, [toast, setIndicator, isReadOnly]);
 
@@ -126,13 +126,13 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 const cid = getActiveConnectionIdGlobal();
                 const readOnlyParam = isReadOnly ? '?readOnly=true' : '';
                 const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges${readOnlyParam}`, toast, setIndicator, { connectionId: cid }) as { edges?: number };
-                if (getConnectionEpoch() !== startEpoch) return "";
+                if (getConnectionEpoch() !== startEpoch) return undefined;
 
-                if (result.edges == null || !Number.isFinite(Number(result.edges))) return "";
+                if (result.edges == null || !Number.isFinite(Number(result.edges))) return "N/A";
 
                 return Number(result.edges).toLocaleString();
             } catch {
-                return "";
+                return "N/A";
             }
         }, [toast, setIndicator, isReadOnly]);
 
