@@ -55,7 +55,6 @@ describe("getAllowedFileType", () => {
       [".pdf", "application/pdf"],
       [".txt", "text/plain"],
       [".csv", "text/csv"],
-      [".cql", "text/plain"],
       [".cypher", "text/plain"],
       [".dump", "application/octet-stream"],
     ];
@@ -68,7 +67,7 @@ describe("getAllowedFileType", () => {
   });
 
   it("includes the contentType in the mimeTypes list for each extension", () => {
-    for (const ext of [".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".txt", ".csv", ".cql", ".cypher", ".dump"]) {
+    for (const ext of [".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".txt", ".csv", ".cypher", ".dump"]) {
       const fileType = getAllowedFileType(ext);
       assert.ok(fileType, `expected config for ${ext}`);
       assert.ok(
@@ -79,7 +78,7 @@ describe("getAllowedFileType", () => {
   });
 
   it("returns a validateContent function for every allowed extension", () => {
-    for (const ext of [".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".txt", ".csv", ".cql", ".cypher", ".dump"]) {
+    for (const ext of [".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".txt", ".csv", ".cypher", ".dump"]) {
       const fileType = getAllowedFileType(ext);
       assert.ok(fileType, `expected config for ${ext}`);
       assert.equal(typeof fileType.validateContent, "function");
@@ -199,13 +198,6 @@ describe("getAllowedFileType validateContent — document/text signatures", () =
     const { validateContent } = getAllowedFileType(".cypher")!;
     assert.equal(await validateContent(file), true);
   });
-
-  it("accepts valid Cypher text for .cql", async () => {
-    const content = new TextEncoder().encode("MATCH (n) RETURN n;\n");
-    const file = makeFile(Array.from(content), "test.cql", "text/plain");
-    const { validateContent } = getAllowedFileType(".cql")!;
-    assert.equal(await validateContent(file), true);
-  });
 });
 
 describe("getAllowedFileType validateContent — binary formats", () => {
@@ -287,12 +279,6 @@ describe("getStoredUpload", () => {
     const result = getStoredUpload(`${VALID_UUID}.cypher`, TEST_USER);
     assert.ok(result);
     assert.equal(result.extension, ".cypher");
-  });
-
-  it("returns the stored upload for .cql", () => {
-    const result = getStoredUpload(`${VALID_UUID}.cql`, TEST_USER);
-    assert.ok(result);
-    assert.equal(result.extension, ".cql");
   });
 
   it("no longer allows .rdb — restore is dump-only (RESTORE needs a DUMP payload)", () => {

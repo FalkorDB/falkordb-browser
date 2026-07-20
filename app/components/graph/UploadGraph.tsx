@@ -22,8 +22,8 @@ import { CSV_UPLOAD_ENABLED } from "@/lib/graphUpload";
 type UploadMode = "cypher" | "load-csv";
 
 const ACCEPTED_CYPHER = {
-    "text/plain": [".txt", ".cql", ".cypher"],
-    "application/octet-stream": [".txt", ".cql", ".cypher"],
+    "text/plain": [".txt", ".cypher"],
+    "application/octet-stream": [".txt", ".cypher"],
 };
 
 const ACCEPTED_CSV = {
@@ -418,7 +418,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
         const tooMany = rejections.some((r) => r.errors.some((e) => e.code === "too-many-files"));
         toast({
             title: "Couldn't add file",
-            description: tooMany ? "Please drop a single file." : "Please choose a .txt, .cql, or .cypher file.",
+            description: tooMany ? "Please drop a single file." : "Please choose a .txt or .cypher file.",
             variant: "destructive",
         });
     };
@@ -904,7 +904,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                     <TabsContent value="cypher" className="mt-2 flex-1 overflow-hidden">
                         <form ref={cypherFormRef} onSubmit={onUploadCypher} className="flex h-full flex-col gap-4">
                             <p className="text-sm text-muted-foreground">
-                                Upload a .txt, .cql, or .cypher file and execute each statement sequentially into the existing graph.
+                                Upload a .txt or .cypher file and execute each statement sequentially into the existing graph.
                             </p>
                             <Dropzone
                                 filesCount
