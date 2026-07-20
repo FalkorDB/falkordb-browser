@@ -44,6 +44,8 @@ interface Props {
     onExpandChange?: Dispatch<SetStateAction<Map<number, number>>>
 }
 
+const hasCellValue = (value: unknown) => value !== undefined && value !== null;
+
 /**
  * Render a virtualized, searchable, and editable table for heterogeneous row data.
  *
@@ -89,8 +91,6 @@ export default function TableComponent({
     initialExpand,
     onExpandChange
 }: Props) {
-
-    const hasCellValue = (value: unknown) => value !== undefined && value !== null;
 
     const { indicator } = useContext(IndicatorContext);
 
@@ -667,9 +667,10 @@ export default function TableComponent({
                                             const isCellLoading = loadingCells.has(cellKey);
                                             const isLazyCell = cell.type === "readonly" && "loadCell" in cell && cell.loadCell;
                                             const isCellValueMissing = !hasCellValue(cell.value);
+                                            const hasLoadAttempted = loadAttemptedRef.current.has(cellKey);
 
-                                            // Show loader while loading and during the initial lazy-cell paint.
-                                            if (isCellLoading || (isLazyCell && isCellValueMissing)) {
+                                            // Show loader while actively loading and during the initial lazy-cell paint only.
+                                            if (isCellLoading || (isLazyCell && isCellValueMissing && !hasLoadAttempted)) {
                                                 return (
                                                     <TableCell
                                                         className={cn(

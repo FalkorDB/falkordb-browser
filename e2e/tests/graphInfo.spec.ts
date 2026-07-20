@@ -218,7 +218,9 @@ test.describe("Graph Info Panel Tests", () => {
     await browser.setPageToFullScreen();
     await graph.openGraphInfoButton();
     const nodesCount = await graph.getGraphInfoNodesCount();
+    const edgesCount = await graph.getGraphInfoEdgesCount();
     expect(nodesCount).toBe("-");
+    expect(edgesCount).toBe("-");
     await apiCall.removeGraph(graphName1);
     await apiCall.removeGraph(graphName2);
   });

@@ -42,9 +42,17 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
         || Labels.size > 0
         || Relationships.size > 0
         || (PropertyKeys?.length ?? 0) > 0;
-    const memoryDisplay = memoryValue === undefined
-        ? undefined
-        : `${memoryValue ?? "<1"} MB`;
+    const memoryDisplay = (() => {
+        if (memoryValue === undefined || memoryValue === null) return undefined;
+
+        const numericMemoryValue = typeof memoryValue === "number"
+            ? memoryValue
+            : Number(memoryValue);
+
+        if (!Number.isFinite(numericMemoryValue)) return undefined;
+
+        return `${numericMemoryValue === 0 ? "<1" : numericMemoryValue} MB`;
+    })();
 
     // Reset searches only when the active graph changes or the display limit
     // changes — not on every periodic poll that refreshes GraphInfoContext.
