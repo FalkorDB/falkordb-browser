@@ -8,12 +8,16 @@ on:
     paths-ignore:
       - '**/*.md'
       - 'LICENSE.txt'
+      - 'helm/**'
+      - '.github/workflows/helm-chart.yml'
       - '.github/dependabot.yml'
   pull_request:
     branches: [ main, staging ]
     paths-ignore:
       - '**/*.md'
       - 'LICENSE.txt'
+      - 'helm/**'
+      - '.github/workflows/helm-chart.yml'
       - '.github/dependabot.yml'
   workflow_call:
     secrets:
