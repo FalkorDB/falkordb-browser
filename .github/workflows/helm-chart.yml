@@ -6,7 +6,7 @@ name: Helm Chart CI/CD
 
 on:
   push:
-    branches: ["main", "staging"]
+    branches: ["main"]
     tags: ["v*.*.*"]
     paths:
       - 'helm/**'
