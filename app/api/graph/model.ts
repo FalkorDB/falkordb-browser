@@ -76,6 +76,10 @@ export class GraphInfo {
 
   private setIndicator: (indicator: "online" | "offline") => void;
 
+  // Connection this GraphInfo's fallback metadata queries must target, so a
+  // mid-build connection switch can't route getMetaStatsCount to another DB.
+  private connectionId: string | null | undefined;
+
   constructor(
     propertyKeys: string[] | undefined,
     labels: Map<string, InfoLabel>,
@@ -83,7 +87,8 @@ export class GraphInfo {
     memoryUsage: Map<string, MemoryValue>,
     toast: ToastFn,
     setIndicator: (indicator: "online" | "offline") => void,
-    colors?: string[]
+    colors?: string[],
+    connectionId?: string | null,
   ) {
     this.propertyKeys = propertyKeys;
     this.labels = labels;
@@ -92,6 +97,7 @@ export class GraphInfo {
     this.toast = toast;
     this.setIndicator = setIndicator;
     this.colors = [...colors || []];
+    this.connectionId = connectionId;
   }
 
 
@@ -131,7 +137,8 @@ export class GraphInfo {
       new Map(this.memoryUsage),
       this.toast,
       this.setIndicator,
-      this.colors
+      this.colors,
+      this.connectionId
     );
   }
 
@@ -140,14 +147,17 @@ export class GraphInfo {
     setIndicator: (indicator: "online" | "offline") => void,
     propertyKeys?: string[],
     memoryUsage?: Map<string, MemoryValue>,
+    connectionId?: string | null,
   ): GraphInfo {
     return new GraphInfo(
-      propertyKeys || [],
+      propertyKeys,
       new Map(),
       new Map(),
       new Map(memoryUsage),
       toast,
-      setIndicator
+      setIndicator,
+      undefined,
+      connectionId
     );
   }
 
@@ -157,9 +167,10 @@ export class GraphInfo {
     relationships: [string, number][],
     memoryUsage: Map<string, MemoryValue>,
     toast: ToastFn,
-    setIndicator: (indicator: "online" | "offline") => void
+    setIndicator: (indicator: "online" | "offline") => void,
+    connectionId?: string | null,
   ): Promise<GraphInfo> {
-    const graphInfo = GraphInfo.empty(toast, setIndicator, propertyKeys, memoryUsage);
+    const graphInfo = GraphInfo.empty(toast, setIndicator, propertyKeys, memoryUsage, connectionId);
     await graphInfo.createLabel(labels, "");
     await relationships.reduce(
       (prev, relationship) => prev.then(() => graphInfo.createRelationship(relationship, "")),
@@ -170,7 +181,7 @@ export class GraphInfo {
   }
 
   private async getMetaStatsCount(graphName: string, type: "relationships" | "labels", name: string): Promise<number> {
-    const result = await getMetaStats(graphName, this.toast, this.setIndicator);
+    const result = await getMetaStats(graphName, this.toast, this.setIndicator, undefined, { connectionId: this.connectionId });
 
     if (!result) return 0;
 
@@ -469,13 +480,12 @@ export class Graph {
     graphInfo?: GraphInfo,
   ): Promise<Graph> {
     const graph = Graph.empty(
-      undefined,
+      id,
       showPropertyKeyPrefix,
       currentLimit,
       graphInfo
     );
     await graph.extend(results);
-    graph.id = id;
     return graph;
   }
 

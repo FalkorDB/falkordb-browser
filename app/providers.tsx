@@ -3,7 +3,7 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue } from "@/lib/utils";
+import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue } from "@/lib/utils";
 import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
@@ -20,7 +20,9 @@ import type { Data as CanvasData, HierarchyDirection, LayoutMode, RadialDirectio
 import LoginVerification from "./loginVerification";
 import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
-import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
+import type { LanguageConfig } from "./components/EditorComponent";
+import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, CypherLanguageContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
+import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
 
@@ -204,14 +206,52 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [urlQueryText, setUrlQueryText] = useState<string | null>(null);
   const [selectedParam, setSelectedParam] = useState<string>(urlSelected);
   const [runDefaultQuery, setRunDefaultQuery] = useState(false);
-  const [graphNames, setGraphNames] = useState<string[]>([]);
+  const [graphNames, setGraphNames] = useState<string[] | undefined>(undefined);
+  // Always-current ref so effects can validate graph names without re-running
+  // on every graphNames mutation (prevents spurious URL→state rollbacks).
+  const graphNamesRef = useRef<string[]>([]);
+  useEffect(() => {
+    graphNamesRef.current = graphNames ?? [];
+  }, [graphNames]);
   const [graphNamesLoaded, setGraphNamesLoaded] = useState(false);
   const [graph, setGraph] = useState<Graph>(Graph.empty());
-  // setGraphInfo updates the GraphInfo inside the graph so there is one source of
-  // truth. Every graphInfo change produces a new Graph object reference, which
-  // triggers React re-renders for all consumers of the graph context.
+  // graphRef always points to the current graph so setGraphInfo can mutate
+  // graph.GraphInfo in-place without triggering a graph state change.
+  const graphRef = useRef<Graph>(graph);
+  graphRef.current = graph;
+  // graphInfo / nodesCount / edgesCount state is owned by GraphInfoProvider so
+  // that periodic info polls only re-render that isolated subtree, not the
+  // whole providers tree.  We communicate with it via a stable ref of setters.
+  const graphInfoPendingRef = useRef<GraphInfoPendingUpdates>({
+    versionBumps: 0,
+    hasNodesCount: false,
+    nodesCount: undefined,
+    hasEdgesCount: false,
+    edgesCount: undefined,
+  });
+  const graphInfoSyncRef = useRef<GraphInfoSync>({
+    bumpVersion: () => {
+      graphInfoPendingRef.current.versionBumps += 1;
+    },
+    setNodesCount: n => {
+      graphInfoPendingRef.current.nodesCount = n;
+      graphInfoPendingRef.current.hasNodesCount = true;
+    },
+    setEdgesCount: e => {
+      graphInfoPendingRef.current.edgesCount = e;
+      graphInfoPendingRef.current.hasEdgesCount = true;
+    },
+  });
+
   const setGraphInfo = useCallback((gi: GraphInfo) => {
-    setGraph(prev => { const g = prev.clone(); g.GraphInfo = gi.clone(); return g; });
+    // Mutate graphRef.current.GraphInfo in-place — no graph state change, so
+    // GraphContext consumers (canvas, toolbar, …) are not disturbed. graphRef
+    // always points at the current graph (kept in sync on every render), so we
+    // avoid a redundant setGraph call that would bail out anyway (same object).
+    graphRef.current.GraphInfo = gi;
+    // Bump the version counter in GraphInfoProvider so its consumers
+    // re-render and read the fresh data from graph.GraphInfo.
+    graphInfoSyncRef.current.bumpVersion();
   }, []);
   const [data, setData] = useState<GraphData>({ ...graph.Elements });
   const [graphData, setGraphData] = useState<CanvasData>();
@@ -238,8 +278,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [newSecretKey, setNewSecretKey] = useState("");
   const [secretKey, setSecretKey] = useState("");
   const [hasChanges, setHasChanges] = useState(false);
-  const [nodesCount, setNodesCount] = useState<number>();
-  const [edgesCount, setEdgesCount] = useState<number>();
   const [newMaxSavedMessages, setNewMaxSavedMessages] = useState(0);
   const [maxSavedMessages, setMaxSavedMessages] = useState(0);
   const [chatApiKeys, setChatApiKeys] = useState<ChatApiKey[]>([]);
@@ -253,12 +291,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0);
   const [isQueryLoading, setIsQueryLoading] = useState(false);
+  const [cypherLanguageConfig, setCypherLanguageConfig] = useState<LanguageConfig | null>(null);
   const [diagnostics, setDiagnostics] = useState<DiagnosticsResult | null>(null);
   const [model, setModel] = useState("");
   const [newModel, setNewModel] = useState("");
   const [perSourceModels, setPerSourceModels] = useState<Record<string, string>>({});
   const [tutorialOpen, setTutorialOpen] = useState(false);
-  const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>([]);
+  const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>();
   const [userGraphBeforeTutorial, setUserGraphBeforeTutorial] = useState<string>("");
   const [urlParamsBeforeTutorial, setUrlParamsBeforeTutorial] = useState<string>("");
   const [showMemoryUsage, setShowMemoryUsage] = useState(false);
@@ -291,6 +330,50 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const prevActiveConnectionIdRef = useRef<string | null>(null);
   const connectionSwitchFetchedRef = useRef(false);
 
+  // ── Graph-operation ownership guards (see idea-6 plan) ──────────────────────
+  // contextGen: "what connection + graph the UI represents" — bumped on a
+  // connection-switch begin, a connection reset, and a graph-name change.
+  const contextGenRef = useRef(0);
+  // querySeq / optionsSeq: the newest query / newest graph-list refresh wins.
+  const querySeqRef = useRef(0);
+  const optionsSeqRef = useRef(0);
+  // loadingOwnerRef: the querySeq that currently owns the isQueryLoading spinner.
+  const loadingOwnerRef = useRef<number | null>(null);
+  // Connection-switch gate. `pendingSwitches` counts in-flight switches (graph ops
+  // are rejected while > 0); `switchTicket` is monotonic so a completing switch
+  // can tell whether it is still the latest (out-of-order completions are ignored).
+  const pendingSwitchesRef = useRef(0);
+  const switchTicketRef = useRef(0);
+
+  const bumpContextGen = useCallback(() => {
+    contextGenRef.current += 1;
+    // A superseded in-flight query can no longer own the spinner — release it so
+    // it isn't left stuck; a fresh query re-claims it immediately.
+    if (loadingOwnerRef.current !== null) {
+      loadingOwnerRef.current = null;
+      setIsQueryLoading(false);
+    }
+    return contextGenRef.current;
+  }, []);
+
+  // Returns a ticket for this switch. Every begin must be matched by exactly one
+  // end (on success via the reset effect, on failure/supersession by the caller),
+  // so the counter can never get stuck above 0.
+  const beginConnectionSwitch = useCallback(() => {
+    pendingSwitchesRef.current += 1;
+    switchTicketRef.current += 1;
+    bumpContextGen();
+    return switchTicketRef.current;
+  }, [bumpContextGen]);
+
+  const endConnectionSwitch = useCallback(() => {
+    pendingSwitchesRef.current = Math.max(0, pendingSwitchesRef.current - 1);
+  }, []);
+
+  // True if `ticket` is still the most recently started switch (so a stale,
+  // out-of-order completion doesn't publish an older connection as active).
+  const isLatestSwitch = useCallback((ticket: number) => switchTicketRef.current === ticket, []);
+
   const replayTutorial = useCallback(() => {
     router.push("/graph");
     localStorage.removeItem("tutorial");
@@ -305,28 +388,54 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   const browserSettingsContext = useMemo(() => ({
     newSettings: {
-      limitSettings: { newLimit, setNewLimit },
-      timeoutSettings: { newTimeout, setNewTimeout },
-      runDefaultQuerySettings: { newRunDefaultQuery, setNewRunDefaultQuery },
-      defaultQuerySettings: { newDefaultQuery, setNewDefaultQuery },
-      contentPersistenceSettings: { newContentPersistence, setNewContentPersistence },
-      captionsKeysSettings: { newCaptionsKeys, setNewCaptionsKeys },
-      showPropertyKeyPrefixSettings: { newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
+      querySettings: {
+        limitSettings: {
+          newLimit,
+          setNewLimit,
+        },
+        newTimeout,
+        setNewTimeout,
+        newRunDefaultQuery,
+        setNewRunDefaultQuery,
+        newDefaultQuery,
+        setNewDefaultQuery,
+      },
+      userExperienceSettings: {
+        newContentPersistence,
+        setNewContentPersistence,
+        captionKeysSettings: {
+          newCaptionsKeys,
+          setNewCaptionsKeys,
+          newShowPropertyKeyPrefix,
+          setNewShowPropertyKeyPrefix,
+        },
+        tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple },
+        newRefreshInterval,
+        setNewRefreshInterval,
+      },
       chatSettings: { newSecretKey, setNewSecretKey, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly, newChatModelSource, setNewChatModelSource, newLocalLlmProvider, setNewLocalLlmProvider, newLocalLlmEndpoint, setNewLocalLlmEndpoint, newModel, setNewModel },
-      graphInfo: { newRefreshInterval, setNewRefreshInterval, newMaxItemsForSearch, setNewMaxItemsForSearch },
-      tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple }
+      graphInfo: { newMaxItemsForSearch, setNewMaxItemsForSearch },
     },
     settings: {
-      limitSettings: { limit, setLimit, lastLimit, setLastLimit },
-      timeoutSettings: { timeout, setTimeout },
-      runDefaultQuerySettings: { runDefaultQuery, setRunDefaultQuery },
-      defaultQuerySettings: { defaultQuery, setDefaultQuery },
-      contentPersistenceSettings: { contentPersistence, setContentPersistence },
-      captionsKeysSettings: { captionsKeys, setCaptionsKeys },
-      showPropertyKeyPrefixSettings: { showPropertyKeyPrefix, setShowPropertyKeyPrefix },
+      querySettings: {
+        limitSettings: { limit, setLimit, lastLimit, setLastLimit },
+        timeout,
+        setTimeout,
+        runDefaultQuery,
+        setRunDefaultQuery,
+        defaultQuery,
+        setDefaultQuery,
+      },
+      userExperienceSettings: {
+        contentPersistence,
+        setContentPersistence,
+        refreshInterval,
+        setRefreshInterval,
+        captionKeysSettings: { captionsKeys, setCaptionsKeys, showPropertyKeyPrefix, setShowPropertyKeyPrefix },
+        tableViewSettings: { columnWidth, setColumnWidth, rowHeight, setRowHeight, rowHeightExpandMultiple, setRowHeightExpandMultiple },
+      },
       chatSettings: { secretKey, setSecretKey, chatApiKeys, setChatApiKeys, selectedChatApiKeyId, setSelectedChatApiKeyId, chatModelSource, setChatModelSource, localLlmProvider, setLocalLlmProvider, localLlmEndpoint, setLocalLlmEndpoint, model, setModel, maxSavedMessages, setMaxSavedMessages, cypherOnly, setCypherOnly, perSourceModels, setPerSourceModels },
       graphInfo: { showMemoryUsage, refreshInterval, setRefreshInterval, maxItemsForSearch, setMaxItemsForSearch },
-      tableViewSettings: { columnWidth, setColumnWidth, rowHeight, setRowHeight, rowHeightExpandMultiple, setRowHeightExpandMultiple }
     },
     hasChanges,
     setHasChanges,
@@ -527,7 +636,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   }), [aiFixSupported, lastFailure, aiFixResult, pendingConsent, requestAiFix, confirmConsent]);
 
   // Refs so runQuery can always call the latest requestAiFix without being in its
-  // eslint-disable-next-line dependency array (avoids recreating runQuery on every AI-state change).
+  // dependency array (avoids recreating runQuery on every AI-state change).
   const requestAiFixRef = useRef(requestAiFix);
   requestAiFixRef.current = requestAiFix;
   // ---------------------------------------------------------------------------
@@ -565,6 +674,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // dependency arrays, which avoids cascading effect re-fires.
   const isReadOnlyRef = useRef(isReadOnly);
   isReadOnlyRef.current = isReadOnly;
+  const activeGraphNameRef = useRef(graphName);
+  activeGraphNameRef.current = graphName;
+  // Ref for the auth status so fetchCount reads the latest value without adding
+  // `status` to its deps (which would churn every consumer of that callback).
+  const statusRef = useRef(status);
+  statusRef.current = status;
 
   const connectionContext = useMemo(() => ({
     connectionType,
@@ -579,7 +694,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     activeConnectionId,
     setActiveConnectionId,
     updateSession,
-  }), [connectionType, connectionInfo, dbVersion, isReadOnly, additionalConnections, activeConnectionId, updateSession]);
+    beginConnectionSwitch,
+    endConnectionSwitch,
+    isLatestSwitch,
+  }), [connectionType, connectionInfo, dbVersion, isReadOnly, additionalConnections, activeConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
 
   const udfContext = useMemo(() => ({
     udfList,
@@ -588,25 +706,62 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setSelectedUdf
   }), [selectedUdf, udfList]);
 
-  const fetchCount = useCallback(async (name?: string) => {
+  const cypherLanguageContext = useMemo(() => ({
+    cypherLanguageConfig,
+    setCypherLanguageConfig,
+  }), [cypherLanguageConfig]);
+
+  const fetchCount = useCallback(async (name?: string, options?: { signal?: AbortSignal; connectionId?: string | null; epoch?: number; isCurrent?: () => boolean }) => {
     const n = name || graphName;
 
-    if (!n || status === "unauthenticated") return;
+    if (!n || statusRef.current === "unauthenticated") return;
 
-    setEdgesCount(undefined);
-    setNodesCount(undefined);
+    // Don't start a count while a connection switch is mid-flight — the global id
+    // and React state may disagree, so this could query (and auto-create) the
+    // old graph on the new connection.
+    if (pendingSwitchesRef.current > 0) return;
+
+    // Capture the connection this request targets. Prefer the caller's captured
+    // epoch (the epoch when its poll/action began) so a switch between that start
+    // and this call is caught; otherwise capture it now.
+    const connectionId = options?.connectionId !== undefined ? options.connectionId : getActiveConnectionIdGlobal();
+    const startEpoch = options?.epoch !== undefined ? options.epoch : getConnectionEpoch();
+
+    // Already superseded: skip the request entirely so we never query a stale
+    // graph against a switched connection (which could auto-create it).
+    if (getConnectionEpoch() !== startEpoch) return;
+
+    // Suppress the request's toast / indicator side effects if the connection is
+    // switched while it is in flight — getSSEGraphResult fires them internally
+    // before we can inspect the epoch, and not every caller passes an AbortSignal.
+    const guardedToast = ((...args: Parameters<typeof toast>) => {
+      if (getConnectionEpoch() === startEpoch) toast(...args);
+    }) as typeof toast;
+    const guardedSetIndicator = (indicator: "online" | "offline") => {
+      if (getConnectionEpoch() === startEpoch) setIndicator(indicator);
+    };
 
     try {
       const readOnlyParam = isReadOnlyRef.current ? '?readOnly=true' : '';
-      const result = await getSSEGraphResult(`api/graph/${prepareArg(n)}/count${readOnlyParam}`, toast, setIndicator) as { nodes?: number; edges?: number };
+      const result = await getSSEGraphResult(`api/graph/${prepareArg(n)}/count${readOnlyParam}`, guardedToast, guardedSetIndicator, {
+        signal: options?.signal,
+        connectionId,
+      }) as { nodes?: number; edges?: number };
 
       if (!result) return;
 
+      // Discard if the graph name or the connection changed while in flight, or
+      // the caller's operation was superseded (e.g. an older query on the same
+      // graph whose count would otherwise overwrite a newer one).
+      if (n !== activeGraphNameRef.current || getConnectionEpoch() !== startEpoch) return;
+      if (options?.isCurrent && !options.isCurrent()) return;
+
       const { nodes, edges } = result;
 
-      setEdgesCount(edges);
-      setNodesCount(nodes);
+      graphInfoSyncRef.current.setEdgesCount(edges);
+      graphInfoSyncRef.current.setNodesCount(nodes);
     } catch (error) {
+      if (isAbortError(error)) return;
       console.error(error);
     }
   }, [graphName, toast]);
@@ -617,22 +772,71 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     }
   }, []);
 
-  const fetchInfo = useCallback(async (type: string, name: string) => {
-    if (!graphName) return [];
+  const fetchInfo = useCallback(async (type: string, name: string, pin?: { connectionId?: string | null; epoch?: number; isCurrent?: () => boolean }) => {
+    if (!name) return [];
+
+    // Pin to the caller's connection (routing) and epoch (so a stale result is
+    // dropped after a connection switch). `!== undefined` honours an explicit null.
+    const cid = pin?.connectionId !== undefined ? pin.connectionId : getActiveConnectionIdGlobal();
+    const startEpoch = pin?.epoch !== undefined ? pin.epoch : getConnectionEpoch();
+    const superseded = () => getConnectionEpoch() !== startEpoch || (pin?.isCurrent ? !pin.isCurrent() : false);
+    const gToast = pin?.isCurrent ? (((...a: Parameters<typeof toast>) => { if (!superseded()) toast(...a); }) as typeof toast) : toast;
+    const gInd = pin?.isCurrent ? ((i: "online" | "offline") => { if (!superseded()) setIndicator(i); }) : setIndicator;
+
+    if (type === "(property key)") {
+      const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
+      const query = "CALL db.propertyKeys() YIELD propertyKey as info";
+      const sse = await getSSEGraphResult(
+        `/api/graph/${prepareArg(name)}?query=${prepareArg(query)}${readOnlyParam}`,
+        gToast,
+        gInd,
+        { connectionId: cid },
+      ) as { data?: Array<{ info?: unknown }> };
+
+      if (superseded() || !sse || !Array.isArray(sse.data)) return [];
+
+      return sse.data
+        .map((entry) => (typeof entry?.info === "string" ? entry.info : undefined))
+        .filter((value): value is string => typeof value === "string");
+    }
 
     const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
-    const result = await securedFetch(`/api/graph/${name}/info?type=${type}${readOnlyParam}`, {
+    const result = await securedFetch(`/api/graph/${prepareArg(name)}/info?type=${prepareArg(type)}${readOnlyParam}`, {
       method: "GET",
-    }, toast, setIndicator);
+    }, gToast, gInd, cid);
 
-    if (!result.ok) return [];
+    if (!result.ok || superseded()) return [];
 
-    const json = await result.json();
+    const bodyText = await result.text();
+    if (superseded()) return [];
+    let json: unknown;
 
-    return json.result.data.map(({ info }: { info: string }) => info);
-  }, [graphName, toast, setIndicator]);
+    try {
+      json = JSON.parse(bodyText);
+    } catch (error) {
+      console.error("Failed to parse graph info response", {
+        error,
+        responseUrl: result.url,
+        contentType: result.headers.get("content-type"),
+        preview: bodyText.slice(0, 200),
+      });
+      return [];
+    }
 
-  const fetchMetaStats = useCallback((name: string) => getMetaStats(name, toast, setIndicator, isReadOnlyRef.current), [toast, setIndicator]);
+    const data = (json as { result?: { data?: Array<{ info?: unknown }> } })?.result?.data;
+    if (!Array.isArray(data)) return [];
+
+    return data
+      .map((entry) => (typeof entry?.info === "string" ? entry.info : undefined))
+      .filter((value): value is string => typeof value === "string");
+  }, [toast, setIndicator]);
+
+  const fetchMetaStats = useCallback((name: string, options?: { signal?: AbortSignal; connectionId?: string | null; isCurrent?: () => boolean }) => {
+    const isCurrent = options?.isCurrent;
+    const gToast = isCurrent ? (((...a: Parameters<typeof toast>) => { if (isCurrent()) toast(...a); }) as typeof toast) : toast;
+    const gInd = isCurrent ? ((i: "online" | "offline") => { if (isCurrent()) setIndicator(i); }) : setIndicator;
+    return getMetaStats(name, gToast, gInd, isReadOnlyRef.current, { signal: options?.signal, connectionId: options?.connectionId });
+  }, [toast, setIndicator]);
 
   const handelGetNewQueries = useCallback((newQuery: Query) => {
     const existing = historyQuery.queries.find(qu => qu.text === newQuery.text);
@@ -641,7 +845,24 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   }, [historyQuery.queries]);
 
   const runQuery = useCallback(async (q: string, name?: string): Promise<void> => {
-    const n = name || graphName;
+    const n = name || activeGraphNameRef.current;
+
+    // Reject while a connection switch is mid-flight — its global id and React
+    // state may still disagree, so starting here could hit the wrong DB.
+    if (pendingSwitchesRef.current > 0) return;
+
+    // Capture ownership once: this is the newest query for the current
+    // connection + graph. `isCurrent()` gates every later apply so a switch, a
+    // graph change, or a newer query discards this run's results.
+    const seq = (querySeqRef.current += 1);
+    const ctx = contextGenRef.current;
+    const cid = getActiveConnectionIdGlobal();
+    const epoch = getConnectionEpoch();
+    const isCurrent = () => querySeqRef.current === seq && contextGenRef.current === ctx;
+    loadingOwnerRef.current = seq;
+    const guardedToast = ((...a: Parameters<typeof toast>) => { if (isCurrent()) toast(...a); }) as typeof toast;
+    const guardedSetIndicator = (i: "online" | "offline") => { if (isCurrent()) setIndicator(i); };
+
     let newQuery: Query = {
       elementsCount: 0,
       explain: [],
@@ -668,25 +889,29 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
     const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}${readOnlyParam}`;
     try {
-      const result = await getSSEGraphResult(url, toast, setIndicator, {
+      const result = await getSSEGraphResult(url, guardedToast, guardedSetIndicator, {
         query: q,
+        connectionId: cid,
       }) as { data: Data; metadata: string[] };
 
       if (!result) throw new Error("Failed to execute query");
+      if (!isCurrent()) return;
 
       const graphI = await Promise.all([
-        fetchMetaStats(n),
-        fetchInfo("(property key)", n),
+        fetchMetaStats(n, { connectionId: cid, isCurrent }),
+        fetchInfo("(property key)", n, { connectionId: cid, epoch, isCurrent }),
       ]).then(async ([metaStats, newPropertyKeys]) => {
-        const memoryUsage = showMemoryUsage ? await getMemoryUsage(n, toast, setIndicator, getActiveConnectionIdGlobal()) : new Map<string, MemoryValue>();
+        const memoryUsage = showMemoryUsage ? await getMemoryUsage(n, guardedToast, guardedSetIndicator, cid) : new Map<string, MemoryValue>();
         const newLabels = metaStats?.[0] || [];
         const newRelationships = metaStats?.[1] || [];
-        const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
-        // setGraph(g) below already carries gi inside — no separate setGraphInfo needed.
+        // Pin the GraphInfo's fallback metadata queries to this connection too.
+        const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, guardedToast, guardedSetIndicator, cid);
+        // gi is embedded in the graph via Graph.create below and also pushed to
+        // GraphInfoContext through setGraphInfo(g.GraphInfo) after setGraph.
         return gi;
       }).catch((error) => {
         console.error("Failed to fetch graph info:", error);
-        toast({
+        if (isCurrent()) toast({
           title: "Error",
           description: "Failed to fetch graph info",
           variant: "destructive",
@@ -694,13 +919,20 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         return undefined;
       });
 
+      if (!isCurrent()) return;
+
       const explain = await securedFetch(`api/graph/${prepareArg(n)}/explain?query=${prepareArg(query)}${readOnlyParam}`, {
         method: "GET"
-      }, toast, setIndicator);
+      }, guardedToast, guardedSetIndicator, cid);
 
       if (!explain.ok) throw new Error("Failed to fetch explain plan");
 
       const explainJson = await explain.json();
+
+      // Guard before Graph.create so its (now connection-pinned) metadata
+      // fallbacks don't fire after a switch.
+      if (!isCurrent()) return;
+
       const g = await Graph.create(n, result, showPropertyKeyPrefix, existingLimit, graphI);
 
       newQuery = {
@@ -712,9 +944,20 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         status: "Success",
       };
 
+      // Final ownership check before applying any state.
+      if (!isCurrent()) return;
+
       setGraph(g);
+      // setGraph only updates GraphContext; the GraphInfo panel reads labels,
+      // relationships and property keys from the separate GraphInfoContext, so
+      // sync it here too — otherwise the panel shows stale info until the next
+      // periodic refresh (up to refreshInterval seconds later).
+      setGraphInfo(g.GraphInfo);
       setData({ ...g.Elements });
-      fetchCount(n);
+      fetchCount(n, { connectionId: cid, epoch, isCurrent });
+      if (!tutorialOpen) {
+        setCurrentTab(g.getElements().length === 0 && g.Data.length !== 0 ? "Table" : "Graph");
+      }
       setLastLimit(limit);
 
       if (!tutorialOpen && prefixReady) {
@@ -739,41 +982,58 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setScrollPosition(0);
       handleCooldown(-1);
     } catch (err) {
-      // Errors from getSSEGraphResult are already surfaced via toast
-      const errorMessage = (err as Error).message || "";
-      setDiagnostics(computeEditorDiagnostics(newQuery.text, errorMessage));
-      setLastFailure({ query: newQuery.text, errorMessage });
+      // Discard a superseded failure so it can't overwrite the active graph's
+      // diagnostics/history/URL after a switch or a newer query.
+      if (isCurrent()) {
+        // Errors from getSSEGraphResult are already surfaced via toast
+        const errorMessage = (err as Error).message || "";
+        setDiagnostics(computeEditorDiagnostics(newQuery.text, errorMessage));
+        setLastFailure({ query: newQuery.text, errorMessage });
 
-      // Save failed query to history with the error message
-      newQuery = { ...newQuery, errorMessage };
-      const failedQueries = handelGetNewQueries(newQuery);
-      if (prefixReady) {
-        setConnectionItem("query history", JSON.stringify(failedQueries));
+        // Save failed query to history with the error message
+        newQuery = { ...newQuery, errorMessage };
+        const failedQueries = handelGetNewQueries(newQuery);
+        if (prefixReady) {
+          setConnectionItem("query history", JSON.stringify(failedQueries));
+        }
+        setHistoryQuery(prev => ({
+          ...prev,
+          queries: failedQueries,
+          currentQuery: newQuery,
+          counter: 0
+        }));
       }
-      setHistoryQuery(prev => ({
-        ...prev,
-        queries: failedQueries,
-        currentQuery: newQuery,
-        counter: 0
-      }));
     } finally {
-      setUrlQueryText(newQuery.text);
-      setIsQueryLoading(false);
+      if (isCurrent()) setUrlQueryText(newQuery.text);
+      // Only the run that still owns the spinner may clear it — a newer query or
+      // a switch/graph change may have taken (or released) ownership.
+      if (loadingOwnerRef.current === seq) {
+        loadingOwnerRef.current = null;
+        setIsQueryLoading(false);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graphName, limit, timeout, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries, showMemoryUsage, captionsKeys, showPropertyKeyPrefix, tutorialOpen, prefixReady]);
+  }, [limit, timeout, fetchInfo, fetchMetaStats, fetchCount, setGraphInfo, handleCooldown, handelGetNewQueries, showMemoryUsage, captionsKeys, showPropertyKeyPrefix, tutorialOpen, prefixReady]);
 
   const graphNameRef = useRef(graphName);
-  graphNameRef.current = graphName;
+
+  useEffect(() => {
+    graphNameRef.current = graphName;
+  }, [graphName]);
 
   const handleSetGraphName = useCallback((name: string) => {
     if (graphNameRef.current === name) return;
+    // Make the new graph name authoritative immediately (both refs otherwise only
+    // refresh at render) and supersede any in-flight op targeting the old graph.
+    graphNameRef.current = name;
+    activeGraphNameRef.current = name;
+    bumpContextGen();
     // Clear stale state from the previous graph so old data doesn't linger
     setGraphName(name);
     setSelectedParam("");
     setGraphInfo(GraphInfo.empty(toast, setIndicator));
-    setNodesCount(undefined);
-    setEdgesCount(undefined);
+    graphInfoSyncRef.current.setNodesCount(undefined);
+    graphInfoSyncRef.current.setEdgesCount(undefined);
     setData({ nodes: [], links: [] });
     setGraphData(undefined);
     setViewport(undefined);
@@ -782,7 +1042,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setDiagnostics(null);
     setHistoryQuery(h => ({ ...h, query: "", currentQuery: defaultQueryHistory.currentQuery }));
     setUrlQueryText(null);
-  }, [toast, setIndicator]);
+  }, [toast, setIndicator, bumpContextGen]);
 
   const graphContext = useMemo(() => ({
     graph,
@@ -796,10 +1056,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setLabels,
     relationships,
     setRelationships,
-    nodesCount,
-    setNodesCount,
-    edgesCount,
-    setEdgesCount,
     currentTab,
     setCurrentTab,
     runQuery,
@@ -813,7 +1069,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     selectedParam,
     setSelectedParam,
     initialQuery: initialQueryRef.current,
-  }), [graph, graphName, handleSetGraphName, graphNames, labels, relationships, nodesCount, edgesCount, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, selectedParam]);
+  }), [graph, graphName, handleSetGraphName, graphNames, labels, relationships, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, selectedParam]);
 
   useEffect(() => {
     setRelationships([...graph.Relationships]);
@@ -1228,13 +1484,35 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     return () => clearInterval(interval);
   }, [checkStatus, status]);
 
-  const handleFetchOptions = useCallback(async () => {
+  const handleFetchOptions = useCallback(async (options?: { clear?: boolean }) => {
     if (indicator === "offline" || tutorialOpen) return;
 
-    await fetchOptions(toast, setIndicator, indicator, setGraphName, setGraphNames);
+    const oseq = (optionsSeqRef.current += 1);
+    const ctx = contextGenRef.current;
+    const cid = getActiveConnectionIdGlobal();
+    const epoch = getConnectionEpoch();
+    const isCurrent = () => getConnectionEpoch() === epoch && optionsSeqRef.current === oseq;
+    const gToast = ((...a: Parameters<typeof toast>) => { if (isCurrent()) toast(...a); }) as typeof toast;
+    const gInd = (i: "online" | "offline") => { if (isCurrent()) setIndicator(i); };
+
+    // Only the connection-reset path clears the list; an ordinary refresh keeps
+    // the last good list so a failed/slow refresh can't empty the selector.
+    if (options?.clear) setGraphNames(undefined);
+
+    const res = await fetchOptions(gToast, gInd, indicator, cid);
+
+    // The list is connection-scoped: apply only if this is still the newest
+    // refresh for the same connection (a later switch/refresh owns it otherwise).
+    if (!isCurrent()) return;
+    if (res) {
+      setGraphNames(res.opts);
+    } else if (options?.clear) {
+      setGraphNames([]);
+    }
     setGraphNamesLoaded(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toast, tutorialOpen]);
+    // Auto-select is graph-scoped: only apply if the graph context is unchanged.
+    if (res?.autoSelect && contextGenRef.current === ctx && isCurrent()) handleSetGraphName(res.autoSelect);
+  }, [toast, setIndicator, indicator, tutorialOpen, handleSetGraphName]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -1256,9 +1534,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (pathname !== "/graph") return;
     if (!graphNamesLoaded) return;
 
-    if (urlGraphName && !graphNames.includes(urlGraphName)) {
-      // URL graph does not exist in DB — strip all related URL params
-      setGraphName("");
+    if (urlGraphName && !graphNamesRef.current.includes(urlGraphName)) {
+      // URL graph does not exist in DB — strip all related URL params. Route the
+      // name change through handleSetGraphName so any in-flight query for the old
+      // graph is superseded (bumps contextGen).
+      handleSetGraphName("");
       setSelectedParam("");
       setUrlQueryText(null);
       return;
@@ -1268,10 +1548,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // When urlGraphName is empty, fetchOptions may have already auto-selected
     // a graph (e.g. single-graph DB) — don't clobber that with an empty string.
     if (urlGraphName) {
-      setGraphName(urlGraphName);
+      handleSetGraphName(urlGraphName);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlGraphName, graphNamesLoaded, graphNames]);
+  }, [urlGraphName, graphNamesLoaded]);
 
   // One-way sync: context state → URL (only while on /graph)
   const prevPathnameRef = useRef(pathname);
@@ -1300,7 +1580,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   // Restore content persistence once on app mount (after auth + settings + graph names loaded)
   useEffect(() => {
-    if (contentRestoredRef.current || !prefixReady || !contentPersistence || graphNames.length === 0) return;
+    if (contentRestoredRef.current || !prefixReady || !contentPersistence || !graphNames || graphNames.length === 0) return;
 
     // If a graph is already loaded, mark as restored and skip
     if (graph.Id) {
@@ -1314,7 +1594,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Use the ref captured at render time: by the time this effect fires,
     // syncRouteUrlParams may have already stripped ?graph= from window.location.
     const urlGraph = initialUrlGraphNameRef.current;
-    if (urlGraph && graphNames.includes(urlGraph)) {
+    if (urlGraph && graphNames?.includes(urlGraph)) {
       contentRestoredRef.current = true;
       return;
     }
@@ -1324,7 +1604,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     try {
       const { graphName: name, query } = JSON.parse(content);
-      if (graphNames.includes(name)) {
+      if (graphNames?.includes(name)) {
         contentRestoredRef.current = true;
         handleSetGraphName(name);
         runQuery(query, name);
@@ -1344,29 +1624,40 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Skip if unchanged
     if (prev === activeConnectionId) return;
 
-    // Clear graph data so stale results from the old connection are gone
-    setGraph(Graph.empty());
-    setGraphInfo(GraphInfo.empty(toast, setIndicator));
+    // The connection actually changed and React state now agrees: supersede any
+    // in-flight graph op and fully release the switch gate so new ops are accepted
+    // again (any still-pending older switch is no longer latest, so it's a no-op).
+    bumpContextGen();
+    activeGraphNameRef.current = "";
+    pendingSwitchesRef.current = 0;
+
+    // Clear graph data so stale results from the old connection are gone.
+    // Build the empty graph with the real toast/setIndicator callbacks up front
+    // so its GraphInfo isn't left with Graph.empty()'s console.error fallbacks
+    // (setGraphInfo only mutates the current graph, not this newly queued one).
+    setGraph(Graph.empty(undefined, undefined, undefined, GraphInfo.empty(toast, setIndicator)));
     setGraphName("");
     setSelectedParam("");
     setGraphNamesLoaded(false);
-    setGraphNames([]);
-    setNodesCount(undefined);
-    setEdgesCount(undefined);
+    graphInfoSyncRef.current.setNodesCount(undefined);
+    graphInfoSyncRef.current.setEdgesCount(undefined);
     setHistoryQuery(h => ({ ...h, query: "", currentQuery: defaultQueryHistory.currentQuery }));
     setLabels([]);
     setRelationships([]);
 
-    // Re-fetch graph list for the new connection
+    // Re-fetch graph list for the new connection (clearing the old list).
     connectionSwitchFetchedRef.current = true;
-    handleFetchOptions();
-  }, [activeConnectionId, handleFetchOptions]);
+    handleFetchOptions({ clear: true });
+  }, [activeConnectionId, toast, setIndicator, handleFetchOptions, bumpContextGen]);
 
   const handleCloseTutorial = () => {
     setTutorialOpen(false);
   };
 
   const handleLoadDemoGraphs = useCallback(async () => {
+    const startEpoch = getConnectionEpoch();
+    const cid = getActiveConnectionIdGlobal();
+
     try {
       // Store current user graphs and URL params
       setUserGraphsBeforeTutorial(graphNames);
@@ -1418,18 +1709,20 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       `;
 
       await Promise.all([
-        getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, toast, setIndicator),
-        getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, toast, setIndicator)
+        getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, toast, setIndicator, { connectionId: cid }),
+        getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, toast, setIndicator, { connectionId: cid })
       ]).catch(async () => {
         await Promise.all([
           securedFetch("/api/graph/social-demo", {
             method: "DELETE",
-          }, toast, setIndicator),
+          }, toast, setIndicator, cid),
           securedFetch("/api/graph/social-demo-test", {
             method: "DELETE",
-          }, toast, setIndicator)
+          }, toast, setIndicator, cid)
         ]);
       });
+
+      if (getConnectionEpoch() !== startEpoch) return;
 
       // Update graph list to only show demo graphs
       setGraphNames(["social-demo", "social-demo-test"]);
@@ -1449,29 +1742,36 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   }, [graphName, graphNames, toast]);
 
   const handleCleanupDemoGraphs = useCallback(async () => {
+    const startEpoch = getConnectionEpoch();
+    const cid = getActiveConnectionIdGlobal();
+
     try {
       await Promise.all([
         securedFetch("/api/graph/social-demo", {
           method: "DELETE",
-        }, toast, setIndicator),
+        }, toast, setIndicator, cid),
         securedFetch("/api/graph/social-demo-test", {
           method: "DELETE",
-        }, toast, setIndicator)
+        }, toast, setIndicator, cid)
       ]);
     } catch (error) {
 
       console.error("Failed to cleanup demo graphs", error);
     }
 
-    // Clear current graph to avoid showing deleted demo graph
-    setGraph(Graph.empty());
-    setGraphInfo(GraphInfo.empty(toast, setIndicator));
+    if (getConnectionEpoch() !== startEpoch) return;
+
+    // Clear current graph to avoid showing deleted demo graph. Build the empty
+    // graph with the real toast/setIndicator callbacks up front so its GraphInfo
+    // isn't left with Graph.empty()'s console.error fallbacks (setGraphInfo only
+    // mutates the current graph, not this newly queued one).
+    setGraph(Graph.empty(undefined, undefined, undefined, GraphInfo.empty(toast, setIndicator)));
     setData({ nodes: [], links: [] });
 
-    if (userGraphBeforeTutorial && userGraphsBeforeTutorial.includes(userGraphBeforeTutorial)) {
+    if (userGraphBeforeTutorial && userGraphsBeforeTutorial?.includes(userGraphBeforeTutorial)) {
       handleSetGraphName(userGraphBeforeTutorial);
       setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }));
-    } else if (userGraphsBeforeTutorial.length === 1) {
+    } else if (userGraphsBeforeTutorial?.length === 1) {
       handleSetGraphName(userGraphsBeforeTutorial[0]);
 
       // Run default query for the graph if enabled
@@ -1503,35 +1803,39 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       <LoginVerification>
         <BrowserSettingsContext.Provider value={browserSettingsContext}>
           <GraphContext.Provider value={graphContext}>
-            <HistoryQueryContext.Provider value={historyQueryContext}>
-              <IndicatorContext.Provider value={indicatorContext}>
-                <QueryLoadingContext.Provider value={queryLoadingContext}>
-                  <DiagnosticsContext.Provider value={diagnosticsContext}>
-                    <ForceGraphContext.Provider value={forceGraphContext}>
-                      <TableViewContext.Provider value={tableViewContext}>
-                        <ConnectionContext.Provider value={connectionContext}>
-                          <UDFContext.Provider value={udfContext}>
-                            <AiFixContext.Provider value={aiFixContext}>
-                              <ProviderLayout
-                                panelRef={panelRef}
-                                tutorialOpen={tutorialOpen}
-                                onCloseTutorial={handleCloseTutorial}
-                                onLoadDemoGraphs={handleLoadDemoGraphs}
-                                onCleanupDemoGraphs={handleCleanupDemoGraphs}
-                                showUDF={showUDF}
-                              >
-                                {children}
-                              </ProviderLayout>
-                              <AiFixDialogs />
-                            </AiFixContext.Provider>
-                          </UDFContext.Provider>
-                        </ConnectionContext.Provider>
-                      </TableViewContext.Provider>
-                    </ForceGraphContext.Provider>
-                  </DiagnosticsContext.Provider>
-                </QueryLoadingContext.Provider>
-              </IndicatorContext.Provider>
-            </HistoryQueryContext.Provider>
+            <GraphInfoProvider syncRef={graphInfoSyncRef} pendingRef={graphInfoPendingRef}>
+              <HistoryQueryContext.Provider value={historyQueryContext}>
+                <IndicatorContext.Provider value={indicatorContext}>
+                  <QueryLoadingContext.Provider value={queryLoadingContext}>
+                    <DiagnosticsContext.Provider value={diagnosticsContext}>
+                      <ForceGraphContext.Provider value={forceGraphContext}>
+                        <TableViewContext.Provider value={tableViewContext}>
+                          <ConnectionContext.Provider value={connectionContext}>
+                            <UDFContext.Provider value={udfContext}>
+                              <CypherLanguageContext.Provider value={cypherLanguageContext}>
+                                <AiFixContext.Provider value={aiFixContext}>
+                                  <ProviderLayout
+                                    panelRef={panelRef}
+                                    tutorialOpen={tutorialOpen}
+                                    onCloseTutorial={handleCloseTutorial}
+                                    onLoadDemoGraphs={handleLoadDemoGraphs}
+                                    onCleanupDemoGraphs={handleCleanupDemoGraphs}
+                                    showUDF={showUDF}
+                                  >
+                                    {children}
+                                  </ProviderLayout>
+                                  <AiFixDialogs />
+                                </AiFixContext.Provider>
+                              </CypherLanguageContext.Provider>
+                            </UDFContext.Provider>
+                          </ConnectionContext.Provider>
+                        </TableViewContext.Provider>
+                      </ForceGraphContext.Provider>
+                    </DiagnosticsContext.Provider>
+                  </QueryLoadingContext.Provider>
+                </IndicatorContext.Provider>
+              </HistoryQueryContext.Provider>
+            </GraphInfoProvider>
           </GraphContext.Provider>
         </BrowserSettingsContext.Provider>
       </LoginVerification>

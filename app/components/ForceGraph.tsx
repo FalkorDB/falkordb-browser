@@ -6,7 +6,7 @@
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import type { Data, GraphLink, GraphNode, ViewportState, LayoutMode, HierarchyDirection, RadialDirection } from "@falkordb/canvas";
-import { securedFetch, getTheme, GraphRef, GraphData, Node, Relationship, Link, convertToCanvasData } from "@/lib/utils";
+import { getActiveConnectionIdGlobal, getConnectionEpoch, securedFetch, getTheme, GraphRef, GraphData, Node, Relationship, Link, convertToCanvasData } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Graph } from "../api/graph/model";
 import { BrowserSettingsContext, IndicatorContext, ConnectionContext, ForceGraphContext } from "./provider";
@@ -43,7 +43,7 @@ export default function ForceGraph({
 }: Props) {
 
     const { setIndicator } = useContext(IndicatorContext);
-    const { settings: { captionsKeysSettings: { captionsKeys }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
+    const { settings: { userExperienceSettings: { captionKeysSettings: { captionsKeys, showPropertyKeyPrefix } } } } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
     const { layout: ctxLayout, direction: ctxDirection } = useContext(ForceGraphContext);
 
@@ -103,18 +103,23 @@ export default function ForceGraph({
     const onFetchNode = useCallback(async (node: Node, clickedNode: GraphNode) => {
         const canvas = canvasRef.current;
         if (!canvas || !canvasLoaded) return;
+        const startEpoch = getConnectionEpoch();
+        const cid = getActiveConnectionIdGlobal();
 
         const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}${isReadOnly ? '?readOnly=true' : ''}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
             }
-        }, toast, setIndicator);
+        }, toast, setIndicator, cid);
 
+        if (getConnectionEpoch() !== startEpoch) return;
         if (result.ok) {
             const json = await result.json();
+            if (getConnectionEpoch() !== startEpoch) return;
 
             const elements = await graph.extend(json.result, true, true);
+            if (getConnectionEpoch() !== startEpoch) return;
 
             if (elements.length === 0) {
                 toast({
@@ -407,6 +412,12 @@ export default function ForceGraph({
             },
         });
     }, [handleNodeClick, handleLinkClick, handleRightClick, handleHover, handleUnselected, checkIsNodeSelected, checkIsLinkSelected, checkIsNodeDimmed, checkIsLinkDimmed, canvasRef, canvasLoaded, captionsKeys, showPropertyKeyPrefix]);
+
+    // Initialize canvas dimmed state when component mounts or dimmed prop changes
+    useEffect(() => {
+        if (!canvasRef.current || !canvasLoaded) return;
+        canvasRef.current.setDimmed(dimmed);
+    }, [dimmed, canvasRef, canvasLoaded]);
 
     // Update canvas data
     useEffect(() => {

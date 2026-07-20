@@ -1,0 +1,89 @@
+{
+    local_certs
+    key_type rsa2048
+}
+
+https://127.0.0.1, https://localhost, https://minio.localhost, https://172.17.0.1, https://127.0.0.1:443, https://localhost:443, https://minio.localhost:443, https://172.17.0.1:443 {
+    log
+
+    @allowedOrigin header_regexp Origin ^https?://(localhost|127\.0\.0\.1)(:3000)?$
+
+    @preflight method OPTIONS
+    handle @preflight {
+        handle @allowedOrigin {
+            header {
+                Access-Control-Allow-Origin {http.request.header.Origin}
+                Access-Control-Allow-Methods "GET, PUT, POST, DELETE, HEAD, OPTIONS"
+                Access-Control-Allow-Headers *
+                Access-Control-Expose-Headers "ETag, x-amz-request-id, x-amz-id-2"
+                Access-Control-Max-Age 3600
+                Vary Origin
+            }
+            respond 204
+        }
+        respond 403
+    }
+
+    reverse_proxy minio:9000 {
+        # Force a stable Host value for local 443 reads so SigV4 validation is
+        # not sensitive to whether the client sends Host with ':443'.
+        header_up Host 172.17.0.1
+        header_down -Access-Control-Allow-Origin
+        header_down -Access-Control-Allow-Methods
+        header_down -Access-Control-Allow-Headers
+        header_down -Access-Control-Allow-Credentials
+        header_down -Access-Control-Expose-Headers
+        header_down -Access-Control-Max-Age
+        header_down -Vary
+    }
+
+    header @allowedOrigin {
+        Access-Control-Allow-Origin {http.request.header.Origin}
+        Access-Control-Allow-Methods "GET, PUT, POST, DELETE, HEAD, OPTIONS"
+        Access-Control-Allow-Headers *
+        Access-Control-Expose-Headers "ETag, x-amz-request-id, x-amz-id-2"
+        Access-Control-Max-Age 3600
+        Vary Origin
+    }
+}
+
+https://127.0.0.1:9443, https://localhost:9443, https://minio.localhost:9443, https://172.17.0.1:9443 {
+    log
+
+    @allowedOrigin header_regexp Origin ^https?://(localhost|127\.0\.0\.1)(:3000)?$
+
+    @preflight method OPTIONS
+    handle @preflight {
+        handle @allowedOrigin {
+            header {
+                Access-Control-Allow-Origin {http.request.header.Origin}
+                Access-Control-Allow-Methods "GET, PUT, POST, DELETE, HEAD, OPTIONS"
+                Access-Control-Allow-Headers *
+                Access-Control-Expose-Headers "ETag, x-amz-request-id, x-amz-id-2"
+                Access-Control-Max-Age 3600
+                Vary Origin
+            }
+            respond 204
+        }
+        respond 403
+    }
+
+    reverse_proxy minio:9000 {
+        header_down -Access-Control-Allow-Origin
+        header_down -Access-Control-Allow-Methods
+        header_down -Access-Control-Allow-Headers
+        header_down -Access-Control-Allow-Credentials
+        header_down -Access-Control-Expose-Headers
+        header_down -Access-Control-Max-Age
+        header_down -Vary
+    }
+
+    header @allowedOrigin {
+        Access-Control-Allow-Origin {http.request.header.Origin}
+        Access-Control-Allow-Methods "GET, PUT, POST, DELETE, HEAD, OPTIONS"
+        Access-Control-Allow-Headers *
+        Access-Control-Expose-Headers "ETag, x-amz-request-id, x-amz-id-2"
+        Access-Control-Max-Age 3600
+        Vary Origin
+    }
+}

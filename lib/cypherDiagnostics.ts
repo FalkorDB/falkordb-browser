@@ -111,7 +111,19 @@ function wordRangeAt(lineText: string, column: number): { startColumn: number; e
     return { startColumn: idx + 1, endColumn: runEnd + 2 };
   }
 
-  // Whitespace (or out-of-range): fall back to a single-character cursor position.
+  // Whitespace: the parser reports the position of the unexpected whitespace, but the
+  // real culprit is the token that immediately precedes it (e.g. the incomplete keyword
+  // 'LIM' when the space that follows it causes "Invalid input ' ': expected LIMIT").
+  // Walk backward past any leading whitespace, then expand the preceding word.
+  let wordEnd = idx - 1;
+  while (wordEnd >= 0 && /\s/.test(lineText[wordEnd])) wordEnd -= 1;
+  if (wordEnd >= 0 && isWord(lineText[wordEnd])) {
+    let wordStart = wordEnd;
+    while (wordStart > 0 && isWord(lineText[wordStart - 1])) wordStart -= 1;
+    return { startColumn: wordStart + 1, endColumn: wordEnd + 2 };
+  }
+
+  // Out-of-range or whitespace not preceded by a word: single-character fallback.
   const single = Math.max(0, Math.min(idx, lineText.length - 1));
   return { startColumn: single + 1, endColumn: single + 2 };
 }

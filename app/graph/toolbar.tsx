@@ -44,7 +44,7 @@ export default function Toolbar({
 }: Props) {
 
     const { isLoading: isLoadingGraph } = useContext(GraphContext);
-    const { settings: { captionsKeysSettings: { captionsKeys }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix} } } = useContext(BrowserSettingsContext);
+    const { settings: { userExperienceSettings: { captionKeysSettings: { captionsKeys, showPropertyKeyPrefix } } } } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
 
 
@@ -97,7 +97,9 @@ export default function Toolbar({
         );
 
         setSuggestions(elements);
-    }, [graph, searchElement]);
+        // Recompute when the search text OR the graph changes so suggestions
+        // don't go stale after a new query / graph switch keeps the same text.
+    }, [searchElement, graph]);
 
     useEffect(() => {
         const timeout = setTimeout(handleOnChange, 300);
@@ -105,7 +107,7 @@ export default function Toolbar({
         return () => {
             clearTimeout(timeout);
         };
-    }, [graph, handleOnChange, searchElement]);
+    }, [handleOnChange, searchElement]);
 
     const handleSearchElement = (element: Node | Link) => {
         canvasRef.current?.zoomToFit(4, (node) => "labels" in element ? element.id === node.id : node.id === element.source || node.id === element.target);
@@ -283,8 +285,8 @@ export default function Toolbar({
                                                                         <div className="rounded-full h-3 w-3" style={{ backgroundColor: suggestion.color }} />
                                                                     )}
                                                                 </div>
-                                                                <p className="overflow-hidden text-sm">{type ? (suggestion as Link).relationship : (suggestion as Node).labels[0]}</p>
-                                                                <div className={cn("text-center overflow-hidden", actualIndex === suggestionIndex ? "text-accent-foreground" : "text-foreground")}>
+                                                                <p className="truncate text-sm">{type ? (suggestion as Link).relationship : (suggestion as Node).labels[0]}</p>
+                                                                <div className={cn("text-center truncate", actualIndex === suggestionIndex ? "text-accent-foreground" : "text-foreground")}>
                                                                     {type ? suggestion.relationship : getNodeDisplayText(suggestion as Node, captionsKeys, showPropertyKeyPrefix)}
                                                                 </div>
                                                                 <p className="text-xs text-muted-foreground text-right truncate">

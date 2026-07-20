@@ -4,15 +4,15 @@
 
 import { useState, useCallback, useContext, Dispatch, SetStateAction } from "react";
 import { cn, formatName, HistoryQuery } from "@/lib/utils";
-import { History, Info, Network, Sparkles } from "lucide-react";
+import { History, Info, Network, Sparkles, Upload } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Button from "../components/ui/Button";
-import { BrowserSettingsContext, ConnectionContext, IndicatorContext, PanelContext } from "../components/provider";
+import { BrowserSettingsContext, ConnectionContext, CypherLanguageContext, IndicatorContext, PanelContext } from "../components/provider";
 import CypherEditor from "../components/CypherEditor";
-import { type LanguageConfig } from "../components/EditorComponent";
 import { Graph } from "../api/graph/model";
 import QueryHistoryPanel from "./QueryHistoryPanel";
+import UploadGraph from "../components/graph/UploadGraph";
 import ResizableBox from "@/components/ui/ResizableBox";
 import { useResizableSize } from "@/lib/useResizableSize";
 
@@ -51,13 +51,16 @@ export default function Selector({
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
-    const { settings: { limitSettings: { limit, lastLimit }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } }, tutorialOpen } = useContext(BrowserSettingsContext);
+    const { settings: { querySettings: { limitSettings: { limit, lastLimit } }, userExperienceSettings: { captionKeysSettings: { showPropertyKeyPrefix } } }, tutorialOpen } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
+    const { cypherLanguageConfig, setCypherLanguageConfig } = useContext(CypherLanguageContext);
     const { panelOpen, onTogglePanel } = useContext(PanelContext);
 
     const [maximize, setMaximize] = useState(false);
-    const [cypherLanguageConfig, setCypherLanguageConfig] = useState<LanguageConfig | null>(null);
-    const handleLanguageConfig = useCallback((config: LanguageConfig) => { setCypherLanguageConfig(config); }, []);
+    const [uploadOpen, setUploadOpen] = useState(false);
+    const handleLanguageConfig = useCallback((config: NonNullable<typeof cypherLanguageConfig>) => {
+        setCypherLanguageConfig(config);
+    }, [setCypherLanguageConfig]);
 
     const { size: historySize, onResize: onHistoryResize } = useResizableSize("queryHistory-size", 560, 600, 350, 300);
 
@@ -85,6 +88,24 @@ export default function Selector({
             >
                 <Network size={20} />
             </Button>
+            <Button
+                aria-label="Upload data"
+                className={cn(
+                    "h-full text-foreground p-2 rounded-lg border border-border bg-background hover:bg-secondary"
+                )}
+                title="Upload data"
+                disabled={isReadOnly || !graphName}
+                onClick={() => setUploadOpen(true)}
+                data-testid="uploadGraphToolbarTrigger"
+            >
+                <Upload size={20} />
+            </Button>
+            <UploadGraph
+                graphName={graphName}
+                disabled={isReadOnly || !graphName}
+                open={uploadOpen}
+                onOpenChange={setUploadOpen}
+            />
             <div className="h-full w-1 grow relative overflow-visible">
                 <CypherEditor
                     graph={graph}

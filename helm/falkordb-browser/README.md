@@ -10,18 +10,14 @@ This Helm chart deploys the FalkorDB Browser application to a Kubernetes cluster
 
 ## Installation
 
-### Install from Helm Repository (Recommended)
+### Install from OCI Registry (Recommended)
 
 ```bash
-# Add the FalkorDB Helm repository
-helm repo add falkordb https://falkordb.github.io/helm-charts
-helm repo update
-
 # Install the latest version
-helm install falkordb-browser falkordb/falkordb-browser
+helm install falkordb-browser oci://ghcr.io/falkordb/helm-charts/falkordb-browser
 
 # Or install a specific version
-helm install falkordb-browser falkordb/falkordb-browser --version 1.6.7
+helm install falkordb-browser oci://ghcr.io/falkordb/helm-charts/falkordb-browser --version 1.6.7
 ```
 
 ### Install from local chart
@@ -38,8 +34,8 @@ helm install falkordb-browser ./falkordb-browser
 ### Install with custom values
 
 ```bash
-# From Helm repository
-helm install falkordb-browser falkordb/falkordb-browser \
+# From OCI registry
+helm install falkordb-browser oci://ghcr.io/falkordb/helm-charts/falkordb-browser \
   --set env.nextauthUrl=https://your-domain.com \
   --set env.nextauthSecret=your-secret-here \
   --set ingress.enabled=true \
@@ -338,9 +334,9 @@ After deploying the browser, you'll need to configure it to connect to your Falk
 
 ## Publishing and CI/CD
 
-This chart is automatically published to the FalkorDB Helm charts repository via GitHub Actions.
+This chart is automatically packaged into the FalkorDB Helm charts repository via GitHub Actions.
 
-The workflow publishes charts to the [FalkorDB/helm-charts](https://github.com/FalkorDB/helm-charts) repository, which is served via GitHub Pages at `https://falkordb.github.io/helm-charts`.
+The [FalkorDB/helm-charts](https://github.com/FalkorDB/helm-charts) repository publishes packaged charts to the GitHub Container Registry. The OCI chart path is `oci://ghcr.io/falkordb/helm-charts/falkordb-browser`.
 
 The workflow requires a `GHCR_TOKEN` or `GITHUB_TOKEN` secret with write access to the FalkorDB/helm-charts repository.
 

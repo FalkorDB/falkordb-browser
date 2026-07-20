@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip"
 
 interface SliderProps extends React.ComponentProps<typeof SliderPrimitive.Root> {
-  type?: "seconds" | "%" | "px" | "items"
+  type?: "seconds" | "%" | "px" | "items" | "multiplier"
 }
 
 const Slider = React.forwardRef<
@@ -33,7 +33,7 @@ const Slider = React.forwardRef<
         <SliderPrimitive.Thumb className="block h-5 w-5 rounded-full border-2 border-primary bg-background ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50" />
       </TooltipTrigger>
       <TooltipContent>
-        {value} {type}
+        {type === "multiplier" ? `${value}x` : <>{value} {type}</>}
       </TooltipContent>
     </Tooltip>
   </SliderPrimitive.Root>

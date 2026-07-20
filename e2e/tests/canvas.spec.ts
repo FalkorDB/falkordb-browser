@@ -54,8 +54,12 @@ test.describe('Canvas Tests', () => {
         await graph.clickZoomInControl();
         await graph.waitForScaleToStabilize();
         const updatedGraph = await graph.getCanvasScaling();
-        expect(updatedGraph.scaleX - initialGraph.scaleX).toBeCloseTo(1, 0);
-        expect(updatedGraph.scaleY - initialGraph.scaleY).toBeCloseTo(1, 0);
+        // Zoom is multiplicative (each click scales by 1.1), so two zoom-in
+        // clicks multiply the scale by 1.1 * 1.1 = 1.21. Assert the ratio rather
+        // than an absolute delta, which depends on the (layout-dependent) base
+        // zoom and made this test flaky.
+        expect(updatedGraph.scaleX / initialGraph.scaleX).toBeCloseTo(1.21, 1);
+        expect(updatedGraph.scaleY / initialGraph.scaleY).toBeCloseTo(1.21, 1);
         await apicalls.removeGraph(graphName);
     });
 
@@ -74,8 +78,12 @@ test.describe('Canvas Tests', () => {
         await graph.clickZoomOutControl();
         await graph.waitForScaleToStabilize();
         const updatedGraph = await graph.getCanvasScaling();
-        expect(initialGraph.scaleX - updatedGraph.scaleX).toBeCloseTo(1, 0);
-        expect(initialGraph.scaleY - updatedGraph.scaleY).toBeCloseTo(1, 0);
+        // Zoom is multiplicative (each click scales by 0.9), so two zoom-out
+        // clicks multiply the scale by 0.9 * 0.9 = 0.81. Assert the ratio rather
+        // than an absolute delta, which depends on the (layout-dependent) base
+        // zoom and made this test flaky.
+        expect(updatedGraph.scaleX / initialGraph.scaleX).toBeCloseTo(0.81, 1);
+        expect(updatedGraph.scaleY / initialGraph.scaleY).toBeCloseTo(0.81, 1);
 
         await apicalls.removeGraph(graphName);
     });
@@ -374,16 +382,16 @@ test.describe('Canvas Tests', () => {
         await graph.insertQuery(CREATE_TWO_NODES_QUERY);
         await graph.clickRunQuery();
 
-        // Initially off
-        expect(await graph.isDimControlChecked()).toBe(false);
-
-        // Turn on
-        await graph.clickDimControl();
+        // Initially on
         expect(await graph.isDimControlChecked()).toBe(true);
 
         // Turn off
         await graph.clickDimControl();
         expect(await graph.isDimControlChecked()).toBe(false);
+
+        // Turn on
+        await graph.clickDimControl();
+        expect(await graph.isDimControlChecked()).toBe(true);
 
         await apicalls.removeGraph(graphName);
     });
@@ -400,8 +408,10 @@ test.describe('Canvas Tests', () => {
         await graph.clickCenterControl();
         await graph.waitForScaleToStabilize();
 
-        // Enable focus mode
-        await graph.clickDimControl();
+        // Ensure focus mode is enabled
+        if (!(await graph.isDimControlChecked())) {
+            await graph.clickDimControl();
+        }
         expect(await graph.isDimControlChecked()).toBe(true);
 
         // Right-click a node to select it (right-click triggers handleRightClick → setSelectedElements)
@@ -428,8 +438,10 @@ test.describe('Canvas Tests', () => {
         await graph.clickCenterControl();
         await graph.waitForScaleToStabilize();
 
-        // Enable focus mode and right-click a node to select it
-        await graph.clickDimControl();
+        // Ensure focus mode is enabled and then right-click a node to select it
+        if (!(await graph.isDimControlChecked())) {
+            await graph.clickDimControl();
+        }
         const nodes = await graph.getNodesScreenPositions();
         await graph.elementClick(nodes[0].screenX, nodes[0].screenY);
         await graph.waitForTimeout(300);
@@ -455,8 +467,10 @@ test.describe('Canvas Tests', () => {
         await graph.clickCenterControl();
         await graph.waitForScaleToStabilize();
 
-        // Enable focus mode
-        await graph.clickDimControl();
+        // Ensure focus mode is enabled
+        if (!(await graph.isDimControlChecked())) {
+            await graph.clickDimControl();
+        }
         expect(await graph.isDimControlChecked()).toBe(true);
 
         // Left-click a link to select it (handleLinkClick sets selectedElements)
