@@ -6,16 +6,12 @@ on:
     paths-ignore:
       - '**/*.md'
       - 'LICENSE.txt'
-      - 'helm/**'
-      - '.github/workflows/helm-chart.yml'
       - '.github/dependabot.yml'
 
   pull_request:
     paths-ignore:
       - '**/*.md'
       - 'LICENSE.txt'
-      - 'helm/**'
-      - '.github/workflows/helm-chart.yml'
       - '.github/dependabot.yml'
 
   # Allows you to run this workflow manually from the Actions tab
