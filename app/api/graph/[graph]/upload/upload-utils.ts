@@ -59,7 +59,6 @@ export async function executeCypherBatch(
 
   for (let index = 0; index < statements.length; index += 1) {
     try {
-      // eslint-disable-next-line no-await-in-loop
       await graph.query(statements[index]);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
