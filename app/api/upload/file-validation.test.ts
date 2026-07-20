@@ -45,6 +45,10 @@ describe("getAllowedFileType", () => {
     assert.equal(getAllowedFileType(".js"), undefined);
   });
 
+  it("rejects .cql after extension support removal", () => {
+    assert.equal(getAllowedFileType(".cql"), undefined);
+  });
+
   it("returns the correct contentType for each allowed extension", () => {
     const cases: [string, string][] = [
       [".png", "image/png"],
@@ -264,6 +268,10 @@ describe("getStoredUpload", () => {
     assert.equal(getStoredUpload(`${VALID_UUID}.exe`, TEST_USER), null);
     assert.equal(getStoredUpload(`${VALID_UUID}.zip`, TEST_USER), null);
     assert.equal(getStoredUpload(`${VALID_UUID}.sh`, TEST_USER), null);
+  });
+
+  it("rejects a UUID filename with .cql after extension support removal", () => {
+    assert.equal(getStoredUpload(`${VALID_UUID}.cql`, TEST_USER), null);
   });
 
   it("returns the stored upload for .csv", () => {

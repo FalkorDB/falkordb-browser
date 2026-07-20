@@ -6,7 +6,12 @@ import path from "path";
 import { getCorsHeaders, resolveReadOnly } from "../../../utils";
 import { executeCypherBatch } from "./upload-utils";
 
-const CYPHER_BATCH_EXTENSIONS = [".txt", ".cypher"];
+const CYPHER_BATCH_EXTENSIONS = [".txt", ".cypher"] as const;
+type CypherBatchExtension = (typeof CYPHER_BATCH_EXTENSIONS)[number];
+
+function isCypherBatchExtension(extension: string): extension is CypherBatchExtension {
+  return (CYPHER_BATCH_EXTENSIONS as readonly string[]).includes(extension);
+}
 
 interface UploadBody {
   fileId?: string;
@@ -74,7 +79,7 @@ export async function POST(
     // Only Cypher batch files are executable here. Reject anything else (e.g. a
     // stale .dump) so a non-Cypher file is never decoded and run as a batch.
     const extension = path.extname(storedUpload.filePath).toLowerCase();
-    if (!CYPHER_BATCH_EXTENSIONS.includes(extension)) {
+    if (!isCypherBatchExtension(extension)) {
       return NextResponse.json(
         { message: "Only .txt or .cypher batch files can be executed." },
         { status: 400, headers: getCorsHeaders(request) }
@@ -86,7 +91,7 @@ export async function POST(
 
     try {
       const count = await executeCypherBatch(graph, batchText, {
-        sourceExtension: extension as ".txt" | ".cypher",
+        sourceExtension: extension,
       });
 
       return NextResponse.json(
