@@ -69,7 +69,7 @@
     "jose": "^6.2.3",
     "lodash": "^4.18.0",
     "lru-cache": "^11.5.2",
-    "lucide-react": "^1.24.0",
+    "lucide-react": "^1.25.0",
     "markdown-it": "^14.3.0",
     "monaco-editor": "^0.55.1",
     "next": "^16.2.10",
