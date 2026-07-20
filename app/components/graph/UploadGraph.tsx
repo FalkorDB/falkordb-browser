@@ -444,6 +444,7 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
 
             // Pin the graph mutation to the connection active when the upload began.
             const cid = activeConnectionId;
+            const startEpoch = getConnectionEpoch();
 
             const uploadResult = await uploadFileWithProgress("api/upload", cypherFiles[0], toast, setIndicator, setUploadPct);
             if (!uploadResult.ok) return;
@@ -467,6 +468,51 @@ export default function UploadGraph({ graphName, disabled, open, onOpenChange, o
                 cid
             );
             if (!processResult.ok) return;
+
+            // Keep Graph Info in sync after a successful Cypher batch upload.
+            // Only mutate panel state for the currently active graph.
+            if (graph.Id === graphName) {
+                try {
+                    const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
+                    const metaStats = await getMetaStats(graphName, toast, setIndicator, isReadOnly, { connectionId: cid });
+                    const propertyInfo = await securedFetch(
+                        `api/graph/${prepareArg(graphName)}/info?type=${prepareArg("(property key)")}${readOnlyParam}`,
+                        { method: "GET" },
+                        toast,
+                        setIndicator,
+                        cid
+                    );
+
+                    const propertyJson = propertyInfo.ok
+                        ? await propertyInfo.json() as { result?: { data?: Array<{ info?: unknown }> } }
+                        : undefined;
+
+                    const propertyKeys = (propertyJson?.result?.data ?? [])
+                        .map((entry) => (typeof entry?.info === "string" ? entry.info : undefined))
+                        .filter((value): value is string => typeof value === "string");
+
+                    const memoryUsage = showMemoryUsage
+                        ? await getMemoryUsage(graphName, toast, setIndicator, cid)
+                        : new Map<string, MemoryValue>();
+
+                    const nextGraphInfo = await GraphInfo.create(
+                        propertyKeys,
+                        metaStats?.[0] ?? [],
+                        metaStats?.[1] ?? [],
+                        memoryUsage,
+                        toast,
+                        setIndicator,
+                        cid
+                    );
+
+                    if (getConnectionEpoch() === startEpoch) {
+                        setGraphInfo(nextGraphInfo);
+                        await fetchCount(graphName, { connectionId: cid, epoch: startEpoch });
+                    }
+                } catch {
+                    // Keep upload success behavior even if post-refresh metadata fails.
+                }
+            }
 
             const data = await processResult.json() as { message?: string };
             toast({ title: "Upload completed", description: data.message || "Graph data uploaded successfully." });

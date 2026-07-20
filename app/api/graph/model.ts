@@ -150,7 +150,7 @@ export class GraphInfo {
     connectionId?: string | null,
   ): GraphInfo {
     return new GraphInfo(
-      propertyKeys || [],
+      propertyKeys,
       new Map(),
       new Map(),
       new Map(memoryUsage),
