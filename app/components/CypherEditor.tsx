@@ -73,7 +73,7 @@ const escapeRegExp = (str: string): string => str.replace(/[.*+?^${}()|[\]\\]/g,
 const toIgnoreCasePattern = (word: string): string =>
     word.replace(/[a-zA-Z]/g, c => `[${c.toUpperCase()}${c.toLowerCase()}]`);
 
-const DEFAULT_MONARCH_TOKENIZER: monaco.languages.IMonarchLanguage = {
+export const DEFAULT_MONARCH_TOKENIZER: monaco.languages.IMonarchLanguage = {
     tokenizer: {
         root: [
             // Keywords: explicit case-insensitive pattern (CREATE = create = Create)
@@ -98,7 +98,7 @@ const DEFAULT_MONARCH_TOKENIZER: monaco.languages.IMonarchLanguage = {
     },
 };
 
-const CYPHER_LANGUAGE_CONFIGURATION: monaco.languages.LanguageConfiguration = {
+export const CYPHER_LANGUAGE_CONFIGURATION: monaco.languages.LanguageConfiguration = {
     brackets: [
         ['{', '}'],
         ['[', ']'],
@@ -239,7 +239,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
     useEffect(() => {
         queryRef.current = historyQuery.query;
-    }, [historyQuery.query]);
+    }, [historyQuery.query, editorMountVersion]);
 
     useEffect(() => {
         indicatorRef.current = indicator;
@@ -514,7 +514,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             // It will include vars from boundVarsRef.current (already updated above).
             updateTokenizer(monacoRef.current);
         }
-    }, [historyQuery.query]);
+    }, [historyQuery.query, editorMountVersion]);
 
     // Build label, relationship, property-key, and procedure suggestions.
     // Labels/rels/prop-keys come from the in-memory graph object.
@@ -649,7 +649,10 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
         const functions = sug.filter(({ detail }) => detail === "(function)" || detail === "(udf function)");
 
-        // Collect labels and relationship types as element namespaces
+        // Keep label/type names separate from namespace highlighting. Labels and
+        // relationship types are already highlighted contextually via `:(name)`.
+        // Coloring them as global namespaces causes values like `City` in
+        // `{name: City}` to be highlighted as keywords.
         const labels = sug.filter(({ detail }) => detail === '(label)').map(({ label }) => label as string);
         // Bump a version when the known-label *set* changes so the schema-lint effect re-runs:
         // it reads schemaLabelsRef (a ref), which alone wouldn't re-lint a query the user
@@ -666,8 +669,6 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
 
         const namespaces = new Set([
             ...udfLibNames,
-            ...labels,
-            ...relTypes,
             ...functions
                 .filter(({ label }) => (label as string).includes("."))
                 .map(({ label }) => {

@@ -33,6 +33,26 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     const [nodesSearch, setNodesSearch] = useState("");
     const [edgesSearch, setEdgesSearch] = useState("");
     const [propertyKeysSearch, setPropertyKeysSearch] = useState("");
+    const hasSelectedGraph = graphName !== "";
+    const memoryValue = MemoryUsage.get("total_graph_sz_mb");
+    const isGraphInfoLoaded =
+        graphInfoVersion > 0
+        || nodesCount !== undefined
+        || edgesCount !== undefined
+        || Labels.size > 0
+        || Relationships.size > 0
+        || (PropertyKeys?.length ?? 0) > 0;
+    const memoryDisplay = (() => {
+        if (memoryValue === undefined || memoryValue === null) return undefined;
+
+        const numericMemoryValue = typeof memoryValue === "number"
+            ? memoryValue
+            : Number(memoryValue);
+
+        if (!Number.isFinite(numericMemoryValue)) return undefined;
+
+        return `${numericMemoryValue === 0 ? "<1" : numericMemoryValue} MB`;
+    })();
 
     // Reset searches only when the active graph changes or the display limit
     // changes — not on every periodic poll that refreshes GraphInfoContext.
@@ -45,7 +65,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     // Stable callbacks so SelectGraph's handleSetRows useCallback is not
     // invalidated on every GraphInfoContext poll update, which would trigger
     // its useEffect([options, handleSetRows]) and reset checked rows.
-    const handleSetOptions = useCallback((opts: string[]) => {
+    const handleSetOptions = useCallback((opts: string[] | undefined) => {
         setGraphNames(opts);
     }, [setGraphNames]);
 
@@ -84,10 +104,10 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             {
                                 !isReadOnly &&
                                 <CreateGraph
-                                    graphNames={graphNames}
+                                    graphNames={graphNames ?? []}
                                     onSetGraphName={(newGraphName) => {
                                         handleSetGraphName(formatName(newGraphName));
-                                        setGraphNames(prev => [...prev, formatName(newGraphName)]);
+                                        setGraphNames(prev => [...(prev ?? []), formatName(newGraphName)]);
                                     }}
                                     trigger={
                                         <Button
@@ -107,15 +127,19 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             <div className="w-full flex items-center gap-2">
                                     <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Memory</h2>
                                     {
-                                        MemoryUsage.get("total_graph_sz_mb") !== undefined || graphName === ""
+                                        !hasSelectedGraph
+                                            ? <p tabIndex={0} role="text" aria-label="No graph selected" className="truncate pointer-events-auto text-sm font-semibold">-</p>
+                                            : memoryDisplay !== undefined
                                             ? <Tooltip>
                                                 <TooltipTrigger asChild>
-                                                    <p tabIndex={0} role="text" aria-label={graphName === "" ? "0" : `${ MemoryUsage.get("total_graph_sz_mb") || "<1"} MB`} className="truncate pointer-events-auto text-sm font-semibold">{graphName === "" ? "0" : `${MemoryUsage.get("total_graph_sz_mb") || "<1"} MB`}</p>
+                                                    <p tabIndex={0} role="text" aria-label={memoryDisplay} className="truncate pointer-events-auto text-sm font-semibold">{memoryDisplay}</p>
                                                 </TooltipTrigger>
                                                 <TooltipContent>
-                                                    {graphName === "" ? "0" : `${MemoryUsage.get("total_graph_sz_mb") || "<1"} MB`}
+                                                    {memoryDisplay}
                                                 </TooltipContent>
                                             </Tooltip>
+                                            : isGraphInfoLoaded
+                                            ? <p tabIndex={0} role="text" aria-label="Memory unavailable" className="truncate pointer-events-auto text-sm font-semibold">N/A</p>
                                             : <Loader2 className="animate-spin" />
                                     }
                             </div>
@@ -124,21 +148,31 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             <div className="flex gap-2 items-center">
                                 <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Nodes</h2>
                                 {
-                                    nodesCount !== undefined || graphName === "" ?
+                                    !hasSelectedGraph ?
+                                        <p
+                                            data-testid="nodesCount"
+                                            tabIndex={0}
+                                            role="text"
+                                            aria-label="No graph selected"
+                                            className="truncate pointer-events-auto text-sm font-semibold"
+                                        >
+                                            -
+                                        </p>
+                                        : nodesCount !== undefined ?
                                      <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <p
                                                     data-testid="nodesCount"
                                                     tabIndex={0}
                                                     role="text"
-                                                    aria-label={`${nodesCount?.toLocaleString() || 0} nodes`}
+                                                    aria-label={`${nodesCount.toLocaleString()} nodes`}
                                                     className="truncate pointer-events-auto text-sm font-semibold"
                                                 >
-                                                    {nodesCount?.toLocaleString() || 0}
+                                                    {nodesCount.toLocaleString()}
                                                 </p>
                                             </TooltipTrigger>
                                             <TooltipContent>
-                                                {nodesCount?.toLocaleString() || 0}
+                                                {nodesCount.toLocaleString()}
                                             </TooltipContent>
                                         </Tooltip>
                                         : <Loader2 data-testid="nodesCountLoader" className="animate-spin" />
@@ -225,21 +259,31 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             <div className="flex gap-2 items-center">
                                 <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Edges</h2>
                                 {
-                                    edgesCount !== undefined || graphName === "" ?
+                                    !hasSelectedGraph ?
+                                        <p
+                                            data-testid="edgesCount"
+                                            tabIndex={0}
+                                            role="text"
+                                            aria-label="No graph selected"
+                                            className="truncate pointer-events-auto text-sm font-semibold"
+                                        >
+                                            -
+                                        </p>
+                                        : edgesCount !== undefined ?
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <p
                                                     data-testid="edgesCount"
                                                     tabIndex={0}
                                                     role="text"
-                                                    aria-label={`${edgesCount?.toLocaleString() || 0} edges`}
+                                                    aria-label={`${edgesCount.toLocaleString()} edges`}
                                                     className="truncate pointer-events-auto text-sm font-semibold"
                                                 >
-                                                    {edgesCount?.toLocaleString() || 0}
+                                                    {edgesCount.toLocaleString()}
                                                 </p>
                                             </TooltipTrigger>
                                             <TooltipContent>
-                                                {edgesCount?.toLocaleString() || 0}
+                                                {edgesCount.toLocaleString()}
                                             </TooltipContent>
                                         </Tooltip>
                                         :

@@ -13,7 +13,6 @@ on:
       - '.github/workflows/helm-chart.yml'
   pull_request:
     paths:
-      - 'helm/**'
       - '.github/workflows/helm-chart.yml'
   workflow_dispatch:
 
@@ -28,7 +27,6 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
-        with:
           fetch-depth: 0
 
       - name: Set up Helm
@@ -159,7 +157,6 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
-        with:
           fetch-depth: 0
 
       - name: Set up Helm

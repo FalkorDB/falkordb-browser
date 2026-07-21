@@ -4,6 +4,7 @@ import { ConnectionInfo, ConnectionType, GraphData, GraphRef, HistoryQuery, Labe
 import type { DiagnosticsResult } from "@/lib/cypherDiagnostics";
 import type { Data as CanvasData, LayoutMode, ViewportState } from "@falkordb/canvas";
 import type { SessionConnection } from "next-auth";
+import type { LanguageConfig } from "./EditorComponent";
 import { Graph, GraphInfo } from "../api/graph/model";
 
 export type ChatApiKey = {
@@ -19,41 +20,37 @@ export type LocalLlmProvider = "ollama" | "lmstudio";
 
 type BrowserSettingsContextType = {
   newSettings: {
-    limitSettings: {
-      newLimit: number;
-      setNewLimit: Dispatch<SetStateAction<number>>;
-    };
-    timeoutSettings: {
+    querySettings: {
+      limitSettings: {
+        newLimit: number;
+        setNewLimit: Dispatch<SetStateAction<number>>;
+      };
       newTimeout: number;
       setNewTimeout: Dispatch<SetStateAction<number>>;
-    };
-    runDefaultQuerySettings: {
       newRunDefaultQuery: boolean;
       setNewRunDefaultQuery: Dispatch<SetStateAction<boolean>>;
-    };
-    defaultQuerySettings: {
       newDefaultQuery: string;
       setNewDefaultQuery: Dispatch<SetStateAction<string>>;
     };
-    contentPersistenceSettings: {
+    userExperienceSettings: {
       newContentPersistence: boolean;
       setNewContentPersistence: Dispatch<SetStateAction<boolean>>;
-    };
-    captionsKeysSettings: {
-      newCaptionsKeys: [string, boolean][];
-      setNewCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
-    };
-    tableViewSettings: {
-      newColumnWidth: number;
-      setNewColumnWidth: Dispatch<SetStateAction<number>>;
-      newRowHeight: number;
-      setNewRowHeight: Dispatch<SetStateAction<number>>;
-      newRowHeightExpandMultiple: number;
-      setNewRowHeightExpandMultiple: Dispatch<SetStateAction<number>>;
-    };
-    showPropertyKeyPrefixSettings: {
-      newShowPropertyKeyPrefix: boolean;
-      setNewShowPropertyKeyPrefix: Dispatch<SetStateAction<boolean>>;
+      newRefreshInterval: number;
+      setNewRefreshInterval: Dispatch<SetStateAction<number>>;
+      captionKeysSettings: {
+        newCaptionsKeys: [string, boolean][];
+        setNewCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
+        newShowPropertyKeyPrefix: boolean;
+        setNewShowPropertyKeyPrefix: Dispatch<SetStateAction<boolean>>;
+      };
+      tableViewSettings: {
+        newColumnWidth: number;
+        setNewColumnWidth: Dispatch<SetStateAction<number>>;
+        newRowHeight: number;
+        setNewRowHeight: Dispatch<SetStateAction<number>>;
+        newRowHeightExpandMultiple: number;
+        setNewRowHeightExpandMultiple: Dispatch<SetStateAction<number>>;
+      };
     };
     chatSettings: {
       newSecretKey: string;
@@ -72,50 +69,44 @@ type BrowserSettingsContextType = {
       setNewModel: Dispatch<SetStateAction<string>>;
     };
     graphInfo: {
-      newRefreshInterval: number;
-      setNewRefreshInterval: Dispatch<SetStateAction<number>>;
       newMaxItemsForSearch: number;
       setNewMaxItemsForSearch: Dispatch<SetStateAction<number>>;
     };
   };
   settings: {
-    limitSettings: {
-      limit: number;
-      setLimit: Dispatch<SetStateAction<number>>;
-      lastLimit: number;
-      setLastLimit: Dispatch<SetStateAction<number>>;
-    };
-    timeoutSettings: {
+    querySettings: {
+      limitSettings: {
+        limit: number;
+        setLimit: Dispatch<SetStateAction<number>>;
+        lastLimit: number;
+        setLastLimit: Dispatch<SetStateAction<number>>;
+      };
       timeout: number;
       setTimeout: Dispatch<SetStateAction<number>>;
-    };
-    runDefaultQuerySettings: {
       runDefaultQuery: boolean;
       setRunDefaultQuery: Dispatch<SetStateAction<boolean>>;
-    };
-    defaultQuerySettings: {
       defaultQuery: string;
       setDefaultQuery: Dispatch<SetStateAction<string>>;
     };
-    contentPersistenceSettings: {
+    userExperienceSettings: {
       contentPersistence: boolean;
       setContentPersistence: Dispatch<SetStateAction<boolean>>;
-    };
-    showPropertyKeyPrefixSettings: {
-      showPropertyKeyPrefix: boolean;
-      setShowPropertyKeyPrefix: Dispatch<SetStateAction<boolean>>;
-    };
-    captionsKeysSettings: {
-      captionsKeys: [string, boolean][];
-      setCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
-    };
-    tableViewSettings: {
-      columnWidth: number;
-      setColumnWidth: Dispatch<SetStateAction<number>>;
-      rowHeight: number;
-      setRowHeight: Dispatch<SetStateAction<number>>;
-      rowHeightExpandMultiple: number;
-      setRowHeightExpandMultiple: Dispatch<SetStateAction<number>>;
+      refreshInterval: number;
+      setRefreshInterval: Dispatch<SetStateAction<number>>;
+      captionKeysSettings: {
+        captionsKeys: [string, boolean][];
+        setCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
+        showPropertyKeyPrefix: boolean;
+        setShowPropertyKeyPrefix: Dispatch<SetStateAction<boolean>>;
+      };
+      tableViewSettings: {
+        columnWidth: number;
+        setColumnWidth: Dispatch<SetStateAction<number>>;
+        rowHeight: number;
+        setRowHeight: Dispatch<SetStateAction<number>>;
+        rowHeightExpandMultiple: number;
+        setRowHeightExpandMultiple: Dispatch<SetStateAction<number>>;
+      };
     };
     chatSettings: {
       secretKey: string;
@@ -161,8 +152,8 @@ type GraphContextType = {
   graphName: string;
   handleSetGraphName: (name: string) => void;
   setGraphInfo: (gi: GraphInfo) => void;
-  graphNames: string[];
-  setGraphNames: Dispatch<SetStateAction<string[]>>;
+  graphNames: string[] | undefined;
+  setGraphNames: Dispatch<SetStateAction<string[] | undefined>>;
   labels: Label[];
   setLabels: Dispatch<SetStateAction<Label[]>>;
   relationships: Relationship[];
@@ -245,6 +236,13 @@ type ConnectionContextType = {
   activeConnectionId: string | null;
   setActiveConnectionId: Dispatch<SetStateAction<string | null>>;
   updateSession: (data: { activeConnectionId?: string | null }) => Promise<unknown>;
+  // Mark a user connection switch as in-progress (blocks graph ops + supersedes
+  // in-flight ones) and clear it once the switch settles. `beginConnectionSwitch`
+  // returns a ticket; `isLatestSwitch(ticket)` reports whether it is still the
+  // newest switch, so out-of-order completions don't publish a stale connection.
+  beginConnectionSwitch: () => number;
+  endConnectionSwitch: () => void;
+  isLatestSwitch: (ticket: number) => boolean;
 };
 
 type UDFContextType = {
@@ -254,38 +252,45 @@ type UDFContextType = {
   setSelectedUdf: Dispatch<SetStateAction<UDFEntryWithCode | undefined>>;
 };
 
+type CypherLanguageContextType = {
+  cypherLanguageConfig: LanguageConfig | null;
+  setCypherLanguageConfig: Dispatch<SetStateAction<LanguageConfig | null>>;
+};
+
 export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
   {
     newSettings: {
-      limitSettings: { newLimit: 0, setNewLimit: () => { } },
-      timeoutSettings: { newTimeout: 0, setNewTimeout: () => { } },
-      runDefaultQuerySettings: {
+      querySettings: {
+        limitSettings: {
+          newLimit: 0,
+          setNewLimit: () => { },
+        },
+        newTimeout: 0,
+        setNewTimeout: () => { },
         newRunDefaultQuery: false,
         setNewRunDefaultQuery: () => { },
-      },
-      defaultQuerySettings: {
         newDefaultQuery: "",
         setNewDefaultQuery: () => { },
       },
-      contentPersistenceSettings: {
+      userExperienceSettings: {
         newContentPersistence: false,
         setNewContentPersistence: () => { },
-      },
-      captionsKeysSettings: {
-        newCaptionsKeys: [],
-        setNewCaptionsKeys: () => { },
-      },
-      tableViewSettings: {
-        newColumnWidth: 0,
-        setNewColumnWidth: () => { },
-        newRowHeight: 0,
-        setNewRowHeight: () => { },
-        newRowHeightExpandMultiple: 0,
-        setNewRowHeightExpandMultiple: () => { },
-      },
-      showPropertyKeyPrefixSettings: {
-        newShowPropertyKeyPrefix: false,
-        setNewShowPropertyKeyPrefix: () => { },
+        captionKeysSettings: {
+          newCaptionsKeys: [],
+          setNewCaptionsKeys: () => { },
+          newShowPropertyKeyPrefix: false,
+          setNewShowPropertyKeyPrefix: () => { },
+        },
+        tableViewSettings: {
+          newColumnWidth: 0,
+          setNewColumnWidth: () => { },
+          newRowHeight: 0,
+          setNewRowHeight: () => { },
+          newRowHeightExpandMultiple: 0,
+          setNewRowHeightExpandMultiple: () => { },
+        },
+        newRefreshInterval: 0,
+        setNewRefreshInterval: () => { },
       },
       chatSettings: {
         newSecretKey: "",
@@ -304,44 +309,44 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         setNewModel: () => { },
       },
       graphInfo: {
-        newRefreshInterval: 0,
-        setNewRefreshInterval: () => { },
         newMaxItemsForSearch: 0,
         setNewMaxItemsForSearch: () => { },
       },
     },
     settings: {
-      limitSettings: {
-        limit: 0,
-        setLimit: () => { },
-        lastLimit: 0,
-        setLastLimit: () => { },
-      },
-      timeoutSettings: { timeout: 0, setTimeout: () => { } },
-      runDefaultQuerySettings: {
+      querySettings: {
+        limitSettings: {
+          limit: 0,
+          setLimit: () => { },
+          lastLimit: 0,
+          setLastLimit: () => { },
+        },
+        timeout: 0,
+        setTimeout: () => { },
         runDefaultQuery: false,
         setRunDefaultQuery: () => { },
+        defaultQuery: "",
+        setDefaultQuery: () => { },
       },
-      defaultQuerySettings: { defaultQuery: "", setDefaultQuery: () => { } },
-      contentPersistenceSettings: {
+      userExperienceSettings: {
         contentPersistence: false,
         setContentPersistence: () => { },
-      },
-      captionsKeysSettings: {
-        captionsKeys: [],
-        setCaptionsKeys: () => { },
-      },
-      tableViewSettings: {
-        columnWidth: 0,
-        setColumnWidth: () => { },
-        rowHeight: 0,
-        setRowHeight: () => { },
-        rowHeightExpandMultiple: 0,
-        setRowHeightExpandMultiple: () => { },
-      },
-      showPropertyKeyPrefixSettings: {
-        showPropertyKeyPrefix: false,
-        setShowPropertyKeyPrefix: () => { },
+        refreshInterval: 0,
+        setRefreshInterval: () => { },
+        captionKeysSettings: {
+          captionsKeys: [],
+          setCaptionsKeys: () => { },
+          showPropertyKeyPrefix: false,
+          setShowPropertyKeyPrefix: () => { },
+        },
+        tableViewSettings: {
+          columnWidth: 0,
+          setColumnWidth: () => { },
+          rowHeight: 0,
+          setRowHeight: () => { },
+          rowHeightExpandMultiple: 0,
+          setRowHeightExpandMultiple: () => { },
+        },
       },
       chatSettings: {
         secretKey: "",
@@ -388,7 +393,7 @@ export const GraphContext = createContext<GraphContextType>({
   graphName: "",
   handleSetGraphName: () => { },
   setGraphInfo: () => { },
-  graphNames: [],
+  graphNames: undefined,
   setGraphNames: () => { },
   labels: [],
   setLabels: () => { },
@@ -496,6 +501,9 @@ export const ConnectionContext = createContext<ConnectionContextType>({
   activeConnectionId: null,
   setActiveConnectionId: () => { },
   updateSession: async () => { },
+  beginConnectionSwitch: () => 0,
+  endConnectionSwitch: () => { },
+  isLatestSwitch: () => true,
 });
 
 export const UDFContext = createContext<UDFContextType>({
@@ -503,7 +511,12 @@ export const UDFContext = createContext<UDFContextType>({
   setUdfList: () => { },
   selectedUdf: undefined,
   setSelectedUdf: () => { },
-}); 
+});
+
+export const CypherLanguageContext = createContext<CypherLanguageContextType>({
+  cypherLanguageConfig: null,
+  setCypherLanguageConfig: () => { },
+});
 
 type DiagnosticsContextType = {
   diagnostics: DiagnosticsResult | null;

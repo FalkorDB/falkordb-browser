@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { cn, convertToCanvasData, getConnectionEpoch, getMemoryUsage, getMetaStats, getSSEGraphResult, isAbortError, isTwoNodes, Link, MemoryValue, Node, prepareArg, securedFetch, Value } from "@/lib/utils";
+import { cn, convertToCanvasData, getActiveConnectionIdGlobal, getConnectionEpoch, getMemoryUsage, getMetaStats, getSSEGraphResult, isAbortError, isTwoNodes, Link, MemoryValue, Node, prepareArg, securedFetch, Value } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamicImport from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -76,8 +76,7 @@ export default function Page() {
     } = useContext(GraphContext);
     const {
         settings: {
-            runDefaultQuerySettings: { runDefaultQuery },
-            defaultQuerySettings: { defaultQuery },
+            querySettings: { runDefaultQuery, defaultQuery },
             graphInfo: { showMemoryUsage, refreshInterval }
         }
     } = useContext(BrowserSettingsContext);
@@ -191,13 +190,10 @@ export default function Page() {
         }
 
         const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
-        const headers = new Headers();
-        if (options?.connectionId) headers.set("X-Connection-Id", options.connectionId);
         const result = await securedFetch(`/api/graph/${prepareArg(graphName)}/info?type=${prepareArg(type)}${readOnlyParam}`, {
             method: "GET",
-            headers,
             signal: options?.signal,
-        }, toast, setIndicator);
+        }, toast, setIndicator, options?.connectionId);
 
         if (!result.ok) return [];
 
@@ -259,14 +255,15 @@ export default function Page() {
             fetchMetaStats(graphName, requestOptions),
             fetchInfo("(property key)", requestOptions),
         ]).then(async ([newDataStats, newPropertyKeys]) => {
-            if (cancelled) return;
+            if (cancelled || getConnectionEpoch() !== pollEpoch) return;
 
             const memoryUsage = showMemoryUsage ? await getMemoryUsage(graphName, toast, setIndicator, pollConnectionId, signal) : new Map<string, MemoryValue>();
+            if (cancelled || getConnectionEpoch() !== pollEpoch) return;
             const newLabels = newDataStats?.[0] || [];
             const newRelationships = newDataStats?.[1] || [];
 
-            const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator);
-            if (cancelled) return;
+            const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator, pollConnectionId);
+            if (cancelled || getConnectionEpoch() !== pollEpoch) return;
 
             setGraphInfo(gi);
             fetchCount(graphName, requestOptions);
@@ -349,7 +346,7 @@ export default function Page() {
         }
 
         setIsQueryLoading(false);
-    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, setIsQueryLoading, tutorialOpen]);
+    }, [fetchCount, graph.Id, graphName, setGraph, runQuery, runDefaultQuery, defaultQuery, setIsQueryLoading, tutorialOpen]);
 
     const handleSetSelectedElements = useCallback((el: (Node | Link)[] = [], fromSearch?: boolean) => {
         setSelectedElements(el);
@@ -474,6 +471,8 @@ export default function Page() {
 
     const handleCreateElement = useCallback(async (attributes: [string, Value][], label: string[]) => {
         if (!canvasRef.current) return false;
+        const startEpoch = getConnectionEpoch();
+        const cid = getActiveConnectionIdGlobal();
 
         const fakeId = "-1";
         const readOnlyParam = isReadOnlyRef.current ? '?readOnly=true' : '';
@@ -485,10 +484,12 @@ export default function Page() {
                 type: isAddNode,
                 selectedNodes: isAddNode ? undefined : selectedElements
             })
-        }, toast, setIndicator);
+        }, toast, setIndicator, cid);
 
+        if (getConnectionEpoch() !== startEpoch) return false;
         if (result.ok) {
             const json = await result.json();
+            if (getConnectionEpoch() !== startEpoch) return false;
 
             if (isAddNode) {
                 const node = await graph.extendNode(json.result.data[0].n, false, true);
@@ -518,6 +519,8 @@ export default function Page() {
 
     const handleDeleteElement = useCallback(async () => {
         if (!canvasRef.current) return;
+        const startEpoch = getConnectionEpoch();
+        const cid = getActiveConnectionIdGlobal();
 
         const deletedElements = (await Promise.all(selectedElements.map(async (element) => {
             const type = !('source' in element);
@@ -525,7 +528,7 @@ export default function Page() {
             const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${prepareArg(element.id.toString())}${readOnlyParam}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type })
-            }, toast, setIndicator);
+            }, toast, setIndicator, cid);
 
             if (!result.ok) return undefined;
 
@@ -560,6 +563,8 @@ export default function Page() {
             return element;
         }))).filter(e => !!e);
 
+        if (getConnectionEpoch() !== startEpoch) return;
+
         graph.removeElements(deletedElements);
 
         setRelationships(graph.removeLinks(deletedElements.map((element) => element.id)));
@@ -575,7 +580,7 @@ export default function Page() {
             description: `${deletedElements.length > 1 ? "Elements" : "Element"} deleted
             ${selectedElements.length > deletedElements.length ? `, ${selectedElements.length - deletedElements.length} failed` : ""}.`,
         });
-    }, [selectedElements, graph, setRelationships, canvasRef, fetchCount, panel, handleSetSelectedElements, toast, setIndicator]);
+    }, [selectedElements, graph, graphName, setRelationships, canvasRef, fetchCount, panel, handleSetSelectedElements, toast, setIndicator]);
 
     const getCurrentPanel = useCallback(() => {
         if (!graphName) return undefined;
@@ -628,8 +633,12 @@ export default function Page() {
         <div className="Page p-3 gap-3">
             <Selector
                 graph={graph}
-                options={graphNames}
-                setOptions={setGraphNames}
+                options={graphNames ?? []}
+                setOptions={next => setGraphNames(prev => (
+                    typeof next === "function"
+                        ? next(prev ?? [])
+                        : next
+                ))}
                 graphName={graphName}
                 setGraphName={handleSetGraphName}
                 setGraph={setGraph}
@@ -683,7 +692,7 @@ export default function Page() {
                 </ResizablePanel>
                 {
                     chatOpen && graphName &&
-                    <div className="absolute bottom-3 right-3 z-30">
+                    <div className="absolute bottom-12 right-3 z-30">
                         <ResizableBox
                             width={chatSize.width}
                             height={chatSize.height}

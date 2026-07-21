@@ -44,7 +44,7 @@ export default function Toolbar({
 }: Props) {
 
     const { isLoading: isLoadingGraph } = useContext(GraphContext);
-    const { settings: { captionsKeysSettings: { captionsKeys }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix} } } = useContext(BrowserSettingsContext);
+    const { settings: { userExperienceSettings: { captionKeysSettings: { captionsKeys, showPropertyKeyPrefix } } } } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
 
 

@@ -1,8 +1,9 @@
 import path from "path";
 import crypto from "crypto";
+import fs from "fs";
+import os from "os";
 
 export const MAX_FILE_SIZE = 5 * 1024 * 1024;
-export const MAX_MULTIPART_SIZE = MAX_FILE_SIZE + 1024 * 1024;
 
 type AllowedFileType = {
   mimeTypes: readonly string[];
@@ -12,8 +13,16 @@ type AllowedFileType = {
 
 const UUID_FILE_NAME_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.[a-z0-9]+$/;
 
+const UPLOADS_BASE_DIR = (() => {
+  // Use a per-process random directory inside OS temp storage to avoid
+  // predictable temp paths that static analysis flags as insecure.
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), "falkordb-uploads-"));
+  fs.chmodSync(base, 0o700);
+  return base;
+})();
+
 function getUploadsDir() {
-  return path.join(process.cwd(), "uploads");
+  return UPLOADS_BASE_DIR;
 }
 
 function getUserUploadsDir(userId: string) {
@@ -64,6 +73,10 @@ async function hasWebpSignature(file: File) {
 
 async function hasPdfSignature(file: File) {
   return matchesAscii(await readFilePrefix(file, 5), "%PDF-");
+}
+
+async function isNonEmptyBinaryFile(file: File) {
+  return file.size > 0;
 }
 
 async function isUtf8TextFile(file: File) {
@@ -119,11 +132,54 @@ export const ALLOWED_FILE_TYPES: Record<string, AllowedFileType> = {
     validateContent: isUtf8TextFile,
   },
   ".csv": {
-    mimeTypes: ["text/csv", "application/csv", "text/plain"],
+    mimeTypes: ["text/csv", "application/csv", "text/plain", "application/vnd.ms-excel"],
     contentType: "text/csv",
     validateContent: isUtf8TextFile,
   },
+  ".cql": {
+    mimeTypes: ["text/plain", "application/octet-stream"],
+    contentType: "text/plain",
+    validateContent: isUtf8TextFile,
+  },
+  ".cypher": {
+    mimeTypes: ["text/plain", "application/octet-stream"],
+    contentType: "text/plain",
+    validateContent: isUtf8TextFile,
+  },
+  ".dump": {
+    mimeTypes: ["application/octet-stream"],
+    contentType: "application/octet-stream",
+    validateContent: isNonEmptyBinaryFile,
+  },
 };
+
+/** Validate a file that has already been written to disk, without buffering it as a File object. */
+export async function validateContentFromPath(extension: string, filePath: string): Promise<boolean> {
+  const fileType = getAllowedFileType(extension);
+  if (!fileType) return false;
+
+  // Open the file once and operate on the descriptor so the size check and the
+  // read target the same inode. Re-resolving `filePath` for a separate stat and
+  // readFile would be a time-of-check/time-of-use race (the path could be
+  // swapped between the two calls).
+  const handle = await fs.promises.open(filePath, "r");
+  try {
+    // Binary files — only require non-empty.
+    if (extension === ".dump") {
+      const stat = await handle.stat();
+      return stat.size > 0;
+    }
+
+    // Read the saved file back into a File-like object so the existing validators work.
+    // These are always text/image files and are already capped at MAX_FILE_SIZE.
+    const buffer = await handle.readFile();
+    const blob = new Blob([buffer]);
+    const file = new File([blob], `file${extension}`);
+    return fileType.validateContent(file);
+  } finally {
+    await handle.close();
+  }
+}
 
 export function getAllowedFileType(extension: string) {
   return ALLOWED_FILE_TYPES[extension];

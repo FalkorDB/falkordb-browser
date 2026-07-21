@@ -492,9 +492,14 @@ test.describe("Chat Feature Tests", () => {
     // Inject fake model + plain-text API key into localStorage so
     // handleSubmit does not bail out before sending the request.
     const page = await browser.getPage();
+    // The response is mocked below, so no real LLM/key is needed. Use the "local"
+    // model source to skip handleSubmit's API-key guard — this avoids the flaky
+    // async legacy-secretKey → encrypted-chatApiKeys migration (server round-trips
+    // after reload) that previously made this test race and intermittently fail
+    // with "No API Key Provided".
     await page.evaluate(() => {
       localStorage.setItem("model", "gpt-4o-mini");
-      localStorage.setItem("secretKey", "fake-test-key-for-markdown");
+      localStorage.setItem("chatModelSource", "local");
     });
     // Reload so the React context picks up the new values
     await page.reload({ waitUntil: "networkidle" });
@@ -674,6 +679,7 @@ test.describe("Chat Feature Tests", () => {
     await page.addInitScript(({ selectedModel }) => {
       localStorage.setItem("model", selectedModel);
       localStorage.setItem("secretKey", "fake-key-footer-test");
+      localStorage.setItem("chatModelSource", "local"); // mock-only: skip API-key guard (avoids flaky async key migration)
     }, { selectedModel: DEFAULT_CHAT_MODEL });
     await page.goto(urls.graphUrl);
     await page.waitForLoadState("networkidle");
@@ -736,6 +742,7 @@ test.describe("Chat Feature Tests", () => {
     await page.addInitScript(({ selectedModel }) => {
       localStorage.setItem("model", selectedModel);
       localStorage.setItem("secretKey", "fake-key-footer-test");
+      localStorage.setItem("chatModelSource", "local"); // mock-only: skip API-key guard (avoids flaky async key migration)
     }, { selectedModel: DEFAULT_CHAT_MODEL });
     await page.goto(urls.graphUrl);
     await page.waitForLoadState("networkidle");
@@ -794,82 +801,86 @@ test.describe("Chat Feature Tests", () => {
   test(`@readwrite Verify confidence badge renders the correct tier and percentage per message`, async () => {
     const graphName = getRandomString("chat");
     await apiCall.addGraph(graphName);
-    await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
+    try {
+      await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
 
-    const chat = await browser.createNewPage(ChatComponent);
-    await browser.setPageToFullScreen();
-    const page = await browser.getPage();
+      const chat = await browser.createNewPage(ChatComponent);
+      await browser.setPageToFullScreen();
+      const page = await browser.getPage();
 
-    await page.addInitScript(({ selectedModel }) => {
-      localStorage.setItem("model", selectedModel);
-      localStorage.setItem("secretKey", "fake-key-confidence-tiers");
-    }, { selectedModel: DEFAULT_CHAT_MODEL });
-    await page.goto(urls.graphUrl);
-    await page.waitForLoadState("networkidle");
+      await page.addInitScript(({ selectedModel }) => {
+        localStorage.setItem("model", selectedModel);
+        localStorage.setItem("secretKey", "fake-key-confidence-tiers");
+        localStorage.setItem("chatModelSource", "local"); // mock-only: skip API-key guard (avoids flaky async key migration)
+      }, { selectedModel: DEFAULT_CHAT_MODEL });
+      await page.goto(urls.graphUrl);
+      await page.waitForLoadState("networkidle");
 
-    // Each call returns the next confidence on the 0-100 scale so we exercise
-    // every tier boundary: 90 (high), 70 (medium), 69 (low).
-    const confidences = [90, 70, 69];
-    let callCount = 0;
-    await page.route("**/api/chat", (route) => {
-      const confidence = confidences[Math.min(callCount, confidences.length - 1)];
-      callCount += 1;
-      route.fulfill({
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          cypherQuery: "MATCH (n) RETURN n",
-          cypherResult: null,
-          answer: `Answer with confidence ${confidence}.`,
-          confidence,
-          tokenUsage: { totalTokens: 10 },
-        }),
+      // Each call returns the next confidence on the 0-100 scale so we exercise
+      // every tier boundary: 90 (high), 70 (medium), 69 (low).
+      const confidences = [90, 70, 69];
+      let callCount = 0;
+      await page.route("**/api/chat", (route) => {
+        const confidence = confidences[Math.min(callCount, confidences.length - 1)];
+        callCount += 1;
+        route.fulfill({
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cypherQuery: "MATCH (n) RETURN n",
+            cypherResult: null,
+            answer: `Answer with confidence ${confidence}.`,
+            confidence,
+            tokenUsage: { totalTokens: 10 },
+          }),
+        });
       });
-    });
 
-    await chat.selectGraphByName(graphName);
-    await chat.openChat();
-    await chat.waitForChatPanel();
+      await chat.selectGraphByName(graphName);
+      await chat.openChat();
+      await chat.waitForChatPanel();
 
-    // 90 → High confidence (inclusive lower boundary)
-    await chat.fillChatInput("First question");
-    await chat.clickChatSendButton();
-    await chat.waitForAssistantResponse("Result");
-    expect(await chat.getChatConfidenceBadgeText()).toContain("90%");
-    expect(await chat.getChatConfidenceBadgeText()).toContain("High confidence");
+      // 90 → High confidence (inclusive lower boundary)
+      await chat.fillChatInput("First question");
+      await chat.clickChatSendButton();
+      await chat.waitForAssistantResponse("Result");
+      expect(await chat.getChatConfidenceBadgeText()).toContain("90%");
+      expect(await chat.getChatConfidenceBadgeText()).toContain("High confidence");
 
-    // 70 → Medium confidence (inclusive lower boundary)
-    await chat.fillChatInput("Second question");
-    await chat.waitForChatSendButtonEnabled();
-    await chat.clickChatSendButton();
-    await chat.waitForAssistantResponse("Result");
-    await page.waitForFunction(
-      () => {
-        const badge = document.querySelectorAll('[data-testid="chatConfidenceBadge"]');
-        return badge[badge.length - 1]?.textContent?.includes("Medium confidence");
-      },
-      { timeout: 5000 }
-    );
-    expect(await chat.getChatConfidenceBadgeText()).toContain("70%");
-    expect(await chat.getChatConfidenceBadgeText()).toContain("Medium confidence");
+      // 70 → Medium confidence (inclusive lower boundary)
+      await chat.fillChatInput("Second question");
+      await chat.waitForChatSendButtonEnabled();
+      await chat.clickChatSendButton();
+      await chat.waitForAssistantResponse("Result");
+      await page.waitForFunction(
+        () => {
+          const badge = document.querySelectorAll('[data-testid="chatConfidenceBadge"]');
+          return badge[badge.length - 1]?.textContent?.includes("Medium confidence");
+        },
+        { timeout: 5000 }
+      );
+      expect(await chat.getChatConfidenceBadgeText()).toContain("70%");
+      expect(await chat.getChatConfidenceBadgeText()).toContain("Medium confidence");
 
-    // 69 → Low confidence (just below the medium boundary)
-    await chat.fillChatInput("Third question");
-    await chat.waitForChatSendButtonEnabled();
-    await chat.clickChatSendButton();
-    await chat.waitForAssistantResponse("Result");
-    await page.waitForFunction(
-      () => {
-        const badge = document.querySelectorAll('[data-testid="chatConfidenceBadge"]');
-        return badge[badge.length - 1]?.textContent?.includes("Low confidence");
-      },
-      { timeout: 5000 }
-    );
-    expect(await chat.getChatConfidenceBadgeText()).toContain("69%");
-    expect(await chat.getChatConfidenceBadgeText()).toContain("Low confidence");
+      // 69 → Low confidence (just below the medium boundary)
+      await chat.fillChatInput("Third question");
+      await chat.waitForChatSendButtonEnabled();
+      await chat.clickChatSendButton();
+      await chat.waitForAssistantResponse("Result");
+      await page.waitForFunction(
+        () => {
+          const badge = document.querySelectorAll('[data-testid="chatConfidenceBadge"]');
+          return badge[badge.length - 1]?.textContent?.includes("Low confidence");
+        },
+        { timeout: 5000 }
+      );
+      expect(await chat.getChatConfidenceBadgeText()).toContain("69%");
+      expect(await chat.getChatConfidenceBadgeText()).toContain("Low confidence");
 
-    await page.unroute("**/api/chat");
-    await apiCall.removeGraph(graphName);
+      await page.unroute("**/api/chat");
+    } finally {
+      await apiCall.removeGraph(graphName).catch(() => undefined);
+    }
   });
 
   test(`@readwrite Verify token usage persists after closing and reopening chat`, async () => {
@@ -884,6 +895,7 @@ test.describe("Chat Feature Tests", () => {
     await page.addInitScript(({ selectedModel }) => {
       localStorage.setItem("model", selectedModel);
       localStorage.setItem("secretKey", "fake-key-footer-persist");
+      localStorage.setItem("chatModelSource", "local"); // mock-only: skip API-key guard (avoids flaky async key migration)
     }, { selectedModel: DEFAULT_CHAT_MODEL });
     await page.goto(urls.graphUrl);
     await page.waitForLoadState("networkidle");
@@ -941,6 +953,7 @@ test.describe("Chat Feature Tests", () => {
     await page.addInitScript(({ selectedModel }) => {
       localStorage.setItem("model", selectedModel);
       localStorage.setItem("secretKey", "fake-key-footer-model");
+      localStorage.setItem("chatModelSource", "local"); // mock-only: skip API-key guard (avoids flaky async key migration)
     }, { selectedModel: DEFAULT_CHAT_MODEL });
     await page.goto(urls.graphUrl);
     await page.waitForLoadState("networkidle");

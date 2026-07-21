@@ -62,6 +62,14 @@ It allows a developer to interact with graphs loaded to FaklorDB, explore how sp
   - Download a `.dump` file via the Browser (`/api/graph/:graph/export`).
 - **Upload data**
   - “Upload Data” dialog supports drag-and-drop file selection (Dropzone UI).
+  - Supports these ingestion modes:
+    - restore graph from a `.dump` export (replace contents) — **temporarily disabled** because of a FalkorDB `RESTORE` bug that can corrupt the target graph. The code is retained and gated by the `DUMP_RESTORE_ENABLED` flag (`lib/graphUpload.ts`); the Restore tab and the create-from-dump option are hidden, and the upload API rejects `.dump` files with a 403 while it is off. Set the flag back to `true` to re-enable.
+    - import a `.csv` via FalkorDB-native `LOAD CSV` (the dialog detects the file's columns and prefills an editable `LOAD CSV [WITH HEADERS] FROM '…' AS row` query). The upload is streamed to a pluggable object store the database can reach — **S3 / R2 / MinIO** or **Vercel Blob** (presigned HTTPS, preferred for large files) or the **local** filesystem (`file://` from a shared `IMPORT_FOLDER`, or a signed-capability HTTPS serve) — chosen automatically from configuration (`CSV_STORAGE`). Large files stream with constant memory (size-capped by `CSV_MAX_FILE_SIZE_MB`).
+      - **Large files on Vercel:** the serverless request body is capped at ~4.5 MB, so CSV uploads larger than that must be served by a self-hosted (non-Vercel-Functions) deployment. The store itself (S3 / Blob) streams without limit; only the browser→app leg is bounded on Vercel Functions.
+      - **Network egress (SSRF):** any account that can run Cypher can also issue `LOAD CSV FROM 'https://…'` directly from the query editor, so the database can fetch arbitrary HTTPS URLs it can reach. This is treated as accepted risk (query-capable users are trusted); for untrusted multi-tenant deployments, restrict the database container's outbound network to the object store only.
+      - **HTTPS-only fetch:** FalkorDB fetches the CSV itself and only accepts `https://` or `file://` URIs — plain `http://` is rejected ("Unsupported URI"). If the storage resolves an `http://` URL (e.g. a MinIO/S3 endpoint over http, or a non-HTTPS `CSV_SERVE_BASE_URL`) the import fails fast with a clear error instead of silently importing 0 rows. Use an HTTPS-reachable store, or the local `file://` mode.
+      - **Large-file execution & timeouts:** the import runs as a single, atomic `LOAD CSV` query, so there is no row-by-row progress to report (the dialog shows an indeterminate "processing" state). The request streams a keep-alive heartbeat while the query runs so idle proxies/load balancers don't drop long imports. The Browser does **not** impose its own query timeout: FalkorDB runs the import to completion. To bound or abort a runaway import, configure the database's **`TIMEOUT_MAX`** (a per-query `TIMEOUT` alone does **not** abort write queries such as `LOAD CSV`). On serverless (Vercel Functions) the platform's max function duration bounds the request, so very large imports need a self-hosted deployment (or a raised function limit).
+    - execute Cypher batch files (`.txt` / `.cql` / `.cypher`) statement-by-statement.
 
 ### Graph Info panel
 - **Memory Usage tracking** Exposes current memory utilization of the graph in MB.
@@ -135,4 +143,3 @@ If enabled, the Browser includes a **Chat panel** that streams responses from a 
 1. Open graph management.
 2. Select a graph.
 3. Click **Export Data** to download a `.dump`.
-

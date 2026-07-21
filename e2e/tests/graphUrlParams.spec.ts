@@ -41,9 +41,11 @@ test.describe("@admin Graph URL params", () => {
             GraphPage,
             `${urls.graphUrl}?graph=${encodeURIComponent(graphName)}`
         );
+        const page = await browser.getPage();
 
         // Wait for graph to load
         await graph.waitForPageIdle();
+        await expect(page.getByTestId("selectGraph")).toContainText(graphName, { timeout: 15000 });
 
         // The graph should be selected — URL should still contain the param
         const url = graph.getCurrentURL();
@@ -73,7 +75,9 @@ test.describe("@admin Graph URL params", () => {
             GraphPage,
             `${urls.graphUrl}?graph=${encodeURIComponent(graphName)}&query=${encodeURIComponent(query)}`
         );
+        const page = await browser.getPage();
         await graph.waitForPageIdle();
+        await expect(page.getByTestId("selectGraph")).toContainText(graphName, { timeout: 15000 });
 
         const url = graph.getCurrentURL();
         expect(url).toContain(`graph=${encodeURIComponent(graphName)}`);
@@ -85,10 +89,13 @@ test.describe("@admin Graph URL params", () => {
             GraphPage,
             `${urls.graphUrl}?graph=${encodeURIComponent(graphName)}`
         );
+        const page = await browser.getPage();
         await graph.waitForPageIdle();
+        await expect(page.getByTestId("selectGraph")).toContainText(graphName, { timeout: 15000 });
 
         await graph.refreshPage();
         await graph.waitForPageIdle();
+        await expect(page.getByTestId("selectGraph")).toContainText(graphName, { timeout: 15000 });
 
         const url = graph.getCurrentURL();
         expect(url).toContain(`graph=${encodeURIComponent(graphName)}`);
@@ -100,7 +107,9 @@ test.describe("@admin Graph URL params", () => {
             GraphPage,
             `${urls.graphUrl}?graph=${encodeURIComponent(graphName)}&query=${encodeURIComponent(query)}`
         );
+        const page = await browser.getPage();
         await graph.waitForPageIdle();
+        await expect(page.getByTestId("selectGraph")).toContainText(graphName, { timeout: 15000 });
 
         const url = graph.getCurrentURL();
         const graphIdx = url.indexOf("graph=");
@@ -147,9 +156,13 @@ test.describe("@admin Graph URL params", () => {
             );
 
             // Navigate to /graph with the URL graph param
+            const graphListResponse = page.waitForResponse(
+                (response) => response.url().includes("/api/graph") && response.request().method() === "GET"
+            );
             await page.goto(`${urls.graphUrl}?graph=${encodeURIComponent(graphName)}`, {
-                waitUntil: "networkidle",
+                waitUntil: "domcontentloaded",
             });
+            await graphListResponse;
 
             // URL graph must win — wait for selector to reflect URL graph (auto-retries)
             await expect(page.getByTestId("selectGraph")).toContainText(graphName, { timeout: 15000 });

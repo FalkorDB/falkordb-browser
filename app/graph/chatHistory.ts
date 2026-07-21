@@ -26,6 +26,18 @@ function isOptionalNumber(value: unknown): boolean {
     return value == null || typeof value === "number";
 }
 
+/**
+ * Coerce legacy `null` `confidence`/`tokenUsage` to `undefined` so a parsed
+ * message actually satisfies `Message` (which only allows `number | undefined`),
+ * even though {@link isMessageLike} accepts the historical `null` shape.
+ */
+function normalizeOptionalNumbers(message: Message): Message {
+    const next = { ...message };
+    if (next.confidence == null) next.confidence = undefined;
+    if (next.tokenUsage == null) next.tokenUsage = undefined;
+    return next;
+}
+
 function isMessageLike(value: unknown): value is Message {
     if (value == null || typeof value !== "object" || Array.isArray(value)) return false;
     const message = value as Record<string, unknown>;
@@ -63,11 +75,11 @@ export function parseStoredMessages(raw: string | null): Message[] {
     }
 
     if (Array.isArray(parsed)) {
-        return parsed.filter(isMessageLike).map(message =>
+        return parsed.filter(isMessageLike).map(message => normalizeOptionalNumbers(
             message.confidence != null
                 ? { ...message, confidence: migrateLegacyConfidence(message.confidence) }
                 : message
-        );
+        ));
     }
 
     if (
@@ -76,7 +88,7 @@ export function parseStoredMessages(raw: string | null): Message[] {
         (parsed as VersionedChatHistory).version === CHAT_HISTORY_VERSION &&
         Array.isArray((parsed as VersionedChatHistory).messages)
     ) {
-        return (parsed as VersionedChatHistory).messages.filter(isMessageLike);
+        return (parsed as VersionedChatHistory).messages.filter(isMessageLike).map(normalizeOptionalNumbers);
     }
 
     return [];
