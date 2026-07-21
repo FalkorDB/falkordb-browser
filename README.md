@@ -203,7 +203,7 @@ clipboard helper in `lib/clipboard.ts`.
 * **Unit tests** (Node's built-in test runner, no extra tooling): `npm test`
   Runs the `*.test.ts` suites under `app/` and `lib/`. Gated in CI by the **Build**
   workflow. These execute TypeScript directly via `node --test`, which relies on native
-  type-stripping — use **Node ≥ 22.18** (CI runs Node 26). Older Node (e.g. 20.x) can run
+  type-stripping — use **Node ≥ 22.18** (CI runs Node 24). Older Node (e.g. 20.x) can run
   the app but cannot run these tests.
 * **Coverage**: `npm run test:coverage` — runs the unit tests and enforces **100%**
   line/branch/function coverage on `lib/cypherSuggestions.ts`, `lib/cypherDiagnostics.ts`,
