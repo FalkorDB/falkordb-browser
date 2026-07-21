@@ -34,6 +34,8 @@ export default function DeleteGraph({
   const [isLoading, setIsLoading] = useState(false);
   const { indicator, setIndicator } = useContext(IndicatorContext);
 
+  const selectedGraphs = useMemo(() => rows.filter(row => row.checked), [rows]);
+
   useEffect(() => {
     if (!open && closeManage) {
       setOpenMenage(false);
@@ -105,12 +107,12 @@ export default function DeleteGraph({
           className="p-1 text-xs"
           data-testid="deleteGraph"
           variant="Delete"
-          disabled={rows.filter(opt => opt.checked).length === 0}
+          disabled={selectedGraphs.length === 0}
           label="Delete"
           title="Confirm the deletion of the selected graph(s)"
         />
       }
-      description={`Are you sure you want to delete the selected graph(s)? (${rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string).join(", ")})`}
+      description={`Are you sure you want to delete the selected graph(s)? (${selectedGraphs.map(opt => opt.cells[0].value as string).join(", ")})`}
     >
       <div className="flex justify-end gap-2">
         <Button
@@ -118,7 +120,7 @@ export default function DeleteGraph({
           indicator={indicator}
           variant="Delete"
           label="Delete Graph"
-          onClick={() => handleDelete(rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string))}
+          onClick={() => handleDelete(selectedGraphs.map(opt => opt.cells[0].value as string))}
           isLoading={isLoading}
         />
         <CloseDialog
