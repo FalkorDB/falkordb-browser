@@ -109,7 +109,7 @@ export default function UdfPanel() {
     };
 
     return (
-        <div className="relative h-full w-full p-2 flex flex-col gap-4 border-r border-border overflow-hidden">
+        <div className="relative h-full w-full p-2 flex flex-col gap-2 border-r border-border overflow-hidden">
             <div className="flex justify-between items-center">
                 <h1 className="text-2xl">UDF Libraries</h1>
                 <Braces size={25} />
@@ -124,9 +124,10 @@ export default function UdfPanel() {
                     }}
                 />
             </div>
-            {udfList.length > 0 && (
-                <div className="flex flex-col gap-2">
                     <h2 className="text-sm font-semibold text-muted-foreground">Libraries</h2>
+            {
+            udfList.length > 0 && (
+                <div className="basis-0 grow flex flex-col gap-2 overflow-y-auto">
                     {udfList.map(([, libraryName, , functions]) => (
                         <LibrarySection
                             key={libraryName}
@@ -146,7 +147,8 @@ export default function UdfPanel() {
                         />
                     ))}
                 </div>
-            )}
+            )
+            }
         </div>
     );
 }
