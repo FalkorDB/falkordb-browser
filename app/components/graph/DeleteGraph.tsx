@@ -1,6 +1,6 @@
 import { useToast } from "@/components/ui/use-toast";
 import { getActiveConnectionIdGlobal, getConnectionEpoch, prepareArg, securedFetch, Row } from "@/lib/utils";
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useState, useMemo } from "react";
 import { Graph } from "@/app/api/graph/model";
 import DialogComponent from "../DialogComponent";
 import Button from "../ui/Button";
