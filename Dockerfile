@@ -2,6 +2,9 @@ ARG CYPHER_VERSION=latest
 
 FROM node:24-alpine3.23@sha256:2bdb65ed1dab192432bc31c95f94155ca5ad7fc1392fb7eb7526ab682fa5bf14 AS base
 
+# Cache-bust arg to ensure apk upgrade always runs with latest packages
+ARG CACHEBUST=1
+
 # Update all Alpine packages to fix security vulnerabilities
 RUN apk upgrade --no-cache --available
 
