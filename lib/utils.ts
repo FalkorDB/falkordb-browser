@@ -59,6 +59,13 @@ export type Query = {
   errorMessage?: string;
 };
 
+export type GraphListEntry = {
+  name: string;
+  type: "active" | "stub";
+  nodes: number | null;
+  edges: number | null;
+};
+
 export type Node = {
   id: number;
   labels: string[];
@@ -1155,7 +1162,7 @@ export async function fetchOptions(
   setIndicator: (indicator: "online" | "offline") => void,
   indicator: "online" | "offline",
   connectionId?: string | null,
-): Promise<{ opts: string[]; autoSelect: string | null } | null> {
+): Promise<{ opts: string[]; autoSelect: string | null; graphs: GraphListEntry[] } | null> {
   if (indicator === "offline") return null;
 
   const result = await securedFetch(
@@ -1170,11 +1177,15 @@ export async function fetchOptions(
 
   if (!result.ok) return null;
 
-  const { opts } = (await result.json()) as { opts: string[] };
+  const response = (await result.json()) as { opts: string[]; graphs?: GraphListEntry[] };
+  const opts = Array.isArray(response.opts) ? response.opts : [];
+  const graphs = Array.isArray(response.graphs)
+    ? response.graphs
+    : opts.map((name) => ({ name, type: "active" as const, nodes: null, edges: null }));
 
   // Return the data so callers can apply it under their own ownership guard
   // (a stale refresh must not overwrite the list/selection after a switch).
-  return { opts, autoSelect: opts.length === 1 ? formatName(opts[0]) : null };
+  return { opts, graphs, autoSelect: opts.length === 1 ? formatName(opts[0]) : null };
 }
 
 export const areCaptionKeysEqual = (left: [string, boolean][], right: [string, boolean][]) =>
