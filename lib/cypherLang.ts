@@ -85,16 +85,8 @@ export const CYPHER_KEYWORDS = [
   // Aliasing
   "AS",
   // Path keywords (from openCypher BNF)
-  "ALL SHORTEST",
-  "ANY SHORTEST",
-  "ALLSHORTESTPATHS",
-  "SHORTESTPATH",
-  "SHORTEST",
   "PATH",
   "PATHS",
-  // Path result set quantifiers (openCypher)
-  "GROUP",
-  "GROUPS",
 ];
 
 // Built-in functions derived from FalkorDB's src/arithmetic/builtin_funcs.gperf
@@ -226,6 +218,7 @@ export const BUILTIN_FUNCTIONS = [
   "relationships",
   "length",
   "shortestPath",
+  "allShortestPaths",
   // Vector functions (FalkorDB extensions)
   "vecf32",
   "vec.euclideanDistance",
