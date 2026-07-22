@@ -12,9 +12,11 @@ updates:
       interval: "daily"
     target-branch: "staging"
     groups:
-      npm-minor-patch:
-        update-types:
-          - "patch"
+      npm-all:
+        patterns:
+          - "*"
+    cooldown:
+      default-days: 7
     ignore:
       # TypeScript 7.0 (native Go compiler) ships no JS Compiler API, which
       # Next.js relies on for `next build` type-checking, so the bump breaks
