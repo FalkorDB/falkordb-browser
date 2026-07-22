@@ -1290,7 +1290,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
                         data-testid="editorRun"
                         ref={submitQuery}
                         indicator={indicator}
-                        disabled={!historyQuery.query || !graphName || !isQueryValid}
+                        disabled={!historyQuery.query || !graphName}
                         variant="Primary"
                         label="RUN"
                         title={getLabel()}
