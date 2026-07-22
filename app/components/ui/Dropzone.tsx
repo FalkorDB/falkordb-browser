@@ -35,7 +35,14 @@ function Dropzone({ title = "Upload File", filesCount = false, className = "", w
 
     const [files, setFiles] = useState<TableFile[]>([]);
 
-    const onDrop = useCallback((acceptedFiles: File[]) => {
+    const onDrop = useCallback((acceptedFiles: File[], fileRejections: FileRejection[]) => {
+        // Keep drop behavior consistent with prior react-dropzone versions:
+        // if anything is rejected, treat the whole drop as rejected.
+        if (fileRejections.length > 0) {
+            setFiles([]);
+            return;
+        }
+
         const newFiles = acceptedFiles.map((file: File) => ({
             name: file.name,
             size: file.size,
