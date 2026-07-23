@@ -30,7 +30,9 @@ import {
 import { buildCandidatePool, type FalkorCandidate, type FalkorSchema } from "./falkordbSpec.ts";
 import { CYPHER_KEYWORDS } from "../cypherLang.ts";
 
-const SUPPORTED_KEYWORDS = new Set(CYPHER_KEYWORDS.map((keyword) => keyword.toUpperCase()));
+const SUPPORTED_KEYWORD_LITERALS = new Set(
+  CYPHER_KEYWORDS.flatMap((keyword) => [keyword, ...keyword.split(" ")]).map((keyword) => keyword.toUpperCase())
+);
 
 /** 0-based caret offset within the source string. */
 export interface CaretPosition {
@@ -118,7 +120,7 @@ export function collectCandidates(
   for (const [tokenType] of candidates.tokens) {
     const literal = tokenLiteral(tokenType);
     if (literal) {
-      if (!SUPPORTED_KEYWORDS.has(literal)) continue;
+      if (!SUPPORTED_KEYWORD_LITERALS.has(literal)) continue;
       // Reuse a pooled keyword candidate if one exists (keeps casing/detail),
       // else synthesize one from the grammar literal.
       const pooled = pool.find((p) => p.kind === "keyword" && p.label.toUpperCase() === literal);

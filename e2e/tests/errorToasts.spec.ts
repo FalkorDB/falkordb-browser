@@ -138,7 +138,7 @@ test.describe("Error Toast Messages", () => {
 
     expect(toastTitle5).toBe("Syntax Error");
     expect(toastText5).not.toContain("errMsg:");
-    expect(toastText5).toContain("Unexpected");
+    expect(toastText5).toMatch(/Unexpected|Invalid input/i);
   });
 
   test(`@admin Syntax error toast includes the generic syntax hint`, async () => {
@@ -149,7 +149,7 @@ test.describe("Error Toast Messages", () => {
     await browser.setPageToFullScreen();
     await graph.selectGraphByName(graphName);
 
-    await graph.insertQuery("MATCH (n) RETsURN n");
+    await graph.insertQuery("CREATE INDEX FOR (p:Person) ON (p.m.n)");
     await graph.clickRunQuery(false);
 
     expect(await graph.getNotificationErrorToast()).toBe(true);
@@ -401,7 +401,7 @@ test.describe("Error Toast Messages", () => {
 
     // A syntax error carries a distinct raw message (the "See more" region), so the
     // Copy button is rendered.
-    await graph.insertQuery("MATCH (n) RETsURN n");
+    await graph.insertQuery("CREATE INDEX FOR (p:Person) ON (p.m.n)");
     await graph.clickRunQuery(false);
     expect(await graph.getNotificationErrorToast()).toBe(true);
 

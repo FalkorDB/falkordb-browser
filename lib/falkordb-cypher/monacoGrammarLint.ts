@@ -7,7 +7,7 @@
 // serve ANY number of editors (main editor, history editor, …) — each editor
 // just writes its own model's diagnostics.
 //
-// This is the only grammar file that imports Monaco.
+// This grammar-specific module imports Monaco directly (alongside monacoGlue.ts).
 // ---------------------------------------------------------------------------
 
 import type { Monaco } from "@monaco-editor/react";

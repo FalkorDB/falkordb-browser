@@ -1,11 +1,10 @@
 // ---------------------------------------------------------------------------
 // falkordb-cypher — simplified query-response handler
 // ---------------------------------------------------------------------------
-// Because the real-time grammar (see linter.ts + monacoGlue.attachRealtimeLinting)
-// blocks invalid syntax from ever being submitted, the network layer no longer
-// needs to parse backend *syntax* errors. This handler therefore ONLY classifies
-// genuine runtime/database issues: timeouts, resource limits, and missing
-// constraints/indexes. Everything syntax-related is intentionally gone.
+// When grammar linting is active (see linter.ts + attachGrammarLinting), invalid
+// syntax is blocked before submit. When grammar artifacts are unavailable,
+// linter.ts no-ops and backend syntax errors can still surface. This module only
+// classifies runtime/database issues that remain relevant in both paths.
 // ---------------------------------------------------------------------------
 
 /** The only error classes that can still reach the client post-syntax-gating. */
