@@ -120,6 +120,7 @@ export default function DeleteGraph({
           indicator={indicator}
           variant="Delete"
           label="Delete Graph"
+          disabled={selectedGraphs.length === 0}
           onClick={() => handleDelete(selectedGraphs.map(opt => opt.cells[0].value as string))}
           isLoading={isLoading}
         />
