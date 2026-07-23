@@ -7,61 +7,126 @@
 
 import type { UDFEntry } from "./utils.ts";
 
+// Multi-word keywords are listed before any single-word keyword that shares a prefix
+// so that the Monarch tokenizer regex alternation tries the longer pattern first and
+// avoids a shorter prefix consuming characters that belong to the full keyword.
+// e.g. "LOAD CSV WITH HEADERS" before "LOAD CSV", and "ORDER BY" before shorter variants.
+//
+// Source: FalkorDB parser keywords in
+// FalkorDB/deps/libcypher-parser/lib/src/parser.leg.
 export const CYPHER_KEYWORDS = [
-  "CREATE",
-  "MATCH",
-  "OPTIONAL",
-  "LOAD",
-  "CSV",
+  // Statement options
+  "CYPHER",
+  "PROFILE",
+  "EXPLAIN",
+  // Query hints
+  "USING PERIODIC COMMIT",
+  // CSV import
+  "LOAD CSV WITH HEADERS",
+  "LOAD CSV",
+  "WITH HEADERS",
+  "FIELDTERMINATOR",
   "FROM",
-  "AS",
+  // Reading clauses
+  "START",
+  "OPTIONAL MATCH",
+  "MATCH",
   "WHERE",
+  "RETURN",
   "DISTINCT",
-  "IN",
-  "IS",
+  "ORDER BY",
+  "SKIP",
+  "LIMIT",
+  // Combining / flow clauses
+  "WITH",
+  "UNION ALL",
+  "UNION",
+  "UNWIND",
+  "FOREACH",
+  // Planner hints
+  "USING INDEX",
+  "USING JOIN ON",
+  "USING SCAN",
+  // Write clauses
+  "CREATE UNIQUE",
+  "CREATE",
+  "MERGE",
+  "ON CREATE SET",
+  "ON MATCH SET",
+  "ON CREATE",
+  "ON MATCH",
+  "ON",
+  "DELETE",
+  "DETACH DELETE",
+  "SET",
+  "REMOVE",
+  // Schema commands
+  "CREATE CONSTRAINT ON",
+  "CREATE INDEX ON",
+  "CREATE INDEX FOR",
+  "DROP CONSTRAINT ON",
+  "DROP INDEX ON",
+  "DROP INDEX FOR",
+  "ASSERT",
+  "IS UNIQUE",
+  // Procedural
+  "CALL",
+  "YIELD",
+  // Boolean / logical operators
   "NOT",
-  "NULL",
+  "AND",
+  "OR",
+  "XOR",
+  // Predicate keywords (multi-word before single-word prefix)
+  "IS NOT NULL",
+  "IS NULL",
+  "IN",
+  "CONTAINS",
+  "STARTS WITH",
+  "ENDS WITH",
+  // CASE expression
   "CASE",
   "WHEN",
   "THEN",
   "ELSE",
   "END",
-  "RETURN",
-  "BY",
-  "ASC",
-  "DESC",
-  "ORDER BY",
-  "ORDER",
-  "SKIP",
-  "LIMIT",
-  "MERGE",
-  "DELETE",
-  "DETACH",
-  "REMOVE",
-  "SET",
-  "ON",
-  "WITH",
-  "UNION",
-  "UNWIND",
-  "FOREACH",
-  "CALL",
-  "YIELD",
-  "EXISTS",
+  // List/predicate expressions
+  "FILTER",
+  "EXTRACT",
+  "REDUCE",
+  "ALL",
+  "ANY",
+  "SINGLE",
+  "NONE",
+  // Literal keywords
+  "NULL",
   "TRUE",
   "FALSE",
-  "OR",
-  "AND",
-  "XOR"
+  // Sort direction
+  "ASC",
+  "ASCENDING",
+  "DESC",
+  "DESCENDING",
+  // Aliasing
+  "AS",
 ];
 
+// Built-in functions derived from FalkorDB's src/arithmetic/builtin_funcs.gperf
+// (https://github.com/FalkorDB/FalkorDB/blob/master/src/arithmetic/builtin_funcs.gperf)
+// cross-referenced against the OpenCypher specification.
+// Internal operator entries (add, sub, eq, gt, etc.) and non-callable internals
+// (case, list_comprehension, intern, nop, prev, path_filter, …) are excluded.
 export const BUILTIN_FUNCTIONS = [
+  // Predicate functions (openCypher)
   "all",
   "any",
   "exists",
   "isEmpty",
   "none",
   "single",
+  // Conditional / general
   "coalesce",
+  // Graph entity functions (openCypher + FalkorDB)
   "endNode",
   "hasLabels",
   "id",
@@ -71,7 +136,8 @@ export const BUILTIN_FUNCTIONS = [
   "startNode",
   "timestamp",
   "type",
-  "typeOf",
+  "typeOf",     // FalkorDB extension
+  // Aggregate functions
   "avg",
   "collect",
   "count",
@@ -79,15 +145,25 @@ export const BUILTIN_FUNCTIONS = [
   "min",
   "percentileCont",
   "percentileDisc",
+  "stDev",
   "stDevP",
   "sum",
+  // List functions (openCypher)
   "head",
   "keys",
   "last",
   "range",
+  "reduce",
   "size",
   "tail",
-  "reduce",
+  "slice",
+  // FalkorDB list extensions
+  "list.dedup",
+  "list.insert",
+  "list.insertlistelements",
+  "list.remove",
+  "list.sort",
+  // Math functions (openCypher)
   "abs",
   "ceil",
   "e",
@@ -100,7 +176,9 @@ export const BUILTIN_FUNCTIONS = [
   "round",
   "sign",
   "sqrt",
+  // Trigonometric functions (openCypher)
   "acos",
+  "asin",
   "atan",
   "atan2",
   "cos",
@@ -111,6 +189,7 @@ export const BUILTIN_FUNCTIONS = [
   "radians",
   "sin",
   "tan",
+  // String functions (openCypher)
   "left",
   "lTrim",
   "replace",
@@ -120,11 +199,25 @@ export const BUILTIN_FUNCTIONS = [
   "split",
   "substring",
   "toLower",
-  "toJSON",
   "toUpper",
   "trim",
+  // String functions (FalkorDB extensions)
+  "toJSON",
+  "string.join",
+  "string.matchregex",
+  "string.replaceregex",
+  // Spatial functions (openCypher)
   "point",
   "distance",
+  // Temporal functions (openCypher)
+  "date",
+  "date.transaction",
+  "duration",
+  "localtime",
+  "localtime.transaction",
+  "localdatetime",
+  "localdatetime.transaction",
+  // Type-conversion functions (openCypher)
   "toBoolean",
   "toBooleanList",
   "toBooleanOrNull",
@@ -137,12 +230,18 @@ export const BUILTIN_FUNCTIONS = [
   "toString",
   "toStringList",
   "toStringOrNull",
+  // Type-conversion functions (FalkorDB extensions)
+  "tolist",
+  "tomap",
+  // Graph traversal / path functions
   "indegree",
   "outdegree",
   "nodes",
   "relationships",
   "length",
   "shortestPath",
+  "allShortestPaths",
+  // Vector functions (FalkorDB extensions)
   "vecf32",
   "vec.euclideanDistance",
   "vec.cosineDistance",
@@ -154,24 +253,34 @@ export const BUILTIN_FUNCTIONS = [
  * unavailable. This list matches the procedures shipped with FalkorDB 4.x.
  */
 export const FALLBACK_PROCEDURE_NAMES: string[] = [
+  // db.* introspection
   "db.constraints",
   "db.indexes",
   "db.labels",
   "db.propertyKeys",
   "db.relationshipTypes",
   "db.meta.stats",
+  // db.idx.* full-text & vector index procedures
   "db.idx.fulltext.createNodeIndex",
   "db.idx.fulltext.drop",
   "db.idx.fulltext.queryNodes",
-  "db.idx.vector.createNodeIndex",
-  "db.idx.vector.drop",
+  "db.idx.fulltext.queryRelationships",
   "db.idx.vector.queryNodes",
-  "algo.SPpaths",
-  "algo.SSpaths",
+  "db.idx.vector.queryRelationships",
+  // dbms.*
+  "dbms.functions",
+  "dbms.procedures",
+  // algo.* graph algorithms
   "algo.betweenness",
   "algo.BFS",
+  "algo.HarmonicCentrality",
+  "algo.labelPropagation",
+  "algo.maxFlow",
+  "algo.MSF",
   "algo.pageRank",
-  "algo.degree",
+  "algo.SPpaths",
+  "algo.SSpaths",
+  "algo.WCC",
 ];
 
 // Derives the namespaced UDF function names (e.g. "myLib.myFunc") from the UDF

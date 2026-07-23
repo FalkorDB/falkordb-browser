@@ -625,6 +625,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     result: aiFixResult,
     pendingConsentProvider: pendingConsent ? getProviderDisplayName(pendingConsent.provider) : null,
     requestAiFix,
+    reportClientError: (query: string, errorMessage: string) => {
+      // Populate lastFailure so the toast's AI-fix button targets this query,
+      // without running it (grammar errors are blocked pre-execution).
+      setLastFailure({ query, errorMessage });
+      setAiFixResult({ status: "idle" });
+    },
     confirmConsent,
     cancelConsent: () => setPendingConsent(null),
     dismissResult: () => setAiFixResult({ status: "idle" }),

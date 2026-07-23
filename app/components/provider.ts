@@ -541,6 +541,9 @@ type AiFixContextType = {
   result: AiFixResult;
   pendingConsentProvider: string | null;
   requestAiFix: (query: string, errorMessage: string) => void;
+  /** Register a client-side (pre-run) failure — e.g. a grammar syntax error —
+   *  so the same "Fix with AI" affordance appears without executing the query. */
+  reportClientError: (query: string, errorMessage: string) => void;
   confirmConsent: (dontAskAgain: boolean) => void;
   cancelConsent: () => void;
   dismissResult: () => void;
@@ -553,6 +556,7 @@ export const AiFixContext = createContext<AiFixContextType>({
   result: { status: "idle" },
   pendingConsentProvider: null,
   requestAiFix: () => { },
+  reportClientError: () => { },
   confirmConsent: () => { },
   cancelConsent: () => { },
   dismissResult: () => { },
