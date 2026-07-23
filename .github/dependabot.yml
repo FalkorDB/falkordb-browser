@@ -9,12 +9,14 @@ updates:
   - package-ecosystem: "npm" # See documentation for possible values
     directory: "/" # Location of package manifests
     schedule:
-      interval: "daily"
+      interval: "weekly"
     target-branch: "staging"
     groups:
-      npm-minor-patch:
-        update-types:
-          - "patch"
+      npm-all:
+        patterns:
+          - "*"
+    cooldown:
+      default-days: 7
     ignore:
       # TypeScript 7.0 (native Go compiler) ships no JS Compiler API, which
       # Next.js relies on for `next build` type-checking, so the bump breaks
@@ -32,4 +34,10 @@ updates:
       # eslint-plugin-react / typescript-eslint support eslint 10.
       - dependency-name: "eslint"
         versions: [">=10.0.0"]
+
+      # Monaco 0.56.x worker entrypoint changes are incompatible with this
+      # Turbopack setup; keep Dependabot from reopening noisy bump PRs until
+      # the worker-resolution migration is completed.
+      - dependency-name: "monaco-editor"
+        versions: ["0.56.x"]
 
