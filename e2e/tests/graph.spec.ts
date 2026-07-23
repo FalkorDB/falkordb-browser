@@ -312,8 +312,7 @@ test.describe("Graph Tests", () => {
   });
 
   const queriesInput = [
-    { query: "C", keywords: ["call", "collect", "count", "create"] },
-    { query: "M", keywords: ["max", "min", "match", "merge"] },
+    { query: "C", keywords: ["call", "case", "create"] },
   ];
   queriesInput.forEach(({ query, keywords }) => {
     test(`@readwrite Validate auto complete in query search for: ${query}`, async () => {

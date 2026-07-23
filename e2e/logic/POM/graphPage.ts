@@ -650,12 +650,12 @@ export default class GraphPage extends BasePage {
   }
 
   private get querySearchList(): Locator {
-    return this.page.locator("//div[contains(@class, 'tree')]");
+    return this.page.locator(".suggest-widget.visible").first();
   }
 
   private get querySearchListItems(): Locator {
-    return this.page.locator(
-      "//div[contains(@class, 'tree')]//div[contains(@class, 'contents')]"
+    return this.querySearchList.locator(
+      ".monaco-list-row .contents, .monaco-list-row .label-name"
     );
   }
 
@@ -1631,6 +1631,8 @@ export default class GraphPage extends BasePage {
   }
 
   async getQuerySearchListText(): Promise<string[]> {
+    // Explicitly open Monaco completion to avoid picking up unrelated UI trees.
+    await this.page.keyboard.press("Control+Space");
     await waitForElementToBeVisible(this.querySearchList);
     const elements = this.querySearchListItems;
     const count = await elements.count();
