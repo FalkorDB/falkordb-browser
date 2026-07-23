@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// falkordb-cypher — Monaco glue (the ONLY module that imports Monaco)
+// falkordb-cypher — Monaco glue (one of the Monaco-facing modules)
 // ---------------------------------------------------------------------------
 // Bridges the pure engine to the existing editor plumbing WITHOUT changing any
 // UI/visual behavior:
@@ -103,8 +103,8 @@ export function attachRealtimeLinting(
 
     const errors = engine.lint(model.getValue());
 
-    // Push syntax errors as Error-severity markers (red squigglies) under the
-    // SAME owner the rest of the app uses.
+    // Push syntax errors as Error-severity markers (red squigglies) under a
+    // dedicated owner so they don't clobber backend-diagnostics markers.
     monacoInstance.editor.setModelMarkers(
       model,
       FALKOR_MARKER_OWNER,

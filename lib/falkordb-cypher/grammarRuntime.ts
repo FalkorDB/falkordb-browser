@@ -6,7 +6,7 @@
 // exposes GRAMMAR_AVAILABLE. Every consumer guards on this flag so the engine
 // degrades gracefully to a no-op when the grammar is absent — the editor never
 // crashes and existing autocomplete is untouched. Drop the real
-// CypherLexer.js / CypherParser.js into ./generated and the engine lights up.
+// CypherLexer.ts / CypherParser.ts artifacts into ./generated and the engine lights up.
 // ---------------------------------------------------------------------------
 
 import { CypherLexer } from "./generated/CypherLexer";

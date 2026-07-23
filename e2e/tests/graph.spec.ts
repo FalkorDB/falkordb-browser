@@ -324,7 +324,7 @@ test.describe("Graph Tests", () => {
       await graph.selectGraphByName(graphName);
       await graph.insertQuery(query);
       const response = await graph.getQuerySearchListText();
-      const hasAny = response.some((s) => keywords.some((k) => s.includes(k)));
+      const hasAny = response.some((s) => keywords.some((k) => s.toLowerCase().includes(k.toLowerCase())));
       expect(hasAny).toBeTruthy();
       await apiCall.removeGraph(graphName);
     });

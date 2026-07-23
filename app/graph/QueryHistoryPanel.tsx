@@ -278,7 +278,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     };
 
     const isTabEnabled = useCallback((tabName: Tab) => {
-        if (tabName === "text") return !!currentQuery?.text;
+        if (tabName === "text") return !!currentQuery;
         if (tabName === "metadata") return !!currentQuery && currentQuery.metadata.length > 0;
         if (tabName === "explain") return !!currentQuery && currentQuery.explain.length > 0;
         return true;
@@ -286,6 +286,14 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
 
     useEffect(() => {
         if (!currentQuery || tab === "profile") return;
+
+        // Keep users on the text tab even when the query is empty so they can type a new query.
+        if (tab === "text") {
+            if (!editorRef.current?.hasTextFocus()) {
+                focusEditorAtEnd();
+            }
+            return;
+        }
 
         const currentValue = currentQuery?.[tab];
 
@@ -299,8 +307,6 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                     focusEditorAtEnd();
                 }
             }
-        } else if (tab === "text" && !editorRef.current?.hasTextFocus()) {
-            focusEditorAtEnd();
         }
     }, [currentQuery, setTab, historyQuery?.query, tab, isTabEnabled]);
 

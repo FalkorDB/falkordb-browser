@@ -12,40 +12,63 @@ import type { UDFEntry } from "./utils.ts";
 // avoids a shorter prefix consuming characters that belong to the full keyword.
 // e.g. "OPTIONAL MATCH" before "OPTIONAL", "IS NOT NULL" before "IS NULL" before "IS".
 //
-// Source: OpenCypher BNF grammar <non-reserved word> list
-// (https://github.com/opencypher/openCypher/blob/master/grammar/openCypher.bnf)
-// extended with FalkorDB-specific clauses (FOREACH).
+// Source: FalkorDB parser keywords in
+// FalkorDB/deps/libcypher-parser/lib/src/parser.leg.
 export const CYPHER_KEYWORDS = [
+  // Statement options
+  "CYPHER",
+  "PROFILE",
+  "EXPLAIN",
+  // Query hints
+  "USING PERIODIC COMMIT",
+  // CSV import
+  "LOAD CSV WITH HEADERS",
+  "LOAD CSV",
+  "WITH HEADERS",
+  "FIELDTERMINATOR",
+  "FROM",
   // Reading clauses
+  "START",
   "OPTIONAL MATCH",
   "MATCH",
-  "OPTIONAL",
   "WHERE",
   "RETURN",
   "DISTINCT",
   "ORDER BY",
-  "ORDER",
-  "BY",
   "SKIP",
-  "OFFSET",   // openCypher synonym for SKIP
   "LIMIT",
   // Combining / flow clauses
   "WITH",
   "UNION ALL",
   "UNION",
   "UNWIND",
-  "FOREACH",  // FalkorDB extension (not in openCypher BNF)
+  "FOREACH",
+  // Planner hints
+  "USING INDEX",
+  "USING JOIN ON",
+  "USING SCAN",
   // Write clauses
+  "CREATE UNIQUE",
   "CREATE",
   "MERGE",
   "ON CREATE SET",
   "ON MATCH SET",
+  "ON CREATE",
+  "ON MATCH",
   "ON",
   "DELETE",
   "DETACH DELETE",
-  "DETACH",
   "SET",
   "REMOVE",
+  // Schema commands
+  "CREATE CONSTRAINT ON",
+  "CREATE INDEX ON",
+  "CREATE INDEX FOR",
+  "DROP CONSTRAINT ON",
+  "DROP INDEX ON",
+  "DROP INDEX FOR",
+  "ASSERT",
+  "IS UNIQUE",
   // Procedural
   "CALL",
   "YIELD",
@@ -57,26 +80,28 @@ export const CYPHER_KEYWORDS = [
   // Predicate keywords (multi-word before single-word prefix)
   "IS NOT NULL",
   "IS NULL",
-  "IS",
   "IN",
   "CONTAINS",
   "STARTS WITH",
-  "STARTS",
   "ENDS WITH",
-  "ENDS",
   // CASE expression
   "CASE",
   "WHEN",
   "THEN",
   "ELSE",
   "END",
+  // List/predicate expressions
+  "FILTER",
+  "EXTRACT",
+  "REDUCE",
+  "ALL",
+  "ANY",
+  "SINGLE",
+  "NONE",
   // Literal keywords
   "NULL",
   "TRUE",
   "FALSE",
-  "NAN",       // openCypher numeric literal
-  "INF",       // openCypher numeric literal
-  "INFINITY",  // openCypher numeric literal
   // Sort direction
   "ASC",
   "ASCENDING",
@@ -84,9 +109,6 @@ export const CYPHER_KEYWORDS = [
   "DESCENDING",
   // Aliasing
   "AS",
-  // Path keywords (from openCypher BNF)
-  "PATH",
-  "PATHS",
 ];
 
 // Built-in functions derived from FalkorDB's src/arithmetic/builtin_funcs.gperf

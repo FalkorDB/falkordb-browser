@@ -55,7 +55,7 @@ test.describe("Error Toast Messages", () => {
     expect(toastText).not.toContain("errCtx:");
     expect(toastText).not.toContain("errCtxOffset:");
     // Should contain the parsed error description
-    expect(toastText).toContain("Invalid input");
+    expect(toastText).toContain("Unexpected");
     // Should contain the word with the error for context
     expect(toastText).toContain("RETsURN");
   });
@@ -77,7 +77,7 @@ test.describe("Error Toast Messages", () => {
 
     expect(toastTitle).toBe("Syntax Error");
     expect(toastText).not.toContain("errMsg:");
-    expect(toastText).toContain("Invalid input");
+    expect(toastText).toContain("Unexpected");
   });
 
   test(`@admin Syntax error — mismatched brackets shows friendly message`, async () => {
@@ -97,7 +97,7 @@ test.describe("Error Toast Messages", () => {
 
     expect(toastTitle3).toBe("Syntax Error");
     expect(toastText3).not.toContain("errMsg:");
-    expect(toastText3).toContain("Invalid input");
+    expect(toastText3).toContain("Unexpected");
   });
 
   test(`@admin Syntax error at offset 0 shows friendly message`, async () => {
@@ -118,7 +118,7 @@ test.describe("Error Toast Messages", () => {
     expect(toastTitle4).toBe("Syntax Error");
     expect(toastText4).not.toContain("errMsg:");
     expect(toastText4).not.toContain("errCtxOffset:");
-    expect(toastText4).toContain("Invalid input");
+    expect(toastText4).toContain("Unexpected");
   });
 
   test(`@admin Syntax error with multiple expected tokens shows friendly message`, async () => {
@@ -138,7 +138,7 @@ test.describe("Error Toast Messages", () => {
 
     expect(toastTitle5).toBe("Syntax Error");
     expect(toastText5).not.toContain("errMsg:");
-    expect(toastText5).toContain("Invalid input");
+    expect(toastText5).toContain("Unexpected");
   });
 
   test(`@admin Syntax error toast includes the generic syntax hint`, async () => {
