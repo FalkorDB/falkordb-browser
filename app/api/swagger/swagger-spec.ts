@@ -540,6 +540,19 @@ const swaggerSpec = {
                         type: "string"
                       },
                       description: "Array of graph names"
+                    },
+                    graphs: {
+                      type: "array",
+                      description: "Graph entries with status and metrics",
+                      items: {
+                        type: "object",
+                        properties: {
+                          name: { type: "string", example: "social_network" },
+                          type: { type: "string", enum: ["active", "stub"], example: "active" },
+                          nodes: { type: ["integer", "null"], example: 1234 },
+                          edges: { type: ["integer", "null"], example: 5678 }
+                        }
+                      }
                     }
                   }
                 }

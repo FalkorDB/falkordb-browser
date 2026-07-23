@@ -15,6 +15,12 @@ export interface RemoveGraphResponse {
 
 export interface GetGraphsResponse {
   opts: string[];
+  graphs?: {
+    name: string;
+    type: "active" | "stub";
+    nodes: number | null;
+    edges: number | null;
+  }[];
 }
 
 export interface DuplicateGraphresponse {

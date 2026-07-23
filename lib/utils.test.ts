@@ -1,6 +1,6 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { createAbortError, getConnectionEpoch, getMetaStats, getSSEGraphResult, isAbortError, securedFetch, setActiveConnectionIdGlobal } from "./utils.ts";
+import { createAbortError, fetchOptions, getConnectionEpoch, getMetaStats, getSSEGraphResult, isAbortError, securedFetch, setActiveConnectionIdGlobal } from "./utils.ts";
 
 const noopToast = () => {};
 const noopIndicator = () => {};
@@ -32,6 +32,45 @@ describe("API URL normalization", () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+
+  describe("fetchOptions", () => {
+    it("returns graph metadata from /api/graph when present", async () => {
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = (async () =>
+        new Response(JSON.stringify({
+          opts: ["g1", "g2"],
+          graphs: [{ name: "g1", type: "active", nodes: 1, edges: 2 }],
+        }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+
+      try {
+        const result = await fetchOptions(noopToast, noopIndicator, "online");
+        assert.deepEqual(result, {
+          opts: ["g1", "g2"],
+          graphs: [{ name: "g1", type: "active", nodes: 1, edges: 2 }],
+          autoSelect: null,
+        });
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    it("falls back to active graph entries when metadata is missing", async () => {
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = (async () =>
+        new Response(JSON.stringify({ opts: ["solo"] }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+
+      try {
+        const result = await fetchOptions(noopToast, noopIndicator, "online");
+        assert.deepEqual(result, {
+          opts: ["solo"],
+          graphs: [{ name: "solo", type: "active", nodes: null, edges: null }],
+          autoSelect: "solo",
+        });
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
   });
 
   it("normalizes relative EventSource URLs to root-relative paths", async () => {

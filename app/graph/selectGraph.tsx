@@ -3,7 +3,7 @@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { fetchOptions, getActiveConnectionIdGlobal, getConnectionEpoch, getMemoryUsage, getSSEGraphResult, prepareArg, Row, securedFetch } from "@/lib/utils";
+import { fetchOptions, getActiveConnectionIdGlobal, getConnectionEpoch, getMemoryUsage, getSSEGraphResult, GraphListEntry, prepareArg, Row, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
 import { ChevronDown, ChevronUp, Loader2, Settings, X } from "lucide-react";
@@ -28,6 +28,9 @@ interface Props {
     setGraph: (graph: Graph) => void
 }
 
+const formatCount = (value: number | null) => (value == null ? "N/A" : Number(value).toLocaleString());
+const formatGraphType = (type: GraphListEntry["type"]) => (type === "stub" ? "Stub" : "Active");
+
 /**
  * Renders a selectable and manageable list of Graph entities with creation, export, duplicate and delete controls.
  *
@@ -42,6 +45,7 @@ interface Props {
  */
 export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, setGraph }: Props) {
     const safeOptions = useMemo(() => options ?? [], [options]);
+    const [graphEntriesByName, setGraphEntriesByName] = useState<Record<string, GraphListEntry>>({});
 
     const { indicator, setIndicator } = useContext(IndicatorContext);
     const { isReadOnly } = useContext(ConnectionContext);
@@ -69,6 +73,21 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const { size: manageSize, onResize: onManageResize } = useResizableSize("manageGraphs-size", 750, 493, 400, 300);
 
+    const getGraphEntry = useCallback((name: string): GraphListEntry => graphEntriesByName[name] ?? {
+        name,
+        type: "active",
+        nodes: null,
+        edges: null
+    }, [graphEntriesByName]);
+
+    const dropdownItems = useMemo(() => safeOptions.map((opt) => {
+        const entry = getGraphEntry(opt);
+        return {
+            text: opt,
+            details: `Type: ${formatGraphType(entry.type)} | Nodes: ${formatCount(entry.nodes)} | Edges: ${formatCount(entry.edges)}`
+        };
+    }), [safeOptions, getGraphEntry]);
+
     useEffect(() => {
         setOpen(false);
     }, [selectedValue]);
@@ -88,6 +107,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         const res = await fetchOptions(gToast, gInd, indicator, cid);
         if (!isCurrent() || !res) return;
         setOptions(res.opts);
+        setGraphEntriesByName(Object.fromEntries(res.graphs.map((entry) => [entry.name, entry])));
         if (res.autoSelect) setSelectedValue(res.autoSelect);
     }, [toast, setIndicator, indicator, setSelectedValue, setOptions]);
 
@@ -160,6 +180,13 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         if (result.ok) {
             const newOptions = safeOptions.map((opt) => (opt === optionName ? option : opt));
             setOptions!(newOptions);
+            setGraphEntriesByName((prev) => {
+                const sourceEntry = prev[optionName] ?? { name: optionName, type: "active" as const, nodes: null, edges: null };
+                const next = { ...prev };
+                delete next[optionName];
+                next[option] = { ...sourceEntry, name: option };
+                return next;
+            });
 
             if (setSelectedValue && optionName === selectedValue) setSelectedValue(option);
 
@@ -168,16 +195,28 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 const baseCell = sessionRole === "Admin"
                     ? { value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" as const }
                     : { value: opt, type: "readonly" as const };
+                const graphEntry = getGraphEntry(opt);
 
                 const cells: Row["cells"] = [baseCell];
+                cells.push({ value: formatGraphType(graphEntry.type), type: "readonly" });
 
                 if (showMemoryUsage) {
-                    cells.push({ loadCell: loadMemory(opt), type: "readonly" });
+                    cells.push(graphEntry.type === "active"
+                        ? { loadCell: loadMemory(opt), type: "readonly" }
+                        : { value: "N/A", type: "readonly" });
                 }
 
                 cells.push(
-                    { loadCell: loadNodesCount(opt), type: "readonly" },
-                    { loadCell: loadEdgesCount(opt), type: "readonly" }
+                    graphEntry.nodes != null
+                        ? { value: formatCount(graphEntry.nodes), type: "readonly" }
+                        : graphEntry.type === "stub"
+                            ? { value: "N/A", type: "readonly" }
+                            : { loadCell: loadNodesCount(opt), type: "readonly" },
+                    graphEntry.edges != null
+                        ? { value: formatCount(graphEntry.edges), type: "readonly" }
+                        : graphEntry.type === "stub"
+                            ? { value: "N/A", type: "readonly" }
+                            : { loadCell: loadEdgesCount(opt), type: "readonly" }
                 );
 
                 return {
@@ -189,23 +228,35 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         }
 
         return result.ok;
-    }, [toast, setIndicator, safeOptions, setOptions, setSelectedValue, selectedValue, sessionRole, showMemoryUsage, loadNodesCount, loadEdgesCount, loadMemory]);
+    }, [toast, setIndicator, safeOptions, setOptions, setSelectedValue, selectedValue, sessionRole, showMemoryUsage, loadNodesCount, loadEdgesCount, loadMemory, getGraphEntry]);
 
     const handleSetRows = useCallback((opts: string[]) => {
         setRows(opts.map((opt) => {
             const baseCell = sessionRole === "Admin"
                 ? { value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" as const }
                 : { value: opt, type: "readonly" as const };
+            const graphEntry = getGraphEntry(opt);
 
             const cells: Row["cells"] = [baseCell];
+            cells.push({ value: formatGraphType(graphEntry.type), type: "readonly" });
 
             if (showMemoryUsage) {
-                cells.push({ loadCell: loadMemory(opt), type: "readonly" });
+                cells.push(graphEntry.type === "active"
+                    ? { loadCell: loadMemory(opt), type: "readonly" }
+                    : { value: "N/A", type: "readonly" });
             }
 
             cells.push(
-                { loadCell: loadNodesCount(opt), type: "readonly" },
-                { loadCell: loadEdgesCount(opt), type: "readonly" }
+                graphEntry.nodes != null
+                    ? { value: formatCount(graphEntry.nodes), type: "readonly" }
+                    : graphEntry.type === "stub"
+                        ? { value: "N/A", type: "readonly" }
+                        : { loadCell: loadNodesCount(opt), type: "readonly" },
+                graphEntry.edges != null
+                    ? { value: formatCount(graphEntry.edges), type: "readonly" }
+                    : graphEntry.type === "stub"
+                        ? { value: "N/A", type: "readonly" }
+                        : { loadCell: loadEdgesCount(opt), type: "readonly" }
             );
 
             return {
@@ -214,7 +265,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 cells
             };
         }));
-    }, [sessionRole, handleSetOption, loadMemory, loadNodesCount, loadEdgesCount, showMemoryUsage, isReadOnly]);
+    }, [sessionRole, handleSetOption, loadMemory, loadNodesCount, loadEdgesCount, showMemoryUsage, isReadOnly, getGraphEntry]);
 
     useEffect(() => {
         if (!openMenage) {
@@ -285,15 +336,19 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 >
                     <PaginationList
                         className="basis-0 grow min-h-fit p-0"
-                        list={safeOptions}
+                        list={dropdownItems}
                         onClick={handleClick}
                         dataTestId="selectGraph"
                         label="Graph"
                         afterSearchCallback={() => { }}
-                        isSelected={(value) => selectedValue === value}
+                        isSelected={(value) => selectedValue === value.text}
                         isLoading={isLoading}
                         searchRef={inputRef}
-                    />
+                    >
+                        <div className="w-full text-xs text-foreground/70">
+                            Total Graphs: {safeOptions.length}
+                        </div>
+                    </PaginationList>
                     <div className="flex gap-2">
                         <Button
                             className="w-fit px-2 py-1 text-xs"
@@ -353,6 +408,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                 entityName="Graph"
                                 headers={[
                                     "Name",
+                                    { name: "Type", width: "12%" },
                                     ...(showMemoryUsage ? [{ name: "Memory Usage", width: "20%" }] : []),
                                     { name: "Nodes #", width: "10%" },
                                     { name: "Edges #", width: "10%" }

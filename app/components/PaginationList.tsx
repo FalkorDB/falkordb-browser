@@ -8,7 +8,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import Button from "./ui/Button";
 import Input from "./ui/Input";
 
-type Item = string | Query;
+export type PaginationListDetailsItem = {
+    text: string;
+    details?: string;
+    detailsTooltip?: string;
+};
+
+type Item = string | Query | PaginationListDetailsItem;
 
 type ElementItem = {
     content: React.ReactNode;
@@ -127,6 +133,8 @@ const getQueryElement = (item: Query) => {
         </div>
     );
 };
+
+const isQuery = (item: Item): item is Query => typeof item !== "string" && "metadata" in item && Array.isArray(item.metadata);
 
 interface Props<T extends Item> {
     list: T[]
@@ -275,29 +283,31 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                         const deleteSelected = isDeleteSelected ? isDeleteSelected(item) : false;
                         const hover = hoverIndex === index;
                         const isString = typeof item === "string";
+                        const queryItem = isQuery(item) ? item : null;
+                        const detailsItem: PaginationListDetailsItem | null = !isString && !queryItem ? item : null;
                         const text = isString ? item : item.text;
                         const queryText = <p data-testid={`${dataTestId}${text}Text`} className={cn("truncate w-full text-left", getItemClassName(selected, deleteSelected, hover))}>{text}</p>;
 
-                        const isFav = !isString && item.fav;
+                        const isFav = queryItem?.fav;
 
                         const content = (
                             <>
                                 {
-                                    !isString && (item.status || item.elementsCount || item.timestamp || item.graphName || getExecutionTime(item.metadata)) &&
+                                    queryItem && (queryItem.status || queryItem.elementsCount || queryItem.timestamp || queryItem.graphName || getExecutionTime(queryItem.metadata)) &&
                                     <div className="w-full flex justify-between text-xs">
-                                        {getQueryElement(item)}
-                                        {!isString && onToggleFav && (
+                                        {getQueryElement(queryItem)}
+                                        {onToggleFav && (
                                             <div
                                                 className="flex items-center gap-1 justify-end overflow-hidden whitespace-nowrap"
                                             >
                                                 {
-                                                    item.name &&
+                                                    queryItem.name &&
                                                     <Tooltip>
                                                         <TooltipTrigger asChild>
-                                                            <p className="text-fav font-medium truncate">{item.name}</p>
+                                                            <p className="text-fav font-medium truncate">{queryItem.name}</p>
                                                         </TooltipTrigger>
                                                         <TooltipContent>
-                                                            Favorite name: {item.name}
+                                                            Favorite name: {queryItem.name}
                                                         </TooltipContent>
                                                     </Tooltip>
                                                 }
@@ -307,9 +317,9 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         if (isFav) {
-                                                            onToggleFav(item);
+                                                            onToggleFav(queryItem);
                                                         } else {
-                                                            setFavDialogItem(item);
+                                                            setFavDialogItem(queryItem);
                                                             setFavName("");
                                                         }
                                                     }}
@@ -322,6 +332,12 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                                                 </Button>
                                             </div>
                                         )}
+                                    </div>
+                                }
+                                {
+                                    detailsItem?.details &&
+                                    <div className="w-full text-left text-xs text-foreground/60 truncate" title={detailsItem.detailsTooltip || detailsItem.details}>
+                                        {detailsItem.details}
                                     </div>
                                 }
                                 {
