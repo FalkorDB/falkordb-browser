@@ -35,3 +35,9 @@ updates:
       - dependency-name: "eslint"
         versions: [">=10.0.0"]
 
+      # Monaco 0.56.x worker entrypoint changes are incompatible with this
+      # Turbopack setup; keep Dependabot from reopening noisy bump PRs until
+      # the worker-resolution migration is completed.
+      - dependency-name: "monaco-editor"
+        versions: ["0.56.x"]
+

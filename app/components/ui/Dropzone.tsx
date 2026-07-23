@@ -40,6 +40,7 @@ function Dropzone({ title = "Upload File", filesCount = false, className = "", w
         // if anything is rejected, treat the whole drop as rejected.
         if (fileRejections.length > 0) {
             setFiles([]);
+            onFileDrop([]);
             return;
         }
 
