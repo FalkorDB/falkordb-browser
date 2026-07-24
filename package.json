@@ -18,7 +18,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1090.0",
+    "@aws-sdk/client-s3": "^3.1094.0",
     "@aws-sdk/lib-storage": "^3.1091.0",
     "@aws-sdk/s3-request-presigner": "^3.1091.0",
     "@falkordb/canvas": "^0.2.5",
