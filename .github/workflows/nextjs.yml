@@ -134,7 +134,7 @@ jobs:
           scanners: 'vuln'
           vuln-type: 'os,library'
           severity: 'HIGH,CRITICAL'
-          version: 'v0.69.2'
+          version: 'v0.72.0'
 
       - name: Check scan outcome
         id: check-sarif
@@ -169,6 +169,7 @@ jobs:
           scanners: 'vuln'
           vuln-type: 'os,library'
           severity: 'HIGH,CRITICAL'
+          version: 'v0.72.0'
           skip-setup-trivy: true
 
       - name: Comment PR with Trivy results
