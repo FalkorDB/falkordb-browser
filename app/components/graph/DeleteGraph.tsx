@@ -1,6 +1,6 @@
 import { useToast } from "@/components/ui/use-toast";
 import { getActiveConnectionIdGlobal, getConnectionEpoch, prepareArg, securedFetch, Row } from "@/lib/utils";
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useState, useMemo } from "react";
 import { Graph } from "@/app/api/graph/model";
 import DialogComponent from "../DialogComponent";
 import Button from "../ui/Button";
@@ -33,6 +33,8 @@ export default function DeleteGraph({
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const { indicator, setIndicator } = useContext(IndicatorContext);
+
+  const selectedGraphs = useMemo(() => rows.filter(row => row.checked), [rows]);
 
   useEffect(() => {
     if (!open && closeManage) {
@@ -105,12 +107,12 @@ export default function DeleteGraph({
           className="p-1 text-xs"
           data-testid="deleteGraph"
           variant="Delete"
-          disabled={rows.filter(opt => opt.checked).length === 0}
+          disabled={selectedGraphs.length === 0}
           label="Delete"
           title="Confirm the deletion of the selected graph(s)"
         />
       }
-      description={`Are you sure you want to delete the selected graph(s)? (${rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string).join(", ")})`}
+      description={`Are you sure you want to delete the selected graph(s)? (${selectedGraphs.map(opt => opt.cells[0].value as string).join(", ")})`}
     >
       <div className="flex justify-end gap-2">
         <Button
@@ -118,7 +120,8 @@ export default function DeleteGraph({
           indicator={indicator}
           variant="Delete"
           label="Delete Graph"
-          onClick={() => handleDelete(rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string))}
+          disabled={selectedGraphs.length === 0}
+          onClick={() => handleDelete(selectedGraphs.map(opt => opt.cells[0].value as string))}
           isLoading={isLoading}
         />
         <CloseDialog

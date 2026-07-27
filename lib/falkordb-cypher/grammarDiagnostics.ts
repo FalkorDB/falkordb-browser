@@ -71,8 +71,9 @@ export function grammarErrorsToDiagnostics(query: string, errors: FalkorSyntaxEr
     const { startColumn, endColumn } = refineRange(lineText, e.startColumn, e.endColumn);
 
     const message = prettifyGrammarMessage(e.message);
-    // Best-effort "Did you mean…?" — reuses the same suggestion engine the
-    // backend errors use, so keyword/function typos get a concrete hint + fix.
+    // Best-effort "Did you mean…?" — reuses the same suggestion engine as
+    // backend/runtime diagnostics, but many raw ANTLR syntax-error formats do
+    // not map to it and will correctly fall back to the generic syntax hint.
     const suggestionHint = suggestForError(e.message, { query });
     const suggestion = suggestionNameForError(e.message, { query });
 

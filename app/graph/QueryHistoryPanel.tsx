@@ -180,6 +180,15 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }), []);
 
+    // Monaco tokenization is global per language id. If we pass through
+    // monarchTokensProvider from the main editor config here, mounting this
+    // history editor can clobber the main editor tokenizer registration.
+    const historyEditorLanguageConfig = useMemo((): LanguageConfig => {
+        if (!sharedLanguageConfig) return historyLanguageConfig;
+        const { monarchTokensProvider: _monarchTokensProvider, ...safeConfig } = sharedLanguageConfig;
+        return safeConfig;
+    }, [sharedLanguageConfig, historyLanguageConfig]);
+
     const afterSearchCallback = useCallback((newFilteredList: Query[]) => {
         const selectedQuery = historyQuery.counter === 0
             ? historyQuery.currentQuery
@@ -616,7 +625,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                                     title={isQueryValid ? "Press Enter to run the query" : "Fix the highlighted syntax errors to run"}
                                     onClick={handleSubmit}
                                     isLoading={isLoading}
-                                    disabled={isQueryLoading || !isQueryValid}
+                                    disabled={isQueryLoading}
                                 />
                                 <label
                                     htmlFor="queryHistoryEditorWrapLines"
@@ -634,7 +643,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                                     className="SofiaSans"
                                     height="100%"
                                     language={CYPHER_LANGUAGE_NAME}
-                                    languageConfig={sharedLanguageConfig ?? historyLanguageConfig}
+                                    languageConfig={historyEditorLanguageConfig}
                                     themeName="selector-theme"
                                     options={{
                                         lineHeight: 22,

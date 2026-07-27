@@ -7,9 +7,9 @@ import LoadUDF from "./LoadUdf";
 import FlushUDFs from "./FlushUdfs";
 import DeleteUDF from "./DeleteUdf";
 
-function LibrarySection({ libraryName, libraryType, functions, isSelected, onSelect, onDelete }: {
+function LibrarySection({ libraryName, libraryFunctionCount, functions, isSelected, onSelect, onDelete }: {
     libraryName: string
-    libraryType: string
+    libraryFunctionCount: string
     functions: string[]
     isSelected: boolean
     onSelect: () => void
@@ -43,16 +43,16 @@ function LibrarySection({ libraryName, libraryType, functions, isSelected, onSel
                     }}
                 >
                     <span className="truncate font-bold">{libraryName}</span>
-                    <span className="text-xs text-muted-foreground ml-auto shrink-0">{libraryType}</span>
+                    <span className="text-xs text-muted-foreground ml-auto shrink-0">{libraryFunctionCount}</span>
                 </button>
                 <DeleteUDF iconSize={iconSize} udfName={libraryName} onDelete={onDelete} />
             </div>
             {open && (
-                <div className="flex flex-col ml-5">
+                <div className="flex flex-col ml-5 overflow-y-auto max-h-32">
                     {functions.map((fn) => (
                         <p
                             key={fn}
-                            className="text-xs py-0.5 px-1 text-muted-foreground truncate"
+                            className="min-h-fit text-xs py-0.5 px-1 text-muted-foreground truncate"
                             title={fn}
                         >
                             {fn}
@@ -109,7 +109,7 @@ export default function UdfPanel() {
     };
 
     return (
-        <div className="relative h-full w-full p-2 flex flex-col gap-4 border-r border-border overflow-auto">
+        <div className="relative h-full w-full p-2 flex flex-col gap-2 border-r border-border overflow-hidden">
             <div className="flex justify-between items-center">
                 <h1 className="text-2xl">UDF Libraries</h1>
                 <Braces size={25} />
@@ -124,14 +124,15 @@ export default function UdfPanel() {
                     }}
                 />
             </div>
-            {udfList.length > 0 && (
-                <div className="flex flex-col gap-2">
                     <h2 className="text-sm font-semibold text-muted-foreground">Libraries</h2>
+            {
+            udfList.length > 0 && (
+                <div className="basis-0 grow flex flex-col gap-2 overflow-y-auto">
                     {udfList.map(([, libraryName, , functions]) => (
                         <LibrarySection
                             key={libraryName}
                             libraryName={libraryName}
-                            libraryType={functions.length.toString()}
+                            libraryFunctionCount={functions.length.toString()}
                             functions={functions}
                             isSelected={selectedLib === libraryName}
                             onSelect={() => handleSelectLib(libraryName)}
@@ -146,7 +147,8 @@ export default function UdfPanel() {
                         />
                     ))}
                 </div>
-            )}
+            )
+            }
         </div>
     );
 }
