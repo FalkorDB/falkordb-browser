@@ -27,7 +27,7 @@ const L = CypherLexer as unknown as Record<string, unknown>;
 // ---------------------------------------------------------------------------
 // Parser rules whose presence at the caret implies a *schema* completion.
 // These are the openCypher `oC_`-prefixed rule names. We look each up by name
-// and drop any a grammar build doesn't define, so a grammar variant never
+// and drop any that a grammar build doesn't define, so a grammar variant never
 // crashes.
 // ---------------------------------------------------------------------------
 export const RULE_TO_CATEGORY: ReadonlyMap<number, "label" | "relationshipType" | "propertyKey" | "procedure" | "function" | "variable"> =

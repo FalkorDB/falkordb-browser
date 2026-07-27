@@ -12,71 +12,71 @@ import type { UDFEntry } from "./utils.ts";
 // avoids a shorter prefix consuming characters that belong to the full keyword.
 // e.g. "LOAD CSV WITH HEADERS" before "LOAD CSV", and "ORDER BY" before shorter variants.
 //
-// Source: FalkorDB parser keywords in
-// FalkorDB/deps/libcypher-parser/lib/src/parser.leg.
+// Source of truth: the generated ANTLR grammar tokens in
+// lib/falkordb-cypher/generated/.grammar-src/Cypher.g4.
 export const CYPHER_KEYWORDS = [
-  // Statement options
-  "CYPHER",
-  "PROFILE",
-  "EXPLAIN",
-  // Query hints
-  "USING PERIODIC COMMIT",
-  // CSV import
-  "LOAD CSV WITH HEADERS",
-  "LOAD CSV",
-  "WITH HEADERS",
-  "FIELDTERMINATOR",
-  "FROM",
-  // Reading clauses
-  "START",
+  // Core query clauses
   "OPTIONAL MATCH",
   "MATCH",
-  "WHERE",
+  "UNWIND",
+  "CALL",
+  "YIELD",
+  "WITH",
   "RETURN",
   "DISTINCT",
   "ORDER BY",
   "SKIP",
   "LIMIT",
-  // Combining / flow clauses
-  "WITH",
+  "WHERE",
+
+  // Query composition / updates
   "UNION ALL",
   "UNION",
-  "UNWIND",
   "FOREACH",
-  // Planner hints
-  "USING INDEX",
-  "USING JOIN ON",
-  "USING SCAN",
-  // Write clauses
-  "CREATE UNIQUE",
-  "CREATE",
   "MERGE",
   "ON CREATE SET",
   "ON MATCH SET",
   "ON CREATE",
   "ON MATCH",
   "ON",
-  "DELETE",
-  "DETACH DELETE",
+  "CREATE",
   "SET",
+  "DETACH DELETE",
+  "DETACH",
+  "DELETE",
   "REMOVE",
-  // Schema commands
+
+  // Pattern/path keywords
+  "SHORTESTPATH",
+  "ALLSHORTESTPATHS",
+
+  // Schema / DDL (OpenCypher + FalkorDB grammar extensions)
   "CREATE CONSTRAINT ON",
-  "CREATE INDEX ON",
-  "CREATE INDEX FOR",
   "DROP CONSTRAINT ON",
-  "DROP INDEX ON",
+  "CREATE INDEX FOR",
+  "CREATE INDEX ON",
   "DROP INDEX FOR",
+  "DROP INDEX ON",
+  "FULLTEXT",
+  "INDEX",
+  "CONSTRAINT",
   "ASSERT",
-  "IS UNIQUE",
-  // Procedural
-  "CALL",
-  "YIELD",
+  "REQUIRE",
+  "UNIQUE",
+  "MANDATORY",
+  "SCALAR",
+  "ADD",
+  "DROP",
+  "DO",
+  "FOR",
+  "OF",
+
   // Boolean / logical operators
   "NOT",
   "AND",
   "OR",
   "XOR",
+
   // Predicate keywords (multi-word before single-word prefix)
   "IS NOT NULL",
   "IS NULL",
@@ -84,12 +84,15 @@ export const CYPHER_KEYWORDS = [
   "CONTAINS",
   "STARTS WITH",
   "ENDS WITH",
+  "EXISTS",
+
   // CASE expression
   "CASE",
   "WHEN",
   "THEN",
   "ELSE",
   "END",
+
   // List/predicate expressions
   "FILTER",
   "EXTRACT",
@@ -98,15 +101,21 @@ export const CYPHER_KEYWORDS = [
   "ANY",
   "SINGLE",
   "NONE",
+
   // Literal keywords
   "NULL",
   "TRUE",
   "FALSE",
+
   // Sort direction
   "ASC",
   "ASCENDING",
   "DESC",
   "DESCENDING",
+
+  // Misc terminals surfaced by the grammar
+  "COUNT",
+
   // Aliasing
   "AS",
 ];
