@@ -9,8 +9,8 @@
 // CypherLexer.ts / CypherParser.ts artifacts into ./generated and the engine lights up.
 // ---------------------------------------------------------------------------
 
-import { CypherLexer } from "./generated/CypherLexer";
-import { CypherParser } from "./generated/CypherParser";
+import { CypherLexer } from "./generated/CypherLexer.ts";
+import { CypherParser } from "./generated/CypherParser.ts";
 
 export const GRAMMAR_AVAILABLE =
   !(CypherLexer as unknown as { __isStub?: boolean }).__isStub &&

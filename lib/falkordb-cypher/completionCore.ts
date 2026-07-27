@@ -106,6 +106,15 @@ export function collectCandidates(
   const candidates = core.collectCandidates(caretIndex);
 
   const pool = buildCandidatePool(schema);
+  const pooledKeywordsByUpper = new Map<string, FalkorCandidate>();
+  for (const candidate of pool) {
+    if (candidate.kind !== "keyword") continue;
+    const key = candidate.label.toUpperCase();
+    if (!pooledKeywordsByUpper.has(key)) {
+      pooledKeywordsByUpper.set(key, candidate);
+    }
+  }
+
   const results: FalkorCandidate[] = [];
   const seen = new Set<string>();
   const push = (c: FalkorCandidate) => {
@@ -123,7 +132,7 @@ export function collectCandidates(
       if (!SUPPORTED_KEYWORD_LITERALS.has(literal)) continue;
       // Reuse a pooled keyword candidate if one exists (keeps casing/detail),
       // else synthesize one from the grammar literal.
-      const pooled = pool.find((p) => p.kind === "keyword" && p.label.toUpperCase() === literal);
+      const pooled = pooledKeywordsByUpper.get(literal);
       push(pooled ?? { label: literal, insertText: literal, kind: "keyword", detail: "(keyword)" });
     }
   }
