@@ -126,6 +126,7 @@ export type MemoryValue = number | Map<string, MemoryValue>;
 
 export interface LinkStyle {
   color: string;
+  size?: number;
 }
 
 export interface LabelStyle extends LinkStyle {

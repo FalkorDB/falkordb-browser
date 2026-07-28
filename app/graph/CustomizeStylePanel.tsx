@@ -23,16 +23,20 @@ export default function CustomizeStylePanel({ label, labelType, onClose }: Props
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { canvasRef } = useContext(ForceGraphContext);
     const isNodeLabel = labelType === "node";
+    const edgeSizeOptions = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5];
+    const nodeSizeOptions = Array.from({ length: 10 }, (_, i) => (i + 1) / 4 * NODE_SIZE);
 
     // Store original values for comparison and cancel functionality
     const [originalColor] = useState<string>(label.style.color);
-    const [originalSize] = useState((label.style as LabelStyle).size ?? NODE_SIZE);
+    const [originalSize] = useState(
+        (label.style as LabelStyle).size ?? (isNodeLabel ? NODE_SIZE : 1)
+    );
 
     const [selectedColor, setSelectedColor] = useState<string>(
         label.style.color
     );
     const [selectedSize, setSelectedSize] = useState(
-        (label.style as LabelStyle).size ?? NODE_SIZE
+        (label.style as LabelStyle).size ?? (isNodeLabel ? NODE_SIZE : 1)
     );
 
     // RGB Color Picker state
@@ -43,7 +47,7 @@ export default function CustomizeStylePanel({ label, labelType, onClose }: Props
     // Track if there are unsaved changes
     const hasChanges =
         selectedColor !== originalColor
-        || (isNodeLabel && selectedSize !== originalSize);
+        || selectedSize !== originalSize;
 
     const saveStyleToStorage = useCallback((labelName: string, style: LabelStyle) => {
         const storageKey = isNodeLabel ? `labelStyle_${labelName}` : `relationshipStyle_${labelName}`;
@@ -60,15 +64,21 @@ export default function CustomizeStylePanel({ label, labelType, onClose }: Props
             relationshipLabel.style = {
                 ...relationshipLabel.style,
                 color,
+                size,
             };
 
             relationship.style = {
                 ...relationship.style,
                 color,
+                size,
             };
 
             relationship.elements.forEach(link => {
                 link.color = color;
+                link.data = {
+                    ...link.data,
+                    __styleSize: size,
+                };
             });
 
             setRelationships([...graph.Relationships]);
@@ -81,6 +91,10 @@ export default function CustomizeStylePanel({ label, labelType, onClose }: Props
                 graphData.links.forEach(link => {
                     if (link.relationship === label.name) {
                         link.color = color;
+                        link.data = {
+                            ...link.data,
+                            __styleSize: size,
+                        };
                     }
                 });
 
@@ -170,7 +184,7 @@ export default function CustomizeStylePanel({ label, labelType, onClose }: Props
             // Save to localStorage
             saveStyleToStorage(label.name, {
                 color: selectedColor,
-                ...(isNodeLabel ? { size: selectedSize } : {}),
+                size: selectedSize,
             });
         }
 
@@ -339,23 +353,22 @@ export default function CustomizeStylePanel({ label, labelType, onClose }: Props
                 </div>
             </div>
 
-            {isNodeLabel && (
-                <div className="flex flex-col gap-2 overflow-hidden">
-                    <h2 className="text-base font-semibold">Size:</h2>
-                    <div className="flex gap-2 p-2 bg-muted/10 rounded-lg overflow-x-auto">
-                        {/* Size options from 0.25x to 2.5x of NODE_SIZE */}
-                        {Array.from({ length: 10 }, (_, i) => (i + 1) / 4 * NODE_SIZE).map((size) => (
-                            <Tooltip key={size}>
-                                <TooltipTrigger asChild>
-                                    <button
-                                        type="button"
-                                        className={cn(
-                                            "flex items-center justify-center transition-all hover:bg-muted rounded-md",
-                                            selectedSize === size && "bg-muted ring-2 ring-foreground"
-                                        )}
-                                        onClick={() => handleSizeSelect(size)}
-                                        aria-label={`Select size ${size}`}
-                                    >
+            <div className="flex flex-col gap-2 overflow-hidden">
+                <h2 className="text-base font-semibold">Size:</h2>
+                <div className="flex gap-2 p-2 bg-muted/10 rounded-lg overflow-x-auto">
+                    {(isNodeLabel ? nodeSizeOptions : edgeSizeOptions).map((size) => (
+                        <Tooltip key={size}>
+                            <TooltipTrigger asChild>
+                                <button
+                                    type="button"
+                                    className={cn(
+                                        "flex items-center justify-center transition-all hover:bg-muted rounded-md",
+                                        selectedSize === size && "bg-muted ring-2 ring-foreground"
+                                    )}
+                                    onClick={() => handleSizeSelect(size)}
+                                    aria-label={`Select size ${size}`}
+                                >
+                                    {isNodeLabel ? (
                                         <div
                                             className="rounded-full"
                                             style={{
@@ -364,16 +377,32 @@ export default function CustomizeStylePanel({ label, labelType, onClose }: Props
                                                 height: `${size * 4}px`,
                                             }}
                                         />
-                                    </button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    {(size / NODE_SIZE).toFixed(2)}x
-                                </TooltipContent>
-                            </Tooltip>
-                        ))}
-                    </div>
+                                    ) : (
+                                        <svg width={Math.max(28, size * 28)} height="16" viewBox={`0 0 ${Math.max(28, size * 28)} 16`}>
+                                            <line
+                                                x1="2"
+                                                y1="8"
+                                                x2={Math.max(28, size * 28) - 9}
+                                                y2="8"
+                                                stroke={selectedColor}
+                                                strokeWidth={Math.max(1, size * 2)}
+                                                strokeLinecap="round"
+                                            />
+                                            <polygon
+                                                points={`${Math.max(28, size * 28) - 9},4 ${Math.max(28, size * 28) - 9},12 ${Math.max(28, size * 28) - 2},8`}
+                                                fill={selectedColor}
+                                            />
+                                        </svg>
+                                    )}
+                                </button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                {isNodeLabel ? (size / NODE_SIZE).toFixed(2) : size.toFixed(2)}x
+                            </TooltipContent>
+                        </Tooltip>
+                    ))}
                 </div>
-            )}
+            </div>
 
             {/* Sticky Save/Cancel Buttons - Only show when there are changes */}
             {

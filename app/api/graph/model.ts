@@ -67,8 +67,8 @@ export function loadRelationshipStyle(relationship: Relationship | InfoRelations
 
   if (savedStyle) {
     try {
-      const { color } = JSON.parse(savedStyle);
-      relationship.style = { color };
+      const { color, size } = JSON.parse(savedStyle);
+      relationship.style = { color, size };
     } catch (e) {
       // Ignore invalid JSON
     }
@@ -651,7 +651,9 @@ export class Graph {
           expand: false,
           collapsed,
           visible: true,
-          data: {},
+          data: {
+            __styleSize: relation.style.size ?? 1,
+          },
         };
       } else {
         let source = this.nodesMap.get(cell.sourceId);
@@ -708,7 +710,9 @@ export class Graph {
           expand: false,
           collapsed,
           visible: true,
-          data: {},
+          data: {
+            __styleSize: relation.style.size ?? 1,
+          },
         };
       }
 

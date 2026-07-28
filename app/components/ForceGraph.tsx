@@ -12,6 +12,10 @@ import { Graph } from "../api/graph/model";
 import { BrowserSettingsContext, IndicatorContext, ConnectionContext, ForceGraphContext } from "./provider";
 
 const DOUBLE_CLICK_MS = 300;
+const EDGE_WIDTH_BASE = 1;
+const EDGE_ARROW_BASE = 8;
+const EDGE_SELECTED_WIDTH = 2;
+const EDGE_SELECTED_ARROW = 16;
 
 interface Props {
     graph: Graph
@@ -57,6 +61,7 @@ export default function ForceGraph({
     // skipped only when data still matches — if React batches a real data refresh
     // into the same render, the references differ and the canvas gets updated.
     const pendingRestoreDataRef = useRef<typeof data | null>(null);
+    const dynamicEdgeStyleRef = useRef({ lineWidth: EDGE_SELECTED_WIDTH, arrowLength: EDGE_SELECTED_ARROW });
 
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>();
     const [canvasLoaded, setCanvasLoaded] = useState(false);
@@ -285,10 +290,31 @@ export default function ForceGraph({
         (!!hoverElement && !('source' in hoverElement) && hoverElement.id === node.id)
         , [selectedElements, hoverElement]);
 
-    const checkIsLinkSelected = useCallback((link: GraphLink) =>
-        selectedElements.some(el => el.id === link.id && 'source' in el) ||
-        (!!hoverElement && 'source' in hoverElement && hoverElement.id === link.id)
-        , [selectedElements, hoverElement]);
+    const checkIsLinkSelected = useCallback((link: GraphLink) => {
+        const interactionSelected =
+            selectedElements.some(el => el.id === link.id && 'source' in el)
+            || (!!hoverElement && 'source' in hoverElement && hoverElement.id === link.id);
+
+        const styleScale = typeof link.data?.__styleSize === "number" ? link.data.__styleSize : 1;
+
+        if (interactionSelected) {
+            dynamicEdgeStyleRef.current = {
+                lineWidth: EDGE_SELECTED_WIDTH * styleScale,
+                arrowLength: EDGE_SELECTED_ARROW * styleScale,
+            };
+            return true;
+        }
+
+        if (styleScale !== 1) {
+            dynamicEdgeStyleRef.current = {
+                lineWidth: EDGE_WIDTH_BASE * styleScale,
+                arrowLength: EDGE_ARROW_BASE * styleScale,
+            };
+            return true;
+        }
+
+        return false;
+    }, [selectedElements, hoverElement]);
 
     // Dim everything not in the selected/hovered neighbourhood.
     // - Selected nodes: the node itself AND its direct neighbours are undimmed.
@@ -397,6 +423,16 @@ export default function ForceGraph({
         canvasRef.current.setConfig({
             captionsKeys,
             showPropertyKeyPrefix,
+            linkStyle: {
+                lineWidthUnselected: EDGE_WIDTH_BASE,
+                arrowLengthUnselected: EDGE_ARROW_BASE,
+                get lineWidthSelected() {
+                    return dynamicEdgeStyleRef.current.lineWidth;
+                },
+                get arrowLengthSelected() {
+                    return dynamicEdgeStyleRef.current.arrowLength;
+                },
+            },
             isNodeSelected: checkIsNodeSelected,
             isLinkSelected: checkIsLinkSelected,
             isNodeDimmed: checkIsNodeDimmed,
