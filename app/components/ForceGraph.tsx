@@ -61,7 +61,12 @@ export default function ForceGraph({
     // skipped only when data still matches — if React batches a real data refresh
     // into the same render, the references differ and the canvas gets updated.
     const pendingRestoreDataRef = useRef<typeof data | null>(null);
-    const dynamicEdgeStyleRef = useRef({ lineWidth: EDGE_SELECTED_WIDTH, arrowLength: EDGE_SELECTED_ARROW });
+    const dynamicEdgeStyleRef = useRef({
+        lineWidthSelected: EDGE_SELECTED_WIDTH,
+        arrowLengthSelected: EDGE_SELECTED_ARROW,
+        lineWidthUnselected: EDGE_WIDTH_BASE,
+        arrowLengthUnselected: EDGE_ARROW_BASE,
+    });
 
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>();
     const [canvasLoaded, setCanvasLoaded] = useState(false);
@@ -313,23 +318,14 @@ export default function ForceGraph({
 
         const styleScale = getLinkStyleScale(link);
 
-        if (interactionSelected) {
-            dynamicEdgeStyleRef.current = {
-                lineWidth: EDGE_SELECTED_WIDTH * styleScale,
-                arrowLength: EDGE_SELECTED_ARROW * styleScale,
-            };
-            return true;
-        }
+        dynamicEdgeStyleRef.current = {
+            lineWidthSelected: EDGE_SELECTED_WIDTH * styleScale,
+            arrowLengthSelected: EDGE_SELECTED_ARROW * styleScale,
+            lineWidthUnselected: EDGE_WIDTH_BASE * styleScale,
+            arrowLengthUnselected: EDGE_ARROW_BASE * styleScale,
+        };
 
-        if (styleScale !== 1) {
-            dynamicEdgeStyleRef.current = {
-                lineWidth: EDGE_WIDTH_BASE * styleScale,
-                arrowLength: EDGE_ARROW_BASE * styleScale,
-            };
-            return true;
-        }
-
-        return false;
+        return interactionSelected;
     }, [selectedElements, hoverElement, getLinkStyleScale]);
 
     // Dim everything not in the selected/hovered neighbourhood.
@@ -440,13 +436,17 @@ export default function ForceGraph({
             captionsKeys,
             showPropertyKeyPrefix,
             linkStyle: {
-                lineWidthUnselected: EDGE_WIDTH_BASE,
-                arrowLengthUnselected: EDGE_ARROW_BASE,
+                get lineWidthUnselected() {
+                    return dynamicEdgeStyleRef.current.lineWidthUnselected;
+                },
+                get arrowLengthUnselected() {
+                    return dynamicEdgeStyleRef.current.arrowLengthUnselected;
+                },
                 get lineWidthSelected() {
-                    return dynamicEdgeStyleRef.current.lineWidth;
+                    return dynamicEdgeStyleRef.current.lineWidthSelected;
                 },
                 get arrowLengthSelected() {
-                    return dynamicEdgeStyleRef.current.arrowLength;
+                    return dynamicEdgeStyleRef.current.arrowLengthSelected;
                 },
             },
             isNodeSelected: checkIsNodeSelected,
