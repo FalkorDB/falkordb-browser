@@ -12,6 +12,9 @@ import Button from "@/app/components/ui/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { NODE_SIZE } from "@falkordb/canvas";
 
+const EDGE_WIDTH_BASE = 1;
+const EDGE_ARROW_BASE = 8;
+
 interface Props {
     label: InfoLabel | InfoRelationship;
     labelType: "node" | "edge";
@@ -378,20 +381,32 @@ export default function CustomizeStylePanel({ label, labelType, onClose }: Props
                                             }}
                                         />
                                     ) : (
-                                        <svg width={Math.max(28, size * 28)} height="16" viewBox={`0 0 ${Math.max(28, size * 28)} 16`}>
-                                            <line
-                                                x1="2"
-                                                y1="8"
-                                                x2={Math.max(28, size * 28) - 9}
-                                                y2="8"
-                                                stroke={selectedColor}
-                                                strokeWidth={Math.max(1, size * 2)}
-                                                strokeLinecap="round"
-                                            />
-                                            <polygon
-                                                points={`${Math.max(28, size * 28) - 9},4 ${Math.max(28, size * 28) - 9},12 ${Math.max(28, size * 28) - 2},8`}
-                                                fill={selectedColor}
-                                            />
+                                        <svg width={Math.max(32, size * 32)} height="16" viewBox={`0 0 ${Math.max(32, size * 32)} 16`}>
+                                            {(() => {
+                                                const previewWidth = Math.max(32, size * 32);
+                                                const arrowLength = EDGE_ARROW_BASE * size;
+                                                const lineEndX = previewWidth - arrowLength - 2;
+                                                const arrowTipX = previewWidth - 2;
+                                                const arrowBaseX = arrowTipX - arrowLength;
+                                                const arrowHalfHeight = Math.max(2, arrowLength / 3.2);
+                                                return (
+                                                    <>
+                                                        <line
+                                                            x1="2"
+                                                            y1="8"
+                                                            x2={lineEndX}
+                                                            y2="8"
+                                                            stroke={selectedColor}
+                                                            strokeWidth={EDGE_WIDTH_BASE * size}
+                                                            strokeLinecap="round"
+                                                        />
+                                                        <polygon
+                                                            points={`${arrowBaseX},${8 - arrowHalfHeight} ${arrowBaseX},${8 + arrowHalfHeight} ${arrowTipX},8`}
+                                                            fill={selectedColor}
+                                                        />
+                                                    </>
+                                                );
+                                            })()}
                                         </svg>
                                     )}
                                 </button>

@@ -290,12 +290,28 @@ export default function ForceGraph({
         (!!hoverElement && !('source' in hoverElement) && hoverElement.id === node.id)
         , [selectedElements, hoverElement]);
 
+    const getLinkStyleScale = useCallback((link: GraphLink) => {
+        const inlineScale = link.data?.__styleSize;
+
+        if (typeof inlineScale === "number" && Number.isFinite(inlineScale) && inlineScale > 0) {
+            return inlineScale;
+        }
+
+        const relationshipScale = graph.RelationshipsMap.get(link.relationship)?.style?.size;
+
+        if (typeof relationshipScale === "number" && Number.isFinite(relationshipScale) && relationshipScale > 0) {
+            return relationshipScale;
+        }
+
+        return 1;
+    }, [graph.RelationshipsMap]);
+
     const checkIsLinkSelected = useCallback((link: GraphLink) => {
         const interactionSelected =
             selectedElements.some(el => el.id === link.id && 'source' in el)
             || (!!hoverElement && 'source' in hoverElement && hoverElement.id === link.id);
 
-        const styleScale = typeof link.data?.__styleSize === "number" ? link.data.__styleSize : 1;
+        const styleScale = getLinkStyleScale(link);
 
         if (interactionSelected) {
             dynamicEdgeStyleRef.current = {
@@ -314,7 +330,7 @@ export default function ForceGraph({
         }
 
         return false;
-    }, [selectedElements, hoverElement]);
+    }, [selectedElements, hoverElement, getLinkStyleScale]);
 
     // Dim everything not in the selected/hovered neighbourhood.
     // - Selected nodes: the node itself AND its direct neighbours are undimmed.
