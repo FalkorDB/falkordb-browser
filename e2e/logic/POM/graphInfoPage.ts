@@ -35,6 +35,10 @@ export default class GraphInfoPage extends GraphPage {
     return this.page.getByTestId(`graphInfo${relationship}Edge`);
   }
 
+  private runRelationshipButton(relationship: string): Locator {
+    return this.page.getByTestId(`runRelationship${relationship}`);
+  }
+
   private get graphInfoButton(): Locator {
     return this.page.getByTestId("graphInfoToggle");
   }
@@ -135,6 +139,12 @@ export default class GraphInfoPage extends GraphPage {
       this.graphInfoEdgeButton(relationship),
       (el) => el.click(),
       `Graph Info Edge Button ${relationship}`
+    );
+    await waitForElementToBeVisible(this.runRelationshipButton(relationship));
+    await interactWhenVisible(
+      this.runRelationshipButton(relationship),
+      (el) => el.click(),
+      `Run Relationship Button ${relationship}`
     );
     await this.waitForCanvasAnimationToEnd();
   }

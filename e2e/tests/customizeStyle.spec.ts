@@ -36,6 +36,19 @@ test.describe("Customize Style Tests", () => {
     await apiCall.removeGraph(graphName);
   });
 
+  test(`@readwrite Validate customize style button is visible for each relationship`, async () => {
+    const graphName = getRandomString("graph");
+    await apiCall.addGraph(graphName);
+    const graph = await browser.createNewPage(CustomizeStylePage, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(graphName);
+    await graph.insertQuery(CREATE_QUERY);
+    await graph.clickRunQuery();
+    await graph.openGraphInfoButton();
+    expect(await graph.isCustomizeStyleEdgeButtonVisible("KNOWS")).toBeTruthy();
+    await apiCall.removeGraph(graphName);
+  });
+
   test(`@readwrite Validate clicking customize style button opens customization panel`, async () => {
     const graphName = getRandomString("graph");
     await apiCall.addGraph(graphName);
@@ -57,6 +70,25 @@ test.describe("Customize Style Tests", () => {
 
     // Verify size section is visible
     expect(await graph.isSizeSectionVisible()).toBeTruthy();
+
+    await apiCall.removeGraph(graphName);
+  });
+
+  test(`@readwrite Validate clicking relationship customize style button opens customization panel`, async () => {
+    const graphName = getRandomString("graph");
+    await apiCall.addGraph(graphName);
+    const graph = await browser.createNewPage(CustomizeStylePage, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(graphName);
+    await graph.insertQuery(CREATE_QUERY);
+    await graph.clickRunQuery();
+    await graph.openGraphInfoButton();
+
+    await graph.clickCustomizeStyleEdgeButton("KNOWS");
+
+    expect(await graph.isPanelVisible()).toBeTruthy();
+    expect(await graph.isColorSectionVisible()).toBeTruthy();
+    expect(await graph.isSizeSectionShown()).toBeFalsy();
 
     await apiCall.removeGraph(graphName);
   });

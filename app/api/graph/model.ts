@@ -59,6 +59,22 @@ export function loadLabelStyle(label: Label | InfoLabel): void {
   }
 }
 
+export function loadRelationshipStyle(relationship: Relationship | InfoRelationship): void {
+  if (typeof window === "undefined") return;
+
+  const storageKey = `relationshipStyle_${relationship.name}`;
+  const savedStyle = getConnectionItem(storageKey);
+
+  if (savedStyle) {
+    try {
+      const { color } = JSON.parse(savedStyle);
+      relationship.style = { color };
+    } catch (e) {
+      // Ignore invalid JSON
+    }
+  }
+}
+
 export class GraphInfo {
   private propertyKeys: string[] | undefined;
 
@@ -233,6 +249,8 @@ export class GraphInfo {
         },
         count: resolvedCount,
       };
+
+      loadRelationshipStyle(r);
 
       this.relationships.set(relationship, r);
       this.colorsCounter += 1;

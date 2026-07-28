@@ -20,6 +20,14 @@ export default class CustomizeStylePage extends GraphInfoPage {
     return this.page.getByText("Customize Style");
   }
 
+  private edgeButton(relationship: string): Locator {
+    return this.page.getByTestId(`graphInfo${relationship}Edge`);
+  }
+
+  private customizeStyleEdgeButton(relationship: string): Locator {
+    return this.page.getByTestId(`customizeStyleEdge${relationship}`);
+  }
+
   private get colorSection(): Locator {
     return this.page.getByText("Color:");
   }
@@ -86,6 +94,31 @@ export default class CustomizeStylePage extends GraphInfoPage {
     );
   }
 
+  async isCustomizeStyleEdgeButtonVisible(relationship: string): Promise<boolean> {
+    await interactWhenVisible(
+      this.edgeButton(relationship),
+      (el) => el.click(),
+      `Relationship Button ${relationship}`
+    );
+    const visible = await waitForElementToBeVisible(this.customizeStyleEdgeButton(relationship));
+    await this.page.keyboard.press("Escape");
+    await waitForElementToNotBeVisible(this.customizeStyleEdgeButton(relationship));
+    return visible;
+  }
+
+  async clickCustomizeStyleEdgeButton(relationship: string): Promise<void> {
+    await interactWhenVisible(
+      this.edgeButton(relationship),
+      (el) => el.click(),
+      `Relationship Button ${relationship}`
+    );
+    await interactWhenVisible(
+      this.customizeStyleEdgeButton(relationship),
+      (el) => el.click(),
+      `Customize Style Edge Button ${relationship}`
+    );
+  }
+
   async isPanelVisible(): Promise<boolean> {
     return waitForElementToBeVisible(this.panelTitle);
   }
@@ -100,6 +133,10 @@ export default class CustomizeStylePage extends GraphInfoPage {
 
   async isSizeSectionVisible(): Promise<boolean> {
     return waitForElementToBeVisible(this.sizeSection);
+  }
+
+  async isSizeSectionShown(): Promise<boolean> {
+    return this.sizeSection.isVisible();
   }
 
   async selectFirstColor(): Promise<void> {

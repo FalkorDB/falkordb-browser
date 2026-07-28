@@ -2,7 +2,7 @@ import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useState 
 import { Loader2, X, Palette, Play, Plus, Network, Search } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger, PopoverClose } from "@/components/ui/popover";
-import { cn, formatName, InfoLabel } from "@/lib/utils";
+import { cn, formatName, InfoLabel, InfoRelationship } from "@/lib/utils";
 import Button from "../components/ui/Button";
 import { BrowserSettingsContext, ConnectionContext, GraphContext, GraphInfoContext, QueryLoadingContext } from "../components/provider";
 import CustomizeStylePanel from "./CustomizeStylePanel";
@@ -10,6 +10,11 @@ import Input from "../components/ui/Input";
 import SelectGraph from "./selectGraph";
 import { Graph } from "../api/graph/model";
 import CreateGraph from "../components/CreateGraph";
+
+type CustomizingLabel = {
+    label: InfoLabel | InfoRelationship;
+    labelType: "node" | "edge";
+};
 
 /** Escape a Cypher identifier by wrapping it in backticks (doubles any internal backticks). */
 function escapeIdentifier(id: string): string {
@@ -22,7 +27,7 @@ function escapeIdentifier(id: string): string {
  * @param onClose - Callback invoked when the panel's close button is clicked
  * @returns The Graph Info panel React element containing graph name, memory usage, node/edge counts, property keys, and query buttons
  */
-export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizingLabel }: { onClose: () => void, customizingLabel: InfoLabel | null, setCustomizingLabel: Dispatch<SetStateAction<InfoLabel | null>> }) {
+export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizingLabel }: { onClose: () => void, customizingLabel: CustomizingLabel | null, setCustomizingLabel: Dispatch<SetStateAction<CustomizingLabel | null>> }) {
     const { graph, runQuery, graphName, handleSetGraphName, graphNames, setGraphNames, setGraph } = useContext(GraphContext);
     const { graphInfoVersion, nodesCount, edgesCount } = useContext(GraphInfoContext);
     const { Labels, Relationships, PropertyKeys, MemoryUsage } = graph.GraphInfo;
@@ -242,7 +247,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                         <Button
                                                             className="w-full justify-start gap-2 px-2 py-1 text-xs hover:bg-secondary rounded-md"
                                                             data-testid={`customizeStyle${name}`}
-                                                            onClick={() => setCustomizingLabel(label)}
+                                                            onClick={() => setCustomizingLabel({ label, labelType: "node" })}
                                                         >
                                                             <Palette size={12} />
                                                             Customize
@@ -313,17 +318,55 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
 
                                     return (
                                         <li key={relationship.name} className="max-w-full">
-                                            <Button
-                                                title={`MATCH p=()-[:${escapeIdentifier(relationship.name)}]-() RETURN p
+                                            <Popover>
+                                                <PopoverTrigger asChild>
+                                                    <Button
+                                                        title={`MATCH p=()-[:${escapeIdentifier(relationship.name)}]-() RETURN p
                                                     #: ${relationship.count.toLocaleString()}`}
-                                                className="h-6 max-w-full px-2 rounded-md flex items-center gap-1.5 bg-secondary text-foreground text-xs hover:bg-secondary/80 transition-colors overflow-hidden border-l-4"
-                                                style={{ borderColor: relationshipColor }}
-                                                data-testid={`graphInfo${relationship.name}Edge`}
-                                                onClick={() => runQuery(`MATCH p=()-[:${escapeIdentifier(relationship.name)}]-() RETURN p`)}
-                                                disabled={isQueryLoading}
-                                            >
-                                                <span className="truncate">{relationship.name}</span>
-                                            </Button>
+                                                        className="h-6 max-w-full px-2 rounded-md flex items-center gap-1.5 bg-secondary text-foreground text-xs hover:bg-secondary/80 transition-colors overflow-hidden border-l-4"
+                                                        style={{ borderColor: relationshipColor }}
+                                                        data-testid={`graphInfo${relationship.name}Edge`}
+                                                    >
+                                                        <span className="truncate">{relationship.name}</span>
+                                                    </Button>
+                                                </PopoverTrigger>
+                                                <PopoverContent
+                                                    className="z-30 w-fit p-1 flex flex-col gap-1"
+                                                    align="start"
+                                                    onInteractOutside={(e) => {
+                                                        if ((e.target as Element)?.closest?.('[data-tutorial-overlay]')) {
+                                                            e.preventDefault();
+                                                        }
+                                                    }}
+                                                    onEscapeKeyDown={(e) => {
+                                                        if ((e.target as Element)?.closest?.('[data-tutorial-overlay]')) {
+                                                            e.preventDefault();
+                                                        }
+                                                    }}
+                                                >
+                                                    <PopoverClose asChild>
+                                                        <Button
+                                                            className="w-full justify-start gap-2 px-2 py-1 text-xs hover:bg-secondary rounded-md"
+                                                            data-testid={`runRelationship${relationship.name}`}
+                                                            onClick={() => runQuery(`MATCH p=()-[:${escapeIdentifier(relationship.name)}]-() RETURN p`)}
+                                                            disabled={isQueryLoading}
+                                                        >
+                                                            <Play size={12} />
+                                                            Run
+                                                        </Button>
+                                                    </PopoverClose>
+                                                    <PopoverClose asChild>
+                                                        <Button
+                                                            className="w-full justify-start gap-2 px-2 py-1 text-xs hover:bg-secondary rounded-md"
+                                                            data-testid={`customizeStyleEdge${relationship.name}`}
+                                                            onClick={() => setCustomizingLabel({ label: relationship, labelType: "edge" })}
+                                                        >
+                                                            <Palette size={12} />
+                                                            Customize
+                                                        </Button>
+                                                    </PopoverClose>
+                                                </PopoverContent>
+                                            </Popover>
                                         </li>
                                     );
                                 })}
@@ -384,7 +427,8 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                     </>
                 ) : (
                     <CustomizeStylePanel
-                        label={customizingLabel}
+                        label={customizingLabel.label}
+                        labelType={customizingLabel.labelType}
                         onClose={() => setCustomizingLabel(null)}
                     />
                 )

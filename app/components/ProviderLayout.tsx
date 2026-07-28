@@ -3,7 +3,7 @@
 import { ReactNode, RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
-import { cn, InfoLabel, Panel } from "@/lib/utils";
+import { cn, InfoLabel, InfoRelationship, Panel } from "@/lib/utils";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import { PanelContext } from "./provider";
@@ -14,6 +14,11 @@ import Tutorial from "./Tutorial";
 const GraphInfoPanel = dynamic(() => import("../graph/graphInfo"), {
   ssr: false,
 });
+
+type CustomizingLabel = {
+  label: InfoLabel | InfoRelationship;
+  labelType: "node" | "edge";
+};
 
 const UdfPanel = dynamic(() => import("../udf/udfPanel"), {
   ssr: false,
@@ -43,7 +48,7 @@ export default function ProviderLayout({
 
   const [panel, setPanel] = useState<Panel>();
   const [isCollapsed, setIsCollapsed] = useState(true);
-  const [customizingLabel, setCustomizingLabel] = useState<InfoLabel | null>(null);
+  const [customizingLabel, setCustomizingLabel] = useState<CustomizingLabel | null>(null);
   const isRestoringSize = useRef(false);
 
   const onPanelResize = useCallback((size: PanelSize) => {
