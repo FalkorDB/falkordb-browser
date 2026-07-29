@@ -4,7 +4,7 @@ import {
   splitCypherStatements,
 } from "../../../../../lib/graphUpload.ts";
 
-type CypherUploadExtension = ".txt" | ".cql" | ".cypher";
+type CypherUploadExtension = ".txt" | ".cypher";
 
 interface ExecuteCypherBatchOptions {
   sourceExtension?: CypherUploadExtension;
@@ -13,7 +13,7 @@ interface ExecuteCypherBatchOptions {
 /**
  * .txt uploads are often copied from docs/issues and may include markdown
  * fences, wrappers, or full-line comments. Strip only obvious non-Cypher
- * lines to make uploads more forgiving without changing trusted .cypher/.cql.
+ * lines to make uploads more forgiving without changing trusted .cypher files.
  *
  * Note: FalkorDB executes Cypher only. This does not add SQL support; it only
  * discards non-Cypher noise in loose text files before Cypher splitting.
@@ -59,6 +59,8 @@ export async function executeCypherBatch(
 
   for (let index = 0; index < statements.length; index += 1) {
     try {
+      // Statements must run sequentially: later statements may depend on the
+      // effects of earlier ones.
       // eslint-disable-next-line no-await-in-loop
       await graph.query(statements[index]);
     } catch (error) {

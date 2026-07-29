@@ -24,7 +24,7 @@ export const runtime = "nodejs";
 // gets a separate, larger cap instead of being uncapped — an uncapped stream
 // would let an authenticated user fill the disk.
 const BINARY_EXTENSIONS = new Set([".dump"]);
-const TEXT_LIKE_EXTENSIONS = new Set([".txt", ".cql", ".cypher"]);
+const TEXT_LIKE_EXTENSIONS = new Set([".txt", ".cypher"]);
 const MAX_DUMP_SIZE = 1024 * 1024 * 1024; // 1 GiB
 
 export async function OPTIONS(request: Request) {

@@ -136,11 +136,6 @@ export const ALLOWED_FILE_TYPES: Record<string, AllowedFileType> = {
     contentType: "text/csv",
     validateContent: isUtf8TextFile,
   },
-  ".cql": {
-    mimeTypes: ["text/plain", "application/octet-stream"],
-    contentType: "text/plain",
-    validateContent: isUtf8TextFile,
-  },
   ".cypher": {
     mimeTypes: ["text/plain", "application/octet-stream"],
     contentType: "text/plain",
