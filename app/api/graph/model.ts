@@ -3,7 +3,7 @@
 /* eslint-disable no-param-reassign */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Data, DataCell, getMetaStats, GraphData, InfoLabel, InfoRelationship, Label, Link, LinkCell, MemoryValue, Node, NodeCell, PathCell, Relationship, ToastFn, Value } from "@/lib/utils";
-import { getConnectionItem } from "@/lib/connection-storage";
+import { getConnectionItem, removeConnectionItem } from "@/lib/connection-storage";
 
 // Color palette for node customization
 export const STYLE_COLORS = [
@@ -43,6 +43,10 @@ export const getLabelWithFewestElements = (labels: Label[]): Label =>
     labels[0]
   );
 
+/** Drop keys whose value is undefined so they don't overwrite existing defaults when spread. */
+const definedOnly = <T extends object>(style: T): Partial<T> =>
+  Object.fromEntries(Object.entries(style).filter(([, v]) => v !== undefined)) as Partial<T>;
+
 export function loadLabelStyle(label: Label | InfoLabel): void {
   if (typeof window === "undefined") return;
 
@@ -52,9 +56,10 @@ export function loadLabelStyle(label: Label | InfoLabel): void {
   if (savedStyle) {
     try {
       const { color, size } = JSON.parse(savedStyle);
-      label.style = { color, size };
+      label.style = { ...label.style, ...definedOnly({ color, size }) };
     } catch (e) {
-      // Ignore invalid JSON
+      // Corrupted entry: drop it so it doesn't fail to parse on every load
+      removeConnectionItem(storageKey);
     }
   }
 }
@@ -68,9 +73,10 @@ export function loadRelationshipStyle(relationship: Relationship | InfoRelations
   if (savedStyle) {
     try {
       const { color, width, fontSize, arrowSize } = JSON.parse(savedStyle);
-      relationship.style = { color, width, fontSize, arrowSize };
+      relationship.style = { ...relationship.style, ...definedOnly({ color, width, fontSize, arrowSize }) };
     } catch (e) {
-      // Ignore invalid JSON
+      // Corrupted entry: drop it so it doesn't fail to parse on every load
+      removeConnectionItem(storageKey);
     }
   }
 }
