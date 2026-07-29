@@ -9,7 +9,7 @@ import DeleteUDF from "./DeleteUdf";
 
 function LibrarySection({ libraryName, libraryFunctionCount, functions, isSelected, onSelect, onDelete }: {
     libraryName: string
-    libraryFunctionCount: string
+    libraryFunctionCount: number
     functions: string[]
     isSelected: boolean
     onSelect: () => void
@@ -132,7 +132,7 @@ export default function UdfPanel() {
                         <LibrarySection
                             key={libraryName}
                             libraryName={libraryName}
-                            libraryFunctionCount={functions.length.toString()}
+                            libraryFunctionCount={functions.length}
                             functions={functions}
                             isSelected={selectedLib === libraryName}
                             onSelect={() => handleSelectLib(libraryName)}

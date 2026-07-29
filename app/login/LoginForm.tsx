@@ -319,6 +319,8 @@ export default function LoginForm({
   };
 
   const onFileDrop = (acceptedFiles: File[]) => {
+    if (acceptedFiles.length === 0) return;
+
     const reader = new FileReader();
 
     reader.onload = () => {

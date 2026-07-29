@@ -5,6 +5,7 @@ import React, { useCallback, useState } from 'react';
 import { Accept, FileRejection, useDropzone } from 'react-dropzone';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
+import { resolveDroppedFiles } from './dropzone-utils';
 
 type TableFile = {
     name: string
@@ -37,20 +38,19 @@ function Dropzone({ title = "Upload File", filesCount = false, className = "", w
 
     const onDrop = useCallback((acceptedFiles: File[], fileRejections: FileRejection[]) => {
         // Keep drop behavior consistent with prior react-dropzone versions:
-        // if anything is rejected, treat the whole drop as rejected.
-        if (fileRejections.length > 0) {
-            setFiles([]);
-            onFileDrop([]);
-            return;
-        }
+        // if anything is rejected, ignore the whole drop and keep the current
+        // selection. Rejection feedback is surfaced through `onDropRejected`,
+        // so `onFileDrop` is only ever called with accepted files.
+        const selected = resolveDroppedFiles(acceptedFiles, fileRejections);
+        if (selected === null) return;
 
-        const newFiles = acceptedFiles.map((file: File) => ({
+        const newFiles = selected.map((file: File) => ({
             name: file.name,
             size: file.size,
             type: file.type,
         }));
         setFiles(newFiles);
-        onFileDrop(acceptedFiles);
+        onFileDrop(selected);
     }, [onFileDrop]);
 
     const { getRootProps, getInputProps } = useDropzone({ onDrop, onDropRejected, disabled, accept, maxFiles });
