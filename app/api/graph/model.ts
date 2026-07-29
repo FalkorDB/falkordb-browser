@@ -43,6 +43,13 @@ export const getLabelWithFewestElements = (labels: Label[]): Label =>
     labels[0]
   );
 
+/** localStorage is untrusted input: keep only values that match the style contract. */
+const validColor = (v: unknown): string | undefined =>
+  typeof v === "string" && v.trim() !== "" ? v : undefined;
+
+const validSize = (v: unknown): number | undefined =>
+  typeof v === "number" && Number.isFinite(v) && v > 0 ? v : undefined;
+
 /** Drop keys whose value is undefined so they don't overwrite existing defaults when spread. */
 const definedOnly = <T extends object>(style: T): Partial<T> =>
   Object.fromEntries(Object.entries(style).filter(([, v]) => v !== undefined)) as Partial<T>;
@@ -56,7 +63,10 @@ export function loadLabelStyle(label: Label | InfoLabel): void {
   if (savedStyle) {
     try {
       const { color, size } = JSON.parse(savedStyle);
-      label.style = { ...label.style, ...definedOnly({ color, size }) };
+      label.style = {
+        ...label.style,
+        ...definedOnly({ color: validColor(color), size: validSize(size) }),
+      };
     } catch (e) {
       // Corrupted entry: drop it so it doesn't fail to parse on every load
       removeConnectionItem(storageKey);
@@ -73,7 +83,15 @@ export function loadRelationshipStyle(relationship: Relationship | InfoRelations
   if (savedStyle) {
     try {
       const { color, width, fontSize, arrowSize } = JSON.parse(savedStyle);
-      relationship.style = { ...relationship.style, ...definedOnly({ color, width, fontSize, arrowSize }) };
+      relationship.style = {
+        ...relationship.style,
+        ...definedOnly({
+          color: validColor(color),
+          width: validSize(width),
+          fontSize: validSize(fontSize),
+          arrowSize: validSize(arrowSize),
+        }),
+      };
     } catch (e) {
       // Corrupted entry: drop it so it doesn't fail to parse on every load
       removeConnectionItem(storageKey);
