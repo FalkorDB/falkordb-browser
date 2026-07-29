@@ -59,6 +59,22 @@ export function loadLabelStyle(label: Label | InfoLabel): void {
   }
 }
 
+export function loadRelationshipStyle(relationship: Relationship | InfoRelationship): void {
+  if (typeof window === "undefined") return;
+
+  const storageKey = `relationshipStyle_${relationship.name}`;
+  const savedStyle = getConnectionItem(storageKey);
+
+  if (savedStyle) {
+    try {
+      const { color, width, fontSize, arrowSize } = JSON.parse(savedStyle);
+      relationship.style = { color, width, fontSize, arrowSize };
+    } catch (e) {
+      // Ignore invalid JSON
+    }
+  }
+}
+
 export class GraphInfo {
   private propertyKeys: string[] | undefined;
 
@@ -233,6 +249,8 @@ export class GraphInfo {
         },
         count: resolvedCount,
       };
+
+      loadRelationshipStyle(r);
 
       this.relationships.set(relationship, r);
       this.colorsCounter += 1;
@@ -630,6 +648,9 @@ export class Graph {
           target: cell.destinationId,
           relationship: cell.relationshipType,
           color: relation.style.color,
+          width: relation.style.width,
+          fontSize: relation.style.fontSize,
+          arrowSize: relation.style.arrowSize,
           expand: false,
           collapsed,
           visible: true,
@@ -687,6 +708,9 @@ export class Graph {
           target: cell.destinationId,
           relationship: cell.relationshipType,
           color: relation.style.color,
+          width: relation.style.width,
+          fontSize: relation.style.fontSize,
+          arrowSize: relation.style.arrowSize,
           expand: false,
           collapsed,
           visible: true,

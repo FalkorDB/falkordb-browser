@@ -3,7 +3,7 @@
 import { ReactNode, RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
-import { cn, InfoLabel, Panel } from "@/lib/utils";
+import { cn, CustomizingItem, Panel } from "@/lib/utils";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import { PanelContext } from "./provider";
@@ -43,7 +43,7 @@ export default function ProviderLayout({
 
   const [panel, setPanel] = useState<Panel>();
   const [isCollapsed, setIsCollapsed] = useState(true);
-  const [customizingLabel, setCustomizingLabel] = useState<InfoLabel | null>(null);
+  const [customizingLabel, setCustomizingLabel] = useState<CustomizingItem | null>(null);
   const isRestoringSize = useRef(false);
 
   const onPanelResize = useCallback((size: PanelSize) => {
