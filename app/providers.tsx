@@ -685,24 +685,37 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   statusRef.current = status;
 
   // GRAPH.STUBS lists the graphs offloaded from memory. It is registered by the
-  // enterprise module only, so callers must gate on `isEnterprise` — the ref
-  // keeps the guard current without re-creating the callback.
-  const isEnterpriseRef = useRef(isEnterprise);
-  isEnterpriseRef.current = isEnterprise;
+  // enterprise module only, so the fetch is gated on `isEnterprise`. The ref
+  // holds the connection the result must still belong to when it resolves, so a
+  // superseded connection can't overwrite the current one's indicators.
+  const activeConnectionIdRef = useRef(activeConnectionId);
+  useEffect(() => { activeConnectionIdRef.current = activeConnectionId; }, [activeConnectionId]);
 
   const refreshOffloadedGraphs = useCallback(async () => {
-    if (!isEnterpriseRef.current) return;
+    if (!isEnterprise) return;
+
+    const connectionId = activeConnectionIdRef.current;
+    const isCurrent = () => activeConnectionIdRef.current === connectionId;
 
     try {
       const result = await fetch("/api/graph/stubs", { method: "GET" });
 
-      if (!result.ok) return;
+      if (!isCurrent()) return;
+
+      if (!result.ok) {
+        setOffloadedGraphs([]);
+        return;
+      }
 
       const { stubs } = (await result.json()) as StubsResponse;
 
+      if (!isCurrent()) return;
+
       setOffloadedGraphs(stubs);
-    } catch { /* ignore */ }
-  }, []);
+    } catch {
+      if (isCurrent()) setOffloadedGraphs([]);
+    }
+  }, [isEnterprise]);
 
   const connectionContext = useMemo(() => ({
     connectionType,
@@ -1112,20 +1125,25 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   useEffect(() => { setFunctionCandidates(udfFunctionNames(udfList)); }, [udfList]);
 
   useEffect(() => {
-    if (status !== "authenticated") return;
+    if (status !== "authenticated") return undefined;
     // Use plain fetch with no X-Connection-Id — the server resolves the
     // connection via session.activeConnectionId from the JWT, which is always
     // correct (set by every connection switch). This avoids the timing race
     // where activeConnectionId is null on page load and the check never fires.
+    let cancelled = false;
+
     (async () => {
       try {
         const result = await fetch("/api/DBVersion", { method: "GET" });
+        if (cancelled) return;
         if (!result.ok) {
           setShowMemoryUsage(false);
           setIsEnterprise(false);
+          setOffloadedGraphs([]);
           return;
         }
         const json = await result.json();
+        if (cancelled) return;
         const [name, version] = json.result || ["", 0];
         setDbVersion(String(version));
         setShowMemoryUsage(name === "graph" && version >= MEMORY_USAGE_VERSION_THRESHOLD);
@@ -1134,6 +1152,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       } catch { /* ignore */ }
     })();
 
+    // Stop a response for the previous connection (or a signed-out session) from
+    // landing on the current one.
+    return () => { cancelled = true; };
   }, [status, activeConnectionId]);
 
   useEffect(() => {

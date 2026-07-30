@@ -11,6 +11,10 @@ describe("isEnterpriseModuleList", () => {
     assert.equal(isEnterpriseModuleList([{ name: "graph" }]), false);
   });
 
+  it("matches the module name case-insensitively", () => {
+    assert.equal(isEnterpriseModuleList([{ name: "FalkorDBE" }]), true);
+  });
+
   it("returns false for an empty module list", () => {
     assert.equal(isEnterpriseModuleList([]), false);
   });

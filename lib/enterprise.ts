@@ -10,7 +10,7 @@
 export const ENTERPRISE_MODULE_NAME = "falkordbe";
 
 export function isEnterpriseModuleList(modules: { name?: string }[]): boolean {
-  return modules.some((module) => module.name === ENTERPRISE_MODULE_NAME);
+  return modules.some((module) => module.name?.toLowerCase() === ENTERPRISE_MODULE_NAME);
 }
 
 export type StubsResponse = {

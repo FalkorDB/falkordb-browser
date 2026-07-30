@@ -584,6 +584,9 @@ const swaggerSpec = {
           "400": {
             description: "Bad request"
           },
+          "401": {
+            description: "Unauthorized"
+          },
           "500": {
             description: "Internal server error"
           }

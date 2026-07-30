@@ -281,7 +281,7 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                         const queryText = (
                             <span className="flex items-center gap-2 w-full min-w-0">
                                 {indicator}
-                                <p data-testid={`${dataTestId}${text}Text`} className={cn("truncate w-full text-left", getItemClassName(selected, deleteSelected, hover))}>{text}</p>
+                                <p data-testid={`${dataTestId}${text}Text`} className={cn("truncate flex-1 min-w-0 text-left", getItemClassName(selected, deleteSelected, hover))}>{text}</p>
                             </span>
                         );
 
