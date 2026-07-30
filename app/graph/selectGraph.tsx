@@ -15,6 +15,7 @@ import ExportGraph from "../components/ExportGraph";
 import DeleteGraph from "../components/graph/DeleteGraph";
 import DuplicateGraph from "../components/graph/DuplicateGraph";
 import UploadGraph from "../components/graph/UploadGraph";
+import GraphLoadIndicator from "../components/graph/GraphLoadIndicator";
 import { Graph } from "../api/graph/model";
 import ResizableBox from "@/components/ui/ResizableBox";
 import { useResizableSize } from "@/lib/useResizableSize";
@@ -44,7 +45,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const safeOptions = useMemo(() => options ?? [], [options]);
 
     const { indicator, setIndicator } = useContext(IndicatorContext);
-    const { isReadOnly } = useContext(ConnectionContext);
+    const { isReadOnly, isEnterprise, offloadedGraphs, refreshOffloadedGraphs } = useContext(ConnectionContext);
     const {
         settings: {
             graphInfo: { showMemoryUsage }
@@ -89,7 +90,10 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         if (!isCurrent() || !res) return;
         setOptions(res.opts);
         if (res.autoSelect) setSelectedValue(res.autoSelect);
-    }, [toast, setIndicator, indicator, setSelectedValue, setOptions]);
+        // Offloaded graphs can change between refreshes, so keep the enterprise
+        // load indicators in sync with the list.
+        refreshOffloadedGraphs();
+    }, [toast, setIndicator, indicator, setSelectedValue, setOptions, refreshOffloadedGraphs]);
 
     const loadMemory = useCallback((opt: string) =>
         async () => {
@@ -244,6 +248,13 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         setOpen(false);
     };
 
+    // Enterprise-only: GRAPH.STUBS reports the graphs offloaded from memory.
+    const renderLoadIndicator = useCallback((name: string) => {
+        if (!isEnterprise) return null;
+
+        return <GraphLoadIndicator offloaded={offloadedGraphs.includes(name)} dataTestId={`graphLoadIndicator${name}`} />;
+    }, [isEnterprise, offloadedGraphs]);
+
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => { setMounted(true); }, []);
@@ -293,6 +304,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         isSelected={(value) => selectedValue === value}
                         isLoading={isLoading}
                         searchRef={inputRef}
+                        itemIndicator={(item) => renderLoadIndicator(item)}
                     />
                     <div className="flex gap-2">
                         <Button
@@ -361,6 +373,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                 setRows={setRows}
                                 inputRef={inputRef}
                                 itemHeight={24}
+                                rowIndicator={renderLoadIndicator}
                             >
                                 {
                                     !isReadOnly &&

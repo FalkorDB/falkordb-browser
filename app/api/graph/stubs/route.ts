@@ -1,14 +1,11 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { getCorsHeaders } from "@/app/api/utils";
-import { isEnterpriseModuleList } from "@/lib/enterprise";
 
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
 
-// eslint-disable-next-line import/prefer-default-export, @typescript-eslint/no-unused-vars
 export async function GET(request: Request) {
   try {
     const session = await getClient(request);
@@ -20,21 +17,9 @@ export async function GET(request: Request) {
     const { client } = session;
 
     try {
-      const result = await (await client.connection).moduleList();
+      const stubs = await client.stubs();
 
-      const data = result.find((arr) => arr.name === "graph");
-
-      if (!data) {
-        return NextResponse.json(
-          { message: "Graph module not found" },
-          { status: 503, headers: getCorsHeaders(request) }
-        );
-      }
-
-      return NextResponse.json(
-        { result: [data?.name, data?.ver], enterprise: isEnterpriseModuleList(result) },
-        { status: 200, headers: getCorsHeaders(request) }
-      );
+      return NextResponse.json({ stubs }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
       return NextResponse.json(

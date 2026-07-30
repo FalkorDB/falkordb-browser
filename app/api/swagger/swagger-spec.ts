@@ -555,6 +555,41 @@ const swaggerSpec = {
         }
       }
     },
+    "/api/graph/stubs": {
+      get: {
+        tags: ["Graph"],
+        summary: "List offloaded graphs",
+        description: "Get the graphs currently offloaded from memory. Requires an enterprise deployment (the `falkordbe` module) — community deployments reject `GRAPH.STUBS` as an unknown command.",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "Offloaded graphs retrieved successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    stubs: {
+                      type: "array",
+                      items: {
+                        type: "string"
+                      },
+                      description: "Array of offloaded graph names"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            description: "Bad request"
+          },
+          "500": {
+            description: "Internal server error"
+          }
+        }
+      }
+    },
     "/api/graph/{graph}": {
       get: {
         tags: ["Graph"],

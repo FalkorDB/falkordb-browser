@@ -42,6 +42,7 @@ interface Props {
     onSearchChange?: Dispatch<SetStateAction<string>>
     initialExpand?: Map<number, number>
     onExpandChange?: Dispatch<SetStateAction<Map<number, number>>>
+    rowIndicator?: (rowName: string) => React.ReactNode
 }
 
 const hasCellValue = (value: unknown) => value !== undefined && value !== null;
@@ -89,7 +90,8 @@ export default function TableComponent({
     initialSearch,
     onSearchChange,
     initialExpand,
-    onExpandChange
+    onExpandChange,
+    rowIndicator
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
@@ -657,7 +659,10 @@ export default function TableComponent({
                                             : null
                                     }
                                     <TableCell className="border-r border-border p-1">
-                                        <p className={cn(!isObjectType && "grow basis-0 text-center")}>{actualIndex + 1}.</p>
+                                        <div className={cn("flex items-center gap-1", !isObjectType && "justify-center")}>
+                                            {rowIndicator?.(row.name)}
+                                            <p className={cn(!isObjectType && "grow basis-0 text-center")}>{actualIndex + 1}.</p>
+                                        </div>
                                     </TableCell>
                                     {
                                         row.cells.map((cell, j) => {

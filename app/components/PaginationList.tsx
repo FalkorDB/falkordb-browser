@@ -142,10 +142,11 @@ interface Props<T extends Item> {
     isLoading?: boolean
     className?: string
     actionButtons?: React.ReactNode
+    itemIndicator?: (item: T) => React.ReactNode
     children?: React.ReactNode
 }
 
-export default function PaginationList<T extends Item>({ list, onClick, onDoubleClick, dataTestId, afterSearchCallback, isSelected, isDeleteSelected, onToggleFav, label, isLoading, className, children, searchRef, actionButtons }: Props<T>) {
+export default function PaginationList<T extends Item>({ list, onClick, onDoubleClick, dataTestId, afterSearchCallback, isSelected, isDeleteSelected, onToggleFav, label, isLoading, className, children, searchRef, actionButtons, itemIndicator }: Props<T>) {
 
     const [filteredList, setFilteredList] = useState<T[]>([...list]);
     const [hoverIndex, setHoverIndex] = useState<number>(0);
@@ -276,7 +277,13 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                         const hover = hoverIndex === index;
                         const isString = typeof item === "string";
                         const text = isString ? item : item.text;
-                        const queryText = <p data-testid={`${dataTestId}${text}Text`} className={cn("truncate w-full text-left", getItemClassName(selected, deleteSelected, hover))}>{text}</p>;
+                        const indicator = itemIndicator?.(item);
+                        const queryText = (
+                            <span className="flex items-center gap-2 w-full min-w-0">
+                                {indicator}
+                                <p data-testid={`${dataTestId}${text}Text`} className={cn("truncate w-full text-left", getItemClassName(selected, deleteSelected, hover))}>{text}</p>
+                            </span>
+                        );
 
                         const isFav = !isString && item.fav;
 

@@ -231,6 +231,11 @@ type ConnectionContextType = {
   dbVersion: string;
   setDbVersion: Dispatch<SetStateAction<string>>;
   isReadOnly: boolean;
+  // Enterprise-only graph offloading: `isEnterprise` gates the offload UI and
+  // `offloadedGraphs` holds the graphs currently offloaded from memory.
+  isEnterprise: boolean;
+  offloadedGraphs: string[];
+  refreshOffloadedGraphs: () => Promise<void>;
   additionalConnections: SessionConnection[];
   setAdditionalConnections: Dispatch<SetStateAction<SessionConnection[]>>;
   activeConnectionId: string | null;
@@ -496,6 +501,9 @@ export const ConnectionContext = createContext<ConnectionContextType>({
   dbVersion: "",
   setDbVersion: () => { },
   isReadOnly: false,
+  isEnterprise: false,
+  offloadedGraphs: [],
+  refreshOffloadedGraphs: async () => { },
   additionalConnections: [],
   setAdditionalConnections: () => { },
   activeConnectionId: null,

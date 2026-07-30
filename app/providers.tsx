@@ -15,6 +15,7 @@ import { setFunctionCandidates } from "@/lib/cypherSuggestions";
 import { udfFunctionNames } from "@/lib/cypherLang";
 import { computeEditorDiagnostics, type DiagnosticsResult } from "@/lib/cypherDiagnostics";
 import { isAiFixSupported } from "@/lib/aiFix";
+import type { StubsResponse } from "@/lib/enterprise";
 import { PanelImperativeHandle } from "react-resizable-panels";
 import type { Data as CanvasData, HierarchyDirection, LayoutMode, RadialDirection, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
@@ -304,6 +305,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [labels, setLabels] = useState<Label[]>([]);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
   const [dbVersion, setDbVersion] = useState<string>("");
+  const [isEnterprise, setIsEnterprise] = useState(false);
+  const [offloadedGraphs, setOffloadedGraphs] = useState<string[]>([]);
   const [connectionType, setConnectionType] = useState<ConnectionType>("Standalone");
   const [connectionInfo, setConnectionInfo] = useState<ConnectionInfo>({});
   const [additionalConnections, setAdditionalConnections] = useState<SessionConnection[]>([]);
@@ -681,6 +684,26 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const statusRef = useRef(status);
   statusRef.current = status;
 
+  // GRAPH.STUBS lists the graphs offloaded from memory. It is registered by the
+  // enterprise module only, so callers must gate on `isEnterprise` — the ref
+  // keeps the guard current without re-creating the callback.
+  const isEnterpriseRef = useRef(isEnterprise);
+  isEnterpriseRef.current = isEnterprise;
+
+  const refreshOffloadedGraphs = useCallback(async () => {
+    if (!isEnterpriseRef.current) return;
+
+    try {
+      const result = await fetch("/api/graph/stubs", { method: "GET" });
+
+      if (!result.ok) return;
+
+      const { stubs } = (await result.json()) as StubsResponse;
+
+      setOffloadedGraphs(stubs);
+    } catch { /* ignore */ }
+  }, []);
+
   const connectionContext = useMemo(() => ({
     connectionType,
     setConnectionType,
@@ -689,6 +712,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     dbVersion,
     setDbVersion,
     isReadOnly,
+    isEnterprise,
+    offloadedGraphs,
+    refreshOffloadedGraphs,
     additionalConnections,
     setAdditionalConnections,
     activeConnectionId,
@@ -697,7 +723,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     beginConnectionSwitch,
     endConnectionSwitch,
     isLatestSwitch,
-  }), [connectionType, connectionInfo, dbVersion, isReadOnly, additionalConnections, activeConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
+  }), [connectionType, connectionInfo, dbVersion, isReadOnly, isEnterprise, offloadedGraphs, refreshOffloadedGraphs, additionalConnections, activeConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
 
   const udfContext = useMemo(() => ({
     udfList,
@@ -1096,15 +1122,28 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         const result = await fetch("/api/DBVersion", { method: "GET" });
         if (!result.ok) {
           setShowMemoryUsage(false);
+          setIsEnterprise(false);
           return;
         }
-        const [name, version] = (await result.json()).result || ["", 0];
+        const json = await result.json();
+        const [name, version] = json.result || ["", 0];
         setDbVersion(String(version));
         setShowMemoryUsage(name === "graph" && version >= MEMORY_USAGE_VERSION_THRESHOLD);
+        // The enterprise module (`falkordbe`) is what adds graph offloading.
+        setIsEnterprise(json.enterprise === true);
       } catch { /* ignore */ }
     })();
 
   }, [status, activeConnectionId]);
+
+  useEffect(() => {
+    if (status !== "authenticated" || !isEnterprise) {
+      setOffloadedGraphs([]);
+      return;
+    }
+
+    refreshOffloadedGraphs();
+  }, [status, activeConnectionId, isEnterprise, refreshOffloadedGraphs]);
   useEffect(() => {
     if (status !== "authenticated") {
       setConnectionType("Standalone");
