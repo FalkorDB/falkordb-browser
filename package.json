@@ -22,7 +22,7 @@
     "@aws-sdk/lib-storage": "^3.1095.0",
     "@aws-sdk/s3-request-presigner": "^3.1095.0",
     "@falkordb/canvas": "^0.2.5",
-    "@falkordb/text-to-cypher": "^0.2.3",
+    "@falkordb/text-to-cypher": "^0.2.4",
     "@hookform/resolvers": "^5.5.5",
     "@monaco-editor/react": "^4.6.0",
     "@radix-ui/react-alert-dialog": "^1.1.23",
