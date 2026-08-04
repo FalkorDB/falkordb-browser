@@ -279,10 +279,7 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                         const text = isString ? item : item.text;
                         const indicator = itemIndicator?.(item);
                         const queryText = (
-                            <span className="flex items-center gap-2 w-full min-w-0">
-                                {indicator}
-                                <p data-testid={`${dataTestId}${text}Text`} className={cn("truncate flex-1 min-w-0 text-left", getItemClassName(selected, deleteSelected, hover))}>{text}</p>
-                            </span>
+                            <p data-testid={`${dataTestId}${text}Text`} className={cn("truncate w-full text-left", getItemClassName(selected, deleteSelected, hover))}>{text}</p>
                         );
 
                         const isFav = !isString && item.fav;
@@ -374,7 +371,16 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                                 style={{ height: `${itemHeight}px` }}
                                 key={text}
                             >
-                                {content}
+                                {
+                                    // The indicator sits beside the row button rather than inside
+                                    // it, so its tooltip isn't nested in the button's tooltip.
+                                    indicator ?
+                                        <div className="flex items-center gap-2 w-full h-full min-w-0">
+                                            {indicator}
+                                            <div className="flex flex-col grow min-w-0 h-full">{content}</div>
+                                        </div>
+                                        : content
+                                }
                             </li>
                         );
                     })

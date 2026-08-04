@@ -7,6 +7,30 @@ interface Props {
 }
 
 /**
+ * Icon-only variant, for places that already provide the "Loaded"/"Offloaded"
+ * wording (a tooltip can't be nested inside another tooltip's content).
+ */
+export function GraphLoadDot({ offloaded, dataTestId }: Props) {
+    const label = offloaded ? "Offloaded" : "Loaded";
+
+    return (
+        <span
+            className="flex items-center shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground"
+            role="img"
+            aria-label={label}
+            data-testid={dataTestId}
+            data-state={offloaded ? "offloaded" : "loaded"}
+        >
+            <Circle
+                size={10}
+                aria-hidden
+                className={offloaded ? "fill-yellow-400 text-yellow-400" : "fill-green-500 text-green-500"}
+            />
+        </span>
+    );
+}
+
+/**
  * Enterprise-only indicator for a graph's memory state: green when the graph is
  * loaded and yellow when it is offloaded.
  */
@@ -16,19 +40,8 @@ export default function GraphLoadIndicator({ offloaded, dataTestId }: Props) {
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <span
-                    className="flex items-center shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground"
-                    role="img"
-                    tabIndex={0}
-                    aria-label={label}
-                    data-testid={dataTestId}
-                    data-state={offloaded ? "offloaded" : "loaded"}
-                >
-                    <Circle
-                        size={10}
-                        aria-hidden
-                        className={offloaded ? "fill-yellow-400 text-yellow-400" : "fill-green-500 text-green-500"}
-                    />
+                <span tabIndex={0} className="flex items-center shrink-0">
+                    <GraphLoadDot offloaded={offloaded} dataTestId={dataTestId} />
                 </span>
             </TooltipTrigger>
             <TooltipContent>{label}</TooltipContent>

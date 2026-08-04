@@ -15,7 +15,7 @@ import ExportGraph from "../components/ExportGraph";
 import DeleteGraph from "../components/graph/DeleteGraph";
 import DuplicateGraph from "../components/graph/DuplicateGraph";
 import UploadGraph from "../components/graph/UploadGraph";
-import GraphLoadIndicator from "../components/graph/GraphLoadIndicator";
+import GraphLoadIndicator, { GraphLoadDot } from "../components/graph/GraphLoadIndicator";
 import { Graph } from "../api/graph/model";
 import ResizableBox from "@/components/ui/ResizableBox";
 import { useResizableSize } from "@/lib/useResizableSize";
@@ -42,24 +42,37 @@ interface Props {
  * @returns The component's rendered JSX element.
  */
 export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, setGraph }: Props) {
-    const safeOptions = useMemo(() => options ?? [], [options]);
-
     const { indicator, setIndicator } = useContext(IndicatorContext);
     const { isReadOnly, isEnterprise, offloadedGraphs, refreshOffloadedGraphs } = useContext(ConnectionContext);
     const {
         settings: {
-            graphInfo: { showMemoryUsage }
+            graphInfo: { showMemoryUsage },
+            userExperienceSettings: { refreshInterval }
         },
         tutorialOpen
     } = useContext(BrowserSettingsContext);
+
+    // GRAPH.LIST omits offloaded graphs, so merge the stubs back in — otherwise
+    // an offloaded graph disappears from the UI instead of showing as offloaded.
+    const safeOptions = useMemo(() => {
+        const opts = options ?? [];
+        const missing = offloadedGraphs.filter((name) => !opts.includes(name));
+
+        return missing.length ? [...opts, ...missing].sort((a, b) => a.localeCompare(b)) : opts;
+    }, [options, offloadedGraphs]);
 
     const inputRef = useRef<HTMLInputElement>(null);
     // Monotonic sequence so two overlapping graph-list refreshes on the SAME
     // connection can't apply out of order (the newest refresh wins).
     const optionsSeqRef = useRef(0);
+    // Mirror of the current list, so a periodic refresh that returns the same
+    // names doesn't hand down a new array and rebuild every table row.
+    const optionsRef = useRef(options);
+
+    useEffect(() => { optionsRef.current = options; }, [options]);
 
     const { toast } = useToast();
-    const { data: session } = useSession();
+    const { data: session, status } = useSession();
     const sessionRole = session?.user.role;
 
     const [open, setOpen] = useState(false);
@@ -88,7 +101,9 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         const gInd = (i: "online" | "offline") => { if (isCurrent()) setIndicator(i); };
         const res = await fetchOptions(gToast, gInd, indicator, cid);
         if (!isCurrent() || !res) return;
-        setOptions(res.opts);
+        const prev = optionsRef.current;
+        const unchanged = prev !== undefined && prev.length === res.opts.length && prev.every((name, i) => name === res.opts[i]);
+        if (!unchanged) setOptions(res.opts);
         if (res.autoSelect) setSelectedValue(res.autoSelect);
         // Offloaded graphs can change between refreshes, so keep the enterprise
         // load indicators in sync with the list.
@@ -144,6 +159,24 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             }
         }, [toast, setIndicator, isReadOnly]);
 
+    // Metrics are read per graph, and reading an offloaded graph loads it back
+    // into memory — so report them as N/A instead of undoing the offload.
+    const buildMetricCells = useCallback((opt: string): Row["cells"] => {
+        const offloaded = offloadedGraphs.includes(opt);
+        const cells: Row["cells"] = [];
+
+        if (showMemoryUsage) {
+            cells.push(offloaded ? { value: "N/A", type: "readonly" } : { loadCell: loadMemory(opt), type: "readonly" });
+        }
+
+        cells.push(
+            offloaded ? { value: "N/A", type: "readonly" } : { loadCell: loadNodesCount(opt), type: "readonly" },
+            offloaded ? { value: "N/A", type: "readonly" } : { loadCell: loadEdgesCount(opt), type: "readonly" }
+        );
+
+        return cells;
+    }, [offloadedGraphs, showMemoryUsage, loadMemory, loadNodesCount, loadEdgesCount]);
+
     const handleSetOption = useCallback(async (option: string, optionName: string) => {
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
@@ -173,27 +206,16 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     ? { value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" as const }
                     : { value: opt, type: "readonly" as const };
 
-                const cells: Row["cells"] = [baseCell];
-
-                if (showMemoryUsage) {
-                    cells.push({ loadCell: loadMemory(opt), type: "readonly" });
-                }
-
-                cells.push(
-                    { loadCell: loadNodesCount(opt), type: "readonly" },
-                    { loadCell: loadEdgesCount(opt), type: "readonly" }
-                );
-
                 return {
                     checked: false,
                     name: opt,
-                    cells
+                    cells: [baseCell, ...buildMetricCells(opt)]
                 };
             }));
         }
 
         return result.ok;
-    }, [toast, setIndicator, safeOptions, setOptions, setSelectedValue, selectedValue, sessionRole, showMemoryUsage, loadNodesCount, loadEdgesCount, loadMemory]);
+    }, [toast, setIndicator, safeOptions, setOptions, setSelectedValue, selectedValue, sessionRole, buildMetricCells]);
 
     const handleSetRows = useCallback((opts: string[]) => {
         setRows(opts.map((opt) => {
@@ -201,24 +223,13 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 ? { value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" as const }
                 : { value: opt, type: "readonly" as const };
 
-            const cells: Row["cells"] = [baseCell];
-
-            if (showMemoryUsage) {
-                cells.push({ loadCell: loadMemory(opt), type: "readonly" });
-            }
-
-            cells.push(
-                { loadCell: loadNodesCount(opt), type: "readonly" },
-                { loadCell: loadEdgesCount(opt), type: "readonly" }
-            );
-
             return {
                 checked: false,
                 name: opt,
-                cells
+                cells: [baseCell, ...buildMetricCells(opt)]
             };
         }));
-    }, [sessionRole, handleSetOption, loadMemory, loadNodesCount, loadEdgesCount, showMemoryUsage, isReadOnly]);
+    }, [sessionRole, handleSetOption, buildMetricCells]);
 
     useEffect(() => {
         if (!openMenage) {
@@ -229,6 +240,18 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     useEffect(() => {
         handleSetRows(safeOptions);
     }, [safeOptions, handleSetRows]);
+
+    // Graphs can be created, dropped or offloaded outside this tab, so refresh
+    // the list (and with it the offloaded stubs) on the same interval the rest
+    // of the app polls with, on top of the refresh done when the list is opened.
+    useEffect(() => {
+        if (status !== "authenticated" || indicator === "offline") return undefined;
+
+        const seconds = Number.isFinite(refreshInterval) && refreshInterval > 0 ? refreshInterval : 30;
+        const interval = setInterval(() => { getOptions(); }, seconds * 1000);
+
+        return () => clearInterval(interval);
+    }, [status, indicator, refreshInterval, getOptions]);
 
     const handleOpenChange = async (o: boolean) => {
         setOpen(o);
@@ -343,8 +366,18 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                         <TooltipTrigger asChild>
                                             <button type="button" className="cursor-default bg-transparent">[{isLoading ? <Loader2 className="inline animate-spin" /> : safeOptions.length}]</button>
                                         </TooltipTrigger>
-                                        <TooltipContent>
-                                            <p> Graphs Count</p>
+                                        <TooltipContent className="max-w-[300px]">
+                                            <p>Graphs Count: {safeOptions.length}</p>
+                                            <ul className="mt-1 max-h-[200px] overflow-auto flex flex-col gap-1">
+                                                {
+                                                    safeOptions.map((name) => (
+                                                        <li key={name} className="flex items-center gap-2">
+                                                            {isEnterprise && <GraphLoadDot offloaded={offloadedGraphs.includes(name)} />}
+                                                            <span className="truncate">{name}</span>
+                                                        </li>
+                                                    ))
+                                                }
+                                            </ul>
                                         </TooltipContent>
                                     </Tooltip>
                                 </div>

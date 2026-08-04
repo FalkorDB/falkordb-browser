@@ -711,7 +711,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
       if (!isCurrent()) return;
 
-      setOffloadedGraphs(stubs);
+      // Keep the same array when nothing changed, so the periodic refresh
+      // doesn't re-render every consumer of the indicators.
+      setOffloadedGraphs((prev) => (
+        prev.length === stubs.length && prev.every((name, i) => name === stubs[i]) ? prev : stubs
+      ));
     } catch {
       if (isCurrent()) setOffloadedGraphs([]);
     }
