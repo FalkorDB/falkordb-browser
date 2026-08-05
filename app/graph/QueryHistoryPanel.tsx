@@ -4,7 +4,7 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "r
 import * as monaco from "monaco-editor";
 import { Monaco } from "@monaco-editor/react";
 import { useTheme } from "next-themes";
-import { History, Info, Star, Trash2, X } from "lucide-react";
+import { Download, History, Info, ListChecks, ListX, Star, StarX, Trash2, X } from "lucide-react";
 import { cn, getTheme, Query } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -20,6 +20,14 @@ import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContex
 import { Explain, Metadata, Profile } from "./MetadataView";
 
 type Tab = "text" | "metadata" | "explain" | "profile";
+
+/** Serializes queries into a runnable `.cypher` batch, one statement per query. */
+const buildCypherBatch = (queries: Query[]) => queries.map(query => {
+    const header = query.graphName && `// graph: ${query.graphName}`
+    const text = query.text.trim().replace(/;+$/, "");
+
+    return header ? `${header}\n${text};` : `${text};`;
+}).join("\n\n");
 
 interface Props {
     onClose: () => void;
@@ -48,7 +56,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     const [favFilter, setFavFilter] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [tab, setTab] = useState<Tab>("text");
-    const [deleteElements, setDeleteElements] = useState<number[]>([]);
+    const [selectedQueries, setSelectedQueries] = useState<string[]>([]);
     const [wrapLines, setWrapLines] = useState(false);
 
     const filters = useMemo(() => {
@@ -96,7 +104,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                 includeGraphMetadata: graphMatches,
             });
         },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }), []);
 
     const editorLanguageConfig = useMemo((): LanguageConfig => {
@@ -300,6 +308,13 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     const handleDeleteQuery = useCallback(() => {
         if (!historyQuery || !setHistoryQuery) return;
 
+        const deleteElements = historyQuery.queries.reduce<number[]>((acc, query, idx) => {
+            if (selectedQueries.includes(query.text)) acc.push(idx);
+            return acc;
+        }, []);
+
+        if (deleteElements.length === 0) return;
+
         const newQueries = historyQuery.queries.filter((_, idx) => !deleteElements.some((removeIndex) => idx === removeIndex));
 
         if (newQueries.length === 0) removeConnectionItem("query history");
@@ -326,9 +341,35 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
             counter: nextCounter,
             query: nextQuery
         }));
-        setDeleteElements([]);
-        setFilteredQueries(current => current.filter(query => deleteElements.some((removeIndex) => historyQuery.queries[removeIndex].timestamp === query.timestamp)));
-    }, [historyQuery, setHistoryQuery, deleteElements]);
+        setSelectedQueries([]);
+        setFilteredQueries(current => current.filter(query => !selectedQueries.includes(query.text)));
+    }, [historyQuery, setHistoryQuery, selectedQueries]);
+
+    const handleExportSelected = useCallback(() => {
+        if (!historyQuery) return;
+
+        const queries = historyQuery.queries.filter(query => selectedQueries.includes(query.text));
+
+        if (queries.length === 0) return;
+
+        const url = URL.createObjectURL(new Blob([`${buildCypherBatch(queries)}\n`], { type: "text/plain;charset=utf-8" }));
+
+        try {
+            const link = document.createElement("a");
+            link.href = url;
+            // Swap characters that are invalid or awkward in file names
+            const timestamp = new Date(Date.now())
+                .toLocaleString()
+                .replace(/[/\\:*?"<>|]/g, "-")
+                .replace(/[,\s]+/g, "_");
+            link.download = `falkordb-queries-${timestamp}.cypher`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } finally {
+            URL.revokeObjectURL(url);
+        }
+    }, [historyQuery, selectedQueries]);
 
     const handleToggleFav = useCallback((item: Query, name?: string) => {
         if (!historyQuery || !setHistoryQuery) return;
@@ -352,7 +393,29 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
         );
     }, [historyQuery, setHistoryQuery]);
 
+    const handleClearSelectedFav = useCallback(() => {
+        if (!historyQuery || !setHistoryQuery) return;
+
+        const unFav = (q: Query) =>
+            q.fav && selectedQueries.includes(q.text) ? { ...q, fav: false, name: undefined } : q;
+
+        const newQueries = historyQuery.queries.map(unFav);
+
+        setConnectionItem("query history", JSON.stringify(newQueries));
+
+        setHistoryQuery(prev => ({
+            ...prev,
+            queries: newQueries,
+            currentQuery: unFav(prev.currentQuery),
+        }));
+
+        setFilteredQueries(prev => prev.map(unFav));
+    }, [historyQuery, setHistoryQuery, selectedQueries]);
+
     if (!historyQuery || !setHistoryQuery) return null;
+
+    const isAllSelected = filteredQueries.length > 0 && filteredQueries.every(q => selectedQueries.includes(q.text));
+    const hasSelectedFav = historyQuery.queries.some(q => q.fav && selectedQueries.includes(q.text));
 
     return (
         <div data-testid="queryHistoryPanel" className="h-full w-full border border-border rounded-lg bg-background">
@@ -372,85 +435,91 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                 <PaginationList
                     label="Query"
                     className="overflow-hidden h-[313px] max-h-[393px] p-1 border-b border-border"
-                    isSelected={(item) => historyQuery.queries.findIndex(q => q.text === item.text) + 1 === historyQuery.counter}
-                    isDeleteSelected={(item) => deleteElements.some(idx => historyQuery.queries[idx]?.text === item.text)}
+                    isSelected={(item) => selectedQueries.includes(item.text)}
                     afterSearchCallback={afterSearchCallback}
                     onToggleFav={handleToggleFav}
                     dataTestId="queryHistory"
                     list={filteredQueries}
                     actionButtons={
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 items-center">
+                            <Button
+                                variant="Delete"
+                                className="p-1"
+                                data-testid="queryHistoryClearSelected"
+                                title="Remove selected queries from favorites"
+                                onClick={handleClearSelectedFav}
+                                disabled={!hasSelectedFav}
+                            >
+                                <StarX size={16} />
+                            </Button>
                             <Button
                                 className="p-1"
                                 variant="Delete"
                                 data-testid="queryHistoryDelete"
-                                title={`Remove selected query from history
-                                    press (Right Click) to select
-                                    press (Ctrl + Right Click) for multi select`}
+                                title="Remove selected queries from history"
                                 onClick={handleDeleteQuery}
-                                disabled={deleteElements.length === 0}
+                                disabled={selectedQueries.length === 0}
                             >
                                 <Trash2 size={16} />
                             </Button>
                             <Button
-                                className="p-1 text-xs"
-                                variant="Delete"
-                                data-testid="queryHistoryDelete"
-                                title="Remove all queries from history"
-                                onClick={() => {
-                                    removeConnectionItem("query history");
-                                    setHistoryQuery(prev => ({
-                                        ...prev,
-                                        queries: [],
-                                        counter: 0
-                                    }));
-                                    setFilteredQueries([]);
-                                    setActiveFilters([]);
-                                    setDeleteElements([]);
-                                }}
-                                disabled={historyQuery.queries.length === 0}
+                                className="p-1"
+                                variant="Primary"
+                                data-testid="queryHistoryExport"
+                                title="Export selected queries to a .cypher file"
+                                onClick={handleExportSelected}
+                                disabled={selectedQueries.length === 0}
                             >
-                                <Trash2 size={16} /> All
+                                <Download size={16} />
                             </Button>
                             <Button
-                                variant="Delete"
-                                className="p-1 text-xs"
-                                data-testid="queryHistoryClearFav"
-                                title="Clear all favorites"
-                                onClick={() => {
-                                    const newQueries = historyQuery.queries.map(q => ({ ...q, fav: false, name: undefined }));
-                                    setConnectionItem("query history", JSON.stringify(newQueries));
-                                    setHistoryQuery(prev => ({
-                                        ...prev,
-                                        queries: newQueries,
-                                        currentQuery: prev.currentQuery.fav
-                                            ? { ...prev.currentQuery, fav: false, name: undefined }
-                                            : prev.currentQuery,
-                                    }));
-                                    setFilteredQueries(prev => prev.map(q => ({ ...q, fav: false, name: undefined })));
-                                }}
-                                disabled={!historyQuery.queries.some(q => q.fav)}
+                                className="p-1"
+                                variant="Primary"
+                                data-testid="queryHistorySelectAll"
+                                title={isAllSelected ? "Deselect all queries" : "Select all queries"}
+                                onClick={() => setSelectedQueries(isAllSelected ? [] : filteredQueries.map(q => q.text))}
+                                disabled={filteredQueries.length === 0}
                             >
-                                <Star size={14} /> Clear
+                                {
+                                    !isAllSelected
+                                        ? <ListChecks size={16} />
+                                        : <ListX size={16} />
+                                }
                             </Button>
+                            <Tooltip>
+                                <TooltipTrigger data-testid="queryHistorySelectInfo" className="flex items-center gap-1 text-foreground/60">
+                                    <Info size={16} />
+                                    {/* Fixed two-digit slot keeps the row from shifting; longer counts are clipped */}
+                                    <span data-testid="queryHistorySelectedCount" className="text-xs tabular-nums w-[2ch] text-left overflow-hidden whitespace-nowrap">
+                                        {selectedQueries.length || ""}
+                                    </span>
+                                </TooltipTrigger>
+                                <TooltipContent className="whitespace-pre-line">
+                                    {`${selectedQueries.length} selected\nPress (Left Click) to select a query\nPress (Ctrl + Left Click) for multi select`}
+                                </TooltipContent>
+                            </Tooltip>
                         </div>
                     }
                     onClick={(counter, evt) => {
                         const index = historyQuery.queries.findIndex(q => q.text === counter);
 
-                        if (evt.type === "rightclick") {
-                            if (evt.ctrlKey) {
-                                setDeleteElements(prev => prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]);
-                            } else {
-                                setDeleteElements(prev => prev.includes(index) ? [] : [index]);
-                            }
-                        } else if (evt.type === "click") {
-                            setHistoryQuery(prev => ({
-                                ...prev,
-                                counter: index + 1 === historyQuery.counter ? 0 : index + 1
-                            }));
-                            setTab("text");
+                        if (index === -1) return;
+
+                        const { text } = historyQuery.queries[index];
+
+                        const isCurrent = index + 1 === historyQuery.counter;
+
+                        if (evt.ctrlKey || evt.metaKey) {
+                            setSelectedQueries(prev => prev.includes(text) ? prev.filter(t => t !== text) : [...prev, text]);
+                        } else {
+                            setSelectedQueries(isCurrent ? [] : [text]);
                         }
+
+                        setHistoryQuery(prev => ({
+                            ...prev,
+                            counter: isCurrent ? 0 : index + 1
+                        }));
+                        setTab("text");
                     }}
                     onDoubleClick={async (counter) => {
                         const index = historyQuery.queries.findIndex(q => q.text === counter);
@@ -479,6 +548,8 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                                 </TooltipTrigger>
                                 <TooltipContent>
                                     Press graph name to see history of that graph
+                                    <br />
+                                    (show all queries if no graph name is selected).
                                 </TooltipContent>
                             </Tooltip>
                         </li>
