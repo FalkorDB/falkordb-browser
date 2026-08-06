@@ -217,6 +217,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     graphNamesRef.current = graphNames ?? [];
   }, [graphNames]);
   const [graphNamesLoaded, setGraphNamesLoaded] = useState(false);
+  // Mirrored at render time so callbacks can tell "the graph is gone" from
+  // "the list is not in yet" without re-creating themselves.
+  const graphNamesLoadedRef = useRef(graphNamesLoaded);
+  graphNamesLoadedRef.current = graphNamesLoaded;
   const [graph, setGraph] = useState<Graph>(Graph.empty());
   // graphRef always points to the current graph so setGraphInfo can mutate
   // graph.GraphInfo in-place without triggering a graph state change.
@@ -1250,15 +1254,22 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       return;
     }
 
+    // A stored tab can name a graph that has since been dropped. Rebuilding it
+    // would query that name, and querying a missing graph makes FalkorDB create
+    // it — so drop the name here and keep the tab's query text.
+    const graphIsGone = !!tab.graphName
+      && graphNamesLoadedRef.current
+      && !graphNamesRef.current.includes(tab.graphName);
+
     // Ordering matters: handleSetGraphName clears the editor and the selection,
     // so everything the tab carries has to be applied after it.
-    handleSetGraphName(tab.graphName);
+    handleSetGraphName(graphIsGone ? "" : tab.graphName);
     setCurrentTab(tab.view);
     setHistoryQuery(h => ({ ...h, query: tab.query, currentQuery: defaultQueryHistory.currentQuery }));
     // /graph resolves this against the results once they arrive.
     setSelectedParam(tab.selected ?? "");
 
-    if (!tab.graphName || !tab.query) return;
+    if (graphIsGone || !tab.graphName || !tab.query) return;
 
     // We run the tab's own query, so the default-query auto-load must not fire.
     pendingAutoLoadRef.current = null;

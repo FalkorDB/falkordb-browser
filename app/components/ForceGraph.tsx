@@ -58,8 +58,9 @@ export default function ForceGraph({
     // into the same render, the references differ and the canvas gets updated.
     const pendingRestoreDataRef = useRef<typeof data | null>(null);
     // Re-applies a restored viewport after the canvas's own deferred zoomToFit.
-    // Held in a ref so it survives effect re-runs; only cleared on unmount.
-    const viewportRestoreTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+    // Held in a ref so it survives the effect re-run that consuming a restore
+    // triggers; cancelled as soon as real data lands, and on unmount.
+    const viewportRestoreTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
     useEffect(() => () => clearTimeout(viewportRestoreTimerRef.current), []);
 
@@ -472,7 +473,10 @@ export default function ForceGraph({
                 canvas.setViewport(viewport);
                 clearTimeout(viewportRestoreTimerRef.current);
                 viewportRestoreTimerRef.current = setTimeout(() => {
-                    canvasRef.current?.setViewport(viewport);
+                    // The canvas captured at effect time, not canvasRef.current:
+                    // a late callback must never touch whatever canvas is
+                    // mounted now.
+                    canvas.setViewport(viewport);
                 }, CANVAS_AUTO_ZOOM_DELAY);
             }
 
@@ -489,6 +493,11 @@ export default function ForceGraph({
         }
         pendingRestoreDataRef.current = null;
 
+        // Past this point the canvas is about to be handed real data, so a
+        // viewport still queued for the previous restore would land on the wrong
+        // graph (switching from a saved tab straight to an unsaved one).
+        clearTimeout(viewportRestoreTimerRef.current);
+        viewportRestoreTimerRef.current = undefined;
         const canvasData = convertToCanvasData(data);
         nodeCount = canvasData.nodes.length;
         canvas.setData(canvasData);

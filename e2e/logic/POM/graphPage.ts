@@ -671,10 +671,7 @@ export default class GraphPage extends BasePage {
    * bounding box width instead.
    */
   private async ensureGraphInfoPanelOpen(): Promise<void> {
-    // Use .first() to avoid strict-mode violations: two elements share
-    // data-testid="graphInfoPanel" (the ResizablePanel wrapper in providers.tsx
-    // and the inner div in graphInfo.tsx).
-    const box = await this.graphInfoPanel.first().boundingBox().catch(() => null);
+    const box = await this.graphInfoPanel.boundingBox().catch(() => null);
     if (!box || box.width < 50) {
       await interactWhenVisible(
         this.graphInfoToggle,
@@ -682,7 +679,7 @@ export default class GraphPage extends BasePage {
         "Graph Info Toggle"
       );
       // Wait for the panel expansion animation to complete
-      await this.graphInfoPanel.first().waitFor({ state: "visible" });
+      await this.graphInfoPanel.waitFor({ state: "visible" });
       await this.page.waitForTimeout(300);
     }
   }
@@ -699,8 +696,9 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("graphInfoToggle");
   }
 
+  /** The resizable wrapper, not the panel body — only it reports the real width. */
   private get graphInfoPanel(): Locator {
-    return this.page.getByTestId("graphInfoPanel");
+    return this.page.getByTestId("graphInfoPanelContainer");
   }
 
   private get closeHelpMessage(): Locator {
@@ -1043,9 +1041,10 @@ export default class GraphPage extends BasePage {
   }
 
   // GRAPH TAB STRIP
-  // The per-connection working contexts in the sub-header. Located by their
-  // visible label, which is the custom name when set and the graph name
-  // otherwise (or "New tab" while the tab has no graph yet).
+  // The per-connection working contexts in the sub-header. Every test id is
+  // keyed on the tab's stable id, so a rename never moves a selector. Tests
+  // still address a tab by its visible label — the container carries it in
+  // `data-tab-label` and the controls are looked up inside that container.
   public get tabStrip(): Locator {
     return this.page.getByTestId("graphSubHeader");
   }
@@ -1055,17 +1054,34 @@ export default class GraphPage extends BasePage {
   }
 
   public stripTab(label: string): Locator {
-    return this.page.getByTestId(`graphTab${label}`);
+    return this.tabStrip.locator(`[data-tab-label="${label}"]`);
+  }
+
+  /** Positional access, for cases where labels repeat (several blank tabs). */
+  public stripTabAt(index: number): Locator {
+    return this.tabStrip.locator('[data-tab-label]').nth(index);
+  }
+
+  public stripTabClose(label: string): Locator {
+    return this.stripTab(label).locator('[data-testid^="graphTabClose-"]');
   }
 
   async getStripTabLabels(): Promise<string[]> {
     await this.tabStrip.waitFor({ state: "visible" });
-    return this.tabStrip.locator('[data-testid^="graphTabSelect"]').allInnerTexts();
+    return this.tabStrip.locator('[data-testid^="graphTabSelect-"]').allInnerTexts();
   }
 
   async getStripTabCount(): Promise<number> {
     await this.tabStrip.waitFor({ state: "visible" });
-    return this.tabStrip.locator('[data-testid^="graphTabSelect"]').count();
+    return this.tabStrip.locator('[data-testid^="graphTabSelect-"]').count();
+  }
+
+  /** The stable ids currently in the strip, in display order. */
+  async getStripTabIds(): Promise<string[]> {
+    await this.tabStrip.waitFor({ state: "visible" });
+    return this.tabStrip.locator("[data-tab-label]").evaluateAll(
+      (els) => els.map((el) => el.getAttribute("data-testid")?.replace(/^graphTab-/, "") ?? "")
+    );
   }
 
   async addStripTab(): Promise<void> {
@@ -1074,7 +1090,7 @@ export default class GraphPage extends BasePage {
 
   async selectStripTab(label: string): Promise<void> {
     await interactWhenVisible(
-      this.page.getByTestId(`graphTabSelect${label}`),
+      this.stripTab(label).locator('[data-testid^="graphTabSelect-"]'),
       (el) => el.click(),
       `Select Tab ${label}`
     );
@@ -1082,7 +1098,7 @@ export default class GraphPage extends BasePage {
 
   async closeStripTab(label: string): Promise<void> {
     await interactWhenVisible(
-      this.page.getByTestId(`graphTabClose${label}`),
+      this.stripTabClose(label),
       (el) => el.click(),
       `Close Tab ${label}`
     );
@@ -1090,12 +1106,13 @@ export default class GraphPage extends BasePage {
 
   /** Renames via the pencil affordance. An empty name clears back to the graph name. */
   async renameStripTab(label: string, name: string): Promise<void> {
+    const tab = this.stripTab(label);
     await interactWhenVisible(
-      this.page.getByTestId(`graphTabRenameTrigger${label}`),
+      tab.locator('[data-testid^="graphTabRenameTrigger-"]'),
       (el) => el.click(),
       `Rename Trigger ${label}`
     );
-    const input = this.page.getByTestId(`graphTabRename${label}`);
+    const input = tab.locator('[data-testid^="graphTabRename-"]');
     await input.waitFor({ state: "visible" });
     await input.fill(name);
     await input.press("Enter");

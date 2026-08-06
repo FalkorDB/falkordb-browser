@@ -568,11 +568,13 @@ test.describe('@browser Browser Settings tests', () => {
 
             await settingsBrowserPage.reloadPage();
             await settingsBrowserPage.waitForTimeout(1000);
+            await settingsBrowserPage.expandUserExperienceSection();
 
             const value = await settingsBrowserPage.getMaxTabsValue();
             expect(value).toBe(4);
         } finally {
             // Restore original value
+            await settingsBrowserPage.expandUserExperienceSection();
             await settingsBrowserPage.setMaxTabsSlider(originalValue);
             await settingsBrowserPage.clickSaveSettingsButton();
         }

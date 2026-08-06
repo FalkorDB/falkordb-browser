@@ -81,6 +81,9 @@ export default function Chat({ onClose }: Props) {
 
     // Each tab keeps its own conversation per graph, so the key carries both.
     const historyKey = useMemo(() => tabScopedKey(activeTabId, `chat-${graphName}`), [activeTabId, graphName]);
+    // The key the in-state messages were actually read from — see the persist
+    // effect below.
+    const loadedHistoryKeyRef = useRef<string | null>(null);
 
     const { toast } = useToast();
     const route = useRouter();
@@ -158,6 +161,7 @@ export default function Chat({ onClose }: Props) {
         if (!getConnectionPrefix()) return;
         const savedMessages = getConnectionItem(historyKey);
         setMessages(parseStoredMessages(savedMessages));
+        loadedHistoryKeyRef.current = historyKey;
 
         const savedCypherOnly = getConnectionItem(`cypherOnly-${graphName}`);
         setCypherOnly(savedCypherOnly === "true");
@@ -166,7 +170,10 @@ export default function Chat({ onClose }: Props) {
     useEffect(() => {
         let statusGroup: Message[];
 
-        if (messages.length > 0) {
+        // `historyKey` changes a render before `messages` catches up (the load
+        // effect above only queues the new list), so writing unconditionally
+        // would file the previous tab's history under the new tab's key.
+        if (messages.length > 0 && loadedHistoryKeyRef.current === historyKey) {
             setConnectionItem(historyKey, serializeChatHistory(getLastUserMessagesWithContext(messages, maxSavedMessages)));
         }
 

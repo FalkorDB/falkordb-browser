@@ -48,7 +48,11 @@ export default function GraphSubHeader() {
           return (
             <div
               key={tab.id}
-              data-testid={`graphTab${label}`}
+              // Keyed on the tab id, not the label: labels are neither stable
+              // (renaming changes them) nor unique (two blank tabs are both
+              // "New tab"). The label is exposed separately for assertions.
+              data-testid={`graphTab-${tab.id}`}
+              data-tab-label={label}
               data-active={isActive}
               style={{ maxWidth: tabMaxWidth }}
               className={cn(
@@ -61,7 +65,7 @@ export default function GraphSubHeader() {
               {
                 isEditing
                   ? <input
-                    data-testid={`graphTabRename${label}`}
+                    data-testid={`graphTabRename-${tab.id}`}
                     className="w-full min-w-0 bg-transparent text-sm outline-none border-b border-primary"
                     aria-label={`Rename ${label}`}
                     placeholder={tab.graphName || "New tab"}
@@ -77,7 +81,7 @@ export default function GraphSubHeader() {
                   : <>
                     <button
                       type="button"
-                      data-testid={`graphTabSelect${label}`}
+                      data-testid={`graphTabSelect-${tab.id}`}
                       className="min-w-0 flex-1 truncate text-left text-sm"
                       title={label}
                       aria-current={isActive}
@@ -89,7 +93,7 @@ export default function GraphSubHeader() {
                       <TooltipTrigger asChild>
                         <button
                           type="button"
-                          data-testid={`graphTabRenameTrigger${label}`}
+                          data-testid={`graphTabRenameTrigger-${tab.id}`}
                           className="rounded hover:bg-background"
                           aria-label={`Rename ${label}`}
                           onClick={() => {
@@ -110,7 +114,7 @@ export default function GraphSubHeader() {
                   <span className="flex">
                     <button
                       type="button"
-                      data-testid={`graphTabClose${label}`}
+                      data-testid={`graphTabClose-${tab.id}`}
                       className="rounded hover:bg-background disabled:opacity-30 disabled:cursor-not-allowed"
                       aria-label={`Close ${label}`}
                       disabled={!canClose}

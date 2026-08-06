@@ -19,12 +19,17 @@ type StubNode = {
 };
 
 const stubCanvas = (nodes: StubNode[]) => {
-    const state = { nodes, setDataCalls: 0, refreshCalls: 0 };
+    const state = {
+        nodes,
+        setDataCalls: 0,
+        refreshCalls: 0,
+        lastSetData: undefined as unknown,
+    };
 
     const canvas = {
         getData: () => ({ nodes: state.nodes.map(({ id }) => ({ id })), links: [] }),
         getGraphData: () => ({ nodes: state.nodes, links: [] }),
-        setData: () => { state.setDataCalls += 1; },
+        setData: (data: unknown) => { state.setDataCalls += 1; state.lastSetData = data; },
         refresh: () => { state.refreshCalls += 1; },
     } as unknown as FalkorDBCanvas;
 
@@ -91,6 +96,9 @@ test("applyCanvasLayout writes the saved coordinates back and pins them", () => 
     applyCanvasLayout(canvas, layout);
 
     assert.equal(state.setDataCalls, 1);
+    // The snapshot's own structure has to be what goes back in — not whatever
+    // the canvas happened to be holding.
+    assert.equal(state.lastSetData, layout.data);
     assert.equal(state.refreshCalls, 1);
     // fx/fy are what makes the restore stick through `setData`'s force warmup,
     // and the velocities are zeroed so nothing drifts before the engine stops.

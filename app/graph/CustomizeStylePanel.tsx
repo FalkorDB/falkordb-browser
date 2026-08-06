@@ -151,14 +151,17 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
 
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
+            // Escape discards the unsaved edits *and* leaves the panel. Closing
+            // matters now that the open panel is part of the tab's persisted
+            // state — a panel left open would come back on the next reload.
             if (e.key === "Escape") {
-                handleCancel();
+                handleClose();
             }
         };
 
         window.addEventListener("keydown", handleEscape);
         return () => window.removeEventListener("keydown", handleEscape);
-    }, [handleCancel]);
+    }, [handleClose]);
 
     return (
         <>

@@ -634,7 +634,7 @@ export default function Page() {
                     minSize="15%"
                     maxSize="30%"
                     onResize={onInfoPanelResize}
-                    data-testid="graphInfoPanel"
+                    data-testid="graphInfoPanelContainer"
                 >
                     <GraphInfoPanel
                         onClose={onTogglePanel}

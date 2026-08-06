@@ -181,10 +181,15 @@ export default function useGraphTabs<S>({
         }));
     }, [withLive]);
 
+    // Structural changes only (add / close / select / rename), plus the two live
+    // fields that change at human pace. `tabs` is deliberately not a dependency:
+    // it also mirrors the query text, so keying on it would write to
+    // localStorage on every keystroke. `persist` folds the live values in when
+    // it runs, and the flush below catches whatever happened in between.
     useEffect(() => {
         if (!prefixReady || !canRestore) return;
         persist();
-    }, [prefixReady, canRestore, tabs, state.activeTabId, persist]);
+    }, [prefixReady, canRestore, state, graphName, view, persist]);
 
     // Panning, zooming and selecting change the canvas without changing `tabs`,
     // so the effect above never sees them. Flush on the way out instead — that

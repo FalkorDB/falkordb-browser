@@ -157,27 +157,31 @@ test.describe("@admin Graph tabs", () => {
 
     test("The last tab cannot be closed", async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-        const page = await browser.getPage();
 
         await graph.selectGraphByName(graphOne);
         await graph.waitForPageIdle();
 
-        await expect(page.getByTestId(`graphTabClose${graphOne}`)).toBeDisabled({ timeout: 15000 });
+        await expect(graph.stripTabClose(graphOne)).toBeDisabled({ timeout: 15000 });
     });
 
     test("The strip stops growing at the max-tabs limit", async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         const page = await browser.getPage();
+        await graph.waitForPageIdle();
 
-        // 10 is the hard ceiling (MAX_GRAPH_TABS); the default limit is 8.
-        for (let i = 0; i < 12; i += 1) {
+        // Read the limit actually in force instead of assuming the default, so
+        // the assertion below can be exact. Mirrors clampMaxTabs (lib/graphTabs).
+        const limit = await page.evaluate(() => {
+            const stored = Number(window.localStorage.getItem("maxTabs"));
+            return Number.isFinite(stored) && stored > 0 ? Math.min(10, Math.max(4, Math.round(stored))) : 8;
+        });
+
+        for (let i = 0; i < limit + 2; i += 1) {
             if (await page.getByTestId("graphTabAdd").isDisabled()) break;
             await graph.addStripTab();
         }
 
-        const count = await graph.getStripTabCount();
-        expect(count).toBeGreaterThanOrEqual(4);
-        expect(count).toBeLessThanOrEqual(10);
+        await expect.poll(() => graph.getStripTabCount(), { timeout: 15000 }).toBe(limit);
         await expect(page.getByTestId("graphTabAdd")).toBeDisabled();
     });
 });

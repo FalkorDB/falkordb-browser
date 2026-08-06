@@ -74,6 +74,9 @@ test.describe("@admin Graph URL params", () => {
         // Same tab, and its context is back without any of it being in the URL.
         await expect.poll(() => tabParam(graph), { timeout: 15000 }).toBe(tabId);
         await expect(page.getByTestId("selectGraph")).toContainText(graphName, { timeout: 15000 });
+        // The query is the other half of the context — a reload that only
+        // restored the graph would otherwise pass.
+        await expect.poll(() => graph.getEditorInput(), { timeout: 15000 }).toBe(query);
     });
 
     test("URL naming an unknown tab falls back to a usable strip", async () => {
@@ -84,6 +87,11 @@ test.describe("@admin Graph URL params", () => {
         await expect
             .poll(() => tabParam(graph), { timeout: 15000 })
             .not.toBe("does-not-exist");
+
+        // …and what it points at has to be a tab that is actually in the strip.
+        const active = tabParam(graph);
+        expect(active).toBeTruthy();
+        expect(await graph.getStripTabIds()).toContain(active!);
     });
 
     test("A tab naming a dropped graph does not resurrect it", async () => {
