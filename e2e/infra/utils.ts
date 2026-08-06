@@ -29,8 +29,8 @@ export function normalizeUrl(url: string | null | undefined): string {
 /**
  * Origin + pathname of a URL, discarding the query string and hash. Use this
  * when asserting that navigation landed on a given page (e.g. `/graph`): the app
- * legitimately appends a `?graph=<name>` param when a graph is auto-selected, so
- * an exact full-URL match is order-dependent and flaky.
+ * legitimately appends a `?tab=<id>` param once a tab is active, so an exact
+ * full-URL match is order-dependent and flaky.
  */
 export function urlPath(url: string | null | undefined): string {
   if (!url) return '';
@@ -54,7 +54,6 @@ export const initializeLocalStorage = (host = "localhost", port = 6379, username
         if (!localStorage.getItem("limit")) localStorage.setItem("limit", "300");
         if (!localStorage.getItem("defaultQuery")) localStorage.setItem("defaultQuery", "");
         if (!localStorage.getItem("runDefaultQuery")) localStorage.setItem("runDefaultQuery", "false");
-        if (!localStorage.getItem("contentPersistence")) localStorage.setItem("contentPersistence", "false");
         if (!localStorage.getItem("${prefix}query history")) localStorage.setItem("${prefix}query history", "[]");
         if (!localStorage.getItem("refreshInterval")) localStorage.setItem("refreshInterval", "60");
         if (!localStorage.getItem("tutorial")) localStorage.setItem("tutorial", "false");

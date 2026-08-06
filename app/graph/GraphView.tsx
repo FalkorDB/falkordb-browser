@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, Dispatch, SetStateAction, useContext, useCallback, useState } from "react";
+import { useEffect, Dispatch, SetStateAction, useContext, useCallback } from "react";
 import { GitGraph, ScrollText, Table } from "lucide-react";
 import { cn, GraphRef, Tab, Label, Link, Node, Relationship, HistoryQuery } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -51,10 +51,8 @@ function GraphView({
 }: Props) {
 
     const { graph, graphName, currentTab, setCurrentTab, isLoading, setIsLoading, expand, setExpand } = useContext(GraphContext);
-    const { setData, data, graphData, setGraphData, setViewport, viewport } = useContext(ForceGraphContext);
+    const { setData, data, graphData, setGraphData, setViewport, viewport, dimmed, setDimmed } = useContext(ForceGraphContext);
     const { tutorialOpen } = useContext(BrowserSettingsContext);
-
-    const [dimmed, setDimmed] = useState(true);
 
     const elementsLength = graph.getElements().length;
 

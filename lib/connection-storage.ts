@@ -71,7 +71,7 @@ export function removeConnectionItem(key: string): void {
  * scoped key and remove the legacy entry so migration is one-time.
  * Must be called AFTER setConnectionPrefix().
  */
-const SCOPED_KEYS = ["query history", "savedContent"];
+const SCOPED_KEYS = ["query history"];
 
 /** Prefixes used by graph-specific keys stored as `prefix-graphName`. */
 const SCOPED_KEY_PREFIXES = ["chat-", "cypherOnly-", "labelStyle_"];

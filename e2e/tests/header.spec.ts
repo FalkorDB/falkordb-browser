@@ -28,7 +28,7 @@ test.describe(`Header tests`, () => {
     const navBar = await browser.createNewPage(NavBarComponent, urls.settingsUrl);
     await navBar.clickOnGraphsButton();
     const newUrl = navBar.getCurrentURL();
-    // Ignore a `?graph=<name>` query the app may append (see urlPath).
+    // Ignore a `?tab=<id>` query the app may append (see urlPath).
     expect(urlPath(newUrl)).toBe(urlPath(urls.graphUrl));
   });
 

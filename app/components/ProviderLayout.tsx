@@ -3,17 +3,13 @@
 import { ReactNode, RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
-import { cn, InfoLabel, Panel } from "@/lib/utils";
+import { InfoLabel, Panel } from "@/lib/utils";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import { PanelContext } from "./provider";
 import Header from "./Header";
 import Navbar from "./Navbar";
 import Tutorial from "./Tutorial";
-
-const GraphInfoPanel = dynamic(() => import("../graph/graphInfo"), {
-  ssr: false,
-});
 
 const UdfPanel = dynamic(() => import("../udf/udfPanel"), {
   ssr: false,
@@ -40,25 +36,38 @@ export default function ProviderLayout({
 }: ProviderLayoutProps) {
   const pathname = usePathname();
   const showNavbarAndHeader = pathname !== "/" && pathname !== "/login";
+  const isGraph = pathname === "/graph";
+  const isUdf = pathname === "/udf";
 
   const [panel, setPanel] = useState<Panel>();
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [customizingLabel, setCustomizingLabel] = useState<InfoLabel | null>(null);
   const isRestoringSize = useRef(false);
+  const udfPanelRef = useRef<PanelImperativeHandle>(null);
+  const isRestoringUdfSize = useRef(false);
 
-  const onPanelResize = useCallback((size: PanelSize) => {
+  // The graph info panel is rendered by the /graph route so a sub-header can span
+  // both it and the graph view, but its state lives here where `Tutorial` (a
+  // sibling of the route) and `Selector` can also drive it.
+  const onInfoPanelResize = useCallback((size: PanelSize) => {
     setIsCollapsed(size.asPercentage === 0);
-    if (!isRestoringSize.current && size.asPercentage > 0 && (pathname === "/graph" || pathname === "/udf")) {
-      localStorage.setItem(`panel-size-${pathname}`, JSON.stringify(size.asPercentage));
+    if (!isRestoringSize.current && size.asPercentage > 0) {
+      localStorage.setItem("panel-size-/graph", JSON.stringify(size.asPercentage));
     }
-  }, [pathname]);
+  }, []);
+
+  const onUdfPanelResize = useCallback((size: PanelSize) => {
+    if (!isRestoringUdfSize.current && size.asPercentage > 0) {
+      localStorage.setItem("panel-size-/udf", JSON.stringify(size.asPercentage));
+    }
+  }, []);
 
   const onExpand = useCallback(() => {
     const currentPanel = panelRef.current;
     if (!currentPanel) return;
     if (currentPanel.isCollapsed()) {
       currentPanel.expand();
-      const stored = localStorage.getItem(`panel-size-${pathname}`);
+      const stored = localStorage.getItem("panel-size-/graph");
       if (stored) {
         isRestoringSize.current = true;
         requestAnimationFrame(() => {
@@ -71,50 +80,71 @@ export default function ProviderLayout({
     } else {
       currentPanel.collapse();
     }
-  }, [panelRef, pathname]);
+  }, [panelRef]);
 
-  // Auto-expand panel on /graph and /udf, collapse on other routes
+  // Auto-expand the graph info panel and restore its persisted width on /graph.
   useEffect(() => {
-    const currentPanel = panelRef.current;
-    if (!currentPanel) return;
-
-    let rafId: number | undefined;
-
-    if (pathname === "/graph" || pathname === "/udf") {
-      if (currentPanel.isCollapsed()) currentPanel.expand();
-      const stored = localStorage.getItem(`panel-size-${pathname}`);
-      if (stored) {
-        isRestoringSize.current = true;
-        rafId = requestAnimationFrame(() => {
-          currentPanel.resize(`${JSON.parse(stored)}%`);
-          // Allow saves again after the restore settles
-          requestAnimationFrame(() => {
-            isRestoringSize.current = false;
-          });
-        });
-      }
-    } else if (!currentPanel.isCollapsed()) {
-      rafId = requestAnimationFrame(() => {
-        if (!currentPanel.isCollapsed()) currentPanel.collapse();
-      });
+    if (!isGraph) {
+      setIsCollapsed(true);
+      return undefined;
     }
 
-    return () => {
-      if (rafId !== undefined) cancelAnimationFrame(rafId);
-    };
-  }, [pathname, panelRef]);
+    const currentPanel = panelRef.current;
+    if (!currentPanel) return undefined;
+
+    if (currentPanel.isCollapsed()) currentPanel.expand();
+
+    const stored = localStorage.getItem("panel-size-/graph");
+    if (!stored) return undefined;
+
+    isRestoringSize.current = true;
+    const rafId = requestAnimationFrame(() => {
+      currentPanel.resize(`${JSON.parse(stored)}%`);
+      // Allow saves again after the restore settles
+      requestAnimationFrame(() => {
+        isRestoringSize.current = false;
+      });
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [isGraph, panelRef]);
+
+  // Restore the UDF panel's persisted width on /udf.
+  useEffect(() => {
+    if (!isUdf) return undefined;
+
+    const currentPanel = udfPanelRef.current;
+    if (!currentPanel) return undefined;
+
+    const stored = localStorage.getItem("panel-size-/udf");
+    if (!stored) return undefined;
+
+    isRestoringUdfSize.current = true;
+    const rafId = requestAnimationFrame(() => {
+      currentPanel.resize(`${JSON.parse(stored)}%`);
+      requestAnimationFrame(() => {
+        isRestoringUdfSize.current = false;
+      });
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [isUdf]);
 
   const panelContext = useMemo(() => ({
     panel,
     setPanel,
     panelOpen: !isCollapsed,
     onTogglePanel: onExpand,
-  }), [panel, isCollapsed, onExpand]);
+    infoPanelRef: panelRef,
+    onInfoPanelResize,
+    customizingLabel,
+    setCustomizingLabel,
+  }), [panel, isCollapsed, onExpand, panelRef, onInfoPanelResize, customizingLabel]);
 
   return (
     <PanelContext.Provider value={panelContext}>
       {
-        pathname === "/graph" &&
+        isGraph &&
         <Tutorial
           open={tutorialOpen}
           onClose={onCloseTutorial}
@@ -131,49 +161,32 @@ export default function ProviderLayout({
           showNavbarAndHeader &&
           <Navbar showUDF={showUDF} />
         }
-        <ResizablePanelGroup orientation="horizontal" className="w-1 grow">
-          <ResizablePanel
-            panelRef={panelRef}
-            defaultSize="0%"
-            collapsible={pathname !== "/udf"}
-            minSize="15%"
-            maxSize="30%"
-            onResize={onPanelResize}
-            data-testid="graphInfoPanel"
-          >
-            {
-              pathname === "/udf" ?
+        {
+          isUdf ?
+            <ResizablePanelGroup orientation="horizontal" className="w-1 grow">
+              <ResizablePanel
+                panelRef={udfPanelRef}
+                defaultSize="20%"
+                minSize="15%"
+                maxSize="30%"
+                onResize={onUdfPanelResize}
+              >
                 <UdfPanel />
-                : pathname === "/graph" &&
-                <GraphInfoPanel
-                  onClose={onExpand}
-                  customizingLabel={customizingLabel}
-                  setCustomizingLabel={setCustomizingLabel}
-                />
-            }
-          </ResizablePanel>
-          <ResizableHandle
-            withHandle
-            onMouseUp={() => isCollapsed && onExpand()}
-            className={cn("bg-border", isCollapsed && "hidden")}
-            disabled={isCollapsed}
-          />
-          <ResizablePanel
-            defaultSize="100%"
-            minSize="70%"
-            maxSize="100%"
-          >
-            {
-              (pathname === "/graph") ?
-                <div className="h-full w-full flex flex-col">
-                  {children}
-                  <div className="h-4 w-full Gradient" />
-                </div>
-                :
-                children
-            }
-          </ResizablePanel>
-        </ResizablePanelGroup>
+              </ResizablePanel>
+              <ResizableHandle withHandle className="bg-border" />
+              <ResizablePanel
+                defaultSize="80%"
+                minSize="70%"
+                maxSize="100%"
+              >
+                {children}
+              </ResizablePanel>
+            </ResizablePanelGroup>
+            :
+            <div className="w-1 grow min-h-0">
+              {children}
+            </div>
+        }
       </div>
     </PanelContext.Provider>
   );

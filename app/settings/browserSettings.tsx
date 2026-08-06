@@ -46,8 +46,6 @@ export default function BrowserSettings() {
                 setNewTimeout,
             },
             userExperienceSettings: {
-                newContentPersistence,
-                setNewContentPersistence,
                 captionKeysSettings: { newCaptionsKeys, setNewCaptionsKeys, newShowPropertyKeyPrefix, setNewShowPropertyKeyPrefix },
                 tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple },
                 newRefreshInterval,
@@ -65,7 +63,6 @@ export default function BrowserSettings() {
                 limitSettings: { limit },
             },
             userExperienceSettings: {
-                contentPersistence,
                 captionKeysSettings: { captionsKeys, showPropertyKeyPrefix },
                 refreshInterval,
                 tableViewSettings: { columnWidth, rowHeight, rowHeightExpandMultiple },
@@ -282,7 +279,6 @@ export default function BrowserSettings() {
     }, [modelDisplayNames]);
 
     useEffect(() => {
-        setNewContentPersistence(contentPersistence);
         setNewRunDefaultQuery(runDefaultQuery);
         setNewDefaultQuery(defaultQuery);
         setNewTimeout(timeoutValue);
@@ -304,11 +300,10 @@ export default function BrowserSettings() {
         setNewLocalLlmProvider(localLlmProvider);
         setNewLocalLlmEndpoint(localLlmEndpoint);
         setNewModel(model);
-    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewRefreshInterval, refreshInterval, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch, chatModelSource, localLlmProvider, localLlmEndpoint, model, setNewChatModelSource, setNewLocalLlmProvider, setNewLocalLlmEndpoint, setNewModel, rowHeight]);
+    }, [runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewRefreshInterval, refreshInterval, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch, chatModelSource, localLlmProvider, localLlmEndpoint, model, setNewChatModelSource, setNewLocalLlmProvider, setNewLocalLlmEndpoint, setNewModel, rowHeight]);
 
     useEffect(() => {
         setHasChanges(
-            newContentPersistence !== contentPersistence ||
             newTimeout !== timeoutValue ||
             newLimit !== limit ||
             newDefaultQuery !== defaultQuery ||
@@ -327,7 +322,7 @@ export default function BrowserSettings() {
             newLocalLlmEndpoint !== localLlmEndpoint ||
             newModel !== model
         );
-    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, refreshInterval, newRefreshInterval, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, newChatModelSource, chatModelSource, newLocalLlmProvider, localLlmProvider, newLocalLlmEndpoint, localLlmEndpoint, newModel, model]);
+    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newTimeout, runDefaultQuery, setHasChanges, timeoutValue, refreshInterval, newRefreshInterval, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, newChatModelSource, chatModelSource, newLocalLlmProvider, localLlmProvider, newLocalLlmEndpoint, localLlmEndpoint, newModel, model]);
 
     const handleSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
         e?.preventDefault();
@@ -1306,20 +1301,6 @@ export default function BrowserSettings() {
                         <CardContent>
                             <div className="flex gap-2">
                                 <div className="flex-1 basis-0 flex flex-col gap-2">
-                                    {/* Content Persistence */}
-                                    <div className="flex items-center gap-2 p-2 bg-muted/10 rounded-lg">
-                                        <Switch
-                                            id="contentPersistenceSwitch"
-                                            className="data-[state=unchecked]:bg-border"
-                                            checked={newContentPersistence}
-                                            onCheckedChange={() => createChangeHandler(setNewContentPersistence)(!newContentPersistence, 'contentPersistenceSwitch')}
-                                        />
-                                        <div className="flex flex-col gap-2">
-                                            <h3 className="text-lg font-semibold">Content Persistence</h3>
-                                            <p className="text-sm text-muted-foreground">Enable this function to &apos;Auto-Save&apos; your data in your next Browser session.</p>
-                                        </div>
-                                    </div>
-
                                     {/* Captions Keys */}
                                     <div className="flex-1 basis-0 flex flex-col gap-2 p-2 bg-muted/10 rounded-lg">
                                         <div className="flex flex-col gap-2">

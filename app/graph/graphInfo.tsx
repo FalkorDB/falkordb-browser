@@ -333,7 +333,17 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             <div className="flex gap-2 items-center">
                                 <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Property Keys</h2>
                                 {
-                                    PropertyKeys !== undefined ?
+                                    !hasSelectedGraph ?
+                                        <p
+                                            data-testid="propertyKeysCount"
+                                            tabIndex={0}
+                                            role="text"
+                                            aria-label="No graph selected"
+                                            className="truncate pointer-events-auto text-sm font-semibold"
+                                        >
+                                            -
+                                        </p>
+                                        : PropertyKeys !== undefined ?
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <p

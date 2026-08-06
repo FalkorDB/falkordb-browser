@@ -6,7 +6,7 @@
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import type { Data, GraphLink, GraphNode, ViewportState, LayoutMode, HierarchyDirection, RadialDirection } from "@falkordb/canvas";
-import { getActiveConnectionIdGlobal, getConnectionEpoch, securedFetch, getTheme, GraphRef, GraphData, Node, Relationship, Link, convertToCanvasData } from "@/lib/utils";
+import { getActiveConnectionIdGlobal, getConnectionEpoch, securedFetch, getTheme, GraphRef, GraphData, Node, Relationship, Link, convertToCanvasData, CanvasLayout, captureCanvasLayout, applyCanvasLayout, CANVAS_AUTO_ZOOM_DELAY } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Graph } from "../api/graph/model";
 import { BrowserSettingsContext, IndicatorContext, ConnectionContext, ForceGraphContext } from "./provider";
@@ -17,8 +17,8 @@ interface Props {
     graph: Graph
     data: GraphData
     setData: Dispatch<SetStateAction<GraphData>>
-    graphData: Data | undefined
-    setGraphData: Dispatch<SetStateAction<Data | undefined>>
+    graphData: CanvasLayout | undefined
+    setGraphData: Dispatch<SetStateAction<CanvasLayout | undefined>>
     canvasRef: GraphRef
     selectedElements: (Node | Link)[]
     setSelectedElements: (el?: (Node | Link)[]) => void
@@ -45,7 +45,7 @@ export default function ForceGraph({
     const { setIndicator } = useContext(IndicatorContext);
     const { settings: { userExperienceSettings: { captionKeysSettings: { captionsKeys, showPropertyKeyPrefix } } } } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
-    const { layout: ctxLayout, direction: ctxDirection } = useContext(ForceGraphContext);
+    const { layout: ctxLayout, direction: ctxDirection, animation: ctxAnimation, pinned: ctxPinned } = useContext(ForceGraphContext);
 
     const { theme } = useTheme();
     const { toast } = useToast();
@@ -57,6 +57,11 @@ export default function ForceGraph({
     // skipped only when data still matches — if React batches a real data refresh
     // into the same render, the references differ and the canvas gets updated.
     const pendingRestoreDataRef = useRef<typeof data | null>(null);
+    // Re-applies a restored viewport after the canvas's own deferred zoomToFit.
+    // Held in a ref so it survives effect re-runs; only cleared on unmount.
+    const viewportRestoreTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+    useEffect(() => () => clearTimeout(viewportRestoreTimerRef.current), []);
 
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>();
     const [canvasLoaded, setCanvasLoaded] = useState(false);
@@ -79,26 +84,39 @@ export default function ForceGraph({
 
     // Load saved viewport on mount
     useEffect(() => {
-        if (!viewport || !canvasRef.current || !canvasLoaded) return;
+        if (!viewport || !canvasRef.current || !canvasLoaded) return undefined;
 
         canvasRef.current.setViewport(viewport);
+        // A viewport that arrives alongside fresh results (a tab rebuilt from its
+        // stored metadata) races the canvas's own deferred zoomToFit, which would
+        // otherwise win. Re-apply once that has had its turn.
+        const handle = setTimeout(() => canvasRef.current?.setViewport(viewport), CANVAS_AUTO_ZOOM_DELAY);
+
+        return () => clearTimeout(handle);
     }, [canvasRef, viewport, canvasLoaded]);
 
-    // Save viewport on unmount
+    // Save the canvas layout on unmount, so leaving the Graph view and coming
+    // back restores the positions instead of re-running the simulation.
+    // Deliberately not keyed on the graph: a mid-life re-run would push the
+    // outgoing graph's nodes into a context that has already moved on (a tab
+    // switch), and the restore branch below would paint them back onto the
+    // canvas. Only a real unmount may capture.
     useEffect(() => {
         const canvas = canvasRef.current;
 
-        return () => {
-            if (canvas && setViewport && canvasLoaded) {
-                const savedData = canvas.getData();
+        // Held onto rather than read in the cleanup: React detaches the ref
+        // before passive cleanups run, so `canvasRef.current` would be null.
+        if (!setViewport || !canvasLoaded || !canvas) return undefined;
 
-                if (savedData.nodes.length !== 0) {
-                    setViewport(canvas.getViewport());
-                    setGraphData(savedData);
-                }
+        return () => {
+            const layout = captureCanvasLayout(canvas);
+
+            if (layout) {
+                setViewport(canvas.getViewport());
+                setGraphData(layout);
             }
         };
-    }, [canvasRef, graph.Id, setGraphData, setViewport, canvasLoaded]);
+    }, [canvasRef, setGraphData, setViewport, canvasLoaded]);
 
     const onFetchNode = useCallback(async (node: Node, clickedNode: GraphNode) => {
         const canvas = canvasRef.current;
@@ -370,7 +388,7 @@ export default function ForceGraph({
         canvasRef.current.setForegroundColor(foreground);
     }, [canvasRef, foreground, canvasLoaded]);
 
-    // Initialize layout from context (sourced from URL on first load)
+    // Initialize layout from context (the active tab supplies it on activation)
     useEffect(() => {
         if (!canvasRef.current || !canvasLoaded) return;
         const mode = (ctxLayout || 'force') as LayoutMode;
@@ -390,6 +408,18 @@ export default function ForceGraph({
 
         canvasRef.current.setLayout(mode);
     }, [canvasRef, canvasLoaded, ctxLayout, ctxDirection]);
+
+    // The remaining view toggles are tab state too, so the canvas follows the
+    // context rather than the control that changed it.
+    useEffect(() => {
+        if (!canvasRef.current || !canvasLoaded) return;
+        canvasRef.current.setAnimation(ctxAnimation);
+    }, [canvasRef, canvasLoaded, ctxAnimation]);
+
+    useEffect(() => {
+        if (!canvasRef.current || !canvasLoaded) return;
+        canvasRef.current.setPinOnDragEnd(ctxPinned);
+    }, [canvasRef, canvasLoaded, ctxPinned]);
 
     // Update event handlers and selection functions
     useEffect(() => {
@@ -430,9 +460,23 @@ export default function ForceGraph({
             // Restore a saved canvas layout. Store the current data snapshot so
             // the cleanup re-run can verify data hasn't changed before skipping.
             pendingRestoreDataRef.current = data;
-            canvas.setData(graphData);
+            applyCanvasLayout(canvas, graphData);
             setGraphData(undefined);
-            return undefined; // zoom correction not needed for a restored viewport
+
+            // setData (inside applyCanvasLayout) schedules its own zoomToFit,
+            // which would land after the mount effect restored the viewport and
+            // undo it. Re-apply once that timer has run. The handle lives in a
+            // ref rather than this effect's cleanup because setGraphData(undefined)
+            // re-runs the effect immediately, which would cancel the timer.
+            if (viewport) {
+                canvas.setViewport(viewport);
+                clearTimeout(viewportRestoreTimerRef.current);
+                viewportRestoreTimerRef.current = setTimeout(() => {
+                    canvasRef.current?.setViewport(viewport);
+                }, CANVAS_AUTO_ZOOM_DELAY);
+            }
+
+            return undefined;
         }
 
         // Skip only when this re-run was triggered by setGraphData(undefined)
@@ -473,7 +517,7 @@ export default function ForceGraph({
         }
 
         return undefined;
-    }, [canvasRef, data, graphData, setGraphData, canvasLoaded]);
+    }, [canvasRef, data, graphData, setGraphData, canvasLoaded, viewport]);
 
     return (
         <div

@@ -58,44 +58,22 @@ export default function useUrlParams<K extends string>(keys: readonly K[]) {
 // ---- Route-specific hooks ----
 // Add one per route so consumers don't need to specify param keys.
 
-const GRAPH_KEYS = ["graph", "query", "selected", "layout", "direction"] as const;
-
-export function useGraphParams() {
-  const { params, setParam } = useUrlParams(GRAPH_KEYS);
-  return {
-    graphName: params.graph,
-    setGraphName: useCallback((value: string) => setParam("graph", value), [setParam]),
-    query: params.query,
-    setQuery: useCallback((value: string) => setParam("query", value), [setParam]),
-    selected: params.selected,
-    setSelected: useCallback((value: string) => setParam("selected", value), [setParam]),
-    layout: params.layout,
-    setLayout: useCallback((value: string) => setParam("layout", value), [setParam]),
-    direction: params.direction,
-    setDirection: useCallback((value: string) => setParam("direction", value), [setParam]),
-  };
-}
-
 /**
  * Build the full URL param record for the /graph route from current state.
+ *
+ * Nothing about the working context — graph, query, selection, viewport,
+ * layout — is in the URL; it belongs to the active tab, which persists it and
+ * rebuilds it on entry. The URL only has to name *which* tab, so a reload
+ * lands where you left off.
+ *
  * Add new graph-page params here — the sync effect in providers.tsx
  * calls this so you never need to update the effect itself.
  */
 export function buildGraphUrlParams(state: {
-  graph: string;
-  query: string | null;
-  selected: string;
-  layout: string;
-  direction: string;
+  tab: string;
 }): Record<string, string | null> {
-  const hasGraph = Boolean(state.graph);
   return {
-    graph: state.graph || null,
-    // Without an active graph, query and selected are meaningless — strip them.
-    query: hasGraph ? state.query : null,
-    selected: hasGraph ? (state.selected || null) : null,
-    layout: state.layout && state.layout !== "force" ? state.layout : null,
-    direction: state.direction || null,
+    tab: state.tab || null,
   };
 }
 
