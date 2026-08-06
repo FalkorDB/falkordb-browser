@@ -5,6 +5,7 @@ import { getConnectionItem, removeConnectionItemsByPrefix, setConnectionItem } f
 import {
     clampMaxTabs,
     createTab,
+    INITIAL_TAB_ID,
     parseStoredTabs,
     TAB_SCOPE_PREFIX,
     TABS_STORAGE_KEY,
@@ -83,7 +84,7 @@ export default function useGraphTabs<S>({
     onActivate,
 }: Params<S>) {
     const [state, setState] = useState<TabsState>(() => {
-        const tab = createTab();
+        const tab = { ...createTab(), id: INITIAL_TAB_ID };
         return { tabs: [tab], activeTabId: tab.id };
     });
 

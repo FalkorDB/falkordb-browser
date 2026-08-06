@@ -110,6 +110,14 @@ export const tabStripItemWidth = (maxTabs: number): string => {
     return `calc((100% - ${ADD_BUTTON_WIDTH + STRIP_GAP * limit}px) / ${limit})`;
 };
 
+/**
+ * Id of the placeholder tab that is rendered before the stored strip is read
+ * back. Fixed rather than random because the tab id reaches the DOM (test ids),
+ * and `crypto.randomUUID()` there is a guaranteed hydration mismatch. The
+ * restore effect replaces this tab on mount, so it is never persisted.
+ */
+export const INITIAL_TAB_ID = "initial";
+
 export const createTab = (): GraphTab => ({
     id: typeof crypto !== "undefined" && crypto.randomUUID
         ? crypto.randomUUID()
