@@ -21,12 +21,13 @@ import { Explain, Metadata, Profile } from "./MetadataView";
 
 type Tab = "text" | "metadata" | "explain" | "profile";
 
-/** Serializes queries into a runnable `.cypher` batch, one statement per query. */
+/** Serializes queries into a runnable `.cypher` batch, one statement per query.
+ *  The terminator sits on its own line so a trailing `//` comment can't swallow it. */
 const buildCypherBatch = (queries: Query[]) => queries.map(query => {
     const header = query.graphName && `// graph: ${query.graphName}`
     const text = query.text.trim().replace(/;+$/, "");
 
-    return header ? `${header}\n${text};` : `${text};`;
+    return header ? `${header}\n${text}\n;` : `${text}\n;`;
 }).join("\n\n");
 
 interface Props {
@@ -52,6 +53,9 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     const searchQueryRef = useRef<HTMLInputElement>(null);
 
     const [filteredQueries, setFilteredQueries] = useState<Query[]>([]);
+    // The list PaginationList actually renders, i.e. `filteredQueries` after its internal
+    // search filtering. Select-all must act on what the user can see.
+    const [visibleQueries, setVisibleQueries] = useState<Query[]>([]);
     const [activeFilters, setActiveFilters] = useState<string[]>([]);
     const [favFilter, setFavFilter] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -119,6 +123,8 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     }, [sharedLanguageConfig, historyLanguageConfig]);
 
     const afterSearchCallback = useCallback((newFilteredList: Query[]) => {
+        setVisibleQueries(newFilteredList);
+
         const selectedQuery = historyQuery.counter === 0
             ? historyQuery.currentQuery
             : historyQuery.queries[historyQuery.counter - 1];
@@ -308,14 +314,16 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     const handleDeleteQuery = useCallback(() => {
         if (!historyQuery || !setHistoryQuery) return;
 
+        const selected = new Set(selectedQueries);
         const deleteElements = historyQuery.queries.reduce<number[]>((acc, query, idx) => {
-            if (selectedQueries.includes(query.text)) acc.push(idx);
+            if (selected.has(query.text)) acc.push(idx);
             return acc;
         }, []);
 
         if (deleteElements.length === 0) return;
 
-        const newQueries = historyQuery.queries.filter((_, idx) => !deleteElements.some((removeIndex) => idx === removeIndex));
+        const deleteIndices = new Set(deleteElements);
+        const newQueries = historyQuery.queries.filter((_, idx) => !deleteIndices.has(idx));
 
         if (newQueries.length === 0) removeConnectionItem("query history");
         else setConnectionItem("query history", JSON.stringify(newQueries));
@@ -342,7 +350,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
             query: nextQuery
         }));
         setSelectedQueries([]);
-        setFilteredQueries(current => current.filter(query => !selectedQueries.includes(query.text)));
+        setFilteredQueries(current => current.filter(query => !selected.has(query.text)));
     }, [historyQuery, setHistoryQuery, selectedQueries]);
 
     const handleExportSelected = useCallback(() => {
@@ -396,8 +404,9 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     const handleClearSelectedFav = useCallback(() => {
         if (!historyQuery || !setHistoryQuery) return;
 
+        const selected = new Set(selectedQueries);
         const unFav = (q: Query) =>
-            q.fav && selectedQueries.includes(q.text) ? { ...q, fav: false, name: undefined } : q;
+            q.fav && selected.has(q.text) ? { ...q, fav: false, name: undefined } : q;
 
         const newQueries = historyQuery.queries.map(unFav);
 
@@ -414,8 +423,9 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
 
     if (!historyQuery || !setHistoryQuery) return null;
 
-    const isAllSelected = filteredQueries.length > 0 && filteredQueries.every(q => selectedQueries.includes(q.text));
-    const hasSelectedFav = historyQuery.queries.some(q => q.fav && selectedQueries.includes(q.text));
+    const selectedSet = new Set(selectedQueries);
+    const isAllSelected = visibleQueries.length > 0 && visibleQueries.every(q => selectedSet.has(q.text));
+    const hasSelectedFav = historyQuery.queries.some(q => q.fav && selectedSet.has(q.text));
 
     return (
         <div data-testid="queryHistoryPanel" className="h-full w-full border border-border rounded-lg bg-background">
@@ -435,7 +445,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                 <PaginationList
                     label="Query"
                     className="overflow-hidden h-[313px] max-h-[393px] p-1 border-b border-border"
-                    isSelected={(item) => selectedQueries.includes(item.text)}
+                    isSelected={(item) => selectedSet.has(item.text)}
                     afterSearchCallback={afterSearchCallback}
                     onToggleFav={handleToggleFav}
                     dataTestId="queryHistory"
@@ -477,8 +487,8 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                                 variant="Primary"
                                 data-testid="queryHistorySelectAll"
                                 title={isAllSelected ? "Deselect all queries" : "Select all queries"}
-                                onClick={() => setSelectedQueries(isAllSelected ? [] : filteredQueries.map(q => q.text))}
-                                disabled={filteredQueries.length === 0}
+                                onClick={() => setSelectedQueries(isAllSelected ? [] : visibleQueries.map(q => q.text))}
+                                disabled={visibleQueries.length === 0}
                             >
                                 {
                                     !isAllSelected
@@ -495,7 +505,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                                     </span>
                                 </TooltipTrigger>
                                 <TooltipContent className="whitespace-pre-line">
-                                    {`${selectedQueries.length} selected\nPress (Left Click) to select a query\nPress (Ctrl + Left Click) for multi select`}
+                                    {`${selectedQueries.length} selected\nPress (Left Click) to select a query\nPress (Ctrl/Cmd + Left Click) for multi select`}
                                 </TooltipContent>
                             </Tooltip>
                         </div>
