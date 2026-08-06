@@ -320,8 +320,10 @@ test.describe("Customize Style Tests", () => {
     // Verify Save button is visible (changes were made)
     expect(await graph.isSaveButtonVisible()).toBeTruthy();
 
-    // Close panel WITHOUT saving (using Escape)
-    await graph.closePanelWithEscape();
+    // Close panel WITHOUT saving. Escape only reverts, it leaves the panel
+    // open, and an open panel is now part of the tab's persisted state — it
+    // would come back after the refresh and cover the graph selector.
+    await graph.closePanel();
 
     // Refresh the page
     await graph.refreshPage();
