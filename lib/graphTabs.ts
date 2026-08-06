@@ -26,7 +26,6 @@ export type GraphTabMeta = {
     /** Chat panel open. Its messages are keyed by tab id + graph name. */
     chatOpen?: boolean;
 };
-
 /**
  * The serializable part of a working context — what the tab strip shows and
  * what survives a page reload. Enough to rebuild the context from scratch:
@@ -126,6 +125,16 @@ export const createTab = (): GraphTab => ({
     query: "",
     view: "Graph",
 });
+
+/**
+ * Strips the parts of a tab that only make sense while the session is alive.
+ *
+ * `customizing` names the label whose style panel is open. That is worth
+ * carrying when the user flips between tabs, but not across a reload: the
+ * panel renders in place of the graph info label list, so restoring it hides
+ * that list behind a panel for a label the reloaded graph may not even have.
+ */
+export const forStorage = ({ customizing, ...tab }: GraphTab): GraphTab => tab;
 
 const isViewport = (value: unknown): value is ViewportState => {
     if (typeof value !== "object" || value === null) return false;

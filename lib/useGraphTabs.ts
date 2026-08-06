@@ -5,6 +5,7 @@ import { getConnectionItem, removeConnectionItemsByPrefix, setConnectionItem } f
 import {
     clampMaxTabs,
     createTab,
+    forStorage,
     INITIAL_TAB_ID,
     parseStoredTabs,
     TAB_SCOPE_PREFIX,
@@ -177,7 +178,7 @@ export default function useGraphTabs<S>({
 
         const prev = stateRef.current;
         setConnectionItem(TABS_STORAGE_KEY, JSON.stringify({
-            tabs: withLive(prev),
+            tabs: withLive(prev).map(forStorage),
             activeTabId: prev.activeTabId,
         }));
     }, [withLive]);

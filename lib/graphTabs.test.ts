@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
     clampMaxTabs,
+    forStorage,
     normalizeDirection,
     normalizeLayout,
     parseStoredTabs,
@@ -24,6 +25,16 @@ const tab = (overrides: Partial<GraphTab> = {}): GraphTab => ({
 
 const stored = (tabs: unknown[], activeTabId?: unknown) =>
     JSON.stringify({ tabs, activeTabId });
+
+test("forStorage drops the open style panel but keeps the rest of the tab", () => {
+    const source = tab({ customizing: "person1", panelOpen: true, chatOpen: true, name: "mine" });
+    const result = forStorage(source);
+
+    assert.equal("customizing" in result, false);
+    assert.deepEqual(result, tab({ panelOpen: true, chatOpen: true, name: "mine" }));
+    // Non-destructive: the live tab still knows which panel is open.
+    assert.equal(source.customizing, "person1");
+});
 
 test("tabStripItemWidth reserves room for the add button and every gap", () => {
     // 4 tabs: 24px add button + 4 x 4px gap = 40px reserved.

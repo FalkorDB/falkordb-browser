@@ -166,6 +166,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
         <>
             <Button
                 className="absolute top-2 right-2 z-10"
+                data-testid="customizeStyleClose"
                 title="Close"
                 onClick={handleClose}
             >
