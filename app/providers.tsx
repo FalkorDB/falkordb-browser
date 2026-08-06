@@ -217,10 +217,15 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     graphNamesRef.current = graphNames ?? [];
   }, [graphNames]);
   const [graphNamesLoaded, setGraphNamesLoaded] = useState(false);
-  // Mirrored at render time so callbacks can tell "the graph is gone" from
-  // "the list is not in yet" without re-creating themselves.
+  // Mirrored so callbacks can tell "the graph is gone" from "the list is not in
+  // yet" without re-creating themselves. Written in an effect, not during
+  // render, so an abandoned render cannot leak a value that never committed —
+  // and, like graphNamesRef above, declared ahead of useGraphTabs so it is
+  // up to date by the time the restore effect activates a tab.
   const graphNamesLoadedRef = useRef(graphNamesLoaded);
-  graphNamesLoadedRef.current = graphNamesLoaded;
+  useEffect(() => {
+    graphNamesLoadedRef.current = graphNamesLoaded;
+  }, [graphNamesLoaded]);
   const [graph, setGraph] = useState<Graph>(Graph.empty());
   // graphRef always points to the current graph so setGraphInfo can mutate
   // graph.GraphInfo in-place without triggering a graph state change.

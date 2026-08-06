@@ -671,7 +671,9 @@ export default class GraphPage extends BasePage {
    * bounding box width instead.
    */
   private async ensureGraphInfoPanelOpen(): Promise<void> {
-    const box = await this.graphInfoPanel.boundingBox().catch(() => null);
+    // Bounded: boundingBox() waits forever on a selector that matches nothing,
+    // which turns a typo into an opaque test timeout instead of a fallback.
+    const box = await this.graphInfoPanel.boundingBox({ timeout: 5000 }).catch(() => null);
     if (!box || box.width < 50) {
       await interactWhenVisible(
         this.graphInfoToggle,
@@ -696,9 +698,14 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("graphInfoToggle");
   }
 
-  /** The resizable wrapper, not the panel body — only it reports the real width. */
+  /**
+   * The panel body from graphInfo.tsx. It is the only element carrying this
+   * test id — react-resizable-panels overwrites any `data-testid` passed to
+   * `ResizablePanel` with the panel's own id, so the wrapper cannot be tagged.
+   * Being `w-full` inside the panel, its box still reports the real width.
+   */
   private get graphInfoPanel(): Locator {
-    return this.page.getByTestId("graphInfoPanelContainer");
+    return this.page.getByTestId("graphInfoPanel");
   }
 
   private get closeHelpMessage(): Locator {
