@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext, useState } from "react";
+import { useContext, useRef, useState } from "react";
 import { Pencil, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { tabStripItemWidth } from "@/lib/useGraphTabs";
@@ -21,6 +21,9 @@ export default function GraphSubHeader() {
   // custom name only: an empty box is what clears it back to the graph name.
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  // Set when Escape cancels a rename, so the blur that follows the unmount does
+  // not commit the discarded draft. Cleared by whichever handler consumes it.
+  const cancelRenameRef = useRef(false);
 
   // The last remaining tab cannot be closed — there is always one context.
   const canClose = tabs.length > 1;
@@ -30,7 +33,19 @@ export default function GraphSubHeader() {
   const tabMaxWidth = tabStripItemWidth(maxTabs);
 
   const commitRename = () => {
+    // Escape unmounts the input, and the resulting blur would otherwise commit
+    // the very draft the user just discarded — the handler still closes over
+    // the pre-update `editingId`/`draft`. The flag makes that blur a no-op.
+    if (cancelRenameRef.current) {
+      cancelRenameRef.current = false;
+      return;
+    }
     if (editingId) renameTab(editingId, draft);
+    setEditingId(null);
+  };
+
+  const cancelRename = () => {
+    cancelRenameRef.current = true;
     setEditingId(null);
   };
 
@@ -75,7 +90,7 @@ export default function GraphSubHeader() {
                     onBlur={commitRename}
                     onKeyDown={e => {
                       if (e.key === "Enter") commitRename();
-                      if (e.key === "Escape") setEditingId(null);
+                      if (e.key === "Escape") cancelRename();
                     }}
                   />
                   : <>
@@ -97,6 +112,7 @@ export default function GraphSubHeader() {
                           className="rounded hover:bg-background"
                           aria-label={`Rename ${label}`}
                           onClick={() => {
+                            cancelRenameRef.current = false;
                             setDraft(tab.name ?? "");
                             setEditingId(tab.id);
                           }}

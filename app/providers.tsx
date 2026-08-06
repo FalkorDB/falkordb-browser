@@ -1575,7 +1575,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setRunDefaultQuery(localStorage.getItem("runDefaultQuery") !== "false");
       setTutorialOpen(localStorage.getItem("tutorial") !== "false");
       setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30));
-      setMaxTabs(clampMaxTabs(parseInt(localStorage.getItem("maxTabs") || "", 10)));
+      const loadedMaxTabs = clampMaxTabs(parseInt(localStorage.getItem("maxTabs") || "", 10));
+      setMaxTabs(loadedMaxTabs);
+      // Seed the settings-form value too, otherwise the form keeps showing the
+      // default and reads as "changed" against the value actually in effect.
+      setNewMaxTabs(loadedMaxTabs);
       setMaxSavedMessages(parseInt(localStorage.getItem("maxSavedMessages") || "5", 10));
       setShowPropertyKeyPrefix(localStorage.getItem("showPropertyKeyPrefix") === "true");
       setCypherOnly(localStorage.getItem("cypherOnly") === "true");

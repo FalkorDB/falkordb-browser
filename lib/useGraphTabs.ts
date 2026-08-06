@@ -262,8 +262,10 @@ export default function useGraphTabs<S>({
         if (!wasActive) sessionsRef.current.set(prev.activeTabId, captureSessionRef.current());
         sessionsRef.current.delete(id);
         // Tab-scoped storage (chat history) would otherwise outlive the tab and
-        // grow without bound, since ids are never reused.
-        removeConnectionItemsByPrefix(`${TAB_SCOPE_PREFIX}${id}-`);
+        // grow without bound, since ids are never reused. Only once the prefix
+        // is set: unprefixed, the helper would sweep unscoped keys instead —
+        // and nothing scoped can have been written yet anyway.
+        if (prefixReady) removeConnectionItemsByPrefix(`${TAB_SCOPE_PREFIX}${id}-`);
 
         const remaining = withLive(prev).filter(t => t.id !== id);
         // Closing the active tab falls back to its neighbour on the right,
@@ -272,7 +274,7 @@ export default function useGraphTabs<S>({
 
         setState({ tabs: remaining, activeTabId: next ? next.id : prev.activeTabId });
         if (next) onActivateRef.current(next, sessionsRef.current.get(next.id));
-    }, [withLive]);
+    }, [withLive, prefixReady]);
 
     return useMemo(() => ({
         tabs,

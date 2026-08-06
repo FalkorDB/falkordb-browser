@@ -4,9 +4,9 @@ import { useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 import { setUrlParam } from "./urlParams";
 
-// The param helpers themselves are pure, so they live in ./urlParams and are
-// unit-testable on their own. Re-exported here so callers keep a single entry
-// point for everything URL-param related.
+// The param helpers themselves are framework-agnostic (no React/Next imports),
+// so they live in ./urlParams and are unit-testable on their own. Re-exported
+// here so callers keep a single entry point for everything URL-param related.
 export * from "./urlParams";
 
 /**
