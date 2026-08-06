@@ -4,7 +4,7 @@ import { useEffect, Dispatch, SetStateAction, useContext, useCallback } from "re
 import { GitGraph, ScrollText, Table } from "lucide-react";
 import { cn, GraphRef, Tab, Label, Link, Node, Relationship, HistoryQuery } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { GraphContext, ForceGraphContext, BrowserSettingsContext } from "@/app/components/provider";
+import { GraphContext, ForceGraphContext } from "@/app/components/provider";
 import ForceGraph from "@/app/components/ForceGraph";
 import { setConnectionItem } from "@/lib/connection-storage";
 import Button from "../components/ui/Button";
@@ -50,11 +50,8 @@ function GraphView({
     isAddNode,
 }: Props) {
 
-    const { graph, graphName, currentTab, setCurrentTab, isLoading, setIsLoading, expand, setExpand } = useContext(GraphContext);
+    const { graph, graphName, currentTab, setCurrentTab, isLoading, expand, setExpand } = useContext(GraphContext);
     const { setData, data, graphData, setGraphData, setViewport, viewport, dimmed, setDimmed } = useContext(ForceGraphContext);
-    const { tutorialOpen } = useContext(BrowserSettingsContext);
-
-    const elementsLength = graph.getElements().length;
 
     useEffect(() => {
         setRelationships([...graph.Relationships]);

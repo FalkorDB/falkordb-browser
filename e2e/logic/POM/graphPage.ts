@@ -1042,6 +1042,65 @@ export default class GraphPage extends BasePage {
     await interactWhenVisible(this.graphTab, (el) => el.click(), "Graph Tab");
   }
 
+  // GRAPH TAB STRIP
+  // The per-connection working contexts in the sub-header. Located by their
+  // visible label, which is the custom name when set and the graph name
+  // otherwise (or "New tab" while the tab has no graph yet).
+  public get tabStrip(): Locator {
+    return this.page.getByTestId("graphSubHeader");
+  }
+
+  public get addTabButton(): Locator {
+    return this.page.getByTestId("graphTabAdd");
+  }
+
+  public stripTab(label: string): Locator {
+    return this.page.getByTestId(`graphTab${label}`);
+  }
+
+  async getStripTabLabels(): Promise<string[]> {
+    await this.tabStrip.waitFor({ state: "visible" });
+    return this.tabStrip.locator('[data-testid^="graphTabSelect"]').allInnerTexts();
+  }
+
+  async getStripTabCount(): Promise<number> {
+    await this.tabStrip.waitFor({ state: "visible" });
+    return this.tabStrip.locator('[data-testid^="graphTabSelect"]').count();
+  }
+
+  async addStripTab(): Promise<void> {
+    await interactWhenVisible(this.addTabButton, (el) => el.click(), "Add Tab");
+  }
+
+  async selectStripTab(label: string): Promise<void> {
+    await interactWhenVisible(
+      this.page.getByTestId(`graphTabSelect${label}`),
+      (el) => el.click(),
+      `Select Tab ${label}`
+    );
+  }
+
+  async closeStripTab(label: string): Promise<void> {
+    await interactWhenVisible(
+      this.page.getByTestId(`graphTabClose${label}`),
+      (el) => el.click(),
+      `Close Tab ${label}`
+    );
+  }
+
+  /** Renames via the pencil affordance. An empty name clears back to the graph name. */
+  async renameStripTab(label: string, name: string): Promise<void> {
+    await interactWhenVisible(
+      this.page.getByTestId(`graphTabRenameTrigger${label}`),
+      (el) => el.click(),
+      `Rename Trigger ${label}`
+    );
+    const input = this.page.getByTestId(`graphTabRename${label}`);
+    await input.waitFor({ state: "visible" });
+    await input.fill(name);
+    await input.press("Enter");
+  }
+
   async getGraphTabEnabled(): Promise<boolean> {
     return waitForElementToBeEnabled(this.graphTab);
   }

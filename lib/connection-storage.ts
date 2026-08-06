@@ -63,6 +63,21 @@ export function removeConnectionItem(key: string): void {
   localStorage.removeItem(prefixed(key));
 }
 
+/**
+ * Removes every scoped key starting with `keyPrefix`. Used to drop the
+ * per-tab entries (chat history, …) of a tab the user just closed.
+ */
+export function removeConnectionItemsByPrefix(keyPrefix: string): void {
+  if (!isBrowser()) return;
+  const full = prefixed(keyPrefix);
+  const doomed: string[] = [];
+  for (let i = 0; i < localStorage.length; i += 1) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith(full)) doomed.push(key);
+  }
+  doomed.forEach(key => localStorage.removeItem(key));
+}
+
 // ── legacy migration ───────────────────────────────────────────────
 
 /**

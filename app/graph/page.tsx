@@ -78,6 +78,8 @@ export default function Page() {
         isLoading,
         pendingAutoLoadRef,
         currentTab,
+        chatOpen,
+        setChatOpen,
     } = useContext(GraphContext);
     const {
         settings: {
@@ -103,7 +105,6 @@ export default function Page() {
     // selection with the graph it was made in.
     const currentGraphIdRef = useRef(graph.Id);
     currentGraphIdRef.current = graph.Id;
-    const [chatOpen, setChatOpen] = useState(false);
     const { size: chatSize, onResize: onChatResize } = useResizableSize("chat-size", 400, 500, 300, 300);
     const [queriesOpen, setQueriesOpen] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(true);

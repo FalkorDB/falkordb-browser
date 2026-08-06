@@ -1,9 +1,9 @@
 "use client";
 
-import { ReactNode, RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, RefObject, Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
-import { InfoLabel, Panel } from "@/lib/utils";
+import { Panel } from "@/lib/utils";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import { PanelContext } from "./provider";
@@ -18,6 +18,9 @@ const UdfPanel = dynamic(() => import("../udf/udfPanel"), {
 interface ProviderLayoutProps {
   children: ReactNode;
   panelRef: RefObject<PanelImperativeHandle | null>;
+  /** Lifted so the active tab can carry it; see `PanelContextType`. */
+  customizingLabel: string | null;
+  setCustomizingLabel: Dispatch<SetStateAction<string | null>>;
   tutorialOpen: boolean;
   onCloseTutorial: () => void;
   onLoadDemoGraphs: () => Promise<void>;
@@ -28,6 +31,8 @@ interface ProviderLayoutProps {
 export default function ProviderLayout({
   children,
   panelRef,
+  customizingLabel,
+  setCustomizingLabel,
   tutorialOpen,
   onCloseTutorial,
   onLoadDemoGraphs,
@@ -41,7 +46,6 @@ export default function ProviderLayout({
 
   const [panel, setPanel] = useState<Panel>();
   const [isCollapsed, setIsCollapsed] = useState(true);
-  const [customizingLabel, setCustomizingLabel] = useState<InfoLabel | null>(null);
   const isRestoringSize = useRef(false);
   const udfPanelRef = useRef<PanelImperativeHandle>(null);
   const isRestoringUdfSize = useRef(false);
@@ -139,7 +143,7 @@ export default function ProviderLayout({
     onInfoPanelResize,
     customizingLabel,
     setCustomizingLabel,
-  }), [panel, isCollapsed, onExpand, panelRef, onInfoPanelResize, customizingLabel]);
+  }), [panel, isCollapsed, onExpand, panelRef, onInfoPanelResize, customizingLabel, setCustomizingLabel]);
 
   return (
     <PanelContext.Provider value={panelContext}>

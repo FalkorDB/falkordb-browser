@@ -15,6 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { detectProviderFromApiKey, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import { serverEncrypt } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
+import { MAX_GRAPH_TABS, MIN_GRAPH_TABS } from "@/lib/useGraphTabs";
 import { BrowserSettingsContext, type ChatModelSource, type LocalLlmProvider } from "../components/provider";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -50,6 +51,8 @@ export default function BrowserSettings() {
                 tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple },
                 newRefreshInterval,
                 setNewRefreshInterval,
+                newMaxTabs,
+                setNewMaxTabs,
             },
             chatSettings: { setNewSecretKey, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly, newChatModelSource, setNewChatModelSource, newLocalLlmProvider, setNewLocalLlmProvider, newLocalLlmEndpoint, setNewLocalLlmEndpoint, newModel, setNewModel },
             graphInfo: { newMaxItemsForSearch, setNewMaxItemsForSearch },
@@ -65,6 +68,7 @@ export default function BrowserSettings() {
             userExperienceSettings: {
                 captionKeysSettings: { captionsKeys, showPropertyKeyPrefix },
                 refreshInterval,
+                maxTabs,
                 tableViewSettings: { columnWidth, rowHeight, rowHeightExpandMultiple },
             },
             chatSettings: { secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, model, setModel, setSecretKey, setSelectedChatApiKeyId, setChatApiKeys, maxSavedMessages, cypherOnly, perSourceModels, setPerSourceModels },
@@ -288,6 +292,7 @@ export default function BrowserSettings() {
         setEditingKeyId(null);
         setEditingKeyValue("");
         setNewRefreshInterval(refreshInterval);
+        setNewMaxTabs(maxTabs);
         setNewMaxSavedMessages(maxSavedMessages);
         setNewCaptionsKeys(captionsKeys);
         setNewShowPropertyKeyPrefix(showPropertyKeyPrefix);
@@ -300,7 +305,7 @@ export default function BrowserSettings() {
         setNewLocalLlmProvider(localLlmProvider);
         setNewLocalLlmEndpoint(localLlmEndpoint);
         setNewModel(model);
-    }, [runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewRefreshInterval, refreshInterval, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch, chatModelSource, localLlmProvider, localLlmEndpoint, model, setNewChatModelSource, setNewLocalLlmProvider, setNewLocalLlmEndpoint, setNewModel, rowHeight]);
+    }, [runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewRefreshInterval, refreshInterval, setNewMaxTabs, maxTabs, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch, chatModelSource, localLlmProvider, localLlmEndpoint, model, setNewChatModelSource, setNewLocalLlmProvider, setNewLocalLlmEndpoint, setNewModel, rowHeight]);
 
     useEffect(() => {
         setHasChanges(
@@ -309,6 +314,7 @@ export default function BrowserSettings() {
             newDefaultQuery !== defaultQuery ||
             newRunDefaultQuery !== runDefaultQuery ||
             refreshInterval !== newRefreshInterval ||
+            newMaxTabs !== maxTabs ||
             newMaxSavedMessages !== maxSavedMessages ||
             !areCaptionKeysEqual(newCaptionsKeys, captionsKeys) ||
             newShowPropertyKeyPrefix !== showPropertyKeyPrefix ||
@@ -322,7 +328,7 @@ export default function BrowserSettings() {
             newLocalLlmEndpoint !== localLlmEndpoint ||
             newModel !== model
         );
-    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newTimeout, runDefaultQuery, setHasChanges, timeoutValue, refreshInterval, newRefreshInterval, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, newChatModelSource, chatModelSource, newLocalLlmProvider, localLlmProvider, newLocalLlmEndpoint, localLlmEndpoint, newModel, model]);
+    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newTimeout, runDefaultQuery, setHasChanges, timeoutValue, refreshInterval, newRefreshInterval, maxTabs, newMaxTabs, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, newChatModelSource, chatModelSource, newLocalLlmProvider, localLlmProvider, newLocalLlmEndpoint, localLlmEndpoint, newModel, model]);
 
     const handleSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
         e?.preventDefault();
@@ -1424,6 +1430,49 @@ export default function BrowserSettings() {
                                             <div className="flex justify-between text-xs text-muted-foreground mt-2">
                                                 <span>5s</span>
                                                 <span>60s</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Max Tabs */}
+                                    <div className="basis-0 grow flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 p-2 bg-muted/10 rounded-lg">
+                                        <div className="flex flex-col gap-2 flex-1">
+                                            <label id="maxTabsLabel" htmlFor="maxTabs" className="text-lg font-semibold">Max Tabs</label>
+                                            <p className="text-sm text-muted-foreground">
+                                                Keep up to {newMaxTabs} graph tabs open at once. Fewer tabs leaves more room for each label.
+                                            </p>
+                                        </div>
+                                        <div className="sm:w-64">
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    aria-label="Decrease max tabs"
+                                                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background hover:bg-muted"
+                                                    onClick={() => nudgeSlider(newMaxTabs, -1, MIN_GRAPH_TABS, MAX_GRAPH_TABS, setNewMaxTabs, "maxTabs")}
+                                                >
+                                                    <Minus className="h-4 w-4" />
+                                                </button>
+                                                <Slider
+                                                    id="maxTabs"
+                                                    aria-labelledby="maxTabsLabel"
+                                                    className="w-full"
+                                                    min={MIN_GRAPH_TABS}
+                                                    max={MAX_GRAPH_TABS}
+                                                    value={[newMaxTabs]}
+                                                    onValueChange={(value) => createChangeHandler(setNewMaxTabs)(value[value.length - 1], "maxTabs")}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    aria-label="Increase max tabs"
+                                                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background hover:bg-muted"
+                                                    onClick={() => nudgeSlider(newMaxTabs, 1, MIN_GRAPH_TABS, MAX_GRAPH_TABS, setNewMaxTabs, "maxTabs")}
+                                                >
+                                                    <Plus className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                            <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                                                <span>{MIN_GRAPH_TABS}</span>
+                                                <span>{MAX_GRAPH_TABS}</span>
                                             </div>
                                         </div>
                                     </div>

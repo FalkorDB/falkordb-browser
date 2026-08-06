@@ -1,13 +1,13 @@
 import { createContext, Dispatch, RefObject, SetStateAction } from "react";
 import type { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import type { AIProvider } from "@/lib/ai-provider-utils";
-import { CanvasLayout, ConnectionInfo, ConnectionType, GraphData, GraphRef, HistoryQuery, InfoLabel, Label, Panel, Relationship, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
+import { CanvasLayout, ConnectionInfo, ConnectionType, GraphData, GraphRef, HistoryQuery, Label, Panel, Relationship, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
 import type { DiagnosticsResult } from "@/lib/cypherDiagnostics";
-import type { GraphTab } from "@/lib/useGraphTabs";
 import type { LayoutMode, ViewportState } from "@falkordb/canvas";
 import type { SessionConnection } from "next-auth";
 import type { LanguageConfig } from "./EditorComponent";
 import { Graph, GraphInfo } from "../api/graph/model";
+import { DEFAULT_GRAPH_TABS, GraphTab } from "@/lib/useGraphTabs";
 
 export type ChatApiKey = {
   id: string;
@@ -37,6 +37,8 @@ type BrowserSettingsContextType = {
     userExperienceSettings: {
       newRefreshInterval: number;
       setNewRefreshInterval: Dispatch<SetStateAction<number>>;
+      newMaxTabs: number;
+      setNewMaxTabs: Dispatch<SetStateAction<number>>;
       captionKeysSettings: {
         newCaptionsKeys: [string, boolean][];
         setNewCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
@@ -91,6 +93,9 @@ type BrowserSettingsContextType = {
     userExperienceSettings: {
       refreshInterval: number;
       setRefreshInterval: Dispatch<SetStateAction<number>>;
+      /** Upper bound on open graph tabs, between 4 and 10. */
+      maxTabs: number;
+      setMaxTabs: Dispatch<SetStateAction<number>>;
       captionKeysSettings: {
         captionsKeys: [string, boolean][];
         setCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
@@ -166,6 +171,9 @@ type GraphContextType = {
   setIsLoading: (loading: boolean) => void;
   expand: boolean;
   setExpand: Dispatch<SetStateAction<boolean>>;
+  /** Chat panel open. Tab metadata, so each tab keeps its own chat visible. */
+  chatOpen: boolean;
+  setChatOpen: Dispatch<SetStateAction<boolean>>;
   selectedParam: string;
   setSelectedParam: Dispatch<SetStateAction<string>>;
   /**
@@ -204,8 +212,13 @@ type PanelContextType = {
    */
   infoPanelRef: RefObject<PanelImperativeHandle | null>;
   onInfoPanelResize: (size: PanelSize) => void;
-  customizingLabel: InfoLabel | null;
-  setCustomizingLabel: Dispatch<SetStateAction<InfoLabel | null>>;
+  /**
+   * Name of the label whose style is being customized, or null for the normal
+   * info view. Held by name — not by object — so it survives a graph info
+   * refresh and can be stored as tab metadata.
+   */
+  customizingLabel: string | null;
+  setCustomizingLabel: Dispatch<SetStateAction<string | null>>;
 };
 
 type QueryLoadingContextType = {
@@ -217,7 +230,10 @@ type GraphTabsContextType = {
   /** Working contexts for the current connection, ordered left to right. */
   tabs: GraphTab[];
   activeTabId: string;
+  /** The user's tab limit, also used to size the tab strip. */
+  maxTabs: number;
   selectTab: (id: string) => void;
+  /** No-op once `maxTabs` tabs are open. */
   addTab: () => void;
   /** Sets a custom label; a blank name falls back to the graph name. */
   renameTab: (id: string, name: string) => void;
@@ -328,6 +344,8 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         },
         newRefreshInterval: 0,
         setNewRefreshInterval: () => { },
+        newMaxTabs: DEFAULT_GRAPH_TABS,
+        setNewMaxTabs: () => { },
       },
       chatSettings: {
         newSecretKey: "",
@@ -368,6 +386,8 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
       userExperienceSettings: {
         refreshInterval: 0,
         setRefreshInterval: () => { },
+        maxTabs: DEFAULT_GRAPH_TABS,
+        setMaxTabs: () => { },
         captionKeysSettings: {
           captionsKeys: [],
           setCaptionsKeys: () => { },
@@ -444,6 +464,8 @@ export const GraphContext = createContext<GraphContextType>({
   setIsLoading: () => { },
   expand: true,
   setExpand: () => { },
+  chatOpen: false,
+  setChatOpen: () => { },
   selectedParam: "",
   setSelectedParam: () => { },
   pendingAutoLoadRef: { current: null },
@@ -506,6 +528,7 @@ export const QueryLoadingContext = createContext<QueryLoadingContextType>({
 export const GraphTabsContext = createContext<GraphTabsContextType>({
   tabs: [],
   activeTabId: "",
+  maxTabs: DEFAULT_GRAPH_TABS,
   selectTab: () => { },
   addTab: () => { },
   renameTab: () => { },

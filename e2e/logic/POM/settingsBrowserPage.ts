@@ -765,6 +765,20 @@ export default class SettingsBrowserPage extends BasePage {
     return this.getSliderValue(this.refreshIntervalSlider);
   }
 
+  private get maxTabsSlider(): Locator {
+    return this.page.locator('#maxTabs');
+  }
+
+  async setMaxTabsSlider(value: number): Promise<void> {
+    await this.expandUserExperienceSection();
+    await this.setSliderByStep(this.maxTabsSlider, value, 1);
+  }
+
+  async getMaxTabsValue(): Promise<number> {
+    await this.expandUserExperienceSection();
+    return this.getSliderValue(this.maxTabsSlider);
+  }
+
   async setMaxItemsForSearchSlider(value: number): Promise<void> {
     await this.setSliderByStep(this.maxItemsForSearchSlider, value, 1);
   }

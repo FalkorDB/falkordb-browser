@@ -11,11 +11,12 @@ import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
-import { GraphContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, UDFContext } from "../components/provider";
+import { GraphContext, GraphTabsContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, UDFContext } from "../components/provider";
 import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import ToastButton from "../components/ToastButton";
 import { ShineBorder } from "@/components/ui/shine-border";
 import { getConnectionItem, setConnectionItem, getConnectionPrefix } from "@/lib/connection-storage";
+import { tabScopedKey } from "@/lib/useGraphTabs";
 import { getConfidenceStyle, normalizeConfidence } from "./confidence";
 import { parseStoredMessages, serializeChatHistory } from "./chatHistory";
 
@@ -71,11 +72,15 @@ export default function Chat({ onClose }: Props) {
     const { currentTheme } = getTheme(resolvedTheme);
     const { setIndicator } = useContext(IndicatorContext);
     const { runQuery, graphName } = useContext(GraphContext);
+    const { activeTabId } = useContext(GraphTabsContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
     const { udfList } = useContext(UDFContext);
     const { settings: { chatSettings: { secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
     // Cypher Only toggle state, persisted per graph
     const [cypherOnly, setCypherOnly] = useState(false);
+
+    // Each tab keeps its own conversation per graph, so the key carries both.
+    const historyKey = useMemo(() => tabScopedKey(activeTabId, `chat-${graphName}`), [activeTabId, graphName]);
 
     const { toast } = useToast();
     const route = useRouter();
@@ -151,18 +156,18 @@ export default function Chat({ onClose }: Props) {
     // Load messages and cypher only preference for current graph on mount
     useEffect(() => {
         if (!getConnectionPrefix()) return;
-        const savedMessages = getConnectionItem(`chat-${graphName}`);
+        const savedMessages = getConnectionItem(historyKey);
         setMessages(parseStoredMessages(savedMessages));
 
         const savedCypherOnly = getConnectionItem(`cypherOnly-${graphName}`);
         setCypherOnly(savedCypherOnly === "true");
-    }, [graphName, maxSavedMessages]);
+    }, [graphName, historyKey, maxSavedMessages]);
 
     useEffect(() => {
         let statusGroup: Message[];
 
         if (messages.length > 0) {
-            setConnectionItem(`chat-${graphName}`, serializeChatHistory(getLastUserMessagesWithContext(messages, maxSavedMessages)));
+            setConnectionItem(historyKey, serializeChatHistory(getLastUserMessagesWithContext(messages, maxSavedMessages)));
         }
 
         const newMessagesList = messages.map((message, i): Message | [Message[], boolean] | undefined => {
@@ -182,7 +187,7 @@ export default function Chat({ onClose }: Props) {
         }).filter(m => !!m);
 
         setMessagesList(newMessagesList);
-    }, [maxSavedMessages, messages]);
+    }, [historyKey, maxSavedMessages, messages]);
 
     // Scroll to bottom whenever the rendered message list changes
     useEffect(() => {

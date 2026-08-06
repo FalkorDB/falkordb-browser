@@ -1,91 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ViewportState } from "@falkordb/canvas";
-import { getConnectionItem, setConnectionItem } from "./connection-storage";
-import { Tab } from "./utils";
+import { getConnectionItem, removeConnectionItemsByPrefix, setConnectionItem } from "./connection-storage";
+import {
+    clampMaxTabs,
+    createTab,
+    parseStoredTabs,
+    TAB_SCOPE_PREFIX,
+    TABS_STORAGE_KEY,
+    type GraphTab,
+    type GraphTabMeta,
+    type TabsState,
+} from "./graphTabs";
+import type { Tab } from "./utils";
 
-/**
- * The parts of a tab that live on the canvas rather than in React state, so
- * they have to be sampled at write time instead of mirrored on every render.
- */
-export type GraphTabMeta = {
-    /** Zoom and center, so a rebuilt tab lands where the user left it. */
-    viewport?: ViewportState;
-    /** `n:<id>` / `e:<id>`, with a trailing `:s` when the pick came from search. */
-    selected?: string;
-    /** Canvas layout mode, and the direction it is arranged in. */
-    layout?: string;
-    direction?: string;
-    /** Canvas view toggles: simulation, pin-on-drag and focus mode. */
-    animation?: boolean;
-    pinned?: boolean;
-    dimmed?: boolean;
-};
-
-/**
- * The serializable part of a working context — what the tab strip shows and
- * what survives a page reload. Enough to rebuild the context from scratch:
- * re-run `query` against `graphName`, then restore the metadata around it.
- */
-export type GraphTab = GraphTabMeta & {
-    id: string;
-    graphName: string;
-    query: string;
-    view: Tab;
-    /** User-supplied label. Falls back to the graph name when unset. */
-    name?: string;
-};
-
-type TabsState = {
-    tabs: GraphTab[];
-    activeTabId: string;
-};
-
-const STORAGE_KEY = "graph-tabs";
-
-const createTab = (): GraphTab => ({
-    id: typeof crypto !== "undefined" && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `tab-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    graphName: "",
-    query: "",
-    view: "Graph",
-});
-
-const isViewport = (value: unknown): value is ViewportState => {
-    if (typeof value !== "object" || value === null) return false;
-    const viewport = value as Record<string, unknown>;
-    return typeof viewport.centerX === "number"
-        && typeof viewport.centerY === "number"
-        && typeof viewport.zoom === "number";
-};
-
-const isGraphTab = (value: unknown): value is GraphTab => {
-    if (typeof value !== "object" || value === null) return false;
-    const tab = value as Partial<GraphTab>;
-    return typeof tab.id === "string"
-        && typeof tab.graphName === "string"
-        && typeof tab.query === "string"
-        && (tab.view === "Graph" || tab.view === "Table" || tab.view === "Metadata");
-};
-
-const asString = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
-
-const asBoolean = (value: unknown): boolean | undefined => (typeof value === "boolean" ? value : undefined);
-
-/** Drops metadata that did not survive storage intact, keeping the tab usable. */
-const normalizeTab = (tab: GraphTab): GraphTab => ({
-    ...tab,
-    viewport: isViewport(tab.viewport) ? tab.viewport : undefined,
-    selected: asString(tab.selected),
-    layout: asString(tab.layout),
-    direction: asString(tab.direction),
-    animation: asBoolean(tab.animation),
-    pinned: asBoolean(tab.pinned),
-    dimmed: asBoolean(tab.dimmed),
-    name: asString(tab.name),
-});
+// The tab shape and its storage helpers are pure, so they live in ./graphTabs
+// and are unit-testable on their own. Re-exported here so callers keep a single
+// entry point for everything tab-related.
+export * from "./graphTabs";
 
 type Params<S> = {
     /** Connection-scoped storage is only usable once the prefix is set. */
@@ -103,6 +35,8 @@ type Params<S> = {
     graphName: string;
     query: string;
     view: Tab;
+    /** How many tabs the user allows at once; `addTab` is a no-op at the cap. */
+    maxTabs: number;
     /**
      * Snapshots the live graph state (results, canvas positions, viewport, …)
      * so returning to the tab can restore it instead of re-querying.
@@ -143,6 +77,7 @@ export default function useGraphTabs<S>({
     graphName,
     query,
     view,
+    maxTabs,
     captureSession,
     captureMeta,
     onActivate,
@@ -167,6 +102,10 @@ export default function useGraphTabs<S>({
 
     const onActivateRef = useRef(onActivate);
     onActivateRef.current = onActivate;
+
+    const limit = clampMaxTabs(maxTabs);
+    const limitRef = useRef(limit);
+    limitRef.current = limit;
 
     // The URL param is spent once, at mount: the state→URL sync overwrites it as
     // soon as the strip settles, so later reads would see our own value.
@@ -207,38 +146,26 @@ export default function useGraphTabs<S>({
         // Sessions belong to the previous connection's graphs — drop them.
         sessionsRef.current.clear();
 
-        const raw = getConnectionItem(STORAGE_KEY);
+        const raw = getConnectionItem(TABS_STORAGE_KEY);
         const fresh = createTab();
         const reset = () => setState({ tabs: [fresh], activeTabId: fresh.id });
 
-        if (!raw) {
+        const stored = parseStoredTabs(raw);
+        if (!stored) {
             reset();
             return;
         }
 
-        try {
-            const parsed = JSON.parse(raw) as Partial<TabsState>;
-            const restored = Array.isArray(parsed?.tabs)
-                ? parsed.tabs.filter(isGraphTab).map(normalizeTab)
-                : [];
-            if (restored.length === 0) {
-                reset();
-                return;
-            }
+        const urlTabId = initialTabIdRef.current;
+        const preferred = [urlTabId, stored.activeTabId].find(id => stored.tabs.some(t => t.id === id));
+        const activeTabId = preferred ?? stored.tabs[0].id;
 
-            const urlTabId = initialTabIdRef.current;
-            const preferred = [urlTabId, parsed.activeTabId].find(id => restored.some(t => t.id === id));
-            const activeTabId = preferred ?? restored[0].id;
+        setState({ tabs: stored.tabs, activeTabId });
 
-            setState({ tabs: restored, activeTabId });
-
-            // Nothing to rebuild for a tab that never picked a graph — and
-            // activating it would clear a graph auto-selected in the meantime.
-            const active = restored.find(t => t.id === activeTabId)!;
-            if (active.graphName) onActivateRef.current(active, undefined);
-        } catch {
-            reset();
-        }
+        // Nothing to rebuild for a tab that never picked a graph — and
+        // activating it would clear a graph auto-selected in the meantime.
+        const active = stored.tabs.find(t => t.id === activeTabId)!;
+        if (active.graphName) onActivateRef.current(active, undefined);
     }, [prefixReady, canRestore, connectionKey]);
 
     const persist = useCallback(() => {
@@ -248,7 +175,7 @@ export default function useGraphTabs<S>({
         if (restoredKeyRef.current === null) return;
 
         const prev = stateRef.current;
-        setConnectionItem(STORAGE_KEY, JSON.stringify({
+        setConnectionItem(TABS_STORAGE_KEY, JSON.stringify({
             tabs: withLive(prev),
             activeTabId: prev.activeTabId,
         }));
@@ -292,6 +219,10 @@ export default function useGraphTabs<S>({
 
     const addTab = useCallback(() => {
         const prev = stateRef.current;
+        // Lowering the setting never closes tabs, so an existing strip can sit
+        // above the cap; it just cannot grow any further.
+        if (prev.tabs.length >= limitRef.current) return;
+
         const tab = createTab();
 
         sessionsRef.current.set(prev.activeTabId, captureSessionRef.current());
@@ -324,6 +255,9 @@ export default function useGraphTabs<S>({
         // snapshot current; closing the active tab discards its snapshot.
         if (!wasActive) sessionsRef.current.set(prev.activeTabId, captureSessionRef.current());
         sessionsRef.current.delete(id);
+        // Tab-scoped storage (chat history) would otherwise outlive the tab and
+        // grow without bound, since ids are never reused.
+        removeConnectionItemsByPrefix(`${TAB_SCOPE_PREFIX}${id}-`);
 
         const remaining = withLive(prev).filter(t => t.id !== id);
         // Closing the active tab falls back to its neighbour on the right,
@@ -337,9 +271,10 @@ export default function useGraphTabs<S>({
     return useMemo(() => ({
         tabs,
         activeTabId: state.activeTabId,
+        maxTabs: limit,
         selectTab,
         addTab,
         renameTab,
         closeTab,
-    }), [tabs, state.activeTabId, selectTab, addTab, renameTab, closeTab]);
+    }), [tabs, state.activeTabId, limit, selectTab, addTab, renameTab, closeTab]);
 }

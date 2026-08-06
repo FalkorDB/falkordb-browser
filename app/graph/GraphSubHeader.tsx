@@ -3,6 +3,7 @@
 import { useContext, useState } from "react";
 import { Pencil, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { tabStripItemWidth } from "@/lib/useGraphTabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { GraphTabsContext } from "../components/provider";
 
@@ -14,7 +15,7 @@ import { GraphTabsContext } from "../components/provider";
  * user can keep several graph/query setups side by side.
  */
 export default function GraphSubHeader() {
-  const { tabs, activeTabId, selectTab, addTab, renameTab, closeTab } = useContext(GraphTabsContext);
+  const { tabs, activeTabId, maxTabs, selectTab, addTab, renameTab, closeTab } = useContext(GraphTabsContext);
 
   // The tab being renamed, and the text typed so far. The draft starts from the
   // custom name only: an empty box is what clears it back to the graph name.
@@ -23,6 +24,10 @@ export default function GraphSubHeader() {
 
   // The last remaining tab cannot be closed — there is always one context.
   const canClose = tabs.length > 1;
+  const canAdd = tabs.length < maxTabs;
+
+  // A full strip has to fit `maxTabs` pills, the add button and the gaps.
+  const tabMaxWidth = tabStripItemWidth(maxTabs);
 
   const commitRename = () => {
     if (editingId) renameTab(editingId, draft);
@@ -45,6 +50,7 @@ export default function GraphSubHeader() {
               key={tab.id}
               data-testid={`graphTab${label}`}
               data-active={isActive}
+              style={{ maxWidth: tabMaxWidth }}
               className={cn(
                 "shrink-0 flex items-center gap-1 h-6 p-1 rounded-lg border transition-colors",
                 isActive
@@ -56,7 +62,7 @@ export default function GraphSubHeader() {
                 isEditing
                   ? <input
                     data-testid={`graphTabRename${label}`}
-                    className="w-[120px] bg-transparent text-sm outline-none border-b border-primary"
+                    className="w-full min-w-0 bg-transparent text-sm outline-none border-b border-primary"
                     aria-label={`Rename ${label}`}
                     placeholder={tab.graphName || "New tab"}
                     value={draft}
@@ -72,7 +78,7 @@ export default function GraphSubHeader() {
                     <button
                       type="button"
                       data-testid={`graphTabSelect${label}`}
-                      className="max-w-[160px] truncate text-sm"
+                      className="min-w-0 flex-1 truncate text-left text-sm"
                       title={label}
                       aria-current={isActive}
                       onClick={() => selectTab(tab.id)}
@@ -124,17 +130,23 @@ export default function GraphSubHeader() {
       }
       <Tooltip>
         <TooltipTrigger asChild>
-          <button
-            type="button"
-            data-testid="graphTabAdd"
-            className="shrink-0 p-1 rounded-lg hover:bg-secondary/50"
-            aria-label="New tab"
-            onClick={addTab}
-          >
-            <Plus size={16} />
-          </button>
+          {/* Wrapper keeps the tooltip reachable while the button is disabled */}
+          <span className="flex">
+            <button
+              type="button"
+              data-testid="graphTabAdd"
+              className="shrink-0 p-1 rounded-lg hover:bg-secondary/50 disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="New tab"
+              disabled={!canAdd}
+              onClick={addTab}
+            >
+              <Plus size={16} />
+            </button>
+          </span>
         </TooltipTrigger>
-        <TooltipContent>New tab</TooltipContent>
+        <TooltipContent>
+          {canAdd ? "New tab" : `Max ${maxTabs} tabs — raise the limit in Settings`}
+        </TooltipContent>
       </Tooltip>
     </div>
   );

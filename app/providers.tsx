@@ -15,9 +15,8 @@ import { setFunctionCandidates } from "@/lib/cypherSuggestions";
 import { udfFunctionNames } from "@/lib/cypherLang";
 import { computeEditorDiagnostics, type DiagnosticsResult } from "@/lib/cypherDiagnostics";
 import { isAiFixSupported } from "@/lib/aiFix";
-import useGraphTabs, { type GraphTab, type GraphTabMeta } from "@/lib/useGraphTabs";
 import { PanelImperativeHandle } from "react-resizable-panels";
-import type { HierarchyDirection, LayoutMode, RadialDirection, ViewportState } from "@falkordb/canvas";
+import type { LayoutMode, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
 import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
@@ -26,6 +25,7 @@ import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContex
 import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
+import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, normalizeDirection, normalizeLayout } from "@/lib/useGraphTabs";
 
 /**
  * A live snapshot of everything the graph view is showing.
@@ -68,25 +68,6 @@ const defaultQueryHistory: HistoryQuery = {
     fav: false
   },
   counter: 0
-};
-
-const VALID_LAYOUTS: LayoutMode[] = ['force', 'tree', 'radial'];
-const HIERARCHY_DIRECTION_VALUES: HierarchyDirection[] = ['td', 'bu', 'lr', 'rl'];
-const RADIAL_DIRECTION_VALUES: RadialDirection[] = ['out', 'in'];
-
-const normalizeLayout = (value: string | null | undefined): LayoutMode =>
-  value && VALID_LAYOUTS.includes(value as LayoutMode) ? (value as LayoutMode) : 'force';
-
-// Normalize the URL direction against the resolved layout so an incompatible
-// combination (e.g. layout=radial&direction=td) falls back to a safe default.
-const normalizeDirection = (layout: LayoutMode, value: string | null | undefined): string => {
-  if (layout === 'tree') {
-    return value && HIERARCHY_DIRECTION_VALUES.includes(value as HierarchyDirection) ? value : 'td';
-  }
-  if (layout === 'radial') {
-    return value && RADIAL_DIRECTION_VALUES.includes(value as RadialDirection) ? value : 'out';
-  }
-  return '';
 };
 
 const CHAT_MODEL_SOURCE_STORAGE_KEY = "chatModelSource";
@@ -304,6 +285,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [newDefaultQuery, setNewDefaultQuery] = useState("");
   const [refreshInterval, setRefreshInterval] = useState(10);
   const [newRefreshInterval, setNewRefreshInterval] = useState(0);
+  const [maxTabs, setMaxTabs] = useState(DEFAULT_GRAPH_TABS);
+  const [newMaxTabs, setNewMaxTabs] = useState(DEFAULT_GRAPH_TABS);
   const [currentTab, setCurrentTab] = useState<Tab>("Graph");
   const [newSecretKey, setNewSecretKey] = useState("");
   const [secretKey, setSecretKey] = useState("");
@@ -356,6 +339,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [maxItemsForSearch, setMaxItemsForSearch] = useState<number>(20);
   const [newMaxItemsForSearch, setNewMaxItemsForSearch] = useState<number>(20);
   const [expandFilter, setExpandFilter] = useState(true);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [customizingLabel, setCustomizingLabel] = useState<string | null>(null);
   const sessionSyncedRef = useRef(false);
   const prevActiveConnectionIdRef = useRef<string | null>(null);
   const connectionSwitchFetchedRef = useRef(false);
@@ -440,6 +425,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple },
         newRefreshInterval,
         setNewRefreshInterval,
+        newMaxTabs,
+        setNewMaxTabs,
       },
       chatSettings: { newSecretKey, setNewSecretKey, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly, newChatModelSource, setNewChatModelSource, newLocalLlmProvider, setNewLocalLlmProvider, newLocalLlmEndpoint, setNewLocalLlmEndpoint, newModel, setNewModel },
       graphInfo: { newMaxItemsForSearch, setNewMaxItemsForSearch },
@@ -457,6 +444,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       userExperienceSettings: {
         refreshInterval,
         setRefreshInterval,
+        maxTabs,
+        setMaxTabs,
         captionKeysSettings: { captionsKeys, setCaptionsKeys, showPropertyKeyPrefix, setShowPropertyKeyPrefix },
         tableViewSettings: { columnWidth, setColumnWidth, rowHeight, setRowHeight, rowHeightExpandMultiple, setRowHeightExpandMultiple },
       },
@@ -474,6 +463,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       localStorage.setItem("defaultQuery", newDefaultQuery);
       localStorage.setItem("limit", newLimit.toString());
       localStorage.setItem("refreshInterval", newRefreshInterval.toString());
+      localStorage.setItem("maxTabs", clampMaxTabs(newMaxTabs).toString());
       localStorage.setItem("maxSavedMessages", newMaxSavedMessages.toString());
       localStorage.setItem("captionsKeys", JSON.stringify(newCaptionsKeys));
       localStorage.setItem("showPropertyKeyPrefix", newShowPropertyKeyPrefix.toString());
@@ -490,6 +480,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setLimit(newLimit);
       setLastLimit(limit);
       setRefreshInterval(newRefreshInterval);
+      setMaxTabs(clampMaxTabs(newMaxTabs));
       setMaxSavedMessages(newMaxSavedMessages);
       setCaptionsKeys(newCaptionsKeys);
       setShowPropertyKeyPrefix(newShowPropertyKeyPrefix);
@@ -528,6 +519,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setNewLimit(limit);
       setNewSecretKey(secretKey);
       setNewRefreshInterval(refreshInterval);
+      setNewMaxTabs(maxTabs);
       setNewMaxSavedMessages(maxSavedMessages);
       setNewCaptionsKeys(captionsKeys);
       setNewShowPropertyKeyPrefix(showPropertyKeyPrefix);
@@ -543,7 +535,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setHasChanges(false);
     }
 
-  }), [defaultQuery, hasChanges, lastLimit, limit, model, newDefaultQuery, newLimit, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, toast, perSourceModels, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, newModel]);
+  }), [defaultQuery, hasChanges, lastLimit, limit, model, newDefaultQuery, newLimit, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, maxTabs, newMaxTabs, runDefaultQuery, secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, toast, perSourceModels, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, newModel]);
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -1104,10 +1096,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setIsLoading,
     expand: expandFilter,
     setExpand: setExpandFilter,
+    chatOpen,
+    setChatOpen,
     selectedParam,
     setSelectedParam,
     pendingAutoLoadRef,
-  }), [graph, graphName, handleSetGraphName, graphNames, labels, relationships, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, selectedParam]);
+  }), [graph, graphName, handleSetGraphName, graphNames, labels, relationships, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, chatOpen, selectedParam]);
 
   // Everything a tab needs to show its results again without querying. Mirrored
   // at render so `captureGraphSession` can read it without a dependency list.
@@ -1134,8 +1128,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   // Mirrored for the same reason: the layout controls are tab metadata, but
   // they are read at capture time rather than on every render.
-  const layoutRef = useRef({ layout, direction, animation, pinned, dimmed });
-  layoutRef.current = { layout, direction, animation, pinned, dimmed };
+  const layoutRef = useRef({ layout, direction, animation, pinned, dimmed, expand: expandFilter, chatOpen, customizingLabel });
+  layoutRef.current = { layout, direction, animation, pinned, dimmed, expand: expandFilter, chatOpen, customizingLabel };
+
+  // The graph info panel is imperative and only mounted on /graph, so its open
+  // state is remembered here for captures that happen once it is gone.
+  const panelOpenRef = useRef(true);
 
   const captureGraphSession = useCallback((): GraphSession => {
     const state = sessionStateRef.current;
@@ -1161,6 +1159,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // An empty canvas reports whatever zoom it happens to sit at, which would
     // overwrite a good viewport with a meaningless one.
     const hasNodes = (canvas?.getGraphData().nodes.length ?? 0) > 0;
+    if (panelRef.current) panelOpenRef.current = !panelRef.current.isCollapsed();
 
     return {
       viewport: hasNodes ? canvas!.getViewport() : state.viewport,
@@ -1170,6 +1169,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       animation: layoutRef.current.animation,
       pinned: layoutRef.current.pinned,
       dimmed: layoutRef.current.dimmed,
+      expand: layoutRef.current.expand,
+      panelOpen: panelOpenRef.current,
+      customizing: layoutRef.current.customizingLabel ?? undefined,
+      chatOpen: layoutRef.current.chatOpen,
     };
   }, [canvasRef]);
 
@@ -1227,6 +1230,20 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setAnimation(tab.animation ?? false);
     setPinned(tab.pinned ?? tabLayout !== 'force');
     setDimmed(tab.dimmed ?? true);
+    setExpandFilter(tab.expand ?? true);
+    setChatOpen(tab.chatOpen ?? false);
+    // Resolved against the tab's own graph by the info panel, so a label that no
+    // longer exists simply falls back to the normal view.
+    setCustomizingLabel(tab.customizing ?? null);
+
+    // The info panel has no React state of its own — drive it imperatively.
+    const infoPanel = panelRef.current;
+    const tabPanelOpen = tab.panelOpen ?? true;
+    panelOpenRef.current = tabPanelOpen;
+    if (infoPanel && infoPanel.isCollapsed() === tabPanelOpen) {
+      if (tabPanelOpen) infoPanel.expand();
+      else infoPanel.collapse();
+    }
 
     if (session) {
       restoreGraphSession(session);
@@ -1264,6 +1281,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     graphName,
     query: historyQuery.query,
     view: currentTab,
+    maxTabs,
     captureSession: captureGraphSession,
     captureMeta: captureTabMeta,
     onActivate: handleActivateTab,
@@ -1541,6 +1559,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setRunDefaultQuery(localStorage.getItem("runDefaultQuery") !== "false");
       setTutorialOpen(localStorage.getItem("tutorial") !== "false");
       setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30));
+      setMaxTabs(clampMaxTabs(parseInt(localStorage.getItem("maxTabs") || "", 10)));
       setMaxSavedMessages(parseInt(localStorage.getItem("maxSavedMessages") || "5", 10));
       setShowPropertyKeyPrefix(localStorage.getItem("showPropertyKeyPrefix") === "true");
       setCypherOnly(localStorage.getItem("cypherOnly") === "true");
@@ -1955,6 +1974,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                                   <GraphTabsContext.Provider value={graphTabs}>
                                     <ProviderLayout
                                       panelRef={panelRef}
+                                      customizingLabel={customizingLabel}
+                                      setCustomizingLabel={setCustomizingLabel}
                                       tutorialOpen={tutorialOpen}
                                       onCloseTutorial={handleCloseTutorial}
                                       onLoadDemoGraphs={handleLoadDemoGraphs}
