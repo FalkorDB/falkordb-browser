@@ -873,7 +873,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     return [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), merged];
   }, [historyQuery.queries]);
 
-  const runQuery = useCallback(async (q: string, name?: string): Promise<void> => {
+  /**
+   * @param options.readOnly Force GRAPH.RO_QUERY regardless of the user's role.
+   * @param options.silent Swallow the failure: no toast, no diagnostics, no history entry.
+   */
+  const runQuery = useCallback(async (q: string, name?: string, options?: { readOnly?: boolean; silent?: boolean }): Promise<void> => {
     const n = name || activeGraphNameRef.current;
 
     // Reject while a connection switch is mid-flight — its global id and React
@@ -893,7 +897,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const epoch = getConnectionEpoch();
     const isCurrent = () => querySeqRef.current === seq && contextGenRef.current === ctx;
     loadingOwnerRef.current = seq;
-    const guardedToast = ((...a: Parameters<typeof toast>) => { if (isCurrent()) toast(...a); }) as typeof toast;
+    const guardedToast = ((...a: Parameters<typeof toast>) => { if (!options?.silent && isCurrent()) toast(...a); }) as typeof toast;
     const guardedSetIndicator = (i: "online" | "offline") => { if (isCurrent()) setIndicator(i); };
 
     let newQuery: Query = {
@@ -919,7 +923,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     }));
 
     const [query, existingLimit] = getQueryWithLimit(q, limit);
-    const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
+    const readOnlyParam = isReadOnlyRef.current || options?.readOnly ? '&readOnly=true' : '';
     const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}${readOnlyParam}`;
     try {
       const result = await getSSEGraphResult(url, guardedToast, guardedSetIndicator, {
@@ -944,7 +948,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         return gi;
       }).catch((error) => {
         console.error("Failed to fetch graph info:", error);
-        if (isCurrent()) toast({
+        guardedToast({
           title: "Error",
           description: "Failed to fetch graph info",
           variant: "destructive",
@@ -1017,7 +1021,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     } catch (err) {
       // Discard a superseded failure so it can't overwrite the active graph's
       // diagnostics/history/URL after a switch or a newer query.
-      if (isCurrent()) {
+      if (!isCurrent()) return;
+
+      if (options?.silent) {
+        // Leave no trace of a run nobody asked for: drop the in-flight entry
+        // that was staged before the request went out.
+        setHistoryQuery(prev => ({ ...prev, currentQuery: defaultQueryHistory.currentQuery }));
+      } else {
         // Errors from getSSEGraphResult are already surfaced via toast
         const errorMessage = (err as Error).message || "";
         setDiagnostics(computeEditorDiagnostics(newQuery.text, errorMessage));
@@ -1278,7 +1288,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
     // We run the tab's own query, so the default-query auto-load must not fire.
     pendingAutoLoadRef.current = null;
-    runQuery(tab.query, tab.graphName).then(() => {
+    // A rebuild is not a user asking to run anything — the query text comes from
+    // storage, and a ?tab= link can hand it to someone else. Force it read-only
+    // whatever the role, so restoring a tab can never write (or create a graph),
+    // and swallow the failure: a write query simply restores nothing.
+    runQuery(tab.query, tab.graphName, { readOnly: true, silent: true }).then(() => {
       // runQuery drops the viewport and picks its own view when the new results
       // land, so both can only be restored afterwards.
       if (activationSeqRef.current !== seq) return;

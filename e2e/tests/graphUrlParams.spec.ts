@@ -120,4 +120,47 @@ test.describe("@admin Graph URL params", () => {
         const graphs = await apiCall.getGraphs();
         expect(JSON.stringify(graphs)).not.toContain(doomed);
     });
+
+    test("A rebuilt tab does not re-run its stored write query", async () => {
+        // Two full page loads plus a write and two count round-trips — the
+        // heaviest test here, and it tips over 30s under load.
+        test.setTimeout(60_000);
+
+        const query = "CREATE (n:Planted) RETURN n";
+        const target = getRandomString("readonly");
+        await apiCall.addGraph(target);
+
+        try {
+            const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+            const page = await browser.getPage();
+
+            await graph.selectGraphByName(target);
+            await graph.waitForPageIdle();
+            // Running it once is the user's own doing. What it leaves behind is a
+            // tab carrying a write query — which is what a shared ?tab= link
+            // hands to whoever opens it next.
+            await graph.insertQuery(query);
+            await graph.clickRunQuery();
+            await expect
+                .poll(async () => (await apiCall.getGraphCount(target)).result.nodes, { timeout: 15000 })
+                .toBe(1);
+
+            // The tab is written to storage off a state update, so reloading too
+            // eagerly would race that write and come back to an empty tab.
+            await expect
+                .poll(() => page.evaluate(() => JSON.stringify(window.localStorage)), { timeout: 15000 })
+                .toContain(query);
+
+            await graph.refreshPage();
+            await graph.waitForPageIdle();
+
+            // The tab is back with its query…
+            await expect.poll(() => graph.getEditorInput(), { timeout: 15000 }).toBe(query);
+            // …but rebuilding it re-issues that query read-only, so the write is
+            // refused and the graph is left exactly as the user left it.
+            expect((await apiCall.getGraphCount(target)).result.nodes).toBe(1);
+        } finally {
+            await apiCall.removeGraph(target);
+        }
+    });
 });
