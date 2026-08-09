@@ -104,9 +104,16 @@ test.describe("@admin Graph URL params", () => {
         await graph.selectGraphByName(doomed);
         await graph.waitForPageIdle();
 
-        // Drop it behind the tab's back, then reload so the tab is rebuilt cold.
+        // Park the page before dropping the graph. An open graph view keeps
+        // polling the graph's counts and metadata, and those reads run as
+        // writable queries — which is enough to make FalkorDB re-create a graph
+        // that was just deleted. Parking first is what "behind the tab's back"
+        // has to mean for the tab restore to be what is under test.
+        await page.goto("about:blank");
         await apiCall.removeGraph(doomed);
-        await graph.refreshPage();
+
+        // Back to a cold page, so the tab is rebuilt from storage.
+        await page.goto(urls.graphUrl);
         await graph.waitForPageIdle();
 
         await expect(page.getByTestId("selectGraph")).not.toContainText(doomed, { timeout: 15000 });
