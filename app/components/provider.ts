@@ -231,9 +231,10 @@ type ConnectionContextType = {
   dbVersion: string;
   setDbVersion: Dispatch<SetStateAction<string>>;
   isReadOnly: boolean;
-  // Enterprise-only graph offloading: `isEnterprise` gates the offload UI and
-  // `offloadedGraphs` holds the graphs currently offloaded from memory.
-  isEnterprise: boolean;
+  // Graph offloading: `supportsOffload` gates the offload UI (enterprise module
+  // plus a recent enough FalkorDB) and `offloadedGraphs` holds the graphs
+  // currently offloaded from memory.
+  supportsOffload: boolean;
   offloadedGraphs: string[];
   refreshOffloadedGraphs: () => Promise<void>;
   additionalConnections: SessionConnection[];
@@ -501,7 +502,7 @@ export const ConnectionContext = createContext<ConnectionContextType>({
   dbVersion: "",
   setDbVersion: () => { },
   isReadOnly: false,
-  isEnterprise: false,
+  supportsOffload: false,
   offloadedGraphs: [],
   refreshOffloadedGraphs: async () => { },
   additionalConnections: [],

@@ -24,7 +24,7 @@ export function GraphLoadDot({ offloaded, dataTestId }: Props) {
             <Circle
                 size={10}
                 aria-hidden
-                className={offloaded ? "fill-yellow-400 text-yellow-400" : "fill-green-500 text-green-500"}
+                className={offloaded ? "fill-yellow text-yellow" : "fill-green text-green"}
             />
         </span>
     );

@@ -43,7 +43,7 @@ interface Props {
  */
 export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, setGraph }: Props) {
     const { indicator, setIndicator } = useContext(IndicatorContext);
-    const { isReadOnly, isEnterprise, offloadedGraphs, refreshOffloadedGraphs } = useContext(ConnectionContext);
+    const { isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs } = useContext(ConnectionContext);
     const {
         settings: {
             graphInfo: { showMemoryUsage },
@@ -273,10 +273,10 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     // Enterprise-only: GRAPH.STUBS reports the graphs offloaded from memory.
     const renderLoadIndicator = useCallback((name: string) => {
-        if (!isEnterprise) return null;
+        if (!supportsOffload) return null;
 
         return <GraphLoadIndicator offloaded={offloadedGraphs.includes(name)} dataTestId={`graphLoadIndicator${name}`} />;
-    }, [isEnterprise, offloadedGraphs]);
+    }, [supportsOffload, offloadedGraphs]);
 
     const [mounted, setMounted] = useState(false);
 
@@ -372,7 +372,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                                 {
                                                     safeOptions.map((name) => (
                                                         <li key={name} className="flex items-center gap-2">
-                                                            {isEnterprise && <GraphLoadDot offloaded={offloadedGraphs.includes(name)} />}
+                                                            {supportsOffload && <GraphLoadDot offloaded={offloadedGraphs.includes(name)} />}
                                                             <span className="truncate">{name}</span>
                                                         </li>
                                                     ))

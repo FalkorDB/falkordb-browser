@@ -24,7 +24,7 @@ import { Graph, GraphInfo } from "./api/graph/model";
 import type { LanguageConfig } from "./components/EditorComponent";
 import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, CypherLanguageContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
 import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
-import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
+import { GRAPH_OFFLOAD_VERSION_THRESHOLD, MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
 
 const defaultQueryHistory: HistoryQuery = {
@@ -305,7 +305,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [labels, setLabels] = useState<Label[]>([]);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
   const [dbVersion, setDbVersion] = useState<string>("");
-  const [isEnterprise, setIsEnterprise] = useState(false);
+  const [supportsOffload, setSupportsOffload] = useState(false);
   const [offloadedGraphs, setOffloadedGraphs] = useState<string[]>([]);
   const [connectionType, setConnectionType] = useState<ConnectionType>("Standalone");
   const [connectionInfo, setConnectionInfo] = useState<ConnectionInfo>({});
@@ -685,14 +685,15 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   statusRef.current = status;
 
   // GRAPH.STUBS lists the graphs offloaded from memory. It is registered by the
-  // enterprise module only, so the fetch is gated on `isEnterprise`. The ref
-  // holds the connection the result must still belong to when it resolves, so a
-  // superseded connection can't overwrite the current one's indicators.
+  // enterprise module only and needs a recent enough core, so the fetch is gated
+  // on `supportsOffload`. The ref holds the connection the result must still
+  // belong to when it resolves, so a superseded connection can't overwrite the
+  // current one's indicators.
   const activeConnectionIdRef = useRef(activeConnectionId);
   useEffect(() => { activeConnectionIdRef.current = activeConnectionId; }, [activeConnectionId]);
 
   const refreshOffloadedGraphs = useCallback(async () => {
-    if (!isEnterprise) return;
+    if (!supportsOffload) return;
 
     const connectionId = activeConnectionIdRef.current;
     const isCurrent = () => activeConnectionIdRef.current === connectionId;
@@ -719,7 +720,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     } catch {
       if (isCurrent()) setOffloadedGraphs([]);
     }
-  }, [isEnterprise]);
+  }, [supportsOffload]);
 
   const connectionContext = useMemo(() => ({
     connectionType,
@@ -729,7 +730,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     dbVersion,
     setDbVersion,
     isReadOnly,
-    isEnterprise,
+    supportsOffload,
     offloadedGraphs,
     refreshOffloadedGraphs,
     additionalConnections,
@@ -740,7 +741,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     beginConnectionSwitch,
     endConnectionSwitch,
     isLatestSwitch,
-  }), [connectionType, connectionInfo, dbVersion, isReadOnly, isEnterprise, offloadedGraphs, refreshOffloadedGraphs, additionalConnections, activeConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
+  }), [connectionType, connectionInfo, dbVersion, isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, additionalConnections, activeConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
 
   const udfContext = useMemo(() => ({
     udfList,
@@ -1142,7 +1143,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         if (cancelled) return;
         if (!result.ok) {
           setShowMemoryUsage(false);
-          setIsEnterprise(false);
+          setSupportsOffload(false);
           setOffloadedGraphs([]);
           return;
         }
@@ -1151,8 +1152,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         const [name, version] = json.result || ["", 0];
         setDbVersion(String(version));
         setShowMemoryUsage(name === "graph" && version >= MEMORY_USAGE_VERSION_THRESHOLD);
-        // The enterprise module (`falkordbe`) is what adds graph offloading.
-        setIsEnterprise(json.enterprise === true);
+        // The enterprise module (`falkordbe`) is what adds graph offloading, and
+        // the core must be recent enough to report stubs.
+        setSupportsOffload(
+          json.enterprise === true && name === "graph" && version >= GRAPH_OFFLOAD_VERSION_THRESHOLD
+        );
       } catch { /* ignore */ }
     })();
 
@@ -1162,13 +1166,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   }, [status, activeConnectionId]);
 
   useEffect(() => {
-    if (status !== "authenticated" || !isEnterprise) {
+    if (status !== "authenticated" || !supportsOffload) {
       setOffloadedGraphs([]);
       return;
     }
 
     refreshOffloadedGraphs();
-  }, [status, activeConnectionId, isEnterprise, refreshOffloadedGraphs]);
+  }, [status, activeConnectionId, supportsOffload, refreshOffloadedGraphs]);
   useEffect(() => {
     if (status !== "authenticated") {
       setConnectionType("Standalone");
