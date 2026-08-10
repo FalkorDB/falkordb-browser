@@ -32,9 +32,8 @@ const getLastRun = (timestamp: number) => {
 
 const getExecutionTime = (metadata: string[]) => metadata.find(value => value.startsWith("Query internal execution time:"))?.split(":")[1].replace(" milliseconds", "ms");
 
-const getItemClassName = (selected: boolean, deleteSelected: boolean, hover: boolean, prefix: "text" | "bg" = "text") => {
+const getItemClassName = (selected: boolean, hover: boolean, prefix: "text" | "bg" = "text") => {
     if (selected) return `${prefix}-primary border-primary`;
-    if (deleteSelected) return `${prefix}-destructive border-destructive`;
     if (hover) return `${prefix}-foreground border-foreground`;
     return `${prefix}-foreground/50 border-foreground/50`;
 };
@@ -135,7 +134,6 @@ interface Props<T extends Item> {
     label: string
     afterSearchCallback: (newFilteredList: T[]) => void
     isSelected: (item: T) => boolean
-    isDeleteSelected?: (item: T) => boolean
     onDoubleClick?: (label: string, evt: MouseEvent<HTMLButtonElement>) => void
     onToggleFav?: (item: T, name?: string) => void
     searchRef: React.RefObject<HTMLInputElement | null>
@@ -145,7 +143,7 @@ interface Props<T extends Item> {
     children?: React.ReactNode
 }
 
-export default function PaginationList<T extends Item>({ list, onClick, onDoubleClick, dataTestId, afterSearchCallback, isSelected, isDeleteSelected, onToggleFav, label, isLoading, className, children, searchRef, actionButtons }: Props<T>) {
+export default function PaginationList<T extends Item>({ list, onClick, onDoubleClick, dataTestId, afterSearchCallback, isSelected, onToggleFav, label, isLoading, className, children, searchRef, actionButtons }: Props<T>) {
 
     const [filteredList, setFilteredList] = useState<T[]>([...list]);
     const [hoverIndex, setHoverIndex] = useState<number>(0);
@@ -272,11 +270,10 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                 {
                     items.map((item, index) => {
                         const selected = isSelected ? isSelected(item) : false;
-                        const deleteSelected = isDeleteSelected ? isDeleteSelected(item) : false;
                         const hover = hoverIndex === index;
                         const isString = typeof item === "string";
                         const text = isString ? item : item.text;
-                        const queryText = <p data-testid={`${dataTestId}${text}Text`} className={cn("truncate w-full text-left", getItemClassName(selected, deleteSelected, hover))}>{text}</p>;
+                        const queryText = <p data-testid={`${dataTestId}${text}Text`} className={cn("truncate w-full text-left", getItemClassName(selected, hover))}>{text}</p>;
 
                         const isFav = !isString && item.fav;
 
@@ -340,14 +337,6 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                                                     onDoubleClick(text, e);
                                                 }
                                             }}
-                                            onContextMenu={(e) => {
-                                                e.preventDefault();
-                                                const syntheticEvent = {
-                                                    ...e,
-                                                    type: "rightclick" as const
-                                                } as typeof e & { type: "rightclick" };
-                                                onClick(text, syntheticEvent);
-                                            }}
                                             tabIndex={-1}
                                         >
                                             {queryText}
@@ -361,7 +350,7 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                             <li
                                 className={cn(
                                     "border-b cursor-pointer relative",
-                                    getItemClassName(selected, deleteSelected, hover)
+                                    getItemClassName(selected, hover)
                                 )}
                                 data-testid={`${dataTestId}${text}`}
                                 style={{ height: `${itemHeight}px` }}
@@ -456,6 +445,5 @@ PaginationList.defaultProps = {
     className: undefined,
     children: undefined,
     isLoading: undefined,
-    isDeleteSelected: undefined,
     onToggleFav: undefined,
 };
