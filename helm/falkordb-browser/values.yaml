@@ -5,6 +5,7 @@
 replicaCount: 1
 
 image:
+  registry: ""
   repository: falkordb/falkordb-browser
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.

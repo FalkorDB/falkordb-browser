@@ -17,7 +17,7 @@ This Helm chart deploys the FalkorDB Browser application to a Kubernetes cluster
 helm install falkordb-browser oci://ghcr.io/falkordb/helm-charts/falkordb-browser
 
 # Or install a specific version
-helm install falkordb-browser oci://ghcr.io/falkordb/helm-charts/falkordb-browser --version 1.6.7
+helm install falkordb-browser oci://ghcr.io/falkordb/helm-charts/falkordb-browser --version 1.6.8
 ```
 
 ### Install from local chart
@@ -62,6 +62,7 @@ The following table lists the configurable parameters of the FalkorDB Browser ch
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `replicaCount` | Number of replicas | `1` |
+| `image.registry` | Image registry (optional prefix) | `""` |
 | `image.repository` | Image repository | `falkordb/falkordb-browser` |
 | `image.tag` | Image tag | `""` (uses chart appVersion) |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
