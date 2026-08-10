@@ -151,6 +151,8 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
 
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
+            // Escape discards the unsaved edits but leaves the panel open, so
+            // the user can keep experimenting from the original values.
             if (e.key === "Escape") {
                 handleCancel();
             }
@@ -164,6 +166,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
         <>
             <Button
                 className="absolute top-2 right-2 z-10"
+                data-testid="customizeStyleClose"
                 title="Close"
                 onClick={handleClose}
             >

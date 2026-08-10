@@ -3,12 +3,12 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue } from "@/lib/utils";
+import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, CanvasLayout, captureCanvasLayout } from "@/lib/utils";
 import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
 import { usePathname, useRouter } from "next/navigation";
-import { useGraphParams, syncRouteUrlParams } from "@/lib/useUrlParams";
+import { syncRouteUrlParams } from "@/lib/useUrlParams";
 import { useToast } from "@/components/ui/use-toast";
 import { detectProviderFromApiKey, getProviderDisplayName, detectProviderFromModel } from "@/lib/ai-provider-utils";
 import { setFunctionCandidates } from "@/lib/cypherSuggestions";
@@ -16,15 +16,42 @@ import { udfFunctionNames } from "@/lib/cypherLang";
 import { computeEditorDiagnostics, type DiagnosticsResult } from "@/lib/cypherDiagnostics";
 import { isAiFixSupported } from "@/lib/aiFix";
 import { PanelImperativeHandle } from "react-resizable-panels";
-import type { Data as CanvasData, HierarchyDirection, LayoutMode, RadialDirection, ViewportState } from "@falkordb/canvas";
+import type { LayoutMode, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
 import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
 import type { LanguageConfig } from "./components/EditorComponent";
-import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, CypherLanguageContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, CypherLanguageContext, GraphTabsContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
 import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
+import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, normalizeDirection, normalizeLayout } from "@/lib/useGraphTabs";
+
+/**
+ * A live snapshot of everything the graph view is showing.
+ *
+ * Held in memory (never serialized — it contains the `Graph` model and canvas
+ * node positions) so a tab can be put back on screen exactly as the user left
+ * it: same results, same layout, same viewport, no query, no re-simulation.
+ */
+type GraphSession = {
+  graphName: string;
+  graph: Graph;
+  data: GraphData;
+  /** Canvas structure plus settled node coordinates, so restoring skips the layout. */
+  graphData: CanvasLayout | undefined;
+  viewport: ViewportState | undefined;
+  labels: Label[];
+  relationships: Relationship[];
+  view: Tab;
+  query: string;
+  currentQuery: Query;
+  selectedParam: string;
+  search: string;
+  scrollPosition: number;
+  nodesCount: number | undefined;
+  edgesCount: number | undefined;
+};
 
 const defaultQueryHistory: HistoryQuery = {
   queries: [],
@@ -41,25 +68,6 @@ const defaultQueryHistory: HistoryQuery = {
     fav: false
   },
   counter: 0
-};
-
-const VALID_LAYOUTS: LayoutMode[] = ['force', 'tree', 'radial'];
-const HIERARCHY_DIRECTION_VALUES: HierarchyDirection[] = ['td', 'bu', 'lr', 'rl'];
-const RADIAL_DIRECTION_VALUES: RadialDirection[] = ['out', 'in'];
-
-const normalizeLayout = (value: string | null | undefined): LayoutMode =>
-  value && VALID_LAYOUTS.includes(value as LayoutMode) ? (value as LayoutMode) : 'force';
-
-// Normalize the URL direction against the resolved layout so an incompatible
-// combination (e.g. layout=radial&direction=td) falls back to a safe default.
-const normalizeDirection = (layout: LayoutMode, value: string | null | undefined): string => {
-  if (layout === 'tree') {
-    return value && HIERARCHY_DIRECTION_VALUES.includes(value as HierarchyDirection) ? value : 'td';
-  }
-  if (layout === 'radial') {
-    return value && RADIAL_DIRECTION_VALUES.includes(value as RadialDirection) ? value : 'out';
-  }
-  return '';
 };
 
 const CHAT_MODEL_SOURCE_STORAGE_KEY = "chatModelSource";
@@ -175,11 +183,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       migrateToScopedStorage();
       setPrefixReady(true);
     } else if (status === "unauthenticated") {
-      // Clean up scoped data before clearing the prefix,
-      // so removeConnectionItem can still resolve the scoped key.
-      // Only do this on explicit unauthenticated — not during "loading" —
-      // so savedContent isn't removed before content persistence can restore it.
-      removeConnectionItem("savedContent");
       clearConnectionPrefix();
       setPrefixReady(false);
     }
@@ -187,24 +190,24 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   const panelRef = useRef<PanelImperativeHandle>(null);
   const canvasRef = useRef<GraphRef["current"]>(null);
-  const contentRestoredRef = useRef(false);
 
-  const { graphName: urlGraphName, selected: urlSelected, query: urlQuery, layout: urlLayout, direction: urlDirection } = useGraphParams();
-  const initialQueryRef = useRef(urlQuery);
-  // Capture the URL graph param at render time — before any effects (e.g.
-  // syncRouteUrlParams) can strip ?graph= from window.location. We cannot
-  // rely on urlGraphName (useSearchParams) because it returns "" during SSR
-  // and the URL is mutated by effects before content persistence can read it.
-  const initialUrlGraphNameRef = useRef(
+  // One-shot latch for "this graph selection still needs its first load".
+  // Armed only when the selection actually changes; disarmed by whoever loads
+  // it. Keeping it a latch (instead of comparing graphName to graph.Id) is what
+  // stops a /graph remount, a tab switch or a failed query from replaying it.
+  const pendingAutoLoadRef = useRef<string | null>(null);
+  // Read ?tab= straight off the location at render time. useSearchParams returns
+  // "" during SSR, and the state→URL sync overwrites the param as soon as the
+  // tab strip settles, so by the time the strip restores it would be our own value.
+  const initialTabIdRef = useRef(
     typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("graph") || ""
+      ? new URLSearchParams(window.location.search).get("tab") || ""
       : ""
   );
 
   const [indicator, setIndicator] = useState<"online" | "offline">("online");
   const [historyQuery, setHistoryQuery] = useState<HistoryQuery>(defaultQueryHistory);
-  const [urlQueryText, setUrlQueryText] = useState<string | null>(null);
-  const [selectedParam, setSelectedParam] = useState<string>(urlSelected);
+  const [selectedParam, setSelectedParam] = useState<string>("");
   const [runDefaultQuery, setRunDefaultQuery] = useState(false);
   const [graphNames, setGraphNames] = useState<string[] | undefined>(undefined);
   // Always-current ref so effects can validate graph names without re-running
@@ -214,6 +217,15 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     graphNamesRef.current = graphNames ?? [];
   }, [graphNames]);
   const [graphNamesLoaded, setGraphNamesLoaded] = useState(false);
+  // Mirrored so callbacks can tell "the graph is gone" from "the list is not in
+  // yet" without re-creating themselves. Written in an effect, not during
+  // render, so an abandoned render cannot leak a value that never committed —
+  // and, like graphNamesRef above, declared ahead of useGraphTabs so it is
+  // up to date by the time the restore effect activates a tab.
+  const graphNamesLoadedRef = useRef(graphNamesLoaded);
+  useEffect(() => {
+    graphNamesLoadedRef.current = graphNamesLoaded;
+  }, [graphNamesLoaded]);
   const [graph, setGraph] = useState<Graph>(Graph.empty());
   // graphRef always points to the current graph so setGraphInfo can mutate
   // graph.GraphInfo in-place without triggering a graph state change.
@@ -244,6 +256,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   });
 
   const setGraphInfo = useCallback((gi: GraphInfo) => {
+    // db.meta.stats() only reports named labels, so a GraphInfo built from it
+    // has no bucket for unlabeled nodes. That "" ("Empty") label is derived
+    // from the elements by Graph.createLabel, so carry it across — otherwise
+    // every info poll wipes the Empty chip out of the graph info panel.
+    const emptyLabel = graphRef.current.GraphInfo.Labels.get("");
+    if (emptyLabel && !gi.Labels.has("")) gi.Labels.set("", emptyLabel);
     // Mutate graphRef.current.GraphInfo in-place — no graph state change, so
     // GraphContext consumers (canvas, toolbar, …) are not disturbed. graphRef
     // always points at the current graph (kept in sync on every render), so we
@@ -254,15 +272,18 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     graphInfoSyncRef.current.bumpVersion();
   }, []);
   const [data, setData] = useState<GraphData>({ ...graph.Elements });
-  const [graphData, setGraphData] = useState<CanvasData>();
-  const [layout, setLayout] = useState<LayoutMode>(normalizeLayout(urlLayout));
-  const [direction, setDirection] = useState(() => normalizeDirection(normalizeLayout(urlLayout), urlDirection));
-  // Do NOT initialize from urlGraphName — start empty and let the gated URL sync
-  // below apply it only after the graph list is loaded and the name is validated.
-  // This prevents page.tsx from running queries (and FalkorDB from auto-creating
-  // graphs) before we know whether the URL graph actually exists.
+  const [graphData, setGraphData] = useState<CanvasLayout>();
+  // Defaults until a tab is activated — like the rest of the working context,
+  // the layout controls belong to the tab and are applied on entry.
+  const [layout, setLayout] = useState<LayoutMode>('force');
+  const [direction, setDirection] = useState(() => normalizeDirection('force', undefined));
+  const [animation, setAnimation] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const [dimmed, setDimmed] = useState(true);
+  // Starts empty and is set by whoever activates a tab — the tab strip restores
+  // after the graph list has loaded, so a stored name is validated before any
+  // query runs (FalkorDB would silently create a graph that no longer exists).
   const [graphName, setGraphName] = useState<string>("");
-  const [contentPersistence, setContentPersistence] = useState(false);
   const [defaultQuery, setDefaultQuery] = useState("");
   const [timeout, setTimeout] = useState(0);
   const [limit, setLimit] = useState(0);
@@ -271,9 +292,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [newTimeout, setNewTimeout] = useState(0);
   const [newRunDefaultQuery, setNewRunDefaultQuery] = useState(false);
   const [newDefaultQuery, setNewDefaultQuery] = useState("");
-  const [newContentPersistence, setNewContentPersistence] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState(10);
   const [newRefreshInterval, setNewRefreshInterval] = useState(0);
+  const [maxTabs, setMaxTabs] = useState(DEFAULT_GRAPH_TABS);
+  const [newMaxTabs, setNewMaxTabs] = useState(DEFAULT_GRAPH_TABS);
   const [currentTab, setCurrentTab] = useState<Tab>("Graph");
   const [newSecretKey, setNewSecretKey] = useState("");
   const [secretKey, setSecretKey] = useState("");
@@ -326,6 +348,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [maxItemsForSearch, setMaxItemsForSearch] = useState<number>(20);
   const [newMaxItemsForSearch, setNewMaxItemsForSearch] = useState<number>(20);
   const [expandFilter, setExpandFilter] = useState(true);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [customizingLabel, setCustomizingLabel] = useState<string | null>(null);
   const sessionSyncedRef = useRef(false);
   const prevActiveConnectionIdRef = useRef<string | null>(null);
   const connectionSwitchFetchedRef = useRef(false);
@@ -401,8 +425,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         setNewDefaultQuery,
       },
       userExperienceSettings: {
-        newContentPersistence,
-        setNewContentPersistence,
         captionKeysSettings: {
           newCaptionsKeys,
           setNewCaptionsKeys,
@@ -412,6 +434,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         tableViewSettings: { newColumnWidth, setNewColumnWidth, newRowHeight, setNewRowHeight, newRowHeightExpandMultiple, setNewRowHeightExpandMultiple },
         newRefreshInterval,
         setNewRefreshInterval,
+        newMaxTabs,
+        setNewMaxTabs,
       },
       chatSettings: { newSecretKey, setNewSecretKey, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly, newChatModelSource, setNewChatModelSource, newLocalLlmProvider, setNewLocalLlmProvider, newLocalLlmEndpoint, setNewLocalLlmEndpoint, newModel, setNewModel },
       graphInfo: { newMaxItemsForSearch, setNewMaxItemsForSearch },
@@ -427,10 +451,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         setDefaultQuery,
       },
       userExperienceSettings: {
-        contentPersistence,
-        setContentPersistence,
         refreshInterval,
         setRefreshInterval,
+        maxTabs,
+        setMaxTabs,
         captionKeysSettings: { captionsKeys, setCaptionsKeys, showPropertyKeyPrefix, setShowPropertyKeyPrefix },
         tableViewSettings: { columnWidth, setColumnWidth, rowHeight, setRowHeight, rowHeightExpandMultiple, setRowHeightExpandMultiple },
       },
@@ -444,11 +468,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     saveSettings: async () => {
       // Save settings to local storage
       localStorage.setItem("runDefaultQuery", newRunDefaultQuery.toString());
-      localStorage.setItem("contentPersistence", newContentPersistence.toString());
       localStorage.setItem("timeout", newTimeout.toString());
       localStorage.setItem("defaultQuery", newDefaultQuery);
       localStorage.setItem("limit", newLimit.toString());
       localStorage.setItem("refreshInterval", newRefreshInterval.toString());
+      localStorage.setItem("maxTabs", clampMaxTabs(newMaxTabs).toString());
       localStorage.setItem("maxSavedMessages", newMaxSavedMessages.toString());
       localStorage.setItem("captionsKeys", JSON.stringify(newCaptionsKeys));
       localStorage.setItem("showPropertyKeyPrefix", newShowPropertyKeyPrefix.toString());
@@ -459,13 +483,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       localStorage.setItem("maxItemsForSearch", newMaxItemsForSearch.toString());
 
       // Update context
-      setContentPersistence(newContentPersistence);
       setRunDefaultQuery(newRunDefaultQuery);
       setDefaultQuery(newDefaultQuery);
       setTimeout(newTimeout);
       setLimit(newLimit);
       setLastLimit(limit);
       setRefreshInterval(newRefreshInterval);
+      setMaxTabs(clampMaxTabs(newMaxTabs));
       setMaxSavedMessages(newMaxSavedMessages);
       setCaptionsKeys(newCaptionsKeys);
       setShowPropertyKeyPrefix(newShowPropertyKeyPrefix);
@@ -498,13 +522,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       });
     },
     resetSettings: () => {
-      setNewContentPersistence(contentPersistence);
       setNewRunDefaultQuery(runDefaultQuery);
       setNewDefaultQuery(defaultQuery);
       setNewTimeout(timeout);
       setNewLimit(limit);
       setNewSecretKey(secretKey);
       setNewRefreshInterval(refreshInterval);
+      setNewMaxTabs(maxTabs);
       setNewMaxSavedMessages(maxSavedMessages);
       setNewCaptionsKeys(captionsKeys);
       setNewShowPropertyKeyPrefix(showPropertyKeyPrefix);
@@ -520,7 +544,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setHasChanges(false);
     }
 
-  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, newContentPersistence, newDefaultQuery, newLimit, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, toast, perSourceModels, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, newModel]);
+  }), [defaultQuery, hasChanges, lastLimit, limit, model, newDefaultQuery, newLimit, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, maxTabs, newMaxTabs, runDefaultQuery, secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, toast, perSourceModels, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, newModel]);
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -630,7 +654,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     dismissResult: () => setAiFixResult({ status: "idle" }),
     insertCorrectedQuery: (q: string) => {
       setHistoryQuery(prev => ({ ...prev, query: q }));
-      setUrlQueryText(q);
       setAiFixResult({ status: "idle" });
     },
   }), [aiFixSupported, lastFailure, aiFixResult, pendingConsent, requestAiFix, confirmConsent]);
@@ -653,7 +676,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setLayout,
     direction,
     setDirection,
-  }), [canvasRef, viewport, data, graphData, layout, direction]);
+    animation,
+    setAnimation,
+    pinned,
+    setPinned,
+    dimmed,
+    setDimmed,
+  }), [canvasRef, viewport, data, graphData, layout, direction, animation, pinned, dimmed]);
 
   const tableViewContext = useMemo(() => ({
     scrollPosition,
@@ -844,12 +873,20 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     return [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), merged];
   }, [historyQuery.queries]);
 
-  const runQuery = useCallback(async (q: string, name?: string): Promise<void> => {
+  /**
+   * @param options.readOnly Force GRAPH.RO_QUERY regardless of the user's role.
+   * @param options.silent Swallow the failure: no toast, no diagnostics, no history entry.
+   */
+  const runQuery = useCallback(async (q: string, name?: string, options?: { readOnly?: boolean; silent?: boolean }): Promise<void> => {
     const n = name || activeGraphNameRef.current;
 
     // Reject while a connection switch is mid-flight — its global id and React
     // state may still disagree, so starting here could hit the wrong DB.
     if (pendingSwitchesRef.current > 0) return;
+
+    // This query *is* the load for that graph, so the automatic one must not
+    // also fire (it would race this one and win, being newer).
+    if (pendingAutoLoadRef.current === n) pendingAutoLoadRef.current = null;
 
     // Capture ownership once: this is the newest query for the current
     // connection + graph. `isCurrent()` gates every later apply so a switch, a
@@ -860,7 +897,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     const epoch = getConnectionEpoch();
     const isCurrent = () => querySeqRef.current === seq && contextGenRef.current === ctx;
     loadingOwnerRef.current = seq;
-    const guardedToast = ((...a: Parameters<typeof toast>) => { if (isCurrent()) toast(...a); }) as typeof toast;
+    const guardedToast = ((...a: Parameters<typeof toast>) => { if (!options?.silent && isCurrent()) toast(...a); }) as typeof toast;
     const guardedSetIndicator = (i: "online" | "offline") => { if (isCurrent()) setIndicator(i); };
 
     let newQuery: Query = {
@@ -886,7 +923,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     }));
 
     const [query, existingLimit] = getQueryWithLimit(q, limit);
-    const readOnlyParam = isReadOnlyRef.current ? '&readOnly=true' : '';
+    const readOnlyParam = isReadOnlyRef.current || options?.readOnly ? '&readOnly=true' : '';
     const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}${readOnlyParam}`;
     try {
       const result = await getSSEGraphResult(url, guardedToast, guardedSetIndicator, {
@@ -911,7 +948,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         return gi;
       }).catch((error) => {
         console.error("Failed to fetch graph info:", error);
-        if (isCurrent()) toast({
+        guardedToast({
           title: "Error",
           description: "Failed to fetch graph info",
           variant: "destructive",
@@ -948,6 +985,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       if (!isCurrent()) return;
 
       setGraph(g);
+      // graphRef only catches up on the next render, and setGraphInfo writes
+      // through it — point it at the new graph now so the sync below lands on
+      // g rather than on the graph being replaced.
+      graphRef.current = g;
       // setGraph only updates GraphContext; the GraphInfo panel reads labels,
       // relationships and property keys from the separate GraphInfoContext, so
       // sync it here too — otherwise the panel shows stale info until the next
@@ -959,10 +1000,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         setCurrentTab(g.getElements().length === 0 && g.Data.length !== 0 ? "Table" : "Graph");
       }
       setLastLimit(limit);
-
-      if (!tutorialOpen && prefixReady) {
-        setConnectionItem("savedContent", JSON.stringify({ graphName: n, query: q }));
-      }
 
       const newQueries = handelGetNewQueries(newQuery);
 
@@ -984,7 +1021,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     } catch (err) {
       // Discard a superseded failure so it can't overwrite the active graph's
       // diagnostics/history/URL after a switch or a newer query.
-      if (isCurrent()) {
+      if (!isCurrent()) return;
+
+      if (options?.silent) {
+        // Leave no trace of a run nobody asked for: drop the in-flight entry
+        // that was staged before the request went out.
+        setHistoryQuery(prev => ({ ...prev, currentQuery: defaultQueryHistory.currentQuery }));
+      } else {
         // Errors from getSSEGraphResult are already surfaced via toast
         const errorMessage = (err as Error).message || "";
         setDiagnostics(computeEditorDiagnostics(newQuery.text, errorMessage));
@@ -1004,7 +1047,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         }));
       }
     } finally {
-      if (isCurrent()) setUrlQueryText(newQuery.text);
       // Only the run that still owns the spinner may clear it — a newer query or
       // a switch/graph change may have taken (or released) ownership.
       if (loadingOwnerRef.current === seq) {
@@ -1023,15 +1065,23 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   const handleSetGraphName = useCallback((name: string) => {
     if (graphNameRef.current === name) return;
+    // A real selection change: arm the one-shot automatic load for it.
+    pendingAutoLoadRef.current = name || null;
     // Make the new graph name authoritative immediately (both refs otherwise only
     // refresh at render) and supersede any in-flight op targeting the old graph.
     graphNameRef.current = name;
     activeGraphNameRef.current = name;
     bumpContextGen();
-    // Clear stale state from the previous graph so old data doesn't linger
+    // Clear stale state from the previous graph so old data doesn't linger.
+    // The whole graph is replaced rather than only its GraphInfo: the label
+    // chips, the canvas legend and the info panel all read off the graph
+    // object, so an empty tab would otherwise keep showing the old labels.
+    const emptyGraph = Graph.empty(name, showPropertyKeyPrefix, limit, GraphInfo.empty(toast, setIndicator));
+    graphRef.current = emptyGraph;
     setGraphName(name);
     setSelectedParam("");
-    setGraphInfo(GraphInfo.empty(toast, setIndicator));
+    setGraph(emptyGraph);
+    graphInfoSyncRef.current.bumpVersion();
     graphInfoSyncRef.current.setNodesCount(undefined);
     graphInfoSyncRef.current.setEdgesCount(undefined);
     setData({ nodes: [], links: [] });
@@ -1041,8 +1091,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setScrollPosition(0);
     setDiagnostics(null);
     setHistoryQuery(h => ({ ...h, query: "", currentQuery: defaultQueryHistory.currentQuery }));
-    setUrlQueryText(null);
-  }, [toast, setIndicator, bumpContextGen]);
+  }, [toast, setIndicator, bumpContextGen, showPropertyKeyPrefix, limit]);
 
   const graphContext = useMemo(() => ({
     graph,
@@ -1066,10 +1115,207 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setIsLoading,
     expand: expandFilter,
     setExpand: setExpandFilter,
+    chatOpen,
+    setChatOpen,
     selectedParam,
     setSelectedParam,
-    initialQuery: initialQueryRef.current,
-  }), [graph, graphName, handleSetGraphName, graphNames, labels, relationships, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, selectedParam]);
+    pendingAutoLoadRef,
+  }), [graph, graphName, handleSetGraphName, graphNames, labels, relationships, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, chatOpen, selectedParam]);
+
+  // Everything a tab needs to show its results again without querying. Mirrored
+  // at render so `captureGraphSession` can read it without a dependency list.
+  const sessionStateRef = useRef<GraphSession>(undefined!);
+  sessionStateRef.current = {
+    graphName,
+    graph,
+    data,
+    graphData,
+    viewport,
+    labels,
+    relationships,
+    view: currentTab,
+    query: historyQuery.query,
+    currentQuery: historyQuery.currentQuery,
+    selectedParam,
+    search,
+    scrollPosition,
+    // GraphInfoProvider owns these but only exposes setters; the pending ref
+    // keeps the last value pushed, so it doubles as a read-back mirror.
+    nodesCount: graphInfoPendingRef.current.nodesCount,
+    edgesCount: graphInfoPendingRef.current.edgesCount,
+  };
+
+  // Mirrored for the same reason: the layout controls are tab metadata, but
+  // they are read at capture time rather than on every render.
+  const layoutRef = useRef({ layout, direction, animation, pinned, dimmed, expand: expandFilter, chatOpen, customizingLabel });
+  layoutRef.current = { layout, direction, animation, pinned, dimmed, expand: expandFilter, chatOpen, customizingLabel };
+
+  // The graph info panel is imperative and only mounted on /graph, so its open
+  // state is remembered here for captures that happen once it is gone.
+  const panelOpenRef = useRef(true);
+
+  const captureGraphSession = useCallback((): GraphSession => {
+    const state = sessionStateRef.current;
+    const canvas = canvasRef.current;
+    // While the canvas is mounted it owns the authoritative node positions and
+    // zoom; capturing them is what lets a return skip the layout entirely.
+    // Off /graph the canvas is unmounted and ForceGraph's own unmount handler
+    // has already pushed the last snapshot into state, so fall back to that.
+    const layout = canvas ? captureCanvasLayout(canvas) : undefined;
+
+    return {
+      ...state,
+      graphData: layout ?? state.graphData,
+      viewport: layout && canvas ? canvas.getViewport() : state.viewport,
+    };
+  }, [canvasRef]);
+
+  // The serializable half of the same snapshot: enough to rebuild the tab by
+  // re-running its query, so it is safe to write to localStorage.
+  const captureTabMeta = useCallback((): GraphTabMeta => {
+    const state = sessionStateRef.current;
+    const canvas = canvasRef.current;
+    // An empty canvas reports whatever zoom it happens to sit at, which would
+    // overwrite a good viewport with a meaningless one.
+    const hasNodes = (canvas?.getGraphData().nodes.length ?? 0) > 0;
+    if (panelRef.current) panelOpenRef.current = !panelRef.current.isCollapsed();
+
+    return {
+      viewport: hasNodes ? canvas!.getViewport() : state.viewport,
+      selected: state.selectedParam || undefined,
+      layout: layoutRef.current.layout,
+      direction: layoutRef.current.direction,
+      animation: layoutRef.current.animation,
+      pinned: layoutRef.current.pinned,
+      dimmed: layoutRef.current.dimmed,
+      expand: layoutRef.current.expand,
+      panelOpen: panelOpenRef.current,
+      customizing: layoutRef.current.customizingLabel ?? undefined,
+      chatOpen: layoutRef.current.chatOpen,
+    };
+  }, [canvasRef]);
+
+  // Puts a captured session back on screen. Nothing here queries: the results,
+  // the canvas positions and the viewport all come from the snapshot, so the
+  // canvas restores instead of re-running the simulation.
+  const restoreGraphSession = useCallback((session: GraphSession) => {
+    // Make the restored graph authoritative immediately and supersede anything
+    // still in flight for the outgoing one.
+    graphNameRef.current = session.graphName;
+    activeGraphNameRef.current = session.graphName;
+    graphRef.current = session.graph;
+    bumpContextGen();
+    // The data is already here — nothing may auto-load it.
+    pendingAutoLoadRef.current = null;
+
+    setGraphName(session.graphName);
+    setGraph(session.graph);
+    // GraphInfo travels inside the graph; nudge its consumers to re-read it.
+    graphInfoSyncRef.current.bumpVersion();
+    graphInfoSyncRef.current.setNodesCount(session.nodesCount);
+    graphInfoSyncRef.current.setEdgesCount(session.edgesCount);
+    setData(session.data);
+    setGraphData(session.graphData);
+    setViewport(session.viewport);
+    setLabels(session.labels);
+    setRelationships(session.relationships);
+    setCurrentTab(session.view);
+    setSelectedParam(session.selectedParam);
+    setSearch(session.search);
+    setScrollPosition(session.scrollPosition);
+    setDiagnostics(null);
+    setHistoryQuery(h => ({ ...h, query: session.query, currentQuery: session.currentQuery }));
+  }, [bumpContextGen]);
+
+  // Guards the async half of a rebuild: a query that lands after the user has
+  // moved on must not paint its viewport over whatever tab is active now.
+  const activationSeqRef = useRef(0);
+
+  // With a session in memory we put the previous results straight back — no
+  // query, no re-simulation. Without one (a brand-new tab, or one read back from
+  // storage after a reload) the context is rebuilt from the tab's serializable
+  // fields: re-run its query, then restore its selection and viewport.
+  const handleActivateTab = useCallback((tab: GraphTab, session?: GraphSession) => {
+    const seq = (activationSeqRef.current += 1);
+
+    // The canvas follows these through ForceGraphContext, so applying them here
+    // covers both branches — a restored session carries its positions, not the
+    // controls that produced them.
+    const tabLayout = normalizeLayout(tab.layout);
+    setLayout(tabLayout);
+    setDirection(normalizeDirection(tabLayout, tab.direction));
+    // Non-force layouts pin their nodes, so that is the fallback for a tab that
+    // never stored the toggle.
+    setAnimation(tab.animation ?? false);
+    setPinned(tab.pinned ?? tabLayout !== 'force');
+    setDimmed(tab.dimmed ?? true);
+    setExpandFilter(tab.expand ?? true);
+    setChatOpen(tab.chatOpen ?? false);
+    // Resolved against the tab's own graph by the info panel, so a label that no
+    // longer exists simply falls back to the normal view.
+    setCustomizingLabel(tab.customizing ?? null);
+
+    // The info panel has no React state of its own — drive it imperatively.
+    const infoPanel = panelRef.current;
+    const tabPanelOpen = tab.panelOpen ?? true;
+    panelOpenRef.current = tabPanelOpen;
+    if (infoPanel && infoPanel.isCollapsed() === tabPanelOpen) {
+      if (tabPanelOpen) infoPanel.expand();
+      else infoPanel.collapse();
+    }
+
+    if (session) {
+      restoreGraphSession(session);
+      return;
+    }
+
+    // A stored tab can name a graph that has since been dropped. Rebuilding it
+    // would query that name, and querying a missing graph makes FalkorDB create
+    // it — so drop the name here and keep the tab's query text.
+    const graphIsGone = !!tab.graphName
+      && graphNamesLoadedRef.current
+      && !graphNamesRef.current.includes(tab.graphName);
+
+    // Ordering matters: handleSetGraphName clears the editor and the selection,
+    // so everything the tab carries has to be applied after it.
+    handleSetGraphName(graphIsGone ? "" : tab.graphName);
+    setCurrentTab(tab.view);
+    setHistoryQuery(h => ({ ...h, query: tab.query, currentQuery: defaultQueryHistory.currentQuery }));
+    // /graph resolves this against the results once they arrive.
+    setSelectedParam(tab.selected ?? "");
+
+    if (graphIsGone || !tab.graphName || !tab.query) return;
+
+    // We run the tab's own query, so the default-query auto-load must not fire.
+    pendingAutoLoadRef.current = null;
+    // A rebuild is not a user asking to run anything — the query text comes from
+    // storage, and a ?tab= link can hand it to someone else. Force it read-only
+    // whatever the role, so restoring a tab can never write (or create a graph),
+    // and swallow the failure: a write query simply restores nothing.
+    runQuery(tab.query, tab.graphName, { readOnly: true, silent: true }).then(() => {
+      // runQuery drops the viewport and picks its own view when the new results
+      // land, so both can only be restored afterwards.
+      if (activationSeqRef.current !== seq) return;
+      if (tab.viewport) setViewport(tab.viewport);
+      setCurrentTab(tab.view);
+    });
+  }, [handleSetGraphName, restoreGraphSession, runQuery]);
+
+  const graphTabs = useGraphTabs({
+    prefixReady,
+    // Rebuilding a tab queries its graph, and querying a graph that has since
+    // been dropped would make FalkorDB re-create it — wait for the list.
+    canRestore: graphNamesLoaded,
+    connectionKey: activeConnectionId,
+    initialTabId: initialTabIdRef.current,
+    graphName,
+    query: historyQuery.query,
+    view: currentTab,
+    maxTabs,
+    captureSession: captureGraphSession,
+    captureMeta: captureTabMeta,
+    onActivate: handleActivateTab,
+  });
 
   useEffect(() => {
     setRelationships([...graph.Relationships]);
@@ -1341,9 +1587,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setLastLimit(l);
       setDefaultQuery(getDefaultQuery(localStorage.getItem("defaultQuery") || undefined));
       setRunDefaultQuery(localStorage.getItem("runDefaultQuery") !== "false");
-      setContentPersistence(localStorage.getItem("contentPersistence") !== "false");
       setTutorialOpen(localStorage.getItem("tutorial") !== "false");
       setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30));
+      const loadedMaxTabs = clampMaxTabs(parseInt(localStorage.getItem("maxTabs") || "", 10));
+      setMaxTabs(loadedMaxTabs);
+      // Seed the settings-form value too, otherwise the form keeps showing the
+      // default and reads as "changed" against the value actually in effect.
+      setNewMaxTabs(loadedMaxTabs);
       setMaxSavedMessages(parseInt(localStorage.getItem("maxSavedMessages") || "5", 10));
       setShowPropertyKeyPrefix(localStorage.getItem("showPropertyKeyPrefix") === "true");
       setCypherOnly(localStorage.getItem("cypherOnly") === "true");
@@ -1524,36 +1774,22 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     handleFetchOptions();
   }, [handleFetchOptions, status]);
 
-  // Unified URL→state sync for the graph name, gated on graphNamesLoaded.
-  // By waiting for the graph list before applying the URL value we prevent:
-  //   1. Page.tsx from running queries against a non-existent graph (which
-  //      FalkorDB would silently create on the first GRAPH.QUERY call).
-  //   2. The default-query fallback from firing before we know the URL graph
-  //      is valid (which would overwrite a failing URL query result).
+  // A stored tab may name a graph that has since been dropped. Rather than
+  // querying it (which would make FalkorDB re-create it), clear the selection
+  // once the list is known — the tab keeps its query text either way.
   useEffect(() => {
-    if (pathname !== "/graph") return;
-    if (!graphNamesLoaded) return;
+    if (!graphNamesLoaded || !graphName) return;
+    if (graphNamesRef.current.includes(graphName)) return;
 
-    if (urlGraphName && !graphNamesRef.current.includes(urlGraphName)) {
-      // URL graph does not exist in DB — strip all related URL params. Route the
-      // name change through handleSetGraphName so any in-flight query for the old
-      // graph is superseded (bumps contextGen).
-      handleSetGraphName("");
-      setSelectedParam("");
-      setUrlQueryText(null);
-      return;
-    }
-
-    // Only override state when the URL explicitly names a graph.
-    // When urlGraphName is empty, fetchOptions may have already auto-selected
-    // a graph (e.g. single-graph DB) — don't clobber that with an empty string.
-    if (urlGraphName) {
-      handleSetGraphName(urlGraphName);
-    }
+    // Route through handleSetGraphName so any in-flight query for it is
+    // superseded (bumps contextGen).
+    handleSetGraphName("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlGraphName, graphNamesLoaded]);
+  }, [graphName, graphNamesLoaded]);
 
-  // One-way sync: context state → URL (only while on /graph)
+  // One-way sync: context state → URL (only while on /graph). The working
+  // context itself is not in the URL — the active tab owns it — so all the URL
+  // has to name is which tab.
   const prevPathnameRef = useRef(pathname);
 
   useEffect(() => {
@@ -1562,58 +1798,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Only write URL while on /graph and not during tutorial
     if (pathname !== "/graph" || tutorialOpen) return;
 
-    // Don't wipe URL params before the graph list has loaded. The URL→state
-    // sync is gated on graphNamesLoaded; if we write state→URL with
-    // graphName="" first, we strip ?graph= before URL sync can apply it,
-    // leaving urlGraphName="" permanently and the URL graph never loading.
+    // The tab strip only settles once the graph list has loaded; writing before
+    // then would strip ?tab= before it has been read back.
     if (!graphNamesLoaded) return;
 
-    // Sync all context state to URL via centralized builder
-    syncRouteUrlParams(pathname, {
-      graph: graphName,
-      query: urlQueryText,
-      selected: selectedParam,
-      layout,
-      direction,
-    });
-  }, [pathname, selectedParam, graphName, urlQueryText, graph.Id, layout, direction, tutorialOpen, graphNamesLoaded]);
+    syncRouteUrlParams(pathname, { tab: graphTabs.activeTabId });
+  }, [pathname, graphTabs.activeTabId, tutorialOpen, graphNamesLoaded]);
 
-  // Restore content persistence once on app mount (after auth + settings + graph names loaded)
-  useEffect(() => {
-    if (contentRestoredRef.current || !prefixReady || !contentPersistence || !graphNames || graphNames.length === 0) return;
-
-    // If a graph is already loaded, mark as restored and skip
-    if (graph.Id) {
-      contentRestoredRef.current = true;
-      return;
-    }
-
-    // URL takes priority over saved content. When the URL explicitly names an
-    // existing graph, the URL→state sync and the graph-loading effect handle
-    // everything — skip persistence so it doesn't overwrite the URL graph.
-    // Use the ref captured at render time: by the time this effect fires,
-    // syncRouteUrlParams may have already stripped ?graph= from window.location.
-    const urlGraph = initialUrlGraphNameRef.current;
-    if (urlGraph && graphNames?.includes(urlGraph)) {
-      contentRestoredRef.current = true;
-      return;
-    }
-
-    const content = getConnectionItem("savedContent");
-    if (!content) return;
-
-    try {
-      const { graphName: name, query } = JSON.parse(content);
-      if (graphNames?.includes(name)) {
-        contentRestoredRef.current = true;
-        handleSetGraphName(name);
-        runQuery(query, name);
-      }
-    } catch {
-      // Invalid saved content, ignore
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prefixReady, contentPersistence, graphNames, graph.Id, runQuery, handleSetGraphName]);
   // Reset all graph state when the active connection changes (user switch)
   useEffect(() => {
     const prev = prevActiveConnectionIdRef.current;
@@ -1814,16 +2005,20 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                             <UDFContext.Provider value={udfContext}>
                               <CypherLanguageContext.Provider value={cypherLanguageContext}>
                                 <AiFixContext.Provider value={aiFixContext}>
-                                  <ProviderLayout
-                                    panelRef={panelRef}
-                                    tutorialOpen={tutorialOpen}
-                                    onCloseTutorial={handleCloseTutorial}
-                                    onLoadDemoGraphs={handleLoadDemoGraphs}
-                                    onCleanupDemoGraphs={handleCleanupDemoGraphs}
-                                    showUDF={showUDF}
-                                  >
-                                    {children}
-                                  </ProviderLayout>
+                                  <GraphTabsContext.Provider value={graphTabs}>
+                                    <ProviderLayout
+                                      panelRef={panelRef}
+                                      customizingLabel={customizingLabel}
+                                      setCustomizingLabel={setCustomizingLabel}
+                                      tutorialOpen={tutorialOpen}
+                                      onCloseTutorial={handleCloseTutorial}
+                                      onLoadDemoGraphs={handleLoadDemoGraphs}
+                                      onCleanupDemoGraphs={handleCleanupDemoGraphs}
+                                      showUDF={showUDF}
+                                    >
+                                      {children}
+                                    </ProviderLayout>
+                                  </GraphTabsContext.Provider>
                                   <AiFixDialogs />
                                 </AiFixContext.Provider>
                               </CypherLanguageContext.Provider>

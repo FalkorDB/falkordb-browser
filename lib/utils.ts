@@ -1147,6 +1147,79 @@ export const convertToCanvasData = (graphData: GraphData): CanvasData => ({
     }))
 });
 
+/** A node's settled coordinates on the canvas. */
+export type CanvasNodePosition = { id: number, x: number, y: number };
+
+/**
+ * A canvas snapshot: the graph structure plus the node coordinates that the
+ * canvas's own `Data` type deliberately leaves out.
+ */
+export type CanvasLayout = { data: CanvasData, positions: CanvasNodePosition[] };
+
+/**
+ * How long to wait before re-applying a viewport after `setData`.
+ *
+ * `setData` schedules its own `zoomToFit` on an internal ~50ms timer and offers
+ * no callback for it, so a viewport restored before that fires gets overwritten.
+ * We re-apply once the timer has comfortably passed.
+ */
+export const CANVAS_AUTO_ZOOM_DELAY = 150;
+
+/**
+ * Snapshot the canvas so it can later be put back exactly as it looks now.
+ *
+ * `getData()` strips x/y (see `graphDataToData` in @falkordb/canvas), so a
+ * snapshot taken from it alone always re-runs the layout on restore. The settled
+ * coordinates live only on the internal nodes from `getGraphData()`, and they
+ * must be COPIED out: the canvas reuses node objects between updates, so holding
+ * references would let a later simulation mutate the snapshot from under us.
+ */
+export const captureCanvasLayout = (canvas: FalkorDBCanvas): CanvasLayout | undefined => {
+    const data = canvas.getData();
+
+    if (data.nodes.length === 0) return undefined;
+
+    return {
+        data,
+        positions: canvas.getGraphData().nodes
+            .filter(({ x, y }) => x !== undefined && y !== undefined)
+            .map(({ id, x, y }) => ({ id, x: x!, y: y! }))
+    };
+};
+
+/**
+ * Restore a snapshot without laying the graph out again.
+ *
+ * The canvas has no API to seed positions — `setData` resets x/y on every node
+ * it hasn't seen and lays them out from scratch — so we set the structure first
+ * and then write the saved coordinates onto the live nodes. Pinning them (fx/fy)
+ * is what makes it stick: `setData` kicks off an async force warmup that would
+ * otherwise drag them off the restored layout before it settles. That matches
+ * the steady state anyway, since the canvas pins every node once the engine
+ * stops while animation is off.
+ */
+export const applyCanvasLayout = (canvas: FalkorDBCanvas, layout: CanvasLayout): void => {
+    canvas.setData(layout.data);
+
+    const positions = new Map(layout.positions.map(position => [position.id, position]));
+
+    canvas.getGraphData().nodes.forEach(node => {
+        const position = positions.get(node.id);
+
+        if (!position) return;
+
+        node.x = position.x;
+        node.y = position.y;
+        node.fx = position.x;
+        node.fy = position.y;
+        node.vx = 0;
+        node.vy = 0;
+        node.initialPositionCalculated = true;
+    });
+
+    canvas.refresh();
+};
+
 export const formatName = (newGraphName: string) =>
   newGraphName === '""' ? "" : newGraphName;
 
