@@ -17,7 +17,7 @@ This Helm chart deploys the FalkorDB Browser application to a Kubernetes cluster
 helm install falkordb-browser oci://ghcr.io/falkordb/helm-charts/falkordb-browser
 
 # Or install a specific version
-helm install falkordb-browser oci://ghcr.io/falkordb/helm-charts/falkordb-browser --version 1.6.7
+helm install falkordb-browser oci://ghcr.io/falkordb/helm-charts/falkordb-browser --version 1.6.8
 ```
 
 ### Install from local chart
