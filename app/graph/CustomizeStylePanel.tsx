@@ -223,25 +223,6 @@ export default function CustomizeStylePanel({ customizing, onClose }: Props) {
         applyStylesToGraph(selectedColor, scale);
     };
 
-    const handleSave = () => {
-        // Prevent saving during tutorial
-        if (!tutorialOpen) {
-            // Save to localStorage
-            saveStyleToStorage(
-                isNode
-                    ? { color: selectedColor, size: NODE_SIZE * selectedScale }
-                    : {
-                        color: selectedColor,
-                        width: LINK_WIDTH * selectedScale,
-                        fontSize: LINK_FONT_SIZE * selectedScale,
-                        arrowSize: ARROW_SIZE * selectedScale,
-                    }
-            );
-        }
-
-        onClose();
-    };
-
     const handleCancel = useCallback(() => {
         // Revert to original values in state
         setSelectedColor(originalColor);
@@ -251,9 +232,32 @@ export default function CustomizeStylePanel({ customizing, onClose }: Props) {
         applyStylesToGraph(originalColor, originalScale);
     }, [originalColor, originalScale, applyStylesToGraph]);
 
+    const handleSave = () => {
+        // The tutorial runs on a demo graph, so its edits stay preview-only:
+        // discard them rather than leaving an unsaved preview applied.
+        if (tutorialOpen) {
+            handleCancel();
+            onClose();
+            return;
+        }
+
+        saveStyleToStorage(
+            isNode
+                ? { color: selectedColor, size: NODE_SIZE * selectedScale }
+                : {
+                    color: selectedColor,
+                    width: LINK_WIDTH * selectedScale,
+                    fontSize: LINK_FONT_SIZE * selectedScale,
+                    arrowSize: ARROW_SIZE * selectedScale,
+                }
+        );
+
+        onClose();
+    };
+
     const handleClose = useCallback(() => {
+        // Same discard as Escape, but the panel closes with it.
         handleCancel();
-        // Just close the panel without reverting changes
         onClose();
     }, [onClose, handleCancel]);
 
