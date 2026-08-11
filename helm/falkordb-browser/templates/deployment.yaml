@@ -37,7 +37,7 @@ spec:
       - name: {{ .Chart.Name }}
         securityContext:
           {{- toYaml .Values.securityContext | nindent 12 }}
-        image: "{{- if .Values.image.registry -}}{{ trimSuffix "/" .Values.image.registry }}/{{- end -}}{{ .Values.image.repository }}:{{ .Values.image.tag | default (printf "v%s" .Chart.AppVersion) }}"
+        image: "{{ include "falkordb-browser.image" . }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         ports:
         - name: http
