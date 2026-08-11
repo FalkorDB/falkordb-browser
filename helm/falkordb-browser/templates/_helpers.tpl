@@ -61,6 +61,25 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
+Return the full container image reference.
+Honors global.imageRegistry when set and keeps backward compatibility when
+image.repository already includes a registry host.
+*/}}
+{{- define "falkordb-browser.image" -}}
+{{- $repository := .Values.image.repository -}}
+{{- $registry := (default dict .Values.global).imageRegistry | default .Values.image.registry -}}
+{{- $tag := .Values.image.tag | default (printf "v%s" .Chart.AppVersion) -}}
+{{- $repositoryParts := splitList "/" $repository -}}
+{{- $firstPart := first $repositoryParts -}}
+{{- $repositoryHasRegistry := or (contains "." $firstPart) (contains ":" $firstPart) (eq $firstPart "localhost") -}}
+{{- if and $registry (not $repositoryHasRegistry) -}}
+{{- printf "%s/%s:%s" (trimSuffix "/" $registry) $repository $tag -}}
+{{- else -}}
+{{- printf "%s:%s" $repository $tag -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Return a valid 64-character hexadecimal ENCRYPTION_KEY.
 Uses .Values.encryption.key when set, otherwise reuses the existing release
 Secret value or generates a new key for first install.

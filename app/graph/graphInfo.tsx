@@ -22,7 +22,7 @@ function escapeIdentifier(id: string): string {
  * @param onClose - Callback invoked when the panel's close button is clicked
  * @returns The Graph Info panel React element containing graph name, memory usage, node/edge counts, property keys, and query buttons
  */
-export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizingLabel }: { onClose: () => void, customizingLabel: InfoLabel | null, setCustomizingLabel: Dispatch<SetStateAction<InfoLabel | null>> }) {
+export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizingLabel }: { onClose: () => void, customizingLabel: string | null, setCustomizingLabel: Dispatch<SetStateAction<string | null>> }) {
     const { graph, runQuery, graphName, handleSetGraphName, graphNames, setGraphNames, setGraph } = useContext(GraphContext);
     const { graphInfoVersion, nodesCount, edgesCount } = useContext(GraphInfoContext);
     const { Labels, Relationships, PropertyKeys, MemoryUsage } = graph.GraphInfo;
@@ -33,6 +33,11 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     const [nodesSearch, setNodesSearch] = useState("");
     const [edgesSearch, setEdgesSearch] = useState("");
     const [propertyKeysSearch, setPropertyKeysSearch] = useState("");
+    // Only the name is held in state, so the styles shown always come from the
+    // current graph info. A label that is gone falls back to the normal view.
+    // Compared against null rather than tested for truthiness: the synthetic
+    // label for unlabeled nodes is named "".
+    const customizing = customizingLabel !== null ? Labels.get(customizingLabel) ?? null : null;
     const hasSelectedGraph = graphName !== "";
     const memoryValue = MemoryUsage.get("total_graph_sz_mb");
     const isGraphInfoLoaded =
@@ -80,7 +85,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     return (
         <div data-testid="graphInfoPanel" data-graph-info-version={graphInfoVersion} className={cn("relative h-full w-full p-3 grid gap-3", showMemoryUsage ? "grid-rows-[max-content_max-content_max-content_1fr_1fr_1fr]" : "grid-rows-[max-content_max-content_1fr_1fr_1fr]")}>
             {
-                !customizingLabel ? (
+                !customizing ? (
                     <>
                         <Button
                             className="absolute top-2 right-2"
@@ -197,6 +202,9 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                     />
                                 </li>
                                 {Array.from(Labels.values()).filter(label => label.name.toLowerCase().includes(nodesSearch.toLowerCase())).sort((a, b) => b.count - a.count).map((label) => {
+                                    // Unlabeled nodes are grouped under a synthetic label named "",
+                                    // which has no Cypher equivalent to match on.
+                                    const isEmptyLabel = label.name === "";
                                     const name = label.name || "Empty";
                                     const labelColor = label.style.color;
 
@@ -231,8 +239,9 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                         <Button
                                                             className="w-full justify-start gap-2 px-2 py-1 text-xs hover:bg-secondary rounded-md"
                                                             data-testid={`runLabel${name}`}
+                                                            title={isEmptyLabel ? "Nodes without a label cannot be matched by label" : undefined}
                                                             onClick={() => runQuery(`MATCH (n:${escapeIdentifier(name)}) RETURN n`)}
-                                                            disabled={isQueryLoading}
+                                                            disabled={isQueryLoading || isEmptyLabel}
                                                         >
                                                             <Play size={12} />
                                                             Run
@@ -242,7 +251,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                         <Button
                                                             className="w-full justify-start gap-2 px-2 py-1 text-xs hover:bg-secondary rounded-md"
                                                             data-testid={`customizeStyle${name}`}
-                                                            onClick={() => setCustomizingLabel(label)}
+                                                            onClick={() => setCustomizingLabel(label.name)}
                                                         >
                                                             <Palette size={12} />
                                                             Customize
@@ -333,7 +342,17 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             <div className="flex gap-2 items-center">
                                 <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Property Keys</h2>
                                 {
-                                    PropertyKeys !== undefined ?
+                                    !hasSelectedGraph ?
+                                        <p
+                                            data-testid="propertyKeysCount"
+                                            tabIndex={0}
+                                            role="text"
+                                            aria-label="No graph selected"
+                                            className="truncate pointer-events-auto text-sm font-semibold"
+                                        >
+                                            -
+                                        </p>
+                                        : PropertyKeys !== undefined ?
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <p
@@ -384,7 +403,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                     </>
                 ) : (
                     <CustomizeStylePanel
-                        label={customizingLabel}
+                        label={customizing}
                         onClose={() => setCustomizingLabel(null)}
                     />
                 )
