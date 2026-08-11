@@ -109,83 +109,87 @@ test.describe("Tutorial Walkthrough", () => {
         await tutorial.waitForStep("Get all nodes (*)");
         await tutorial.clickTutorialTarget('[data-testid="graphInfoAllNodes"]');
 
-        // Step 14: "Get KNOWS edge" — advanceOn: "click" on graphInfoKNOWSEdge
-        await tutorial.waitForStep("Get KNOWS edge");
+        // Step 14: "Open Edge Options" — advanceOn: "click" on graphInfoKNOWSEdge
+        await tutorial.waitForStep("Open Edge Options");
         await tutorial.waitForTimeout(1000); // Wait for previous query to finish
         await tutorial.clickTutorialTarget('[data-testid="graphInfoKNOWSEdge"]');
 
-        // Step 15: "Query Editor" — advanceOn: "click" on editorRun
+        // Step 15: "Get KNOWS edge" — advanceOn: "click" on runRelationshipKNOWS
+        await tutorial.waitForStep("Get KNOWS edge");
+        await tutorial.clickTutorialTarget('[data-testid="runRelationshipKNOWS"]');
+
+        // Step 16: "Query Editor" — advanceOn: "click" on editorRun
         await tutorial.waitForStep("Query Editor");
         await tutorial.waitForTimeout(1000); // Wait for previous query to finish
         await tutorial.clickTutorialTarget('[data-testid="editorRun"]');
 
-        // Step 16: "Graph Visualization" — no advanceOn, has Next button
+        // Step 17: "Graph Visualization" — no advanceOn, has Next button
         await tutorial.waitForStep("Graph Visualization");
         await tutorial.waitForTimeout(2000); // Wait for canvas animation
         await tutorial.clickNextButton();
 
-        // Step 17: "Expand Node" — no advanceOn, has Next button (forwards events for optional interaction)
+        // Step 18: "Expand Node" — no advanceOn, has Next button (forwards events for optional interaction)
         await tutorial.waitForStep("Expand Node");
         // The canvas remains interactive and populated for the optional expand interaction.
         await expect(tutorial.canvasElement).toBeVisible();
         expect((await tutorial.getNodesScreenPositions()).length).toBeGreaterThan(0);
         await tutorial.clickNextButton();
 
-        // Step 18: "Collapse Node" — no advanceOn, has Next button (forwards events for optional interaction)
+        // Step 19: "Collapse Node" — no advanceOn, has Next button (forwards events for optional interaction)
         await tutorial.waitForStep("Collapse Node");
         await expect(tutorial.canvasElement).toBeVisible();
         expect((await tutorial.getNodesScreenPositions()).length).toBeGreaterThan(0);
         await tutorial.clickNextButton();
 
-        // Step 19: "View Node / Edge Details" — advanceOn: "contextmenu", with advanceCondition
+        // Step 20: "View Node / Edge Details" — advanceOn: "contextmenu", with advanceCondition
         // Right-click on an actual node so the DataPanel opens reliably.
         await tutorial.waitForStep("View Node / Edge Details");
         const hit = await tutorial.rightClickCanvasUntilDataPanel();
         expect(hit, "Right-click fallback: DataPanel never appeared after exhausting all canvas node positions").toBeTruthy();
 
-        // Step 20: "Data Panel" — no advanceOn, has Next button
+        // Step 21: "Data Panel" — no advanceOn, has Next button
         await tutorial.waitForStep("Data Panel");
         await tutorial.clickNextButton();
 
-        // Step 21: "Graph Action Toolbar" — no advanceOn, has Next button
+        // Step 22: "Graph Action Toolbar" — no advanceOn, has Next button
         await tutorial.waitForStep("Graph Action Toolbar");
         await tutorial.clickNextButton();
 
-        // Step 22: "Table Results" — advanceOn: "mousedown" on tableTab
+        // Step 23: "Table Results" — advanceOn: "mousedown" on tableTab
         await tutorial.waitForStep("Table Results");
         await tutorial.clickTutorialTarget('[data-testid="tableTab"]');
 
-        // Step 23: "Export Table Results" — no advanceOn, has Next button
+        // Step 24: "Export Table Results" — no advanceOn, has Next button
         await tutorial.waitForStep("Export Table Results");
         await tutorial.clickNextButton();
 
-        // Step 24: "Query Metadata" — advanceOn: "mousedown" on metadataTab
+        // Step 25: "Query Metadata" — advanceOn: "mousedown" on metadataTab
         await tutorial.waitForStep("Query Metadata");
         await tutorial.clickTutorialTarget('[data-testid="metadataTab"]');
 
-        // Step 25: "Query History" — advanceOn: "click" on queryHistory
+        // Step 26: "Query History" — advanceOn: "click" on queryHistory
         await tutorial.waitForStep("Query History");
         await tutorial.clickTutorialTarget('[data-testid="queryHistory"]');
 
-        // Step 26: "Query History Window" — no advanceOn, has Next button
+        // Step 27: "Query History Window" — no advanceOn, has Next button
         await tutorial.waitForStep("Query History Window");
         await tutorial.clickNextButton();
 
-        // Step 27: "Close Query History Window" — advanceOn: "click" on queryHistoryCloseButton
+        // Step 28: "Close Query History Window" — advanceOn: "click" on queryHistoryCloseButton
         await tutorial.waitForStep("Close Query History Window");
         await tutorial.clickTutorialTarget('[data-testid="queryHistoryCloseButton"]');
 
         // Track 4: Layouts and canvas actions
 
-        // Step 28: "Graph View" — advanceOn: "mousedown" on graphTab
+        // Step 29: "Graph View" — advanceOn: "mousedown" on graphTab
         await tutorial.waitForStep("Graph View");
         await tutorial.clickTutorialTarget('[data-testid="graphTab"]');
 
-        // Step 29: "Open Layout Dropdown" — advanceOn: "click" on layoutControl
+        // Step 30: "Open Layout Dropdown" — advanceOn: "click" on layoutControl
         await tutorial.waitForStep("Open Layout Dropdown");
         await tutorial.clickTutorialTarget('[data-testid="layoutControl"]');
 
-        // Step 30: "Hover Tree" — advanceOn: "pointermove" on layoutTreeSub, advanceCondition checks sub-content
+        // Step 31: "Hover Tree" — advanceOn: "pointermove" on layoutTreeSub, advanceCondition checks sub-content
         await tutorial.waitForStep("Hover Tree");
         await tutorial.hoverTutorialTarget(
             '[data-testid="layoutTreeSub"]',
@@ -193,20 +197,20 @@ test.describe("Tutorial Walkthrough", () => {
             '[data-testid="layoutTreeDirection-td"]'
         );
 
-        // Step 31: "Select Tree Direction" — advanceOn: "click" on layoutTreeDirection-td, passthrough
+        // Step 32: "Select Tree Direction" — advanceOn: "click" on layoutTreeDirection-td, passthrough
         await tutorial.waitForStep("Select Tree Direction");
         await tutorial.clickTutorialTarget('[data-testid="layoutTreeDirection-td"]');
 
-        // Step 32: "Tree Layout Active" — no advanceOn, has Next button
+        // Step 33: "Tree Layout Active" — no advanceOn, has Next button
         await tutorial.waitForStep("Tree Layout Active");
         await tutorial.waitForTimeout(1000);
         await tutorial.clickNextButton();
 
-        // Step 33: "Open Layout Dropdown" (again) — advanceOn: "click" on layoutControl
+        // Step 34: "Open Layout Dropdown" (again) — advanceOn: "click" on layoutControl
         await tutorial.waitForStep("Open Layout Dropdown");
         await tutorial.clickTutorialTarget('[data-testid="layoutControl"]');
 
-        // Step 34: "Hover Radial" — advanceOn: "pointermove" on layoutRadialSub, advanceCondition checks sub-content
+        // Step 35: "Hover Radial" — advanceOn: "pointermove" on layoutRadialSub, advanceCondition checks sub-content
         await tutorial.waitForStep("Hover Radial");
         await tutorial.hoverTutorialTarget(
             '[data-testid="layoutRadialSub"]',
@@ -214,16 +218,16 @@ test.describe("Tutorial Walkthrough", () => {
             '[data-testid="layoutRadialDirection-out"]'
         );
 
-        // Step 35: "Select Radial Direction" — advanceOn: "click" on layoutRadialDirection-out, passthrough
+        // Step 36: "Select Radial Direction" — advanceOn: "click" on layoutRadialDirection-out, passthrough
         await tutorial.waitForStep("Select Radial Direction");
         await tutorial.clickTutorialTarget('[data-testid="layoutRadialDirection-out"]');
 
-        // Step 36: "Radial Layout Active" — no advanceOn, has Next button
+        // Step 37: "Radial Layout Active" — no advanceOn, has Next button
         await tutorial.waitForStep("Radial Layout Active");
         await tutorial.waitForTimeout(1000);
         await tutorial.clickNextButton();
 
-        // Step 37: "Animation Control" — no advanceOn, has Next button.
+        // Step 38: "Animation Control" — no advanceOn, has Next button.
         // The radial layout is active here, so animation auto-pins and the
         // control must be disabled (animationDisabled = pinned || layout !== 'force').
         await tutorial.waitForStep("Animation Control");
@@ -231,24 +235,24 @@ test.describe("Tutorial Walkthrough", () => {
         await expect(tutorial.animationControl).toBeDisabled();
         await tutorial.clickNextButton();
 
-        // Step 38: "Pin on Drag" — no advanceOn, has Next button.
+        // Step 39: "Pin on Drag" — no advanceOn, has Next button.
         await tutorial.waitForStep("Pin on Drag");
         await expect(tutorial.pinControl).toBeVisible();
         await tutorial.clickNextButton();
 
-        // Step 39: "Zoom Controls" — no advanceOn, has Next button
+        // Step 40: "Zoom Controls" — no advanceOn, has Next button
         await tutorial.waitForStep("Zoom Controls");
         await tutorial.clickNextButton();
 
-        // Step 40: "Theme Toggle" — no advanceOn, has Next button
+        // Step 41: "Theme Toggle" — no advanceOn, has Next button
         await tutorial.waitForStep("Theme Toggle");
         await tutorial.clickNextButton();
 
-        // Step 41: "Left Menu Navigation" — no advanceOn, has Next button
+        // Step 42: "Left Menu Navigation" — no advanceOn, has Next button
         await tutorial.waitForStep("Left Menu Navigation");
         await tutorial.clickNextButton();
 
-        // Step 42: "You're All Set!" — has Finish button
+        // Step 43: "You're All Set!" — has Finish button
         await tutorial.waitForStep("You're All Set!");
         await tutorial.clickNextButton(); // This is the "Finish" button
 
