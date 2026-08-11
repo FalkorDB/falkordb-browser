@@ -285,9 +285,13 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         let cancelled = false;
 
         // Clear stale entries immediately so the previous graph's procedures
-        // are never shown while the new fetch is in flight.
+        // are never shown while the new fetch is in flight. The schema effect
+        // above reads this ref, so the clear has to be published too — otherwise
+        // the engine keeps validating against the previous graph's procedures
+        // (forever, when `requestGraphId` is empty and no fetch follows).
         procedureSuggestionsRef.current = [];
         cachedSuggestionsRef.current = [];
+        setProceduresVersion(v => v + 1);
 
         if (!requestGraphId) return () => { cancelled = true; };
 

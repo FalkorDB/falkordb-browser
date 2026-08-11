@@ -211,7 +211,9 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
             ? historyQuery.currentQuery
             : historyQuery.queries[historyQuery.counter - 1];
 
-        if (selectedQuery && newFilteredList.every(q => q.text !== selectedQuery.text)) {
+        // `timestamp`, like every other identity check in this panel — text is not
+        // an entry identity, so a filtered-out entry could look visible.
+        if (selectedQuery && newFilteredList.every(q => q.timestamp !== selectedQuery.timestamp)) {
             setHistoryQuery(prev => {
                 if (prev.counter === 0) return prev;
                 return {

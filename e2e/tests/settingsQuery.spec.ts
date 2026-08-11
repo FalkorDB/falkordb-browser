@@ -228,11 +228,9 @@ test.describe.serial("Query Settings", () => {
       await querySettings.insertQuery(query);
       await querySettings.clickRunQuery(false);
       await querySettings.refreshPage();
-      const tabEnabled =
-        (await querySettings.getGraphTabEnabled()) ||
-        (await querySettings.getTableTabEnabled()) ||
-        (await querySettings.getMetadataTabEnabled());
-      expect(tabEnabled).toBe(true);
+      // The tabs can be enabled by the graph selection alone, so assert on the
+      // rebuilt result itself: the seeded node has to be back on the canvas.
+      expect(await querySettings.getNodesScreenPositions()).toHaveLength(1);
     } finally {
       await apiCall.removeGraph(graphName);
     }
