@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, Dispatch, SetStateAction, useContext, useCallback } from "react";
-import { GitGraph, ScrollText, Table } from "lucide-react";
+import { useEffect, Dispatch, SetStateAction, useContext, useCallback, useState } from "react";
+import { GitGraph, ScrollText, Table, Waypoints } from "lucide-react";
 import { cn, GraphRef, Tab, Label, Link, Node, Relationship, HistoryQuery } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GraphContext, ForceGraphContext } from "@/app/components/provider";
@@ -13,6 +13,7 @@ import Toolbar from "./toolbar";
 import Controls from "./controls";
 import Labels from "./labels";
 import MetadataView from "./MetadataView";
+import SchemaView from "./SchemaView";
 
 interface Props {
     selectedElements: (Node | Link)[]
@@ -53,6 +54,10 @@ function GraphView({
     const { graph, graphName, currentTab, setCurrentTab, isLoading, expand, setExpand } = useContext(GraphContext);
     const { setData, data, graphData, setGraphData, setViewport, viewport, dimmed, setDimmed } = useContext(ForceGraphContext);
 
+    // The Schema tab puts its own controls in this bar, but they need the state
+    // that lives inside SchemaView, so it fills the slot with a portal.
+    const [schemaControlsSlot, setSchemaControlsSlot] = useState<HTMLDivElement | null>(null);
+
     useEffect(() => {
         setRelationships([...graph.Relationships]);
         setLabels([...graph.Labels]);
@@ -62,8 +67,10 @@ function GraphView({
         if (tab === "Table") return graph.Data.length !== 0;
         if (tab === "Metadata") return historyQuery.currentQuery && historyQuery.currentQuery.metadata.length > 0 && historyQuery.currentQuery.explain.length > 0;
         if (tab === "Graph") return graph.getElements().length !== 0;
+        // The schema is derived from the graph itself, not from a query result.
+        if (tab === "Schema") return graphName !== "";
         return true;
-    }, [graph, historyQuery.currentQuery]);
+    }, [graph, graphName, historyQuery.currentQuery]);
 
     const onLabelClick = (label: Label) => {
         const canvas = canvasRef.current;
@@ -211,6 +218,19 @@ function GraphView({
                                 <ScrollText />
                             </Button>
                         </TabsTrigger>
+                        <TabsTrigger
+                            data-testid="schemaTab"
+                            asChild
+                            value="Schema"
+                        >
+                            <Button
+                                disabled={!isTabEnabled("Schema")}
+                                className="tabs-trigger"
+                                title={!isTabEnabled("Schema") ? "No Graph Selected" : "Schema"}
+                            >
+                                <Waypoints />
+                            </Button>
+                        </TabsTrigger>
                     </TabsList>
                     {
                         graph.getElements().length > 0 && currentTab === "Graph" && !isLoading &&
@@ -222,6 +242,10 @@ function GraphView({
                                 setDimmed={setDimmed}
                                 selectedElements={selectedElements}
                             />
+                    }
+                    {
+                        currentTab === "Schema" &&
+                        <div ref={setSchemaControlsSlot} className="flex gap-2 items-center pointer-events-auto" />
                     }
                     {
                         (historyQuery?.currentQuery?.metadata?.length ?? 0) > 0 &&
@@ -278,6 +302,9 @@ function GraphView({
                     query={historyQuery.currentQuery}
                     fetchCount={fetchCount}
                 />
+            </TabsContent>
+            <TabsContent value="Schema" className="h-full w-full mt-0 overflow-hidden">
+                <SchemaView controlsSlot={schemaControlsSlot} />
             </TabsContent>
         </Tabs>
     );

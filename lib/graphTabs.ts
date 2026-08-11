@@ -150,7 +150,7 @@ const isGraphTab = (value: unknown): value is GraphTab => {
     return typeof tab.id === "string"
         && typeof tab.graphName === "string"
         && typeof tab.query === "string"
-        && (tab.view === "Graph" || tab.view === "Table" || tab.view === "Metadata");
+        && (tab.view === "Graph" || tab.view === "Table" || tab.view === "Metadata" || tab.view === "Schema");
 };
 
 const asString = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);

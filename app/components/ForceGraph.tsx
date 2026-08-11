@@ -26,6 +26,15 @@ interface Props {
     viewport?: ViewportState
     setViewport?: Dispatch<SetStateAction<ViewportState>>
     dimmed?: boolean
+    /**
+     * Turns off double-click expansion. Set it for a graph whose nodes are not
+     * real elements (the schema view), where expanding would query the database
+     * for a node id that does not exist.
+     */
+    disableExpand?: boolean
+    /** `window` property the e2e tests read the canvas data from. */
+    testHookName?: string
+    testId?: string
 }
 
 export default function ForceGraph({
@@ -40,6 +49,9 @@ export default function ForceGraph({
     viewport = undefined,
     setViewport = undefined,
     dimmed = false,
+    disableExpand = false,
+    testHookName = "graph",
+    testId = "graphCanvasWrapper",
 }: Props) {
 
     const { setIndicator } = useContext(IndicatorContext);
@@ -80,8 +92,8 @@ export default function ForceGraph({
         if (!canvas || !canvasLoaded) return;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any)["graph"] = () => canvas.getGraphData();
-    }, [canvasRef, canvasLoaded]);
+        (window as any)[testHookName] = () => canvas.getGraphData();
+    }, [canvasRef, canvasLoaded, testHookName]);
 
     // Load saved viewport on mount
     useEffect(() => {
@@ -220,7 +232,7 @@ export default function ForceGraph({
 
     const handleNodeClick = useCallback(async (node: GraphNode, _event: MouseEvent) => {
         const fullNode = graph.NodesMap.get(node.id);
-        if (!fullNode) return;
+        if (!fullNode || disableExpand) return;
 
         const now = Date.now();
         const isDoubleClick = now - lastClick.current.date < DOUBLE_CLICK_MS && lastClick.current.id === node.id;
@@ -240,7 +252,7 @@ export default function ForceGraph({
                 deleteNeighbors([fullNode]);
             }
         }
-    }, [graph.NodesMap, onFetchNode, deleteNeighbors]);
+    }, [graph.NodesMap, onFetchNode, deleteNeighbors, disableExpand]);
 
     const handleLinkClick = useCallback((link: GraphLink, event: MouseEvent) => {
         const fullLink = graph.LinksMap.get(link.id);
@@ -531,7 +543,7 @@ export default function ForceGraph({
     return (
         <div
             className="w-full h-full"
-            data-testid="graphCanvasWrapper"
+            data-testid={testId}
             data-focus-active={String(dimmed && selectedElements.length > 0)}
             data-selection-count={String(selectedElements.length)}
         >

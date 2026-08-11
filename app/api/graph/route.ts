@@ -20,9 +20,7 @@ export async function GET(request: Request) {
     try {
       const result = await client.list();
 
-      const graphNames = result.filter((name) => !name.endsWith("_schema"));
-
-      return NextResponse.json({ opts: graphNames }, { status: 200, headers: getCorsHeaders(request) });
+      return NextResponse.json({ opts: result }, { status: 200, headers: getCorsHeaders(request) });
     } catch (error) {
       console.error(error);
       return NextResponse.json(

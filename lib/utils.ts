@@ -184,7 +184,35 @@ export type TextCell = {
   onChange: (value: string) => Promise<boolean>;
 };
 
-export type Tab = "Graph" | "Table" | "Metadata";
+export type Tab = "Graph" | "Table" | "Metadata" | "Schema";
+
+/**
+ * One observed placement of a relationship type: the source label, the
+ * relationship type and the target label of at least one real edge.
+ * Unlabeled endpoints are reported as the empty string, matching the synthetic
+ * "" label `GraphInfo` uses for them.
+ */
+export type SchemaEdge = {
+  source: string;
+  relationship: string;
+  target: string;
+};
+
+/**
+ * The property keys one label or relationship type carries, mapped to the value
+ * type(s) observed for them. FalkorDB enforces no schema, so the same key can
+ * hold different types on different elements; those are joined (`"Integer | String"`).
+ */
+export type SchemaPropertyKeys = Record<string, string>;
+
+/** Everything the Schema view draws, discovered with two read-only queries. */
+export type SchemaSnapshot = {
+  edges: SchemaEdge[];
+  /** Keyed by label; unlabeled nodes are under `""`. */
+  labelKeys: Record<string, SchemaPropertyKeys>;
+  /** Keyed by relationship type. */
+  relationshipKeys: Record<string, SchemaPropertyKeys>;
+};
 
 export type ReadOnlyCell = {
   value: string;
@@ -900,6 +928,142 @@ export const getMetaStats = async (
     console.error("Failed to fetch meta stats:", error);
     return undefined;
   }
+};
+
+/**
+ * Folds a discovered `(owner, key, type)` row into an accumulator, joining the
+ * types a key was seen with. A graph without an enforced schema can hold, say,
+ * a `port` that is an Integer on one node and a String on another.
+ */
+const addSchemaPropertyKey = (
+  into: Record<string, SchemaPropertyKeys>,
+  owner: string,
+  key: string,
+  type: string,
+) => {
+  const keys = into[owner] ?? {};
+  const seen = keys[key];
+
+  keys[key] = !seen || seen === type
+    ? type
+    : [...new Set([...seen.split(" | "), type])].sort().join(" | ");
+
+  into[owner] = keys;
+};
+
+/** Orders owners and their keys so that two equal snapshots serialize equally. */
+const sortSchemaKeys = (records: Record<string, SchemaPropertyKeys>): Record<string, SchemaPropertyKeys> =>
+  Object.fromEntries(
+    Object.entries(records)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([owner, keys]) => [
+        owner,
+        Object.fromEntries(Object.entries(keys).sort(([a], [b]) => a.localeCompare(b))),
+      ]),
+  );
+
+/**
+ * Discovers everything the Schema view draws:
+ * - every placement a relationship type has, i.e. which
+ *   (source label)-[type]->(target label) triples actually occur;
+ * - the property keys each label and each relationship type carries, with the
+ *   value type(s) they hold.
+ *
+ * Both queries aggregate server-side and return only the distinct combinations,
+ * so no nodes or edges are ever transferred: the cost is one scan of the nodes
+ * and one of the edges, and the answer is exact rather than sampled — which
+ * matters because FalkorDB enforces no schema, so two nodes sharing a label can
+ * carry completely different properties.
+ *
+ * Always issued read-only: schema discovery must never (re)create a graph.
+ */
+export const getSchema = async (
+  name: string,
+  toast: ToastFn,
+  setIndicator: (indicator: "online" | "offline") => void,
+  options?: { signal?: AbortSignal; connectionId?: string | null },
+): Promise<SchemaSnapshot | undefined> => {
+  if (!name) return undefined;
+
+  // Unlabeled endpoints are folded into the "" label so they line up with the
+  // synthetic "Empty" label the graph info panel shows. Edge placements and edge
+  // property keys come from the same query so the edges are only scanned once;
+  // a key of null marks an edge with no properties, whose placement still counts.
+  const edgesQuery = `MATCH (a)-[e]->(b)
+UNWIND (CASE WHEN size(labels(a)) = 0 THEN [''] ELSE labels(a) END) AS source
+UNWIND (CASE WHEN size(labels(b)) = 0 THEN [''] ELSE labels(b) END) AS target
+UNWIND (CASE WHEN size(keys(e)) = 0 THEN [null] ELSE keys(e) END) AS key
+RETURN DISTINCT source, type(e) AS relationship, target, key,
+CASE WHEN key IS NULL THEN null ELSE typeOf(e[key]) END AS keyType`;
+
+  const labelsQuery = `MATCH (n)
+UNWIND (CASE WHEN size(labels(n)) = 0 THEN [''] ELSE labels(n) END) AS label
+UNWIND keys(n) AS key
+RETURN DISTINCT label, key, typeOf(n[key]) AS keyType`;
+
+  const run = (query: string) => getSSEGraphResult(
+    `/api/graph/${prepareArg(name)}?query=${encodeURIComponent(query)}&readOnly=true`,
+    toast,
+    setIndicator,
+    { signal: options?.signal, connectionId: options?.connectionId, query },
+  ) as Promise<{ data?: unknown[] } | undefined>;
+
+  const [edgeResult, labelResult] = await Promise.all([run(edgesQuery), run(labelsQuery)]);
+
+  if (!edgeResult || !Array.isArray(edgeResult.data)) return undefined;
+
+  const edges: SchemaEdge[] = [];
+  const seenEdges = new Set<string>();
+  const relationshipKeys: Record<string, SchemaPropertyKeys> = {};
+
+  edgeResult.data.forEach((row) => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) return;
+
+    const { source, relationship, target, key, keyType } = row as Record<string, unknown>;
+
+    if (
+      typeof source !== "string"
+      || typeof relationship !== "string"
+      || typeof target !== "string"
+    ) return;
+
+    // The same placement repeats once per property key of the edges holding it.
+    const placement = `${source}\u0000${relationship}\u0000${target}`;
+
+    if (!seenEdges.has(placement)) {
+      seenEdges.add(placement);
+      edges.push({ source, relationship, target });
+    }
+
+    if (typeof key === "string" && typeof keyType === "string") {
+      addSchemaPropertyKey(relationshipKeys, relationship, key, keyType);
+    }
+  });
+
+  const labelKeys: Record<string, SchemaPropertyKeys> = {};
+
+  if (labelResult && Array.isArray(labelResult.data)) {
+    labelResult.data.forEach((row) => {
+      if (!row || typeof row !== "object" || Array.isArray(row)) return;
+
+      const { label, key, keyType } = row as Record<string, unknown>;
+
+      if (typeof label !== "string" || typeof key !== "string" || typeof keyType !== "string") return;
+
+      addSchemaPropertyKey(labelKeys, label, key, keyType);
+    });
+  }
+
+  // FalkorDB returns the rows in no guaranteed order, so the snapshot is
+  // canonicalized: two runs over an unchanged graph have to compare equal,
+  // otherwise a refresh would look like a change and re-lay-out the view.
+  edges.sort((a, b) => (
+    a.source.localeCompare(b.source)
+    || a.relationship.localeCompare(b.relationship)
+    || a.target.localeCompare(b.target)
+  ));
+
+  return { edges, labelKeys: sortSchemaKeys(labelKeys), relationshipKeys: sortSchemaKeys(relationshipKeys) };
 };
 
 export function rgbToHSL(hex: string): string {
