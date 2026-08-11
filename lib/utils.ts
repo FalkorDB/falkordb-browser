@@ -81,6 +81,9 @@ export type Link = {
   visible: boolean;
   expand: boolean;
   collapsed: boolean;
+  width?: number;
+  fontSize?: number;
+  arrowSize?: number;
   data: {
     [key: string]: any;
   };
@@ -124,11 +127,20 @@ export type Data = DataRow[];
 
 export type MemoryValue = number | Map<string, MemoryValue>;
 
-export interface LinkStyle {
+export interface BaseStyle {
   color: string;
 }
 
-export interface LabelStyle extends LinkStyle {
+export interface LinkStyle extends BaseStyle {
+  /** Link line width (defaults to the canvas LINK_WIDTH) */
+  width?: number;
+  /** Relationship-type caption font size (defaults to the canvas LINK_FONT_SIZE) */
+  fontSize?: number;
+  /** Arrowhead length (defaults to the canvas ARROW_SIZE) */
+  arrowSize?: number;
+}
+
+export interface LabelStyle extends BaseStyle {
   size?: number;
 }
 
@@ -160,6 +172,17 @@ export interface Relationship extends Omit<InfoRelationship, "count"> {
   textAscent?: number;
   textDescent?: number;
 }
+
+/**
+ * Identifies the item whose style panel is open. Only the kind and name are
+ * held, so the styles rendered always come from the current graph info.
+ */
+export type CustomizingRef = { kind: "node" | "edge"; name: string };
+
+/** Item currently open in the Customize Style panel, resolved from a `CustomizingRef`. */
+export type CustomizingItem =
+  | { kind: "node"; item: InfoLabel }
+  | { kind: "edge"; item: InfoRelationship };
 
 export type GraphRef = RefObject<FalkorDBCanvas | null>;
 
@@ -1136,13 +1159,16 @@ export const convertToCanvasData = (graphData: GraphData): CanvasData => ({
         expand,
         data
     })),
-    links: graphData.links.map(({ id, relationship, color, visible, source, target, data }) => ({
+    links: graphData.links.map(({ id, relationship, color, visible, source, target, width, fontSize, arrowSize, data }) => ({
         id,
         relationship,
         color,
         visible,
         source,
         target,
+        width,
+        fontSize,
+        arrowSize,
         data
     }))
 });
