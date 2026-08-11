@@ -46,10 +46,8 @@ export default class GraphInfoPage extends GraphPage {
     // Checking nodesCount visibility would incorrectly report the panel as
     // closed during loading, causing openGraphInfoButton() to toggle it shut.
     // Use the panel's bounding-box width instead: > 50 px means expanded.
-    // .first() is needed because both the ResizablePanel wrapper (providers.tsx)
-    // and the inner GraphInfoPanel div (graphInfo.tsx) share the same test-id.
     await this.page.waitForTimeout(300);
-    const box = await this.page.getByTestId("graphInfoPanel").first().boundingBox().catch(() => null);
+    const box = await this.page.getByTestId("graphInfoPanel").boundingBox({ timeout: 5000 }).catch(() => null);
     return !!(box && box.width > 50);
   }
 

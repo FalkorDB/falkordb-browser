@@ -184,28 +184,6 @@ test.describe.serial("Query Settings", () => {
     expect(runDefaultQuerySwitchOff).toBeFalsy();
   });
 
-  test(`@admin Validate that content persistence is set and saved`, async () => {
-    const querySettings = await browser.createNewPage(
-      QuerySettingsPage,
-      urls.settingsUrl
-    );
-    await querySettings.expandUserExperienceSection();
-    await querySettings.clickContentPersistenceSwitchOn();
-    await querySettings.clickSaveQuerySettingsBtn();
-    await querySettings.refreshPage();
-    await querySettings.expandUserExperienceSection();
-    const contentPersistenceSwitchOn =
-      await querySettings.getContentPersistenceSwitch();
-    expect(contentPersistenceSwitchOn).toBeTruthy();
-    await querySettings.clickContentPersistenceSwitchOff();
-    await querySettings.clickSaveQuerySettingsBtn();
-    await querySettings.refreshPage();
-    await querySettings.expandUserExperienceSection();
-    const contentPersistenceSwitchOff =
-      await querySettings.getContentPersistenceSwitch();
-    expect(contentPersistenceSwitchOff).toBeFalsy();
-  });
-
   test(`@admin Validate that when run default query is on default query will run when graph is selected`, async () => {
     const graphName = getRandomString("settingsQuery");
     await apiCall.addGraph(graphName);
@@ -230,7 +208,7 @@ test.describe.serial("Query Settings", () => {
     await apiCall.removeGraph(graphName);
   });
 
-  test(`@admin Validate that content persistence is on and the content is saved`, async () => {
+  test(`@admin Validate that the active tab rebuilds its results after a refresh`, async () => {
     const graphName = getRandomString("settingsQuery");
     await apiCall.addGraph(graphName);
     const querySettings = await browser.createNewPage(
@@ -239,8 +217,6 @@ test.describe.serial("Query Settings", () => {
     );
     await querySettings.expandQueryExecutionSection();
     await querySettings.clickRunDefaultQuerySwitchOn();
-    await querySettings.expandUserExperienceSection();
-    await querySettings.clickContentPersistenceSwitchOn();
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.clickGraphsTabInHeader();
     await querySettings.selectGraphByName(graphName);

@@ -247,8 +247,14 @@ export default class ChatComponent extends GraphPage {
   }
 
   // Combined Actions
+  /**
+   * Idempotent: the chat panel is part of the tab's persisted state, so after a
+   * reload it can already be open. Toggling it blindly would close it.
+   */
   async openChat(): Promise<void> {
-    await this.clickChatToggleButton();
+    if (!(await this.isChatPanelVisible())) {
+      await this.clickChatToggleButton();
+    }
     await this.waitForChatPanel();
   }
 

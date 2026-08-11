@@ -5,10 +5,14 @@
 replicaCount: 1
 
 image:
+  registry: docker.io
   repository: falkordb/falkordb-browser
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
+
+global:
+  imageRegistry: ""
 
 imagePullSecrets: []
 nameOverride: ""
