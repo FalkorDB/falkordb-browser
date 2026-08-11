@@ -84,6 +84,10 @@ export default function Chat({ onClose }: Props) {
     // The key the in-state messages were actually read from — see the persist
     // effect below.
     const loadedHistoryKeyRef = useRef<string | null>(null);
+    // Read by in-flight requests to tell whether the conversation they were sent
+    // from is still the one on screen.
+    const historyKeyRef = useRef(historyKey);
+    historyKeyRef.current = historyKey;
 
     const { toast } = useToast();
     const route = useRouter();
@@ -267,6 +271,12 @@ export default function Chat({ onClose }: Props) {
 
         setIsLoading(true);
 
+        // Switching tab or graph swaps `messages` wholesale. Anything this request
+        // produces afterwards belongs to a conversation that is no longer on screen,
+        // so it must not be appended (it would also be persisted under the new key).
+        const submittedKey = historyKey;
+        const isStale = () => historyKeyRef.current !== submittedKey;
+
         const newMessages = [...messages, { role: "user", type: "Text", content: newMessage } as const];
 
         handleSetMessages(newMessages);
@@ -325,27 +335,36 @@ export default function Chat({ onClose }: Props) {
             try {
                 data = await response.json();
             } catch {
-                handleSetMessages({
-                    role: "assistant",
-                    content: "Failed to parse server response",
-                    type: "Error"
-                });
+                if (!isStale()) {
+                    handleSetMessages({
+                        role: "assistant",
+                        content: "Failed to parse server response",
+                        type: "Error"
+                    });
+                }
                 setIsLoading(false);
                 return;
             }
 
             if (!response.ok) {
                 if (response.status >= 500) setIndicator("offline");
-                handleSetMessages({
-                    role: "assistant",
-                    content: data.error || "An error occurred",
-                    type: "Error"
-                });
+                if (!isStale()) {
+                    handleSetMessages({
+                        role: "assistant",
+                        content: data.error || "An error occurred",
+                        type: "Error"
+                    });
+                }
                 setIsLoading(false);
                 return;
             }
 
             setIndicator("online");
+
+            if (isStale()) {
+                setIsLoading(false);
+                return;
+            }
 
             // Show cypher query if available
             if (data.cypherQuery) {
@@ -386,11 +405,13 @@ export default function Chat({ onClose }: Props) {
 
         } catch (error) {
             const friendly = toUserFriendlyMessage(error instanceof Error ? error.message : error, getErrorStatus(error));
-            handleSetMessages({
-                role: "assistant",
-                content: `${friendly.title}: ${friendly.description}`,
-                type: "Error"
-            });
+            if (!isStale()) {
+                handleSetMessages({
+                    role: "assistant",
+                    content: `${friendly.title}: ${friendly.description}`,
+                    type: "Error"
+                });
+            }
             setIsLoading(false);
         }
     };

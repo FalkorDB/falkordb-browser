@@ -135,6 +135,16 @@ export default function useGraphTabs<S>({
     // `onActivate` so it rebuilds itself from its own metadata. Gated on
     // `canRestore` because that rebuild runs a query.
     const restoredKeyRef = useRef<string | null>(null);
+    // The state the restore effect handed to `setState`. Its commit lands in a later
+    // render, but the persist effect below runs in the *same* commit as the restore,
+    // when `stateRef` still holds the pre-restore strip. Persisting then would write
+    // the outgoing connection's tabs under the incoming connection's key.
+    const restoredStateRef = useRef<TabsState | null>(null);
+    const commitRestored = useCallback((next: TabsState) => {
+        restoredStateRef.current = next;
+        setState(next);
+    }, []);
+
     useEffect(() => {
         if (!prefixReady || !canRestore) {
             restoredKeyRef.current = null;
@@ -150,7 +160,7 @@ export default function useGraphTabs<S>({
 
         const raw = getConnectionItem(TABS_STORAGE_KEY);
         const fresh = createTab();
-        const reset = () => setState({ tabs: [fresh], activeTabId: fresh.id });
+        const reset = () => commitRestored({ tabs: [fresh], activeTabId: fresh.id });
 
         const stored = parseStoredTabs(raw);
         if (!stored) {
@@ -162,19 +172,24 @@ export default function useGraphTabs<S>({
         const preferred = [urlTabId, stored.activeTabId].find(id => stored.tabs.some(t => t.id === id));
         const activeTabId = preferred ?? stored.tabs[0].id;
 
-        setState({ tabs: stored.tabs, activeTabId });
+        commitRestored({ tabs: stored.tabs, activeTabId });
 
         // Nothing to rebuild for a tab that never picked a graph — and
         // activating it would clear a graph auto-selected in the meantime.
         const active = stored.tabs.find(t => t.id === activeTabId)!;
         if (active.graphName) onActivateRef.current(active, undefined);
-    }, [prefixReady, canRestore, connectionKey]);
+    }, [prefixReady, canRestore, connectionKey, commitRestored]);
 
     const persist = useCallback(() => {
         // Never write before the restore has run: on mount the state is a single
         // blank tab, and saving that would erase the stored strip we are about
         // to read back.
         if (restoredKeyRef.current === null) return;
+        // ...and not until the restored strip has actually been committed.
+        if (restoredStateRef.current) {
+            if (stateRef.current !== restoredStateRef.current) return;
+            restoredStateRef.current = null;
+        }
 
         const prev = stateRef.current;
         setConnectionItem(TABS_STORAGE_KEY, JSON.stringify({

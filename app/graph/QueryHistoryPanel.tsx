@@ -76,7 +76,10 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     const [favFilter, setFavFilter] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [tab, setTab] = useState<Tab>("text");
-    const [selectedQueries, setSelectedQueries] = useState<string[]>([]);
+    // Timestamps, not query text: the same text can be run many times, and text-keyed
+    // selection makes delete/export/un-fav hit every repeat. `timestamp` is already the
+    // entry identity used by handleToggleFav and is present on every stored record.
+    const [selectedQueries, setSelectedQueries] = useState<number[]>([]);
     const [wrapLines, setWrapLines] = useState(false);
 
     const filters = useMemo(() => {
@@ -414,7 +417,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
 
         const selected = new Set(selectedQueries);
         const deleteElements = historyQuery.queries.reduce<number[]>((acc, query, idx) => {
-            if (selected.has(query.text)) acc.push(idx);
+            if (selected.has(query.timestamp)) acc.push(idx);
             return acc;
         }, []);
 
@@ -448,33 +451,30 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
             query: nextQuery
         }));
         setSelectedQueries([]);
-        setFilteredQueries(current => current.filter(query => !selected.has(query.text)));
+        setFilteredQueries(current => current.filter(query => !selected.has(query.timestamp)));
     }, [historyQuery, setHistoryQuery, selectedQueries]);
 
     const handleExportSelected = useCallback(() => {
         if (!historyQuery) return;
 
-        const queries = historyQuery.queries.filter(query => selectedQueries.includes(query.text));
+        const selected = new Set(selectedQueries);
+        const queries = historyQuery.queries.filter(query => selected.has(query.timestamp));
 
         if (queries.length === 0) return;
 
         const url = URL.createObjectURL(new Blob([`${buildCypherBatch(queries)}\n`], { type: "text/plain;charset=utf-8" }));
 
-        try {
-            const link = document.createElement("a");
-            link.href = url;
-            // Swap characters that are invalid or awkward in file names
-            const timestamp = new Date(Date.now())
-                .toLocaleString()
-                .replace(/[/\\:*?"<>|]/g, "-")
-                .replace(/[,\s]+/g, "_");
-            link.download = `falkordb-queries-${timestamp}.cypher`;
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-        } finally {
-            URL.revokeObjectURL(url);
-        }
+        const link = document.createElement("a");
+        link.href = url;
+        // ISO, not toLocaleString(): the file name must not change with the user's locale.
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        link.download = `falkordb-queries-${timestamp}.cypher`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        // Deferred: Firefox and Safari abort the download if the blob URL is revoked
+        // in the same task as the click.
+        setTimeout(() => URL.revokeObjectURL(url), 0);
     }, [historyQuery, selectedQueries]);
 
     const handleToggleFav = useCallback((item: Query, name?: string) => {
@@ -504,7 +504,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
 
         const selected = new Set(selectedQueries);
         const unFav = (q: Query) =>
-            q.fav && selected.has(q.text) ? { ...q, fav: false, name: undefined } : q;
+            q.fav && selected.has(q.timestamp) ? { ...q, fav: false, name: undefined } : q;
 
         const newQueries = historyQuery.queries.map(unFav);
 
@@ -522,8 +522,8 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     if (!historyQuery || !setHistoryQuery) return null;
 
     const selectedSet = new Set(selectedQueries);
-    const isAllSelected = visibleQueries.length > 0 && visibleQueries.every(q => selectedSet.has(q.text));
-    const hasSelectedFav = historyQuery.queries.some(q => q.fav && selectedSet.has(q.text));
+    const isAllSelected = visibleQueries.length > 0 && visibleQueries.every(q => selectedSet.has(q.timestamp));
+    const hasSelectedFav = historyQuery.queries.some(q => q.fav && selectedSet.has(q.timestamp));
 
     return (
         <div data-testid="queryHistoryPanel" className="h-full w-full border border-border rounded-lg bg-background">
@@ -543,7 +543,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                 <PaginationList
                     label="Query"
                     className="overflow-hidden h-[313px] max-h-[393px] p-1 border-b border-border"
-                    isSelected={(item) => selectedSet.has(item.text)}
+                    isSelected={(item) => selectedSet.has(item.timestamp)}
                     afterSearchCallback={afterSearchCallback}
                     onToggleFav={handleToggleFav}
                     dataTestId="queryHistory"
@@ -585,7 +585,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                                 variant="Primary"
                                 data-testid="queryHistorySelectAll"
                                 title={isAllSelected ? "Deselect all queries" : "Select all queries"}
-                                onClick={() => setSelectedQueries(isAllSelected ? [] : visibleQueries.map(q => q.text))}
+                                onClick={() => setSelectedQueries(isAllSelected ? [] : visibleQueries.map(q => q.timestamp))}
                                 disabled={visibleQueries.length === 0}
                             >
                                 {
@@ -608,19 +608,19 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                             </Tooltip>
                         </div>
                     }
-                    onClick={(counter, evt) => {
-                        const index = historyQuery.queries.findIndex(q => q.text === counter);
+                    onClick={(item, evt) => {
+                        const index = historyQuery.queries.findIndex(q => q.timestamp === item.timestamp);
 
                         if (index === -1) return;
 
-                        const { text } = historyQuery.queries[index];
+                        const { timestamp } = historyQuery.queries[index];
 
                         const isCurrent = index + 1 === historyQuery.counter;
 
                         if (evt.ctrlKey || evt.metaKey) {
-                            setSelectedQueries(prev => prev.includes(text) ? prev.filter(t => t !== text) : [...prev, text]);
+                            setSelectedQueries(prev => prev.includes(timestamp) ? prev.filter(t => t !== timestamp) : [...prev, timestamp]);
                         } else {
-                            setSelectedQueries(isCurrent ? [] : [text]);
+                            setSelectedQueries(isCurrent ? [] : [timestamp]);
                         }
 
                         setHistoryQuery(prev => ({
@@ -629,8 +629,8 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                         }));
                         setTab("text");
                     }}
-                    onDoubleClick={async (counter) => {
-                        const index = historyQuery.queries.findIndex(q => q.text === counter);
+                    onDoubleClick={async (item) => {
+                        const index = historyQuery.queries.findIndex(q => q.timestamp === item.timestamp);
                         setHistoryQuery(prev => ({
                             ...prev,
                             counter: index + 1
@@ -638,8 +638,8 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                         setTab("text");
                         try {
                             setIsLoading(true);
-                            if (counter.trim()) {
-                                await runQuery(counter.trim());
+                            if (item.text.trim()) {
+                                await runQuery(item.text.trim());
                             }
                             onClose();
                         } finally {
