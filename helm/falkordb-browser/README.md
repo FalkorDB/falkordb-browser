@@ -62,10 +62,11 @@ The following table lists the configurable parameters of the FalkorDB Browser ch
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `replicaCount` | Number of replicas | `1` |
-| `image.registry` | Image registry (optional prefix) | `""` |
+| `image.registry` | Image registry | `docker.io` |
 | `image.repository` | Image repository | `falkordb/falkordb-browser` |
 | `image.tag` | Image tag | `""` (uses chart appVersion) |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
+| `global.imageRegistry` | Global image registry override (takes precedence over `image.registry`) | `""` |
 | `encryption.key` | 64-character hex key for server-side encryption. Generated and reused from the release Secret when empty. | `""` |
 | `encryption.existingSecret.name` | Existing Secret name for `ENCRYPTION_KEY`. Mutually exclusive with `encryption.key`. | `""` |
 | `encryption.existingSecret.key` | Key in `encryption.existingSecret.name` that contains the encryption key. | `ENCRYPTION_KEY` |
