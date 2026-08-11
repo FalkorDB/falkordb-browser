@@ -51,10 +51,6 @@ export default class SettingsQueryPage extends GraphPage {
     return this.page.locator("#runDefaultQueryResetBtn");
   }
 
-  private get contentPersistenceSwitch(): Locator {
-    return this.page.locator("#contentPersistenceSwitch");
-  }
-
   private get cancelQuerySettingsBtn(): Locator {
     return this.page.locator("#cancelQuerySettingsBtn");
   }
@@ -197,36 +193,6 @@ export default class SettingsQueryPage extends GraphPage {
     await waitForElementToNotBeVisible(this.runDefaultQueryInput, 1000);
   }
 
-  async clickContentPersistenceSwitchOn(): Promise<void> {
-    await interactWhenVisible(
-      this.contentPersistenceSwitch,
-      async (el) => {
-        if ((await el.getAttribute("data-state")) === "checked") return;
-        el.click();
-      },
-      "check content persistence ON switch"
-    );
-  }
-
-  async clickContentPersistenceSwitchOff(): Promise<void> {
-    await interactWhenVisible(
-      this.contentPersistenceSwitch,
-      async (el) => {
-        if ((await el.getAttribute("data-state")) === "unchecked") return;
-        el.click();
-      },
-      "check content persistence OFF switch"
-    );
-  }
-
-  async getContentPersistenceSwitch(): Promise<boolean> {
-    return interactWhenVisible(
-      this.contentPersistenceSwitch,
-      async (el) => (await el.getAttribute("data-state")) === "checked",
-      "check content persistence ON switch"
-    );
-  }
-
   async clickCancelQuerySettingsBtn(): Promise<void> {
     await interactWhenVisible(
       this.cancelQuerySettingsBtn,
@@ -259,7 +225,6 @@ export default class SettingsQueryPage extends GraphPage {
       this.userExperienceSectionHeader,
       async (el) => {
         await el.click();
-        await this.contentPersistenceSwitch.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
       },
       "expand user experience section"
     );

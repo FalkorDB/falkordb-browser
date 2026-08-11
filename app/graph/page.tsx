@@ -12,6 +12,11 @@ import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
 import ResizableBox from "@/components/ui/ResizableBox";
 import { useResizableSize } from "@/lib/useResizableSize";
+import GraphSubHeader from "./GraphSubHeader";
+
+const GraphInfoPanel = dynamicImport(() => import("./graphInfo"), {
+    ssr: false,
+});
 
 const DataPanel = dynamicImport(() => import("./DataPanel"), {
     ssr: false,
@@ -47,7 +52,7 @@ const GraphView = dynamicImport(() => import("./GraphView"), {
 export default function Page() {
     const { historyQuery, setHistoryQuery } = useContext(HistoryQueryContext);
     const { setIndicator } = useContext(IndicatorContext);
-    const { panel, setPanel } = useContext(PanelContext);
+    const { panel, setPanel, panelOpen, onTogglePanel, infoPanelRef, onInfoPanelResize, customizingLabel, setCustomizingLabel } = useContext(PanelContext);
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext);
     const { canvasRef, graphData, setViewport } = useContext(ForceGraphContext);
@@ -71,8 +76,10 @@ export default function Page() {
         selectedParam,
         setSelectedParam,
         isLoading,
-        initialQuery,
+        pendingAutoLoadRef,
         currentTab,
+        chatOpen,
+        setChatOpen,
     } = useContext(GraphContext);
     const {
         settings: {
@@ -98,17 +105,11 @@ export default function Page() {
     // selection with the graph it was made in.
     const currentGraphIdRef = useRef(graph.Id);
     currentGraphIdRef.current = graph.Id;
-    const [chatOpen, setChatOpen] = useState(false);
     const { size: chatSize, onResize: onChatResize } = useResizableSize("chat-size", 400, 500, 300, 300);
     const [queriesOpen, setQueriesOpen] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(true);
     const [isAddNode, setIsAddNode] = useState(false);
     const [isAddEdge, setIsAddEdge] = useState(false);
-    const initialUrlQueryRef = useRef(initialQuery);
-    // Tracks whether a URL query has been dispatched but hasn't completed yet.
-    // Prevents the default query from firing when `runDefaultQuery` state
-    // changes (loaded from localStorage) before the async URL query finishes.
-    const urlQueryFiredRef = useRef<string | null>(null);
 
     const onPanelResize = useCallback((size: PanelSize) => {
         setIsCollapsed(size.asPercentage === 0);
@@ -154,6 +155,10 @@ export default function Page() {
 
     }, [getPanelSize, panel]);
 
+    // Keeps the element panel in step with the selection. This re-asserts
+    // `expand()` on every selection change — not just when the count changes —
+    // because switching tabs can swap one selected element for another while
+    // `panel` stays "data", which on its own would leave the panel collapsed.
     useEffect(() => {
         const currentPanel = panelRef.current;
 
@@ -167,7 +172,7 @@ export default function Page() {
         } else if (panel === "data") {
             currentPanel.collapse();
         }
-    }, [currentTab, panel, selectedElements.length, setPanel]);
+    }, [currentTab, panel, selectedElements, setPanel]);
 
     const fetchInfo = useCallback(async (type: string, options?: { signal?: AbortSignal; connectionId?: string | null }) => {
         if (!graphName) return [];
@@ -276,14 +281,14 @@ export default function Page() {
             });
         });
 
-        // When runDefaultQuery is enabled and the graph name just changed, the
-        // graph-setup effect below will call runQuery which already fetches
-        // info/stats (including memory) internally — skip here to avoid
-        // duplicating that initial fetch.
-        // For any other dep change (e.g. showMemoryUsage becoming true after a
-        // connection switch to admin, or refreshInterval changing), always call
-        // immediately so memory appears without waiting for the next interval.
-        if (!runDefaultQuery || !graphNameJustChanged) {
+        // The auto-load effect below runs the query for a freshly selected
+        // graph, and that query fetches info/stats (including memory) itself —
+        // skip here so the initial fetch isn't duplicated. Every other reason
+        // this effect re-runs (a restored tab, showMemoryUsage flipping on,
+        // refreshInterval changing) needs the fetch right away rather than at
+        // the next tick of the interval.
+        const willAutoLoadQuery = runDefaultQuery && pendingAutoLoadRef.current === graphName;
+        if (!graphNameJustChanged || !willAutoLoadQuery) {
             handleSetInfo();
         }
 
@@ -303,39 +308,17 @@ export default function Page() {
         panelRef.current?.collapse();
     }, [graphName]);
 
+    // Loads a graph automatically, at most once per selection. This is a
+    // one-shot on purpose: nothing here may re-fire when this page remounts on
+    // a route change, when a tab is restored, or when a query fails.
     useEffect(() => {
-        // Priority 1: URL params (graph + query)
-        const pendingUrlQuery = initialUrlQueryRef.current;
-        if (pendingUrlQuery && graphName) {
-            if (graphName !== graph.Id) {
-                initialUrlQueryRef.current = "";
-                urlQueryFiredRef.current = graphName;
-                runQuery(pendingUrlQuery, graphName);
-            } else {
-                // Data is already loaded for this graph (e.g. navigating back from
-                // another route while providers stay mounted). Clear the pending ref
-                // so it doesn't re-fire on later dep changes.
-                initialUrlQueryRef.current = "";
-            }
-            return;
-        }
+        // The graph the user just picked. `pendingAutoLoad` is armed by
+        // handleSetGraphName on a real selection change and disarmed by whoever
+        // loads the graph — including an explicit runQuery, so a user hitting RUN
+        // first is never followed by the default query.
+        if (graphName && pendingAutoLoadRef.current === graphName) {
+            pendingAutoLoadRef.current = null;
 
-        // If the URL query was dispatched but hasn't completed yet (graph.Id
-        // not yet updated by the async runQuery), skip the default-query path
-        // so it doesn't overwrite the in-flight URL query result.
-        if (urlQueryFiredRef.current) {
-            if (graphName === graph.Id) {
-                urlQueryFiredRef.current = null;
-            } else if (graphName !== urlQueryFiredRef.current) {
-                // Different graph selected — clear the stale latch
-                urlQueryFiredRef.current = null;
-            } else {
-                return;
-            }
-        }
-
-        // Priority 2: Default query / empty graph
-        if (graphName && graphName !== graph.Id) {
             if (runDefaultQuery && !tutorialOpen) {
                 runQuery(defaultQuery, graphName);
                 return;
@@ -346,7 +329,7 @@ export default function Page() {
         }
 
         setIsQueryLoading(false);
-    }, [fetchCount, graph.Id, graphName, setGraph, runQuery, runDefaultQuery, defaultQuery, setIsQueryLoading, tutorialOpen]);
+    }, [fetchCount, graph.Id, graphName, setGraph, runQuery, runDefaultQuery, defaultQuery, setIsQueryLoading, tutorialOpen, pendingAutoLoadRef]);
 
     const handleSetSelectedElements = useCallback((el: (Node | Link)[] = [], fromSearch?: boolean) => {
         setSelectedElements(el);
@@ -381,13 +364,24 @@ export default function Page() {
         if (!graph.Id) return;
 
         const { graphId: selectionGraphId, elements: prev } = selectedElementsRef.current;
-        const canRestore = selectionGraphId === graph.Id && prev.length > 0;
+        const last = prev[prev.length - 1];
+        // `selectedParam` names the last element of the current selection, so a
+        // mismatch means something else set it — a tab activation asking for its
+        // own pick — and that wins over the selection carried over from before.
+        const paramMatchesSelection = last !== undefined
+            && selectedParam.split(":").slice(0, 2).join(":") === `${"labels" in last ? "n" : "e"}:${last.id}`;
+        const canRestore = selectionGraphId === graph.Id && paramMatchesSelection;
 
         if (graph.NodesMap.size === 0 && graph.LinksMap.size === 0) {
             // Empty graph (e.g. a query returned no rows). Drop a selection carried
             // over from a *different* graph so a stale element panel doesn't linger;
             // keep a same-graph selection untouched (the graph may be mid-reload).
-            if (!canRestore && selectedElements.length > 0) handleSetSelectedElements();
+            // `selectedParam` is left alone on purpose — on a tab switch it already
+            // names the incoming tab's pick, which its results will resolve.
+            if (!canRestore && selectedElements.length > 0) {
+                setSelectedElements([]);
+                setPanel(undefined);
+            }
             return;
         }
 
@@ -630,81 +624,115 @@ export default function Page() {
     }, [graphName, panel, handleSetSelectedElements, setPanel, isAddNode, selectedElements, handleCreateElement, setLabels, canvasRef]);
 
     return (
-        <div className="Page p-3 gap-3">
-            <Selector
-                graph={graph}
-                options={graphNames ?? []}
-                setOptions={next => setGraphNames(prev => (
-                    typeof next === "function"
-                        ? next(prev ?? [])
-                        : next
-                ))}
-                graphName={graphName}
-                setGraphName={handleSetGraphName}
-                setGraph={setGraph}
-                runQuery={runQuery}
-                historyQuery={historyQuery}
-                setHistoryQuery={setHistoryQuery}
-                isQueryLoading={isQueryLoading}
-                chatOpen={chatOpen}
-                setChatOpen={setChatOpen}
-                queriesOpen={queriesOpen}
-                setQueriesOpen={setQueriesOpen}
-            />
-            <ResizablePanelGroup orientation="horizontal" className="h-1 grow relative">
+        <div className="h-full w-full flex flex-col min-h-0">
+            <GraphSubHeader />
+            <ResizablePanelGroup orientation="horizontal" className="h-1 grow">
                 <ResizablePanel
-                    defaultSize="100%"
+                    panelRef={infoPanelRef}
+                    defaultSize="0%"
                     collapsible
-                    minSize="30%"
+                    minSize="15%"
+                    maxSize="30%"
+                    onResize={onInfoPanelResize}
                 >
-                    <GraphView
-                        selectedElements={selectedElements}
-                        setSelectedElements={handleSetSelectedElements}
-                        canvasRef={canvasRef}
-                        handleDeleteElement={handleDeleteElement}
-                        setLabels={setLabels}
-                        setRelationships={setRelationships}
-                        labels={labels}
-                        relationships={relationships}
-                        fetchCount={fetchCount}
-                        historyQuery={historyQuery}
-                        setHistoryQuery={setHistoryQuery}
-                        setIsAddNode={handleSetIsAdd(setIsAddNode, setIsAddEdge)}
-                        setIsAddEdge={handleSetIsAdd(setIsAddEdge, setIsAddNode)}
-                        isAddEdge={isAddEdge}
-                        isAddNode={isAddNode}
+                    <GraphInfoPanel
+                        onClose={onTogglePanel}
+                        customizingLabel={customizingLabel}
+                        setCustomizingLabel={setCustomizingLabel}
                     />
                 </ResizablePanel>
                 <ResizableHandle
                     withHandle
-                    onMouseUp={() => isCollapsed && handleSetSelectedElements()}
-                    className={cn("bg-transparent", isCollapsed && "hidden")}
-                    disabled={isCollapsed}
+                    onMouseUp={() => !panelOpen && onTogglePanel()}
+                    className={cn("bg-border", !panelOpen && "hidden")}
+                    disabled={!panelOpen}
                 />
                 <ResizablePanel
-                    panelRef={panelRef}
-                    collapsible
-                    defaultSize="0%"
-                    minSize={panelMinSize}
-                    onResize={onPanelResize}
+                    defaultSize="100%"
+                    minSize="70%"
+                    maxSize="100%"
                 >
-                    {getCurrentPanel()}
-                </ResizablePanel>
-                {
-                    chatOpen && graphName &&
-                    <div className="absolute bottom-12 right-3 z-30">
-                        <ResizableBox
-                            width={chatSize.width}
-                            height={chatSize.height}
-                            minWidth={300}
-                            minHeight={300}
-                            onResizeEnd={(w, h) => onChatResize(w, h)}
-                            direction="top-left"
-                        >
-                            <Chat onClose={() => setChatOpen(false)} />
-                        </ResizableBox>
+                    <div className="h-full w-full flex flex-col">
+                        <div className="Page p-3 gap-3">
+                            <Selector
+                                graph={graph}
+                                options={graphNames ?? []}
+                                setOptions={next => setGraphNames(prev => (
+                                    typeof next === "function"
+                                        ? next(prev ?? [])
+                                        : next
+                                ))}
+                                graphName={graphName}
+                                setGraphName={handleSetGraphName}
+                                setGraph={setGraph}
+                                runQuery={runQuery}
+                                historyQuery={historyQuery}
+                                setHistoryQuery={setHistoryQuery}
+                                isQueryLoading={isQueryLoading}
+                                chatOpen={chatOpen}
+                                setChatOpen={setChatOpen}
+                                queriesOpen={queriesOpen}
+                                setQueriesOpen={setQueriesOpen}
+                            />
+                            <ResizablePanelGroup orientation="horizontal" className="h-1 grow relative">
+                                <ResizablePanel
+                                    defaultSize="100%"
+                                    collapsible
+                                    minSize="30%"
+                                >
+                                    <GraphView
+                                        selectedElements={selectedElements}
+                                        setSelectedElements={handleSetSelectedElements}
+                                        canvasRef={canvasRef}
+                                        handleDeleteElement={handleDeleteElement}
+                                        setLabels={setLabels}
+                                        setRelationships={setRelationships}
+                                        labels={labels}
+                                        relationships={relationships}
+                                        fetchCount={fetchCount}
+                                        historyQuery={historyQuery}
+                                        setHistoryQuery={setHistoryQuery}
+                                        setIsAddNode={handleSetIsAdd(setIsAddNode, setIsAddEdge)}
+                                        setIsAddEdge={handleSetIsAdd(setIsAddEdge, setIsAddNode)}
+                                        isAddEdge={isAddEdge}
+                                        isAddNode={isAddNode}
+                                    />
+                                </ResizablePanel>
+                                <ResizableHandle
+                                    withHandle
+                                    onMouseUp={() => isCollapsed && handleSetSelectedElements()}
+                                    className={cn("bg-transparent", isCollapsed && "hidden")}
+                                    disabled={isCollapsed}
+                                />
+                                <ResizablePanel
+                                    panelRef={panelRef}
+                                    collapsible
+                                    defaultSize="0%"
+                                    minSize={panelMinSize}
+                                    onResize={onPanelResize}
+                                >
+                                    {getCurrentPanel()}
+                                </ResizablePanel>
+                                {
+                                    chatOpen && graphName &&
+                                    <div className="absolute bottom-12 right-3 z-30">
+                                        <ResizableBox
+                                            width={chatSize.width}
+                                            height={chatSize.height}
+                                            minWidth={300}
+                                            minHeight={300}
+                                            onResizeEnd={(w, h) => onChatResize(w, h)}
+                                            direction="top-left"
+                                        >
+                                            <Chat onClose={() => setChatOpen(false)} />
+                                        </ResizableBox>
+                                    </div>
+                                }
+                            </ResizablePanelGroup>
+                        </div>
+                        <div className="h-4 w-full Gradient" />
                     </div>
-                }
+                </ResizablePanel>
             </ResizablePanelGroup>
         </div>
     );
