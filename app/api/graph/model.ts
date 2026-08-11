@@ -3,7 +3,7 @@
 /* eslint-disable no-param-reassign */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Data, DataCell, getMetaStats, GraphData, InfoLabel, InfoRelationship, Label, Link, LinkCell, MemoryValue, Node, NodeCell, PathCell, Relationship, ToastFn, Value } from "@/lib/utils";
-import { getConnectionItem } from "@/lib/connection-storage";
+import { getConnectionItem, removeConnectionItem } from "@/lib/connection-storage";
 
 // Color palette for node customization
 export const STYLE_COLORS = [
@@ -43,6 +43,17 @@ export const getLabelWithFewestElements = (labels: Label[]): Label =>
     labels[0]
   );
 
+/** localStorage is untrusted input: keep only values that match the style contract. */
+const validColor = (v: unknown): string | undefined =>
+  typeof v === "string" && v.trim() !== "" ? v : undefined;
+
+const validSize = (v: unknown): number | undefined =>
+  typeof v === "number" && Number.isFinite(v) && v > 0 ? v : undefined;
+
+/** Drop keys whose value is undefined so they don't overwrite existing defaults when spread. */
+const definedOnly = <T extends object>(style: T): Partial<T> =>
+  Object.fromEntries(Object.entries(style).filter(([, v]) => v !== undefined)) as Partial<T>;
+
 export function loadLabelStyle(label: Label | InfoLabel): void {
   if (typeof window === "undefined") return;
 
@@ -52,9 +63,38 @@ export function loadLabelStyle(label: Label | InfoLabel): void {
   if (savedStyle) {
     try {
       const { color, size } = JSON.parse(savedStyle);
-      label.style = { color, size };
+      label.style = {
+        ...label.style,
+        ...definedOnly({ color: validColor(color), size: validSize(size) }),
+      };
     } catch (e) {
-      // Ignore invalid JSON
+      // Corrupted entry: drop it so it doesn't fail to parse on every load
+      removeConnectionItem(storageKey);
+    }
+  }
+}
+
+export function loadRelationshipStyle(relationship: Relationship | InfoRelationship): void {
+  if (typeof window === "undefined") return;
+
+  const storageKey = `relationshipStyle_${relationship.name}`;
+  const savedStyle = getConnectionItem(storageKey);
+
+  if (savedStyle) {
+    try {
+      const { color, width, fontSize, arrowSize } = JSON.parse(savedStyle);
+      relationship.style = {
+        ...relationship.style,
+        ...definedOnly({
+          color: validColor(color),
+          width: validSize(width),
+          fontSize: validSize(fontSize),
+          arrowSize: validSize(arrowSize),
+        }),
+      };
+    } catch (e) {
+      // Corrupted entry: drop it so it doesn't fail to parse on every load
+      removeConnectionItem(storageKey);
     }
   }
 }
@@ -233,6 +273,8 @@ export class GraphInfo {
         },
         count: resolvedCount,
       };
+
+      loadRelationshipStyle(r);
 
       this.relationships.set(relationship, r);
       this.colorsCounter += 1;
@@ -630,6 +672,9 @@ export class Graph {
           target: cell.destinationId,
           relationship: cell.relationshipType,
           color: relation.style.color,
+          width: relation.style.width,
+          fontSize: relation.style.fontSize,
+          arrowSize: relation.style.arrowSize,
           expand: false,
           collapsed,
           visible: true,
@@ -687,6 +732,9 @@ export class Graph {
           target: cell.destinationId,
           relationship: cell.relationshipType,
           color: relation.style.color,
+          width: relation.style.width,
+          fontSize: relation.style.fontSize,
+          arrowSize: relation.style.arrowSize,
           expand: false,
           collapsed,
           visible: true,

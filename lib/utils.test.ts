@@ -1,6 +1,6 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { createAbortError, getConnectionEpoch, getMetaStats, getSSEGraphResult, isAbortError, securedFetch, setActiveConnectionIdGlobal } from "./utils.ts";
+import { convertToCanvasData, createAbortError, getConnectionEpoch, getMetaStats, getSSEGraphResult, isAbortError, securedFetch, setActiveConnectionIdGlobal, type GraphData } from "./utils.ts";
 
 const noopToast = () => {};
 const noopIndicator = () => {};
@@ -385,5 +385,52 @@ describe("getSSEGraphResult connection routing & cancellation", () => {
     } finally {
       mock.restore();
     }
+  });
+});
+
+describe("convertToCanvasData", () => {
+  it("forwards the per-relationship style dimensions onto the canvas links", () => {
+    const link = {
+      id: 1,
+      relationship: "KNOWS",
+      color: "#FF0000",
+      visible: true,
+      source: { id: 1 },
+      target: { id: 2 },
+      width: 3,
+      fontSize: 18,
+      arrowSize: 24,
+      data: {},
+    };
+
+    const [converted] = convertToCanvasData({
+      nodes: [],
+      links: [link],
+    } as unknown as GraphData).links;
+
+    assert.equal(converted.width, 3);
+    assert.equal(converted.fontSize, 18);
+    assert.equal(converted.arrowSize, 24);
+  });
+
+  it("leaves the dimensions undefined when the relationship has no custom style, so the canvas applies its defaults", () => {
+    const link = {
+      id: 1,
+      relationship: "KNOWS",
+      color: "#FF0000",
+      visible: true,
+      source: { id: 1 },
+      target: { id: 2 },
+      data: {},
+    };
+
+    const [converted] = convertToCanvasData({
+      nodes: [],
+      links: [link],
+    } as unknown as GraphData).links;
+
+    assert.equal(converted.width, undefined);
+    assert.equal(converted.fontSize, undefined);
+    assert.equal(converted.arrowSize, undefined);
   });
 });

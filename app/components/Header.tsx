@@ -2,7 +2,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Button from "./ui/Button";
 import { BrowserSettingsContext, ConnectionContext, GraphContext, IndicatorContext } from "./provider";
-import { useCallback, useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Copy, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
@@ -33,12 +33,25 @@ export default function Header() {
     const { indicator, setIndicator } = useContext(IndicatorContext);
     const { graphNames } = useContext(GraphContext);
     const { settings: { userExperienceSettings: { refreshInterval } } } = useContext(BrowserSettingsContext);
-    const { connectionType, connectionInfo, dbVersion } = useContext(ConnectionContext);
+    const { connectionType, connectionInfo, dbVersion, supportsOffload, offloadedGraphs } = useContext(ConnectionContext);
     const { status, data: session } = useSession();
     const { toast } = useToast();
 
     const [usedMemory, setUsedMemory] = useState<string | null>(null);
     const [mounted, setMounted] = useState(false);
+
+    // GRAPH.LIST covers both loaded and offloaded graphs, and GRAPH.STUBS reports
+    // only the offloaded ones — so the loaded count is the difference.
+    const { totalCount, loadedCount, offloadedCount } = useMemo(() => {
+        const total = graphNames?.length ?? 0;
+        const offloaded = supportsOffload ? offloadedGraphs.length : 0;
+
+        return {
+            totalCount: total,
+            loadedCount: Math.max(total - offloaded, 0),
+            offloadedCount: offloaded,
+        };
+    }, [graphNames, offloadedGraphs, supportsOffload]);
 
     useEffect(() => { setMounted(true); }, []);
 
@@ -123,7 +136,31 @@ export default function Header() {
                 {
                     graphNames === undefined
                         ? <Loader2 data-testid="graphsCountLoader" className="animate-spin" size={16} />
-                        : <h2 data-testid="graphsCountValue">{graphNames.length}</h2>
+                        : <h2 data-testid="graphsCountValue">{totalCount}</h2>
+                }
+                {
+                    supportsOffload && graphNames !== undefined &&
+                    <div className="flex gap-1 items-center">
+                        <span>[</span>
+                        <Tooltip>
+                            <TooltipTrigger>
+                                <span className="text-green" data-testid="graphsOnLoadCountValue">{loadedCount}</span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Loaded</p>
+                            </TooltipContent>
+                        </Tooltip>
+                        <span>,</span>
+                        <Tooltip>
+                            <TooltipTrigger>
+                                <span className="text-yellow" data-testid="graphsOffLoadCountValue">{offloadedCount}</span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Offloaded</p>
+                            </TooltipContent>
+                        </Tooltip>
+                        <span>]</span>
+                    </div>
                 }
             </div>
             <div className="flex gap-1 items-center">

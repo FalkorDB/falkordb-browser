@@ -3,10 +3,9 @@
 /* eslint-disable react/require-default-props */
 
 import { ChevronDown, Circle, Pause, Pin, PinOff, Play, Shrink, Telescope, ZoomIn, ZoomOut } from "lucide-react";
-import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react";
+import { Dispatch, SetStateAction, useContext, useEffect, useRef } from "react";
 import type { HierarchyDirection, LayoutMode, RadialDirection } from "@falkordb/canvas";
 import { cn, GraphRef, Node, Link } from "@/lib/utils";
-import { setUrlParam } from "@/lib/useUrlParams";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
@@ -63,16 +62,22 @@ export default function Controls({
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
-    const { layout, setLayout: setContextLayout, direction: contextDirection, setDirection: setContextDirection } = useContext(ForceGraphContext);
+    const {
+        layout,
+        setLayout: setContextLayout,
+        direction: contextDirection,
+        setDirection: setContextDirection,
+        animation,
+        setAnimation,
+        pinned,
+        setPinned,
+    } = useContext(ForceGraphContext);
     const { tutorialOpen } = useContext(BrowserSettingsContext);
 
     const directionsRef = useRef<Record<string, string>>({
         tree: layout === 'tree' ? (contextDirection || 'td') : 'td',
         radial: layout === 'radial' ? (contextDirection || 'out') : 'out',
     });
-
-    const [animation, setAnimation] = useState(false);
-    const [pinned, setPinned] = useState(layout !== 'force');
 
     // Keep the per-layout direction memory in sync with externally driven context
     // updates (e.g. URL restoration), without letting a direction from one layout
@@ -121,21 +126,18 @@ export default function Controls({
         canvasRef.current?.zoomToFit();
     };
 
+    // The canvas follows these through ForceGraphContext, so the handlers only
+    // move the state the active tab owns.
     const handleAnimationToggle = () => {
-        const next = !animation;
-        setAnimation(next);
-        canvasRef.current?.setAnimation(next);
+        setAnimation(!animation);
     };
 
     const handleDimToggle = (checked: boolean) => {
         setDimmed(checked);
-        canvasRef.current?.setDimmed(checked);
     };
 
     const handlePinToggle = () => {
-        const next = !pinned;
-        setPinned(next);
-        canvasRef.current?.setPinOnDragEnd(next);
+        setPinned(!pinned);
     };
 
     const handleLayoutChange = (value: string) => {
@@ -152,20 +154,16 @@ export default function Controls({
 
         canvasRef.current?.setLayout(mode);
 
-        // Non-force layouts auto-pin, sync UI and canvas
-        const nextPinned = mode !== 'force';
-        setPinned(nextPinned);
-        canvasRef.current?.setPinOnDragEnd(nextPinned);
+        // Non-force layouts auto-pin
+        setPinned(mode !== 'force');
 
         setContextDirection(dir);
-        setUrlParam({ layout: mode, direction: dir || null });
     };
 
     const handleDirectionChange = (value: string, targetLayout?: string) => {
         const effectiveLayout = targetLayout || layout;
         directionsRef.current = { ...directionsRef.current, [effectiveLayout]: value };
         setContextDirection(value);
-        setUrlParam({ direction: value || null });
 
         if (effectiveLayout === 'tree') {
             canvasRef.current?.setLayoutOptions({

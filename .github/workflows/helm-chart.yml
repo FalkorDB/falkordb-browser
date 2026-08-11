@@ -57,6 +57,19 @@ jobs:
           echo "Testing with serviceAccount.create=false..."
           helm template test helm/falkordb-browser --set serviceAccount.create=false > /dev/null
 
+          echo "Testing default image registry..."
+          helm template test helm/falkordb-browser --show-only templates/deployment.yaml | grep -q 'image: "docker.io/falkordb/falkordb-browser:v'
+
+          echo "Testing global image registry override..."
+          helm template test helm/falkordb-browser \
+            --set global.imageRegistry=my-mirror.example.com \
+            --show-only templates/deployment.yaml | grep -q 'image: "my-mirror.example.com/falkordb/falkordb-browser:v'
+
+          echo "Testing repository with embedded registry host compatibility..."
+          helm template test helm/falkordb-browser \
+            --set image.repository=ghcr.io/falkordb/falkordb-browser \
+            --show-only templates/deployment.yaml | grep -q 'image: "ghcr.io/falkordb/falkordb-browser:v'
+
           echo "Testing generated encryption key..."
           GENERATED_KEY=$(helm template test helm/falkordb-browser --show-only templates/secret.yaml | awk -F'"' '/ENCRYPTION_KEY:/ {print $2}')
           if ! echo "$GENERATED_KEY" | grep -Eq '^[0-9a-fA-F]{64}$'; then

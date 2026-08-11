@@ -1,6 +1,6 @@
 import { cn, getTheme, Message, getActiveConnectionIdGlobal, toUserFriendlyMessage } from "@/lib/utils";
 import { UDF_CHAT_MAX_LIBRARIES, UDF_CHAT_MAX_FUNCTIONS_PER_LIBRARY, UDF_CHAT_MAX_NAME_LENGTH } from "@/app/utils";
-import { memo, useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { memo, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
 import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
 import { useTheme } from "next-themes";
@@ -11,11 +11,12 @@ import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
-import { GraphContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, UDFContext } from "../components/provider";
+import { GraphContext, GraphTabsContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, UDFContext } from "../components/provider";
 import { detectProviderFromApiKey, detectProviderFromModel, getProviderDisplayName } from "@/lib/ai-provider-utils";
 import ToastButton from "../components/ToastButton";
 import { ShineBorder } from "@/components/ui/shine-border";
 import { getConnectionItem, setConnectionItem, getConnectionPrefix } from "@/lib/connection-storage";
+import { tabScopedKey } from "@/lib/useGraphTabs";
 import { getConfidenceStyle, normalizeConfidence } from "./confidence";
 import { parseStoredMessages, serializeChatHistory } from "./chatHistory";
 
@@ -71,11 +72,25 @@ export default function Chat({ onClose }: Props) {
     const { currentTheme } = getTheme(resolvedTheme);
     const { setIndicator } = useContext(IndicatorContext);
     const { runQuery, graphName } = useContext(GraphContext);
+    const { activeTabId } = useContext(GraphTabsContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
     const { udfList } = useContext(UDFContext);
     const { settings: { chatSettings: { secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, model, maxSavedMessages } } } = useContext(BrowserSettingsContext);
     // Cypher Only toggle state, persisted per graph
     const [cypherOnly, setCypherOnly] = useState(false);
+
+    // Each tab keeps its own conversation per graph, so the key carries both.
+    const historyKey = useMemo(() => tabScopedKey(activeTabId, `chat-${graphName}`), [activeTabId, graphName]);
+    // The key the in-state messages were actually read from — see the persist
+    // effect below.
+    const loadedHistoryKeyRef = useRef<string | null>(null);
+    // Read by in-flight requests to tell whether the conversation they were sent
+    // from is still the one on screen. Written after commit, not during render:
+    // a render React throws away must not move the ref past what is on screen.
+    const historyKeyRef = useRef(historyKey);
+    useLayoutEffect(() => {
+        historyKeyRef.current = historyKey;
+    }, [historyKey]);
 
     const { toast } = useToast();
     const route = useRouter();
@@ -84,7 +99,13 @@ export default function Chat({ onClose }: Props) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [messagesList, setMessagesList] = useState<(Message | [Message[], boolean])[]>([]);
     const [newMessage, setNewMessage] = useState("");
-    const [isLoading, setIsLoading] = useState(false);
+    // Requests in flight, keyed by the conversation they were sent from. A single
+    // boolean leaks across tabs: switching mid-request would block the conversation
+    // you switched to, and the old request settling would clear its spinner.
+    const [loadingKeys, setLoadingKeys] = useState<string[]>([]);
+    const isLoading = loadingKeys.includes(historyKey);
+    const startLoading = useCallback((key: string) => setLoadingKeys(prev => prev.includes(key) ? prev : [...prev, key]), []);
+    const stopLoading = useCallback((key: string) => setLoadingKeys(prev => prev.filter(k => k !== key)), []);
     const [queryCollapse, setQueryCollapse] = useState<{ [key: string]: boolean }>({});
     const [collapseEligible, setCollapseEligible] = useState<{ [key: number]: boolean }>({});
     const textRefs = useRef<Map<number, HTMLElement>>(new Map());
@@ -151,18 +172,22 @@ export default function Chat({ onClose }: Props) {
     // Load messages and cypher only preference for current graph on mount
     useEffect(() => {
         if (!getConnectionPrefix()) return;
-        const savedMessages = getConnectionItem(`chat-${graphName}`);
+        const savedMessages = getConnectionItem(historyKey);
         setMessages(parseStoredMessages(savedMessages));
+        loadedHistoryKeyRef.current = historyKey;
 
         const savedCypherOnly = getConnectionItem(`cypherOnly-${graphName}`);
         setCypherOnly(savedCypherOnly === "true");
-    }, [graphName, maxSavedMessages]);
+    }, [graphName, historyKey, maxSavedMessages]);
 
     useEffect(() => {
         let statusGroup: Message[];
 
-        if (messages.length > 0) {
-            setConnectionItem(`chat-${graphName}`, serializeChatHistory(getLastUserMessagesWithContext(messages, maxSavedMessages)));
+        // `historyKey` changes a render before `messages` catches up (the load
+        // effect above only queues the new list), so writing unconditionally
+        // would file the previous tab's history under the new tab's key.
+        if (messages.length > 0 && loadedHistoryKeyRef.current === historyKey) {
+            setConnectionItem(historyKey, serializeChatHistory(getLastUserMessagesWithContext(messages, maxSavedMessages)));
         }
 
         const newMessagesList = messages.map((message, i): Message | [Message[], boolean] | undefined => {
@@ -182,7 +207,7 @@ export default function Chat({ onClose }: Props) {
         }).filter(m => !!m);
 
         setMessagesList(newMessagesList);
-    }, [maxSavedMessages, messages]);
+    }, [historyKey, maxSavedMessages, messages]);
 
     // Scroll to bottom whenever the rendered message list changes
     useEffect(() => {
@@ -198,6 +223,13 @@ export default function Chat({ onClose }: Props) {
 
     const handleSubmit = async (e?: React.FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>) => {
         e?.preventDefault();
+
+        // Switching tab or graph swaps `messages` wholesale. Anything this request
+        // produces afterwards belongs to a conversation that is no longer on screen,
+        // so it must not be appended (it would also be persisted under the new key),
+        // and only this conversation's loading state may be settled by it.
+        const submittedKey = historyKey;
+        const isStale = () => historyKeyRef.current !== submittedKey;
 
         if (isLoading) {
             toast({
@@ -233,7 +265,7 @@ export default function Chat({ onClose }: Props) {
                 variant: "destructive",
                 action: ToastActionButton
             });
-            setIsLoading(false);
+            stopLoading(submittedKey);
             return;
         }
 
@@ -249,11 +281,11 @@ export default function Chat({ onClose }: Props) {
                 variant: "destructive",
                 action: ToastActionButton
             });
-            setIsLoading(false);
+            stopLoading(submittedKey);
             return;
         }
 
-        setIsLoading(true);
+        startLoading(submittedKey);
 
         const newMessages = [...messages, { role: "user", type: "Text", content: newMessage } as const];
 
@@ -305,7 +337,7 @@ export default function Chat({ onClose }: Props) {
                 const { signOut } = await import("next-auth/react");
                 signOut({ callbackUrl: "/login" });
                 setIndicator("offline");
-                setIsLoading(false);
+                stopLoading(submittedKey);
                 return;
             }
 
@@ -313,27 +345,36 @@ export default function Chat({ onClose }: Props) {
             try {
                 data = await response.json();
             } catch {
-                handleSetMessages({
-                    role: "assistant",
-                    content: "Failed to parse server response",
-                    type: "Error"
-                });
-                setIsLoading(false);
+                if (!isStale()) {
+                    handleSetMessages({
+                        role: "assistant",
+                        content: "Failed to parse server response",
+                        type: "Error"
+                    });
+                }
+                stopLoading(submittedKey);
                 return;
             }
 
             if (!response.ok) {
                 if (response.status >= 500) setIndicator("offline");
-                handleSetMessages({
-                    role: "assistant",
-                    content: data.error || "An error occurred",
-                    type: "Error"
-                });
-                setIsLoading(false);
+                if (!isStale()) {
+                    handleSetMessages({
+                        role: "assistant",
+                        content: data.error || "An error occurred",
+                        type: "Error"
+                    });
+                }
+                stopLoading(submittedKey);
                 return;
             }
 
             setIndicator("online");
+
+            if (isStale()) {
+                stopLoading(submittedKey);
+                return;
+            }
 
             // Show cypher query if available
             if (data.cypherQuery) {
@@ -370,16 +411,18 @@ export default function Chat({ onClose }: Props) {
                 });
             }
 
-            setIsLoading(false);
+            stopLoading(submittedKey);
 
         } catch (error) {
             const friendly = toUserFriendlyMessage(error instanceof Error ? error.message : error, getErrorStatus(error));
-            handleSetMessages({
-                role: "assistant",
-                content: `${friendly.title}: ${friendly.description}`,
-                type: "Error"
-            });
-            setIsLoading(false);
+            if (!isStale()) {
+                handleSetMessages({
+                    role: "assistant",
+                    content: `${friendly.title}: ${friendly.description}`,
+                    type: "Error"
+                });
+            }
+            stopLoading(submittedKey);
         }
     };
 

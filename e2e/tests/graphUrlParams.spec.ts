@@ -5,6 +5,9 @@ import GraphPage from "../logic/POM/graphPage";
 import ApiCalls from "../logic/api/apiCalls";
 import { getRandomString } from "../infra/utils";
 
+// The working context (graph, query, selection, viewport) lives on the active
+// tab, not in the URL. All the URL carries is which tab to open, so these tests
+// assert the handover: state → ?tab=, and ?tab= → rebuilt context.
 test.describe("@admin Graph URL params", () => {
     let browser: BrowserWrapper;
     let apiCall: ApiCalls;
@@ -28,171 +31,140 @@ test.describe("@admin Graph URL params", () => {
         await browser.closeBrowser();
     });
 
-    test("Selecting a graph updates URL with ?graph= param", async () => {
+    const tabParam = (graph: GraphPage) =>
+        new URL(graph.getCurrentURL()).searchParams.get("tab");
+
+    test("Selecting a graph updates URL with ?tab= param", async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await graph.selectGraphByName(graphName);
+        await graph.waitForPageIdle();
 
-        const url = graph.getCurrentURL();
-        expect(url).toContain(`graph=${encodeURIComponent(graphName)}`);
+        await expect.poll(() => tabParam(graph), { timeout: 15000 }).toBeTruthy();
     });
 
-    test("Navigating directly to ?graph=<name> selects that graph", async () => {
-        const graph = await browser.createNewPage(
-            GraphPage,
-            `${urls.graphUrl}?graph=${encodeURIComponent(graphName)}`
-        );
+    test("Working context is kept off the URL", async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await graph.selectGraphByName(graphName);
+        await graph.waitForPageIdle();
+        await graph.insertQuery("MATCH (n) RETURN n LIMIT 5");
+        await graph.clickRunQuery();
+
+        const params = new URL(graph.getCurrentURL()).searchParams;
+        expect(params.get("graph")).toBeNull();
+        expect(params.get("query")).toBeNull();
+        expect(params.get("selected")).toBeNull();
+    });
+
+    test("Refreshing rebuilds the tab's graph and query", async () => {
+        const query = "MATCH (n) RETURN n LIMIT 5";
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         const page = await browser.getPage();
 
-        // Wait for graph to load
+        await graph.selectGraphByName(graphName);
         await graph.waitForPageIdle();
-        await expect(page.getByTestId("selectGraph")).toContainText(graphName, { timeout: 15000 });
-
-        // The graph should be selected — URL should still contain the param
-        const url = graph.getCurrentURL();
-        expect(url).toContain(`graph=${encodeURIComponent(graphName)}`);
-    });
-
-    test("Running a query updates URL with ?query= param", async () => {
-        const graph = await browser.createNewPage(
-            GraphPage,
-            `${urls.graphUrl}?graph=${encodeURIComponent(graphName)}`
-        );
-        await graph.waitForPageIdle();
-
-        const query = "MATCH (n) RETURN n LIMIT 5";
         await graph.insertQuery(query);
         await graph.clickRunQuery();
 
-        const url = graph.getCurrentURL();
-        expect(url).toContain("query=");
-        const urlObj = new URL(url);
-        expect(urlObj.searchParams.get("query")).toBe(query);
-    });
-
-    test("Navigating to ?graph=<name>&query=<cypher> loads graph with query", async () => {
-        const query = "MATCH (n) RETURN n LIMIT 1";
-        const graph = await browser.createNewPage(
-            GraphPage,
-            `${urls.graphUrl}?graph=${encodeURIComponent(graphName)}&query=${encodeURIComponent(query)}`
-        );
-        const page = await browser.getPage();
-        await graph.waitForPageIdle();
-        await expect(page.getByTestId("selectGraph")).toContainText(graphName, { timeout: 15000 });
-
-        const url = graph.getCurrentURL();
-        expect(url).toContain(`graph=${encodeURIComponent(graphName)}`);
-        expect(url).toContain("query=");
-    });
-
-    test("Graph param persists after page refresh", async () => {
-        const graph = await browser.createNewPage(
-            GraphPage,
-            `${urls.graphUrl}?graph=${encodeURIComponent(graphName)}`
-        );
-        const page = await browser.getPage();
-        await graph.waitForPageIdle();
-        await expect(page.getByTestId("selectGraph")).toContainText(graphName, { timeout: 15000 });
+        await expect.poll(() => tabParam(graph), { timeout: 15000 }).toBeTruthy();
+        const tabId = tabParam(graph);
 
         await graph.refreshPage();
         await graph.waitForPageIdle();
-        await expect(page.getByTestId("selectGraph")).toContainText(graphName, { timeout: 15000 });
 
-        const url = graph.getCurrentURL();
-        expect(url).toContain(`graph=${encodeURIComponent(graphName)}`);
+        // Same tab, and its context is back without any of it being in the URL.
+        await expect.poll(() => tabParam(graph), { timeout: 15000 }).toBe(tabId);
+        await expect(page.getByTestId("selectGraph")).toContainText(graphName, { timeout: 15000 });
+        // The query is the other half of the context — a reload that only
+        // restored the graph would otherwise pass.
+        await expect.poll(() => graph.getEditorInput(), { timeout: 15000 }).toBe(query);
     });
 
-    test("URL params order is graph, query, selected", async () => {
-        const query = "MATCH (n) RETURN n LIMIT 5";
-        const graph = await browser.createNewPage(
-            GraphPage,
-            `${urls.graphUrl}?graph=${encodeURIComponent(graphName)}&query=${encodeURIComponent(query)}`
-        );
-        const page = await browser.getPage();
+    test("URL naming an unknown tab falls back to a usable strip", async () => {
+        const graph = await browser.createNewPage(GraphPage, `${urls.graphUrl}?tab=does-not-exist`);
         await graph.waitForPageIdle();
-        await expect(page.getByTestId("selectGraph")).toContainText(graphName, { timeout: 15000 });
 
-        const url = graph.getCurrentURL();
-        const graphIdx = url.indexOf("graph=");
-        const queryIdx = url.indexOf("query=");
+        // The stored strip wins; we must never be left pointing at a dead tab.
+        await expect
+            .poll(() => tabParam(graph), { timeout: 15000 })
+            .not.toBe("does-not-exist");
 
-        // graph should come before query in the URL
-        expect(graphIdx).toBeGreaterThan(-1);
-        expect(queryIdx).toBeGreaterThan(-1);
-        expect(graphIdx).toBeLessThan(queryIdx);
+        // …and what it points at has to be a tab that is actually in the strip.
+        const active = tabParam(graph);
+        expect(active).toBeTruthy();
+        expect(await graph.getStripTabIds()).toContain(active!);
     });
 
-    test("URL with existing graph: selector shows that graph and URL param is kept", async () => {
-        const graph = await browser.createNewPage(
-            GraphPage,
-            `${urls.graphUrl}?graph=${encodeURIComponent(graphName)}`
-        );
+    test("A tab naming a dropped graph does not resurrect it", async () => {
+        const doomed = getRandomString("dropped");
+        await apiCall.addGraph(doomed);
+
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         const page = await browser.getPage();
 
-        // Wait until the selector reflects the URL graph — auto-retries until
-        // React effects finish loading the graph list and setting graphName.
-        await expect(page.getByTestId("selectGraph")).toContainText(graphName, { timeout: 15000 });
+        await graph.selectGraphByName(doomed);
+        await graph.waitForPageIdle();
 
-        // URL must still carry the graph param
-        const url = graph.getCurrentURL();
-        expect(url).toContain(`graph=${encodeURIComponent(graphName)}`);
+        // Park the page before dropping the graph. An open graph view keeps
+        // polling the graph's counts and metadata, and those reads run as
+        // writable queries — which is enough to make FalkorDB re-create a graph
+        // that was just deleted. Parking first is what "behind the tab's back"
+        // has to mean for the tab restore to be what is under test.
+        await page.goto("about:blank");
+        await apiCall.removeGraph(doomed);
+
+        // Back to a cold page, so the tab is rebuilt from storage.
+        await page.goto(urls.graphUrl);
+        await graph.waitForPageIdle();
+
+        // Anchor the negative assertion on a settled state: on a cold load the
+        // strip is empty for a moment, and asserting then would pass without the
+        // restore having run at all.
+        await expect.poll(() => graph.getStripTabIds(), { timeout: 15000 }).not.toHaveLength(0);
+        await expect(page.getByTestId("selectGraph")).not.toContainText(doomed, { timeout: 15000 });
+        const graphs = await apiCall.getGraphs();
+        expect(JSON.stringify(graphs)).not.toContain(doomed);
     });
 
-    test("URL with existing graph: URL graph wins over content-persistence saved graph", async () => {
-        const otherGraph = getRandomString("persist");
-        await apiCall.addGraph(otherGraph);
+    test("A rebuilt tab does not re-run its stored write query", async () => {
+        // Two full page loads plus a write and two count round-trips — the
+        // heaviest test here, and it tips over 30s under load.
+        test.setTimeout(60_000);
+
+        const query = "CREATE (n:Planted) RETURN n";
+        const target = getRandomString("readonly");
+        await apiCall.addGraph(target);
 
         try {
-            // Land on a neutral page first so the init script runs and sets
-            // defaults, then override content-persistence settings before the
-            // actual /graph navigation.
-            const graph = await browser.createNewPage(GraphPage, urls.localHost);
+            const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
             const page = await browser.getPage();
 
-            const storagePrefix = "localhost:6379:default:";
-            await graph.setLocalStorageItem("contentPersistence", "true");
-            await graph.setLocalStorageItem(
-                `${storagePrefix}savedContent`,
-                JSON.stringify({ graphName: otherGraph, query: "MATCH (n) RETURN n" }),
-            );
+            await graph.selectGraphByName(target);
+            await graph.waitForPageIdle();
+            // Running it once is the user's own doing. What it leaves behind is a
+            // tab carrying a write query — which is what a shared ?tab= link
+            // hands to whoever opens it next.
+            await graph.insertQuery(query);
+            await graph.clickRunQuery();
+            await expect
+                .poll(async () => (await apiCall.getGraphCount(target)).result.nodes, { timeout: 15000 })
+                .toBe(1);
 
-            // Navigate to /graph with the URL graph param
-            const graphListResponse = page.waitForResponse(
-                (response) => response.url().includes("/api/graph") && response.request().method() === "GET"
-            );
-            await page.goto(`${urls.graphUrl}?graph=${encodeURIComponent(graphName)}`, {
-                waitUntil: "domcontentloaded",
-            });
-            await graphListResponse;
+            // The tab is written to storage off a state update, so reloading too
+            // eagerly would race that write and come back to an empty tab.
+            await expect
+                .poll(() => page.evaluate(() => JSON.stringify(window.localStorage)), { timeout: 15000 })
+                .toContain(query);
 
-            // URL graph must win — wait for selector to reflect URL graph (auto-retries)
-            await expect(page.getByTestId("selectGraph")).toContainText(graphName, { timeout: 15000 });
-            await expect(page.getByTestId("selectGraph")).not.toContainText(otherGraph, { timeout: 5000 });
+            await graph.refreshPage();
+            await graph.waitForPageIdle();
 
-            const url = graph.getCurrentURL();
-            expect(url).toContain(`graph=${encodeURIComponent(graphName)}`);
-            expect(url).not.toContain(encodeURIComponent(otherGraph));
+            // The tab is back with its query…
+            await expect.poll(() => graph.getEditorInput(), { timeout: 15000 }).toBe(query);
+            // …but rebuilding it re-issues that query read-only, so the write is
+            // refused and the graph is left exactly as the user left it.
+            expect((await apiCall.getGraphCount(target)).result.nodes).toBe(1);
         } finally {
-            await apiCall.removeGraph(otherGraph);
+            await apiCall.removeGraph(target);
         }
-    });
-
-    test("URL with non-existing graph: param is stripped and selector stays empty", async () => {
-        // Use a name guaranteed not to exist
-        const nonExistentGraph = `nonexistent-${Date.now()}`;
-
-        const graph = await browser.createNewPage(
-            GraphPage,
-            `${urls.graphUrl}?graph=${encodeURIComponent(nonExistentGraph)}`
-        );
-        await graph.waitForPageIdle();
-
-        // URL param must be cleared by the validation logic
-        const url = graph.getCurrentURL();
-        expect(url).not.toContain(`graph=${encodeURIComponent(nonExistentGraph)}`);
-
-        // Selector must show the placeholder, not the invalid graph name
-        const selectedName = await graph.getSelectedGraphName();
-        expect(selectedName).not.toContain(nonExistentGraph);
-        expect(selectedName).toContain("Select Graph");
     });
 });
