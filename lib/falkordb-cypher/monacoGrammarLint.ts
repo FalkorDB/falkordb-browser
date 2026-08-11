@@ -59,6 +59,11 @@ export function attachGrammarLinting(
   onValidityChange: (isValid: boolean) => void
 ): monaco.IDisposable {
   let lastValid: boolean | undefined;
+  // Every model URI this attachment has written to. Monaco can dispose the model
+  // before the editor (an EditorComponent remount with a new key does exactly
+  // that), so the cleanup below cannot rely on `editor.getModel()` still
+  // resolving — otherwise the registry entry outlives the page.
+  const ownedUris = new Set<string>();
 
   const run = () => {
     const model = editor.getModel();
@@ -66,6 +71,7 @@ export function attachGrammarLinting(
     const text = model.getValue();
     const diagnostics = grammarErrorsToDiagnostics(text, engine.lint(text));
 
+    ownedUris.add(model.uri.toString());
     grammarRegistry.set(model.uri.toString(), diagnostics);
     monacoInstance.editor.setModelMarkers(model, GRAMMAR_MARKER_OWNER, toMarkers(monacoInstance, diagnostics));
 
@@ -85,8 +91,9 @@ export function attachGrammarLinting(
       const model = editor.getModel();
       if (model && !model.isDisposed()) {
         monacoInstance.editor.setModelMarkers(model, GRAMMAR_MARKER_OWNER, []);
-        grammarRegistry.delete(model.uri.toString());
       }
+      ownedUris.forEach((uri) => grammarRegistry.delete(uri));
+      ownedUris.clear();
     },
   };
 }
@@ -98,6 +105,11 @@ export interface AiFixBridge {
 }
 
 let codeActionsRegistered = false;
+// The provider is registered once but serves every editor, so the AI-fix bridge
+// must NOT be captured in the first caller's closure — that component can
+// unmount while other editors keep using the provider. Each caller overwrites
+// this, and the provider reads it fresh.
+let latestGetAiFix: () => AiFixBridge = () => ({ aiFixSupported: false, requestAiFix: () => { } });
 
 /**
  * Register ONE code-action provider (guarded) that serves grammar diagnostics
@@ -105,13 +117,15 @@ let codeActionsRegistered = false;
  * and a "✨ Fix with AI" action for syntax errors.
  *
  * @param getAiFix returns the current AI-fix bridge so the action always uses
- *                 up-to-date capability/handlers without re-registering.
+ *                 up-to-date capability/handlers without re-registering. The
+ *                 most recent caller wins, regardless of registration order.
  */
 export function registerGrammarCodeActions(
   monacoInstance: Monaco,
   languageId: string,
   getAiFix: () => AiFixBridge
 ): monaco.IDisposable | null {
+  latestGetAiFix = getAiFix;
   if (codeActionsRegistered) return null;
   codeActionsRegistered = true;
 
@@ -156,7 +170,7 @@ export function registerGrammarCodeActions(
 
       // "✨ Fix with AI" — only when AI is configured. Reuses the same requestAiFix
       // flow the failed-run toast uses, so grammar errors get AI fixes too.
-      const { aiFixSupported, requestAiFix } = getAiFix();
+      const { aiFixSupported, requestAiFix } = latestGetAiFix();
       if (aiFixSupported) {
         const firstError = diagnostics[0];
         actions.push({

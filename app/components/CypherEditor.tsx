@@ -205,6 +205,9 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
     const [blur, setBlur] = useState(false);
     const [editorMountVersion, setEditorMountVersion] = useState(0);
     const [schemaLabelsVersion, setSchemaLabelsVersion] = useState(0);
+    // Bumped when the procedure fetch settles: procedures live in a ref, so the
+    // engine-schema effect below has nothing else to react to.
+    const [proceduresVersion, setProceduresVersion] = useState(0);
     // Toggled by the real-time linter; false blocks execution (requirement 6).
     const [isQueryValid, setIsQueryValid] = useState(true);
 
@@ -272,7 +275,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             }),
             functions: udfFunctionNames(udfList),
         };
-    }, [graph.Id, graph.GraphInfo, udfList, schemaLabelsVersion]);
+    }, [graph.Id, graph.GraphInfo, udfList, schemaLabelsVersion, proceduresVersion]);
 
     // Fetch procedures whenever the graph or read-only mode changes.
     // Read-only mode is included because the server may return a different set
@@ -282,9 +285,13 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
         let cancelled = false;
 
         // Clear stale entries immediately so the previous graph's procedures
-        // are never shown while the new fetch is in flight.
+        // are never shown while the new fetch is in flight. The schema effect
+        // above reads this ref, so the clear has to be published too — otherwise
+        // the engine keeps validating against the previous graph's procedures
+        // (forever, when `requestGraphId` is empty and no fetch follows).
         procedureSuggestionsRef.current = [];
         cachedSuggestionsRef.current = [];
+        setProceduresVersion(v => v + 1);
 
         if (!requestGraphId) return () => { cancelled = true; };
 
@@ -321,6 +328,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             if (monacoRef.current) {
                 updateTokenizer(monacoRef.current);
             }
+            setProceduresVersion(v => v + 1);
         }).catch(() => {
             if (cancelled || graphIdRef.current !== requestGraphId) return;
             // On error, fall back to the well-known FalkorDB built-in procedures
@@ -336,6 +344,7 @@ export default function CypherEditor({ graph, graphName, historyQuery, maximize,
             }));
             cachedSuggestionsRef.current = [];
             if (monacoRef.current) updateTokenizer(monacoRef.current);
+            setProceduresVersion(v => v + 1);
         });
 
         return () => { cancelled = true; };

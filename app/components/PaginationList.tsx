@@ -129,12 +129,13 @@ const getQueryElement = (item: Query) => {
 
 interface Props<T extends Item> {
     list: T[]
-    onClick: (label: string, evt: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLInputElement>) => void
+    /** Receives the clicked ITEM, not its label: labels are not unique (query history repeats text). */
+    onClick: (item: T, evt: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLInputElement>) => void
     dataTestId: string
     label: string
     afterSearchCallback: (newFilteredList: T[]) => void
     isSelected: (item: T) => boolean
-    onDoubleClick?: (label: string, evt: MouseEvent<HTMLButtonElement>) => void
+    onDoubleClick?: (item: T, evt: MouseEvent<HTMLButtonElement>) => void
     onToggleFav?: (item: T, name?: string) => void
     searchRef: React.RefObject<HTMLInputElement | null>
     isLoading?: boolean
@@ -255,7 +256,7 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
 
                         if (e.key === "Enter") {
                             e.preventDefault();
-                            onClick(typeof items[hoverIndex] === "string" ? items[hoverIndex] : items[hoverIndex].text, e);
+                            onClick(items[hoverIndex], e);
                         }
                     }}
                     onFocus={() => setHoverIndex(0)}
@@ -334,11 +335,11 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                                             onMouseEnter={() => setHoverIndex(index)}
                                             onMouseLeave={() => searchRef.current !== document.activeElement && setHoverIndex(-1)}
                                             onClick={(e) => {
-                                                onClick(text, e);
+                                                onClick(item, e);
                                             }}
                                             onDoubleClick={(e) => {
                                                 if (onDoubleClick) {
-                                                    onDoubleClick(text, e);
+                                                    onDoubleClick(item, e);
                                                 }
                                             }}
                                             tabIndex={-1}

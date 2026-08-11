@@ -8,7 +8,12 @@
 // ---------------------------------------------------------------------------
 
 /** The only error classes that can still reach the client post-syntax-gating. */
-export type RuntimeErrorKind = "timeout" | "resourceLimit" | "missingConstraint" | "unknown";
+export type RuntimeErrorKind =
+  | "timeout"
+  | "resourceLimit"
+  | "constraintViolation"
+  | "missingConstraint"
+  | "unknown";
 
 export interface RuntimeError {
   kind: RuntimeErrorKind;
@@ -29,6 +34,13 @@ const RUNTIME_MATCHERS: { kind: RuntimeErrorKind; test: RegExp; message: string 
     kind: "resourceLimit",
     test: /resultset size|max queued queries|memory|resource|too many/i,
     message: "The query hit a server resource limit. Reduce the result size or simplify the query.",
+  },
+  {
+    // Must precede `missingConstraint`: a violated constraint mentions the same
+    // words as an absent one, but has the opposite cause.
+    kind: "constraintViolation",
+    test: /constraint violation|violates? .*constraint|already indexed|duplicate key/i,
+    message: "The query violates a constraint on the graph. Check for duplicate or missing required values.",
   },
   {
     kind: "missingConstraint",

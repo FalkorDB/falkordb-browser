@@ -116,6 +116,10 @@ test.describe("@admin Graph URL params", () => {
         await page.goto(urls.graphUrl);
         await graph.waitForPageIdle();
 
+        // Anchor the negative assertion on a settled state: on a cold load the
+        // strip is empty for a moment, and asserting then would pass without the
+        // restore having run at all.
+        await expect.poll(() => graph.getStripTabIds(), { timeout: 15000 }).not.toHaveLength(0);
         await expect(page.getByTestId("selectGraph")).not.toContainText(doomed, { timeout: 15000 });
         const graphs = await apiCall.getGraphs();
         expect(JSON.stringify(graphs)).not.toContain(doomed);

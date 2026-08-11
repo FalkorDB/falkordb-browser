@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable no-await-in-loop */
-import { Download, Locator } from "@playwright/test";
+import { Download, Locator, expect } from "@playwright/test";
 import {
   pollForElementContent,
   waitForElementToBeVisible,
@@ -680,9 +680,14 @@ export default class GraphPage extends BasePage {
         (el) => el.click(),
         "Graph Info Toggle"
       );
-      // Wait for the panel expansion animation to complete
-      await this.graphInfoPanel.waitFor({ state: "visible" });
-      await this.page.waitForTimeout(300);
+      // `visible` is meaningless here (see above) and a fixed sleep is either
+      // flaky or wasted time — poll the same width the check above uses.
+      await expect
+        .poll(
+          async () => (await this.graphInfoPanel.boundingBox().catch(() => null))?.width ?? 0,
+          { timeout: 5000 }
+        )
+        .toBeGreaterThan(50);
     }
   }
 
@@ -1061,7 +1066,9 @@ export default class GraphPage extends BasePage {
   }
 
   public stripTab(label: string): Locator {
-    return this.tabStrip.locator(`[data-tab-label="${label}"]`);
+    // Labels are user-supplied: quote them so a `"` or `\` cannot break out of
+    // the attribute selector.
+    return this.tabStrip.locator(`[data-tab-label=${JSON.stringify(label)}]`);
   }
 
   /** Positional access, for cases where labels repeat (several blank tabs). */
