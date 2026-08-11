@@ -372,7 +372,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                     <PopoverClose asChild>
                                                         <Button
                                                             className="w-full justify-start gap-2 px-2 py-1 text-xs hover:bg-secondary rounded-md"
-                                                            data-testid={`customizeStyle${relationship.name}`}
+                                                            data-testid={`customizeRelationshipStyle${relationship.name}`}
                                                             onClick={() => setCustomizingLabel({ kind: "edge", name: relationship.name })}
                                                         >
                                                             <Palette size={12} />

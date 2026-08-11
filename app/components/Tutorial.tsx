@@ -198,12 +198,21 @@ const tutorialSteps: TutorialStep[] = [
         hidePrev: true
     },
     {
-        title: "Get KNOWS edge",
-        description: "Click this button to retrieve all edges of type 'KNOWS' in the graph. This will show you the count and details of all KNOWS relationships.",
+        title: "Open Edge Options",
+        description: "Click on the 'KNOWS' edge type to see the available options for this relationship.",
         placementAxis: "x",
         targetSelector: '[data-testid="graphInfoKNOWSEdge"]',
         advanceOn: "click",
-        forward: ["mouseenter", "mouseleave"]
+        forward: ["mouseenter", "mouseleave", "pointerdown"]
+    },
+    {
+        title: "Get KNOWS edge",
+        description: "Click 'Run' to retrieve all edges of type 'KNOWS' in the graph. This will show you the count and details of all KNOWS relationships.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="runRelationshipKNOWS"]',
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave", "pointerdown"],
+        hidePrev: true
     },
     ///// Query and Canvas (Track 3)
     {
