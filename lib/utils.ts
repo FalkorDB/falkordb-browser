@@ -807,6 +807,24 @@ export function prepareArg(arg: string) {
 }
 
 /**
+ * Reads a panel width back out of storage, which anything can have written to.
+ * The size is applied in an animation frame, where a throw is swallowed and the
+ * panel would silently keep the wrong width, so a value that is not a usable
+ * percentage yields `undefined` and the caller falls back to its default.
+ */
+export function parsePanelSizePercent(stored: string | null | undefined): number | undefined {
+  if (!stored) return undefined;
+
+  try {
+    const parsed: unknown = JSON.parse(stored);
+
+    return typeof parsed === "number" && Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Upload a single file via XHR so the caller can render real request-body upload
  * progress (the fetch API can't report it). Mirrors securedFetch's behaviour:
  * injects X-Connection-Id, surfaces a friendly error toast, and drives the

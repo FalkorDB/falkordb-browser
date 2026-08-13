@@ -1,7 +1,7 @@
 'use client';
 
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { cn, convertToCanvasData, getActiveConnectionIdGlobal, getConnectionEpoch, getMemoryUsage, getMetaStats, getSSEGraphResult, isAbortError, isTwoNodes, Link, MemoryValue, Node, prepareArg, securedFetch, Value } from "@/lib/utils";
+import { cn, convertToCanvasData, getActiveConnectionIdGlobal, getConnectionEpoch, getMemoryUsage, getMetaStats, getSSEGraphResult, isAbortError, isTwoNodes, Link, MemoryValue, Node, parsePanelSizePercent, prepareArg, securedFetch, Value } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamicImport from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -168,20 +168,10 @@ export default function Page() {
 
     const getPanelSize = useCallback(() => {
         if (!panel) return "0%";
-        const stored = getConnectionItem(panelSizeKey(panel));
 
-        if (stored) {
-            // The value comes from storage, which anything can have written.
-            // A resize runs in an animation frame, so a throw here would be
-            // swallowed and the panel would silently keep the wrong width.
-            try {
-                const parsed: unknown = JSON.parse(stored);
+        const stored = parsePanelSizePercent(getConnectionItem(panelSizeKey(panel)));
 
-                if (typeof parsed === "number" && Number.isFinite(parsed) && parsed > 0) return `${parsed}%`;
-            } catch {
-                // Fall through to the default below.
-            }
-        }
+        if (stored !== undefined) return `${stored}%`;
 
         return panelSizes[panel]?.size ?? "0%";
     }, [panel, panelSizeKey, panelSizes]);
