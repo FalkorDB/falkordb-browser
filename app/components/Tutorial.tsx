@@ -198,12 +198,21 @@ const tutorialSteps: TutorialStep[] = [
         hidePrev: true
     },
     {
-        title: "Get KNOWS edge",
-        description: "Click this button to retrieve all edges of type 'KNOWS' in the graph. This will show you the count and details of all KNOWS relationships.",
+        title: "Open Edge Options",
+        description: "Click on the 'KNOWS' edge type to see the available options for this relationship.",
         placementAxis: "x",
         targetSelector: '[data-testid="graphInfoKNOWSEdge"]',
         advanceOn: "click",
-        forward: ["mouseenter", "mouseleave"]
+        forward: ["mouseenter", "mouseleave", "pointerdown"]
+    },
+    {
+        title: "Get KNOWS edge",
+        description: "Click 'Run' to retrieve all edges of type 'KNOWS' in the graph. This will show you the count and details of all KNOWS relationships.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="runRelationshipKNOWS"]',
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave", "pointerdown"],
+        hidePrev: true
     },
     ///// Query and Canvas (Track 3)
     {
@@ -494,11 +503,11 @@ const tutorialTracks: TutorialTrack[] = [
         },
     },
     {
-        // State after step 14 (Get KNOWS edge): social-demo selected,
+        // State after step 15 (Get KNOWS edge): social-demo selected,
         // KNOWS query was run → graph has edges visible, Graph tab active,
         // no DataPanel open, no query history open
         name: "Query & Results",
-        startIndex: 15,
+        startIndex: 16,
         setup: async (ctx) => {
             closeStaleOverlays();
             ctx.handleSetGraphName("social-demo");
@@ -510,11 +519,11 @@ const tutorialTracks: TutorialTrack[] = [
         },
     },
     {
-        // State after step 27 (Close Query History Window): social-demo selected,
-        // query was run (graph has elements), Metadata tab is active (from step 24),
-        // query history panel is CLOSED (step 27 closed it), no DataPanel
+        // State after step 28 (Close Query History Window): social-demo selected,
+        // query was run (graph has elements), Metadata tab is active (from step 25),
+        // query history panel is CLOSED (step 28 closed it), no DataPanel
         name: "Layouts & Canvas",
-        startIndex: 28,
+        startIndex: 29,
         setup: async (ctx) => {
             closeStaleOverlays();
             ctx.handleSetGraphName("social-demo");
@@ -527,10 +536,10 @@ const tutorialTracks: TutorialTrack[] = [
         },
     },
     {
-        // State after step 39 (Zoom Controls): social-demo selected, graph has elements,
+        // State after step 40 (Zoom Controls): social-demo selected, graph has elements,
         // Graph tab active, controls visible, radial layout active, no overlays open
         name: "Theme & Navigation",
-        startIndex: 40,
+        startIndex: 41,
         setup: async (ctx) => {
             closeStaleOverlays();
             ctx.handleSetGraphName("social-demo");

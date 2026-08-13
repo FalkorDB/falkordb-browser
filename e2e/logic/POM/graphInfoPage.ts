@@ -113,6 +113,10 @@ export default class GraphInfoPage extends GraphPage {
     return this.page.getByTestId(`runLabel${label}`);
   }
 
+  private runRelationshipButton(relationship: string): Locator {
+    return this.page.getByTestId(`runRelationship${relationship}`);
+  }
+
   async clickGraphInfoNodeButton(label: string): Promise<void> {
     await interactWhenVisible(
       this.graphInfoNodeButton(label),
@@ -133,6 +137,12 @@ export default class GraphInfoPage extends GraphPage {
       this.graphInfoEdgeButton(relationship),
       (el) => el.click(),
       `Graph Info Edge Button ${relationship}`
+    );
+    await waitForElementToBeVisible(this.runRelationshipButton(relationship));
+    await interactWhenVisible(
+      this.runRelationshipButton(relationship),
+      (el) => el.click(),
+      `Run Relationship Button ${relationship}`
     );
     await this.waitForCanvasAnimationToEnd();
   }

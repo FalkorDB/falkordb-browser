@@ -27,13 +27,14 @@ const stored = (tabs: unknown[], activeTabId?: unknown) =>
     JSON.stringify({ tabs, activeTabId });
 
 test("forStorage drops the open style panel but keeps the rest of the tab", () => {
-    const source = tab({ customizing: "person1", panelOpen: true, chatOpen: true, name: "mine" });
+    const customizing = { kind: "node", name: "person1" } as const;
+    const source = tab({ customizing, panelOpen: true, chatOpen: true, name: "mine" });
     const result = forStorage(source);
 
     assert.equal("customizing" in result, false);
     assert.deepEqual(result, tab({ panelOpen: true, chatOpen: true, name: "mine" }));
     // Non-destructive: the live tab still knows which panel is open.
-    assert.equal(source.customizing, "person1");
+    assert.deepEqual(source.customizing, customizing);
 });
 
 test("tabStripItemWidth reserves room for the add button and every gap", () => {
@@ -134,7 +135,7 @@ test("parseStoredTabs keeps every piece of well-formed tab metadata", () => {
         dimmed: true,
         expand: false,
         panelOpen: false,
-        customizing: "Person",
+        customizing: { kind: "edge", name: "KNOWS" },
         chatOpen: true,
     })]));
 
@@ -153,7 +154,7 @@ test("parseStoredTabs keeps every piece of well-formed tab metadata", () => {
         dimmed: true,
         expand: false,
         panelOpen: false,
-        customizing: "Person",
+        customizing: { kind: "edge", name: "KNOWS" },
         chatOpen: true,
     });
 });
@@ -191,6 +192,17 @@ test("parseStoredTabs strips metadata of the wrong type but keeps the tab", () =
         chatOpen: undefined,
         name: undefined,
     }]);
+});
+
+test("parseStoredTabs drops a customizing ref that is not a known kind and name", () => {
+    const customizing = (value: unknown) => parseStoredTabs(stored([
+        tab({ customizing: value } as unknown as Partial<GraphTab>),
+    ]))?.tabs[0].customizing;
+
+    assert.equal(customizing({ kind: "line", name: "KNOWS" }), undefined);
+    assert.equal(customizing({ kind: "node" }), undefined);
+    assert.equal(customizing({ name: "Person" }), undefined);
+    assert.deepEqual(customizing({ kind: "node", name: "" }), { kind: "node", name: "" });
 });
 
 test("parseStoredTabs defaults a missing active tab id to empty", () => {

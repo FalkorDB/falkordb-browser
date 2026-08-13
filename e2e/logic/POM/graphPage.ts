@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable no-await-in-loop */
-import { Download, Locator } from "@playwright/test";
+import { Download, Locator, expect } from "@playwright/test";
 import {
   pollForElementContent,
   waitForElementToBeVisible,
@@ -650,12 +650,12 @@ export default class GraphPage extends BasePage {
   }
 
   private get querySearchList(): Locator {
-    return this.page.locator("//div[contains(@class, 'tree')]");
+    return this.page.locator(".suggest-widget.visible").first();
   }
 
   private get querySearchListItems(): Locator {
-    return this.page.locator(
-      "//div[contains(@class, 'tree')]//div[contains(@class, 'contents')]"
+    return this.querySearchList.locator(
+      ".monaco-list-row .contents, .monaco-list-row .label-name"
     );
   }
 
@@ -680,9 +680,14 @@ export default class GraphPage extends BasePage {
         (el) => el.click(),
         "Graph Info Toggle"
       );
-      // Wait for the panel expansion animation to complete
-      await this.graphInfoPanel.waitFor({ state: "visible" });
-      await this.page.waitForTimeout(300);
+      // `visible` is meaningless here (see above) and a fixed sleep is either
+      // flaky or wasted time — poll the same width the check above uses.
+      await expect
+        .poll(
+          async () => (await this.graphInfoPanel.boundingBox().catch(() => null))?.width ?? 0,
+          { timeout: 5000 }
+        )
+        .toBeGreaterThan(50);
     }
   }
 
@@ -1061,7 +1066,9 @@ export default class GraphPage extends BasePage {
   }
 
   public stripTab(label: string): Locator {
-    return this.tabStrip.locator(`[data-tab-label="${label}"]`);
+    // Labels are user-supplied: quote them so a `"` or `\` cannot break out of
+    // the attribute selector.
+    return this.tabStrip.locator(`[data-tab-label=${JSON.stringify(label)}]`);
   }
 
   /** Positional access, for cases where labels repeat (several blank tabs). */
@@ -1402,7 +1409,22 @@ export default class GraphPage extends BasePage {
 
   async insertQuery(query: string): Promise<void> {
     await this.clickEditorInput();
-    await this.page.keyboard.type(query);
+    // Set editor content through Monaco to avoid flaky keyboard-based replacement
+    // when previous content exists or keybindings intercept keystrokes.
+    await this.page.waitForFunction(() => {
+      const m = (window as unknown as { monaco?: typeof import("monaco-editor") }).monaco;
+      const container = document.querySelector('[data-testid="editorContainer"]');
+      return !!m
+        && !!container
+        && m.editor.getEditors().some((e) => container.contains(e.getContainerDomNode()));
+    });
+    await this.page.evaluate((text) => {
+      const m = (window as unknown as { monaco?: typeof import("monaco-editor") }).monaco;
+      const container = document.querySelector('[data-testid="editorContainer"]');
+      const editor = m?.editor.getEditors().find((e) => container?.contains(e.getContainerDomNode()));
+      if (!editor) throw new Error("Monaco editor not found");
+      editor.setValue(text);
+    }, query);
   }
 
   async clickRunQuery(waitForAnimation = true): Promise<void> {
@@ -1699,6 +1721,8 @@ export default class GraphPage extends BasePage {
   }
 
   async getQuerySearchListText(): Promise<string[]> {
+    // Explicitly open Monaco completion to avoid picking up unrelated UI trees.
+    await this.page.keyboard.press("Control+Space");
     await waitForElementToBeVisible(this.querySearchList);
     const elements = this.querySearchListItems;
     const count = await elements.count();

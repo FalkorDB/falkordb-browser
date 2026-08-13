@@ -42,6 +42,7 @@ interface Props {
     onSearchChange?: Dispatch<SetStateAction<string>>
     initialExpand?: Map<number, number>
     onExpandChange?: Dispatch<SetStateAction<Map<number, number>>>
+    rowIndicator?: (rowName: string) => React.ReactNode
 }
 
 const hasCellValue = (value: unknown) => value !== undefined && value !== null;
@@ -89,7 +90,8 @@ export default function TableComponent({
     initialSearch,
     onSearchChange,
     initialExpand,
-    onExpandChange
+    onExpandChange,
+    rowIndicator
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
@@ -413,7 +415,7 @@ export default function TableComponent({
         </svg>`
     ), [itemHeight]);
     const stripBackground = useMemo(() => `url("data:image/svg+xml,${stripSVG}")`, [stripSVG]);
-    const columnCount = (setRows ? headerNames.length + 1 : headerNames.length) + 1;
+    const columnCount = (setRows ? headerNames.length + 1 : headerNames.length) + (rowIndicator ? 2 : 1);
 
     const renderValue = (v: any) => (
         <span className={cn("pointer-events-auto text-xs", valueClassName)}>{v}</span>
@@ -488,6 +490,11 @@ export default function TableComponent({
                                         }}
                                     />
                                 </TableHead>
+                                : null
+                        }
+                        {
+                            rowIndicator ?
+                                <TableHead key="indicator" className="w-5 border-r border-border p-2 text-center">Status</TableHead>
                                 : null
                         }
                         <TableHead key="index" className="w-5 border-r border-border p-2">
@@ -653,6 +660,13 @@ export default function TableComponent({
                                                         }}
                                                     />
                                                 </div>
+                                            </TableCell>
+                                            : null
+                                    }
+                                    {
+                                        rowIndicator ?
+                                            <TableCell className="border-r border-border p-1">
+                                                <div className="flex items-center justify-center">{rowIndicator(row.name)}</div>
                                             </TableCell>
                                             : null
                                     }

@@ -1,5 +1,8 @@
 export const MEMORY_USAGE_VERSION_THRESHOLD = 41408;
 export const UDF_VERSION_THRESHOLD = 41600;
+// Graph offloading indicators need the enterprise module AND a FalkorDB core new
+// enough to report stubs consistently — 42002 is v4.20.2, the latest release.
+export const GRAPH_OFFLOAD_VERSION_THRESHOLD = 42002;
 
 // Bounds for the UDF catalog forwarded to the chat API. The `chatRequest` schema enforces these
 // limits for untrusted callers (an oversized payload is rejected with 400). The client clamps to the

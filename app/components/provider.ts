@@ -1,7 +1,7 @@
 import { createContext, Dispatch, RefObject, SetStateAction } from "react";
 import type { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import type { AIProvider } from "@/lib/ai-provider-utils";
-import { CanvasLayout, ConnectionInfo, ConnectionType, GraphData, GraphRef, HistoryQuery, Label, Panel, Relationship, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
+import { CanvasLayout, ConnectionInfo, ConnectionType, CustomizingRef, GraphData, GraphRef, HistoryQuery, Label, Panel, Relationship, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
 import type { DiagnosticsResult } from "@/lib/cypherDiagnostics";
 import type { LayoutMode, ViewportState } from "@falkordb/canvas";
 import type { SessionConnection } from "next-auth";
@@ -213,12 +213,12 @@ type PanelContextType = {
   infoPanelRef: RefObject<PanelImperativeHandle | null>;
   onInfoPanelResize: (size: PanelSize) => void;
   /**
-   * Name of the label whose style is being customized, or null for the normal
-   * info view. Held by name — not by object — so it survives a graph info
-   * refresh and can be stored as tab metadata.
+   * Kind and name of the label or relationship whose style is being customized,
+   * or null for the normal info view. Held by name — not by object — so it
+   * survives a graph info refresh and can be stored as tab metadata.
    */
-  customizingLabel: string | null;
-  setCustomizingLabel: Dispatch<SetStateAction<string | null>>;
+  customizingLabel: CustomizingRef | null;
+  setCustomizingLabel: Dispatch<SetStateAction<CustomizingRef | null>>;
 };
 
 type QueryLoadingContextType = {
@@ -286,6 +286,12 @@ type ConnectionContextType = {
   dbVersion: string;
   setDbVersion: Dispatch<SetStateAction<string>>;
   isReadOnly: boolean;
+  // Graph offloading: `supportsOffload` gates the offload UI (enterprise module
+  // plus a recent enough FalkorDB) and `offloadedGraphs` holds the graphs
+  // currently offloaded from memory.
+  supportsOffload: boolean;
+  offloadedGraphs: string[];
+  refreshOffloadedGraphs: () => Promise<void>;
   additionalConnections: SessionConnection[];
   setAdditionalConnections: Dispatch<SetStateAction<SessionConnection[]>>;
   activeConnectionId: string | null;
@@ -573,6 +579,9 @@ export const ConnectionContext = createContext<ConnectionContextType>({
   dbVersion: "",
   setDbVersion: () => { },
   isReadOnly: false,
+  supportsOffload: false,
+  offloadedGraphs: [],
+  refreshOffloadedGraphs: async () => { },
   additionalConnections: [],
   setAdditionalConnections: () => { },
   activeConnectionId: null,
@@ -618,6 +627,9 @@ type AiFixContextType = {
   result: AiFixResult;
   pendingConsentProvider: string | null;
   requestAiFix: (query: string, errorMessage: string) => void;
+  /** Register a client-side (pre-run) failure — e.g. a grammar syntax error —
+   *  so the same "Fix with AI" affordance appears without executing the query. */
+  reportClientError: (query: string, errorMessage: string) => void;
   confirmConsent: (dontAskAgain: boolean) => void;
   cancelConsent: () => void;
   dismissResult: () => void;
@@ -630,6 +642,7 @@ export const AiFixContext = createContext<AiFixContextType>({
   result: { status: "idle" },
   pendingConsentProvider: null,
   requestAiFix: () => { },
+  reportClientError: () => { },
   confirmConsent: () => { },
   cancelConsent: () => { },
   dismissResult: () => { },

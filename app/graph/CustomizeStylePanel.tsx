@@ -1,37 +1,101 @@
-/* eslint-disable no-param-reassign */
-
 'use client';
 
 import { useContext, useState, useEffect, useCallback, useRef } from "react";
 import { X, Palette } from "lucide-react";
-import { LabelStyle, InfoLabel, Label, cn } from "@/lib/utils";
+import { CustomizingItem, LabelStyle, LinkStyle, Label, cn } from "@/lib/utils";
 import { GraphContext, ForceGraphContext, BrowserSettingsContext } from "@/app/components/provider";
 import { STYLE_COLORS, getLabelWithFewestElements } from "@/app/api/graph/model";
 import { setConnectionItem } from "@/lib/connection-storage";
 import Button from "@/app/components/ui/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { NODE_SIZE } from "@falkordb/canvas";
+import { NODE_SIZE, LINK_WIDTH, LINK_FONT_SIZE, ARROW_SIZE } from "@falkordb/canvas";
 
 interface Props {
-    label: InfoLabel;
+    customizing: CustomizingItem;
     onClose: () => void;
 }
 
-export default function CustomizeStylePanel({ label, onClose }: Props) {
-    const { graph, setLabels } = useContext(GraphContext);
+/** Preview swatch drawn inside each size button. */
+const renderPreview = (scale: number, isNode: boolean, selectedColor: string) => {
+    if (isNode) {
+        const diameter = nodePreviewSize(scale);
+
+        return (
+            <div
+                className="rounded-full shrink-0"
+                style={{
+                    backgroundColor: selectedColor,
+                    width: `${diameter}px`,
+                    height: `${diameter}px`,
+                }}
+            />
+        );
+    }
+
+    // Edge preview: a line plus an arrowhead, both scaled by the multiplier.
+    return (
+        <div className="flex items-center">
+            <div
+                style={{
+                    backgroundColor: selectedColor,
+                    width: "14px",
+                    height: `${Math.max(1, scale * 2)}px`,
+                }}
+            />
+            <div
+                style={{
+                    width: 0,
+                    height: 0,
+                    borderTop: `${Math.max(2, scale * 4)}px solid transparent`,
+                    borderBottom: `${Math.max(2, scale * 4)}px solid transparent`,
+                    borderLeft: `${Math.max(4, scale * 7)}px solid ${selectedColor}`,
+                }}
+            />
+        </div>
+    );
+};
+
+/** Scale multipliers offered by the size selector (0.25x - 2.5x). */
+const SCALE_OPTIONS = Array.from({ length: 10 }, (_, i) => (i + 1) / 4);
+
+/** Node preview diameter in px for a given multiplier. */
+const nodePreviewSize = (scale: number) => NODE_SIZE * scale * 4;
+
+/** Edge preview height in px (arrowhead is the tallest part) for a given multiplier. */
+const edgePreviewSize = (scale: number) => scale * 4 * 2;
+
+/**
+ * Height the size row must reserve for the largest preview. The row scrolls
+ * horizontally, and a horizontal scrollbar eats into an auto height, so the
+ * height is set explicitly: largest preview + button padding + row padding +
+ * scrollbar allowance.
+ */
+const sizeRowHeight = (isNode: boolean) => {
+    const largest = Math.max(...SCALE_OPTIONS.map((scale) => (isNode ? nodePreviewSize(scale) : edgePreviewSize(scale))));
+    return largest + 8 + 16 + 12;
+};
+
+export default function CustomizeStylePanel({ customizing, onClose }: Props) {
+    const { kind, item } = customizing;
+
+    const { graph, setLabels, setRelationships } = useContext(GraphContext);
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { canvasRef } = useContext(ForceGraphContext);
 
-    // Store original values for comparison and cancel functionality
-    const [originalColor] = useState<string>(label.style.color);
-    const [originalSize] = useState(label.style.size || NODE_SIZE);
+    const isNode = kind === "node";
 
-    const [selectedColor, setSelectedColor] = useState<string>(
-        label.style.color
-    );
-    const [selectedSize, setSelectedSize] = useState(
-        label.style.size || NODE_SIZE
-    );
+    // Store original values for comparison and cancel functionality
+    const [originalColor] = useState<string>(item.style.color);
+    // A single multiplier drives every size property of the element: the node
+    // radius, or the link width + caption font size + arrow size together.
+    const [originalScale] = useState<number>(() => (
+        isNode
+            ? ((item.style as LabelStyle).size ?? NODE_SIZE) / NODE_SIZE
+            : ((item.style as LinkStyle).width ?? LINK_WIDTH) / LINK_WIDTH
+    ));
+
+    const [selectedColor, setSelectedColor] = useState<string>(originalColor);
+    const [selectedScale, setSelectedScale] = useState<number>(originalScale);
 
     // RGB Color Picker state
     const [showRgbPicker, setShowRgbPicker] = useState(false);
@@ -41,65 +105,104 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
     // Track if there are unsaved changes
     const hasChanges =
         selectedColor !== originalColor ||
-        selectedSize !== originalSize;
+        selectedScale !== originalScale;
 
-    const saveStyleToStorage = useCallback((labelName: string, style: LabelStyle) => {
-        const storageKey = `labelStyle_${labelName}`;
+    const saveStyleToStorage = useCallback((style: LabelStyle | LinkStyle) => {
+        const storageKey = `${isNode ? "labelStyle" : "relationshipStyle"}_${item.name}`;
         setConnectionItem(storageKey, JSON.stringify(style));
-    }, []);
+    }, [isNode, item.name]);
 
-    const applyStylesToGraph = useCallback((color: string, size: number) => {
-        // Mutate the InfoLabel prop directly so graphInfo context stays in sync
-        label.style = {
-            ...label.style,
-            color,
-            size,
-        };
+    const applyStylesToGraph = useCallback((color: string, scale: number) => {
+        const canvas = canvasRef.current;
 
-        const updatedLabel = graph.LabelsMap.get(label.name);
+        if (isNode) {
+            const size = NODE_SIZE * scale;
+            const style: LabelStyle = { color, size };
 
-        if (!updatedLabel) return;
+            // Mutate the InfoLabel prop directly so graphInfo context stays in sync
+            item.style = { ...item.style, ...style };
 
-        updatedLabel.style = {
-            ...updatedLabel.style,
-            color,
-            size,
-        };
+            const updatedLabel = graph.LabelsMap.get(item.name);
 
-        // Update all nodes with this label
-        updatedLabel.elements.forEach(n => {
-            if (getLabelWithFewestElements(n.labels.map(l => graph.LabelsMap.get(l)).filter(Boolean) as Label[])?.name === label.name) {
-                n.color = color;
-                n.size = size;
+            if (!updatedLabel) return;
+
+            updatedLabel.style = { ...updatedLabel.style, ...style };
+
+            // Update all nodes with this label
+            updatedLabel.elements.forEach(n => {
+                if (getLabelWithFewestElements(n.labels.map(l => graph.LabelsMap.get(l)).filter(Boolean) as Label[])?.name === item.name) {
+                    n.color = color;
+                    n.size = size;
+                }
+            });
+
+            setLabels([...graph.Labels]);
+
+            if (canvas) {
+                const graphData = canvas.getGraphData();
+
+                graphData.nodes.forEach(node => {
+                    if (getLabelWithFewestElements(node.labels.map(l => graph.LabelsMap.get(l)).filter(Boolean) as Label[])?.name === item.name) {
+                        node.color = color;
+
+                        if (node.size !== size) {
+                            node.size = size;
+                        }
+                    }
+                });
+
+                canvas.refresh();
             }
+
+            return;
+        }
+
+        const style: LinkStyle = {
+            color,
+            width: LINK_WIDTH * scale,
+            fontSize: LINK_FONT_SIZE * scale,
+            arrowSize: ARROW_SIZE * scale,
+        };
+
+        // Mutate the InfoRelationship prop directly so graphInfo context stays in sync
+        item.style = { ...item.style, ...style };
+
+        const updatedRelationship = graph.RelationshipsMap.get(item.name);
+
+        if (!updatedRelationship) return;
+
+        updatedRelationship.style = { ...updatedRelationship.style, ...style };
+
+        updatedRelationship.elements.forEach(l => {
+            l.color = color;
+            l.width = style.width;
+            l.fontSize = style.fontSize;
+            l.arrowSize = style.arrowSize;
         });
 
-        setLabels([...graph.Labels]);
-
-        const canvas = canvasRef.current;
+        setRelationships([...graph.Relationships]);
 
         if (canvas) {
             const graphData = canvas.getGraphData();
 
-            graphData.nodes.forEach(node => {
-                if (getLabelWithFewestElements(node.labels.map(l => graph.LabelsMap.get(l)).filter(Boolean) as Label[])?.name === label.name) {
-                    node.color = color;
+            graphData.links.forEach(link => {
+                if (link.relationship !== item.name) return;
 
-                    if (node.size !== size) {
-                        node.size = size;
-                    }
-                }
+                link.color = color;
+                link.width = style.width;
+                link.fontSize = style.fontSize;
+                link.arrowSize = style.arrowSize;
             });
 
             canvas.refresh();
         }
-    }, [canvasRef, graph.Labels, graph.LabelsMap, label, setLabels]);
+    }, [canvasRef, graph.Labels, graph.LabelsMap, graph.Relationships, graph.RelationshipsMap, isNode, item, setLabels, setRelationships]);
 
     const handleColorSelect = (color: string) => {
         setSelectedColor(color);
         setShowRgbPicker(false); // Close RGB picker when preset color is selected
         // Apply to graph immediately for preview (without saving to localStorage)
-        applyStylesToGraph(color, selectedSize);
+        applyStylesToGraph(color, selectedScale);
     };
 
     const handleRgbColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -107,45 +210,54 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
         setCustomRgbColor(color);
         setSelectedColor(color);
         // Apply to graph immediately for preview
-        applyStylesToGraph(color, selectedSize);
+        applyStylesToGraph(color, selectedScale);
     };
 
     const handleRgbPickerClick = () => {
         setShowRgbPicker(!showRgbPicker);
     };
 
-    const handleSizeSelect = (size: number) => {
-        setSelectedSize(size);
+    const handleScaleSelect = (scale: number) => {
+        setSelectedScale(scale);
         // Apply to graph immediately for preview (without saving to localStorage)
-        applyStylesToGraph(selectedColor, size);
-    };
-
-
-    const handleSave = () => {
-        // Prevent saving during tutorial
-        if (!tutorialOpen) {
-            // Save to localStorage
-            saveStyleToStorage(label.name, {
-                color: selectedColor,
-                size: selectedSize,
-            });
-        }
-
-        onClose();
+        applyStylesToGraph(selectedColor, scale);
     };
 
     const handleCancel = useCallback(() => {
         // Revert to original values in state
         setSelectedColor(originalColor);
-        setSelectedSize(originalSize);
+        setSelectedScale(originalScale);
 
         // Revert graph to original values
-        applyStylesToGraph(originalColor, originalSize);
-    }, [originalColor, originalSize, applyStylesToGraph]);
+        applyStylesToGraph(originalColor, originalScale);
+    }, [originalColor, originalScale, applyStylesToGraph]);
+
+    const handleSave = () => {
+        // The tutorial runs on a demo graph, so its edits stay preview-only:
+        // discard them rather than leaving an unsaved preview applied.
+        if (tutorialOpen) {
+            handleCancel();
+            onClose();
+            return;
+        }
+
+        saveStyleToStorage(
+            isNode
+                ? { color: selectedColor, size: NODE_SIZE * selectedScale }
+                : {
+                    color: selectedColor,
+                    width: LINK_WIDTH * selectedScale,
+                    fontSize: LINK_FONT_SIZE * selectedScale,
+                    arrowSize: ARROW_SIZE * selectedScale,
+                }
+        );
+
+        onClose();
+    };
 
     const handleClose = useCallback(() => {
+        // Same discard as Escape, but the panel closes with it.
         handleCancel();
-        // Just close the panel without reverting changes
         onClose();
     }, [onClose, handleCancel]);
 
@@ -179,20 +291,20 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
             <div className="flex gap-2 items-center overflow-hidden">
                 <div
                     style={{ backgroundColor: selectedColor }}
-                    className="w-8 h-8 rounded-full"
+                    className={cn("w-8", isNode ? "h-8 rounded-full" : "h-2 rounded-full")}
                 />
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <p className="truncate pointer-events-auto SofiaSans">{label.name}</p>
+                        <p className="truncate pointer-events-auto SofiaSans">{item.name}</p>
                     </TooltipTrigger>
                     <TooltipContent>
-                        {label.name}
+                        {item.name}
                     </TooltipContent>
                 </Tooltip>
             </div>
 
             {/* Color Selection */}
-            <div className="flex flex-col gap-2 overflow-hidden">
+            <div className="flex flex-col gap-2 min-h-0 shrink">
                 <h2 className="text-base font-semibold">Color:</h2>
                 <div className="flex gap-2 flex-wrap p-2 bg-muted/10 rounded-lg overflow-y-auto">
                     {/* First 15 preset colors */}
@@ -282,7 +394,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
                                                         setCustomRgbColor(color);
                                                         if (color.length === 7) {
                                                             setSelectedColor(color);
-                                                            applyStylesToGraph(color, selectedSize);
+                                                            applyStylesToGraph(color, selectedScale);
                                                         }
                                                     }
                                                 }}
@@ -299,35 +411,31 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
                 </div>
             </div>
 
-            {/* Size Selection */}
-            <div className="flex flex-col gap-2 overflow-hidden">
+            {/* Size Selection — one multiplier scales every size property */}
+            <div className="flex flex-col gap-2 h-fit shrink-0">
                 <h2 className="text-base font-semibold">Size:</h2>
-                <div className="flex gap-2 p-2 bg-muted/10 rounded-lg overflow-x-auto">
-                    {/* Size options from 0.25x to 2.5x of NODE_SIZE */}
-                    {Array.from({ length: 10 }, (_, i) => (i + 1) / 4 * NODE_SIZE).map((size) => (
-                        <Tooltip key={size}>
+                <div
+                    data-testid="sizeOptions"
+                    className="flex gap-2 items-center p-2 bg-muted/10 rounded-lg overflow-x-auto overflow-y-hidden"
+                    style={{ height: `${sizeRowHeight(isNode)}px` }}
+                >
+                    {SCALE_OPTIONS.map((scale) => (
+                        <Tooltip key={scale}>
                             <TooltipTrigger asChild>
                                 <button
                                     type="button"
                                     className={cn(
-                                        "flex items-center justify-center transition-all hover:bg-muted rounded-md",
-                                        selectedSize === size && "bg-muted ring-2 ring-foreground"
+                                        "shrink-0 min-w-8 min-h-8 p-1 flex items-center justify-center transition-all hover:bg-muted rounded-md",
+                                        selectedScale === scale && "bg-muted ring-2 ring-foreground"
                                     )}
-                                    onClick={() => handleSizeSelect(size)}
-                                    aria-label={`Select size ${size}`}
+                                    onClick={() => handleScaleSelect(scale)}
+                                    aria-label={`Select size ${scale.toFixed(2)}x`}
                                 >
-                                    <div
-                                        className="rounded-full"
-                                        style={{
-                                            backgroundColor: selectedColor,
-                                            width: `${size * 4}px`,
-                                            height: `${size * 4}px`,
-                                        }}
-                                    />
+                                    {renderPreview(scale, isNode, selectedColor)}
                                 </button>
                             </TooltipTrigger>
                             <TooltipContent>
-                                {(size / NODE_SIZE).toFixed(2)}x
+                                {scale.toFixed(2)}x
                             </TooltipContent>
                         </Tooltip>
                     ))}
@@ -337,7 +445,7 @@ export default function CustomizeStylePanel({ label, onClose }: Props) {
             {/* Sticky Save/Cancel Buttons - Only show when there are changes */}
             {
                 hasChanges && (
-                    <div className="flex-shrink-0 p-3 pt-2 border-t border-border bg-background">
+                    <div className="mt-auto shrink-0 p-3 pt-2 border-t border-border bg-background">
                         <div className="flex gap-2 justify-center">
                             <button
                                 type="button"

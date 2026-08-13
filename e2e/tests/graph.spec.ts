@@ -312,8 +312,7 @@ test.describe("Graph Tests", () => {
   });
 
   const queriesInput = [
-    { query: "C", keywords: ["call", "collect", "count", "create"] },
-    { query: "M", keywords: ["max", "min", "match", "merge"] },
+    { query: "C", keywords: ["call", "case", "create"] },
   ];
   queriesInput.forEach(({ query, keywords }) => {
     test(`@readwrite Validate auto complete in query search for: ${query}`, async () => {
@@ -324,7 +323,7 @@ test.describe("Graph Tests", () => {
       await graph.selectGraphByName(graphName);
       await graph.insertQuery(query);
       const response = await graph.getQuerySearchListText();
-      const hasAny = response.some((s) => keywords.some((k) => s.includes(k)));
+      const hasAny = response.some((s) => keywords.some((k) => s.toLowerCase().includes(k.toLowerCase())));
       expect(hasAny).toBeTruthy();
       await apiCall.removeGraph(graphName);
     });

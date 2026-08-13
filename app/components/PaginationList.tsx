@@ -129,21 +129,23 @@ const getQueryElement = (item: Query) => {
 
 interface Props<T extends Item> {
     list: T[]
-    onClick: (label: string, evt: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLInputElement>) => void
+    /** Receives the clicked ITEM, not its label: labels are not unique (query history repeats text). */
+    onClick: (item: T, evt: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLInputElement>) => void
     dataTestId: string
     label: string
     afterSearchCallback: (newFilteredList: T[]) => void
     isSelected: (item: T) => boolean
-    onDoubleClick?: (label: string, evt: MouseEvent<HTMLButtonElement>) => void
+    onDoubleClick?: (item: T, evt: MouseEvent<HTMLButtonElement>) => void
     onToggleFav?: (item: T, name?: string) => void
     searchRef: React.RefObject<HTMLInputElement | null>
     isLoading?: boolean
     className?: string
     actionButtons?: React.ReactNode
+    itemIndicator?: (item: T) => React.ReactNode
     children?: React.ReactNode
 }
 
-export default function PaginationList<T extends Item>({ list, onClick, onDoubleClick, dataTestId, afterSearchCallback, isSelected, onToggleFav, label, isLoading, className, children, searchRef, actionButtons }: Props<T>) {
+export default function PaginationList<T extends Item>({ list, onClick, onDoubleClick, dataTestId, afterSearchCallback, isSelected, onToggleFav, label, isLoading, className, children, searchRef, actionButtons, itemIndicator }: Props<T>) {
 
     const [filteredList, setFilteredList] = useState<T[]>([...list]);
     const [hoverIndex, setHoverIndex] = useState<number>(0);
@@ -254,7 +256,7 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
 
                         if (e.key === "Enter") {
                             e.preventDefault();
-                            onClick(typeof items[hoverIndex] === "string" ? items[hoverIndex] : items[hoverIndex].text, e);
+                            onClick(items[hoverIndex], e);
                         }
                     }}
                     onFocus={() => setHoverIndex(0)}
@@ -273,7 +275,10 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                         const hover = hoverIndex === index;
                         const isString = typeof item === "string";
                         const text = isString ? item : item.text;
-                        const queryText = <p data-testid={`${dataTestId}${text}Text`} className={cn("truncate w-full text-left", getItemClassName(selected, hover))}>{text}</p>;
+                        const indicator = itemIndicator?.(item);
+                        const queryText = (
+                            <p data-testid={`${dataTestId}${text}Text`} className={cn("truncate w-full text-left", getItemClassName(selected, hover))}>{text}</p>
+                        );
 
                         const isFav = !isString && item.fav;
 
@@ -330,11 +335,11 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                                             onMouseEnter={() => setHoverIndex(index)}
                                             onMouseLeave={() => searchRef.current !== document.activeElement && setHoverIndex(-1)}
                                             onClick={(e) => {
-                                                onClick(text, e);
+                                                onClick(item, e);
                                             }}
                                             onDoubleClick={(e) => {
                                                 if (onDoubleClick) {
-                                                    onDoubleClick(text, e);
+                                                    onDoubleClick(item, e);
                                                 }
                                             }}
                                             tabIndex={-1}
@@ -356,7 +361,16 @@ export default function PaginationList<T extends Item>({ list, onClick, onDouble
                                 style={{ height: `${itemHeight}px` }}
                                 key={text}
                             >
-                                {content}
+                                {
+                                    // The indicator sits beside the row button rather than inside
+                                    // it, so its tooltip isn't nested in the button's tooltip.
+                                    indicator ?
+                                        <div className="flex items-center gap-2 w-full h-full min-w-0">
+                                            {indicator}
+                                            <div className="flex flex-col grow min-w-0 h-full">{content}</div>
+                                        </div>
+                                        : content
+                                }
                             </li>
                         );
                     })

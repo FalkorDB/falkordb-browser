@@ -211,24 +211,28 @@ test.describe.serial("Query Settings", () => {
   test(`@admin Validate that the active tab rebuilds its results after a refresh`, async () => {
     const graphName = getRandomString("settingsQuery");
     await apiCall.addGraph(graphName);
-    const querySettings = await browser.createNewPage(
-      QuerySettingsPage,
-      urls.settingsUrl
-    );
-    await querySettings.expandQueryExecutionSection();
-    await querySettings.clickRunDefaultQuerySwitchOn();
-    await querySettings.clickSaveQuerySettingsBtn();
-    await querySettings.clickGraphsTabInHeader();
-    await querySettings.selectGraphByName(graphName);
-    const query = "MATCH (n) RETURN n";
-    await querySettings.insertQuery(query);
-    await querySettings.clickRunQuery(false);
-    await querySettings.refreshPage();
-    const tabEnabled =
-      (await querySettings.getGraphTabEnabled()) ||
-      (await querySettings.getTableTabEnabled()) ||
-      (await querySettings.getMetadataTabEnabled());
-    expect(tabEnabled).toBe(true);
-    await apiCall.removeGraph(graphName);
+    try {
+      // Seed a node: on an empty graph `MATCH (n) RETURN n` returns nothing, so
+      // the tabs could report enabled without any result having been rebuilt.
+      await apiCall.runQuery(graphName, "CREATE (:Seeded {name: 'seed'})");
+      const querySettings = await browser.createNewPage(
+        QuerySettingsPage,
+        urls.settingsUrl
+      );
+      await querySettings.expandQueryExecutionSection();
+      await querySettings.clickRunDefaultQuerySwitchOn();
+      await querySettings.clickSaveQuerySettingsBtn();
+      await querySettings.clickGraphsTabInHeader();
+      await querySettings.selectGraphByName(graphName);
+      const query = "MATCH (n) RETURN n";
+      await querySettings.insertQuery(query);
+      await querySettings.clickRunQuery(false);
+      await querySettings.refreshPage();
+      // The tabs can be enabled by the graph selection alone, so assert on the
+      // rebuilt result itself: the seeded node has to be back on the canvas.
+      expect(await querySettings.getNodesScreenPositions()).toHaveLength(1);
+    } finally {
+      await apiCall.removeGraph(graphName);
+    }
   });
 });

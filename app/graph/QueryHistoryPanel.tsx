@@ -9,14 +9,17 @@ import { cn, getTheme, Query } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/components/ui/use-toast";
 import { setConnectionItem, removeConnectionItem } from "@/lib/connection-storage";
 import Button from "../components/ui/Button";
 import EditorComponent from "../components/EditorComponent";
 import { LanguageConfig } from "../components/EditorComponent";
 import { CYPHER_LANGUAGE_NAME, STATIC_SUGGESTIONS } from "../components/CypherEditor";
-import { buildCypherCompletionItems, buildUdfFunctionSuggestions } from "../components/cypherLanguageSuggestions";
+import { extractVariableCandidates } from "@/lib/cypherSuggestions";
+import { udfFunctionNames } from "@/lib/cypherLang";
+import { createFalkorCypherEngine, attachGrammarLinting, registerGrammarCodeActions, getGrammarDiagnostics, toCompletionItems, type FalkorSchema } from "@/lib/falkordb-cypher";
 import PaginationList from "../components/PaginationList";
-import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, UDFContext } from "../components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, UDFContext, AiFixContext } from "../components/provider";
 import { Explain, Metadata, Profile } from "./MetadataView";
 
 type Tab = "text" | "metadata" | "explain" | "profile";
@@ -44,6 +47,8 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     const { udfList } = useContext(UDFContext);
     const { isQueryLoading } = useContext(QueryLoadingContext);
     const { indicator } = useContext(IndicatorContext);
+    const { aiFixSupported, requestAiFix, reportClientError } = useContext(AiFixContext);
+    const { toast } = useToast();
 
     const { theme } = useTheme();
     const { background } = getTheme(theme);
@@ -51,6 +56,17 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
     const submitQuery = useRef<HTMLButtonElement>(null);
     const searchQueryRef = useRef<HTMLInputElement>(null);
+
+    // falkordb-cypher engine — same brain the main editor uses, so the history
+    // editor gets identical real-time syntax validation. Its schema getter reads
+    // the always-current engineSchemaRef (kept in sync below).
+    const engineSchemaRef = useRef<FalkorSchema>({});
+    const engineRef = useRef(createFalkorCypherEngine(() => engineSchemaRef.current));
+    // Latest AI-fix capability/handler for the shared grammar code-action provider.
+    const aiFixRef = useRef({ aiFixSupported, requestAiFix });
+    useEffect(() => { aiFixRef.current = { aiFixSupported, requestAiFix }; }, [aiFixSupported, requestAiFix]);
+    // Toggled by the real-time linter; false blocks execution.
+    const [isQueryValid, setIsQueryValid] = useState(true);
 
     const [filteredQueries, setFilteredQueries] = useState<Query[]>([]);
     // The list PaginationList actually renders, i.e. `filteredQueries` after its internal
@@ -60,7 +76,10 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     const [favFilter, setFavFilter] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [tab, setTab] = useState<Tab>("text");
-    const [selectedQueries, setSelectedQueries] = useState<string[]>([]);
+    // Timestamps, not query text: the same text can be run many times, and text-keyed
+    // selection makes delete/export/un-fav hit every repeat. `timestamp` is already the
+    // entry identity used by handleToggleFav and is present on every stored record.
+    const [selectedQueries, setSelectedQueries] = useState<number[]>([]);
     const [wrapLines, setWrapLines] = useState(false);
 
     const filters = useMemo(() => {
@@ -84,7 +103,27 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     useEffect(() => { graphRef.current = graph; }, [graph]);
     useEffect(() => { graphNameRef.current = graphName; }, [graphName]);
 
-    const udfSuggestions = useMemo(() => buildUdfFunctionSuggestions(udfList), [udfList]);
+    // Keep the engine schema in sync so completion (once the grammar is generated)
+    // sees this graph's labels, relationship types, property keys, and UDFs.
+    useEffect(() => {
+        engineSchemaRef.current = {
+            labels: Array.from(graph.GraphInfo.Labels.keys()).filter(Boolean) as string[],
+            relationshipTypes: Array.from(graph.GraphInfo.Relationships.keys()).filter(Boolean) as string[],
+            propertyKeys: (graph.GraphInfo.PropertyKeys ?? []) as string[],
+            functions: udfFunctionNames(udfList),
+        };
+    }, [graph, udfList]);
+
+    const udfSuggestions = useMemo(() =>
+        udfList.flatMap(([, libName, , functions]) =>
+            functions.map((fn: string) => ({
+                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                insertText: `${libName}.${fn}(\${0})`,
+                label: `${libName}.${fn}()`,
+                kind: monaco.languages.CompletionItemKind.Function,
+                detail: '(udf function)',
+            }))
+        ), [udfList]);
     const udfSuggestionsRef = useRef(udfSuggestions);
     useEffect(() => { udfSuggestionsRef.current = udfSuggestions; }, [udfSuggestions]);
 
@@ -94,32 +133,75 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const historyLanguageConfig = useMemo((): LanguageConfig => ({
         triggerCharacters: ['.'],
-        getSuggestions: async (monacoInstance: Monaco, context) => {
+        getSuggestions: async (monacoInstance: Monaco, context, model, position) => {
             const g = graphRef.current;
             const graphMatches = currentQueryRef.current?.graphName === graphNameRef.current;
             const udfs = udfSuggestionsRef.current;
-            return buildCypherCompletionItems({
-                monacoInstance,
-                context,
-                graphInfo: g.GraphInfo,
-                queryText: currentQueryRef.current?.text ?? "",
-                udfSuggestions: udfs,
-                staticSuggestions: STATIC_SUGGESTIONS,
-                includeGraphMetadata: graphMatches,
+
+            // Dot-triggered: property keys only (when graph matches)
+            if (context?.triggerCharacter === '.') {
+                if (!graphMatches) return [];
+                return (g.GraphInfo.PropertyKeys ?? []).map(key => ({
+                    insertText: key,
+                    label: key,
+                    kind: monacoInstance.languages.CompletionItemKind.Property,
+                    detail: '(property key)',
+                }));
+            }
+
+            // EditorComponent always overwrites `range`; use a loose type to avoid
+            // the strict `range` requirement on every push.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const items: any[] = [...STATIC_SUGGESTIONS, ...udfs];
+
+            // Bound variables from the currently displayed query
+            const queryText = currentQueryRef.current?.text ?? "";
+            extractVariableCandidates(queryText).forEach(v => {
+                items.push({
+                    insertText: v,
+                    label: v,
+                    kind: monacoInstance.languages.CompletionItemKind.Variable,
+                    detail: '(variable)',
+                });
             });
+
+            if (graphMatches) {
+                g.GraphInfo.Labels.forEach((_, name) => {
+                    if (!name) return;
+                    items.push({ insertText: name, label: name, kind: monacoInstance.languages.CompletionItemKind.Class, detail: '(label)' });
+                });
+                g.GraphInfo.Relationships.forEach((_, name) => {
+                    if (!name) return;
+                    items.push({ insertText: name, label: name, kind: monacoInstance.languages.CompletionItemKind.Interface, detail: '(relationship type)' });
+                });
+                (g.GraphInfo.PropertyKeys ?? []).forEach(key => {
+                    items.push({ insertText: key, label: key, kind: monacoInstance.languages.CompletionItemKind.Property, detail: '(property key)' });
+                });
+            }
+
+            // Grammar-aware completions from the engine (inert until the ANTLR
+            // grammar is generated), merged in and deduped by label.
+            if (model && position) {
+                const engineItems = toCompletionItems(monacoInstance, engineRef.current.getCompletions(model.getValue(), position.lineNumber, position.column - 1));
+                const seen = new Set(items.map(s => (typeof s.label === 'string' ? s.label : s.label.label)));
+                engineItems.forEach(s => {
+                    const l = typeof s.label === 'string' ? s.label : s.label.label;
+                    if (!seen.has(l)) items.push(s);
+                });
+            }
+
+            return items;
         },
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }), []);
 
-    const editorLanguageConfig = useMemo((): LanguageConfig => {
+    // Monaco tokenization is global per language id. If we pass through
+    // monarchTokensProvider from the main editor config here, mounting this
+    // history editor can clobber the main editor tokenizer registration.
+    const historyEditorLanguageConfig = useMemo((): LanguageConfig => {
         if (!sharedLanguageConfig) return historyLanguageConfig;
-
-        // Do not reset the global Cypher tokenizer on history-editor mount.
-        // The main editor maintains a dynamic tokenizer (bound vars, namespaces),
-        // and overriding it here with the default provider causes temporary
-        // de-highlighting until the next query-change retokenization.
-        const { monarchTokensProvider: _ignored, ...rest } = sharedLanguageConfig;
-        return rest;
+        const { monarchTokensProvider: _monarchTokensProvider, ...safeConfig } = sharedLanguageConfig;
+        return safeConfig;
     }, [sharedLanguageConfig, historyLanguageConfig]);
 
     const afterSearchCallback = useCallback((newFilteredList: Query[]) => {
@@ -129,7 +211,9 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
             ? historyQuery.currentQuery
             : historyQuery.queries[historyQuery.counter - 1];
 
-        if (selectedQuery && newFilteredList.every(q => q.text !== selectedQuery.text)) {
+        // `timestamp`, like every other identity check in this panel — text is not
+        // an entry identity, so a filtered-out entry could look visible.
+        if (selectedQuery && newFilteredList.every(q => q.timestamp !== selectedQuery.timestamp)) {
             setHistoryQuery(prev => {
                 if (prev.counter === 0) return prev;
                 return {
@@ -222,8 +306,6 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     };
 
     const isTabEnabled = useCallback((tabName: Tab) => {
-        // Text editor should stay accessible even when the current query is empty,
-        // so users can type a new query from the Current Query state.
         if (tabName === "text") return !!currentQuery;
         if (tabName === "metadata") return !!currentQuery && currentQuery.metadata.length > 0;
         if (tabName === "explain") return !!currentQuery && currentQuery.explain.length > 0;
@@ -233,11 +315,17 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     useEffect(() => {
         if (!currentQuery || tab === "profile") return;
 
+        // Keep users on the text tab even when the query is empty so they can type a new query.
+        if (tab === "text") {
+            if (!editorRef.current?.hasTextFocus()) {
+                focusEditorAtEnd();
+            }
+            return;
+        }
+
         const currentValue = currentQuery?.[tab];
 
-        // For the text tab, an empty string is expected and should not force
-        // fallback to another tab.
-        if (tab !== "text" && (!currentValue || currentValue.length === 0)) {
+        if (!currentValue || currentValue.length === 0) {
             const fallbackTab = (Object.keys(currentQuery) as Tab[]).find(isTabEnabled);
 
             if (fallbackTab && fallbackTab !== tab) {
@@ -247,13 +335,18 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                     focusEditorAtEnd();
                 }
             }
-        } else if (tab === "text" && !editorRef.current?.hasTextFocus()) {
-            focusEditorAtEnd();
         }
     }, [currentQuery, setTab, historyQuery?.query, tab, isTabEnabled]);
 
     const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
         editorRef.current = e;
+
+        // Real-time grammar linting: enriched (prettified + hint + quick-fix)
+        // squigglies and the isQueryValid execution gate — identical to the main
+        // editor. Register the shared quick-fix + "Fix with AI" provider (guarded).
+        registerGrammarCodeActions(monaco, CYPHER_LANGUAGE_NAME, () => aiFixRef.current);
+        const lintDisposable = attachGrammarLinting(monaco, e, engineRef.current, setIsQueryValid);
+        e.onDidDispose(() => lintDisposable.dispose());
 
         // eslint-disable-next-line no-bitwise
         e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
@@ -302,6 +395,16 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     };
 
     const handleSubmit = async () => {
+        // Grammar validation gates execution: invalid syntax never runs. Reuse the
+        // failed-run pipeline: prettified toast + "Fix with AI" button.
+        if (!isQueryValid) {
+            const model = editorRef.current?.getModel();
+            const message = (model ? getGrammarDiagnostics(model)[0]?.message : undefined) ?? "Syntax error";
+            const query = historyQuery!.query.trim();
+            reportClientError(query, message);
+            toast({ title: "Syntax Error", description: message, variant: "destructive", query });
+            return;
+        }
         try {
             setIsLoading(true);
             await runQuery(historyQuery!.query.trim());
@@ -316,7 +419,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
 
         const selected = new Set(selectedQueries);
         const deleteElements = historyQuery.queries.reduce<number[]>((acc, query, idx) => {
-            if (selected.has(query.text)) acc.push(idx);
+            if (selected.has(query.timestamp)) acc.push(idx);
             return acc;
         }, []);
 
@@ -350,33 +453,30 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
             query: nextQuery
         }));
         setSelectedQueries([]);
-        setFilteredQueries(current => current.filter(query => !selected.has(query.text)));
+        setFilteredQueries(current => current.filter(query => !selected.has(query.timestamp)));
     }, [historyQuery, setHistoryQuery, selectedQueries]);
 
     const handleExportSelected = useCallback(() => {
         if (!historyQuery) return;
 
-        const queries = historyQuery.queries.filter(query => selectedQueries.includes(query.text));
+        const selected = new Set(selectedQueries);
+        const queries = historyQuery.queries.filter(query => selected.has(query.timestamp));
 
         if (queries.length === 0) return;
 
         const url = URL.createObjectURL(new Blob([`${buildCypherBatch(queries)}\n`], { type: "text/plain;charset=utf-8" }));
 
-        try {
-            const link = document.createElement("a");
-            link.href = url;
-            // Swap characters that are invalid or awkward in file names
-            const timestamp = new Date(Date.now())
-                .toLocaleString()
-                .replace(/[/\\:*?"<>|]/g, "-")
-                .replace(/[,\s]+/g, "_");
-            link.download = `falkordb-queries-${timestamp}.cypher`;
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-        } finally {
-            URL.revokeObjectURL(url);
-        }
+        const link = document.createElement("a");
+        link.href = url;
+        // ISO, not toLocaleString(): the file name must not change with the user's locale.
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        link.download = `falkordb-queries-${timestamp}.cypher`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        // Deferred: Firefox and Safari abort the download if the blob URL is revoked
+        // in the same task as the click.
+        setTimeout(() => URL.revokeObjectURL(url), 0);
     }, [historyQuery, selectedQueries]);
 
     const handleToggleFav = useCallback((item: Query, name?: string) => {
@@ -406,7 +506,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
 
         const selected = new Set(selectedQueries);
         const unFav = (q: Query) =>
-            q.fav && selected.has(q.text) ? { ...q, fav: false, name: undefined } : q;
+            q.fav && selected.has(q.timestamp) ? { ...q, fav: false, name: undefined } : q;
 
         const newQueries = historyQuery.queries.map(unFav);
 
@@ -424,8 +524,8 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
     if (!historyQuery || !setHistoryQuery) return null;
 
     const selectedSet = new Set(selectedQueries);
-    const isAllSelected = visibleQueries.length > 0 && visibleQueries.every(q => selectedSet.has(q.text));
-    const hasSelectedFav = historyQuery.queries.some(q => q.fav && selectedSet.has(q.text));
+    const isAllSelected = visibleQueries.length > 0 && visibleQueries.every(q => selectedSet.has(q.timestamp));
+    const hasSelectedFav = historyQuery.queries.some(q => q.fav && selectedSet.has(q.timestamp));
 
     return (
         <div data-testid="queryHistoryPanel" className="h-full w-full border border-border rounded-lg bg-background">
@@ -445,7 +545,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                 <PaginationList
                     label="Query"
                     className="overflow-hidden h-[313px] max-h-[393px] p-1 border-b border-border"
-                    isSelected={(item) => selectedSet.has(item.text)}
+                    isSelected={(item) => selectedSet.has(item.timestamp)}
                     afterSearchCallback={afterSearchCallback}
                     onToggleFav={handleToggleFav}
                     dataTestId="queryHistory"
@@ -487,7 +587,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                                 variant="Primary"
                                 data-testid="queryHistorySelectAll"
                                 title={isAllSelected ? "Deselect all queries" : "Select all queries"}
-                                onClick={() => setSelectedQueries(isAllSelected ? [] : visibleQueries.map(q => q.text))}
+                                onClick={() => setSelectedQueries(isAllSelected ? [] : visibleQueries.map(q => q.timestamp))}
                                 disabled={visibleQueries.length === 0}
                             >
                                 {
@@ -510,19 +610,19 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                             </Tooltip>
                         </div>
                     }
-                    onClick={(counter, evt) => {
-                        const index = historyQuery.queries.findIndex(q => q.text === counter);
+                    onClick={(item, evt) => {
+                        const index = historyQuery.queries.findIndex(q => q.timestamp === item.timestamp);
 
                         if (index === -1) return;
 
-                        const { text } = historyQuery.queries[index];
+                        const { timestamp } = historyQuery.queries[index];
 
                         const isCurrent = index + 1 === historyQuery.counter;
 
                         if (evt.ctrlKey || evt.metaKey) {
-                            setSelectedQueries(prev => prev.includes(text) ? prev.filter(t => t !== text) : [...prev, text]);
+                            setSelectedQueries(prev => prev.includes(timestamp) ? prev.filter(t => t !== timestamp) : [...prev, timestamp]);
                         } else {
-                            setSelectedQueries(isCurrent ? [] : [text]);
+                            setSelectedQueries(isCurrent ? [] : [timestamp]);
                         }
 
                         setHistoryQuery(prev => ({
@@ -531,8 +631,8 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                         }));
                         setTab("text");
                     }}
-                    onDoubleClick={async (counter) => {
-                        const index = historyQuery.queries.findIndex(q => q.text === counter);
+                    onDoubleClick={async (item) => {
+                        const index = historyQuery.queries.findIndex(q => q.timestamp === item.timestamp);
                         setHistoryQuery(prev => ({
                             ...prev,
                             counter: index + 1
@@ -540,8 +640,8 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                         setTab("text");
                         try {
                             setIsLoading(true);
-                            if (counter.trim()) {
-                                await runQuery(counter.trim());
+                            if (item.text.trim()) {
+                                await runQuery(item.text.trim());
                             }
                             onClose();
                         } finally {
@@ -605,7 +705,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                                     indicator={indicator}
                                     variant="Primary"
                                     label="Run"
-                                    title="Press Enter to run the query"
+                                    title={isQueryValid ? "Press Enter to run the query" : "Fix the highlighted syntax errors to run"}
                                     onClick={handleSubmit}
                                     isLoading={isLoading}
                                     disabled={isQueryLoading}
@@ -626,7 +726,7 @@ export default function QueryHistoryPanel({ onClose, graphName, languageConfig: 
                                     className="SofiaSans"
                                     height="100%"
                                     language={CYPHER_LANGUAGE_NAME}
-                                    languageConfig={editorLanguageConfig}
+                                    languageConfig={historyEditorLanguageConfig}
                                     themeName="selector-theme"
                                     options={{
                                         lineHeight: 22,
