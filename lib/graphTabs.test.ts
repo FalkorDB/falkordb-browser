@@ -30,16 +30,18 @@ const stored = (tabs: unknown[], activeTabId?: unknown) =>
 
 test("forStorage drops the open style panel but keeps the rest of the tab", () => {
     const source = tab({
-        graph: { customizing: "person1", panelOpen: true, chatOpen: true },
-        schema: { layout: "tree" },
+        graph: { customizing: "person1", panelOpen: true },
+        schema: { layout: "tree", panelOpen: false },
+        chatOpen: true,
         name: "mine",
     });
     const result = forStorage(source);
 
     assert.equal("customizing" in result.graph, false);
     assert.deepEqual(result, tab({
-        graph: { panelOpen: true, chatOpen: true },
-        schema: { layout: "tree" },
+        graph: { panelOpen: true },
+        schema: { layout: "tree", panelOpen: false },
+        chatOpen: true,
         name: "mine",
     }));
     // Non-destructive: the live tab still knows which panel is open.
@@ -135,6 +137,7 @@ test("parseStoredTabs keeps every piece of well-formed tab metadata", () => {
     const viewport = { centerX: 1, centerY: 2, zoom: 3 };
     const result = parseStoredTabs(stored([tab({
         name: "My tab",
+        chatOpen: true,
         graph: {
             viewport,
             selected: "n:12:s",
@@ -146,7 +149,6 @@ test("parseStoredTabs keeps every piece of well-formed tab metadata", () => {
             expand: false,
             panelOpen: false,
             customizing: "Person",
-            chatOpen: true,
         },
         schema: {
             viewport,
@@ -157,6 +159,7 @@ test("parseStoredTabs keeps every piece of well-formed tab metadata", () => {
             pinned: true,
             dimmed: false,
             expand: true,
+            panelOpen: true,
         },
     })]));
 
@@ -166,6 +169,7 @@ test("parseStoredTabs keeps every piece of well-formed tab metadata", () => {
         query: "MATCH (n) RETURN n",
         view: "Graph",
         name: "My tab",
+        chatOpen: true,
         graph: {
             viewport,
             selected: "n:12:s",
@@ -177,7 +181,6 @@ test("parseStoredTabs keeps every piece of well-formed tab metadata", () => {
             expand: false,
             panelOpen: false,
             customizing: "Person",
-            chatOpen: true,
         },
         schema: {
             viewport,
@@ -188,6 +191,7 @@ test("parseStoredTabs keeps every piece of well-formed tab metadata", () => {
             pinned: true,
             dimmed: false,
             expand: true,
+            panelOpen: true,
         },
     });
 });
@@ -206,6 +210,7 @@ test("parseStoredTabs reads a strip written before the metadata was split per vi
         layout: "tree",
         panelOpen: false,
         customizing: "Person",
+        chatOpen: true,
     }]));
 
     assert.deepEqual(result?.tabs[0].graph, {
@@ -219,8 +224,9 @@ test("parseStoredTabs reads a strip written before the metadata was split per vi
         expand: undefined,
         panelOpen: false,
         customizing: "Person",
-        chatOpen: undefined,
     });
+    // Chat belongs to the tab now, wherever it was stored.
+    assert.equal(result?.tabs[0].chatOpen, true);
     assert.deepEqual(result?.tabs[0].schema, {
         viewport: undefined,
         selected: undefined,
@@ -230,7 +236,17 @@ test("parseStoredTabs reads a strip written before the metadata was split per vi
         pinned: undefined,
         dimmed: undefined,
         expand: undefined,
+        panelOpen: undefined,
     });
+});
+
+test("parseStoredTabs lifts chat out of the graph view's metadata", () => {
+    const result = parseStoredTabs(stored([tab({
+        graph: { chatOpen: true },
+    } as unknown as Partial<GraphTab>)]));
+
+    assert.equal(result?.tabs[0].chatOpen, true);
+    assert.equal("chatOpen" in result!.tabs[0].graph, false);
 });
 
 test("parseStoredTabs strips metadata of the wrong type but keeps the tab", () => {
@@ -260,6 +276,7 @@ test("parseStoredTabs strips metadata of the wrong type but keeps the tab", () =
         pinned: undefined,
         dimmed: undefined,
         expand: undefined,
+        panelOpen: undefined,
     };
 
     assert.deepEqual(result?.tabs, [{
@@ -267,7 +284,8 @@ test("parseStoredTabs strips metadata of the wrong type but keeps the tab", () =
         graphName: "g",
         query: "MATCH (n) RETURN n",
         view: "Graph",
-        graph: { ...empty, panelOpen: undefined, customizing: undefined, chatOpen: undefined },
+        chatOpen: undefined,
+        graph: { ...empty, customizing: undefined },
         schema: empty,
         name: undefined,
     }]);

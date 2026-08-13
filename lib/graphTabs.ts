@@ -20,16 +20,14 @@ export type ViewTabMeta = {
     dimmed?: boolean;
     /** Toolbar search/filter panel open. */
     expand?: boolean;
+    /** Side panel (graph info / selected element) expanded. */
+    panelOpen?: boolean;
 };
 
-/** What only the graph view has: the graph info side panel and chat. */
+/** What only the graph view has. */
 export type GraphViewMeta = ViewTabMeta & {
-    /** Graph info side panel expanded. */
-    panelOpen?: boolean;
     /** Name of the label whose style panel is open inside the graph info panel. */
     customizing?: string;
-    /** Chat panel open. Its messages are keyed by tab id + graph name. */
-    chatOpen?: boolean;
 };
 
 /**
@@ -42,6 +40,11 @@ export type SchemaViewMeta = ViewTabMeta;
 export type GraphTabMeta = {
     graph: GraphViewMeta;
     schema: SchemaViewMeta;
+    /**
+     * Chat panel open. It belongs to the tab rather than to either view: its
+     * messages are keyed by tab id + graph name, not by view.
+     */
+    chatOpen?: boolean;
 };
 /**
  * The serializable part of a working context — what the tab strip shows and
@@ -192,6 +195,7 @@ const normalizeViewMeta = (value: unknown): ViewTabMeta => {
         pinned: asBoolean(meta.pinned),
         dimmed: asBoolean(meta.dimmed),
         expand: asBoolean(meta.expand),
+        panelOpen: asBoolean(meta.panelOpen),
     };
 };
 
@@ -201,7 +205,7 @@ const normalizeViewMeta = (value: unknown): ViewTabMeta => {
  * itself doubles as the graph view's metadata.
  */
 const normalizeTab = (tab: GraphTab): GraphTab => {
-    const graph = (tab.graph ?? tab) as Partial<GraphViewMeta>;
+    const graph = (tab.graph ?? tab) as Partial<GraphViewMeta & { chatOpen?: boolean }>;
 
     return {
         id: tab.id,
@@ -209,11 +213,11 @@ const normalizeTab = (tab: GraphTab): GraphTab => {
         query: tab.query,
         view: tab.view,
         name: asString(tab.name),
+        // Chat used to be stored inside the graph view's metadata.
+        chatOpen: asBoolean(tab.chatOpen) ?? asBoolean(graph.chatOpen),
         graph: {
             ...normalizeViewMeta(graph),
-            panelOpen: asBoolean(graph.panelOpen),
             customizing: asString(graph.customizing),
-            chatOpen: asBoolean(graph.chatOpen),
         },
         schema: normalizeViewMeta(tab.schema),
     };

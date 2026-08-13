@@ -1151,8 +1151,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   layoutRef.current = { layout, direction, animation, pinned, dimmed, expand: expandFilter, chatOpen, customizingLabel };
 
   // The graph info panel is imperative and only mounted on /graph, so its open
-  // state is remembered here for captures that happen once it is gone.
-  const panelOpenRef = useRef(true);
+  // state is remembered here for captures that happen once it is gone. It is
+  // one physical panel shared by both views, but each view remembers its own
+  // state — sampling writes to whichever view is on screen.
+  const panelOpenRef = useRef({ graph: true, schema: true });
 
   // The schema view is unmounted whenever the Schema tab is not the active one,
   // so it cannot be sampled at capture time the way the graph canvas is. It
@@ -1188,7 +1190,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // An empty canvas reports whatever zoom it happens to sit at, which would
     // overwrite a good viewport with a meaningless one.
     const hasNodes = (canvas?.getGraphData().nodes.length ?? 0) > 0;
-    if (panelRef.current) panelOpenRef.current = !panelRef.current.isCollapsed();
+    const panelView = state.view === "Schema" ? "schema" : "graph";
+    if (panelRef.current) panelOpenRef.current[panelView] = !panelRef.current.isCollapsed();
 
     return {
       graph: {
@@ -1200,11 +1203,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         pinned: layoutRef.current.pinned,
         dimmed: layoutRef.current.dimmed,
         expand: layoutRef.current.expand,
-        panelOpen: panelOpenRef.current,
+        panelOpen: panelOpenRef.current.graph,
         customizing: layoutRef.current.customizingLabel ?? undefined,
-        chatOpen: layoutRef.current.chatOpen,
       },
-      schema: schemaMetaRef.current,
+      schema: { ...schemaMetaRef.current, panelOpen: panelOpenRef.current.schema },
+      chatOpen: layoutRef.current.chatOpen,
     };
   }, [canvasRef]);
 
@@ -1268,15 +1271,19 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setPinned(meta.pinned ?? tabLayout !== 'force');
     setDimmed(meta.dimmed ?? true);
     setExpandFilter(meta.expand ?? true);
-    setChatOpen(meta.chatOpen ?? false);
+    setChatOpen(tab.chatOpen ?? false);
     // Resolved against the tab's own graph by the info panel, so a label that no
     // longer exists simply falls back to the normal view.
     setCustomizingLabel(meta.customizing ?? null);
 
-    // The info panel has no React state of its own — drive it imperatively.
+    // The info panel has no React state of its own — drive it imperatively,
+    // following the view the tab opens on.
     const infoPanel = panelRef.current;
-    const tabPanelOpen = meta.panelOpen ?? true;
-    panelOpenRef.current = tabPanelOpen;
+    panelOpenRef.current = {
+      graph: meta.panelOpen ?? true,
+      schema: tab.schema?.panelOpen ?? true,
+    };
+    const tabPanelOpen = tab.view === "Schema" ? panelOpenRef.current.schema : panelOpenRef.current.graph;
     if (infoPanel && infoPanel.isCollapsed() === tabPanelOpen) {
       if (tabPanelOpen) infoPanel.expand();
       else infoPanel.collapse();

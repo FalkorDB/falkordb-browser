@@ -3,7 +3,8 @@
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Loader2 } from "lucide-react";
-import type { FalkorDBCanvas, LayoutMode, NodeShape, ViewportState } from "@falkordb/canvas";
+import type { FalkorDBCanvas, LayoutMode, ViewportState, NodeShape } from "@falkordb/canvas";
+import { NODE_SIZE } from "@falkordb/canvas";
 import { useToast } from "@/components/ui/use-toast";
 import ForceGraph from "@/app/components/ForceGraph";
 import {
@@ -50,6 +51,9 @@ const SCHEMA_CAPTIONS: [string, boolean][] = [[SCHEMA_CAPTION_KEY, true]];
 
 /** Squares set the schema's label nodes apart from the graph's element nodes. */
 const SCHEMA_NODE_SHAPE: NodeShape = "square";
+
+/** A schema node carries a whole label name, so it gets twice the usual room. */
+const SCHEMA_NODE_SIZE = NODE_SIZE * 2;
 
 const EMPTY_SCHEMA: SchemaSnapshot = { edges: [], labelKeys: {}, relationshipKeys: {} };
 
@@ -335,6 +339,7 @@ function SchemaGraph({ cacheKey, storedMeta, controlsSlot, selectedElements, set
                 visible: true,
                 expand: false,
                 collapsed: false,
+                size: SCHEMA_NODE_SIZE,
                 data: { ...schema.labelKeys[name], [SCHEMA_CAPTION_KEY]: name === "" ? EMPTY_LABEL_DISPLAY_NAME : name },
             };
             const label: Label = { name, show: true, style: { color: UNKNOWN_COLOR }, elements: [node] };
