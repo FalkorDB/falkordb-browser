@@ -406,7 +406,9 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                 setRows={setRows}
                                 inputRef={inputRef}
                                 itemHeight={24}
-                                rowIndicator={renderLoadIndicator}
+                                // Undefined (not a null-returning callback) so the
+                                // "Status" column disappears entirely without offload.
+                                rowIndicator={supportsOffload ? renderLoadIndicator : undefined}
                             >
                                 {
                                     !isReadOnly &&

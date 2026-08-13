@@ -129,6 +129,13 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("manageGraphs");
   }
 
+  /** A column header of the Manage Graphs table, by its visible name. */
+  public manageTableHeader(name: string): Locator {
+    return this.page
+      .getByTestId("manageContent")
+      .getByRole("columnheader", { name, exact: true });
+  }
+
   // TABLE
   public get tableCheckbox(): Locator {
     return this.page.getByTestId("tableGraphsCheckbox");
