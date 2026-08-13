@@ -1,7 +1,7 @@
 'use client';
 
 import { Check, CirclePlus, Info, Pencil, Trash2, X } from "lucide-react";
-import { cn, getActiveConnectionIdGlobal, getConnectionEpoch, prepareArg, securedFetch, GraphRef, Link, Node, Value } from "@/lib/utils";
+import { cn, getActiveConnectionIdGlobal, getConnectionEpoch, prepareArg, securedFetch, GraphRef, Link, Node, SCHEMA_CAPTION_KEY, Value } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Fragment, MutableRefObject, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Switch } from "@/components/ui/switch";
@@ -24,9 +24,11 @@ interface Props {
     lastObjId: MutableRefObject<number | undefined>
     canvasRef: GraphRef
     className?: string
+    /** Schema elements have no values, only the type(s) each key holds. */
+    schema?: boolean
 }
 
-export default function DataTable({ object, type, lastObjId, canvasRef, className }: Props) {
+export default function DataTable({ object, type, lastObjId, canvasRef, className, schema }: Props) {
 
     const { graph, setGraphInfo } = useContext(GraphContext);
     const { settings: { userExperienceSettings: { captionKeysSettings: { captionsKeys } } } } = useContext(BrowserSettingsContext);
@@ -476,6 +478,39 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
 
     const iconSize = 15;
 
+    // The schema table is the same table with nothing to edit: a key holds a
+    // type instead of a value, so the value and action columns fall away.
+    if (schema) {
+        return (
+            <div className={cn("flex flex-col gap-4 bg-background rounded-lg overflow-hidden", className)}>
+                <div className="h-1 grow overflow-y-auto overflow-x-hidden">
+                    <div className="w-full grid grid-cols-[minmax(0,max-content)_minmax(0,max-content)]">
+                        <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Key</div>
+                        <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Type</div>
+                        {
+                            attributes.filter((key) => key !== SCHEMA_CAPTION_KEY).map((key) => (
+                                <Fragment key={key}>
+                                    <div
+                                        className="flex items-center px-1 border-b border-border min-h-6"
+                                        data-testid={`DataPanelAttribute${key}`}
+                                    >
+                                        <p className="w-full truncate">{key}:</p>
+                                    </div>
+                                    <div
+                                        className="flex items-center px-1 border-b border-border min-h-6"
+                                        data-testid={`DataPanelAttributeType${key}`}
+                                    >
+                                        <p className="w-full truncate">{String(object.data[key])}</p>
+                                    </div>
+                                </Fragment>
+                            ))
+                        }
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className={cn("flex flex-col gap-4 bg-background rounded-lg overflow-hidden", className)}>
             <div ref={scrollableContainerRef} className="h-1 grow overflow-y-auto overflow-x-hidden">
@@ -729,5 +764,6 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
 }
 
 DataTable.defaultProps = {
-    className: undefined
+    className: undefined,
+    schema: false
 };

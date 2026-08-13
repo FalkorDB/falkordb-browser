@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, Dispatch, SetStateAction, useContext, useCallback } from "react";
-import { GitGraph, ScrollText, Table } from "lucide-react";
+import { useEffect, Dispatch, SetStateAction, useContext, useCallback, useState } from "react";
+import { GitGraph, ScrollText, Table, Waypoints } from "lucide-react";
 import { cn, GraphRef, Tab, Label, Link, Node, Relationship, HistoryQuery } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GraphContext, ForceGraphContext } from "@/app/components/provider";
@@ -13,10 +13,13 @@ import Toolbar from "./toolbar";
 import Controls from "./controls";
 import Labels from "./labels";
 import MetadataView from "./MetadataView";
+import SchemaView from "./SchemaView";
 
 interface Props {
     selectedElements: (Node | Link)[]
     setSelectedElements: (elements?: (Node | Link)[], fromSearch?: boolean) => void
+    selectedSchemaElements: (Node | Link)[]
+    setSelectedSchemaElements: Dispatch<SetStateAction<(Node | Link)[]>>
     canvasRef: GraphRef
     handleDeleteElement: () => Promise<void>
     setLabels: Dispatch<SetStateAction<Label[]>>
@@ -35,6 +38,8 @@ interface Props {
 function GraphView({
     selectedElements,
     setSelectedElements,
+    selectedSchemaElements,
+    setSelectedSchemaElements,
     canvasRef,
     handleDeleteElement,
     setLabels,
@@ -53,6 +58,10 @@ function GraphView({
     const { graph, graphName, currentTab, setCurrentTab, isLoading, expand, setExpand } = useContext(GraphContext);
     const { setData, data, graphData, setGraphData, setViewport, viewport, dimmed, setDimmed } = useContext(ForceGraphContext);
 
+    // The Schema tab puts its own controls in this bar, but they need the state
+    // that lives inside SchemaView, so it fills the slot with a portal.
+    const [schemaControlsSlot, setSchemaControlsSlot] = useState<HTMLDivElement | null>(null);
+
     useEffect(() => {
         setRelationships([...graph.Relationships]);
         setLabels([...graph.Labels]);
@@ -62,13 +71,13 @@ function GraphView({
         if (tab === "Table") return graph.Data.length !== 0;
         if (tab === "Metadata") return historyQuery.currentQuery && historyQuery.currentQuery.metadata.length > 0 && historyQuery.currentQuery.explain.length > 0;
         if (tab === "Graph") return graph.getElements().length !== 0;
+        // The schema is derived from the graph itself, not from a query result.
+        if (tab === "Schema") return graphName !== "";
         return true;
-    }, [graph, historyQuery.currentQuery]);
+    }, [graph, graphName, historyQuery.currentQuery]);
 
     const onLabelClick = (label: Label) => {
-        const canvas = canvasRef.current;
-
-        if (!canvas) return;
+        if (!canvasRef.current) return;
 
         label.show = !label.show;
 
@@ -80,32 +89,13 @@ function GraphView({
         graph.visibleLinks(label.show);
         graph.LabelsMap.set(label.name, label);
 
-        const graphData = canvas.getGraphData();
-
-        graphData.nodes.forEach(canvasNode => {
-            const appNode = graph.NodesMap.get(canvasNode.id);
-
-            if (appNode) {
-                canvasNode.visible = appNode.visible;
-            }
-        });
-        graphData.links.forEach(canvasLink => {
-            const appLink = graph.LinksMap.get(canvasLink.id);
-
-            if (appLink) {
-                canvasLink.visible = appLink.visible;
-            }
-        });
-
-        canvas.refresh();
+        syncCanvasVisibility();
 
         setLabels([...graph.Labels]);
     };
 
     const onRelationshipClick = (relationship: Relationship) => {
-        const canvas = canvasRef.current;
-
-        if (!canvas) return;
+        if (!canvasRef.current) return;
 
         relationship.show = !relationship.show;
 
@@ -115,23 +105,53 @@ function GraphView({
 
         graph.RelationshipsMap.set(relationship.name, relationship);
 
+        syncCanvasVisibility();
+
+        setRelationships([...graph.Relationships]);
+    };
+
+    // Pushes the elements' current visibility onto the canvas copies of them.
+    const syncCanvasVisibility = () => {
+        const canvas = canvasRef.current;
+
+        if (!canvas) return;
+
         const graphData = canvas.getGraphData();
 
-        graphData.nodes.forEach(canvasNode => {
+        graphData.nodes.forEach((canvasNode) => {
             const appNode = graph.NodesMap.get(canvasNode.id);
+
             if (appNode) {
                 canvasNode.visible = appNode.visible;
             }
         });
-        graphData.links.forEach(canvasLink => {
+        graphData.links.forEach((canvasLink) => {
             const appLink = graph.LinksMap.get(canvasLink.id);
+
             if (appLink) {
                 canvasLink.visible = appLink.visible;
             }
         });
 
         canvas.refresh();
+    };
 
+    const showAllElements = () => {
+        graph.Labels.forEach((label) => {
+            label.show = true;
+            label.elements.forEach((node) => {
+                node.visible = true;
+            });
+        });
+        graph.Relationships.forEach((relationship) => {
+            relationship.show = true;
+        });
+        graph.Elements.links.forEach((link) => {
+            link.visible = true;
+        });
+
+        syncCanvasVisibility();
+        setLabels([...graph.Labels]);
         setRelationships([...graph.Relationships]);
     };
 
@@ -152,6 +172,7 @@ function GraphView({
                                 selectedElements={selectedElements}
                                 setSelectedElements={setSelectedElements}
                                 handleDeleteElement={handleDeleteElement}
+                                showAllElements={showAllElements}
                                 canvasRef={canvasRef}
                                 setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => "labels" in e) ? setIsAddEdge : undefined}
                                 setIsAddNode={setIsAddNode}
@@ -211,6 +232,19 @@ function GraphView({
                                 <ScrollText />
                             </Button>
                         </TabsTrigger>
+                        <TabsTrigger
+                            data-testid="schemaTab"
+                            asChild
+                            value="Schema"
+                        >
+                            <Button
+                                disabled={!isTabEnabled("Schema")}
+                                className="tabs-trigger"
+                                title={!isTabEnabled("Schema") ? "No Graph Selected" : "Schema"}
+                            >
+                                <Waypoints />
+                            </Button>
+                        </TabsTrigger>
                     </TabsList>
                     {
                         graph.getElements().length > 0 && currentTab === "Graph" && !isLoading &&
@@ -224,7 +258,11 @@ function GraphView({
                             />
                     }
                     {
-                        (historyQuery?.currentQuery?.metadata?.length ?? 0) > 0 &&
+                        currentTab === "Schema" &&
+                        <div ref={setSchemaControlsSlot} className="flex gap-2 items-center pointer-events-auto" />
+                    }
+                    {
+                        currentTab !== "Schema" && (historyQuery?.currentQuery?.metadata?.length ?? 0) > 0 &&
                         <>
                             <div className="h-4 w-px bg-border rounded-full" />
                             <p>Nodes: {graph.NodesMap.size}</p>
@@ -277,6 +315,13 @@ function GraphView({
                     }}
                     query={historyQuery.currentQuery}
                     fetchCount={fetchCount}
+                />
+            </TabsContent>
+            <TabsContent value="Schema" className="h-full w-full mt-0 overflow-hidden">
+                <SchemaView
+                    controlsSlot={schemaControlsSlot}
+                    selectedElements={selectedSchemaElements}
+                    setSelectedElements={setSelectedSchemaElements}
                 />
             </TabsContent>
         </Tabs>

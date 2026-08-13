@@ -7,7 +7,7 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import React, { type RefObject } from "react";
-import type { FalkorDBCanvas, Data as CanvasData } from "@falkordb/canvas";
+import type { FalkorDBCanvas, Data as CanvasData, NodeShape } from "@falkordb/canvas";
 import { signOut } from "next-auth/react";
 import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, enrichSyntaxMessage, type SyntaxErrorInfo, type HintLink } from "./cypherErrors.ts";
 import { suggestForError, findFuncArgTypo } from "./cypherSuggestions.ts";
@@ -207,7 +207,44 @@ export type TextCell = {
   onChange: (value: string) => Promise<boolean>;
 };
 
-export type Tab = "Graph" | "Table" | "Metadata";
+export type Tab = "Graph" | "Table" | "Metadata" | "Schema";
+
+/**
+ * One observed placement of a relationship type: the source label, the
+ * relationship type and the target label of at least one real edge.
+ * Unlabeled endpoints are reported as the empty string, matching the synthetic
+ * "" label `GraphInfo` uses for them.
+ */
+export type SchemaEdge = {
+  source: string;
+  relationship: string;
+  target: string;
+};
+
+/**
+ * The property keys one label or relationship type carries, mapped to the value
+ * type(s) observed for them. FalkorDB enforces no schema, so the same key can
+ * hold different types on different elements; those are joined (`"Integer | String"`).
+ * Discovered from a sample of the elements, not from all of them.
+ */
+export type SchemaPropertyKeys = Record<string, string>;
+
+/** Everything the Schema view draws, discovered with two read-only queries. */
+export type SchemaSnapshot = {
+  edges: SchemaEdge[];
+  /** Keyed by label; unlabeled nodes are under `""`. */
+  labelKeys: Record<string, SchemaPropertyKeys>;
+  /** Keyed by relationship type. */
+  relationshipKeys: Record<string, SchemaPropertyKeys>;
+};
+
+/**
+ * The canvas captions an element from its `data`, so a schema element carries
+ * its name there next to its property keys. The key is reserved rather than
+ * "label" so a real property of that name cannot be shadowed by it, and the
+ * data panel knows which entry to leave out.
+ */
+export const SCHEMA_CAPTION_KEY = "__schemaCaption";
 
 export type ReadOnlyCell = {
   value: string;
@@ -770,6 +807,24 @@ export function prepareArg(arg: string) {
 }
 
 /**
+ * Reads a panel width back out of storage, which anything can have written to.
+ * The size is applied in an animation frame, where a throw is swallowed and the
+ * panel would silently keep the wrong width, so a value that is not a usable
+ * percentage yields `undefined` and the caller falls back to its default.
+ */
+export function parsePanelSizePercent(stored: string | null | undefined): number | undefined {
+  if (!stored) return undefined;
+
+  try {
+    const parsed: unknown = JSON.parse(stored);
+
+    return typeof parsed === "number" && Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Upload a single file via XHR so the caller can render real request-body upload
  * progress (the fetch API can't report it). Mirrors securedFetch's behaviour:
  * injects X-Connection-Id, surfaces a friendly error toast, and drives the
@@ -923,6 +978,198 @@ export const getMetaStats = async (
     console.error("Failed to fetch meta stats:", error);
     return undefined;
   }
+};
+
+/**
+ * Folds a discovered `(owner, key, type)` row into an accumulator, joining the
+ * types a key was seen with. A graph without an enforced schema can hold, say,
+ * a `port` that is an Integer on one node and a String on another.
+ */
+const addSchemaPropertyKey = (
+  into: Record<string, SchemaPropertyKeys>,
+  owner: string,
+  key: string,
+  type: string,
+) => {
+  const keys = into[owner] ?? {};
+  const seen = keys[key];
+
+  keys[key] = !seen || seen === type
+    ? type
+    : [...new Set([...seen.split(" | "), type])].sort().join(" | ");
+
+  into[owner] = keys;
+};
+
+/** Orders owners and their keys so that two equal snapshots serialize equally. */
+const sortSchemaKeys = (records: Record<string, SchemaPropertyKeys>): Record<string, SchemaPropertyKeys> =>
+  Object.fromEntries(
+    Object.entries(records)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([owner, keys]) => [
+        owner,
+        Object.fromEntries(Object.entries(keys).sort(([a], [b]) => a.localeCompare(b))),
+      ]),
+  );
+
+/**
+ * How many elements of a label or relationship type are inspected for property
+ * keys. FalkorDB enforces no schema, so this is a sample rather than the truth:
+ * a key only the eleventh node of a label carries is not reported. Scanning
+ * every element of a large graph to find that out costs far more than it is
+ * worth, and a per-label scan stops after this many rows.
+ */
+const SCHEMA_KEY_SAMPLE_SIZE = 10;
+
+/**
+ * How many labels or relationship types one query covers. The query travels in
+ * the URL, so it is split into batches rather than sent as one huge UNION.
+ */
+const SCHEMA_KEY_BATCH_SIZE = 20;
+
+/** Quotes a label or relationship type for use as a pattern in a query. */
+const quoteSchemaName = (name: string) => `\`${name.replace(/`/g, "``")}\``;
+
+/** Quotes a label or relationship type for use as a returned string literal. */
+const schemaNameLiteral = (name: string) => `'${name.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+
+/**
+ * Discovers everything the Schema view draws:
+ * - every placement a relationship type has, i.e. which
+ *   (source label)-[type]->(target label) triples actually occur;
+ * - the property keys each label and each relationship type carries, with the
+ *   value type(s) they hold.
+ *
+ * Placements are exact: that query aggregates server-side and returns only the
+ * distinct combinations, so no edges are ever transferred. Property keys are
+ * sampled per label and per relationship type — see `SCHEMA_KEY_SAMPLE_SIZE`.
+ *
+ * Always issued read-only: schema discovery must never (re)create a graph.
+ */
+export const getSchema = async (
+  name: string,
+  toast: ToastFn,
+  setIndicator: (indicator: "online" | "offline") => void,
+  options?: { signal?: AbortSignal; connectionId?: string | null },
+): Promise<SchemaSnapshot | undefined> => {
+  if (!name) return undefined;
+
+  // Unlabeled endpoints are folded into the "" label so they line up with the
+  // synthetic "Empty" label the graph info panel shows.
+  const edgesQuery = `MATCH (a)-[e]->(b)
+UNWIND (CASE WHEN size(labels(a)) = 0 THEN [''] ELSE labels(a) END) AS source
+UNWIND (CASE WHEN size(labels(b)) = 0 THEN [''] ELSE labels(b) END) AS target
+RETURN DISTINCT source, type(e) AS relationship, target`;
+
+  const run = (query: string) => getSSEGraphResult(
+    `/api/graph/${prepareArg(name)}?query=${encodeURIComponent(query)}&readOnly=true`,
+    toast,
+    setIndicator,
+    { signal: options?.signal, connectionId: options?.connectionId, query },
+  ) as Promise<{ data?: unknown[] } | undefined>;
+
+  const [edgeResult, labelsResult] = await Promise.all([
+    run(edgesQuery),
+    // Labels that carry no edge still get a node in the view, so they cannot be
+    // read off the placements.
+    run("CALL db.labels() YIELD label RETURN label"),
+  ]);
+
+  if (!edgeResult || !Array.isArray(edgeResult.data)) return undefined;
+
+  const edges: SchemaEdge[] = [];
+  const seenEdges = new Set<string>();
+
+  edgeResult.data.forEach((row) => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) return;
+
+    const { source, relationship, target } = row as Record<string, unknown>;
+
+    if (
+      typeof source !== "string"
+      || typeof relationship !== "string"
+      || typeof target !== "string"
+    ) return;
+
+    const placement = `${source}\u0000${relationship}\u0000${target}`;
+
+    if (seenEdges.has(placement)) return;
+
+    seenEdges.add(placement);
+    edges.push({ source, relationship, target });
+  });
+
+  const labelNames = new Set<string>(
+    (Array.isArray(labelsResult?.data) ? labelsResult.data : [])
+      .map((row) => (row && typeof row === "object" && !Array.isArray(row)
+        ? (row as Record<string, unknown>).label
+        : undefined))
+      .filter((label): label is string => typeof label === "string"),
+  );
+
+  // Nodes with no labels are their own group, which `db.labels()` does not
+  // report. There is no index to scan for them, but the scan stops as soon as
+  // the sample is full and costs ~20ms on a graph of 100k labeled nodes.
+  labelNames.add("");
+
+  /**
+   * Runs one sampling branch per owner, batched into a handful of queries, and
+   * folds the rows into the accumulator every caller expects.
+   */
+  const collectKeys = async (owners: string[], branch: (owner: string) => string) => {
+    const into: Record<string, SchemaPropertyKeys> = {};
+    const batches: string[][] = [];
+
+    for (let i = 0; i < owners.length; i += SCHEMA_KEY_BATCH_SIZE) {
+      batches.push(owners.slice(i, i + SCHEMA_KEY_BATCH_SIZE));
+    }
+
+    const results = await Promise.all(
+      batches.map((batch) => run(batch.map(branch).join("\nUNION\n"))),
+    );
+
+    results.forEach((result) => {
+      if (!result || !Array.isArray(result.data)) return;
+
+      result.data.forEach((row) => {
+        if (!row || typeof row !== "object" || Array.isArray(row)) return;
+
+        const { owner, key, keyType } = row as Record<string, unknown>;
+
+        if (typeof owner !== "string" || typeof key !== "string" || typeof keyType !== "string") return;
+
+        addSchemaPropertyKey(into, owner, key, keyType);
+      });
+    });
+
+    return into;
+  };
+
+  const [labelKeys, relationshipKeys] = await Promise.all([
+    collectKeys([...labelNames], (label) => {
+      const match = label === ""
+        ? "MATCH (n) WHERE size(labels(n)) = 0"
+        : `MATCH (n:${quoteSchemaName(label)})`;
+
+      return `${match} WITH n LIMIT ${SCHEMA_KEY_SAMPLE_SIZE} UNWIND keys(n) AS key`
+        + ` RETURN DISTINCT ${schemaNameLiteral(label)} AS owner, key, typeOf(n[key]) AS keyType`;
+    }),
+    collectKeys([...new Set(edges.map(({ relationship }) => relationship))], (relationship) => (
+      `MATCH ()-[e:${quoteSchemaName(relationship)}]->() WITH e LIMIT ${SCHEMA_KEY_SAMPLE_SIZE} UNWIND keys(e) AS key`
+      + ` RETURN DISTINCT ${schemaNameLiteral(relationship)} AS owner, key, typeOf(e[key]) AS keyType`
+    )),
+  ]);
+
+  // FalkorDB returns the rows in no guaranteed order, so the snapshot is
+  // canonicalized: two runs over an unchanged graph have to compare equal,
+  // otherwise a refresh would look like a change and re-lay-out the view.
+  edges.sort((a, b) => (
+    a.source.localeCompare(b.source)
+    || a.relationship.localeCompare(b.relationship)
+    || a.target.localeCompare(b.target)
+  ));
+
+  return { edges, labelKeys: sortSchemaKeys(labelKeys), relationshipKeys: sortSchemaKeys(relationshipKeys) };
 };
 
 export function rgbToHSL(hex: string): string {
@@ -1149,7 +1396,7 @@ export function getQueryWithLimit(
   return [query, existingLimit];
 }
 
-export const convertToCanvasData = (graphData: GraphData): CanvasData => ({
+export const convertToCanvasData = (graphData: GraphData, shape?: NodeShape): CanvasData => ({
     nodes: graphData.nodes.map(({ id, labels, color, visible, size, data, expand }) => ({
         id,
         labels,
@@ -1157,6 +1404,7 @@ export const convertToCanvasData = (graphData: GraphData): CanvasData => ({
         visible,
         size,
         expand,
+        shape,
         data
     })),
     links: graphData.links.map(({ id, relationship, color, visible, source, target, width, fontSize, arrowSize, data }) => ({

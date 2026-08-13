@@ -20,6 +20,10 @@ export async function GET(request: Request) {
     try {
       const result = await client.list();
 
+      // The schema view derives its structure from the graph itself, so nothing
+      // writes a `<name>_schema` graph any more. Deployments upgraded from the
+      // versions that did still hold them, and they are not graphs the user
+      // picked — keep hiding them rather than re-exposing them here.
       const graphNames = result.filter((name) => !name.endsWith("_schema"));
 
       return NextResponse.json({ opts: graphNames }, { status: 200, headers: getCorsHeaders(request) });
