@@ -108,6 +108,23 @@ test.describe("Schema View Tests", () => {
         expect(await schemaView.getSchemaLabels()).toEqual(EXPECTED_LABELS);
     });
 
+    test("@admin check schema view counts its own elements and reports no run time", async () => {
+        await apiCalls.runQuery(GRAPH_NAME, MESSY_GRAPH_QUERY);
+        const schemaView = await browser.createNewPage(SchemaView, urls.graphUrl);
+        await schemaView.selectGraphByName(GRAPH_NAME);
+        await schemaView.insertQuery("MATCH (n)-[e]-(m) RETURN n, e, m");
+        await schemaView.clickRunQuery();
+        expect(await schemaView.isRunTimeVisible()).toBe(true);
+
+        await schemaView.clickSchemaTab();
+        await schemaView.waitForSchemaTripleCount(EXPECTED_TRIPLES.length);
+        expect(await schemaView.getSchemaCounts()).toEqual({
+            labels: EXPECTED_LABELS.length,
+            relationships: EXPECTED_TRIPLES.length,
+        });
+        expect(await schemaView.isRunTimeVisible()).toBe(false);
+    });
+
     test("@admin check schema view shows every relationship placement exactly once", async () => {
         await apiCalls.runQuery(GRAPH_NAME, MESSY_GRAPH_QUERY);
         const schemaView = await browser.createNewPage(SchemaView, urls.graphUrl);
@@ -115,6 +132,60 @@ test.describe("Schema View Tests", () => {
         await schemaView.clickSchemaTab();
         await schemaView.waitForSchemaTripleCount(EXPECTED_TRIPLES.length);
         expect(await schemaView.getSchemaTripleStrings()).toEqual(EXPECTED_TRIPLES);
+    });
+
+    test("@admin check schema view legend hides a label together with its placements", async () => {
+        await apiCalls.runQuery(GRAPH_NAME, MESSY_GRAPH_QUERY);
+        const schemaView = await browser.createNewPage(SchemaView, urls.graphUrl);
+        await schemaView.selectGraphByName(GRAPH_NAME);
+        await schemaView.clickSchemaTab();
+        await schemaView.waitForSchemaTripleCount(EXPECTED_TRIPLES.length);
+
+        await schemaView.toggleSchemaLabel("City");
+        expect(await schemaView.getVisibleSchemaLabels()).toEqual(
+            EXPECTED_LABELS.filter((label) => label !== "City")
+        );
+        expect(await schemaView.getVisibleSchemaTripleStrings()).toEqual(
+            EXPECTED_TRIPLES.filter((triple) => !triple.includes("City"))
+        );
+
+        await schemaView.toggleSchemaLabel("City");
+        expect(await schemaView.getVisibleSchemaLabels()).toEqual(EXPECTED_LABELS);
+        expect(await schemaView.getVisibleSchemaTripleStrings()).toEqual(EXPECTED_TRIPLES);
+    });
+
+    test("@admin check schema view legend hides a relationship type", async () => {
+        await apiCalls.runQuery(GRAPH_NAME, MESSY_GRAPH_QUERY);
+        const schemaView = await browser.createNewPage(SchemaView, urls.graphUrl);
+        await schemaView.selectGraphByName(GRAPH_NAME);
+        await schemaView.clickSchemaTab();
+        await schemaView.waitForSchemaTripleCount(EXPECTED_TRIPLES.length);
+
+        await schemaView.toggleSchemaRelationship("KNOWS");
+        // Only the placements go — the labels they connect stay on screen.
+        expect(await schemaView.getVisibleSchemaTripleStrings()).toEqual(
+            EXPECTED_TRIPLES.filter((triple) => !triple.includes("KNOWS"))
+        );
+        expect(await schemaView.getVisibleSchemaLabels()).toEqual(EXPECTED_LABELS);
+
+        await schemaView.toggleSchemaRelationship("KNOWS");
+        expect(await schemaView.getVisibleSchemaTripleStrings()).toEqual(EXPECTED_TRIPLES);
+    });
+
+    test("@admin check schema view show all brings back what the legend hid", async () => {
+        await apiCalls.runQuery(GRAPH_NAME, MESSY_GRAPH_QUERY);
+        const schemaView = await browser.createNewPage(SchemaView, urls.graphUrl);
+        await schemaView.selectGraphByName(GRAPH_NAME);
+        await schemaView.clickSchemaTab();
+        await schemaView.waitForSchemaTripleCount(EXPECTED_TRIPLES.length);
+
+        await schemaView.toggleSchemaLabel("City");
+        await schemaView.toggleSchemaRelationship("KNOWS");
+        expect(await schemaView.getVisibleSchemaLabels()).not.toEqual(EXPECTED_LABELS);
+
+        await schemaView.clickSchemaShowAll();
+        expect(await schemaView.getVisibleSchemaLabels()).toEqual(EXPECTED_LABELS);
+        expect(await schemaView.getVisibleSchemaTripleStrings()).toEqual(EXPECTED_TRIPLES);
     });
 
     test("@admin check schema view places one relationship type between several label pairs", async () => {
@@ -141,7 +212,7 @@ test.describe("Schema View Tests", () => {
         expect(triples).toContainEqual({ source: "Company", relationship: "OWNS", target: "Company" });
     });
 
-    test("@admin check schema view refresh picks up a newly added placement", async () => {
+    test("@admin check schema view picks up a newly added placement when the tab is reopened", async () => {
         await apiCalls.runQuery(GRAPH_NAME, MESSY_GRAPH_QUERY);
         const schemaView = await browser.createNewPage(SchemaView, urls.graphUrl);
         await schemaView.selectGraphByName(GRAPH_NAME);
@@ -153,12 +224,13 @@ test.describe("Schema View Tests", () => {
             "MATCH (c:Company {name: 'c1'}), (p:Person {name: 'p1'}) CREATE (c)-[:KNOWS]->(p)"
         );
 
-        await schemaView.clickSchemaRefresh();
+        await schemaView.clickGraphTab();
+        await schemaView.clickSchemaTab();
         await schemaView.waitForSchemaTripleCount(EXPECTED_TRIPLES.length + 1);
         expect(await schemaView.getSchemaTripleStrings()).toContain("Company-[KNOWS]->Person");
     });
 
-    test("@admin check schema view refresh keeps node positions and the viewport", async () => {
+    test("@admin check schema view keeps node positions when a placement is added", async () => {
         await apiCalls.runQuery(GRAPH_NAME, MESSY_GRAPH_QUERY);
         const schemaView = await browser.createNewPage(SchemaView, urls.graphUrl);
         await schemaView.selectGraphByName(GRAPH_NAME);
@@ -169,16 +241,18 @@ test.describe("Schema View Tests", () => {
         const positionsBefore = await schemaView.getSchemaNodePositions();
         const viewportBefore = await schemaView.getSchemaViewport();
 
-        // A new placement between labels that are already on screen: the refresh
+        // A new placement between labels that are already on screen: the refetch
         // has real work to do, so the assertion can't pass by simply reading the
-        // pre-refresh canvas.
+        // previous canvas.
         await apiCalls.runQuery(
             GRAPH_NAME,
             "MATCH (c:Company {name: 'c1'}), (p:Person {name: 'p1'}) CREATE (c)-[:KNOWS]->(p)"
         );
 
-        await schemaView.clickSchemaRefresh();
+        await schemaView.clickGraphTab();
+        await schemaView.clickSchemaTab();
         await schemaView.waitForSchemaTripleCount(EXPECTED_TRIPLES.length + 1);
+        await schemaView.waitForSchemaToSettle();
 
         const positionsAfter = await schemaView.getSchemaNodePositions();
         expect(Object.keys(positionsAfter).sort()).toEqual(EXPECTED_LABELS);
@@ -314,5 +388,44 @@ test.describe("Schema View Tests", () => {
             age: "Integer | String",
             nickname: "String",
         });
+    });
+
+    test("@admin check schema view details panel is restored when returning to the tab", async () => {
+        await apiCalls.runQuery(GRAPH_NAME, MESSY_GRAPH_QUERY);
+        const schemaView = await browser.createNewPage(SchemaView, urls.graphUrl);
+        await schemaView.selectGraphByName(GRAPH_NAME);
+        await schemaView.clickSchemaTab();
+        await schemaView.waitForSchemaTripleCount(EXPECTED_TRIPLES.length);
+
+        await schemaView.selectSchemaElementBySearch("Person");
+        expect(await schemaView.getSchemaDataPanelName()).toBe("Person");
+
+        // The graph has no selection of its own, so its panel stays closed.
+        await schemaView.clickGraphTab();
+        expect(await schemaView.isSchemaDataPanelVisible()).toBe(false);
+
+        await schemaView.clickSchemaTab();
+        expect(await schemaView.getSchemaDataPanelName()).toBe("Person");
+    });
+
+    test("@admin check schema view keeps its state per graph tab", async () => {
+        await apiCalls.runQuery(GRAPH_NAME, MESSY_GRAPH_QUERY);
+        const schemaView = await browser.createNewPage(SchemaView, urls.graphUrl);
+        await schemaView.selectGraphByName(GRAPH_NAME);
+        await schemaView.clickSchemaTab();
+        await schemaView.waitForSchemaTripleCount(EXPECTED_TRIPLES.length);
+        await schemaView.waitForSchemaToSettle();
+
+        await schemaView.selectSchemaElementBySearch("Person");
+        const positions = await schemaView.getSchemaNodePositions();
+
+        // A fresh tab has a schema of its own — here, none at all.
+        await schemaView.addStripTab();
+        expect(await schemaView.isSchemaDataPanelVisible()).toBe(false);
+
+        await schemaView.selectStripTab(GRAPH_NAME);
+        await schemaView.waitForSchemaTripleCount(EXPECTED_TRIPLES.length);
+        expect(await schemaView.getSchemaDataPanelName()).toBe("Person");
+        expect(await schemaView.getSchemaNodePositions()).toEqual(positions);
     });
 });

@@ -2,17 +2,19 @@
 
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, RefreshCcw } from "lucide-react";
-import type { FalkorDBCanvas, LayoutMode, ViewportState } from "@falkordb/canvas";
+import { Loader2 } from "lucide-react";
+import type { FalkorDBCanvas, LayoutMode, NodeShape, ViewportState } from "@falkordb/canvas";
 import { useToast } from "@/components/ui/use-toast";
 import ForceGraph from "@/app/components/ForceGraph";
 import {
+    CANVAS_AUTO_ZOOM_DELAY,
     CanvasLayout,
     GraphData,
     Label,
     Link,
     Node,
     Relationship,
+    SCHEMA_CAPTION_KEY,
     SchemaSnapshot,
     captureCanvasLayout,
     cn,
@@ -21,12 +23,14 @@ import {
     getSchema,
     isAbortError,
 } from "@/lib/utils";
+import { normalizeDirection, normalizeLayout, type SchemaViewMeta } from "@/lib/useGraphTabs";
 import {
     BrowserSettingsContext,
     ConnectionContext,
     ForceGraphContext,
     GraphContext,
     GraphInfoContext,
+    GraphTabsContext,
     IndicatorContext,
 } from "../components/provider";
 import { Graph } from "../api/graph/model";
@@ -34,7 +38,6 @@ import Button from "../components/ui/Button";
 import Controls from "./controls";
 import Labels from "./labels";
 import Toolbar from "./toolbar";
-import SchemaDataPanel from "./SchemaDataPanel";
 
 /** Shown in place of the synthetic "" label FalkorDB reports for unlabeled nodes. */
 const EMPTY_LABEL_DISPLAY_NAME = "Empty";
@@ -43,17 +46,43 @@ const EMPTY_LABEL_DISPLAY_NAME = "Empty";
 const UNKNOWN_COLOR = "#A3A3A3";
 
 /** A schema node stands for a label, so that is what captions it. */
-const SCHEMA_CAPTIONS: [string, boolean][] = [["label", true]];
+const SCHEMA_CAPTIONS: [string, boolean][] = [[SCHEMA_CAPTION_KEY, true]];
+
+/** Squares set the schema's label nodes apart from the graph's element nodes. */
+const SCHEMA_NODE_SHAPE: NodeShape = "square";
 
 const EMPTY_SCHEMA: SchemaSnapshot = { edges: [], labelKeys: {}, relationshipKeys: {} };
 
+/** A tab that has never shown its schema has nothing stored for it. */
+const EMPTY_META: SchemaViewMeta = {};
+
+/**
+ * Identifies a schema element by what it stands for rather than by its id: ids
+ * are handed out by this view and start over on a reload, but a label name and
+ * a (source, type, target) triple mean the same thing in every session.
+ */
+const schemaElementKey = (graph: Graph, element: Node | Link) => {
+    if (!("source" in element)) return `l:${element.labels[0] ?? ""}`;
+
+    const source = graph.NodesMap.get(element.source)?.labels[0] ?? "";
+    const target = graph.NodesMap.get(element.target)?.labels[0] ?? "";
+
+    return `r:${source}|${element.relationship}|${target}`;
+};
+
+/** The element a stored key stands for, or nothing when the schema no longer has it. */
+const findSchemaElement = (graph: Graph, key: string | undefined) => {
+    if (!key) return undefined;
+
+    return graph.getElements().find((element) => schemaElementKey(graph, element) === key);
+};
+
 /**
  * Everything needed to put the view back exactly as the user left it. Kept
- * outside React because switching tabs unmounts the whole view. One slot is
- * enough: only one schema is on screen at a time.
+ * outside React because switching tabs unmounts the whole view.
  */
 type SchemaCache = {
-    /** Connection + graph the cache belongs to. */
+    /** Connection + graph tab + graph the cache belongs to. */
     key: string;
     schema: SchemaSnapshot;
     /** Label ids have to survive a remount, see `labelIdsRef` below. */
@@ -72,9 +101,28 @@ type SchemaCache = {
     expand: boolean;
 };
 
-let cache: SchemaCache | undefined;
+/**
+ * One entry per graph tab, so each tab remembers its own schema. Bounded and
+ * least-recently-used, since tab ids are never reused and a closed tab would
+ * otherwise leave its entry behind forever.
+ */
+const cache = new Map<string, SchemaCache>();
 
-const readCache = (key: string) => (cache?.key === key ? cache : undefined);
+const CACHE_LIMIT = 12;
+
+const readCache = (key: string) => cache.get(key);
+
+const writeCache = (key: string, entry: SchemaCache) => {
+    // Re-inserting moves the entry to the end, making the first one the oldest.
+    cache.delete(key);
+    cache.set(key, entry);
+
+    if (cache.size > CACHE_LIMIT) {
+        const oldest = cache.keys().next();
+
+        if (!oldest.done) cache.delete(oldest.value);
+    }
+};
 
 /**
  * State that has to survive a tab switch. The cache is written as the value is
@@ -115,28 +163,56 @@ const isSameSchema = (a: SchemaSnapshot, b: SchemaSnapshot) => JSON.stringify(a)
  * rather than real elements. So the details panel lists the property keys of a
  * type and the value type they hold instead of values, and nothing is editable.
  */
-export default function SchemaView({ controlsSlot }: { controlsSlot: HTMLElement | null }) {
+type SchemaViewProps = {
+    /** Where GraphView wants the controls rendered: in the tab bar, next to its own. */
+    controlsSlot: HTMLElement | null;
+    selectedElements: (Node | Link)[];
+    setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>;
+};
+
+export default function SchemaView({ controlsSlot, selectedElements, setSelectedElements }: SchemaViewProps) {
     const { graphName } = useContext(GraphContext);
     const { activeConnectionId } = useContext(ConnectionContext);
+    const { activeTabId, tabs } = useContext(GraphTabsContext);
 
-    // A different graph is a different schema. Remounting is the simplest way to
-    // reset every piece of view state at once, and it lets all of it be
-    // initialised straight from the cache.
-    const key = `${activeConnectionId ?? ""}:${graphName}`;
+    // A different graph tab is a different schema view, and a different graph is
+    // a different schema. Remounting is the simplest way to reset every piece of
+    // view state at once, and it lets all of it be initialised straight from the
+    // cache.
+    const key = `${activeConnectionId ?? ""}:${activeTabId}:${graphName}`;
 
-    return <SchemaGraph key={key} cacheKey={key} controlsSlot={controlsSlot} />;
+    // The cache only lives as long as the page does. What the tab wrote to
+    // storage is the fallback for a reload, where there is no cache to restore
+    // from — it holds the view state, not the schema itself.
+    const storedMeta = tabs.find(({ id }) => id === activeTabId)?.schema ?? EMPTY_META;
+
+    return (
+        <SchemaGraph
+            key={key}
+            cacheKey={key}
+            storedMeta={storedMeta}
+            controlsSlot={controlsSlot}
+            selectedElements={selectedElements}
+            setSelectedElements={setSelectedElements}
+        />
+    );
 }
 
-function SchemaGraph({ cacheKey, controlsSlot }: { cacheKey: string, controlsSlot: HTMLElement | null }) {
+function SchemaGraph({ cacheKey, storedMeta, controlsSlot, selectedElements, setSelectedElements }: SchemaViewProps & { cacheKey: string, storedMeta: SchemaViewMeta }) {
     const { graph, graphName, isLoading: isGraphLoading } = useContext(GraphContext);
     const { graphInfoVersion } = useContext(GraphInfoContext);
     const { setIndicator } = useContext(IndicatorContext);
+    const { setSchemaMeta } = useContext(GraphTabsContext);
     const connection = useContext(ConnectionContext);
     const browserSettings = useContext(BrowserSettingsContext);
 
     const { toast } = useToast();
 
     const restored = readCache(cacheKey);
+    // Only the reload path reads the tab: with a cache entry in hand, that entry
+    // is both newer and more complete.
+    const stored = restored ? EMPTY_META : storedMeta;
+    const storedLayout = normalizeLayout(stored.layout);
 
     const canvasRef = useRef<FalkorDBCanvas | null>(null);
 
@@ -158,24 +234,21 @@ function SchemaGraph({ cacheKey, controlsSlot }: { cacheKey: string, controlsSlo
             expand: true,
         };
 
-        cache = { ...base, ...patch, key: cacheKey };
+        writeCache(cacheKey, { ...base, ...patch, key: cacheKey });
     }, [cacheKey]);
-
     const [schema, setSchema] = usePersisted("schema", restored?.schema ?? EMPTY_SCHEMA, persist);
     const [hiddenLabels, setHiddenLabels] = usePersisted("hiddenLabels", restored?.hiddenLabels ?? [], persist);
     const [hiddenRelationships, setHiddenRelationships] = usePersisted("hiddenRelationships", restored?.hiddenRelationships ?? [], persist);
     const [graphData, setGraphData] = usePersisted("graphData", restored?.graphData, persist);
-    const [viewport, setViewport] = usePersisted("viewport", restored?.viewport, persist);
-    const [layout, setLayout] = usePersisted("layout", restored?.layout ?? "force", persist);
-    const [direction, setDirection] = usePersisted("direction", restored?.direction ?? "", persist);
-    const [animation, setAnimation] = usePersisted("animation", restored?.animation ?? false, persist);
-    const [pinned, setPinned] = usePersisted("pinned", restored?.pinned ?? false, persist);
-    const [dimmed, setDimmed] = usePersisted("dimmed", restored?.dimmed ?? true, persist);
-    const [expand, setExpand] = usePersisted("expand", restored?.expand ?? true, persist);
+    const [viewport, setViewport] = usePersisted("viewport", restored?.viewport ?? stored.viewport, persist);
+    const [layout, setLayout] = usePersisted("layout", restored?.layout ?? storedLayout, persist);
+    const [direction, setDirection] = usePersisted("direction", restored?.direction ?? normalizeDirection(storedLayout, stored.direction), persist);
+    const [animation, setAnimation] = usePersisted("animation", restored?.animation ?? stored.animation ?? false, persist);
+    const [pinned, setPinned] = usePersisted("pinned", restored?.pinned ?? stored.pinned ?? false, persist);
+    const [dimmed, setDimmed] = usePersisted("dimmed", restored?.dimmed ?? stored.dimmed ?? true, persist);
+    const [expand, setExpand] = usePersisted("expand", restored?.expand ?? stored.expand ?? true, persist);
 
     const [isLoading, setIsLoading] = useState(false);
-    const [refreshKey, setRefreshKey] = useState(0);
-    const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
     const [labels, setLabels] = useState<Label[]>([]);
     const [relationships, setRelationships] = useState<Relationship[]>([]);
 
@@ -187,8 +260,14 @@ function SchemaGraph({ cacheKey, controlsSlot }: { cacheKey: string, controlsSlo
         next: restored?.nextLabelId ?? 0,
     });
 
-    // Discover the schema. Re-runs when the graph changes or the user asks for a
-    // refresh; a superseded request is dropped silently.
+    // The stored selection is only ever put back once, when the schema first
+    // arrives: after that the page's selection is the live one, and re-applying
+    // a stored key would fight the user clearing it.
+    const storedSelectedRef = useRef(stored.selected);
+    const selectionRestoredRef = useRef(false);
+
+    // Discover the schema. Re-runs when the graph changes; a superseded request
+    // is dropped silently.
     useEffect(() => {
         if (!graphName) return undefined;
 
@@ -215,7 +294,7 @@ function SchemaGraph({ cacheKey, controlsSlot }: { cacheKey: string, controlsSlo
             });
 
         return () => controller.abort();
-    }, [graphName, refreshKey, toast, setIndicator, setSchema]);
+    }, [graphName, toast, setIndicator, setSchema]);
 
     // Only the set of labels decides when the graph is rebuilt from the graph
     // info side. Colors are applied in place further down, so a poll never
@@ -256,9 +335,7 @@ function SchemaGraph({ cacheKey, controlsSlot }: { cacheKey: string, controlsSlo
                 visible: true,
                 expand: false,
                 collapsed: false,
-                // The caption key is written last so a property that happens to
-                // be called "label" cannot take the caption over.
-                data: { ...schema.labelKeys[name], label: name === "" ? EMPTY_LABEL_DISPLAY_NAME : name },
+                data: { ...schema.labelKeys[name], [SCHEMA_CAPTION_KEY]: name === "" ? EMPTY_LABEL_DISPLAY_NAME : name },
             };
             const label: Label = { name, show: true, style: { color: UNKNOWN_COLOR }, elements: [node] };
 
@@ -317,6 +394,11 @@ function SchemaGraph({ cacheKey, controlsSlot }: { cacheKey: string, controlsSlo
     // an effect here would only get to act after the canvas had already re-laid
     // the graph out.
     const renderedGraphRef = useRef(schemaGraph);
+    // A restored viewport only reaches the canvas for good once the zoomToFit
+    // that `setData` schedules has been overridden. Until then the canvas still
+    // reports the fit, so reading the camera back would save the very frame the
+    // restore is undoing.
+    const restorePendingUntilRef = useRef(graphData ? Date.now() + CANVAS_AUTO_ZOOM_DELAY : 0);
 
     if (renderedGraphRef.current !== schemaGraph) {
         renderedGraphRef.current = schemaGraph;
@@ -326,18 +408,61 @@ function SchemaGraph({ cacheKey, controlsSlot }: { cacheKey: string, controlsSlo
         const positions = canvas ? captureCanvasLayout(canvas)?.positions : undefined;
 
         if (canvas && positions?.length) {
-            setViewport(canvas.getViewport());
-            setGraphData({ data: convertToCanvasData(schemaGraph.Elements), positions });
+            if (Date.now() >= restorePendingUntilRef.current) setViewport(canvas.getViewport());
+
+            restorePendingUntilRef.current = Date.now() + CANVAS_AUTO_ZOOM_DELAY;
+            setGraphData({ data: convertToCanvasData(schemaGraph.Elements, SCHEMA_NODE_SHAPE), positions });
         }
     }
 
     // A rebuild replaces every element object, so anything holding the old ones
-    // has to be re-derived.
+    // has to be re-derived. The selection outlives this view (the panel it feeds
+    // is the page's), so it is re-resolved by id instead of being dropped.
     useEffect(() => {
-        setSelectedElements([]);
+        // After a reload the page has no selection to re-resolve, so the tab's
+        // own — stored by name, since the ids above are handed out afresh — is
+        // put back instead. Once, and only once the schema has actually arrived.
+        const built = schemaGraph.getElements().length !== 0;
+        const restoredSelection = !selectionRestoredRef.current && built
+            ? findSchemaElement(schemaGraph, storedSelectedRef.current)
+            : undefined;
+
+        if (built) selectionRestoredRef.current = true;
+
+        setSelectedElements((prev) => {
+            const resolved = prev
+                .map((element) => ("source" in element
+                    ? schemaGraph.LinksMap.get(element.id)
+                    : schemaGraph.NodesMap.get(element.id)))
+                .filter((element): element is Node | Link => !!element);
+
+            if (resolved.length === 0 && restoredSelection) return [restoredSelection];
+
+            return resolved.length === prev.length && resolved.every((e, i) => e === prev[i])
+                ? prev
+                : resolved;
+        });
         setLabels([...schemaGraph.Labels]);
         setRelationships([...schemaGraph.Relationships]);
-    }, [schemaGraph]);
+    }, [schemaGraph, setSelectedElements]);
+
+    // The tab is what remembers this view across a reload, and this view is
+    // unmounted whenever it is not the one on screen — so it hands its state
+    // over as it changes rather than being asked for it when the tab is saved.
+    useEffect(() => {
+        setSchemaMeta({
+            viewport,
+            selected: selectedElements.length === 1
+                ? schemaElementKey(schemaGraph, selectedElements[0])
+                : undefined,
+            layout,
+            direction,
+            animation,
+            pinned,
+            dimmed,
+            expand,
+        });
+    }, [setSchemaMeta, schemaGraph, selectedElements, viewport, layout, direction, animation, pinned, dimmed, expand]);
 
     // Colors and visibility never change the graph's shape, so they are applied
     // in place instead of costing a re-layout.
@@ -358,15 +483,20 @@ function SchemaGraph({ cacheKey, controlsSlot }: { cacheKey: string, controlsSlo
 
         schemaGraph.Relationships.forEach((relationship) => {
             const color = infoRelationships.get(relationship.name)?.style.color ?? UNKNOWN_COLOR;
+            const show = !hiddenRelationships.includes(relationship.name);
 
             relationship.style.color = color;
-            relationship.show = !hiddenRelationships.includes(relationship.name);
+            relationship.show = show;
             relationship.elements.forEach((link) => {
                 link.color = color;
+                // Both ends have to be on screen too — a link to a hidden label
+                // would otherwise dangle. Derived rather than toggled, because
+                // this effect applies the whole state at once.
+                link.visible = show
+                    && !!schemaGraph.NodesMap.get(link.source)?.visible
+                    && !!schemaGraph.NodesMap.get(link.target)?.visible;
             });
         });
-
-        schemaGraph.visibleLinks(true);
 
         setLabels([...schemaGraph.Labels]);
         setRelationships([...schemaGraph.Relationships]);
@@ -412,9 +542,14 @@ function SchemaGraph({ cacheKey, controlsSlot }: { cacheKey: string, controlsSlo
 
     const handleSelect = useCallback((elements?: (Node | Link)[]) => {
         setSelectedElements(elements ?? []);
-    }, []);
+    }, [setSelectedElements]);
 
-    const handleRefresh = useCallback(() => setRefreshKey((prev) => prev + 1), []);
+    // Showing everything again is the same thing the legend does, which is also
+    // what keeps it across a tab switch.
+    const showAllElements = useCallback(() => {
+        setHiddenLabels([]);
+        setHiddenRelationships([]);
+    }, [setHiddenLabels, setHiddenRelationships]);
 
     // The schema is derived, not edited: there is nothing to add or delete.
     const handleDeleteElement = useCallback(async () => { }, []);
@@ -463,7 +598,6 @@ function SchemaGraph({ cacheKey, controlsSlot }: { cacheKey: string, controlsSlo
         },
     }), [browserSettings]);
 
-    const selected = selectedElements[selectedElements.length - 1];
     const isEmpty = schemaGraph.getElements().length === 0;
     const hasLegend = labels.length !== 0 || relationships.length !== 0;
 
@@ -488,15 +622,17 @@ function SchemaGraph({ cacheKey, controlsSlot }: { cacheKey: string, controlsSlo
                                         selectedElements={selectedElements}
                                     />
                                     <div className="h-4 w-px bg-border rounded-full" />
-                                    <Button
-                                        data-testid="schemaRefresh"
-                                        className="p-1 rounded-md hover:bg-secondary"
-                                        title="Refresh schema"
-                                        disabled={!graphName || isLoading}
-                                        onClick={handleRefresh}
-                                    >
-                                        <RefreshCcw size={16} />
-                                    </Button>
+                                    {
+                                        // The schema is derived, not queried, so it
+                                        // counts labels and placements and has no
+                                        // run time to report.
+                                        !isEmpty &&
+                                        <>
+                                            <p data-testid="schemaLabelsCount">Labels: {schemaGraph.NodesMap.size}</p>
+                                            <div className="h-4 w-px bg-border rounded-full" />
+                                            <p data-testid="schemaRelationshipsCount">Relationships: {schemaGraph.LinksMap.size}</p>
+                                        </>
+                                    }
                                 </div>,
                                 controlsSlot
                             )
@@ -510,6 +646,7 @@ function SchemaGraph({ cacheKey, controlsSlot }: { cacheKey: string, controlsSlo
                                     selectedElements={selectedElements}
                                     setSelectedElements={handleSelect}
                                     handleDeleteElement={handleDeleteElement}
+                                    showAllElements={showAllElements}
                                     canvasRef={canvasRef}
                                     setIsAddNode={noop}
                                     setExpand={setExpand}
@@ -533,20 +670,6 @@ function SchemaGraph({ cacheKey, controlsSlot }: { cacheKey: string, controlsSlo
                                 {graphName ? "This graph has no labels yet" : "Select a graph to see its schema"}
                             </p>
                         }
-                        {
-                            selected &&
-                            <div className="absolute top-14 right-2 bottom-12 w-[320px] z-20 pointer-events-auto">
-                                <SchemaDataPanel
-                                    object={selected}
-                                    keys={
-                                        "source" in selected
-                                            ? schema.relationshipKeys[selected.relationship] ?? {}
-                                            : schema.labelKeys[selected.labels[0]] ?? {}
-                                    }
-                                    onClose={() => setSelectedElements([])}
-                                />
-                            </div>
-                        }
                         <ForceGraph
                             graph={schemaGraph}
                             data={schemaGraph.Elements}
@@ -561,6 +684,7 @@ function SchemaGraph({ cacheKey, controlsSlot }: { cacheKey: string, controlsSlo
                             setViewport={setViewport}
                             dimmed={dimmed}
                             disableExpand
+                            nodeShape={SCHEMA_NODE_SHAPE}
                             testHookName="schema"
                             testId="schemaCanvasWrapper"
                         />

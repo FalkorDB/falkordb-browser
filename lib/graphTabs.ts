@@ -2,13 +2,14 @@ import type { HierarchyDirection, LayoutMode, RadialDirection, ViewportState } f
 import type { Tab } from "./utils";
 
 /**
- * The parts of a tab that live on the canvas rather than in React state, so
- * they have to be sampled at write time instead of mirrored on every render.
+ * The parts of a canvas view that live on the canvas rather than in React
+ * state, so they have to be sampled at write time instead of mirrored on every
+ * render. The graph view and the schema view each keep their own copy.
  */
-export type GraphTabMeta = {
-    /** Zoom and center, so a rebuilt tab lands where the user left it. */
+export type ViewTabMeta = {
+    /** Zoom and center, so a rebuilt view lands where the user left it. */
     viewport?: ViewportState;
-    /** `n:<id>` / `e:<id>`, with a trailing `:s` when the pick came from search. */
+    /** The picked element, in whatever form the view can resolve it again. */
     selected?: string;
     /** Canvas layout mode, and the direction it is arranged in. */
     layout?: string;
@@ -19,12 +20,28 @@ export type GraphTabMeta = {
     dimmed?: boolean;
     /** Toolbar search/filter panel open. */
     expand?: boolean;
+};
+
+/** What only the graph view has: the graph info side panel and chat. */
+export type GraphViewMeta = ViewTabMeta & {
     /** Graph info side panel expanded. */
     panelOpen?: boolean;
     /** Name of the label whose style panel is open inside the graph info panel. */
     customizing?: string;
     /** Chat panel open. Its messages are keyed by tab id + graph name. */
     chatOpen?: boolean;
+};
+
+/**
+ * The schema view is derived from the graph, so it has no query, no results and
+ * no graph info of its own — only the view state it shares with the graph.
+ */
+export type SchemaViewMeta = ViewTabMeta;
+
+/** Everything a tab remembers, split by the view it belongs to. */
+export type GraphTabMeta = {
+    graph: GraphViewMeta;
+    schema: SchemaViewMeta;
 };
 /**
  * The serializable part of a working context — what the tab strip shows and
@@ -124,6 +141,8 @@ export const createTab = (): GraphTab => ({
     graphName: "",
     query: "",
     view: "Graph",
+    graph: {},
+    schema: {},
 });
 
 /**
@@ -134,7 +153,10 @@ export const createTab = (): GraphTab => ({
  * panel renders in place of the graph info label list, so restoring it hides
  * that list behind a panel for a label the reloaded graph may not even have.
  */
-export const forStorage = ({ customizing, ...tab }: GraphTab): GraphTab => tab;
+export const forStorage = ({ graph, ...tab }: GraphTab): GraphTab => {
+    const { customizing, ...rest } = graph;
+    return { ...tab, graph: rest };
+};
 
 const isViewport = (value: unknown): value is ViewportState => {
     if (typeof value !== "object" || value === null) return false;
@@ -157,22 +179,45 @@ const asString = (value: unknown): string | undefined => (typeof value === "stri
 
 const asBoolean = (value: unknown): boolean | undefined => (typeof value === "boolean" ? value : undefined);
 
-/** Drops metadata that did not survive storage intact, keeping the tab usable. */
-const normalizeTab = (tab: GraphTab): GraphTab => ({
-    ...tab,
-    viewport: isViewport(tab.viewport) ? tab.viewport : undefined,
-    selected: asString(tab.selected),
-    layout: asString(tab.layout),
-    direction: asString(tab.direction),
-    animation: asBoolean(tab.animation),
-    pinned: asBoolean(tab.pinned),
-    dimmed: asBoolean(tab.dimmed),
-    expand: asBoolean(tab.expand),
-    panelOpen: asBoolean(tab.panelOpen),
-    customizing: asString(tab.customizing),
-    chatOpen: asBoolean(tab.chatOpen),
-    name: asString(tab.name),
-});
+/** Drops view metadata that did not survive storage intact. */
+const normalizeViewMeta = (value: unknown): ViewTabMeta => {
+    const meta = (typeof value === "object" && value !== null ? value : {}) as Partial<ViewTabMeta>;
+
+    return {
+        viewport: isViewport(meta.viewport) ? meta.viewport : undefined,
+        selected: asString(meta.selected),
+        layout: asString(meta.layout),
+        direction: asString(meta.direction),
+        animation: asBoolean(meta.animation),
+        pinned: asBoolean(meta.pinned),
+        dimmed: asBoolean(meta.dimmed),
+        expand: asBoolean(meta.expand),
+    };
+};
+
+/**
+ * Drops metadata that did not survive storage intact, keeping the tab usable.
+ * A strip written before the metadata was split per view is flat, so the tab
+ * itself doubles as the graph view's metadata.
+ */
+const normalizeTab = (tab: GraphTab): GraphTab => {
+    const graph = (tab.graph ?? tab) as Partial<GraphViewMeta>;
+
+    return {
+        id: tab.id,
+        graphName: tab.graphName,
+        query: tab.query,
+        view: tab.view,
+        name: asString(tab.name),
+        graph: {
+            ...normalizeViewMeta(graph),
+            panelOpen: asBoolean(graph.panelOpen),
+            customizing: asString(graph.customizing),
+            chatOpen: asBoolean(graph.chatOpen),
+        },
+        schema: normalizeViewMeta(tab.schema),
+    };
+};
 
 /**
  * Reads a stored strip back, dropping entries that are not usable tabs and

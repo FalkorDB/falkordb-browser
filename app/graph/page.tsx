@@ -1,17 +1,19 @@
 'use client';
 
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { cn, convertToCanvasData, getActiveConnectionIdGlobal, getConnectionEpoch, getMemoryUsage, getMetaStats, getSSEGraphResult, isAbortError, isTwoNodes, Link, MemoryValue, Node, prepareArg, securedFetch, Value } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamicImport from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import { Graph, GraphInfo } from "../api/graph/model";
-import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ForceGraphContext, ConnectionContext } from "../components/provider";
+import { BrowserSettingsContext, GraphContext, GraphTabsContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ForceGraphContext, ConnectionContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
 import ResizableBox from "@/components/ui/ResizableBox";
 import { useResizableSize } from "@/lib/useResizableSize";
+import { tabScopedKey } from "@/lib/useGraphTabs";
+import { getConnectionItem, setConnectionItem } from "@/lib/connection-storage";
 import GraphSubHeader from "./GraphSubHeader";
 
 const GraphInfoPanel = dynamicImport(() => import("./graphInfo"), {
@@ -41,6 +43,9 @@ const GraphView = dynamicImport(() => import("./GraphView"), {
     </div>
 });
 
+/** Shared so a tab with no schema selection keeps a stable identity. */
+const EMPTY_SELECTION: (Node | Link)[] = [];
+
 /**
  * Render the main Graph page UI that orchestrates the selector, graph view, and right-hand panels.
  *
@@ -57,6 +62,7 @@ export default function Page() {
     const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext);
     const { canvasRef, graphData, setViewport } = useContext(ForceGraphContext);
     const { isReadOnly, activeConnectionId } = useContext(ConnectionContext);
+    const { tabs, activeTabId } = useContext(GraphTabsContext);
     const isReadOnlyRef = useRef(isReadOnly);
     isReadOnlyRef.current = isReadOnly;
     const {
@@ -97,6 +103,36 @@ export default function Page() {
     const prevGraphNameRef = useRef<string | undefined>(undefined);
 
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
+    // The Schema tab has a selection of its own — of labels and relationship
+    // types, not elements — and it shares the panel with the graph's. It is kept
+    // per graph tab, like everything else a tab remembers.
+    const [schemaSelections, setSchemaSelections] = useState<Record<string, { graphName: string, elements: (Node | Link)[] }>>({});
+    // A schema element belongs to the graph it was derived from, so an entry left
+    // over from a graph the tab no longer shows simply does not count.
+    const schemaSelection = schemaSelections[activeTabId];
+    const selectedSchemaElements = schemaSelection?.graphName === graphName ? schemaSelection.elements : EMPTY_SELECTION;
+
+    const setSelectedSchemaElements = useCallback<Dispatch<SetStateAction<(Node | Link)[]>>>((next) => {
+        setSchemaSelections((prev) => {
+            const entry = prev[activeTabId];
+            const current = entry?.graphName === graphName ? entry.elements : EMPTY_SELECTION;
+            const resolved = typeof next === "function" ? next(current) : next;
+
+            return resolved === current ? prev : { ...prev, [activeTabId]: { graphName, elements: resolved } };
+        });
+    }, [activeTabId, graphName]);
+
+    // Tab ids are never reused, so a closed tab's selection would just leak.
+    useEffect(() => {
+        setSchemaSelections((prev) => {
+            const live = new Set(tabs.map(({ id }) => id));
+            const kept = Object.keys(prev).filter((id) => live.has(id));
+
+            return kept.length === Object.keys(prev).length
+                ? prev
+                : Object.fromEntries(kept.map((id) => [id, prev[id]]));
+        });
+    }, [tabs]);
     // Ref that mirrors selectedElements tagged with the graph it belongs to, so the
     // graph-change restore effect can read the current full selection without adding
     // it as a dependency — and skip restoring a selection made in a different graph.
@@ -111,12 +147,19 @@ export default function Page() {
     const [isAddNode, setIsAddNode] = useState(false);
     const [isAddEdge, setIsAddEdge] = useState(false);
 
+    // The side panel is shared by the Graph and the Schema tab, and each graph
+    // tab sizes it for itself — so the width is remembered per tab AND per view.
+    const panelSizeKey = useCallback(
+        (name: string) => tabScopedKey(activeTabId, `panel-size-${name}-${currentTab === "Schema" ? "schema" : "graph"}`),
+        [activeTabId, currentTab]
+    );
+
     const onPanelResize = useCallback((size: PanelSize) => {
         setIsCollapsed(size.asPercentage === 0);
         if (size.asPercentage > 0 && panel) {
-            localStorage.setItem(`panel-size-${panel}`, JSON.stringify(size.asPercentage));
+            setConnectionItem(panelSizeKey(panel), JSON.stringify(size.asPercentage));
         }
-    }, [panel]);
+    }, [panel, panelSizeKey]);
 
     const panelSizes: Record<string, { size: string; min: string }> = useMemo(() => ({
         data: { size: "200px", min: "200px" },
@@ -125,12 +168,12 @@ export default function Page() {
 
     const getPanelSize = useCallback(() => {
         if (!panel) return "0%";
-        const stored = localStorage.getItem(`panel-size-${panel}`);
+        const stored = getConnectionItem(panelSizeKey(panel));
         if (stored) {
             return `${JSON.parse(stored)}%`;
         }
         return panelSizes[panel]?.size ?? "0%";
-    }, [panel, panelSizes]);
+    }, [panel, panelSizeKey, panelSizes]);
 
     const panelMinSize = useMemo(() => {
         if (!panel) return "0%";
@@ -164,15 +207,20 @@ export default function Page() {
 
         if (!currentPanel) return;
 
-        if (currentTab === "Graph") {
-            if (selectedElements.length !== 0) {
-                currentPanel.expand();
-                if (panel === undefined) setPanel("data");
-            }
+        // Graph and Schema each have a selection of their own; the other tabs
+        // have none, so the panel closes while they are open.
+        let selection: (Node | Link)[] = [];
+
+        if (currentTab === "Graph") selection = selectedElements;
+        if (currentTab === "Schema") selection = selectedSchemaElements;
+
+        if (selection.length !== 0) {
+            currentPanel.expand();
+            if (panel === undefined) setPanel("data");
         } else if (panel === "data") {
             currentPanel.collapse();
         }
-    }, [currentTab, panel, selectedElements, setPanel]);
+    }, [currentTab, panel, selectedElements, selectedSchemaElements, setPanel]);
 
     const fetchInfo = useCallback(async (type: string, options?: { signal?: AbortSignal; connectionId?: string | null }) => {
         if (!graphName) return [];
@@ -580,16 +628,19 @@ export default function Page() {
         if (!graphName) return undefined;
 
         switch (panel) {
-            case "data":
+            case "data": {
+                const selection = currentTab === "Schema" ? selectedSchemaElements : selectedElements;
 
-                if (selectedElements.length === 0) return undefined;
+                if (selection.length === 0) return undefined;
 
                 return <DataPanel
-                    object={selectedElements[selectedElements.length - 1]}
-                    onClose={() => handleSetSelectedElements()}
+                    object={selection[selection.length - 1]}
+                    onClose={() => (currentTab === "Schema" ? setSelectedSchemaElements([]) : handleSetSelectedElements())}
                     setLabels={setLabels}
                     canvasRef={canvasRef}
+                    schema={currentTab === "Schema"}
                 />;
+            }
 
             case "add": {
                 const onCloseHandler = () => {
@@ -621,7 +672,7 @@ export default function Page() {
                 return undefined;
         }
 
-    }, [graphName, panel, handleSetSelectedElements, setPanel, isAddNode, selectedElements, handleCreateElement, setLabels, canvasRef]);
+    }, [graphName, panel, handleSetSelectedElements, setPanel, isAddNode, selectedElements, handleCreateElement, setLabels, canvasRef, currentTab, selectedSchemaElements, setSelectedSchemaElements]);
 
     return (
         <div className="h-full w-full flex flex-col min-h-0">
@@ -683,6 +734,8 @@ export default function Page() {
                                     <GraphView
                                         selectedElements={selectedElements}
                                         setSelectedElements={handleSetSelectedElements}
+                                        selectedSchemaElements={selectedSchemaElements}
+                                        setSelectedSchemaElements={setSelectedSchemaElements}
                                         canvasRef={canvasRef}
                                         handleDeleteElement={handleDeleteElement}
                                         setLabels={setLabels}

@@ -12,11 +12,15 @@ export interface SchemaTriple {
   target: string;
 }
 
+/** Mirrors SCHEMA_CAPTION_KEY: the reserved entry the view captions nodes from. */
+const CAPTION_KEY = "__schemaCaption";
+
 /** Raw shape of the canvas data the schema view renders. */
 interface SchemaCanvasData {
   nodes: {
     id: number;
-    data?: Record<string, string> & { label?: string };
+    data?: Record<string, string>;
+    visible?: boolean;
     x?: number;
     y?: number;
   }[];
@@ -24,6 +28,7 @@ interface SchemaCanvasData {
     relationship: string;
     source: number | { id: number };
     target: number | { id: number };
+    visible?: boolean;
     data?: Record<string, string>;
   }[];
 }
@@ -46,10 +51,6 @@ export default class SchemaView extends GraphPage {
 
   private get schemaContainer(): Locator {
     return this.page.getByTestId("schemaView");
-  }
-
-  private get schemaRefresh(): Locator {
-    return this.page.getByTestId("schemaRefresh");
   }
 
   private get schemaEmptyState(): Locator {
@@ -77,7 +78,23 @@ export default class SchemaView extends GraphPage {
   }
 
   private get schemaDataPanel(): Locator {
-    return this.page.getByTestId("SchemaDataPanel");
+    return this.page.getByTestId("DataPanel");
+  }
+
+  /** The element counts the schema reports in the tab bar. */
+  public async getSchemaCounts(): Promise<{ labels: number; relationships: number }> {
+    const read = async (testId: string) =>
+      Number((await this.page.getByTestId(testId).textContent())?.split(":")[1]?.trim() ?? NaN);
+
+    return {
+      labels: await read("schemaLabelsCount"),
+      relationships: await read("schemaRelationshipsCount"),
+    };
+  }
+
+  /** The query run time, which only the graph reports. */
+  public async isRunTimeVisible(): Promise<boolean> {
+    return this.page.getByText(/^RT:/).isVisible();
   }
 
   public async clickSchemaTab(): Promise<void> {
@@ -85,14 +102,6 @@ export default class SchemaView extends GraphPage {
       this.schemaTab,
       (el) => el.click(),
       "schema tab"
-    );
-  }
-
-  public async clickSchemaRefresh(): Promise<void> {
-    await interactWhenVisible(
-      this.schemaRefresh,
-      (el) => el.click(),
-      "schema refresh"
     );
   }
 
@@ -108,6 +117,15 @@ export default class SchemaView extends GraphPage {
     await interactWhenVisible(this.schemaCenter, (el) => el.click(), "schema fit to screen");
   }
 
+  /** Brings back everything hidden, including whatever the legend hid. */
+  public async clickSchemaShowAll(): Promise<void> {
+    await interactWhenVisible(
+      this.schemaContainer.getByTestId("elementCanvasShowAllGraph"),
+      (el) => el.click(),
+      "schema show all"
+    );
+  }
+
   /** Selects the first element the search matches, which opens the details panel. */
   public async selectSchemaElementBySearch(text: string): Promise<void> {
     await interactWhenVisible(this.schemaSearch, (el) => el.fill(text), "schema search");
@@ -119,19 +137,29 @@ export default class SchemaView extends GraphPage {
     await this.schemaDataPanel.waitFor({ state: "visible" });
   }
 
-  public async getSchemaDataPanelName(): Promise<string | null> {
-    return this.schemaDataPanel.getByTestId("SchemaDataPanelName").textContent();
+  /** The label or relationship type the details panel is describing. */
+  public async getSchemaDataPanelName(): Promise<string> {
+    return (
+      (await this.schemaDataPanel.getByTestId("DataPanelLabel").textContent())?.trim() ?? ""
+    );
+  }
+
+  public async isSchemaDataPanelVisible(): Promise<boolean> {
+    return this.schemaDataPanel.isVisible();
   }
 
   /** The property keys the details panel lists, mapped to the type it shows for them. */
   public async getSchemaDataPanelKeys(): Promise<Record<string, string>> {
-    const rows = await this.schemaDataPanel.locator("tbody tr").all();
-    const entries = await Promise.all(
-      rows.map(async (row) => {
-        const cells = await row.locator("td").allTextContents();
-        return [cells[0], cells[1]] as const;
-      })
-    );
+    const prefix = "DataPanelAttributeType";
+    const entries = await this.schemaDataPanel
+      .locator(`[data-testid^="${prefix}"]`)
+      .evaluateAll((cells, testIdPrefix) =>
+        cells.map((cell) => [
+          (cell.getAttribute("data-testid") ?? "").slice(testIdPrefix.length),
+          cell.textContent?.trim() ?? "",
+        ]),
+        prefix
+      );
 
     return Object.fromEntries(entries);
   }
@@ -172,7 +200,34 @@ export default class SchemaView extends GraphPage {
   /** Label of every node in the schema, sorted. Unlabeled nodes read "Empty". */
   public async getSchemaLabels(): Promise<string[]> {
     const { nodes } = await this.readSchemaCanvasData();
-    return nodes.map((node) => node.data?.label ?? "").sort();
+    return nodes.map((node) => node.data?.[CAPTION_KEY] ?? "").sort();
+  }
+
+  /** Toggles a label in the legend, which hides or shows it on the canvas. */
+  public async toggleSchemaLabel(name: string): Promise<void> {
+    await interactWhenVisible(
+      this.schemaContainer.getByTestId(`GraphLabelsButton${name}`),
+      (el) => el.click(),
+      `schema label ${name}`
+    );
+  }
+
+  /** Toggles a relationship type in the legend. */
+  public async toggleSchemaRelationship(name: string): Promise<void> {
+    await interactWhenVisible(
+      this.schemaContainer.getByTestId(`GraphRelationshipsButton${name}`),
+      (el) => el.click(),
+      `schema relationship ${name}`
+    );
+  }
+
+  /** Only the labels the canvas is actually drawing, sorted. */
+  public async getVisibleSchemaLabels(): Promise<string[]> {
+    const { nodes } = await this.readSchemaCanvasData();
+    return nodes
+      .filter((node) => node.visible !== false)
+      .map((node) => node.data?.[CAPTION_KEY] ?? "")
+      .sort();
   }
 
   /** Current position of every node, keyed by label, for stability assertions. */
@@ -181,7 +236,7 @@ export default class SchemaView extends GraphPage {
 
     return Object.fromEntries(
       nodes.map((node) => [
-        node.data?.label ?? "",
+        node.data?.[CAPTION_KEY] ?? "",
         { x: node.x ?? 0, y: node.y ?? 0 },
       ])
     );
@@ -200,13 +255,26 @@ export default class SchemaView extends GraphPage {
 
   /** Every relationship placement in the schema, sorted and de-duplicated. */
   public async getSchemaTriples(): Promise<SchemaTriple[]> {
+    return this.readSchemaTriples();
+  }
+
+  /** Only the placements the canvas is actually drawing. */
+  public async getVisibleSchemaTripleStrings(): Promise<string[]> {
+    const triples = await this.readSchemaTriples(true);
+    return triples
+      .map(({ source, relationship, target }) => `${source}-[${relationship}]->${target}`)
+      .sort();
+  }
+
+  private async readSchemaTriples(visibleOnly = false): Promise<SchemaTriple[]> {
     const { nodes, links } = await this.readSchemaCanvasData();
-    const labelById = new Map(nodes.map((node) => [node.id, node.data?.label ?? ""]));
+    const labelById = new Map(nodes.map((node) => [node.id, node.data?.[CAPTION_KEY] ?? ""]));
     // force-graph replaces the endpoint ids with node objects once it has run.
     const resolve = (endpoint: number | { id: number }) =>
       labelById.get(typeof endpoint === "object" ? endpoint.id : endpoint) ?? "";
 
     return links
+      .filter((link) => !visibleOnly || link.visible !== false)
       .map((link) => ({
         source: resolve(link.source),
         relationship: link.relationship,
@@ -229,15 +297,15 @@ export default class SchemaView extends GraphPage {
 
   /**
    * Property keys and their value types per label, as the schema discovered
-   * them. `label` is the caption the view adds, not a property, so it is
-   * dropped.
+   * them. The caption entry is the name the view renders, not a property, so it
+   * is dropped.
    */
   public async getSchemaLabelKeys(): Promise<Record<string, Record<string, string>>> {
     const { nodes } = await this.readSchemaCanvasData();
 
     return Object.fromEntries(
       nodes.map(({ data }) => {
-        const { label, ...keys } = data ?? {};
+        const { [CAPTION_KEY]: label, ...keys } = data ?? {};
         return [label ?? "", keys];
       })
     );

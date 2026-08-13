@@ -5,7 +5,7 @@
 
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
-import type { Data, GraphLink, GraphNode, ViewportState, LayoutMode, HierarchyDirection, RadialDirection } from "@falkordb/canvas";
+import type { Data, GraphLink, GraphNode, ViewportState, LayoutMode, HierarchyDirection, RadialDirection, NodeShape } from "@falkordb/canvas";
 import { getActiveConnectionIdGlobal, getConnectionEpoch, securedFetch, getTheme, GraphRef, GraphData, Node, Relationship, Link, convertToCanvasData, CanvasLayout, captureCanvasLayout, applyCanvasLayout, CANVAS_AUTO_ZOOM_DELAY } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Graph } from "../api/graph/model";
@@ -32,6 +32,8 @@ interface Props {
      * for a node id that does not exist.
      */
     disableExpand?: boolean
+    /** Shape the nodes are drawn with. Left out, the canvas draws circles. */
+    nodeShape?: NodeShape
     /** `window` property the e2e tests read the canvas data from. */
     testHookName?: string
     testId?: string
@@ -50,6 +52,7 @@ export default function ForceGraph({
     setViewport = undefined,
     dimmed = false,
     disableExpand = false,
+    nodeShape = undefined,
     testHookName = "graph",
     testId = "graphCanvasWrapper",
 }: Props) {
@@ -204,8 +207,8 @@ export default function ForceGraph({
 
         setRelationships(graph.removeLinks(nodes.map(n => n.id)));
 
-        canvas.setGraphData(convertToCanvasData(graph.Elements));
-    }, [canvasRef, canvasLoaded, graph, setRelationships]);
+        canvas.setGraphData(convertToCanvasData(graph.Elements, nodeShape));
+    }, [canvasRef, canvasLoaded, graph, setRelationships, nodeShape]);
 
     // When focus mode is on, pan the canvas to the centroid of the selected elements.
     const centerOnSelection = useCallback((selection: (Node | Link)[]) => {
@@ -510,7 +513,7 @@ export default function ForceGraph({
         // graph (switching from a saved tab straight to an unsaved one).
         clearTimeout(viewportRestoreTimerRef.current);
         viewportRestoreTimerRef.current = undefined;
-        const canvasData = convertToCanvasData(data);
+        const canvasData = convertToCanvasData(data, nodeShape);
         nodeCount = canvasData.nodes.length;
         canvas.setData(canvasData);
 
@@ -538,7 +541,7 @@ export default function ForceGraph({
         }
 
         return undefined;
-    }, [canvasRef, data, graphData, setGraphData, canvasLoaded, viewport]);
+    }, [canvasRef, data, graphData, setGraphData, canvasLoaded, viewport, nodeShape]);
 
     return (
         <div

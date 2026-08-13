@@ -25,7 +25,7 @@ import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContex
 import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
 import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
-import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, normalizeDirection, normalizeLayout } from "@/lib/useGraphTabs";
+import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDirection, normalizeLayout } from "@/lib/useGraphTabs";
 
 /**
  * A live snapshot of everything the graph view is showing.
@@ -1154,6 +1154,16 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // state is remembered here for captures that happen once it is gone.
   const panelOpenRef = useRef(true);
 
+  // The schema view is unmounted whenever the Schema tab is not the active one,
+  // so it cannot be sampled at capture time the way the graph canvas is. It
+  // pushes its own metadata here instead, and this mirror is what gets written
+  // into the tab — seeded from the tab on activation so a capture taken before
+  // the view mounts does not carry the previous tab's state over.
+  const schemaMetaRef = useRef<SchemaViewMeta>({});
+  const setSchemaMeta = useCallback((meta: SchemaViewMeta) => {
+    schemaMetaRef.current = meta;
+  }, []);
+
   const captureGraphSession = useCallback((): GraphSession => {
     const state = sessionStateRef.current;
     const canvas = canvasRef.current;
@@ -1181,17 +1191,20 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (panelRef.current) panelOpenRef.current = !panelRef.current.isCollapsed();
 
     return {
-      viewport: hasNodes ? canvas!.getViewport() : state.viewport,
-      selected: state.selectedParam || undefined,
-      layout: layoutRef.current.layout,
-      direction: layoutRef.current.direction,
-      animation: layoutRef.current.animation,
-      pinned: layoutRef.current.pinned,
-      dimmed: layoutRef.current.dimmed,
-      expand: layoutRef.current.expand,
-      panelOpen: panelOpenRef.current,
-      customizing: layoutRef.current.customizingLabel ?? undefined,
-      chatOpen: layoutRef.current.chatOpen,
+      graph: {
+        viewport: hasNodes ? canvas!.getViewport() : state.viewport,
+        selected: state.selectedParam || undefined,
+        layout: layoutRef.current.layout,
+        direction: layoutRef.current.direction,
+        animation: layoutRef.current.animation,
+        pinned: layoutRef.current.pinned,
+        dimmed: layoutRef.current.dimmed,
+        expand: layoutRef.current.expand,
+        panelOpen: panelOpenRef.current,
+        customizing: layoutRef.current.customizingLabel ?? undefined,
+        chatOpen: layoutRef.current.chatOpen,
+      },
+      schema: schemaMetaRef.current,
     };
   }, [canvasRef]);
 
@@ -1237,27 +1250,32 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   // fields: re-run its query, then restore its selection and viewport.
   const handleActivateTab = useCallback((tab: GraphTab, session?: GraphSession) => {
     const seq = (activationSeqRef.current += 1);
+    const meta = tab.graph ?? {};
+
+    // The schema view reads this when it mounts, and writes back to it as the
+    // user works — so hand it the incoming tab's state before it does either.
+    schemaMetaRef.current = tab.schema ?? {};
 
     // The canvas follows these through ForceGraphContext, so applying them here
     // covers both branches — a restored session carries its positions, not the
     // controls that produced them.
-    const tabLayout = normalizeLayout(tab.layout);
+    const tabLayout = normalizeLayout(meta.layout);
     setLayout(tabLayout);
-    setDirection(normalizeDirection(tabLayout, tab.direction));
+    setDirection(normalizeDirection(tabLayout, meta.direction));
     // Non-force layouts pin their nodes, so that is the fallback for a tab that
     // never stored the toggle.
-    setAnimation(tab.animation ?? false);
-    setPinned(tab.pinned ?? tabLayout !== 'force');
-    setDimmed(tab.dimmed ?? true);
-    setExpandFilter(tab.expand ?? true);
-    setChatOpen(tab.chatOpen ?? false);
+    setAnimation(meta.animation ?? false);
+    setPinned(meta.pinned ?? tabLayout !== 'force');
+    setDimmed(meta.dimmed ?? true);
+    setExpandFilter(meta.expand ?? true);
+    setChatOpen(meta.chatOpen ?? false);
     // Resolved against the tab's own graph by the info panel, so a label that no
     // longer exists simply falls back to the normal view.
-    setCustomizingLabel(tab.customizing ?? null);
+    setCustomizingLabel(meta.customizing ?? null);
 
     // The info panel has no React state of its own — drive it imperatively.
     const infoPanel = panelRef.current;
-    const tabPanelOpen = tab.panelOpen ?? true;
+    const tabPanelOpen = meta.panelOpen ?? true;
     panelOpenRef.current = tabPanelOpen;
     if (infoPanel && infoPanel.isCollapsed() === tabPanelOpen) {
       if (tabPanelOpen) infoPanel.expand();
@@ -1282,7 +1300,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setCurrentTab(tab.view);
     setHistoryQuery(h => ({ ...h, query: tab.query, currentQuery: defaultQueryHistory.currentQuery }));
     // /graph resolves this against the results once they arrive.
-    setSelectedParam(tab.selected ?? "");
+    setSelectedParam(meta.selected ?? "");
 
     if (graphIsGone || !tab.graphName || !tab.query) return;
 
@@ -1296,7 +1314,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       // runQuery drops the viewport and picks its own view when the new results
       // land, so both can only be restored afterwards.
       if (activationSeqRef.current !== seq) return;
-      if (tab.viewport) setViewport(tab.viewport);
+      if (meta.viewport) setViewport(meta.viewport);
       setCurrentTab(tab.view);
     });
   }, [handleSetGraphName, restoreGraphSession, runQuery]);
@@ -1316,6 +1334,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     captureMeta: captureTabMeta,
     onActivate: handleActivateTab,
   });
+
+  const graphTabsContext = useMemo(
+    () => ({ ...graphTabs, setSchemaMeta }),
+    [graphTabs, setSchemaMeta],
+  );
 
   useEffect(() => {
     setRelationships([...graph.Relationships]);
@@ -2005,7 +2028,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
                             <UDFContext.Provider value={udfContext}>
                               <CypherLanguageContext.Provider value={cypherLanguageContext}>
                                 <AiFixContext.Provider value={aiFixContext}>
-                                  <GraphTabsContext.Provider value={graphTabs}>
+                                  <GraphTabsContext.Provider value={graphTabsContext}>
                                     <ProviderLayout
                                       panelRef={panelRef}
                                       customizingLabel={customizingLabel}

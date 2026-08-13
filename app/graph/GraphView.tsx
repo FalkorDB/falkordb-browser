@@ -18,6 +18,8 @@ import SchemaView from "./SchemaView";
 interface Props {
     selectedElements: (Node | Link)[]
     setSelectedElements: (elements?: (Node | Link)[], fromSearch?: boolean) => void
+    selectedSchemaElements: (Node | Link)[]
+    setSelectedSchemaElements: Dispatch<SetStateAction<(Node | Link)[]>>
     canvasRef: GraphRef
     handleDeleteElement: () => Promise<void>
     setLabels: Dispatch<SetStateAction<Label[]>>
@@ -36,6 +38,8 @@ interface Props {
 function GraphView({
     selectedElements,
     setSelectedElements,
+    selectedSchemaElements,
+    setSelectedSchemaElements,
     canvasRef,
     handleDeleteElement,
     setLabels,
@@ -142,6 +146,51 @@ function GraphView({
         setRelationships([...graph.Relationships]);
     };
 
+    // Pushes the elements' current visibility onto the canvas copies of them.
+    const syncCanvasVisibility = () => {
+        const canvas = canvasRef.current;
+
+        if (!canvas) return;
+
+        const graphData = canvas.getGraphData();
+
+        graphData.nodes.forEach((canvasNode) => {
+            const appNode = graph.NodesMap.get(canvasNode.id);
+
+            if (appNode) {
+                canvasNode.visible = appNode.visible;
+            }
+        });
+        graphData.links.forEach((canvasLink) => {
+            const appLink = graph.LinksMap.get(canvasLink.id);
+
+            if (appLink) {
+                canvasLink.visible = appLink.visible;
+            }
+        });
+
+        canvas.refresh();
+    };
+
+    const showAllElements = () => {
+        graph.Labels.forEach((label) => {
+            label.show = true;
+            label.elements.forEach((node) => {
+                node.visible = true;
+            });
+        });
+        graph.Relationships.forEach((relationship) => {
+            relationship.show = true;
+        });
+        graph.Elements.links.forEach((link) => {
+            link.visible = true;
+        });
+
+        syncCanvasVisibility();
+        setLabels([...graph.Labels]);
+        setRelationships([...graph.Relationships]);
+    };
+
     const handleTabChange = (value: string) => {
         setCurrentTab(value as Tab);
     };
@@ -159,6 +208,7 @@ function GraphView({
                                 selectedElements={selectedElements}
                                 setSelectedElements={setSelectedElements}
                                 handleDeleteElement={handleDeleteElement}
+                                showAllElements={showAllElements}
                                 canvasRef={canvasRef}
                                 setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => "labels" in e) ? setIsAddEdge : undefined}
                                 setIsAddNode={setIsAddNode}
@@ -248,7 +298,7 @@ function GraphView({
                         <div ref={setSchemaControlsSlot} className="flex gap-2 items-center pointer-events-auto" />
                     }
                     {
-                        (historyQuery?.currentQuery?.metadata?.length ?? 0) > 0 &&
+                        currentTab !== "Schema" && (historyQuery?.currentQuery?.metadata?.length ?? 0) > 0 &&
                         <>
                             <div className="h-4 w-px bg-border rounded-full" />
                             <p>Nodes: {graph.NodesMap.size}</p>
@@ -304,7 +354,11 @@ function GraphView({
                 />
             </TabsContent>
             <TabsContent value="Schema" className="h-full w-full mt-0 overflow-hidden">
-                <SchemaView controlsSlot={schemaControlsSlot} />
+                <SchemaView
+                    controlsSlot={schemaControlsSlot}
+                    selectedElements={selectedSchemaElements}
+                    setSelectedElements={setSelectedSchemaElements}
+                />
             </TabsContent>
         </Tabs>
     );
