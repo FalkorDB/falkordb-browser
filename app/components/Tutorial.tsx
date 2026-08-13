@@ -199,11 +199,51 @@ const tutorialSteps: TutorialStep[] = [
     },
     {
         title: "Open Edge Options",
-        description: "Click on the 'KNOWS' edge type to see the available options for this relationship.",
+        description: "Edges can be styled just like nodes. Click on the 'KNOWS' edge type to see the available options for this relationship.",
         placementAxis: "x",
         targetSelector: '[data-testid="graphInfoKNOWSEdge"]',
         advanceOn: "click",
         forward: ["mouseenter", "mouseleave", "pointerdown"]
+    },
+    {
+        title: "Customize Edge Styles",
+        description: "Click 'Customize' to open the style panel for this relationship type.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="customizeRelationshipStyleKNOWS"]',
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave", "pointerdown"],
+        hidePrev: true
+    },
+    {
+        title: "Choose Edge Color",
+        description: "Pick a color for every edge of this type. Use a preset or the RGB picker — the graph updates as you choose.",
+        placementAxis: "x",
+        targetSelector: 'button[aria-label^="Select color"]',
+        advanceOn: "click",
+        hidePrev: true
+    },
+    {
+        title: "Adjust Edge Size",
+        description: "One multiplier scales the whole edge — line width, arrowhead and caption font size all grow together.",
+        placementAxis: "x",
+        targetSelector: 'button[aria-label^="Select size"]',
+        advanceOn: "click",
+    },
+    {
+        title: "Save Edge Style Changes",
+        description: "Click 'Save Changes' to apply your edge style. Styles are stored per connection, so they are still there the next time you open this graph.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="saveStyleChanges"]',
+        advanceOn: "click",
+    },
+    {
+        title: "Reopen Edge Options",
+        description: "Saving closes the style panel. Click the 'KNOWS' edge type again to reopen its options.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="graphInfoKNOWSEdge"]',
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave", "pointerdown"],
+        hidePrev: true
     },
     {
         title: "Get KNOWS edge",
@@ -428,7 +468,58 @@ const tutorialSteps: TutorialStep[] = [
         placementAxis: "x",
         targetSelector: '[data-testid="zoomControls"]',
     },
-    ///// Theme and Navigation (Track 5)
+    ///// Graph tabs (Track 5)
+    {
+        title: "Graph Tabs",
+        description: "The tab strip keeps several working contexts side by side. Each tab remembers its own graph, query, layout, selection and open panels — and they are all restored the next time you open the browser.",
+        placementAxis: "y",
+        targetSelector: '[data-testid="graphSubHeader"]',
+        hidePrev: true
+    },
+    {
+        title: "Open a New Tab",
+        description: "Click **+** to open another tab. It starts empty, so you can explore a second graph without losing anything you have set up here.",
+        placementAxis: "y",
+        targetSelector: '[data-testid="graphTabAdd"]',
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave"],
+        hidePrev: true
+    },
+    {
+        title: "Rename a Tab",
+        description: "Click the pencil on the active tab to give it a name of your own.",
+        placementAxis: "y",
+        targetSelector: '[data-testid="graphSubHeader"] > div[data-active="true"] [data-testid^="graphTabRenameTrigger-"]',
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave"],
+        hidePrev: true
+    },
+    {
+        title: "Name Your Tab",
+        description: "Type a name for this tab, then click Next — the name is saved as soon as you leave the box. Clearing it restores the graph name.",
+        placementAxis: "y",
+        targetSelector: '[data-testid="graphSubHeader"] input[data-testid^="graphTabRename-"]',
+        hidePrev: true
+    },
+    {
+        title: "Switch Between Tabs",
+        description: "Click the first tab to switch back to it. Its graph, query and canvas come back exactly as you left them.",
+        placementAxis: "y",
+        targetSelector: '[data-testid="graphSubHeader"] > div:first-of-type [data-testid^="graphTabSelect-"]',
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave"],
+        hidePrev: true
+    },
+    {
+        title: "Close a Tab",
+        description: "Click the **X** on the last tab to close it. The last remaining tab can't be closed — there is always one context open.",
+        placementAxis: "y",
+        targetSelector: '[data-testid="graphSubHeader"] > div:last-of-type [data-testid^="graphTabClose-"]',
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave"],
+        hidePrev: true
+    },
+    ///// Theme and Navigation (Track 6)
     {
         title: "Theme Toggle",
         description: "Switch between light, dark, and system themes for a comfortable viewing experience.",
@@ -503,11 +594,11 @@ const tutorialTracks: TutorialTrack[] = [
         },
     },
     {
-        // State after step 15 (Get KNOWS edge): social-demo selected,
+        // State after step 20 (Get KNOWS edge): social-demo selected,
         // KNOWS query was run → graph has edges visible, Graph tab active,
-        // no DataPanel open, no query history open
+        // no DataPanel open, no query history open, style panel closed
         name: "Query & Results",
-        startIndex: 16,
+        startIndex: 21,
         setup: async (ctx) => {
             closeStaleOverlays();
             ctx.handleSetGraphName("social-demo");
@@ -519,11 +610,11 @@ const tutorialTracks: TutorialTrack[] = [
         },
     },
     {
-        // State after step 28 (Close Query History Window): social-demo selected,
-        // query was run (graph has elements), Metadata tab is active (from step 25),
-        // query history panel is CLOSED (step 28 closed it), no DataPanel
+        // State after step 33 (Close Query History Window): social-demo selected,
+        // query was run (graph has elements), Metadata tab is active (from step 30),
+        // query history panel is CLOSED (step 33 closed it), no DataPanel
         name: "Layouts & Canvas",
-        startIndex: 29,
+        startIndex: 34,
         setup: async (ctx) => {
             closeStaleOverlays();
             ctx.handleSetGraphName("social-demo");
@@ -536,10 +627,26 @@ const tutorialTracks: TutorialTrack[] = [
         },
     },
     {
-        // State after step 40 (Zoom Controls): social-demo selected, graph has elements,
+        // State after step 45 (Zoom Controls): social-demo selected, graph has elements,
+        // Graph tab active, radial layout active, no overlays open
+        name: "Graph Tabs",
+        startIndex: 46,
+        setup: async (ctx) => {
+            closeStaleOverlays();
+            ctx.handleSetGraphName("social-demo");
+            await ctx.runQuery("MATCH p=()-[:MANAGES]->() RETURN p", "social-demo");
+            ctx.setCurrentTab("Graph");
+            ctx.setLayout('radial');
+            ctx.setDirection('out');
+            ctx.canvasRef.current?.setLayout('radial');
+            ctx.canvasRef.current?.setLayoutOptions({ radial: { direction: 'out' as RadialDirection } });
+        },
+    },
+    {
+        // State after step 51 (Close a Tab): social-demo selected, graph has elements,
         // Graph tab active, controls visible, radial layout active, no overlays open
         name: "Theme & Navigation",
-        startIndex: 41,
+        startIndex: 52,
         setup: async (ctx) => {
             closeStaleOverlays();
             ctx.handleSetGraphName("social-demo");
