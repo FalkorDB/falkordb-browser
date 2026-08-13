@@ -164,6 +164,26 @@ export default class TutorialPanel extends GraphPage {
     return false;
   }
 
+  /** Close button of the customize-style panel — absent once the panel is closed. */
+  public get customizeStyleClose(): Locator {
+    return this.page.getByTestId("customizeStyleClose");
+  }
+
+  /** The layout dropdown trigger, which is labelled with the active layout. */
+  public get layoutControl(): Locator {
+    return this.page.getByTestId("layoutControl");
+  }
+
+  /**
+   * The rename box of the tab the tutorial points at — always the active one,
+   * so a stale input on another tab can never be picked up.
+   */
+  public get activeTabRenameInput(): Locator {
+    return this.page.locator(
+      '[data-testid="graphSubHeader"] > div[data-active="true"] input[data-testid^="graphTabRename-"]'
+    );
+  }
+
   /**
    * Type a name into the tab rename box the tutorial is pointing at.
    * The input auto-focuses when it mounts and the tutorial overlay sits on top
@@ -171,9 +191,8 @@ export default class TutorialPanel extends GraphPage {
    * is used instead of a click.
    */
   async typeTabName(name: string): Promise<void> {
-    const input = this.page.locator('[data-testid^="graphTabRename-"]').first();
-    await waitForElementToBeVisible(input);
-    await input.fill(name);
+    await waitForElementToBeVisible(this.activeTabRenameInput);
+    await this.activeTabRenameInput.fill(name);
   }
 
   /**

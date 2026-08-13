@@ -7,7 +7,7 @@ import { createPortal } from "react-dom";
 import { Copy, CornerDownLeft, CornerDownRight, CornerLeftDown, CornerRightDown } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { cn, Tab, GraphRef } from "@/lib/utils";
-import type { LayoutMode, RadialDirection } from "@falkordb/canvas";
+import type { LayoutMode } from "@falkordb/canvas";
 import { Graph } from "@/app/api/graph/model";
 import { GraphContext, PanelContext, ForceGraphContext } from "./provider";
 import Button from "./ui/Button";
@@ -558,6 +558,21 @@ function closeStaleOverlays(): void {
 }
 
 /**
+ * Shared setup for the tracks that resume with the social-demo graph laid out
+ * radially — the state steps 42-45 leave behind.
+ */
+async function setupSocialDemoRadial(ctx: TrackSetupContext) {
+    closeStaleOverlays();
+    ctx.handleSetGraphName("social-demo");
+    await ctx.runQuery("MATCH p=()-[:MANAGES]->() RETURN p", "social-demo");
+    ctx.setCurrentTab("Graph");
+    ctx.setLayout('radial');
+    ctx.setDirection('out');
+    ctx.canvasRef.current?.setLayout('radial');
+    ctx.canvasRef.current?.setLayoutOptions({ radial: { direction: 'out' } });
+}
+
+/**
  * Track definitions — each track groups related tutorial steps.
  * The `setup` function puts the page in the right state for the track's first step.
  * Each setup recreates the exact state that exists at the end of the step immediately
@@ -631,32 +646,14 @@ const tutorialTracks: TutorialTrack[] = [
         // Graph tab active, radial layout active, no overlays open
         name: "Graph Tabs",
         startIndex: 46,
-        setup: async (ctx) => {
-            closeStaleOverlays();
-            ctx.handleSetGraphName("social-demo");
-            await ctx.runQuery("MATCH p=()-[:MANAGES]->() RETURN p", "social-demo");
-            ctx.setCurrentTab("Graph");
-            ctx.setLayout('radial');
-            ctx.setDirection('out');
-            ctx.canvasRef.current?.setLayout('radial');
-            ctx.canvasRef.current?.setLayoutOptions({ radial: { direction: 'out' as RadialDirection } });
-        },
+        setup: setupSocialDemoRadial,
     },
     {
         // State after step 51 (Close a Tab): social-demo selected, graph has elements,
         // Graph tab active, controls visible, radial layout active, no overlays open
         name: "Theme & Navigation",
         startIndex: 52,
-        setup: async (ctx) => {
-            closeStaleOverlays();
-            ctx.handleSetGraphName("social-demo");
-            await ctx.runQuery("MATCH p=()-[:MANAGES]->() RETURN p", "social-demo");
-            ctx.setCurrentTab("Graph");
-            ctx.setLayout('radial');
-            ctx.setDirection('out');
-            ctx.canvasRef.current?.setLayout('radial');
-            ctx.canvasRef.current?.setLayoutOptions({ radial: { direction: 'out' as RadialDirection } });
-        },
+        setup: setupSocialDemoRadial,
     },
 ];
 

@@ -130,6 +130,9 @@ test.describe("Tutorial Walkthrough", () => {
         // Step 18: "Save Edge Style Changes" — advanceOn: "click" on saveStyleChanges
         await tutorial.waitForStep("Save Edge Style Changes");
         await tutorial.clickTutorialTarget('[data-testid="saveStyleChanges"]');
+        // Saving closes the style panel — that is what puts the KNOWS chip back
+        // within reach of the next step.
+        await expect(tutorial.customizeStyleClose).toHaveCount(0);
 
         // Step 19: "Reopen Edge Options" — advanceOn: "click" on graphInfoKNOWSEdge
         await tutorial.waitForStep("Reopen Edge Options");
@@ -224,7 +227,7 @@ test.describe("Tutorial Walkthrough", () => {
 
         // Step 38: "Tree Layout Active" — no advanceOn, has Next button
         await tutorial.waitForStep("Tree Layout Active");
-        await tutorial.waitForTimeout(1000);
+        await expect(tutorial.layoutControl).toContainText("Tree");
         await tutorial.clickNextButton();
 
         // Step 39: "Open Layout Dropdown" (again) — advanceOn: "click" on layoutControl
@@ -245,7 +248,7 @@ test.describe("Tutorial Walkthrough", () => {
 
         // Step 42: "Radial Layout Active" — no advanceOn, has Next button
         await tutorial.waitForStep("Radial Layout Active");
-        await tutorial.waitForTimeout(1000);
+        await expect(tutorial.layoutControl).toContainText("Radial");
         await tutorial.clickNextButton();
 
         // Step 43: "Animation Control" — no advanceOn, has Next button.
@@ -288,6 +291,8 @@ test.describe("Tutorial Walkthrough", () => {
         await tutorial.waitForStep("Name Your Tab");
         await tutorial.typeTabName(tabName);
         await tutorial.clickNextButton();
+        // Clicking Next blurs the box, which commits the rename and unmounts it.
+        await expect(tutorial.activeTabRenameInput).toHaveCount(0);
         await expect(tutorial.stripTab(tabName)).toBeVisible();
 
         // Step 50: "Switch Between Tabs" — advanceOn: "click" on the first tab
@@ -296,8 +301,12 @@ test.describe("Tutorial Walkthrough", () => {
             '[data-testid="graphSubHeader"] > div:first-of-type [data-testid^="graphTabSelect-"]'
         );
 
-        // Step 51: "Close a Tab" — advanceOn: "click" on the last tab's close button
+        // Step 51: "Close a Tab" — advanceOn: "click" on the last tab's close button.
+        // The tutorial points at the last tab, which is the one added and renamed
+        // above — assert that before closing, so the lifecycle checks below can
+        // only pass if the right tab went away.
         await tutorial.waitForStep("Close a Tab");
+        await expect(tutorial.stripTabAt(tabsBefore)).toHaveAttribute("data-tab-label", tabName);
         await tutorial.clickTutorialTarget(
             '[data-testid="graphSubHeader"] > div:last-of-type [data-testid^="graphTabClose-"]'
         );
