@@ -22,9 +22,5 @@ spec:
       targetPort: rest
       protocol: TCP
       name: rest
-    - port: {{ .Values.service.mcpPort }}
-      targetPort: mcp
-      protocol: TCP
-      name: mcp
   selector:
     {{- include "falkordb-browser.selectorLabels" . | nindent 4 }}

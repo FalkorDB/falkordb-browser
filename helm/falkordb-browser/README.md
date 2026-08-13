@@ -73,7 +73,6 @@ The following table lists the configurable parameters of the FalkorDB Browser ch
 | `service.type` | Kubernetes service type | `ClusterIP` |
 | `service.port` | Service port for browser | `3000` |
 | `service.restPort` | Service port for REST API | `8080` |
-| `service.mcpPort` | Service port for MCP | `3001` |
 | `ingress.enabled` | Enable ingress | `false` |
 | `ingress.className` | Ingress class name | `""` |
 | `ingress.hosts` | Ingress hosts configuration | `[{host: falkordb-browser.local, paths: [{path: /, pathType: ImplementationSpecific}]}]` |
