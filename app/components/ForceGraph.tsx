@@ -92,10 +92,18 @@ export default function ForceGraph({
     useEffect(() => {
         const canvas = canvasRef.current;
 
-        if (!canvas || !canvasLoaded) return;
+        if (!canvas || !canvasLoaded) return undefined;
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any)[testHookName] = () => canvas.getGraphData();
+        const globals = window as unknown as Record<string, unknown>;
+        const hook = () => canvas.getGraphData();
+
+        globals[testHookName] = hook;
+
+        // Leaving it behind would keep an unmounted canvas — and its data —
+        // reachable, and hand the next test a stale instance.
+        return () => {
+            if (globals[testHookName] === hook) delete globals[testHookName];
+        };
     }, [canvasRef, canvasLoaded, testHookName]);
 
     // Load saved viewport on mount

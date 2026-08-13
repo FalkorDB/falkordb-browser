@@ -35,7 +35,6 @@ import {
     IndicatorContext,
 } from "../components/provider";
 import { Graph } from "../api/graph/model";
-import Button from "../components/ui/Button";
 import Controls from "./controls";
 import Labels from "./labels";
 import Toolbar from "./toolbar";
@@ -383,12 +382,19 @@ function SchemaGraph({ cacheKey, storedMeta, controlsSlot, selectedElements, set
             }
         });
 
-        persist({ labelIds: [...registry.ids], nextLabelId: registry.next });
-
         return g;
         // `graph` is only read for its label names, which labelNamesKey covers.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [graphName, labelNamesKey, schema, persist]);
+    }, [graphName, labelNamesKey, schema]);
+
+    // Written after commit rather than from the memo above: React may run a
+    // memo callback more than once (StrictMode, an interrupted render), and a
+    // discarded render must not leave its ids behind in the cache.
+    useEffect(() => {
+        const registry = labelIdsRef.current;
+
+        persist({ labelIds: [...registry.ids], nextLabelId: registry.next });
+    }, [schemaGraph, persist]);
 
     // A rebuild hands the canvas a brand new structure, which it lays out from
     // scratch — so a schema that grew by one placement would throw the whole

@@ -77,9 +77,7 @@ function GraphView({
     }, [graph, graphName, historyQuery.currentQuery]);
 
     const onLabelClick = (label: Label) => {
-        const canvas = canvasRef.current;
-
-        if (!canvas) return;
+        if (!canvasRef.current) return;
 
         label.show = !label.show;
 
@@ -91,32 +89,13 @@ function GraphView({
         graph.visibleLinks(label.show);
         graph.LabelsMap.set(label.name, label);
 
-        const graphData = canvas.getGraphData();
-
-        graphData.nodes.forEach(canvasNode => {
-            const appNode = graph.NodesMap.get(canvasNode.id);
-
-            if (appNode) {
-                canvasNode.visible = appNode.visible;
-            }
-        });
-        graphData.links.forEach(canvasLink => {
-            const appLink = graph.LinksMap.get(canvasLink.id);
-
-            if (appLink) {
-                canvasLink.visible = appLink.visible;
-            }
-        });
-
-        canvas.refresh();
+        syncCanvasVisibility();
 
         setLabels([...graph.Labels]);
     };
 
     const onRelationshipClick = (relationship: Relationship) => {
-        const canvas = canvasRef.current;
-
-        if (!canvas) return;
+        if (!canvasRef.current) return;
 
         relationship.show = !relationship.show;
 
@@ -126,22 +105,7 @@ function GraphView({
 
         graph.RelationshipsMap.set(relationship.name, relationship);
 
-        const graphData = canvas.getGraphData();
-
-        graphData.nodes.forEach(canvasNode => {
-            const appNode = graph.NodesMap.get(canvasNode.id);
-            if (appNode) {
-                canvasNode.visible = appNode.visible;
-            }
-        });
-        graphData.links.forEach(canvasLink => {
-            const appLink = graph.LinksMap.get(canvasLink.id);
-            if (appLink) {
-                canvasLink.visible = appLink.visible;
-            }
-        });
-
-        canvas.refresh();
+        syncCanvasVisibility();
 
         setRelationships([...graph.Relationships]);
     };
