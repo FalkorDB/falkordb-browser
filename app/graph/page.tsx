@@ -169,9 +169,20 @@ export default function Page() {
     const getPanelSize = useCallback(() => {
         if (!panel) return "0%";
         const stored = getConnectionItem(panelSizeKey(panel));
+
         if (stored) {
-            return `${JSON.parse(stored)}%`;
+            // The value comes from storage, which anything can have written.
+            // A resize runs in an animation frame, so a throw here would be
+            // swallowed and the panel would silently keep the wrong width.
+            try {
+                const parsed: unknown = JSON.parse(stored);
+
+                if (typeof parsed === "number" && Number.isFinite(parsed) && parsed > 0) return `${parsed}%`;
+            } catch {
+                // Fall through to the default below.
+            }
         }
+
         return panelSizes[panel]?.size ?? "0%";
     }, [panel, panelSizeKey, panelSizes]);
 

@@ -623,7 +623,7 @@ function SchemaGraph({ cacheKey, storedMeta, controlsSlot, selectedElements, set
                             // while they stay inside this view's providers.
                             controlsSlot && createPortal(
                                 <div data-testid="schemaControls" className="flex gap-2 items-center">
-                                    {isLoading && <Loader2 data-testid="schemaLoading" className="animate-spin" size={16} />}
+                                    {isLoading && <Loader2 data-testid="schemaLoading" role="status" aria-label="Discovering schema" className="animate-spin" size={16} />}
                                     <Controls
                                         graph={schemaGraph}
                                         canvasRef={canvasRef}
@@ -636,12 +636,15 @@ function SchemaGraph({ cacheKey, storedMeta, controlsSlot, selectedElements, set
                                     {
                                         // The schema is derived, not queried, so it
                                         // counts labels and placements and has no
-                                        // run time to report.
+                                        // run time to report. A placement is one
+                                        // (source, type, target) triple, so the
+                                        // count is of drawn edges, not of distinct
+                                        // relationship types — hence "Connections".
                                         !isEmpty &&
                                         <>
                                             <p data-testid="schemaLabelsCount">Labels: {schemaGraph.NodesMap.size}</p>
                                             <div className="h-4 w-px bg-border rounded-full" />
-                                            <p data-testid="schemaRelationshipsCount">Relationships: {schemaGraph.LinksMap.size}</p>
+                                            <p data-testid="schemaConnectionsCount">Connections: {schemaGraph.LinksMap.size}</p>
                                         </>
                                     }
                                 </div>,

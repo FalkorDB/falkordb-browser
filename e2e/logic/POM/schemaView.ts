@@ -82,13 +82,13 @@ export default class SchemaView extends GraphPage {
   }
 
   /** The element counts the schema reports in the tab bar. */
-  public async getSchemaCounts(): Promise<{ labels: number; relationships: number }> {
+  public async getSchemaCounts(): Promise<{ labels: number; connections: number }> {
     const read = async (testId: string) =>
       Number((await this.page.getByTestId(testId).textContent())?.split(":")[1]?.trim() ?? NaN);
 
     return {
       labels: await read("schemaLabelsCount"),
-      relationships: await read("schemaRelationshipsCount"),
+      connections: await read("schemaConnectionsCount"),
     };
   }
 

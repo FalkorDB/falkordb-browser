@@ -120,7 +120,7 @@ test.describe("Schema View Tests", () => {
         await schemaView.waitForSchemaTripleCount(EXPECTED_TRIPLES.length);
         expect(await schemaView.getSchemaCounts()).toEqual({
             labels: EXPECTED_LABELS.length,
-            relationships: EXPECTED_TRIPLES.length,
+            connections: EXPECTED_TRIPLES.length,
         });
         expect(await schemaView.isRunTimeVisible()).toBe(false);
     });
@@ -419,9 +419,11 @@ test.describe("Schema View Tests", () => {
         await schemaView.selectSchemaElementBySearch("Person");
         const positions = await schemaView.getSchemaNodePositions();
 
-        // A fresh tab has a schema of its own — here, none at all.
+        // A fresh tab has a schema of its own — here, none at all. The panel of
+        // the tab we left may still be mounted for a frame, so poll rather than
+        // read once.
         await schemaView.addStripTab();
-        expect(await schemaView.isSchemaDataPanelVisible()).toBe(false);
+        await expect.poll(() => schemaView.isSchemaDataPanelVisible()).toBe(false);
 
         await schemaView.selectStripTab(GRAPH_NAME);
         await schemaView.waitForSchemaTripleCount(EXPECTED_TRIPLES.length);
