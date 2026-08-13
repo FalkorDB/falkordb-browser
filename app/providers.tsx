@@ -3,7 +3,7 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, CanvasLayout, captureCanvasLayout } from "@/lib/utils";
+import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, CustomizingRef, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, CanvasLayout, captureCanvasLayout } from "@/lib/utils";
 import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
@@ -15,6 +15,7 @@ import { setFunctionCandidates } from "@/lib/cypherSuggestions";
 import { udfFunctionNames } from "@/lib/cypherLang";
 import { computeEditorDiagnostics, type DiagnosticsResult } from "@/lib/cypherDiagnostics";
 import { isAiFixSupported } from "@/lib/aiFix";
+import type { StubsResponse } from "@/lib/enterprise";
 import { PanelImperativeHandle } from "react-resizable-panels";
 import type { LayoutMode, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
@@ -23,7 +24,7 @@ import { Graph, GraphInfo } from "./api/graph/model";
 import type { LanguageConfig } from "./components/EditorComponent";
 import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, CypherLanguageContext, GraphTabsContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
 import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
-import { MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
+import { GRAPH_OFFLOAD_VERSION_THRESHOLD, MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
 import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDirection, normalizeLayout } from "@/lib/useGraphTabs";
 
@@ -326,6 +327,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [labels, setLabels] = useState<Label[]>([]);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
   const [dbVersion, setDbVersion] = useState<string>("");
+  const [supportsOffload, setSupportsOffload] = useState(false);
+  const [offloadedGraphs, setOffloadedGraphs] = useState<string[]>([]);
   const [connectionType, setConnectionType] = useState<ConnectionType>("Standalone");
   const [connectionInfo, setConnectionInfo] = useState<ConnectionInfo>({});
   const [additionalConnections, setAdditionalConnections] = useState<SessionConnection[]>([]);
@@ -349,7 +352,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [newMaxItemsForSearch, setNewMaxItemsForSearch] = useState<number>(20);
   const [expandFilter, setExpandFilter] = useState(true);
   const [chatOpen, setChatOpen] = useState(false);
-  const [customizingLabel, setCustomizingLabel] = useState<string | null>(null);
+  const [customizingLabel, setCustomizingLabel] = useState<CustomizingRef | null>(null);
   const sessionSyncedRef = useRef(false);
   const prevActiveConnectionIdRef = useRef<string | null>(null);
   const connectionSwitchFetchedRef = useRef(false);
@@ -649,6 +652,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     result: aiFixResult,
     pendingConsentProvider: pendingConsent ? getProviderDisplayName(pendingConsent.provider) : null,
     requestAiFix,
+    reportClientError: (query: string, errorMessage: string) => {
+      // Populate lastFailure so the toast's AI-fix button targets this query,
+      // without running it (grammar errors are blocked pre-execution).
+      setLastFailure({ query, errorMessage });
+      setAiFixResult({ status: "idle" });
+    },
     confirmConsent,
     cancelConsent: () => setPendingConsent(null),
     dismissResult: () => setAiFixResult({ status: "idle" }),
@@ -710,6 +719,44 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const statusRef = useRef(status);
   statusRef.current = status;
 
+  // GRAPH.STUBS lists the graphs offloaded from memory. It is registered by the
+  // enterprise module only and needs a recent enough core, so the fetch is gated
+  // on `supportsOffload`. The ref holds the connection the result must still
+  // belong to when it resolves, so a superseded connection can't overwrite the
+  // current one's indicators.
+  const activeConnectionIdRef = useRef(activeConnectionId);
+  useEffect(() => { activeConnectionIdRef.current = activeConnectionId; }, [activeConnectionId]);
+
+  const refreshOffloadedGraphs = useCallback(async () => {
+    if (!supportsOffload) return;
+
+    const connectionId = activeConnectionIdRef.current;
+    const isCurrent = () => activeConnectionIdRef.current === connectionId;
+
+    try {
+      const result = await fetch("/api/graph/stubs", { method: "GET" });
+
+      if (!isCurrent()) return;
+
+      if (!result.ok) {
+        setOffloadedGraphs([]);
+        return;
+      }
+
+      const { stubs } = (await result.json()) as StubsResponse;
+
+      if (!isCurrent()) return;
+
+      // Keep the same array when nothing changed, so the periodic refresh
+      // doesn't re-render every consumer of the indicators.
+      setOffloadedGraphs((prev) => (
+        prev.length === stubs.length && prev.every((name, i) => name === stubs[i]) ? prev : stubs
+      ));
+    } catch {
+      if (isCurrent()) setOffloadedGraphs([]);
+    }
+  }, [supportsOffload]);
+
   const connectionContext = useMemo(() => ({
     connectionType,
     setConnectionType,
@@ -718,6 +765,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     dbVersion,
     setDbVersion,
     isReadOnly,
+    supportsOffload,
+    offloadedGraphs,
+    refreshOffloadedGraphs,
     additionalConnections,
     setAdditionalConnections,
     activeConnectionId,
@@ -726,7 +776,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     beginConnectionSwitch,
     endConnectionSwitch,
     isLatestSwitch,
-  }), [connectionType, connectionInfo, dbVersion, isReadOnly, additionalConnections, activeConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
+  }), [connectionType, connectionInfo, dbVersion, isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, additionalConnections, activeConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
 
   const udfContext = useMemo(() => ({
     udfList,
@@ -1362,25 +1412,49 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   useEffect(() => { setFunctionCandidates(udfFunctionNames(udfList)); }, [udfList]);
 
   useEffect(() => {
-    if (status !== "authenticated") return;
+    if (status !== "authenticated") return undefined;
     // Use plain fetch with no X-Connection-Id — the server resolves the
     // connection via session.activeConnectionId from the JWT, which is always
     // correct (set by every connection switch). This avoids the timing race
     // where activeConnectionId is null on page load and the check never fires.
+    let cancelled = false;
+
     (async () => {
       try {
         const result = await fetch("/api/DBVersion", { method: "GET" });
+        if (cancelled) return;
         if (!result.ok) {
           setShowMemoryUsage(false);
+          setSupportsOffload(false);
+          setOffloadedGraphs([]);
           return;
         }
-        const [name, version] = (await result.json()).result || ["", 0];
+        const json = await result.json();
+        if (cancelled) return;
+        const [name, version] = json.result || ["", 0];
         setDbVersion(String(version));
         setShowMemoryUsage(name === "graph" && version >= MEMORY_USAGE_VERSION_THRESHOLD);
+        // The enterprise module (`falkordbe`) is what adds graph offloading, and
+        // the core must be recent enough to report stubs.
+        setSupportsOffload(
+          json.enterprise === true && name === "graph" && version >= GRAPH_OFFLOAD_VERSION_THRESHOLD
+        );
       } catch { /* ignore */ }
     })();
 
+    // Stop a response for the previous connection (or a signed-out session) from
+    // landing on the current one.
+    return () => { cancelled = true; };
   }, [status, activeConnectionId]);
+
+  useEffect(() => {
+    if (status !== "authenticated" || !supportsOffload) {
+      setOffloadedGraphs([]);
+      return;
+    }
+
+    refreshOffloadedGraphs();
+  }, [status, activeConnectionId, supportsOffload, refreshOffloadedGraphs]);
   useEffect(() => {
     if (status !== "authenticated") {
       setConnectionType("Standalone");

@@ -29,8 +29,9 @@ const stored = (tabs: unknown[], activeTabId?: unknown) =>
     JSON.stringify({ tabs, activeTabId });
 
 test("forStorage drops the open style panel but keeps the rest of the tab", () => {
+    const customizing = { kind: "node", name: "person1" } as const;
     const source = tab({
-        graph: { customizing: "person1", panelOpen: true },
+        graph: { customizing, panelOpen: true },
         schema: { layout: "tree", panelOpen: false },
         chatOpen: true,
         name: "mine",
@@ -45,7 +46,7 @@ test("forStorage drops the open style panel but keeps the rest of the tab", () =
         name: "mine",
     }));
     // Non-destructive: the live tab still knows which panel is open.
-    assert.equal(source.graph.customizing, "person1");
+    assert.deepEqual(source.graph.customizing, customizing);
 });
 
 test("tabStripItemWidth reserves room for the add button and every gap", () => {
@@ -148,7 +149,7 @@ test("parseStoredTabs keeps every piece of well-formed tab metadata", () => {
             dimmed: true,
             expand: false,
             panelOpen: false,
-            customizing: "Person",
+            customizing: { kind: "edge", name: "KNOWS" },
         },
         schema: {
             viewport,
@@ -180,7 +181,7 @@ test("parseStoredTabs keeps every piece of well-formed tab metadata", () => {
             dimmed: true,
             expand: false,
             panelOpen: false,
-            customizing: "Person",
+            customizing: { kind: "edge", name: "KNOWS" },
         },
         schema: {
             viewport,
@@ -209,7 +210,7 @@ test("parseStoredTabs reads a strip written before the metadata was split per vi
         selected: "n:12",
         layout: "tree",
         panelOpen: false,
-        customizing: "Person",
+        customizing: { kind: "node", name: "Person" },
         chatOpen: true,
     }]));
 
@@ -223,7 +224,7 @@ test("parseStoredTabs reads a strip written before the metadata was split per vi
         dimmed: undefined,
         expand: undefined,
         panelOpen: false,
-        customizing: "Person",
+        customizing: { kind: "node", name: "Person" },
     });
     // Chat belongs to the tab now, wherever it was stored.
     assert.equal(result?.tabs[0].chatOpen, true);
@@ -289,6 +290,17 @@ test("parseStoredTabs strips metadata of the wrong type but keeps the tab", () =
         schema: empty,
         name: undefined,
     }]);
+});
+
+test("parseStoredTabs drops a customizing ref that is not a known kind and name", () => {
+    const customizing = (value: unknown) => parseStoredTabs(stored([
+        tab({ graph: { customizing: value } } as unknown as Partial<GraphTab>),
+    ]))?.tabs[0].graph.customizing;
+
+    assert.equal(customizing({ kind: "line", name: "KNOWS" }), undefined);
+    assert.equal(customizing({ kind: "node" }), undefined);
+    assert.equal(customizing({ name: "Person" }), undefined);
+    assert.deepEqual(customizing({ kind: "node", name: "" }), { kind: "node", name: "" });
 });
 
 test("parseStoredTabs defaults a missing active tab id to empty", () => {

@@ -1,5 +1,5 @@
 import type { HierarchyDirection, LayoutMode, RadialDirection, ViewportState } from "@falkordb/canvas";
-import type { Tab } from "./utils";
+import type { CustomizingRef, Tab } from "./utils";
 
 /**
  * The parts of a canvas view that live on the canvas rather than in React
@@ -26,8 +26,8 @@ export type ViewTabMeta = {
 
 /** What only the graph view has. */
 export type GraphViewMeta = ViewTabMeta & {
-    /** Name of the label whose style panel is open inside the graph info panel. */
-    customizing?: string;
+    /** Kind and name of the label or relationship whose style panel is open inside the graph info panel. */
+    customizing?: CustomizingRef;
 };
 
 /**
@@ -151,10 +151,10 @@ export const createTab = (): GraphTab => ({
 /**
  * Strips the parts of a tab that only make sense while the session is alive.
  *
- * `customizing` names the label whose style panel is open. That is worth
- * carrying when the user flips between tabs, but not across a reload: the
- * panel renders in place of the graph info label list, so restoring it hides
- * that list behind a panel for a label the reloaded graph may not even have.
+ * `customizing` names the label or relationship whose style panel is open. That
+ * is worth carrying when the user flips between tabs, but not across a reload:
+ * the panel renders in place of the graph info label list, so restoring it hides
+ * that list behind a panel for an item the reloaded graph may not even have.
  */
 export const forStorage = ({ graph, ...tab }: GraphTab): GraphTab => {
     const { customizing, ...rest } = graph;
@@ -199,6 +199,13 @@ const normalizeViewMeta = (value: unknown): ViewTabMeta => {
     };
 };
 
+const asCustomizing = (value: unknown): CustomizingRef | undefined => {
+    if (typeof value !== "object" || value === null) return undefined;
+    const ref = value as Partial<CustomizingRef>;
+    if (ref.kind !== "node" && ref.kind !== "edge") return undefined;
+    return typeof ref.name === "string" ? { kind: ref.kind, name: ref.name } : undefined;
+};
+
 /**
  * Drops metadata that did not survive storage intact, keeping the tab usable.
  * A strip written before the metadata was split per view is flat, so the tab
@@ -217,7 +224,7 @@ const normalizeTab = (tab: GraphTab): GraphTab => {
         chatOpen: asBoolean(tab.chatOpen) ?? asBoolean(graph.chatOpen),
         graph: {
             ...normalizeViewMeta(graph),
-            customizing: asString(graph.customizing),
+            customizing: asCustomizing(graph.customizing),
         },
         schema: normalizeViewMeta(tab.schema),
     };

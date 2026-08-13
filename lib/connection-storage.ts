@@ -88,8 +88,8 @@ export function removeConnectionItemsByPrefix(keyPrefix: string): void {
  */
 const SCOPED_KEYS = ["query history"];
 
-/** Prefixes used by graph-specific keys stored as `prefix-graphName`. */
-const SCOPED_KEY_PREFIXES = ["chat-", "cypherOnly-", "labelStyle_"];
+/** Prefixes used by keys scoped to a single graph entity, e.g. `chat-<graphName>` or `labelStyle_<label>`. */
+const SCOPED_KEY_PREFIXES = ["chat-", "cypherOnly-", "labelStyle_", "relationshipStyle_"];
 
 export function migrateToScopedStorage(): void {
   if (!isBrowser() || !_prefix) return;

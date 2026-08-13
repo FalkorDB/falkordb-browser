@@ -3,7 +3,7 @@
 import { ReactNode, RefObject, Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
-import { Panel } from "@/lib/utils";
+import { CustomizingRef, Panel } from "@/lib/utils";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import { PanelContext } from "./provider";
@@ -19,8 +19,8 @@ interface ProviderLayoutProps {
   children: ReactNode;
   panelRef: RefObject<PanelImperativeHandle | null>;
   /** Lifted so the active tab can carry it; see `PanelContextType`. */
-  customizingLabel: string | null;
-  setCustomizingLabel: Dispatch<SetStateAction<string | null>>;
+  customizingLabel: CustomizingRef | null;
+  setCustomizingLabel: Dispatch<SetStateAction<CustomizingRef | null>>;
   tutorialOpen: boolean;
   onCloseTutorial: () => void;
   onLoadDemoGraphs: () => Promise<void>;
