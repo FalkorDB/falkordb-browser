@@ -7,7 +7,7 @@ import type { LayoutMode, ViewportState } from "@falkordb/canvas";
 import type { SessionConnection } from "next-auth";
 import type { LanguageConfig } from "./EditorComponent";
 import { Graph, GraphInfo } from "../api/graph/model";
-import { DEFAULT_GRAPH_TABS, GraphTab } from "@/lib/useGraphTabs";
+import { DEFAULT_GRAPH_TABS, GraphTab, SchemaViewMeta } from "@/lib/useGraphTabs";
 
 export type ChatApiKey = {
   id: string;
@@ -239,6 +239,12 @@ type GraphTabsContextType = {
   renameTab: (id: string, name: string) => void;
   /** No-op when only one tab is left. */
   closeTab: (id: string) => void;
+  /**
+   * The schema view is unmounted while it is not the active view, so it hands
+   * its metadata over as it changes instead of being sampled when the tab is
+   * captured.
+   */
+  setSchemaMeta: (meta: SchemaViewMeta) => void;
 };
 
 type ForceGraphContextType = {
@@ -539,6 +545,7 @@ export const GraphTabsContext = createContext<GraphTabsContextType>({
   addTab: () => { },
   renameTab: () => { },
   closeTab: () => { },
+  setSchemaMeta: () => { },
 });
 
 export const ForceGraphContext = createContext<ForceGraphContextType>({

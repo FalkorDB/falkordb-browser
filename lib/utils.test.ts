@@ -1,6 +1,6 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { convertToCanvasData, createAbortError, getConnectionEpoch, getMetaStats, getSSEGraphResult, isAbortError, securedFetch, setActiveConnectionIdGlobal, type GraphData } from "./utils.ts";
+import { convertToCanvasData, createAbortError, getConnectionEpoch, getMetaStats, getSchema, getSSEGraphResult, isAbortError, parsePanelSizePercent, securedFetch, setActiveConnectionIdGlobal, type GraphData } from "./utils.ts";
 
 const noopToast = () => {};
 const noopIndicator = () => {};
@@ -432,5 +432,325 @@ describe("convertToCanvasData", () => {
     assert.equal(converted.width, undefined);
     assert.equal(converted.fontSize, undefined);
     assert.equal(converted.arrowSize, undefined);
+  });
+
+  it("stamps the requested shape on every node, and leaves it to the canvas default when none is asked for", () => {
+    const nodes = [
+      { id: 1, labels: ["Person"], color: "#FF0000", visible: true, size: 10, expand: false, data: {} },
+      { id: 2, labels: ["City"], color: "#00FF00", visible: true, size: 10, expand: false, data: {} },
+    ];
+    const graphData = { nodes, links: [] } as unknown as GraphData;
+
+    assert.deepEqual(
+      convertToCanvasData(graphData, "square").nodes.map(({ shape }) => shape),
+      ["square", "square"],
+    );
+    assert.deepEqual(
+      convertToCanvasData(graphData).nodes.map(({ shape }) => shape),
+      [undefined, undefined],
+    );
+  });
+});
+
+describe("parsePanelSizePercent", () => {
+  it("accepts a stored percentage", () => {
+    assert.equal(parsePanelSizePercent("42"), 42);
+    assert.equal(parsePanelSizePercent("33.5"), 33.5);
+  });
+
+  it("rejects anything that is not a usable percentage, so the caller keeps its default", () => {
+    // Nothing stored yet.
+    assert.equal(parsePanelSizePercent(null), undefined);
+    assert.equal(parsePanelSizePercent(undefined), undefined);
+    assert.equal(parsePanelSizePercent(""), undefined);
+    // Not JSON at all: this used to throw inside an animation frame, where the
+    // failure was swallowed and the panel silently kept the wrong width.
+    assert.equal(parsePanelSizePercent("abc"), undefined);
+    // Valid JSON, but not a number: would have produced a CSS size of `"30"%`.
+    assert.equal(parsePanelSizePercent('"30"'), undefined);
+    assert.equal(parsePanelSizePercent("null"), undefined);
+    assert.equal(parsePanelSizePercent("[30]"), undefined);
+    // A number, but not one a panel can be sized to.
+    assert.equal(parsePanelSizePercent("0"), undefined);
+    assert.equal(parsePanelSizePercent("-10"), undefined);
+    assert.equal(parsePanelSizePercent("1e999"), undefined);
+  });
+});
+
+type SchemaRow = Record<string, unknown>;
+
+/**
+ * Answers every schema query the way the server would, and records what was
+ * asked. Unlike `installMockEventSource` this serves each instance: schema
+ * discovery has several requests in flight at once.
+ */
+function installSchemaEventSource(respond: (query: string) => SchemaRow[] | undefined): {
+  queries: string[];
+  restore: () => void;
+} {
+  const Original = globalThis.EventSource;
+  const queries: string[] = [];
+
+  class MockEventSource {
+    listeners: Record<string, (event: MessageEvent) => void> = {};
+
+    onerror: ((event?: unknown) => void) | null = null;
+
+    constructor(url: string) {
+      const query = new URL(url, "http://localhost").searchParams.get("query") ?? "";
+
+      queries.push(query);
+
+      // The caller attaches its listeners as soon as the constructor returns,
+      // so the answer waits a microtask.
+      queueMicrotask(() => {
+        this.listeners.result?.({ data: JSON.stringify({ data: respond(query) ?? [] }) } as MessageEvent);
+      });
+    }
+
+    addEventListener(name: string, listener: (event: MessageEvent) => void) {
+      this.listeners[name] = listener;
+    }
+
+    close() {}
+  }
+
+  globalThis.EventSource = MockEventSource as unknown as typeof EventSource;
+
+  return { queries, restore: () => { globalThis.EventSource = Original; } };
+}
+
+const isEdgesQuery = (query: string) => query.startsWith("MATCH (a)-[e]->(b)");
+const isLabelsQuery = (query: string) => query.startsWith("CALL db.labels()");
+const isNodeKeysQuery = (query: string) => query.includes("UNWIND keys(n)");
+const isEdgeKeysQuery = (query: string) => query.includes("UNWIND keys(e)");
+
+describe("getSchema", () => {
+  it("returns the placements, the edgeless labels and the sampled property keys", async () => {
+    const mock = installSchemaEventSource((query) => {
+      if (isEdgesQuery(query)) {
+        return [
+          // Deliberately unsorted, and with one placement reported twice.
+          { source: "Person", relationship: "LIVES_IN", target: "City" },
+          { source: "Person", relationship: "KNOWS", target: "Person" },
+          { source: "Person", relationship: "KNOWS", target: "Person" },
+          // An unlabeled endpoint is folded into the "" label.
+          { source: "", relationship: "KNOWS", target: "Person" },
+        ];
+      }
+
+      // "Company" carries no edge, so only db.labels() knows about it.
+      if (isLabelsQuery(query)) return [{ label: "Person" }, { label: "City" }, { label: "Company" }];
+
+      if (isNodeKeysQuery(query)) {
+        return [
+          { owner: "Person", key: "name", keyType: "String" },
+          { owner: "Person", key: "age", keyType: "Integer" },
+          // FalkorDB enforces no schema: one key, two types across the sample.
+          { owner: "Person", key: "age", keyType: "String" },
+          { owner: "City", key: "name", keyType: "String" },
+        ];
+      }
+
+      if (isEdgeKeysQuery(query)) return [{ owner: "KNOWS", key: "since", keyType: "Integer" }];
+
+      return [];
+    });
+
+    try {
+      const snapshot = await getSchema("demo", noopToast, noopIndicator);
+
+      assert.deepEqual(snapshot?.edges, [
+        { source: "", relationship: "KNOWS", target: "Person" },
+        { source: "Person", relationship: "KNOWS", target: "Person" },
+        { source: "Person", relationship: "LIVES_IN", target: "City" },
+      ]);
+      assert.deepEqual(snapshot?.labelKeys, {
+        City: { name: "String" },
+        Person: { age: "Integer | String", name: "String" },
+      });
+      assert.deepEqual(snapshot?.relationshipKeys, { KNOWS: { since: "Integer" } });
+    } finally {
+      mock.restore();
+    }
+  });
+
+  it("samples keys for every label db.labels() reports plus the unlabeled group, and only for the relationship types that occur", async () => {
+    const mock = installSchemaEventSource((query) => {
+      if (isEdgesQuery(query)) return [{ source: "Person", relationship: "KNOWS", target: "Person" }];
+      if (isLabelsQuery(query)) return [{ label: "Person" }, { label: "Company" }];
+      return [];
+    });
+
+    try {
+      await getSchema("demo", noopToast, noopIndicator);
+
+      const nodeKeysQuery = mock.queries.find(isNodeKeysQuery) ?? "";
+      const edgeKeysQuery = mock.queries.find(isEdgeKeysQuery) ?? "";
+
+      assert.ok(nodeKeysQuery.includes("MATCH (n:`Person`)"));
+      assert.ok(nodeKeysQuery.includes("MATCH (n:`Company`)"));
+      // Nodes with no label are their own group and db.labels() misses them.
+      assert.ok(nodeKeysQuery.includes("MATCH (n) WHERE size(labels(n)) = 0"));
+      assert.ok(edgeKeysQuery.includes("MATCH ()-[e:`KNOWS`]->()"));
+      // Every element scan stops at the sample size.
+      assert.ok(nodeKeysQuery.includes("LIMIT 10"));
+      assert.ok(edgeKeysQuery.includes("LIMIT 10"));
+    } finally {
+      mock.restore();
+    }
+  });
+
+  it("never lets discovery write: every query is read-only", async () => {
+    const urls: string[] = [];
+    const Original = globalThis.EventSource;
+
+    class RecordingEventSource {
+      listeners: Record<string, (event: MessageEvent) => void> = {};
+
+      onerror: ((event?: unknown) => void) | null = null;
+
+      constructor(url: string) {
+        urls.push(url);
+        queueMicrotask(() => {
+          this.listeners.result?.({ data: JSON.stringify({ data: [] }) } as MessageEvent);
+        });
+      }
+
+      addEventListener(name: string, listener: (event: MessageEvent) => void) {
+        this.listeners[name] = listener;
+      }
+
+      close() {}
+    }
+
+    globalThis.EventSource = RecordingEventSource as unknown as typeof EventSource;
+
+    try {
+      await getSchema("demo", noopToast, noopIndicator);
+
+      assert.ok(urls.length > 0);
+      urls.forEach((url) => assert.ok(url.includes("readOnly=true"), url));
+    } finally {
+      globalThis.EventSource = Original;
+    }
+  });
+
+  it("escapes names so a backtick or a quote cannot break out of the query", async () => {
+    const mock = installSchemaEventSource((query) => {
+      if (isEdgesQuery(query)) return [{ source: "we`ird", relationship: "O'NEIL", target: "we`ird" }];
+      if (isLabelsQuery(query)) return [{ label: "we`ird" }];
+      return [];
+    });
+
+    try {
+      await getSchema("demo", noopToast, noopIndicator);
+
+      const nodeKeysQuery = mock.queries.find(isNodeKeysQuery) ?? "";
+      const edgeKeysQuery = mock.queries.find(isEdgeKeysQuery) ?? "";
+
+      // A backtick in a quoted name is doubled, and the literal is quoted too.
+      assert.ok(nodeKeysQuery.includes("MATCH (n:`we``ird`)"));
+      assert.ok(nodeKeysQuery.includes("'we`ird' AS owner"));
+      assert.ok(edgeKeysQuery.includes("MATCH ()-[e:`O'NEIL`]->()"));
+      assert.ok(edgeKeysQuery.includes("'O\\'NEIL' AS owner"));
+    } finally {
+      mock.restore();
+    }
+  });
+
+  it("splits the key sampling into batches so one query never carries every label", async () => {
+    const labels = Array.from({ length: 21 }, (_, i) => ({ label: `Label${i}` }));
+    const mock = installSchemaEventSource((query) => {
+      if (isEdgesQuery(query)) return [];
+      if (isLabelsQuery(query)) return labels;
+      return [];
+    });
+
+    try {
+      await getSchema("demo", noopToast, noopIndicator);
+
+      // 21 labels plus the unlabeled group is 22 owners, batched 20 at a time.
+      const batches = mock.queries.filter(isNodeKeysQuery);
+      assert.equal(batches.length, 2);
+      assert.equal(batches[0].split("UNION").length, 20);
+      assert.equal(batches[1].split("UNION").length, 2);
+    } finally {
+      mock.restore();
+    }
+  });
+
+  it("asks nothing without a graph name, and gives up on a malformed placement response", async () => {
+    const unusedMock = installSchemaEventSource(() => []);
+
+    try {
+      assert.equal(await getSchema("", noopToast, noopIndicator), undefined);
+      assert.equal(unusedMock.queries.length, 0);
+    } finally {
+      unusedMock.restore();
+    }
+
+    const Original = globalThis.EventSource;
+
+    class MalformedEventSource {
+      listeners: Record<string, (event: MessageEvent) => void> = {};
+
+      onerror: ((event?: unknown) => void) | null = null;
+
+      constructor() {
+        queueMicrotask(() => {
+          this.listeners.result?.({ data: JSON.stringify({ data: "not rows" }) } as MessageEvent);
+        });
+      }
+
+      addEventListener(name: string, listener: (event: MessageEvent) => void) {
+        this.listeners[name] = listener;
+      }
+
+      close() {}
+    }
+
+    globalThis.EventSource = MalformedEventSource as unknown as typeof EventSource;
+
+    try {
+      assert.equal(await getSchema("demo", noopToast, noopIndicator), undefined);
+    } finally {
+      globalThis.EventSource = Original;
+    }
+  });
+
+  it("skips rows that are not the shape the view needs instead of drawing garbage", async () => {
+    const mock = installSchemaEventSource((query) => {
+      if (isEdgesQuery(query)) {
+        return [
+          { source: "Person", relationship: "KNOWS", target: "Person" },
+          // A row per way a response can be wrong.
+          { source: "Person", relationship: 7, target: "Person" },
+          { source: "Person", target: "Person" },
+          ["Person", "KNOWS", "Person"] as unknown as SchemaRow,
+        ];
+      }
+
+      if (isLabelsQuery(query)) return [{ label: "Person" }, { label: 42 }, {}];
+
+      if (isNodeKeysQuery(query)) {
+        return [
+          { owner: "Person", key: "name", keyType: "String" },
+          { owner: "Person", key: "age" },
+          { owner: 1, key: "name", keyType: "String" },
+        ];
+      }
+
+      return [];
+    });
+
+    try {
+      const snapshot = await getSchema("demo", noopToast, noopIndicator);
+
+      assert.deepEqual(snapshot?.edges, [{ source: "Person", relationship: "KNOWS", target: "Person" }]);
+      assert.deepEqual(snapshot?.labelKeys, { Person: { name: "String" } });
+    } finally {
+      mock.restore();
+    }
   });
 });

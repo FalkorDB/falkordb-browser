@@ -1,4 +1,4 @@
-import { ArrowRight, Circle, Search, X } from "lucide-react";
+import { ArrowRight, Circle, ScanEye, Search, X } from "lucide-react";
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { cn, GraphRef, Link, Node } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -15,6 +15,8 @@ interface Props {
     selectedElements: (Node | Link)[]
     setSelectedElements: (elements: (Node | Link)[], fromSearch?: boolean) => void
     handleDeleteElement: () => Promise<void>
+    /** Brings back everything hidden, legend included. */
+    showAllElements: () => void
     canvasRef: GraphRef
     setIsAddNode: (isAddNode: boolean) => void
     setIsAddEdge?: (isAddEdge: boolean) => void
@@ -34,6 +36,7 @@ export default function Toolbar({
     selectedElements,
     setSelectedElements,
     handleDeleteElement,
+    showAllElements,
     canvasRef,
     setIsAddNode,
     setIsAddEdge,
@@ -180,6 +183,18 @@ export default function Toolbar({
                         {
                             expand ? <X size={25} /> : <Search size={25} />
                         }
+                    </Button>
+                }
+                {
+                    graph.getElements().length > 0 &&
+                    <Button
+                        data-testid="elementCanvasShowAllGraph"
+                        className="pointer-events-auto"
+                        title="Show All"
+                        disabled={graph.Labels.every(label => label.show) && graph.Relationships.every(rel => rel.show) ? true : false}
+                        onClick={showAllElements}
+                    >
+                        <ScanEye size={25} />
                     </Button>
                 }
                 <div className={cn("basis-0 grow relative pointer-events-auto min-w-[20dvw] max-w-[55dvw]")}>

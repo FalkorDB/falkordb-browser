@@ -187,6 +187,26 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("elementCanvasAddEdgeGraph");
   }
 
+  // VISIBILITY
+  public get elementCanvasShowAll(): Locator {
+    return this.page.getByTestId("elementCanvasShowAllGraph");
+  }
+
+  async clickShowAll(): Promise<void> {
+    await interactWhenVisible(this.elementCanvasShowAll, (el) => el.click(), "show all");
+  }
+
+  /** How many elements the canvas is actually drawing. */
+  async getVisibleElementCounts(): Promise<{ nodes: number; links: number }> {
+    return this.page.evaluate(() => {
+      const data = (window as any).graph?.() ?? { nodes: [], links: [] };
+      const shown = (elements: { visible?: boolean }[]) =>
+        elements.filter((element) => element.visible !== false).length;
+
+      return { nodes: shown(data.nodes ?? []), links: shown(data.links ?? []) };
+    });
+  }
+
   // DELETE ELEMENT
   public get deleteElement(): (type?: Element | "Graph") => Locator {
     return (type: Element | "Graph" = "Graph") =>
