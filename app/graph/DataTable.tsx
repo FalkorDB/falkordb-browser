@@ -1,7 +1,7 @@
 'use client';
 
-import { Check, CirclePlus, Info, Pencil, Trash2, X } from "lucide-react";
-import { cn, getActiveConnectionIdGlobal, getConnectionEpoch, prepareArg, securedFetch, GraphRef, Link, Node, SCHEMA_CAPTION_KEY, Value } from "@/lib/utils";
+import { Asterisk, Check, CirclePlus, Fingerprint, Info, LucideIcon, Pencil, Trash2, X, Zap } from "lucide-react";
+import { cn, getActiveConnectionIdGlobal, getConnectionEpoch, isSchemaReservedKey, prepareArg, securedFetch, GraphRef, Link, Node, SchemaPropertyRules, SchemaPropertyRulesMap, SCHEMA_RULES_KEY, Value } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Fragment, MutableRefObject, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Switch } from "@/components/ui/switch";
@@ -17,6 +17,67 @@ import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
 
 type ValueType = "string" | "number" | "boolean";
+
+const iconSize = 15;
+
+/**
+ * What the graph declares about a schema property. Shown as icons rather than
+ * a column of its own: most properties carry no rule at all, so a column would
+ * be empty far more often than not.
+ */
+function SchemaRuleIndicators({ propertyKey, rules }: { propertyKey: string, rules?: SchemaPropertyRules }) {
+    if (!rules) return null;
+
+    const indicators: { id: string, label: string, description: string, Icon: LucideIcon }[] = [];
+
+    if (rules.indexes.length > 0) {
+        indicators.push({
+            id: "Indexed",
+            label: "Indexed",
+            description: `Indexed (${rules.indexes.join(", ").toLowerCase()})`,
+            Icon: Zap,
+        });
+    }
+
+    if (rules.unique) {
+        indicators.push({
+            id: "Unique",
+            label: "Unique",
+            description: "Unique: no two elements can hold the same value",
+            Icon: Fingerprint,
+        });
+    }
+
+    if (rules.mandatory) {
+        indicators.push({
+            id: "Mandatory",
+            label: "Mandatory",
+            description: "Mandatory: every element has to carry this property",
+            Icon: Asterisk,
+        });
+    }
+
+    if (indicators.length === 0) return null;
+
+    return (
+        <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
+            {
+                indicators.map(({ id, label, description, Icon }) => (
+                    <Tooltip key={id}>
+                        <TooltipTrigger asChild>
+                            <span role="img" aria-label={label} data-testid={`DataPanelAttribute${id}${propertyKey}`}>
+                                <Icon size={iconSize} />
+                            </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>{description}</p>
+                        </TooltipContent>
+                    </Tooltip>
+                ))
+            }
+        </span>
+    );
+}
 
 interface Props {
     object: Node | Link
@@ -476,11 +537,11 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
         }
     };
 
-    const iconSize = 15;
-
     // The schema table is the same table with nothing to edit: a key holds a
     // type instead of a value, so the value and action columns fall away.
     if (schema) {
+        const rules = (object.data[SCHEMA_RULES_KEY] ?? {}) as SchemaPropertyRulesMap;
+
         return (
             <div className={cn("flex flex-col gap-4 bg-background rounded-lg overflow-hidden", className)}>
                 <div className="h-1 grow overflow-y-auto overflow-x-hidden">
@@ -488,13 +549,14 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                         <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Key</div>
                         <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Type</div>
                         {
-                            attributes.filter((key) => key !== SCHEMA_CAPTION_KEY).map((key) => (
+                            attributes.filter((key) => !isSchemaReservedKey(key)).map((key) => (
                                 <Fragment key={key}>
                                     <div
-                                        className="flex items-center px-1 border-b border-border min-h-6"
+                                        className="flex items-center gap-1 px-1 border-b border-border min-h-6"
                                         data-testid={`DataPanelAttribute${key}`}
                                     >
-                                        <p className="w-full truncate">{key}:</p>
+                                        <p className="min-w-0 truncate">{key}:</p>
+                                        <SchemaRuleIndicators propertyKey={key} rules={rules[key]} />
                                     </div>
                                     <div
                                         className="flex items-center px-1 border-b border-border min-h-6"

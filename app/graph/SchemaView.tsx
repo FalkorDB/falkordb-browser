@@ -16,6 +16,7 @@ import {
     Node,
     Relationship,
     SCHEMA_CAPTION_KEY,
+    SCHEMA_RULES_KEY,
     SchemaSnapshot,
     captureCanvasLayout,
     cn,
@@ -54,7 +55,7 @@ const SCHEMA_NODE_SHAPE: NodeShape = "square";
 /** A schema node carries a whole label name, so it gets twice the usual room. */
 const SCHEMA_NODE_SIZE = NODE_SIZE * 2;
 
-const EMPTY_SCHEMA: SchemaSnapshot = { edges: [], labelKeys: {}, relationshipKeys: {} };
+const EMPTY_SCHEMA: SchemaSnapshot = { edges: [], labelKeys: {}, relationshipKeys: {}, labelRules: {}, relationshipRules: {} };
 
 /** A tab that has never shown its schema has nothing stored for it. */
 const EMPTY_META: SchemaViewMeta = {};
@@ -339,7 +340,11 @@ function SchemaGraph({ cacheKey, storedMeta, controlsSlot, selectedElements, set
                 expand: false,
                 collapsed: false,
                 size: SCHEMA_NODE_SIZE,
-                data: { ...schema.labelKeys[name], [SCHEMA_CAPTION_KEY]: name === "" ? EMPTY_LABEL_DISPLAY_NAME : name },
+                data: {
+                    ...schema.labelKeys[name],
+                    [SCHEMA_CAPTION_KEY]: name === "" ? EMPTY_LABEL_DISPLAY_NAME : name,
+                    [SCHEMA_RULES_KEY]: schema.labelRules[name] ?? {},
+                },
             };
             const label: Label = { name, show: true, style: { color: UNKNOWN_COLOR }, elements: [node] };
 
@@ -364,7 +369,10 @@ function SchemaGraph({ cacheKey, storedMeta, controlsSlot, selectedElements, set
                 visible: true,
                 expand: false,
                 collapsed: false,
-                data: { ...schema.relationshipKeys[relationship] },
+                data: {
+                    ...schema.relationshipKeys[relationship],
+                    [SCHEMA_RULES_KEY]: schema.relationshipRules[relationship] ?? {},
+                },
             };
 
             g.Elements.links.push(link);

@@ -164,6 +164,17 @@ export default class SchemaView extends GraphPage {
     return Object.fromEntries(entries);
   }
 
+  /** What the details panel says the graph enforces on one property key. */
+  public async getSchemaDataPanelRules(key: string): Promise<string[]> {
+    const cell = this.schemaDataPanel.getByTestId(`DataPanelAttribute${key}`);
+
+    await cell.waitFor({ state: "visible" });
+
+    return cell
+      .locator("[role='img']")
+      .evaluateAll((icons) => icons.map((icon) => icon.getAttribute("aria-label") ?? ""));
+  }
+
   public async isSchemaTabEnabled(): Promise<boolean> {
     return waitForElementToBeEnabled(this.schemaTab);
   }

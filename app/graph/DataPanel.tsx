@@ -1,6 +1,6 @@
 'use client';
 
-import { getActiveConnectionIdGlobal, getConnectionEpoch, prepareArg, securedFetch, GraphRef, Node, Link, Label, SCHEMA_CAPTION_KEY } from "@/lib/utils";
+import { getActiveConnectionIdGlobal, getConnectionEpoch, isSchemaReservedKey, prepareArg, securedFetch, GraphRef, Node, Link, Label } from "@/lib/utils";
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Pencil, TableProperties, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
@@ -189,7 +189,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef, schem
                 </div>
                 <div className="flex flex-col gap-1 text-sm text-nowrap">
                     {!schema && <p>ID: <span className="Gradient text-transparent bg-clip-text font-semibold">{object.id}</span></p>}
-                    <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text font-semibold">{Object.keys(object.data).filter((key) => key !== SCHEMA_CAPTION_KEY).length}</span></p>
+                    <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text font-semibold">{Object.keys(object.data).filter((key) => !isSchemaReservedKey(key)).length}</span></p>
                 </div>
                 <ul
                     ref={labelsListRef}

@@ -1,6 +1,6 @@
 import { ArrowRight, Circle, ScanEye, Search, X } from "lucide-react";
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { cn, GraphRef, Link, Node } from "@/lib/utils";
+import { cn, GraphRef, Link, Node, SCHEMA_RULES_KEY } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Graph } from "../api/graph/model";
 import Input from "../components/ui/Input";
@@ -93,7 +93,7 @@ export default function Toolbar({
         }
 
         const elements = graph.getElements().filter(el =>
-            Object.values(el.data).some(value => value != null && value.toString().toLowerCase().startsWith(searchElement.toLowerCase()))
+            Object.entries(el.data).some(([key, value]) => key !== SCHEMA_RULES_KEY && value != null && value.toString().toLowerCase().startsWith(searchElement.toLowerCase()))
             || el.id.toString().toLowerCase().includes(searchElement.toLowerCase())
             || ("relationship" in el && (el as Link).relationship.toLowerCase().includes(searchElement.toLowerCase()))
             || ("labels" in el && (el as Node).labels.some(c => c.toLowerCase().includes(searchElement.toLowerCase())))
@@ -131,7 +131,7 @@ export default function Toolbar({
         const lowerSearch = searchElement.toLowerCase();
 
         for (const [key, value] of Object.entries(el.data)) {
-            if (value != null && value.toString().toLowerCase().startsWith(lowerSearch)) {
+            if (key !== SCHEMA_RULES_KEY && value != null && value.toString().toLowerCase().startsWith(lowerSearch)) {
                 return { key, value: value.toString() };
             }
         }
