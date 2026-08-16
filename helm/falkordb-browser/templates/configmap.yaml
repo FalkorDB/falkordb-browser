@@ -10,7 +10,6 @@ data:
   NEXT_PUBLIC_GOOGLE_ANALYTICS: {{ .Values.env.googleAnalytics | quote }}
   PORT: {{ .Values.env.port | quote }}
   REST_PORT: {{ .Values.env.restPort | quote }}
-  MCP_PORT: {{ .Values.env.mcpPort | quote }}
   CYPHER: {{ .Values.env.cypher | quote }}
   HOSTNAME: {{ .Values.env.hostname | quote }}
   API_TOKEN_STORAGE_PATH: {{ .Values.env.apiTokenStoragePath | quote }}
