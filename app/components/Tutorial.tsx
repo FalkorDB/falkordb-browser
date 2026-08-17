@@ -335,6 +335,30 @@ const tutorialSteps: TutorialStep[] = [
         forward: ["mousedown", "mouseenter", "mouseleave"],
     },
     {
+        title: "Graph Schema",
+        description: "The last tab answers a different question: not what a query returned, but what the graph is made of. Click **Schema** to see it.",
+        placementAxis: "y",
+        targetSelector: '[data-testid="schemaTab"]',
+        advanceOn: "mousedown",
+        forward: ["mousedown", "mouseenter", "mouseleave"],
+    },
+    {
+        title: "Schema View",
+        description: "Every node here is a label and every edge a relationship between two labels, discovered from the data itself — nothing has to be declared up front. The label and connection counts sit next to the tabs, and the legend hides a label or a relationship the same way it does in the graph.",
+        placementAxis: "x",
+        targetSelector: 'falkordb-canvas',
+        spotlightSelector: '[data-testid="schemaView"]',
+        forward: ["mousedown", "mouseup", "mousemove", "mouseenter", "mouseleave", "mouseover", "mouseout", "contextmenu", "pointerdown", "pointerup", "pointermove", "pointerenter", "pointerleave", "wheel"],
+    },
+    {
+        title: "Label Properties",
+        description: "Right-click a label or a relationship to open its data panel. It lists the property keys that label carries and the type of each one, so you can learn a graph you have never seen before without writing a single query.",
+        placementAxis: "x",
+        targetSelector: 'falkordb-canvas',
+        spotlightSelector: '[data-testid="schemaView"]',
+        forward: ["mousedown", "mouseup", "mousemove", "mouseenter", "mouseleave", "mouseover", "mouseout", "contextmenu", "pointerdown", "pointerup", "pointermove", "pointerenter", "pointerleave", "wheel"],
+    },
+    {
         title: "Query History",
         description: "Access your previous queries here. You can filter by graph, search queries, and view metadata for each executed query.",
         placementAxis: "y",
@@ -487,18 +511,10 @@ const tutorialSteps: TutorialStep[] = [
     },
     {
         title: "Rename a Tab",
-        description: "Click the pencil on the active tab to give it a name of your own.",
+        description: "The pencil on the active tab opens a name box. Whatever you type is saved as soon as you leave the box, and clearing it brings the graph name back. Hover it to see the hint, then click Next — there is nothing to rename yet.",
         placementAxis: "y",
         targetSelector: '[data-testid="graphSubHeader"] > div[data-active="true"] [data-testid^="graphTabRenameTrigger-"]',
-        advanceOn: "click",
         forward: ["mouseenter", "mouseleave"],
-        hidePrev: true
-    },
-    {
-        title: "Name Your Tab",
-        description: "Type a name for this tab, then click Next — the name is saved as soon as you leave the box. Clearing it restores the graph name.",
-        placementAxis: "y",
-        targetSelector: '[data-testid="graphSubHeader"] input[data-testid^="graphTabRename-"]',
         hidePrev: true
     },
     {
@@ -539,6 +555,10 @@ const tutorialSteps: TutorialStep[] = [
     }
 ];
 
+/** How long Next waits for the next step's target before letting the user through anyway. */
+const NEXT_TARGET_TIMEOUT = 10000;
+const NEXT_TARGET_POLL = 150;
+
 /** Helper: close any open overlays/panels that might be stale */
 function closeStaleOverlays(): void {
     // Close layout dropdown if open (check content portal existence, not data-state which conflicts with TooltipTrigger)
@@ -559,7 +579,7 @@ function closeStaleOverlays(): void {
 
 /**
  * Shared setup for the tracks that resume with the social-demo graph laid out
- * radially — the state steps 42-45 leave behind.
+ * radially — the state steps 45-48 leave behind.
  */
 async function setupSocialDemoRadial(ctx: TrackSetupContext) {
     closeStaleOverlays();
@@ -625,34 +645,34 @@ const tutorialTracks: TutorialTrack[] = [
         },
     },
     {
-        // State after step 33 (Close Query History Window): social-demo selected,
-        // query was run (graph has elements), Metadata tab is active (from step 30),
-        // query history panel is CLOSED (step 33 closed it), no DataPanel
+        // State after step 36 (Close Query History Window): social-demo selected,
+        // query was run (graph has elements), the Schema tab is active (from the
+        // schema steps), query history panel is CLOSED (step 36 closed it), no DataPanel
         name: "Layouts & Canvas",
-        startIndex: 34,
+        startIndex: 37,
         setup: async (ctx) => {
             closeStaleOverlays();
             ctx.handleSetGraphName("social-demo");
             await ctx.runQuery("MATCH p=()-[r:KNOWS]-() WHERE r.since > 2018 RETURN p ", "social-demo");
-            // Set Metadata tab directly — the auto-tab-switch useEffect is suppressed during tutorial
-            ctx.setCurrentTab("Metadata");
+            // Set the tab directly — the auto-tab-switch useEffect is suppressed during tutorial
+            ctx.setCurrentTab("Schema");
             ctx.setLayout('force');
             ctx.setDirection('');
             ctx.canvasRef.current?.setLayout('force');
         },
     },
     {
-        // State after step 45 (Zoom Controls): social-demo selected, graph has elements,
+        // State after step 48 (Zoom Controls): social-demo selected, graph has elements,
         // Graph tab active, radial layout active, no overlays open
         name: "Graph Tabs",
-        startIndex: 46,
+        startIndex: 49,
         setup: setupSocialDemoRadial,
     },
     {
-        // State after step 51 (Close a Tab): social-demo selected, graph has elements,
+        // State after step 53 (Close a Tab): social-demo selected, graph has elements,
         // Graph tab active, controls visible, radial layout active, no overlays open
         name: "Theme & Navigation",
-        startIndex: 52,
+        startIndex: 54,
         setup: setupSocialDemoRadial,
     },
 ];
@@ -764,6 +784,8 @@ function TutorialPortal({
 
     const [mounted, setMounted] = useState(false);
     const [targetDisabled, setTargetDisabled] = useState(false);
+    // Whether the step Next leads to has its target on screen yet.
+    const [nextReady, setNextReady] = useState(true);
     const [arrowStyle, setArrowStyle] = useState<React.CSSProperties>({ display: 'none' });
     const [arrowDirection, setArrowDirection] = useState<"left" | "right" | "top" | "bottom">("top");
     // retryCount forces the setup effect to re-run when a target element isn’t in the DOM yet
@@ -802,6 +824,7 @@ function TutorialPortal({
 
     const currentStep = tutorialSteps[step];
     const { targetSelector, advanceOn, forward, description, position, title, hidePrev, spotlightSelector, placementAxis } = currentStep;
+    const nextTargetSelector = tutorialSteps[step + 1]?.targetSelector;
 
     useEffect(() => {
         setMounted(true);
@@ -821,6 +844,31 @@ function TutorialPortal({
             stopKeepAlive();
         }
     }, [step, stopKeepAlive]);
+
+    // Hold Next until the step it leads to has something to point at. Entering a
+    // track starts a fetch, so a label or a panel the next step highlights can
+    // still be on its way — advancing then lands on a step with no target.
+    // Steps the user advances by acting on the page have no Next to hold.
+    useEffect(() => {
+        if (advanceOn || !nextTargetSelector || document.querySelector(nextTargetSelector)) {
+            setNextReady(true);
+            return () => { };
+        }
+
+        setNextReady(false);
+
+        // Bounded: a target that never arrives must not strand the user on this
+        // step — the next step retries on its own, and can be skipped past.
+        const deadline = Date.now() + NEXT_TARGET_TIMEOUT;
+        const id = window.setInterval(() => {
+            if (!document.querySelector(nextTargetSelector) && Date.now() < deadline) return;
+            window.clearInterval(id);
+            setNextReady(true);
+        }, NEXT_TARGET_POLL);
+
+        return () => window.clearInterval(id);
+    }, [step, advanceOn, nextTargetSelector]);
+
 
     useEffect(() => {
         const forwardArr = [...(forward || []), advanceOn].filter(ev => !!ev);
@@ -1450,7 +1498,9 @@ function TutorialPortal({
                                 // If step does not require user action, show enabled Next/Finish
                                 !advanceOn && (
                                     <Button
-                                        disabled={targetDisabled}
+                                        data-testid="tutorialNext"
+                                        disabled={targetDisabled || !nextReady}
+                                        title={!nextReady ? "Preparing the next step" : undefined}
                                         variant="Primary"
                                         label={isLastStep ? "Finish" : "Next"}
                                         onClick={isLastStep ? onClose : onNext}

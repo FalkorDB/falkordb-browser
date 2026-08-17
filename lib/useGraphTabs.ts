@@ -32,6 +32,12 @@ type Params<S> = {
     canRestore: boolean;
     /** Re-read/reset the tab strip when the user switches connection. */
     connectionKey: string | null;
+    /**
+     * The tutorial works on demo graphs of its own, so it gets a strip of its
+     * own too: the user's tabs are neither shown nor written to while it runs,
+     * and are read back from storage when it closes.
+     */
+    tutorialOpen: boolean;
     /** Tab named by the URL on entry; wins over the stored active tab. */
     initialTabId: string;
     graphName: string;
@@ -75,6 +81,7 @@ export default function useGraphTabs<S>({
     prefixReady,
     canRestore,
     connectionKey,
+    tutorialOpen,
     initialTabId,
     graphName,
     query,
@@ -146,7 +153,10 @@ export default function useGraphTabs<S>({
     }, []);
 
     useEffect(() => {
-        if (!prefixReady || !canRestore) {
+        // Dropping the key while the tutorial runs does double duty: it stops
+        // `persist` from writing the tutorial's tabs over the user's, and makes
+        // this effect restore them from storage once the tutorial closes.
+        if (!prefixReady || !canRestore || tutorialOpen) {
             restoredKeyRef.current = null;
             return;
         }
@@ -178,7 +188,21 @@ export default function useGraphTabs<S>({
         // activating it would clear a graph auto-selected in the meantime.
         const active = stored.tabs.find(t => t.id === activeTabId)!;
         if (active.graphName) onActivateRef.current(active, undefined);
-    }, [prefixReady, canRestore, connectionKey, commitRestored]);
+    }, [prefixReady, canRestore, tutorialOpen, connectionKey, commitRestored]);
+
+    // Hand the tutorial a blank strip the moment it takes over. Nothing has to
+    // be saved first: the user's tabs are still in storage untouched, and that
+    // is what the restore above rolls the strip back to when the tutorial ends.
+    const tutorialOpenRef = useRef(false);
+    useEffect(() => {
+        const was = tutorialOpenRef.current;
+        tutorialOpenRef.current = tutorialOpen;
+        if (!tutorialOpen || was) return;
+
+        sessionsRef.current.clear();
+        const tab = createTab();
+        setState({ tabs: [tab], activeTabId: tab.id });
+    }, [tutorialOpen]);
 
     const persist = useCallback(() => {
         // Never write before the restore has run: on mount the state is a single

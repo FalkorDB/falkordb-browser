@@ -184,15 +184,9 @@ export default class TutorialPanel extends GraphPage {
     );
   }
 
-  /**
-   * Type a name into the tab rename box the tutorial is pointing at.
-   * The input auto-focuses when it mounts and the tutorial overlay sits on top
-   * of it, so `fill` (which focuses the element directly, without a hit test)
-   * is used instead of a click.
-   */
-  async typeTabName(name: string): Promise<void> {
-    await waitForElementToBeVisible(this.activeTabRenameInput);
-    await this.activeTabRenameInput.fill(name);
+  /** The schema canvas the tutorial's schema steps point at. */
+  public get schemaView(): Locator {
+    return this.page.getByTestId("schemaView");
   }
 
   /**

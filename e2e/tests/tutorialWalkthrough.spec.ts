@@ -18,7 +18,6 @@ test.describe("Tutorial Walkthrough", () => {
     let browser: BrowserWrapper;
     let apiCall: ApiCalls;
     const userGraph = getRandomString("tutorialTest");
-    const tabName = getRandomString("tutorialTab");
 
     test.beforeEach(async () => {
         browser = new BrowserWrapper();
@@ -50,6 +49,12 @@ test.describe("Tutorial Walkthrough", () => {
         const graphsBefore = await tutorial.getGraphList();
         expect(graphsBefore).toContain(userGraph);
 
+        // Open a second tab, so the strip the tutorial replaces is one the user
+        // can tell apart from the tutorial's own single tab.
+        await tutorial.addStripTab();
+        const userTabs = await tutorial.getStripTabCount();
+        expect(userTabs).toBe(2);
+
         // 2. Start the tutorial by setting localStorage and refreshing
         await tutorial.changeLocalStorage("true");
         await tutorial.refreshPage();
@@ -59,6 +64,9 @@ test.describe("Tutorial Walkthrough", () => {
         // Step 1: "Welcome to FalkorDB Browser" — has Next button (no advanceOn)
         await tutorial.waitForStep("Welcome to FalkorDB Browser");
         expect(await tutorial.isTutorialVisible()).toBeTruthy();
+        // The tutorial works on a strip of its own — the user's tabs are hidden
+        // for its duration, exactly like their graphs.
+        expect(await tutorial.getStripTabCount()).toBe(1);
         await tutorial.clickNextButton();
 
         // Step 2: "Select a Graph" — advanceOn: "click" on selectGraph
@@ -191,29 +199,42 @@ test.describe("Tutorial Walkthrough", () => {
         await tutorial.waitForStep("Query Metadata");
         await tutorial.clickTutorialTarget('[data-testid="metadataTab"]');
 
-        // Step 31: "Query History" — advanceOn: "click" on queryHistory
+        // Step 31: "Graph Schema" — advanceOn: "mousedown" on schemaTab
+        await tutorial.waitForStep("Graph Schema");
+        await tutorial.clickTutorialTarget('[data-testid="schemaTab"]');
+
+        // Step 32: "Schema View" — no advanceOn, has Next button
+        await tutorial.waitForStep("Schema View");
+        await expect(tutorial.schemaView).toBeVisible();
+        await tutorial.clickNextButton();
+
+        // Step 33: "Label Properties" — no advanceOn, has Next button
+        await tutorial.waitForStep("Label Properties");
+        await tutorial.clickNextButton();
+
+        // Step 34: "Query History" — advanceOn: "click" on queryHistory
         await tutorial.waitForStep("Query History");
         await tutorial.clickTutorialTarget('[data-testid="queryHistory"]');
 
-        // Step 32: "Query History Window" — no advanceOn, has Next button
+        // Step 35: "Query History Window" — no advanceOn, has Next button
         await tutorial.waitForStep("Query History Window");
         await tutorial.clickNextButton();
 
-        // Step 33: "Close Query History Window" — advanceOn: "click" on queryHistoryCloseButton
+        // Step 36: "Close Query History Window" — advanceOn: "click" on queryHistoryCloseButton
         await tutorial.waitForStep("Close Query History Window");
         await tutorial.clickTutorialTarget('[data-testid="queryHistoryCloseButton"]');
 
         // Track 4: Layouts and canvas actions
 
-        // Step 34: "Graph View" — advanceOn: "mousedown" on graphTab
+        // Step 37: "Graph View" — advanceOn: "mousedown" on graphTab
         await tutorial.waitForStep("Graph View");
         await tutorial.clickTutorialTarget('[data-testid="graphTab"]');
 
-        // Step 35: "Open Layout Dropdown" — advanceOn: "click" on layoutControl
+        // Step 38: "Open Layout Dropdown" — advanceOn: "click" on layoutControl
         await tutorial.waitForStep("Open Layout Dropdown");
         await tutorial.clickTutorialTarget('[data-testid="layoutControl"]');
 
-        // Step 36: "Hover Tree" — advanceOn: "pointermove" on layoutTreeSub, advanceCondition checks sub-content
+        // Step 39: "Hover Tree" — advanceOn: "pointermove" on layoutTreeSub, advanceCondition checks sub-content
         await tutorial.waitForStep("Hover Tree");
         await tutorial.hoverTutorialTarget(
             '[data-testid="layoutTreeSub"]',
@@ -221,20 +242,20 @@ test.describe("Tutorial Walkthrough", () => {
             '[data-testid="layoutTreeDirection-td"]'
         );
 
-        // Step 37: "Select Tree Direction" — advanceOn: "click" on layoutTreeDirection-td, passthrough
+        // Step 40: "Select Tree Direction" — advanceOn: "click" on layoutTreeDirection-td, passthrough
         await tutorial.waitForStep("Select Tree Direction");
         await tutorial.clickTutorialTarget('[data-testid="layoutTreeDirection-td"]');
 
-        // Step 38: "Tree Layout Active" — no advanceOn, has Next button
+        // Step 41: "Tree Layout Active" — no advanceOn, has Next button
         await tutorial.waitForStep("Tree Layout Active");
         await expect(tutorial.layoutControl).toContainText("Tree");
         await tutorial.clickNextButton();
 
-        // Step 39: "Open Layout Dropdown" (again) — advanceOn: "click" on layoutControl
+        // Step 42: "Open Layout Dropdown" (again) — advanceOn: "click" on layoutControl
         await tutorial.waitForStep("Open Layout Dropdown");
         await tutorial.clickTutorialTarget('[data-testid="layoutControl"]');
 
-        // Step 40: "Hover Radial" — advanceOn: "pointermove" on layoutRadialSub, advanceCondition checks sub-content
+        // Step 43: "Hover Radial" — advanceOn: "pointermove" on layoutRadialSub, advanceCondition checks sub-content
         await tutorial.waitForStep("Hover Radial");
         await tutorial.hoverTutorialTarget(
             '[data-testid="layoutRadialSub"]',
@@ -242,16 +263,16 @@ test.describe("Tutorial Walkthrough", () => {
             '[data-testid="layoutRadialDirection-out"]'
         );
 
-        // Step 41: "Select Radial Direction" — advanceOn: "click" on layoutRadialDirection-out, passthrough
+        // Step 44: "Select Radial Direction" — advanceOn: "click" on layoutRadialDirection-out, passthrough
         await tutorial.waitForStep("Select Radial Direction");
         await tutorial.clickTutorialTarget('[data-testid="layoutRadialDirection-out"]');
 
-        // Step 42: "Radial Layout Active" — no advanceOn, has Next button
+        // Step 45: "Radial Layout Active" — no advanceOn, has Next button
         await tutorial.waitForStep("Radial Layout Active");
         await expect(tutorial.layoutControl).toContainText("Radial");
         await tutorial.clickNextButton();
 
-        // Step 43: "Animation Control" — no advanceOn, has Next button.
+        // Step 46: "Animation Control" — no advanceOn, has Next button.
         // The radial layout is active here, so animation auto-pins and the
         // control must be disabled (animationDisabled = pinned || layout !== 'force').
         await tutorial.waitForStep("Animation Control");
@@ -259,69 +280,56 @@ test.describe("Tutorial Walkthrough", () => {
         await expect(tutorial.animationControl).toBeDisabled();
         await tutorial.clickNextButton();
 
-        // Step 44: "Pin on Drag" — no advanceOn, has Next button.
+        // Step 47: "Pin on Drag" — no advanceOn, has Next button.
         await tutorial.waitForStep("Pin on Drag");
         await expect(tutorial.pinControl).toBeVisible();
         await tutorial.clickNextButton();
 
-        // Step 45: "Zoom Controls" — no advanceOn, has Next button
+        // Step 48: "Zoom Controls" — no advanceOn, has Next button
         await tutorial.waitForStep("Zoom Controls");
         await tutorial.clickNextButton();
 
         // Track 5: Graph tabs
 
-        // Step 46: "Graph Tabs" — no advanceOn, has Next button
+        // Step 49: "Graph Tabs" — no advanceOn, has Next button
         await tutorial.waitForStep("Graph Tabs");
         await expect(tutorial.tabStrip).toBeVisible();
         const tabsBefore = await tutorial.getStripTabCount();
         await tutorial.clickNextButton();
 
-        // Step 47: "Open a New Tab" — advanceOn: "click" on graphTabAdd
+        // Step 50: "Open a New Tab" — advanceOn: "click" on graphTabAdd
         await tutorial.waitForStep("Open a New Tab");
         await tutorial.clickTutorialTarget('[data-testid="graphTabAdd"]');
         expect(await tutorial.getStripTabCount()).toBe(tabsBefore + 1);
 
-        // Step 48: "Rename a Tab" — advanceOn: "click" on the active tab's rename trigger
+        // Step 51: "Rename a Tab" — no advanceOn; the pencil is only pointed at,
+        // so the name box must stay closed when the step is advanced with Next.
         await tutorial.waitForStep("Rename a Tab");
-        await tutorial.clickTutorialTarget(
-            '[data-testid="graphSubHeader"] > div[data-active="true"] [data-testid^="graphTabRenameTrigger-"]'
-        );
-
-        // Step 49: "Name Your Tab" — no advanceOn; typing commits when the box loses focus
-        await tutorial.waitForStep("Name Your Tab");
-        await tutorial.typeTabName(tabName);
         await tutorial.clickNextButton();
-        // Clicking Next blurs the box, which commits the rename and unmounts it.
         await expect(tutorial.activeTabRenameInput).toHaveCount(0);
-        await expect(tutorial.stripTab(tabName)).toBeVisible();
 
-        // Step 50: "Switch Between Tabs" — advanceOn: "click" on the first tab
+        // Step 52: "Switch Between Tabs" — advanceOn: "click" on the first tab
         await tutorial.waitForStep("Switch Between Tabs");
         await tutorial.clickTutorialTarget(
             '[data-testid="graphSubHeader"] > div:first-of-type [data-testid^="graphTabSelect-"]'
         );
 
-        // Step 51: "Close a Tab" — advanceOn: "click" on the last tab's close button.
-        // The tutorial points at the last tab, which is the one added and renamed
-        // above — assert that before closing, so the lifecycle checks below can
-        // only pass if the right tab went away.
+        // Step 53: "Close a Tab" — advanceOn: "click" on the last tab's close button.
         await tutorial.waitForStep("Close a Tab");
-        await expect(tutorial.stripTabAt(tabsBefore)).toHaveAttribute("data-tab-label", tabName);
         await tutorial.clickTutorialTarget(
             '[data-testid="graphSubHeader"] > div:last-of-type [data-testid^="graphTabClose-"]'
         );
         expect(await tutorial.getStripTabCount()).toBe(tabsBefore);
-        await expect(tutorial.stripTab(tabName)).toHaveCount(0);
 
-        // Step 52: "Theme Toggle" — no advanceOn, has Next button
+        // Step 54: "Theme Toggle" — no advanceOn, has Next button
         await tutorial.waitForStep("Theme Toggle");
         await tutorial.clickNextButton();
 
-        // Step 53: "Left Menu Navigation" — no advanceOn, has Next button
+        // Step 55: "Left Menu Navigation" — no advanceOn, has Next button
         await tutorial.waitForStep("Left Menu Navigation");
         await tutorial.clickNextButton();
 
-        // Step 54: "You're All Set!" — has Finish button
+        // Step 56: "You're All Set!" — has Finish button
         await tutorial.waitForStep("You're All Set!");
         await tutorial.clickNextButton(); // This is the "Finish" button
 
@@ -338,6 +346,9 @@ test.describe("Tutorial Walkthrough", () => {
 
         // 5. Verify the user's original graph is still present
         expect(graphsAfter).toContain(userGraph);
+
+        // 6. Verify the user's own tabs came back with them
+        expect(await tutorial.getStripTabCount()).toBe(userTabs);
 
         // 6. Verify the tutorial flag is set to "false" (completed)
         const page = await browser.getPage();
