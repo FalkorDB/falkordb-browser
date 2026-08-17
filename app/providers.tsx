@@ -1382,6 +1382,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // been dropped would make FalkorDB re-create it — wait for the list.
     canRestore: graphNamesLoaded,
     connectionKey: activeConnectionId,
+    // The tutorial gets a strip of its own; the user's tabs come back with it.
+    tutorialOpen,
     initialTabId: initialTabIdRef.current,
     graphName,
     query: historyQuery.query,

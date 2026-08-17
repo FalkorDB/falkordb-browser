@@ -49,7 +49,8 @@ const SCHEMA_CAPTIONS: [string, boolean][] = [[SCHEMA_CAPTION_KEY, true]];
 const SCHEMA_NODE_SHAPE: NodeShape = "square";
 
 /** A schema node carries a whole label name, so it gets twice the usual room. */
-const SCHEMA_NODE_SIZE = NODE_SIZE * 2;
+const SCHEMA_NODE_SCALE = 2;
+const SCHEMA_NODE_SIZE = NODE_SIZE * SCHEMA_NODE_SCALE;
 
 const EMPTY_SCHEMA: SchemaSnapshot = { edges: [], labelKeys: {}, relationshipKeys: {}, labelRules: {}, relationshipRules: {} };
 
@@ -532,31 +533,45 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
         });
     }, [setSchemaMeta, schemaGraph, selectedElements, viewport, layout, direction, animation, pinned, dimmed, expand]);
 
-    // Colors and visibility never change the graph's shape, so they are applied
-    // in place instead of costing a re-layout.
+    // Colors, sizes and visibility never change the graph's shape, so they are
+    // applied in place instead of costing a re-layout. The styles come from the
+    // graph info, which is where the Customize panel writes them — so a label
+    // restyled in the graph view looks the same here, and the other way round.
     useEffect(() => {
         const { Labels: infoLabels, Relationships: infoRelationships } = graph.GraphInfo;
 
         schemaGraph.Labels.forEach((label) => {
-            const color = infoLabels.get(label.name)?.style.color ?? UNKNOWN_COLOR;
+            const style = infoLabels.get(label.name)?.style;
+            const color = style?.color ?? UNKNOWN_COLOR;
+            // The schema draws a label bigger than the graph draws a node, so the
+            // customized size is scaled rather than used as-is — the emphasis is
+            // kept, and the user's multiplier still shows.
+            const size = (style?.size ?? NODE_SIZE) * SCHEMA_NODE_SCALE;
             const show = !hiddenLabels.includes(label.name);
 
-            label.style.color = color;
+            label.style = { ...label.style, color, size };
             label.show = show;
             label.elements.forEach((node) => {
                 node.color = color;
+                node.size = size;
                 node.visible = show;
             });
         });
 
         schemaGraph.Relationships.forEach((relationship) => {
-            const color = infoRelationships.get(relationship.name)?.style.color ?? UNKNOWN_COLOR;
+            const style = infoRelationships.get(relationship.name)?.style;
+            const color = style?.color ?? UNKNOWN_COLOR;
             const show = !hiddenRelationships.includes(relationship.name);
 
-            relationship.style.color = color;
+            relationship.style = { ...relationship.style, color, width: style?.width, fontSize: style?.fontSize, arrowSize: style?.arrowSize };
             relationship.show = show;
             relationship.elements.forEach((link) => {
                 link.color = color;
+                // Undefined leaves the canvas on its own default, which is what
+                // an un-customized relationship should draw with.
+                link.width = style?.width;
+                link.fontSize = style?.fontSize;
+                link.arrowSize = style?.arrowSize;
                 // Both ends have to be on screen too — a link to a hidden label
                 // would otherwise dangle. Derived rather than toggled, because
                 // this effect applies the whole state at once.
@@ -581,6 +596,7 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
             if (!node) return;
 
             canvasNode.color = node.color;
+            canvasNode.size = node.size ?? SCHEMA_NODE_SIZE;
             canvasNode.visible = node.visible;
         });
         canvasData.links.forEach((canvasLink) => {
@@ -589,6 +605,9 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
             if (!link) return;
 
             canvasLink.color = link.color;
+            canvasLink.width = link.width;
+            canvasLink.fontSize = link.fontSize;
+            canvasLink.arrowSize = link.arrowSize;
             canvasLink.visible = link.visible;
         });
 
