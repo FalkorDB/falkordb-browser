@@ -1680,6 +1680,12 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
     // Load demo graphs when tutorial opens and auto-advance to step 1
     useEffect(() => {
         if (open && step === 0 && !demoLoaded) {
+            // Every step before the schema track is written against the graph
+            // view, and the tutorial's own strip is handed over without going
+            // through a tab activation — so the view the user was on would
+            // otherwise carry into it.
+            setCurrentTab("Graph");
+
             if (onLoadDemoGraphs) {
                 onLoadDemoGraphs()
                     .then(() => {
@@ -1695,7 +1701,7 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
                 setStep(1);
             }
         }
-    }, [open, step, demoLoaded, onLoadDemoGraphs, onClose]);
+    }, [open, step, demoLoaded, onLoadDemoGraphs, onClose, setCurrentTab]);
 
     const handleNextStep = useCallback(async () => {
         const currentStepDef = tutorialSteps[step];
