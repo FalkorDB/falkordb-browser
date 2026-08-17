@@ -11,6 +11,7 @@ import type { FalkorDBCanvas, Data as CanvasData, NodeShape } from "@falkordb/ca
 import { signOut } from "next-auth/react";
 import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, enrichSyntaxMessage, type SyntaxErrorInfo, type HintLink } from "./cypherErrors.ts";
 import { suggestForError, findFuncArgTypo } from "./cypherSuggestions.ts";
+import type { GeoPoint } from "./graphValues.ts";
 
 export { parseSyntaxError };
 export type { SyntaxErrorInfo };
@@ -36,7 +37,8 @@ export const screenSize = {
 };
 
 
-export type Value = string | number | boolean;
+/** Every type FalkorDB can persist as a property value. */
+export type Value = string | number | boolean | GeoPoint | Value[];
 
 export type HistoryQuery = {
   queries: Query[];

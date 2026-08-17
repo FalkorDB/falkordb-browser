@@ -400,8 +400,9 @@ test.describe("Schema View Tests", () => {
 
         await schemaView.selectSchemaElementBySearch("Person");
 
-        expect(await schemaView.getSchemaDataPanelRules("name")).toEqual(["Indexed"]);
+        expect(await schemaView.getSchemaDataPanelIndexTypes("name")).toBe("range");
         // Nothing is declared on the other keys, so they stay unmarked.
+        expect(await schemaView.getSchemaDataPanelIndexTypes("age")).toBe("");
         expect(await schemaView.getSchemaDataPanelRules("age")).toEqual([]);
     });
 

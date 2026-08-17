@@ -1,7 +1,8 @@
 'use client';
 
-import { Asterisk, Check, CirclePlus, Fingerprint, Info, LucideIcon, Pencil, Trash2, X, Zap } from "lucide-react";
+import { Asterisk, Check, CirclePlus, Fingerprint, Info, LucideIcon, Pencil, Trash2, X } from "lucide-react";
 import { cn, getActiveConnectionIdGlobal, getConnectionEpoch, isSchemaReservedKey, prepareArg, securedFetch, GraphRef, Link, Node, SchemaPropertyRules, SchemaPropertyRulesMap, SCHEMA_RULES_KEY, Value } from "@/lib/utils";
+import { formatValue, getDefaultValue, inferValueType, isGeoPoint, isTextValueType, parseValue, VALUE_PLACEHOLDERS, VALUE_TYPES, type ValueType } from "@/lib/graphValues";
 import { useToast } from "@/components/ui/use-toast";
 import { Fragment, MutableRefObject, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Switch } from "@/components/ui/switch";
@@ -16,28 +17,16 @@ import ToastButton from "../components/ToastButton";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
 
-type ValueType = "string" | "number" | "boolean";
-
 const iconSize = 15;
 
 /**
- * What the graph declares about a schema property. Shown as icons rather than
- * a column of its own: most properties carry no rule at all, so a column would
- * be empty far more often than not.
+ * The constraints the graph enforces on a schema property, as icons. The index
+ * types get a column of their own since they read as text, not as a flag.
  */
 function SchemaRuleIndicators({ propertyKey, rules }: { propertyKey: string, rules?: SchemaPropertyRules }) {
     if (!rules) return null;
 
     const indicators: { id: string, label: string, description: string, Icon: LucideIcon }[] = [];
-
-    if (rules.indexes.length > 0) {
-        indicators.push({
-            id: "Indexed",
-            label: "Indexed",
-            description: `Indexed (${rules.indexes.join(", ").toLowerCase()})`,
-            Icon: Zap,
-        });
-    }
 
     if (rules.unique) {
         indicators.push({
@@ -217,20 +206,11 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
         setExpandedAttributes({});
     }, [lastObjId, object, setAttributes, type]);
 
-    const getDefaultVal = (t: ValueType) => {
-        switch (t) {
-            case "boolean":
-                return false;
-            case "number":
-                return 0;
-            default:
-                return "";
-        }
-    };
-
+    // A map is the only thing a property can never hold, and it is the only
+    // shape the editor has nothing to offer for.
     const isComplexType = (value: Value) => {
         const valueType = typeof value;
-        return valueType !== "string" && valueType !== "number" && valueType !== "boolean";
+        return valueType === "object" && !Array.isArray(value) && !isGeoPoint(value);
     };
 
     const handleSetEditable = (key: string, value?: Value) => {
@@ -238,16 +218,19 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
             setIsAddValue(false);
         }
 
-        // Don't allow editing complex types
+        // Maps cannot be stored as property values, so there is nothing to edit.
         if (value !== undefined && isComplexType(value)) {
             return;
         }
 
-        setEditable(key);
-        setNewVal(value ?? "");
-        setNewType(typeof value === "undefined" ? "string" : typeof value as ValueType);
+        const valueType = value === undefined ? "string" : inferValueType(value);
 
-        if (typeof value !== "undefined" && typeof value !== "string") return;
+        setEditable(key);
+        // The structured types are edited as the text they read as.
+        setNewVal(value === undefined ? "" : (isTextValueType(valueType) ? formatValue(value) : value));
+        setNewType(valueType);
+
+        if (value !== undefined && valueType !== "string") return;
 
         setTimeout(() => {
             if (setTextareaRef.current) {
@@ -257,7 +240,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
         }, 0);
     };
 
-    const setProperty = async (key: string, val: Value, isUndo: boolean, actionType: ("added" | "set") = "set") => {
+    const setProperty = async (key: string, val: Value, isUndo: boolean, actionType: ("added" | "set") = "set", valueType: ValueType = inferValueType(val)) => {
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
         const { id } = object;
@@ -275,6 +258,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                 method: "POST",
                 body: JSON.stringify({
                     value: val,
+                    valueType,
                     type
                 })
             }, toast, setIndicator, cid);
@@ -342,6 +326,22 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
         }
     };
 
+    /** Validates what the editor holds, then writes it as the picked type. */
+    const commitValue = async (key: string, raw: Value, valueType: ValueType, isUndo: boolean, actionType: ("added" | "set") = "set") => {
+        const parsed = parseValue(valueType, raw);
+
+        if ("error" in parsed) {
+            toast({
+                title: "Error",
+                description: parsed.error,
+                variant: "destructive"
+            });
+            return false;
+        }
+
+        return setProperty(key, parsed.value, isUndo, actionType, valueType);
+    };
+
     const handleAddValue = async (key: string, value: Value) => {
         if (!key || key === "" || value === "") {
             toast({
@@ -353,7 +353,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
         }
         try {
             setIsAddLoading(true);
-            const success = await setProperty(key, value, false, "added");
+            const success = await commitValue(key, value, newType, false, "added");
             if (!success) return;
             setIsAddValue(false);
             setNewKey("");
@@ -457,7 +457,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
         if (e.key === "Enter" && !e.shiftKey) {
             if (isSetLoading || indicator === "offline") return;
             e.preventDefault();
-            setProperty(editable, newVal, true);
+            commitValue(editable, newVal, newType, true);
         }
     };
 
@@ -472,7 +472,8 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                     data-testid={dataTestId}
                     onCheckedChange={(checked) => setNewVal(checked)}
                 />;
-            case "number":
+            case "integer":
+            case "float":
                 return <Input
                     className="w-full"
                     ref={setInputRef}
@@ -482,6 +483,24 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                         const num = Number(e.target.value);
                         if (!Number.isNaN(num)) setNewVal(num);
                     }}
+                    onKeyDown={actionType === "set" ? handleSetKeyDown : handleAddKeyDown}
+                />;
+            case "array":
+            case "vector":
+            case "point":
+            case "date":
+            case "time":
+            case "datetime":
+            case "duration":
+                // Written as text and parsed on save, so a half-typed list or
+                // date does not have to be a valid value of its type.
+                return <Input
+                    className="w-full"
+                    ref={setInputRef}
+                    data-testid={dataTestId}
+                    placeholder={VALUE_PLACEHOLDERS[t]}
+                    value={newVal as string}
+                    onChange={(e) => setNewVal(e.target.value)}
                     onKeyDown={actionType === "set" ? handleSetKeyDown : handleAddKeyDown}
                 />;
             default:
@@ -504,11 +523,17 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
 
     const getNewTypeInput = () => (
         <Combobox
-            options={["string", "number", "boolean"]}
+            options={[...VALUE_TYPES]}
             selectedValue={newType}
             setSelectedValue={(t) => {
-                setNewType(t);
-                setNewVal(typeof newVal === t ? newVal : getDefaultVal(t));
+                const nextType = t as ValueType;
+
+                setNewType(nextType);
+                // Carry the text over between the types that are edited as
+                // text; anything else starts from that type's empty value.
+                setNewVal(inferValueType(newVal) === nextType || (isTextValueType(nextType) && typeof newVal === "string")
+                    ? newVal
+                    : getDefaultValue(nextType));
             }}
             label="Type"
         />
@@ -525,17 +550,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
         }));
     };
 
-    const getStringValue = (value: Value) => {
-        switch (typeof value) {
-            case "object":
-            case "number":
-                return String(value);
-            case "boolean":
-                return value ? "true" : "false";
-            default:
-                return typeof value === "undefined" ? "" : value as string;
-        }
-    };
+    const getStringValue = (value: Value) => formatValue(value);
 
     // The schema table is the same table with nothing to edit: a key holds a
     // type instead of a value, so the value and action columns fall away.
@@ -545,24 +560,37 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
         return (
             <div className={cn("flex flex-col gap-4 bg-background rounded-lg overflow-hidden", className)}>
                 <div className="h-1 grow overflow-y-auto overflow-x-hidden">
-                    <div className="w-full grid grid-cols-[minmax(0,max-content)_minmax(0,max-content)]">
+                    <div className="w-full grid grid-cols-[minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)]">
                         <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Key</div>
                         <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Type</div>
+                        <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Constraints</div>
+                        <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Index</div>
                         {
                             attributes.filter((key) => !isSchemaReservedKey(key)).map((key) => (
                                 <Fragment key={key}>
                                     <div
-                                        className="flex items-center gap-1 px-1 border-b border-border min-h-6"
+                                        className="flex items-center px-1 border-b border-border min-h-6"
                                         data-testid={`DataPanelAttribute${key}`}
                                     >
-                                        <p className="min-w-0 truncate">{key}:</p>
-                                        <SchemaRuleIndicators propertyKey={key} rules={rules[key]} />
+                                        <p className="w-full truncate">{key}:</p>
                                     </div>
                                     <div
                                         className="flex items-center px-1 border-b border-border min-h-6"
                                         data-testid={`DataPanelAttributeType${key}`}
                                     >
                                         <p className="w-full truncate">{String(object.data[key])}</p>
+                                    </div>
+                                    <div
+                                        className="flex items-center px-1 border-b border-border min-h-6"
+                                        data-testid={`DataPanelAttributeIndicators${key}`}
+                                    >
+                                        <SchemaRuleIndicators propertyKey={key} rules={rules[key]} />
+                                    </div>
+                                    <div
+                                        className="flex items-center px-1 border-b border-border min-h-6"
+                                        data-testid={`DataPanelAttributeIndex${key}`}
+                                    >
+                                        <p className="w-full truncate">{(rules[key]?.indexes ?? []).join(", ").toLowerCase()}</p>
                                     </div>
                                 </Fragment>
                             ))
@@ -611,7 +639,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                                     >
                                         {
                                             editable === key ?
-                                                getCellEditableContent(typeof newVal as ValueType)
+                                                getCellEditableContent(newType)
                                                 : (
                                                     <div className="flex w-full flex-col gap-1">
                                                         <Button
@@ -659,7 +687,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                                         onMouseLeave={() => setHover("")}
                                         key={`${key}-type`}
                                     >
-                                        {editable === key ? getNewTypeInput() : <p className="w-full truncate">{typeof value}</p>}
+                                        {editable === key ? getNewTypeInput() : <p className="w-full truncate">{inferValueType(value)}</p>}
                                     </div>
                                     <div
                                         className={cellClass}
@@ -677,7 +705,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                                                             variant="button"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                setProperty(key, newVal, true);
+                                                                commitValue(key, newVal, newType, true);
                                                             }}
                                                             isLoading={isSetLoading}
                                                         >

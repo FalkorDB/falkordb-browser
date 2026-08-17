@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { UDF_CHAT_MAX_LIBRARIES, UDF_CHAT_MAX_FUNCTIONS_PER_LIBRARY, UDF_CHAT_MAX_NAME_LENGTH } from "@/app/utils";
+import { VALUE_TYPES } from "@/lib/graphValues";
 
 export const createUser = z.object({
   username: z
@@ -106,12 +107,19 @@ export const removeGraphElementLabel = z.object({
     .min(1, "Label cannot be empty"),
 });
 
+const propertyScalar = z.union([z.string(), z.number(), z.boolean()]);
+
 export const updateGraphElementAttribute = z.object({
   type: z.boolean(),
+  // Absent for the primitive types, which need no help from Cypher to be built.
+  valueType: z.enum(VALUE_TYPES).optional(),
   value: z.union([
     z.string().min(1, "Attribute value cannot be empty"),
     z.number(),
     z.boolean(),
+    // Arrays hold scalars or arrays of them; FalkorDB stores nothing deeper.
+    z.array(z.union([propertyScalar, z.array(propertyScalar)])),
+    z.object({ latitude: z.number(), longitude: z.number() }),
   ]),
 });
 

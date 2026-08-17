@@ -1,7 +1,6 @@
 "use client";
 
-import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { Dispatch, ReactNode, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import type { FalkorDBCanvas, LayoutMode, ViewportState, NodeShape } from "@falkordb/canvas";
 import { NODE_SIZE } from "@falkordb/canvas";
@@ -11,6 +10,7 @@ import {
     CANVAS_AUTO_ZOOM_DELAY,
     CanvasLayout,
     GraphData,
+    GraphRef,
     Label,
     Link,
     Node,
@@ -19,7 +19,6 @@ import {
     SCHEMA_RULES_KEY,
     SchemaSnapshot,
     captureCanvasLayout,
-    cn,
     convertToCanvasData,
     getActiveConnectionIdGlobal,
     getSchema,
@@ -36,9 +35,6 @@ import {
     IndicatorContext,
 } from "../components/provider";
 import { Graph } from "../api/graph/model";
-import Controls from "./controls";
-import Labels from "./labels";
-import Toolbar from "./toolbar";
 
 /** Shown in place of the synthetic "" label FalkorDB reports for unlabeled nodes. */
 const EMPTY_LABEL_DISPLAY_NAME = "Empty";
@@ -159,22 +155,69 @@ function usePersisted<K extends keyof SchemaCache>(
 const isSameSchema = (a: SchemaSnapshot, b: SchemaSnapshot) => JSON.stringify(a) === JSON.stringify(b);
 
 /**
+ * Everything the graph view's chrome — toolbar, legend, controls and the counts
+ * in the tab bar — runs on. The Graph tab fills it from its own state and the
+ * Schema tab from the state below, so there is one of each on screen rather
+ * than a second set built for the schema.
+ */
+export type ActiveGraphView = {
+    mode: "graph" | "schema";
+    graph: Graph;
+    graphName: string;
+    canvasRef: GraphRef;
+    labels: Label[];
+    relationships: Relationship[];
+    onLabelClick: (label: Label) => void;
+    onRelationshipClick: (relationship: Relationship) => void;
+    /** Brings back everything hidden, legend included. */
+    showAllElements: () => void;
+    selectedElements: (Node | Link)[];
+    setSelectedElements: (elements?: (Node | Link)[], fromSearch?: boolean) => void;
+    handleDeleteElement: () => Promise<void>;
+    expand: boolean;
+    setExpand: Dispatch<SetStateAction<boolean>>;
+    setIsAddNode: (isAddNode: boolean) => void;
+    /** Left out when there is nothing an edge could be added between. */
+    setIsAddEdge?: (isAddEdge: boolean) => void;
+    isAddNode: boolean;
+    isAddEdge: boolean;
+    dimmed: boolean;
+    setDimmed: Dispatch<SetStateAction<boolean>>;
+    /** True when the view has nothing for the controls to act on. */
+    isEmpty: boolean;
+    showControls: boolean;
+    /** Built where the view's state lives, drawn where its tab is. */
+    canvas: ReactNode;
+    /** What the view reports next to the controls. */
+    status: ReactNode;
+};
+
+/**
  * A structural overview of the graph: one node per label, and one edge per
  * (source label, relationship type, target label) triple that actually occurs.
  *
- * It behaves like the graph view — same canvas, controls, search, legend and
- * details panel — except its elements stand for label and relationship *types*
- * rather than real elements. So the details panel lists the property keys of a
- * type and the value type they hold instead of values, and nothing is editable.
+ * It is the graph view in schema mode — same canvas, controls, search, legend
+ * and details panel — except its elements stand for label and relationship
+ * *types* rather than real elements. So the details panel lists the property
+ * keys of a type and the value type they hold instead of values, and nothing is
+ * editable.
+ *
+ * Which is why this is a scope rather than a view: it owns the schema's state
+ * and hands it to the graph view's own chrome, which it renders as its child so
+ * the read-only connection, the schema captions and the schema canvas all reach
+ * it through context.
  */
-type SchemaViewProps = {
-    /** Where GraphView wants the controls rendered: in the tab bar, next to its own. */
-    controlsSlot: HTMLElement | null;
+type SchemaScopeProps = {
+    /** True while the Schema tab is the one on screen. */
+    active: boolean;
+    /** What the chrome runs on while it is not. */
+    fallback: ActiveGraphView;
     selectedElements: (Node | Link)[];
     setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>;
+    children: (view: ActiveGraphView) => ReactNode;
 };
 
-export default function SchemaView({ controlsSlot, selectedElements, setSelectedElements }: SchemaViewProps) {
+export default function SchemaScope({ active, fallback, selectedElements, setSelectedElements, children }: SchemaScopeProps) {
     const { graphName } = useContext(GraphContext);
     const { activeConnectionId } = useContext(ConnectionContext);
     const { activeTabId, tabs } = useContext(GraphTabsContext);
@@ -190,20 +233,26 @@ export default function SchemaView({ controlsSlot, selectedElements, setSelected
     // from — it holds the view state, not the schema itself.
     const storedMeta = tabs.find(({ id }) => id === activeTabId)?.schema ?? EMPTY_META;
 
+    // Discovery, and everything it feeds, only runs while the tab is on screen.
+    if (!active) return <>{children(fallback)}</>;
+
     return (
         <SchemaGraph
             key={key}
             cacheKey={key}
             storedMeta={storedMeta}
-            controlsSlot={controlsSlot}
             selectedElements={selectedElements}
             setSelectedElements={setSelectedElements}
-        />
+        >
+            {children}
+        </SchemaGraph>
     );
 }
 
-function SchemaGraph({ cacheKey, storedMeta, controlsSlot, selectedElements, setSelectedElements }: SchemaViewProps & { cacheKey: string, storedMeta: SchemaViewMeta }) {
-    const { graph, graphName, isLoading: isGraphLoading } = useContext(GraphContext);
+type SchemaGraphProps = Omit<SchemaScopeProps, "active" | "fallback"> & { cacheKey: string, storedMeta: SchemaViewMeta };
+
+function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElements, children }: SchemaGraphProps) {
+    const { graph, graphName } = useContext(GraphContext);
     const { graphInfoVersion } = useContext(GraphInfoContext);
     const { setIndicator } = useContext(IndicatorContext);
     const { setSchemaMeta } = useContext(GraphTabsContext);
@@ -618,99 +667,85 @@ function SchemaGraph({ cacheKey, storedMeta, controlsSlot, selectedElements, set
     }), [browserSettings]);
 
     const isEmpty = schemaGraph.getElements().length === 0;
-    const hasLegend = labels.length !== 0 || relationships.length !== 0;
+
+    const view: ActiveGraphView = {
+        mode: "schema",
+        graph: schemaGraph,
+        graphName,
+        canvasRef,
+        labels,
+        relationships,
+        onLabelClick,
+        onRelationshipClick,
+        showAllElements,
+        selectedElements,
+        setSelectedElements: handleSelect,
+        handleDeleteElement,
+        expand,
+        setExpand,
+        // The schema is derived, not edited: there is nothing to add.
+        setIsAddNode: noop,
+        isAddNode: false,
+        isAddEdge: false,
+        dimmed,
+        setDimmed,
+        isEmpty,
+        // Unlike the graph's, they stay reachable while the schema is empty —
+        // it is discovered rather than queried, so there is nothing to run first.
+        showControls: true,
+        canvas: (
+            <div data-testid="schemaView" className="relative h-full w-full">
+                {
+                    isEmpty && !isLoading &&
+                    <p data-testid="schemaEmptyState" className="absolute inset-0 flex items-center justify-center text-foreground/50 pointer-events-none">
+                        {graphName ? "This graph has no labels yet" : "Select a graph to see its schema"}
+                    </p>
+                }
+                <ForceGraph
+                    graph={schemaGraph}
+                    data={schemaGraph.Elements}
+                    setData={setData}
+                    graphData={graphData}
+                    setGraphData={setGraphData}
+                    canvasRef={canvasRef}
+                    selectedElements={selectedElements}
+                    setSelectedElements={handleSelect}
+                    setRelationships={setRelationships}
+                    viewport={viewport}
+                    setViewport={setViewport}
+                    dimmed={dimmed}
+                    disableExpand
+                    nodeShape={SCHEMA_NODE_SHAPE}
+                    testHookName="schema"
+                    testId="schemaCanvasWrapper"
+                />
+            </div>
+        ),
+        status: (
+            // The schema is derived, not queried, so it counts labels and
+            // placements and has no run time to report. A placement is one
+            // (source, type, target) triple, so the count is of drawn edges,
+            // not of distinct relationship types — hence "Connections".
+            <>
+                {isLoading && <Loader2 data-testid="schemaLoading" role="status" aria-label="Discovering schema" className="animate-spin" size={16} />}
+                {
+                    !isEmpty &&
+                    <>
+                        <div className="h-4 w-px bg-border rounded-full" />
+                        <p data-testid="schemaLabelsCount">Labels: {schemaGraph.NodesMap.size}</p>
+                        <div className="h-4 w-px bg-border rounded-full" />
+                        <p data-testid="schemaConnectionsCount">Connections: {schemaGraph.LinksMap.size}</p>
+                    </>
+                }
+            </>
+        ),
+    };
 
     return (
         <ConnectionContext.Provider value={connectionValue}>
             <BrowserSettingsContext.Provider value={settingsValue}>
                 <ForceGraphContext.Provider value={forceGraphValue}>
-                    <div data-testid="schemaView" className="relative h-full w-full">
-                        {
-                            // The controls belong next to the tab list, which is
-                            // rendered by GraphView. A portal keeps them there
-                            // while they stay inside this view's providers.
-                            controlsSlot && createPortal(
-                                <div data-testid="schemaControls" className="flex gap-2 items-center">
-                                    {isLoading && <Loader2 data-testid="schemaLoading" role="status" aria-label="Discovering schema" className="animate-spin" size={16} />}
-                                    <Controls
-                                        graph={schemaGraph}
-                                        canvasRef={canvasRef}
-                                        disabled={isEmpty}
-                                        dimmed={dimmed}
-                                        setDimmed={setDimmed}
-                                        selectedElements={selectedElements}
-                                    />
-                                    <div className="h-4 w-px bg-border rounded-full" />
-                                    {
-                                        // The schema is derived, not queried, so it
-                                        // counts labels and placements and has no
-                                        // run time to report. A placement is one
-                                        // (source, type, target) triple, so the
-                                        // count is of drawn edges, not of distinct
-                                        // relationship types — hence "Connections".
-                                        !isEmpty &&
-                                        <>
-                                            <p data-testid="schemaLabelsCount">Labels: {schemaGraph.NodesMap.size}</p>
-                                            <div className="h-4 w-px bg-border rounded-full" />
-                                            <p data-testid="schemaConnectionsCount">Connections: {schemaGraph.LinksMap.size}</p>
-                                        </>
-                                    }
-                                </div>,
-                                controlsSlot
-                            )
-                        }
-                        <div className="absolute inset-0 z-10 flex flex-col gap-2 p-2 pointer-events-none">
-                            {
-                                !isGraphLoading &&
-                                <Toolbar
-                                    graph={schemaGraph}
-                                    graphName={graphName}
-                                    selectedElements={selectedElements}
-                                    setSelectedElements={handleSelect}
-                                    handleDeleteElement={handleDeleteElement}
-                                    showAllElements={showAllElements}
-                                    canvasRef={canvasRef}
-                                    setIsAddNode={noop}
-                                    setExpand={setExpand}
-                                    expand={expand}
-                                    isAddEdge={false}
-                                    isAddNode={false}
-                                />
-                            }
-                            {
-                                !isGraphLoading && expand && hasLegend &&
-                                <div className={cn("w-fit max-w-[180px] h-1 grow grid gap-1.5", labels.length !== 0 && relationships.length !== 0 ? "grid-rows-[minmax(0,max-content)_max-content_minmax(0,max-content)]" : "grid-rows-[minmax(0,max-content)]")}>
-                                    {labels.length !== 0 && <Labels labels={labels} onClick={onLabelClick} label="Labels" />}
-                                    {labels.length !== 0 && relationships.length !== 0 && <div className="h-px bg-border/40 rounded-full" />}
-                                    {relationships.length !== 0 && <Labels labels={relationships} onClick={onRelationshipClick} label="Relationships" />}
-                                </div>
-                            }
-                        </div>
-                        {
-                            isEmpty && !isLoading &&
-                            <p data-testid="schemaEmptyState" className="absolute inset-0 flex items-center justify-center text-foreground/50 pointer-events-none">
-                                {graphName ? "This graph has no labels yet" : "Select a graph to see its schema"}
-                            </p>
-                        }
-                        <ForceGraph
-                            graph={schemaGraph}
-                            data={schemaGraph.Elements}
-                            setData={setData}
-                            graphData={graphData}
-                            setGraphData={setGraphData}
-                            canvasRef={canvasRef}
-                            selectedElements={selectedElements}
-                            setSelectedElements={handleSelect}
-                            setRelationships={setRelationships}
-                            viewport={viewport}
-                            setViewport={setViewport}
-                            dimmed={dimmed}
-                            disableExpand
-                            nodeShape={SCHEMA_NODE_SHAPE}
-                            testHookName="schema"
-                            testId="schemaCanvasWrapper"
-                        />
-                    </div>
+                    {children(view)}
                 </ForceGraphContext.Provider>
             </BrowserSettingsContext.Provider>
         </ConnectionContext.Provider>
