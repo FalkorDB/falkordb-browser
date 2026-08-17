@@ -15,6 +15,17 @@ export interface SchemaTriple {
 /** Mirrors SCHEMA_CAPTION_KEY: the reserved entry the view captions nodes from. */
 const CAPTION_KEY = "__schemaCaption";
 
+/** Mirrors SCHEMA_RULES_KEY: the reserved entry carrying the property rules. */
+const RULES_KEY = "__schemaRules";
+
+/** The property keys of one element, without the entries the view reserves. */
+const propertyKeysOf = (data: Record<string, string> | undefined) =>
+  Object.fromEntries(
+    Object.entries(data ?? {}).filter(
+      ([key]) => key !== CAPTION_KEY && key !== RULES_KEY
+    )
+  );
+
 /** Raw shape of the canvas data the schema view renders. */
 interface SchemaCanvasData {
   nodes: {
@@ -53,6 +64,10 @@ export default class SchemaView extends GraphPage {
     return this.page.getByTestId("schemaView");
   }
 
+  // The toolbar, legend and controls are the graph view's own, shown in schema
+  // mode — so they sit outside the schema canvas. Only one set of them is ever
+  // mounted, which is why they are looked up on the page rather than scoped.
+
   private get schemaEmptyState(): Locator {
     return this.page.getByTestId("schemaEmptyState");
   }
@@ -74,7 +89,7 @@ export default class SchemaView extends GraphPage {
   }
 
   private get schemaSearch(): Locator {
-    return this.schemaContainer.getByTestId("elementCanvasSearchGraph");
+    return this.page.getByTestId("elementCanvasSearchGraph");
   }
 
   private get schemaDataPanel(): Locator {
@@ -120,7 +135,7 @@ export default class SchemaView extends GraphPage {
   /** Brings back everything hidden, including whatever the legend hid. */
   public async clickSchemaShowAll(): Promise<void> {
     await interactWhenVisible(
-      this.schemaContainer.getByTestId("elementCanvasShowAllGraph"),
+      this.page.getByTestId("elementCanvasShowAllGraph"),
       (el) => el.click(),
       "schema show all"
     );
@@ -130,7 +145,7 @@ export default class SchemaView extends GraphPage {
   public async selectSchemaElementBySearch(text: string): Promise<void> {
     await interactWhenVisible(this.schemaSearch, (el) => el.fill(text), "schema search");
     // The suggestions are debounced, so Enter would be a no-op until they land.
-    await this.schemaContainer
+    await this.page
       .getByTestId("elementCanvasSuggestionsListGraph")
       .waitFor({ state: "visible" });
     await this.schemaSearch.press("Enter");
@@ -162,6 +177,26 @@ export default class SchemaView extends GraphPage {
       );
 
     return Object.fromEntries(entries);
+  }
+
+  /** What the details panel says the graph enforces on one property key. */
+  public async getSchemaDataPanelRules(key: string): Promise<string[]> {
+    const cell = this.schemaDataPanel.getByTestId(`DataPanelAttributeIndicators${key}`);
+
+    await cell.waitFor({ state: "visible" });
+
+    return cell
+      .locator("[role='img']")
+      .evaluateAll((icons) => icons.map((icon) => icon.getAttribute("aria-label") ?? ""));
+  }
+
+  /** The index types the details panel lists for one property key, if any. */
+  public async getSchemaDataPanelIndexTypes(key: string): Promise<string> {
+    const cell = this.schemaDataPanel.getByTestId(`DataPanelAttributeIndex${key}`);
+
+    await cell.waitFor({ state: "visible" });
+
+    return (await cell.textContent())?.trim() ?? "";
   }
 
   public async isSchemaTabEnabled(): Promise<boolean> {
@@ -206,7 +241,7 @@ export default class SchemaView extends GraphPage {
   /** Toggles a label in the legend, which hides or shows it on the canvas. */
   public async toggleSchemaLabel(name: string): Promise<void> {
     await interactWhenVisible(
-      this.schemaContainer.getByTestId(`GraphLabelsButton${name}`),
+      this.page.getByTestId(`GraphLabelsButton${name}`),
       (el) => el.click(),
       `schema label ${name}`
     );
@@ -215,7 +250,7 @@ export default class SchemaView extends GraphPage {
   /** Toggles a relationship type in the legend. */
   public async toggleSchemaRelationship(name: string): Promise<void> {
     await interactWhenVisible(
-      this.schemaContainer.getByTestId(`GraphRelationshipsButton${name}`),
+      this.page.getByTestId(`GraphRelationshipsButton${name}`),
       (el) => el.click(),
       `schema relationship ${name}`
     );
@@ -297,17 +332,14 @@ export default class SchemaView extends GraphPage {
 
   /**
    * Property keys and their value types per label, as the schema discovered
-   * them. The caption entry is the name the view renders, not a property, so it
-   * is dropped.
+   * them. The reserved entries are what the view renders from, not properties,
+   * so they are dropped.
    */
   public async getSchemaLabelKeys(): Promise<Record<string, Record<string, string>>> {
     const { nodes } = await this.readSchemaCanvasData();
 
     return Object.fromEntries(
-      nodes.map(({ data }) => {
-        const { [CAPTION_KEY]: label, ...keys } = data ?? {};
-        return [label ?? "", keys];
-      })
+      nodes.map(({ data }) => [data?.[CAPTION_KEY] ?? "", propertyKeysOf(data)])
     );
   }
 
@@ -316,7 +348,7 @@ export default class SchemaView extends GraphPage {
     const { links } = await this.readSchemaCanvasData();
 
     return Object.fromEntries(
-      links.map(({ relationship, data }) => [relationship, data ?? {}])
+      links.map(({ relationship, data }) => [relationship, propertyKeysOf(data)])
     );
   }
 

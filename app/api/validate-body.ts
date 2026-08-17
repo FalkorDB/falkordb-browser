@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { UDF_CHAT_MAX_LIBRARIES, UDF_CHAT_MAX_FUNCTIONS_PER_LIBRARY, UDF_CHAT_MAX_NAME_LENGTH } from "@/app/utils";
+// Relative, extension-carrying paths: the schemas are unit-tested under plain
+// node, which has no view of the bundler's `@/` alias.
+import { UDF_CHAT_MAX_LIBRARIES, UDF_CHAT_MAX_FUNCTIONS_PER_LIBRARY, UDF_CHAT_MAX_NAME_LENGTH } from "../utils.ts";
+import { VALUE_TYPES, VALUE_PATTERNS, VALUE_PLACEHOLDERS, type ValueType } from "../../lib/graphValues.ts";
 
 export const createUser = z.object({
   username: z
@@ -106,14 +109,70 @@ export const removeGraphElementLabel = z.object({
     .min(1, "Label cannot be empty"),
 });
 
-export const updateGraphElementAttribute = z.object({
-  type: z.boolean(),
-  value: z.union([
-    z.string().min(1, "Attribute value cannot be empty"),
-    z.number(),
-    z.boolean(),
-  ]),
-});
+const propertyScalar = z.union([z.string(), z.number(), z.boolean()]);
+
+/** An array of scalars, nested as deep as FalkorDB allows. */
+type PropertyArray = (string | number | boolean | PropertyArray)[];
+
+const propertyArray: z.ZodType<PropertyArray> = z.lazy(() =>
+  z.array(z.union([propertyScalar, propertyArray])),
+);
+
+const attributeText = z.string().min(1, "Attribute value cannot be empty");
+const geoPoint = z.object({ latitude: z.number(), longitude: z.number() });
+
+const temporal = (type: keyof typeof VALUE_PATTERNS) =>
+  z.string().regex(VALUE_PATTERNS[type], `Expected the format ${VALUE_PLACEHOLDERS[type]}`);
+
+/**
+ * What each type needs `value` to hold. The route hands `value` to the Cypher
+ * function that builds the type, so a mismatch here is a mismatch the database
+ * only finds out about — or, worse, silently stores as something else.
+ */
+const valueByType: Record<ValueType, z.ZodType> = {
+  string: attributeText,
+  integer: z.number().int("Value has to be a whole number"),
+  float: z.number(),
+  boolean: z.boolean(),
+  array: propertyArray,
+  vector: z.array(z.number()),
+  point: geoPoint,
+  date: temporal("date"),
+  time: temporal("time"),
+  datetime: temporal("datetime"),
+  duration: temporal("duration"),
+};
+
+// Without a type the value is bound as a parameter untouched, so only what a
+// parameter can carry on its own gets through — a map never can.
+const parameterizedValue = z.union([attributeText, z.number(), z.boolean(), propertyArray]);
+
+export const updateGraphElementAttribute = z
+  .object({
+    type: z.boolean(),
+    // Absent for the primitive types, which need no help from Cypher to be built.
+    valueType: z.enum(VALUE_TYPES).optional(),
+    value: z.union([
+      attributeText,
+      z.number(),
+      z.boolean(),
+      propertyArray,
+      geoPoint,
+    ]),
+  })
+  .superRefine(({ value, valueType }, ctx) => {
+    const result = (valueType ? valueByType[valueType] : parameterizedValue).safeParse(value);
+
+    if (result.success) return;
+
+    ctx.addIssue({
+      code: "custom",
+      path: ["value"],
+      message: valueType
+        ? `${result.error.issues[0].message} for valueType "${valueType}"`
+        : result.error.issues[0].message,
+    });
+  });
 
 export const deleteGraphElementAttribute = z.object({
   type: z.boolean({

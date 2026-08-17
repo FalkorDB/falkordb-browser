@@ -390,6 +390,22 @@ test.describe("Schema View Tests", () => {
         });
     });
 
+    test("@admin check schema view details panel marks an indexed property key", async () => {
+        await apiCalls.runQuery(GRAPH_NAME, MESSY_GRAPH_QUERY);
+        await apiCalls.runQuery(GRAPH_NAME, "CREATE INDEX FOR (p:Person) ON (p.name)");
+        const schemaView = await browser.createNewPage(SchemaView, urls.graphUrl);
+        await schemaView.selectGraphByName(GRAPH_NAME);
+        await schemaView.clickSchemaTab();
+        await schemaView.waitForSchemaTripleCount(EXPECTED_TRIPLES.length);
+
+        await schemaView.selectSchemaElementBySearch("Person");
+
+        expect(await schemaView.getSchemaDataPanelIndexTypes("name")).toBe("range");
+        // Nothing is declared on the other keys, so they stay unmarked.
+        expect(await schemaView.getSchemaDataPanelIndexTypes("age")).toBe("");
+        expect(await schemaView.getSchemaDataPanelRules("age")).toEqual([]);
+    });
+
     test("@admin check schema view details panel is restored when returning to the tab", async () => {
         await apiCalls.runQuery(GRAPH_NAME, MESSY_GRAPH_QUERY);
         const schemaView = await browser.createNewPage(SchemaView, urls.graphUrl);

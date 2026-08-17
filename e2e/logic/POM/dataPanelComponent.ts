@@ -10,7 +10,11 @@ import {
   waitForElementToBeVisible,
   waitForElementToNotBeVisible,
 } from "@/e2e/infra/utils";
+import type { ValueType } from "@/lib/graphValues";
 import GraphPage from "./graphPage";
+
+/** Every value type the data panel edits as text, i.e. all but the switch. */
+type TextValueType = Exclude<ValueType, "boolean">;
 
 export default class DataPanel extends GraphPage {
   private get dataPanel(): Locator {
@@ -425,7 +429,7 @@ export default class DataPanel extends GraphPage {
   async setAttribute(
     key: string,
     value: string,
-    type: "string" | "number"
+    type: TextValueType
   ): Promise<void>;
   async setAttribute(
     key: string,
@@ -435,7 +439,7 @@ export default class DataPanel extends GraphPage {
   async setAttribute(
     key: string,
     value: string | boolean,
-    type: "string" | "number" | "boolean"
+    type: TextValueType | "boolean"
   ): Promise<void> {
     await this.hoverDataPanelAttribute(key);
     await this.clickDataPanelSetAttribute();
@@ -456,7 +460,7 @@ export default class DataPanel extends GraphPage {
   async addAttribute(
     key: string,
     value: string,
-    type: "string" | "number"
+    type: TextValueType
   ): Promise<void>;
   async addAttribute(
     key: string,
@@ -466,7 +470,7 @@ export default class DataPanel extends GraphPage {
   async addAttribute(
     key: string,
     value: string | boolean,
-    type: "string" | "number" | "boolean"
+    type: TextValueType | "boolean"
   ): Promise<void> {
     await this.clickDataPanelAddAttribute();
     await this.fillDataPanelAddAttributeKey(key);

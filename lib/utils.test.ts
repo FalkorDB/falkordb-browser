@@ -504,7 +504,17 @@ function installSchemaEventSource(respond: (query: string) => SchemaRow[] | unde
       // The caller attaches its listeners as soon as the constructor returns,
       // so the answer waits a microtask.
       queueMicrotask(() => {
-        this.listeners.result?.({ data: JSON.stringify({ data: respond(query) ?? [] }) } as MessageEvent);
+        let rows: SchemaRow[] | undefined;
+
+        // A responder that throws stands for a query the server refuses.
+        try {
+          rows = respond(query);
+        } catch {
+          this.onerror?.();
+          return;
+        }
+
+        this.listeners.result?.({ data: JSON.stringify({ data: rows ?? [] }) } as MessageEvent);
       });
     }
 
@@ -524,6 +534,8 @@ const isEdgesQuery = (query: string) => query.startsWith("MATCH (a)-[e]->(b)");
 const isLabelsQuery = (query: string) => query.startsWith("CALL db.labels()");
 const isNodeKeysQuery = (query: string) => query.includes("UNWIND keys(n)");
 const isEdgeKeysQuery = (query: string) => query.includes("UNWIND keys(e)");
+const isIndexesQuery = (query: string) => query.startsWith("CALL db.indexes()");
+const isConstraintsQuery = (query: string) => query.startsWith("CALL db.constraints()");
 
 describe("getSchema", () => {
   it("returns the placements, the edgeless labels and the sampled property keys", async () => {
@@ -749,6 +761,159 @@ describe("getSchema", () => {
 
       assert.deepEqual(snapshot?.edges, [{ source: "Person", relationship: "KNOWS", target: "Person" }]);
       assert.deepEqual(snapshot?.labelKeys, { Person: { name: "String" } });
+    } finally {
+      mock.restore();
+    }
+  });
+
+  it("reports the indexes and constraints declared on a property, per side", async () => {
+    const mock = installSchemaEventSource((query) => {
+      if (isEdgesQuery(query)) return [{ source: "Person", relationship: "KNOWS", target: "Person" }];
+      if (isLabelsQuery(query)) return [{ label: "Person" }];
+
+      if (isIndexesQuery(query)) {
+        return [
+          // One property can be covered by more than one index.
+          { label: "Person", types: { name: ["RANGE", "FULLTEXT"], bio: ["VECTOR"] }, entitytype: "NODE" },
+          { label: "KNOWS", types: { since: ["RANGE"] }, entitytype: "RELATIONSHIP" },
+        ];
+      }
+
+      if (isConstraintsQuery(query)) {
+        return [
+          { type: "UNIQUE", label: "Person", properties: ["name"], entitytype: "NODE", status: "OPERATIONAL" },
+          // A property can be constrained without being the same one indexed.
+          { type: "MANDATORY", label: "Person", properties: ["age"], entitytype: "NODE", status: "OPERATIONAL" },
+          { type: "MANDATORY", label: "KNOWS", properties: ["since"], entitytype: "RELATIONSHIP", status: "OPERATIONAL" },
+        ];
+      }
+
+      return [];
+    });
+
+    try {
+      const snapshot = await getSchema("demo", noopToast, noopIndicator);
+
+      assert.deepEqual(snapshot?.labelRules, {
+        Person: {
+          age: { indexes: [], unique: false, mandatory: true },
+          bio: { indexes: ["vector"], unique: false, mandatory: false },
+          name: { indexes: ["fulltext", "range"], unique: true, mandatory: false },
+        },
+      });
+      assert.deepEqual(snapshot?.relationshipRules, {
+        KNOWS: { since: { indexes: ["range"], unique: false, mandatory: true } },
+      });
+    } finally {
+      mock.restore();
+    }
+  });
+
+  it("reads a composite constraint for what it enforces: every property is mandatory, none is unique on its own", async () => {    const mock = installSchemaEventSource((query) => {
+      if (isEdgesQuery(query)) return [{ source: "Person", relationship: "KNOWS", target: "Person" }];
+      if (isLabelsQuery(query)) return [{ label: "Person" }];
+
+      if (isConstraintsQuery(query)) {
+        return [
+          // Only the pair is unique, so neither property may claim it.
+          {
+            type: "UNIQUE",
+            label: "Person",
+            properties: ["firstName", "lastName"],
+            entitytype: "NODE",
+            status: "OPERATIONAL",
+          },
+          {
+            type: "MANDATORY",
+            label: "Person",
+            properties: ["firstName", "lastName"],
+            entitytype: "NODE",
+            status: "OPERATIONAL",
+          },
+        ];
+      }
+
+      return [];
+    });
+
+    try {
+      const snapshot = await getSchema("demo", noopToast, noopIndicator);
+
+      assert.deepEqual(snapshot?.labelRules, {
+        Person: {
+          firstName: { indexes: [], unique: false, mandatory: true },
+          lastName: { indexes: [], unique: false, mandatory: true },
+        },
+      });
+    } finally {
+      mock.restore();
+    }
+  });
+
+  it("keeps the schema when the rule procedures are unavailable", async () => {
+    const mock = installSchemaEventSource((query) => {
+      if (isEdgesQuery(query)) return [{ source: "Person", relationship: "KNOWS", target: "Person" }];
+      if (isLabelsQuery(query)) return [{ label: "Person" }];
+
+      // A server that does not expose them, or a user not allowed to call them.
+      if (isIndexesQuery(query) || isConstraintsQuery(query)) throw new Error("unavailable");
+
+      return [];
+    });
+
+    try {
+      const snapshot = await getSchema("demo", noopToast, noopIndicator);
+
+      // Rules are detail on top of a schema, so losing them costs the detail
+      // only: the view still has its labels and placements.
+      assert.deepEqual(snapshot?.edges, [{ source: "Person", relationship: "KNOWS", target: "Person" }]);
+      assert.deepEqual(snapshot?.labelRules, {});
+      assert.deepEqual(snapshot?.relationshipRules, {});
+    } finally {
+      mock.restore();
+    }
+  });
+
+  it("promises nothing the graph does not enforce: a constraint that is not operational, or a row it cannot read", async () => {
+    const mock = installSchemaEventSource((query) => {
+      if (isEdgesQuery(query)) return [{ source: "Person", relationship: "KNOWS", target: "Person" }];
+      if (isLabelsQuery(query)) return [{ label: "Person" }];
+
+      if (isIndexesQuery(query)) {
+        return [
+          // A row per way a response can be wrong.
+          { label: "Person", types: { name: ["RANGE"] }, entitytype: "SOMETHING_ELSE" },
+          { label: 42, types: { name: ["RANGE"] }, entitytype: "NODE" },
+          { label: "Person", types: ["name"], entitytype: "NODE" },
+          { label: "Person", types: { name: "RANGE", bio: [7] }, entitytype: "NODE" },
+        ];
+      }
+
+      if (isConstraintsQuery(query)) {
+        return [
+          // Not enforced yet, or never will be.
+          { type: "UNIQUE", label: "Person", properties: ["email"], entitytype: "NODE", status: "UNDER CONSTRUCTION" },
+          { type: "MANDATORY", label: "Person", properties: ["email"], entitytype: "NODE", status: "FAILED" },
+          { type: "SOMETHING_ELSE", label: "Person", properties: ["name"], entitytype: "NODE", status: "OPERATIONAL" },
+          { type: "UNIQUE", label: "Person", properties: "name", entitytype: "NODE", status: "OPERATIONAL" },
+          { type: "UNIQUE", label: "Person", properties: [7], entitytype: "NODE", status: "OPERATIONAL" },
+        ];
+      }
+
+      return [];
+    });
+
+    try {
+      const snapshot = await getSchema("demo", noopToast, noopIndicator);
+
+      // The one readable index row says nothing about which types cover the key.
+      assert.deepEqual(snapshot?.labelRules, {
+        Person: {
+          bio: { indexes: [], unique: false, mandatory: false },
+          name: { indexes: [], unique: false, mandatory: false },
+        },
+      });
+      assert.deepEqual(snapshot?.relationshipRules, {});
     } finally {
       mock.restore();
     }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, Dispatch, SetStateAction, useContext, useCallback, useState } from "react";
+import { useEffect, Dispatch, SetStateAction, useContext, useCallback } from "react";
 import { GitGraph, ScrollText, Table, Waypoints } from "lucide-react";
 import { cn, GraphRef, Tab, Label, Link, Node, Relationship, HistoryQuery } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,7 +13,7 @@ import Toolbar from "./toolbar";
 import Controls from "./controls";
 import Labels from "./labels";
 import MetadataView from "./MetadataView";
-import SchemaView from "./SchemaView";
+import SchemaScope, { type ActiveGraphView } from "./SchemaView";
 
 interface Props {
     selectedElements: (Node | Link)[]
@@ -57,10 +57,6 @@ function GraphView({
 
     const { graph, graphName, currentTab, setCurrentTab, isLoading, expand, setExpand } = useContext(GraphContext);
     const { setData, data, graphData, setGraphData, setViewport, viewport, dimmed, setDimmed } = useContext(ForceGraphContext);
-
-    // The Schema tab puts its own controls in this bar, but they need the state
-    // that lives inside SchemaView, so it fills the slot with a portal.
-    const [schemaControlsSlot, setSchemaControlsSlot] = useState<HTMLDivElement | null>(null);
 
     useEffect(() => {
         setRelationships([...graph.Relationships]);
@@ -159,171 +155,211 @@ function GraphView({
         setCurrentTab(value as Tab);
     };
 
+    const isSchema = currentTab === "Schema";
+    // Only these two draw on a canvas, so only they have chrome around it.
+    const hasChrome = currentTab === "Graph" || isSchema;
+
+    // What the chrome runs on while the Graph tab is the one on screen. The
+    // Schema tab swaps it for its own, which is what makes the toolbar, legend
+    // and controls below serve both without a second set of them.
+    const graphView: ActiveGraphView = {
+        mode: "graph",
+        graph,
+        graphName,
+        canvasRef,
+        labels,
+        relationships,
+        onLabelClick,
+        onRelationshipClick,
+        showAllElements,
+        selectedElements,
+        setSelectedElements,
+        handleDeleteElement,
+        expand,
+        setExpand,
+        setIsAddNode,
+        setIsAddEdge: selectedElements.length === 2 && selectedElements.every(e => "labels" in e) ? setIsAddEdge : undefined,
+        isAddNode,
+        isAddEdge,
+        dimmed,
+        setDimmed,
+        isEmpty: graph.getElements().length === 0,
+        showControls: graph.getElements().length > 0 && !isLoading,
+        canvas: (
+            <ForceGraph
+                graph={graph}
+                data={data}
+                setData={setData}
+                graphData={graphData}
+                setGraphData={setGraphData}
+                canvasRef={canvasRef}
+                selectedElements={selectedElements}
+                setSelectedElements={setSelectedElements}
+                setRelationships={setRelationships}
+                viewport={viewport}
+                setViewport={setViewport}
+                dimmed={dimmed}
+            />
+        ),
+        status: (historyQuery?.currentQuery?.metadata?.length ?? 0) > 0 && (
+            <>
+                <div className="h-4 w-px bg-border rounded-full" />
+                <p className="text-nowrap">Nodes: {graph.NodesMap.size}</p>
+                <div className="h-4 w-px bg-border rounded-full" />
+                <p className="text-nowrap">Edges: {graph.LinksMap.size}</p>
+                <div className="h-4 w-px bg-border rounded-full" />
+                <p className="text-nowrap">RT: {historyQuery?.currentQuery?.metadata?.find(v => v.startsWith("Query internal execution time:"))?.split(":")[1]?.trim().replace(" milliseconds", "ms") ?? "N/A"}</p>
+            </>
+        ),
+    };
+
     return (
         <Tabs data-testid="graphView" value={currentTab} onValueChange={handleTabChange} className={cn("h-full w-full relative overflow-hidden", currentTab === "Table" && "flex flex-col-reverse")}>
-            <div className="h-full w-full flex flex-col gap-4 absolute p-2 pointer-events-none z-10 justify-between">
-                <div className="grow basis-0 flex flex-col gap-2 overflow-hidden">
-                    {
-                        !isLoading && currentTab === "Graph" &&
-                        <>
-                            <Toolbar
-                                graph={graph}
-                                graphName={graphName}
-                                selectedElements={selectedElements}
-                                setSelectedElements={setSelectedElements}
-                                handleDeleteElement={handleDeleteElement}
-                                showAllElements={showAllElements}
-                                canvasRef={canvasRef}
-                                setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => "labels" in e) ? setIsAddEdge : undefined}
-                                setIsAddNode={setIsAddNode}
-                                expand={expand}
-                                setExpand={setExpand}
-                                isAddEdge={isAddEdge}
-                                isAddNode={isAddNode}
+            <SchemaScope
+                active={isSchema}
+                fallback={graphView}
+                selectedElements={selectedSchemaElements}
+                setSelectedElements={setSelectedSchemaElements}
+            >
+                {(view) => (
+                    <>
+                        <div className="h-full w-full flex flex-col gap-4 absolute p-2 pointer-events-none z-10 justify-between">
+                            <div className="grow basis-0 flex flex-col gap-2 overflow-hidden">
+                                {
+                                    !isLoading && hasChrome &&
+                                    <>
+                                        <Toolbar
+                                            graph={view.graph}
+                                            graphName={view.graphName}
+                                            selectedElements={view.selectedElements}
+                                            setSelectedElements={view.setSelectedElements}
+                                            handleDeleteElement={view.handleDeleteElement}
+                                            showAllElements={view.showAllElements}
+                                            canvasRef={view.canvasRef}
+                                            setIsAddEdge={view.setIsAddEdge}
+                                            setIsAddNode={view.setIsAddNode}
+                                            expand={view.expand}
+                                            setExpand={view.setExpand}
+                                            isAddEdge={view.isAddEdge}
+                                            isAddNode={view.isAddNode}
+                                        />
+                                        {
+                                            view.expand && (view.labels.length !== 0 || view.relationships.length !== 0) &&
+                                            <div className={cn("w-fit max-w-[180px] h-1 grow grid gap-1.5", view.labels.length !== 0 && view.relationships.length !== 0 ? "grid-rows-[minmax(0,max-content)_max-content_minmax(0,max-content)]" : "grid-rows-[minmax(0,max-content)]")}>
+                                                {view.labels.length !== 0 && <Labels labels={view.labels} onClick={view.onLabelClick} label="Labels" />}
+                                                {view.labels.length !== 0 && view.relationships.length > 0 && <div className="h-px bg-border/40 rounded-full" />}
+                                                {view.relationships.length !== 0 && <Labels labels={view.relationships} onClick={view.onRelationshipClick} label="Relationships" />}
+                                            </div>
+                                        }
+                                    </>
+                                }
+                            </div>
+                            <div className="flex gap-2 items-center">
+                                <TabsList className="bg-transparent flex gap-2 pointer-events-auto p-0">
+                                    <TabsTrigger
+                                        data-testid="graphTab"
+                                        asChild
+                                        value="Graph"
+                                    >
+                                        <Button
+                                            className="tabs-trigger"
+                                            title="Graph"
+                                        >
+                                            <GitGraph />
+                                        </Button>
+                                    </TabsTrigger>
+                                    <TabsTrigger
+                                        data-testid="tableTab"
+                                        asChild
+                                        value="Table"
+                                    >
+                                        <Button
+                                            disabled={!isTabEnabled("Table")}
+                                            className="tabs-trigger"
+                                            title={!isTabEnabled("Table") ? "No Data" : "Table"}
+                                        >
+                                            <Table />
+                                        </Button>
+                                    </TabsTrigger>
+                                    <TabsTrigger
+                                        data-testid="metadataTab"
+                                        asChild
+                                        value="Metadata"
+                                    >
+                                        <Button
+                                            disabled={!isTabEnabled("Metadata")}
+                                            className="tabs-trigger"
+                                            title={!isTabEnabled("Metadata") ? "No Metadata" : "Metadata"}
+                                        >
+                                            <ScrollText />
+                                        </Button>
+                                    </TabsTrigger>
+                                    <TabsTrigger
+                                        data-testid="schemaTab"
+                                        asChild
+                                        value="Schema"
+                                    >
+                                        <Button
+                                            disabled={!isTabEnabled("Schema")}
+                                            className="tabs-trigger"
+                                            title={!isTabEnabled("Schema") ? "No Graph Selected" : "Schema"}
+                                        >
+                                            <Waypoints />
+                                        </Button>
+                                    </TabsTrigger>
+                                </TabsList>
+                                {
+                                    hasChrome && view.showControls &&
+                                    <div data-testid={view.mode === "schema" ? "schemaControls" : undefined} className="flex gap-2 items-center">
+                                        <Controls
+                                            graph={view.graph}
+                                            canvasRef={view.canvasRef}
+                                            disabled={view.isEmpty}
+                                            dimmed={view.dimmed}
+                                            setDimmed={view.setDimmed}
+                                            selectedElements={view.selectedElements}
+                                        />
+                                    </div>
+                                }
+                                {view.status}
+                            </div>
+                        </div>
+                        <TabsContent data-testid="graphView" value="Graph" className="h-full w-full mt-0 overflow-hidden">
+                            {view.mode === "graph" && view.canvas}
+                        </TabsContent>
+                        <TabsContent value="Table" className="h-1 grow w-full mt-0 overflow-hidden">
+                            <TableView />
+                        </TabsContent>
+                        <TabsContent value="Metadata" className="h-full w-full mt-0 overflow-hidden">
+                            <MetadataView
+                                setQuery={({ profile }) => {
+                                    setHistoryQuery(prev => {
+                                        const newQuery = {
+                                            ...prev.currentQuery,
+                                            profile: profile || []
+                                        };
+
+                                        const newQueries = prev.queries.map(q => q.text === newQuery.text ? newQuery : q);
+
+                                        setConnectionItem("query history", JSON.stringify(newQueries));
+
+                                        return {
+                                            ...prev,
+                                            currentQuery: newQuery,
+                                            queries: newQueries
+                                        };
+                                    });
+                                }}
+                                query={historyQuery.currentQuery}
+                                fetchCount={fetchCount}
                             />
-                            {
-                                expand && (labels.length !== 0 || relationships.length !== 0) &&
-                                <div className={cn("w-fit max-w-[180px] h-1 grow grid gap-1.5", labels.length !== 0 && relationships.length !== 0 ? "grid-rows-[minmax(0,max-content)_max-content_minmax(0,max-content)]" : "grid-rows-[minmax(0,max-content)]")}>
-                                    {labels.length !== 0 && <Labels labels={labels} onClick={onLabelClick} label="Labels" />}
-                                    {labels.length !== 0 && relationships.length > 0 && <div className="h-px bg-border/40 rounded-full" />}
-                                    {relationships.length !== 0 && <Labels labels={relationships} onClick={onRelationshipClick} label="Relationships" />}
-                                </div>
-                            }
-                        </>
-                    }
-                </div>
-                <div className="flex gap-2 items-center">
-                    <TabsList className="bg-transparent flex gap-2 pointer-events-auto p-0">
-                        <TabsTrigger
-                            data-testid="graphTab"
-                            asChild
-                            value="Graph"
-                        >
-                            <Button
-                                className="tabs-trigger"
-                                title="Graph"
-                            >
-                                <GitGraph />
-                            </Button>
-                        </TabsTrigger>
-                        <TabsTrigger
-                            data-testid="tableTab"
-                            asChild
-                            value="Table"
-                        >
-                            <Button
-                                disabled={!isTabEnabled("Table")}
-                                className="tabs-trigger"
-                                title={!isTabEnabled("Table") ? "No Data" : "Table"}
-                            >
-                                <Table />
-                            </Button>
-                        </TabsTrigger>
-                        <TabsTrigger
-                            data-testid="metadataTab"
-                            asChild
-                            value="Metadata"
-                        >
-                            <Button
-                                disabled={!isTabEnabled("Metadata")}
-                                className="tabs-trigger"
-                                title={!isTabEnabled("Metadata") ? "No Metadata" : "Metadata"}
-                            >
-                                <ScrollText />
-                            </Button>
-                        </TabsTrigger>
-                        <TabsTrigger
-                            data-testid="schemaTab"
-                            asChild
-                            value="Schema"
-                        >
-                            <Button
-                                disabled={!isTabEnabled("Schema")}
-                                className="tabs-trigger"
-                                title={!isTabEnabled("Schema") ? "No Graph Selected" : "Schema"}
-                            >
-                                <Waypoints />
-                            </Button>
-                        </TabsTrigger>
-                    </TabsList>
-                    {
-                        graph.getElements().length > 0 && currentTab === "Graph" && !isLoading &&
-                            <Controls
-                                graph={graph}
-                                canvasRef={canvasRef}
-                                disabled={graph.getElements().length === 0}
-                                dimmed={dimmed}
-                                setDimmed={setDimmed}
-                                selectedElements={selectedElements}
-                            />
-                    }
-                    {
-                        currentTab === "Schema" &&
-                        <div ref={setSchemaControlsSlot} className="flex gap-2 items-center pointer-events-auto" />
-                    }
-                    {
-                        currentTab !== "Schema" && (historyQuery?.currentQuery?.metadata?.length ?? 0) > 0 &&
-                        <>
-                            <div className="h-4 w-px bg-border rounded-full" />
-                            <p>Nodes: {graph.NodesMap.size}</p>
-                            <div className="h-4 w-px bg-border rounded-full" />
-                            <p>Edges: {graph.LinksMap.size}</p>
-                            <div className="h-4 w-px bg-border rounded-full" />
-                            <p>RT: {historyQuery?.currentQuery?.metadata?.find(v => v.startsWith("Query internal execution time:"))?.split(":")[1]?.trim().replace(" milliseconds", "ms") ?? "N/A"}</p>
-                        </>
-                    }
-                </div>
-            </div>
-            <TabsContent data-testid="graphView" value="Graph" className="h-full w-full mt-0 overflow-hidden">
-                <ForceGraph
-                    graph={graph}
-                    data={data}
-                    setData={setData}
-                    graphData={graphData}
-                    setGraphData={setGraphData}
-                    canvasRef={canvasRef}
-                    selectedElements={selectedElements}
-                    setSelectedElements={setSelectedElements}
-                    setRelationships={setRelationships}
-                    viewport={viewport}
-                    setViewport={setViewport}
-                    dimmed={dimmed}
-                />
-            </TabsContent>
-            <TabsContent value="Table" className="h-1 grow w-full mt-0 overflow-hidden">
-                <TableView />
-            </TabsContent>
-            <TabsContent value="Metadata" className="h-full w-full mt-0 overflow-hidden">
-                <MetadataView
-                    setQuery={({ profile }) => {
-                        setHistoryQuery(prev => {
-                            const newQuery = {
-                                ...prev.currentQuery,
-                                profile: profile || []
-                            };
-
-                            const newQueries = prev.queries.map(q => q.text === newQuery.text ? newQuery : q);
-
-                            setConnectionItem("query history", JSON.stringify(newQueries));
-
-                            return {
-                                ...prev,
-                                currentQuery: newQuery,
-                                queries: newQueries
-                            };
-                        });
-                    }}
-                    query={historyQuery.currentQuery}
-                    fetchCount={fetchCount}
-                />
-            </TabsContent>
-            <TabsContent value="Schema" className="h-full w-full mt-0 overflow-hidden">
-                <SchemaView
-                    controlsSlot={schemaControlsSlot}
-                    selectedElements={selectedSchemaElements}
-                    setSelectedElements={setSelectedSchemaElements}
-                />
-            </TabsContent>
+                        </TabsContent>
+                        <TabsContent value="Schema" className="h-full w-full mt-0 overflow-hidden">
+                            {view.mode === "schema" && view.canvas}
+                        </TabsContent>
+                    </>
+                )}
+            </SchemaScope>
         </Tabs>
     );
 }
