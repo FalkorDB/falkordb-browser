@@ -1,5 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
+import { quoteCypherIdentifier } from "@/lib/cypher";
+import { VALUE_EXPRESSIONS } from "@/lib/graphValues";
 import {
   updateGraphElementAttribute,
   deleteGraphElementAttribute,
@@ -42,7 +44,7 @@ export async function POST(
         );
       }
 
-      const { value, type } = validation.data;
+      const { value, type, valueType } = validation.data;
       const graph = client.selectGraph(graphId);
 
       if (isReadOnly) {
@@ -52,9 +54,16 @@ export async function POST(
         );
       }
 
+      // Points, vectors and the temporal types cannot be expressed by a
+      // parameter alone, so the parameter feeds the function that builds them.
+      const valueExpression = VALUE_EXPRESSIONS[valueType ?? "string"];
+      // The key comes from the URL and names a property, so it cannot be bound
+      // as a parameter: it is quoted instead.
+      const quotedKey = quoteCypherIdentifier(key);
+
       const query = type
-        ? `MATCH (n) WHERE ID(n) = $id SET n.${key} = $value`
-        : `MATCH ()-[e]->() WHERE ID(e) = $id SET e.${key} = $value`;
+        ? `MATCH (n) WHERE ID(n) = $id SET n.${quotedKey} = ${valueExpression}`
+        : `MATCH ()-[e]->() WHERE ID(e) = $id SET e.${quotedKey} = ${valueExpression}`;
 
       await graph.query(query, { params: { id: elementId, value } });
 
@@ -120,9 +129,11 @@ export async function DELETE(
         );
       }
 
+      const quotedKey = quoteCypherIdentifier(key);
+
       const query = type
-        ? `MATCH (n) WHERE ID(n) = $id SET n.${key} = NULL`
-        : `MATCH ()-[e]->() WHERE ID(e) = $id SET e.${key} = NULL`;
+        ? `MATCH (n) WHERE ID(n) = $id SET n.${quotedKey} = NULL`
+        : `MATCH ()-[e]->() WHERE ID(e) = $id SET e.${quotedKey} = NULL`;
 
       await graph.query(query, { params: { id: elementId } });
 

@@ -46,9 +46,6 @@ spec:
         - name: rest
           containerPort: {{ .Values.service.restPort }}
           protocol: TCP
-        - name: mcp
-          containerPort: {{ .Values.service.mcpPort }}
-          protocol: TCP
         envFrom:
         - configMapRef:
             name: {{ include "falkordb-browser.fullname" . }}

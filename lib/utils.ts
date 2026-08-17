@@ -11,6 +11,8 @@ import type { FalkorDBCanvas, Data as CanvasData, NodeShape } from "@falkordb/ca
 import { signOut } from "next-auth/react";
 import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, enrichSyntaxMessage, type SyntaxErrorInfo, type HintLink } from "./cypherErrors.ts";
 import { suggestForError, findFuncArgTypo } from "./cypherSuggestions.ts";
+import { quoteCypherIdentifier } from "./cypher.ts";
+import type { GeoPoint } from "./graphValues.ts";
 
 export { parseSyntaxError };
 export type { SyntaxErrorInfo };
@@ -36,7 +38,8 @@ export const screenSize = {
 };
 
 
-export type Value = string | number | boolean;
+/** Every type FalkorDB can persist as a property value. */
+export type Value = string | number | boolean | GeoPoint | Value[];
 
 export type HistoryQuery = {
   queries: Query[];
@@ -229,13 +232,38 @@ export type SchemaEdge = {
  */
 export type SchemaPropertyKeys = Record<string, string>;
 
-/** Everything the Schema view draws, discovered with two read-only queries. */
+/**
+ * What the graph itself declares about one property, as opposed to what a
+ * sample of the elements happens to hold. Unlike the property keys these are
+ * exact: they are read off the index and constraint definitions.
+ */
+export type SchemaPropertyRules = {
+  /**
+   * The index types covering the property, lower-cased at ingest so every
+   * reader shows the same form: `"range"`, `"fulltext"`, `"vector"`. Empty
+   * when the property is not indexed.
+   */
+  indexes: string[];
+  /** No two elements of the type may hold the same value. */
+  unique: boolean;
+  /** Every element of the type has to carry the property. */
+  mandatory: boolean;
+};
+
+/** The rules of each property of one label or relationship type. */
+export type SchemaPropertyRulesMap = Record<string, SchemaPropertyRules>;
+
+/** Everything the Schema view draws, discovered with read-only queries. */
 export type SchemaSnapshot = {
   edges: SchemaEdge[];
   /** Keyed by label; unlabeled nodes are under `""`. */
   labelKeys: Record<string, SchemaPropertyKeys>;
   /** Keyed by relationship type. */
   relationshipKeys: Record<string, SchemaPropertyKeys>;
+  /** Keyed by label. Only the properties that carry a rule appear. */
+  labelRules: Record<string, SchemaPropertyRulesMap>;
+  /** Keyed by relationship type. Only the properties that carry a rule appear. */
+  relationshipRules: Record<string, SchemaPropertyRulesMap>;
 };
 
 /**
@@ -245,6 +273,15 @@ export type SchemaSnapshot = {
  * data panel knows which entry to leave out.
  */
 export const SCHEMA_CAPTION_KEY = "__schemaCaption";
+
+/**
+ * Where a schema element carries its `SchemaPropertyRulesMap`, for the same
+ * reason the caption travels in `data`: that is all the details panel is given.
+ */
+export const SCHEMA_RULES_KEY = "__schemaRules";
+
+/** True for the entries of a schema element's `data` that are not properties of it. */
+export const isSchemaReservedKey = (key: string) => key === SCHEMA_CAPTION_KEY || key === SCHEMA_RULES_KEY;
 
 export type ReadOnlyCell = {
   value: string;
@@ -1002,7 +1039,7 @@ const addSchemaPropertyKey = (
 };
 
 /** Orders owners and their keys so that two equal snapshots serialize equally. */
-const sortSchemaKeys = (records: Record<string, SchemaPropertyKeys>): Record<string, SchemaPropertyKeys> =>
+const sortSchemaKeys = <T>(records: Record<string, Record<string, T>>): Record<string, Record<string, T>> =>
   Object.fromEntries(
     Object.entries(records)
       .sort(([a], [b]) => a.localeCompare(b))
@@ -1028,17 +1065,33 @@ const SCHEMA_KEY_SAMPLE_SIZE = 10;
 const SCHEMA_KEY_BATCH_SIZE = 20;
 
 /** Quotes a label or relationship type for use as a pattern in a query. */
-const quoteSchemaName = (name: string) => `\`${name.replace(/`/g, "``")}\``;
+const quoteSchemaName = quoteCypherIdentifier;
 
 /** Quotes a label or relationship type for use as a returned string literal. */
 const schemaNameLiteral = (name: string) => `'${name.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+
+/** The rules recorded for one property, created on first mention. */
+const schemaRuleFor = (
+  into: Record<string, SchemaPropertyRulesMap>,
+  owner: string,
+  key: string,
+) => {
+  const keys = into[owner] ?? {};
+  const rule = keys[key] ?? { indexes: [], unique: false, mandatory: false };
+
+  keys[key] = rule;
+  into[owner] = keys;
+
+  return rule;
+};
 
 /**
  * Discovers everything the Schema view draws:
  * - every placement a relationship type has, i.e. which
  *   (source label)-[type]->(target label) triples actually occur;
  * - the property keys each label and each relationship type carries, with the
- *   value type(s) they hold.
+ *   value type(s) they hold;
+ * - the indexes and constraints declared on those properties.
  *
  * Placements are exact: that query aggregates server-side and returns only the
  * distinct combinations, so no edges are ever transferred. Property keys are
@@ -1061,18 +1114,35 @@ UNWIND (CASE WHEN size(labels(a)) = 0 THEN [''] ELSE labels(a) END) AS source
 UNWIND (CASE WHEN size(labels(b)) = 0 THEN [''] ELSE labels(b) END) AS target
 RETURN DISTINCT source, type(e) AS relationship, target`;
 
-  const run = (query: string) => getSSEGraphResult(
+  const run = (query: string, reportErrors: boolean = true) => getSSEGraphResult(
     `/api/graph/${prepareArg(name)}?query=${encodeURIComponent(query)}&readOnly=true`,
-    toast,
+    reportErrors ? toast : () => {},
     setIndicator,
     { signal: options?.signal, connectionId: options?.connectionId, query },
   ) as Promise<{ data?: unknown[] } | undefined>;
 
-  const [edgeResult, labelsResult] = await Promise.all([
+  /**
+   * Index and constraint rules are detail on top of a schema, not the schema
+   * itself: a server that does not expose the procedures, or a user not allowed
+   * to call them, still gets the view. An abort is not a failed query, so it
+   * still propagates.
+   */
+  const runOptional = (query: string) => run(query, false).catch((error: unknown) => {
+    if (isAbortError(error)) throw error;
+
+    return undefined;
+  });
+
+  const [edgeResult, labelsResult, indexesResult, constraintsResult] = await Promise.all([
     run(edgesQuery),
     // Labels that carry no edge still get a node in the view, so they cannot be
     // read off the placements.
     run("CALL db.labels() YIELD label RETURN label"),
+    // `types` maps every indexed property to the index types covering it, so
+    // the property list adds nothing on top of it.
+    runOptional("CALL db.indexes() YIELD label, types, entitytype RETURN label, types, entitytype"),
+    runOptional("CALL db.constraints() YIELD type, label, properties, entitytype, status"
+      + " RETURN type, label, properties, entitytype, status"),
   ]);
 
   if (!edgeResult || !Array.isArray(edgeResult.data)) return undefined;
@@ -1160,6 +1230,63 @@ RETURN DISTINCT source, type(e) AS relationship, target`;
     )),
   ]);
 
+  const labelRules: Record<string, SchemaPropertyRulesMap> = {};
+  const relationshipRules: Record<string, SchemaPropertyRulesMap> = {};
+
+  /** Which side an index or constraint belongs to, or nothing when unreadable. */
+  const rulesOf = (entityType: unknown) => {
+    if (entityType === "NODE") return labelRules;
+    if (entityType === "RELATIONSHIP") return relationshipRules;
+
+    return undefined;
+  };
+
+  const procedureRows = (result: { data?: unknown[] } | undefined) => (
+    (Array.isArray(result?.data) ? result.data : []).filter(
+      (row): row is Record<string, unknown> => !!row && typeof row === "object" && !Array.isArray(row),
+    )
+  );
+
+  procedureRows(indexesResult).forEach(({ label, types, entitytype }) => {
+    const into = rulesOf(entitytype);
+
+    if (!into || typeof label !== "string" || !types || typeof types !== "object" || Array.isArray(types)) return;
+
+    Object.entries(types as Record<string, unknown>).forEach(([key, indexTypes]) => {
+      const reported = Array.isArray(indexTypes)
+        ? indexTypes.filter((type): type is string => typeof type === "string").map((type) => type.toLowerCase())
+        : [];
+      const rule = schemaRuleFor(into, label, key);
+
+      rule.indexes = [...new Set([...rule.indexes, ...reported])].sort();
+    });
+  });
+
+  procedureRows(constraintsResult).forEach(({ type, label, properties, entitytype, status }) => {
+    const into = rulesOf(entitytype);
+
+    // A constraint that is still building or has failed is not enforced, so
+    // reporting it would promise more than the graph delivers.
+    if (!into || status !== "OPERATIONAL" || typeof label !== "string" || !Array.isArray(properties)) return;
+    if (type !== "UNIQUE" && type !== "MANDATORY") return;
+    // A unique constraint over several properties makes the combination
+    // unique, not any of them on its own, so it is not a per-property flag.
+    // A mandatory one does require each listed property, so it still is.
+    if (type === "UNIQUE" && properties.length > 1) return;
+
+    properties.forEach((property) => {
+      if (typeof property !== "string") return;
+
+      const rule = schemaRuleFor(into, label, property);
+
+      if (type === "UNIQUE") {
+        rule.unique = true;
+      } else {
+        rule.mandatory = true;
+      }
+    });
+  });
+
   // FalkorDB returns the rows in no guaranteed order, so the snapshot is
   // canonicalized: two runs over an unchanged graph have to compare equal,
   // otherwise a refresh would look like a change and re-lay-out the view.
@@ -1169,7 +1296,13 @@ RETURN DISTINCT source, type(e) AS relationship, target`;
     || a.target.localeCompare(b.target)
   ));
 
-  return { edges, labelKeys: sortSchemaKeys(labelKeys), relationshipKeys: sortSchemaKeys(relationshipKeys) };
+  return {
+    edges,
+    labelKeys: sortSchemaKeys(labelKeys),
+    relationshipKeys: sortSchemaKeys(relationshipKeys),
+    labelRules: sortSchemaKeys(labelRules),
+    relationshipRules: sortSchemaKeys(relationshipRules),
+  };
 };
 
 export function rgbToHSL(hex: string): string {

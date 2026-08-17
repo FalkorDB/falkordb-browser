@@ -147,6 +147,17 @@ export default function Page() {
     const [isAddNode, setIsAddNode] = useState(false);
     const [isAddEdge, setIsAddEdge] = useState(false);
 
+    // Graph and Schema each have a selection of their own; the other tabs have
+    // none. `panel` is shared by all of them, so it stays "data" across a tab
+    // switch — only the selection tells whether there is anything to show.
+    const activeSelection = useMemo(() => {
+        if (currentTab === "Graph") return selectedElements;
+        if (currentTab === "Schema") return selectedSchemaElements;
+        return EMPTY_SELECTION;
+    }, [currentTab, selectedElements, selectedSchemaElements]);
+
+    const hasPanelContent = panel !== undefined && (panel !== "data" || activeSelection.length > 0);
+
     // The side panel is shared by the Graph and the Schema tab, and each graph
     // tab sizes it for itself — so the width is remembered per tab AND per view.
     const panelSizeKey = useCallback(
@@ -186,7 +197,7 @@ export default function Page() {
 
         if (!currentPanel) return;
 
-        if (panel) {
+        if (hasPanelContent) {
             currentPanel.expand();
             // Defer resize to next frame so the panel processes the updated minSize prop first
             const frameId = requestAnimationFrame(() => {
@@ -197,7 +208,7 @@ export default function Page() {
         }
         currentPanel.collapse();
 
-    }, [getPanelSize, panel]);
+    }, [getPanelSize, hasPanelContent]);
 
     // Keeps the element panel in step with the selection. This re-asserts
     // `expand()` on every selection change — not just when the count changes —
@@ -208,20 +219,13 @@ export default function Page() {
 
         if (!currentPanel) return;
 
-        // Graph and Schema each have a selection of their own; the other tabs
-        // have none, so the panel closes while they are open.
-        let selection: (Node | Link)[] = [];
-
-        if (currentTab === "Graph") selection = selectedElements;
-        if (currentTab === "Schema") selection = selectedSchemaElements;
-
-        if (selection.length !== 0) {
+        if (activeSelection.length !== 0) {
             currentPanel.expand();
             if (panel === undefined) setPanel("data");
         } else if (panel === "data") {
             currentPanel.collapse();
         }
-    }, [currentTab, panel, selectedElements, selectedSchemaElements, setPanel]);
+    }, [activeSelection, panel, setPanel]);
 
     const fetchInfo = useCallback(async (type: string, options?: { signal?: AbortSignal; connectionId?: string | null }) => {
         if (!graphName) return [];
