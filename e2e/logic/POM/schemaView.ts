@@ -15,6 +15,17 @@ export interface SchemaTriple {
 /** Mirrors SCHEMA_CAPTION_KEY: the reserved entry the view captions nodes from. */
 const CAPTION_KEY = "__schemaCaption";
 
+/** Mirrors SCHEMA_RULES_KEY: the reserved entry carrying the property rules. */
+const RULES_KEY = "__schemaRules";
+
+/** The property keys of one element, without the entries the view reserves. */
+const propertyKeysOf = (data: Record<string, string> | undefined) =>
+  Object.fromEntries(
+    Object.entries(data ?? {}).filter(
+      ([key]) => key !== CAPTION_KEY && key !== RULES_KEY
+    )
+  );
+
 /** Raw shape of the canvas data the schema view renders. */
 interface SchemaCanvasData {
   nodes: {
@@ -321,17 +332,14 @@ export default class SchemaView extends GraphPage {
 
   /**
    * Property keys and their value types per label, as the schema discovered
-   * them. The caption entry is the name the view renders, not a property, so it
-   * is dropped.
+   * them. The reserved entries are what the view renders from, not properties,
+   * so they are dropped.
    */
   public async getSchemaLabelKeys(): Promise<Record<string, Record<string, string>>> {
     const { nodes } = await this.readSchemaCanvasData();
 
     return Object.fromEntries(
-      nodes.map(({ data }) => {
-        const { [CAPTION_KEY]: label, ...keys } = data ?? {};
-        return [label ?? "", keys];
-      })
+      nodes.map(({ data }) => [data?.[CAPTION_KEY] ?? "", propertyKeysOf(data)])
     );
   }
 
@@ -340,7 +348,7 @@ export default class SchemaView extends GraphPage {
     const { links } = await this.readSchemaCanvasData();
 
     return Object.fromEntries(
-      links.map(({ relationship, data }) => [relationship, data ?? {}])
+      links.map(({ relationship, data }) => [relationship, propertyKeysOf(data)])
     );
   }
 

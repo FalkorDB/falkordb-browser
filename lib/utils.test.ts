@@ -504,7 +504,17 @@ function installSchemaEventSource(respond: (query: string) => SchemaRow[] | unde
       // The caller attaches its listeners as soon as the constructor returns,
       // so the answer waits a microtask.
       queueMicrotask(() => {
-        this.listeners.result?.({ data: JSON.stringify({ data: respond(query) ?? [] }) } as MessageEvent);
+        let rows: SchemaRow[] | undefined;
+
+        // A responder that throws stands for a query the server refuses.
+        try {
+          rows = respond(query);
+        } catch {
+          this.onerror?.();
+          return;
+        }
+
+        this.listeners.result?.({ data: JSON.stringify({ data: rows ?? [] }) } as MessageEvent);
       });
     }
 
@@ -787,13 +797,78 @@ describe("getSchema", () => {
       assert.deepEqual(snapshot?.labelRules, {
         Person: {
           age: { indexes: [], unique: false, mandatory: true },
-          bio: { indexes: ["VECTOR"], unique: false, mandatory: false },
-          name: { indexes: ["FULLTEXT", "RANGE"], unique: true, mandatory: false },
+          bio: { indexes: ["vector"], unique: false, mandatory: false },
+          name: { indexes: ["fulltext", "range"], unique: true, mandatory: false },
         },
       });
       assert.deepEqual(snapshot?.relationshipRules, {
-        KNOWS: { since: { indexes: ["RANGE"], unique: false, mandatory: true } },
+        KNOWS: { since: { indexes: ["range"], unique: false, mandatory: true } },
       });
+    } finally {
+      mock.restore();
+    }
+  });
+
+  it("reads a composite constraint for what it enforces: every property is mandatory, none is unique on its own", async () => {    const mock = installSchemaEventSource((query) => {
+      if (isEdgesQuery(query)) return [{ source: "Person", relationship: "KNOWS", target: "Person" }];
+      if (isLabelsQuery(query)) return [{ label: "Person" }];
+
+      if (isConstraintsQuery(query)) {
+        return [
+          // Only the pair is unique, so neither property may claim it.
+          {
+            type: "UNIQUE",
+            label: "Person",
+            properties: ["firstName", "lastName"],
+            entitytype: "NODE",
+            status: "OPERATIONAL",
+          },
+          {
+            type: "MANDATORY",
+            label: "Person",
+            properties: ["firstName", "lastName"],
+            entitytype: "NODE",
+            status: "OPERATIONAL",
+          },
+        ];
+      }
+
+      return [];
+    });
+
+    try {
+      const snapshot = await getSchema("demo", noopToast, noopIndicator);
+
+      assert.deepEqual(snapshot?.labelRules, {
+        Person: {
+          firstName: { indexes: [], unique: false, mandatory: true },
+          lastName: { indexes: [], unique: false, mandatory: true },
+        },
+      });
+    } finally {
+      mock.restore();
+    }
+  });
+
+  it("keeps the schema when the rule procedures are unavailable", async () => {
+    const mock = installSchemaEventSource((query) => {
+      if (isEdgesQuery(query)) return [{ source: "Person", relationship: "KNOWS", target: "Person" }];
+      if (isLabelsQuery(query)) return [{ label: "Person" }];
+
+      // A server that does not expose them, or a user not allowed to call them.
+      if (isIndexesQuery(query) || isConstraintsQuery(query)) throw new Error("unavailable");
+
+      return [];
+    });
+
+    try {
+      const snapshot = await getSchema("demo", noopToast, noopIndicator);
+
+      // Rules are detail on top of a schema, so losing them costs the detail
+      // only: the view still has its labels and placements.
+      assert.deepEqual(snapshot?.edges, [{ source: "Person", relationship: "KNOWS", target: "Person" }]);
+      assert.deepEqual(snapshot?.labelRules, {});
+      assert.deepEqual(snapshot?.relationshipRules, {});
     } finally {
       mock.restore();
     }

@@ -109,19 +109,33 @@ export const removeGraphElementLabel = z.object({
 
 const propertyScalar = z.union([z.string(), z.number(), z.boolean()]);
 
-export const updateGraphElementAttribute = z.object({
-  type: z.boolean(),
-  // Absent for the primitive types, which need no help from Cypher to be built.
-  valueType: z.enum(VALUE_TYPES).optional(),
-  value: z.union([
-    z.string().min(1, "Attribute value cannot be empty"),
-    z.number(),
-    z.boolean(),
-    // Arrays hold scalars or arrays of them; FalkorDB stores nothing deeper.
-    z.array(z.union([propertyScalar, z.array(propertyScalar)])),
-    z.object({ latitude: z.number(), longitude: z.number() }),
-  ]),
-});
+/** An array of scalars, nested as deep as FalkorDB allows. */
+type PropertyArray = (string | number | boolean | PropertyArray)[];
+
+const propertyArray: z.ZodType<PropertyArray> = z.lazy(() =>
+  z.array(z.union([propertyScalar, propertyArray])),
+);
+
+export const updateGraphElementAttribute = z
+  .object({
+    type: z.boolean(),
+    // Absent for the primitive types, which need no help from Cypher to be built.
+    valueType: z.enum(VALUE_TYPES).optional(),
+    value: z.union([
+      z.string().min(1, "Attribute value cannot be empty"),
+      z.number(),
+      z.boolean(),
+      propertyArray,
+      z.object({ latitude: z.number(), longitude: z.number() }),
+    ]),
+  })
+  // A map is not a property value: coordinates only become a point once
+  // `point()` builds them, which only the matching valueType asks for.
+  .refine(
+    ({ value, valueType }) =>
+      typeof value !== "object" || Array.isArray(value) || valueType === "point",
+    { message: 'A point value requires valueType "point"', path: ["valueType"] },
+  );
 
 export const deleteGraphElementAttribute = z.object({
   type: z.boolean({

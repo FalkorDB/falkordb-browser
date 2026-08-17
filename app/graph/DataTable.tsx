@@ -2,7 +2,7 @@
 
 import { Asterisk, Check, CirclePlus, Fingerprint, Info, LucideIcon, Pencil, Trash2, X } from "lucide-react";
 import { cn, getActiveConnectionIdGlobal, getConnectionEpoch, isSchemaReservedKey, prepareArg, securedFetch, GraphRef, Link, Node, SchemaPropertyRules, SchemaPropertyRulesMap, SCHEMA_RULES_KEY, Value } from "@/lib/utils";
-import { formatValue, getDefaultValue, inferValueType, isGeoPoint, isTextValueType, parseValue, VALUE_PLACEHOLDERS, VALUE_TYPES, type ValueType } from "@/lib/graphValues";
+import { formatValue, getDefaultValue, inferValueType, isGeoPoint, parseValue, VALUE_PLACEHOLDERS, VALUE_TYPES, type ValueType } from "@/lib/graphValues";
 import { useToast } from "@/components/ui/use-toast";
 import { Fragment, MutableRefObject, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Switch } from "@/components/ui/switch";
@@ -103,6 +103,12 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
     const [attributes, setAttributes] = useState<string[]>([]);
     const [expandedAttributes, setExpandedAttributes] = useState<Record<string, boolean>>({});
     const valueParagraphRefs = useRef<Record<string, HTMLParagraphElement | null>>({});
+    /**
+     * The type each property was last written with. A temporal value reads back
+     * as its ISO text, so inference alone would restore a date as a string when
+     * an edit or a removal is undone.
+     */
+    const writtenTypes = useRef<Record<string, ValueType>>({});
     const [valueOverflowMap, setValueOverflowMap] = useState<Record<string, boolean>>({});
 
     const setValueParagraphRef = useCallback((key: string) => (el: HTMLParagraphElement | null) => {
@@ -201,6 +207,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
             setNewVal("");
             setNewKey("");
             setIsAddValue(false);
+            writtenTypes.current = {};
         }
         setAttributes(Object.keys(object.data));
         setExpandedAttributes({});
@@ -226,8 +233,9 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
         const valueType = value === undefined ? "string" : inferValueType(value);
 
         setEditable(key);
-        // The structured types are edited as the text they read as.
-        setNewVal(value === undefined ? "" : (isTextValueType(valueType) ? formatValue(value) : value));
+        // Only the switch holds a value as-is; every other type is edited as
+        // the text it reads as.
+        setNewVal(value === undefined ? "" : (valueType === "boolean" ? value : formatValue(value)));
         setNewType(valueType);
 
         if (value !== undefined && valueType !== "string") return;
@@ -266,6 +274,9 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
             if (getConnectionEpoch() !== startEpoch) return false;
             if (result.ok) {
                 const value = object.data[key];
+                const previousType = writtenTypes.current[key] ?? inferValueType(value);
+
+                writtenTypes.current[key] = valueType;
 
                 graph.setProperty(key, val, id, type);
 
@@ -314,7 +325,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                     action: isUndo ?
                         <ToastButton
                             showUndo
-                            onClick={() => setProperty(key, value, false)}
+                            onClick={() => setProperty(key, value, false, "set", previousType)}
                         />
                         : undefined
                 });
@@ -378,6 +389,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
 
             if (success) {
                 const value = object.data[key];
+                const removedType = writtenTypes.current[key] ?? inferValueType(value);
                 const isDisplayKey = getNodeDisplayKey(object as Node, captionsKeys) === key;
 
                 graph.removeProperty(key, id, type);
@@ -420,7 +432,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                     action:
                         <ToastButton
                             showUndo
-                            onClick={() => setProperty(key, value, false)}
+                            onClick={() => setProperty(key, value, false, "set", removedType)}
                         />,
                     variant: "default"
                 });
@@ -474,17 +486,6 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                 />;
             case "integer":
             case "float":
-                return <Input
-                    className="w-full"
-                    ref={setInputRef}
-                    data-testid={dataTestId}
-                    value={newVal as number}
-                    onChange={(e) => {
-                        const num = Number(e.target.value);
-                        if (!Number.isNaN(num)) setNewVal(num);
-                    }}
-                    onKeyDown={actionType === "set" ? handleSetKeyDown : handleAddKeyDown}
-                />;
             case "array":
             case "vector":
             case "point":
@@ -492,8 +493,8 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
             case "time":
             case "datetime":
             case "duration":
-                // Written as text and parsed on save, so a half-typed list or
-                // date does not have to be a valid value of its type.
+                // Held as text and parsed on save, so a half-typed number, list
+                // or date does not have to be a valid value of its type yet.
                 return <Input
                     className="w-full"
                     ref={setInputRef}
@@ -529,11 +530,11 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                 const nextType = t as ValueType;
 
                 setNewType(nextType);
-                // Carry the text over between the types that are edited as
-                // text; anything else starts from that type's empty value.
-                setNewVal(inferValueType(newVal) === nextType || (isTextValueType(nextType) && typeof newVal === "string")
-                    ? newVal
-                    : getDefaultValue(nextType));
+                // Only the switch holds something other than text, so the text
+                // carries over between every other type.
+                setNewVal(nextType === "boolean" || typeof newVal === "boolean"
+                    ? getDefaultValue(nextType)
+                    : newVal);
             }}
             label="Type"
         />
@@ -590,7 +591,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                                         className="flex items-center px-1 border-b border-border min-h-6"
                                         data-testid={`DataPanelAttributeIndex${key}`}
                                     >
-                                        <p className="w-full truncate">{(rules[key]?.indexes ?? []).join(", ").toLowerCase()}</p>
+                                        <p className="w-full truncate">{(rules[key]?.indexes ?? []).join(", ")}</p>
                                     </div>
                                 </Fragment>
                             ))

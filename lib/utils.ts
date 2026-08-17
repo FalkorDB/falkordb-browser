@@ -11,6 +11,7 @@ import type { FalkorDBCanvas, Data as CanvasData, NodeShape } from "@falkordb/ca
 import { signOut } from "next-auth/react";
 import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, enrichSyntaxMessage, type SyntaxErrorInfo, type HintLink } from "./cypherErrors.ts";
 import { suggestForError, findFuncArgTypo } from "./cypherSuggestions.ts";
+import { quoteCypherIdentifier } from "./cypher.ts";
 import type { GeoPoint } from "./graphValues.ts";
 
 export { parseSyntaxError };
@@ -238,8 +239,9 @@ export type SchemaPropertyKeys = Record<string, string>;
  */
 export type SchemaPropertyRules = {
   /**
-   * The index types covering the property (`"RANGE"`, `"FULLTEXT"`,
-   * `"VECTOR"`), empty when it is not indexed.
+   * The index types covering the property, lower-cased at ingest so every
+   * reader shows the same form: `"range"`, `"fulltext"`, `"vector"`. Empty
+   * when the property is not indexed.
    */
   indexes: string[];
   /** No two elements of the type may hold the same value. */
@@ -1063,7 +1065,7 @@ const SCHEMA_KEY_SAMPLE_SIZE = 10;
 const SCHEMA_KEY_BATCH_SIZE = 20;
 
 /** Quotes a label or relationship type for use as a pattern in a query. */
-const quoteSchemaName = (name: string) => `\`${name.replace(/`/g, "``")}\``;
+const quoteSchemaName = quoteCypherIdentifier;
 
 /** Quotes a label or relationship type for use as a returned string literal. */
 const schemaNameLiteral = (name: string) => `'${name.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
@@ -1112,12 +1114,24 @@ UNWIND (CASE WHEN size(labels(a)) = 0 THEN [''] ELSE labels(a) END) AS source
 UNWIND (CASE WHEN size(labels(b)) = 0 THEN [''] ELSE labels(b) END) AS target
 RETURN DISTINCT source, type(e) AS relationship, target`;
 
-  const run = (query: string) => getSSEGraphResult(
+  const run = (query: string, reportErrors: boolean = true) => getSSEGraphResult(
     `/api/graph/${prepareArg(name)}?query=${encodeURIComponent(query)}&readOnly=true`,
-    toast,
+    reportErrors ? toast : () => {},
     setIndicator,
     { signal: options?.signal, connectionId: options?.connectionId, query },
   ) as Promise<{ data?: unknown[] } | undefined>;
+
+  /**
+   * Index and constraint rules are detail on top of a schema, not the schema
+   * itself: a server that does not expose the procedures, or a user not allowed
+   * to call them, still gets the view. An abort is not a failed query, so it
+   * still propagates.
+   */
+  const runOptional = (query: string) => run(query, false).catch((error: unknown) => {
+    if (isAbortError(error)) throw error;
+
+    return undefined;
+  });
 
   const [edgeResult, labelsResult, indexesResult, constraintsResult] = await Promise.all([
     run(edgesQuery),
@@ -1126,8 +1140,8 @@ RETURN DISTINCT source, type(e) AS relationship, target`;
     run("CALL db.labels() YIELD label RETURN label"),
     // `types` maps every indexed property to the index types covering it, so
     // the property list adds nothing on top of it.
-    run("CALL db.indexes() YIELD label, types, entitytype RETURN label, types, entitytype"),
-    run("CALL db.constraints() YIELD type, label, properties, entitytype, status"
+    runOptional("CALL db.indexes() YIELD label, types, entitytype RETURN label, types, entitytype"),
+    runOptional("CALL db.constraints() YIELD type, label, properties, entitytype, status"
       + " RETURN type, label, properties, entitytype, status"),
   ]);
 
@@ -1240,7 +1254,7 @@ RETURN DISTINCT source, type(e) AS relationship, target`;
 
     Object.entries(types as Record<string, unknown>).forEach(([key, indexTypes]) => {
       const reported = Array.isArray(indexTypes)
-        ? indexTypes.filter((type): type is string => typeof type === "string")
+        ? indexTypes.filter((type): type is string => typeof type === "string").map((type) => type.toLowerCase())
         : [];
       const rule = schemaRuleFor(into, label, key);
 
@@ -1255,6 +1269,10 @@ RETURN DISTINCT source, type(e) AS relationship, target`;
     // reporting it would promise more than the graph delivers.
     if (!into || status !== "OPERATIONAL" || typeof label !== "string" || !Array.isArray(properties)) return;
     if (type !== "UNIQUE" && type !== "MANDATORY") return;
+    // A unique constraint over several properties makes the combination
+    // unique, not any of them on its own, so it is not a per-property flag.
+    // A mandatory one does require each listed property, so it still is.
+    if (type === "UNIQUE" && properties.length > 1) return;
 
     properties.forEach((property) => {
       if (typeof property !== "string") return;

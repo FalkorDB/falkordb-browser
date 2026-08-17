@@ -54,6 +54,8 @@ export const VALUE_EXPRESSIONS: Record<ValueType, string> = {
 
 /** The format hint shown while editing a value of each type. */
 export const VALUE_PLACEHOLDERS: Partial<Record<ValueType, string>> = {
+  integer: "42",
+  float: "3.14",
   array: '[1, "two", true]',
   vector: "[0.1, 0.2, 0.3]",
   point: '{ "latitude": 32.07, "longitude": 34.79 }',
@@ -62,19 +64,6 @@ export const VALUE_PLACEHOLDERS: Partial<Record<ValueType, string>> = {
   datetime: "2025-06-29T13:45:00",
   duration: "P3DT12H",
 };
-
-/** Types whose editor is a free-text field parsed when the edit is saved. */
-const TEXT_TYPES = new Set<ValueType>([
-  "array",
-  "vector",
-  "point",
-  "date",
-  "time",
-  "datetime",
-  "duration",
-]);
-
-export const isTextValueType = (type: ValueType) => TEXT_TYPES.has(type);
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_PATTERN = /^\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
@@ -103,16 +92,12 @@ export function inferValueType(value: unknown): ValueType {
   return "string";
 }
 
+/**
+ * What an editor of this type starts from. Everything but a boolean is edited
+ * as text, so everything but a boolean starts empty.
+ */
 export function getDefaultValue(type: ValueType): PropertyValue {
-  switch (type) {
-    case "boolean":
-      return false;
-    case "integer":
-    case "float":
-      return 0;
-    default:
-      return "";
-  }
+  return type === "boolean" ? false : "";
 }
 
 /** Renders a value for display — and, for the text types, for editing. */
@@ -128,6 +113,11 @@ type ParseResult = { value: PropertyValue } | { error: string };
 const isPrimitive = (value: unknown): boolean =>
   typeof value === "string" || typeof value === "number" || typeof value === "boolean";
 
+/**
+ * FalkorDB nests arrays as deep as it likes, and so does the request schema
+ * that guards the route — the two have to agree, or the editor would accept a
+ * value the server rejects.
+ */
 const isStorableArray = (value: unknown): boolean =>
   Array.isArray(value) && value.every((item) => isPrimitive(item) || isStorableArray(item));
 

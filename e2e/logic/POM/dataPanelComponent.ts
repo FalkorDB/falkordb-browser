@@ -10,7 +10,7 @@ import {
   waitForElementToBeVisible,
   waitForElementToNotBeVisible,
 } from "@/e2e/infra/utils";
-import { ValueType } from "@/lib/graphValues";
+import type { ValueType } from "@/lib/graphValues";
 import GraphPage from "./graphPage";
 
 /** Every value type the data panel edits as text, i.e. all but the switch. */

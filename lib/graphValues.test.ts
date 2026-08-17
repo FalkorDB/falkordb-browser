@@ -5,7 +5,6 @@ import {
     getDefaultValue,
     inferValueType,
     isGeoPoint,
-    isTextValueType,
     parseValue,
     VALUE_EXPRESSIONS,
     VALUE_TYPES,
@@ -31,11 +30,11 @@ test("every type knows how it is written", () => {
     });
 });
 
-test("only the types edited as text are text types", () => {
-    assert.deepEqual(
-        VALUE_TYPES.filter(isTextValueType),
-        ["array", "vector", "point", "date", "time", "datetime", "duration"]
-    );
+test("only a boolean is edited as something other than text", () => {
+    assert.equal(getDefaultValue("boolean"), false);
+    VALUE_TYPES.filter((type) => type !== "boolean").forEach((type) => {
+        assert.equal(getDefaultValue(type), "", `for ${type}`);
+    });
 });
 
 test("isGeoPoint accepts a point and nothing else", () => {
@@ -67,10 +66,8 @@ test("inferValueType picks the type an existing value reads back as", () => {
 
 test("getDefaultValue starts each type from an empty value", () => {
     assert.equal(getDefaultValue("boolean"), false);
-    assert.equal(getDefaultValue("integer"), 0);
-    assert.equal(getDefaultValue("float"), 0);
+    assert.equal(getDefaultValue("integer"), "");
     assert.equal(getDefaultValue("string"), "");
-    assert.equal(getDefaultValue("point"), "");
 });
 
 test("formatValue renders every type as editable text", () => {
