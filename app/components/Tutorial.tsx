@@ -1497,14 +1497,25 @@ function TutorialPortal({
                             {
                                 // If step does not require user action, show enabled Next/Finish
                                 !advanceOn && (
-                                    <Button
-                                        data-testid="tutorialNext"
-                                        disabled={targetDisabled || !nextReady}
-                                        title={!nextReady ? "Preparing the next step" : undefined}
-                                        variant="Primary"
-                                        label={isLastStep ? "Finish" : "Next"}
-                                        onClick={isLastStep ? onClose : onNext}
-                                    />
+                                    <>
+                                        {
+                                            // A disabled button fires no pointer
+                                            // events, so a `title` on it would
+                                            // never be seen — the wait is spelled
+                                            // out beside it instead.
+                                            !nextReady &&
+                                            <span className="text-xs opacity-70" data-testid="tutorialNextPending">
+                                                Preparing the next step
+                                            </span>
+                                        }
+                                        <Button
+                                            data-testid="tutorialNext"
+                                            disabled={targetDisabled || !nextReady}
+                                            variant="Primary"
+                                            label={isLastStep ? "Finish" : "Next"}
+                                            onClick={isLastStep ? onClose : onNext}
+                                        />
+                                    </>
                                 )
                             }
                         </div>

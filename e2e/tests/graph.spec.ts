@@ -38,12 +38,15 @@ test.describe("Graph Tests", () => {
   test(`@admin Validate that the graphs table hides the Status column when offload is unsupported`, async () => {
     const graphName = getRandomString("graph");
     await apiCall.addGraph(graphName);
-    const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-    await graph.clickSelect();
-    await graph.clickManage();
-    await expect(graph.manageTableHeader("Name")).toBeVisible();
-    await expect(graph.manageTableHeader("Status")).toHaveCount(0);
-    await apiCall.removeGraph(graphName);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      await graph.clickSelect();
+      await graph.clickManage();
+      await expect(graph.manageTableHeader("Name")).toBeVisible();
+      await expect(graph.manageTableHeader("Status")).toHaveCount(0);
+    } finally {
+      await apiCall.removeGraph(graphName);
+    }
   });
 
   test(`@admin Add graph via API -> remove graph via UI -> validate graph exists via API`, async () => {
