@@ -72,6 +72,18 @@ const DATETIME_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
 const DURATION_PATTERN =
   /^P(?!$)(\d+Y)?(\d+M)?(\d+W)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+(\.\d+)?S)?)?$/;
 
+/**
+ * The text FalkorDB accepts for each temporal type. The editor and the request
+ * schema that guards the route both read them from here, so what the editor
+ * lets through is exactly what the server takes.
+ */
+export const VALUE_PATTERNS = {
+  date: DATE_PATTERN,
+  time: TIME_PATTERN,
+  datetime: DATETIME_PATTERN,
+  duration: DURATION_PATTERN,
+} as const;
+
 export const isGeoPoint = (value: unknown): value is GeoPoint =>
   typeof value === "object" &&
   value !== null &&
@@ -180,14 +192,8 @@ export function parseValue(type: ValueType, raw: PropertyValue): ParseResult {
     case "datetime":
     case "duration": {
       const text = String(raw).trim();
-      const patterns: Record<string, RegExp> = {
-        date: DATE_PATTERN,
-        time: TIME_PATTERN,
-        datetime: DATETIME_PATTERN,
-        duration: DURATION_PATTERN,
-      };
 
-      if (!patterns[type].test(text)) {
+      if (!VALUE_PATTERNS[type].test(text)) {
         return { error: `Expected the format ${VALUE_PLACEHOLDERS[type]}` };
       }
 
