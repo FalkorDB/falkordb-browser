@@ -61,9 +61,8 @@ service:
   type: ClusterIP
   port: 3000
   targetPort: 3000
-  # Additional ports for text-to-cypher REST API and MCP
+  # Additional port for text-to-cypher REST API
   restPort: 8080
-  mcpPort: 3001
   # Session affinity for sticky sessions (uncomment to enable)
   # sessionAffinity: ClientIP
   # sessionAffinityConfig:
@@ -170,8 +169,6 @@ env:
   port: "3000"
   # Text-to-cypher REST API port
   restPort: "8080"
-  # MCP port
-  mcpPort: "3001"
   # Enable/disable text-to-cypher feature (1 = enabled, 0 = disabled)
   cypher: "1"
   # Hostname binding

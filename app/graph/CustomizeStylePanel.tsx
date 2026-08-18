@@ -78,7 +78,7 @@ const sizeRowHeight = (isNode: boolean) => {
 export default function CustomizeStylePanel({ customizing, onClose }: Props) {
     const { kind, item } = customizing;
 
-    const { graph, setLabels, setRelationships } = useContext(GraphContext);
+    const { graph, setGraphInfo, setLabels, setRelationships, currentTab } = useContext(GraphContext);
     const { tutorialOpen } = useContext(BrowserSettingsContext);
     const { canvasRef } = useContext(ForceGraphContext);
 
@@ -114,6 +114,11 @@ export default function CustomizeStylePanel({ customizing, onClose }: Props) {
 
     const applyStylesToGraph = useCallback((color: string, scale: number) => {
         const canvas = canvasRef.current;
+        // The graph view owns the legend while it is the one on screen. The
+        // schema view keeps a legend of its own — built from its own elements —
+        // and re-derives it from the graph info below, so handing it the graph's
+        // labels would only flash the wrong list at it.
+        const ownsLegend = currentTab !== "Schema";
 
         if (isNode) {
             const size = NODE_SIZE * scale;
@@ -124,79 +129,84 @@ export default function CustomizeStylePanel({ customizing, onClose }: Props) {
 
             const updatedLabel = graph.LabelsMap.get(item.name);
 
-            if (!updatedLabel) return;
+            if (updatedLabel) {
+                updatedLabel.style = { ...updatedLabel.style, ...style };
 
-            updatedLabel.style = { ...updatedLabel.style, ...style };
-
-            // Update all nodes with this label
-            updatedLabel.elements.forEach(n => {
-                if (getLabelWithFewestElements(n.labels.map(l => graph.LabelsMap.get(l)).filter(Boolean) as Label[])?.name === item.name) {
-                    n.color = color;
-                    n.size = size;
-                }
-            });
-
-            setLabels([...graph.Labels]);
-
-            if (canvas) {
-                const graphData = canvas.getGraphData();
-
-                graphData.nodes.forEach(node => {
-                    if (getLabelWithFewestElements(node.labels.map(l => graph.LabelsMap.get(l)).filter(Boolean) as Label[])?.name === item.name) {
-                        node.color = color;
-
-                        if (node.size !== size) {
-                            node.size = size;
-                        }
+                // Update all nodes with this label
+                updatedLabel.elements.forEach(n => {
+                    if (getLabelWithFewestElements(n.labels.map(l => graph.LabelsMap.get(l)).filter(Boolean) as Label[])?.name === item.name) {
+                        n.color = color;
+                        n.size = size;
                     }
                 });
 
-                canvas.refresh();
+                if (ownsLegend) setLabels([...graph.Labels]);
+
+                if (canvas) {
+                    const graphData = canvas.getGraphData();
+
+                    graphData.nodes.forEach(node => {
+                        if (getLabelWithFewestElements(node.labels.map(l => graph.LabelsMap.get(l)).filter(Boolean) as Label[])?.name === item.name) {
+                            node.color = color;
+
+                            if (node.size !== size) {
+                                node.size = size;
+                            }
+                        }
+                    });
+
+                    canvas.refresh();
+                }
             }
+        } else {
+            const style: LinkStyle = {
+                color,
+                width: LINK_WIDTH * scale,
+                fontSize: LINK_FONT_SIZE * scale,
+                arrowSize: ARROW_SIZE * scale,
+            };
 
-            return;
+            // Mutate the InfoRelationship prop directly so graphInfo context stays in sync
+            item.style = { ...item.style, ...style };
+
+            const updatedRelationship = graph.RelationshipsMap.get(item.name);
+
+            if (updatedRelationship) {
+                updatedRelationship.style = { ...updatedRelationship.style, ...style };
+
+                updatedRelationship.elements.forEach(l => {
+                    l.color = color;
+                    l.width = style.width;
+                    l.fontSize = style.fontSize;
+                    l.arrowSize = style.arrowSize;
+                });
+
+                if (ownsLegend) setRelationships([...graph.Relationships]);
+
+                if (canvas) {
+                    const graphData = canvas.getGraphData();
+
+                    graphData.links.forEach(link => {
+                        if (link.relationship !== item.name) return;
+
+                        link.color = color;
+                        link.width = style.width;
+                        link.fontSize = style.fontSize;
+                        link.arrowSize = style.arrowSize;
+                    });
+
+                    canvas.refresh();
+                }
+            }
         }
 
-        const style: LinkStyle = {
-            color,
-            width: LINK_WIDTH * scale,
-            fontSize: LINK_FONT_SIZE * scale,
-            arrowSize: ARROW_SIZE * scale,
-        };
-
-        // Mutate the InfoRelationship prop directly so graphInfo context stays in sync
-        item.style = { ...item.style, ...style };
-
-        const updatedRelationship = graph.RelationshipsMap.get(item.name);
-
-        if (!updatedRelationship) return;
-
-        updatedRelationship.style = { ...updatedRelationship.style, ...style };
-
-        updatedRelationship.elements.forEach(l => {
-            l.color = color;
-            l.width = style.width;
-            l.fontSize = style.fontSize;
-            l.arrowSize = style.arrowSize;
-        });
-
-        setRelationships([...graph.Relationships]);
-
-        if (canvas) {
-            const graphData = canvas.getGraphData();
-
-            graphData.links.forEach(link => {
-                if (link.relationship !== item.name) return;
-
-                link.color = color;
-                link.width = style.width;
-                link.fontSize = style.fontSize;
-                link.arrowSize = style.arrowSize;
-            });
-
-            canvas.refresh();
-        }
-    }, [canvasRef, graph.Labels, graph.LabelsMap, graph.Relationships, graph.RelationshipsMap, isNode, item, setLabels, setRelationships]);
+        // The style was written into the graph info above, and the graph info is
+        // what both views draw from — the graph through the elements just
+        // updated, the schema by re-applying the styles to its own. Handing it
+        // back bumps the version they subscribe to, so whichever of the two is on
+        // screen repaints and the other picks the change up when it mounts.
+        setGraphInfo(graph.GraphInfo);
+    }, [canvasRef, currentTab, graph, isNode, item, setGraphInfo, setLabels, setRelationships]);
 
     const handleColorSelect = (color: string) => {
         setSelectedColor(color);

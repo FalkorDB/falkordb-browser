@@ -1,7 +1,8 @@
 'use client';
 
-import { Check, CirclePlus, Info, Pencil, Trash2, X } from "lucide-react";
-import { cn, getActiveConnectionIdGlobal, getConnectionEpoch, prepareArg, securedFetch, GraphRef, Link, Node, Value } from "@/lib/utils";
+import { Asterisk, Check, CirclePlus, Fingerprint, Info, LucideIcon, Pencil, Trash2, X } from "lucide-react";
+import { cn, getActiveConnectionIdGlobal, getConnectionEpoch, isSchemaReservedKey, prepareArg, securedFetch, GraphRef, Link, Node, SchemaPropertyRules, SchemaPropertyRulesMap, SCHEMA_RULES_KEY, Value } from "@/lib/utils";
+import { formatValue, getDefaultValue, inferValueType, isGeoPoint, parseValue, VALUE_PLACEHOLDERS, VALUE_TYPES, type ValueType } from "@/lib/graphValues";
 import { useToast } from "@/components/ui/use-toast";
 import { Fragment, MutableRefObject, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Switch } from "@/components/ui/switch";
@@ -16,7 +17,56 @@ import ToastButton from "../components/ToastButton";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
 
-type ValueType = "string" | "number" | "boolean";
+const iconSize = 15;
+
+/**
+ * The constraints the graph enforces on a schema property, as icons. The index
+ * types get a column of their own since they read as text, not as a flag.
+ */
+function SchemaRuleIndicators({ propertyKey, rules }: { propertyKey: string, rules?: SchemaPropertyRules }) {
+    if (!rules) return null;
+
+    const indicators: { id: string, label: string, description: string, Icon: LucideIcon }[] = [];
+
+    if (rules.unique) {
+        indicators.push({
+            id: "Unique",
+            label: "Unique",
+            description: "Unique: no two elements can hold the same value",
+            Icon: Fingerprint,
+        });
+    }
+
+    if (rules.mandatory) {
+        indicators.push({
+            id: "Mandatory",
+            label: "Mandatory",
+            description: "Mandatory: every element has to carry this property",
+            Icon: Asterisk,
+        });
+    }
+
+    if (indicators.length === 0) return null;
+
+    return (
+        <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
+            {
+                indicators.map(({ id, label, description, Icon }) => (
+                    <Tooltip key={id}>
+                        <TooltipTrigger asChild>
+                            <span role="img" aria-label={label} data-testid={`DataPanelAttribute${id}${propertyKey}`}>
+                                <Icon size={iconSize} />
+                            </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>{description}</p>
+                        </TooltipContent>
+                    </Tooltip>
+                ))
+            }
+        </span>
+    );
+}
 
 interface Props {
     object: Node | Link
@@ -24,9 +74,11 @@ interface Props {
     lastObjId: MutableRefObject<number | undefined>
     canvasRef: GraphRef
     className?: string
+    /** Schema elements have no values, only the type(s) each key holds. */
+    schema?: boolean
 }
 
-export default function DataTable({ object, type, lastObjId, canvasRef, className }: Props) {
+export default function DataTable({ object, type, lastObjId, canvasRef, className, schema }: Props) {
 
     const { graph, setGraphInfo } = useContext(GraphContext);
     const { settings: { userExperienceSettings: { captionKeysSettings: { captionsKeys } } } } = useContext(BrowserSettingsContext);
@@ -51,6 +103,12 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
     const [attributes, setAttributes] = useState<string[]>([]);
     const [expandedAttributes, setExpandedAttributes] = useState<Record<string, boolean>>({});
     const valueParagraphRefs = useRef<Record<string, HTMLParagraphElement | null>>({});
+    /**
+     * The type each property was last written with. A temporal value reads back
+     * as its ISO text, so inference alone would restore a date as a string when
+     * an edit or a removal is undone.
+     */
+    const writtenTypes = useRef<Record<string, ValueType>>({});
     const [valueOverflowMap, setValueOverflowMap] = useState<Record<string, boolean>>({});
 
     const setValueParagraphRef = useCallback((key: string) => (el: HTMLParagraphElement | null) => {
@@ -149,25 +207,17 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
             setNewVal("");
             setNewKey("");
             setIsAddValue(false);
+            writtenTypes.current = {};
         }
         setAttributes(Object.keys(object.data));
         setExpandedAttributes({});
     }, [lastObjId, object, setAttributes, type]);
 
-    const getDefaultVal = (t: ValueType) => {
-        switch (t) {
-            case "boolean":
-                return false;
-            case "number":
-                return 0;
-            default:
-                return "";
-        }
-    };
-
+    // A map is the only thing a property can never hold, and it is the only
+    // shape the editor has nothing to offer for.
     const isComplexType = (value: Value) => {
         const valueType = typeof value;
-        return valueType !== "string" && valueType !== "number" && valueType !== "boolean";
+        return valueType === "object" && !Array.isArray(value) && !isGeoPoint(value);
     };
 
     const handleSetEditable = (key: string, value?: Value) => {
@@ -175,16 +225,20 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
             setIsAddValue(false);
         }
 
-        // Don't allow editing complex types
+        // Maps cannot be stored as property values, so there is nothing to edit.
         if (value !== undefined && isComplexType(value)) {
             return;
         }
 
-        setEditable(key);
-        setNewVal(value ?? "");
-        setNewType(typeof value === "undefined" ? "string" : typeof value as ValueType);
+        const valueType = value === undefined ? "string" : inferValueType(value);
 
-        if (typeof value !== "undefined" && typeof value !== "string") return;
+        setEditable(key);
+        // Only the switch holds a value as-is; every other type is edited as
+        // the text it reads as.
+        setNewVal(value === undefined ? "" : (valueType === "boolean" ? value : formatValue(value)));
+        setNewType(valueType);
+
+        if (value !== undefined && valueType !== "string") return;
 
         setTimeout(() => {
             if (setTextareaRef.current) {
@@ -194,7 +248,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
         }, 0);
     };
 
-    const setProperty = async (key: string, val: Value, isUndo: boolean, actionType: ("added" | "set") = "set") => {
+    const setProperty = async (key: string, val: Value, isUndo: boolean, actionType: ("added" | "set") = "set", valueType: ValueType = inferValueType(val)) => {
         const startEpoch = getConnectionEpoch();
         const cid = getActiveConnectionIdGlobal();
         const { id } = object;
@@ -212,6 +266,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                 method: "POST",
                 body: JSON.stringify({
                     value: val,
+                    valueType,
                     type
                 })
             }, toast, setIndicator, cid);
@@ -219,6 +274,9 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
             if (getConnectionEpoch() !== startEpoch) return false;
             if (result.ok) {
                 const value = object.data[key];
+                const previousType = writtenTypes.current[key] ?? inferValueType(value);
+
+                writtenTypes.current[key] = valueType;
 
                 graph.setProperty(key, val, id, type);
 
@@ -267,7 +325,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                     action: isUndo ?
                         <ToastButton
                             showUndo
-                            onClick={() => setProperty(key, value, false)}
+                            onClick={() => setProperty(key, value, false, "set", previousType)}
                         />
                         : undefined
                 });
@@ -277,6 +335,22 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
         } finally {
             if (actionType === "set") setIsSetLoading(false);
         }
+    };
+
+    /** Validates what the editor holds, then writes it as the picked type. */
+    const commitValue = async (key: string, raw: Value, valueType: ValueType, isUndo: boolean, actionType: ("added" | "set") = "set") => {
+        const parsed = parseValue(valueType, raw);
+
+        if ("error" in parsed) {
+            toast({
+                title: "Error",
+                description: parsed.error,
+                variant: "destructive"
+            });
+            return false;
+        }
+
+        return setProperty(key, parsed.value, isUndo, actionType, valueType);
     };
 
     const handleAddValue = async (key: string, value: Value) => {
@@ -290,7 +364,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
         }
         try {
             setIsAddLoading(true);
-            const success = await setProperty(key, value, false, "added");
+            const success = await commitValue(key, value, newType, false, "added");
             if (!success) return;
             setIsAddValue(false);
             setNewKey("");
@@ -315,6 +389,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
 
             if (success) {
                 const value = object.data[key];
+                const removedType = writtenTypes.current[key] ?? inferValueType(value);
                 const isDisplayKey = getNodeDisplayKey(object as Node, captionsKeys) === key;
 
                 graph.removeProperty(key, id, type);
@@ -357,7 +432,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                     action:
                         <ToastButton
                             showUndo
-                            onClick={() => setProperty(key, value, false)}
+                            onClick={() => setProperty(key, value, false, "set", removedType)}
                         />,
                     variant: "default"
                 });
@@ -394,7 +469,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
         if (e.key === "Enter" && !e.shiftKey) {
             if (isSetLoading || indicator === "offline") return;
             e.preventDefault();
-            setProperty(editable, newVal, true);
+            commitValue(editable, newVal, newType, true);
         }
     };
 
@@ -409,16 +484,24 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                     data-testid={dataTestId}
                     onCheckedChange={(checked) => setNewVal(checked)}
                 />;
-            case "number":
+            case "integer":
+            case "float":
+            case "array":
+            case "vector":
+            case "point":
+            case "date":
+            case "time":
+            case "datetime":
+            case "duration":
+                // Held as text and parsed on save, so a half-typed number, list
+                // or date does not have to be a valid value of its type yet.
                 return <Input
                     className="w-full"
                     ref={setInputRef}
                     data-testid={dataTestId}
-                    value={newVal as number}
-                    onChange={(e) => {
-                        const num = Number(e.target.value);
-                        if (!Number.isNaN(num)) setNewVal(num);
-                    }}
+                    placeholder={VALUE_PLACEHOLDERS[t]}
+                    value={newVal as string}
+                    onChange={(e) => setNewVal(e.target.value)}
                     onKeyDown={actionType === "set" ? handleSetKeyDown : handleAddKeyDown}
                 />;
             default:
@@ -441,11 +524,17 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
 
     const getNewTypeInput = () => (
         <Combobox
-            options={["string", "number", "boolean"]}
+            options={[...VALUE_TYPES]}
             selectedValue={newType}
             setSelectedValue={(t) => {
-                setNewType(t);
-                setNewVal(typeof newVal === t ? newVal : getDefaultVal(t));
+                const nextType = t as ValueType;
+
+                setNewType(nextType);
+                // Only the switch holds something other than text, so the text
+                // carries over between every other type.
+                setNewVal(nextType === "boolean" || typeof newVal === "boolean"
+                    ? getDefaultValue(nextType)
+                    : newVal);
             }}
             label="Type"
         />
@@ -462,19 +551,56 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
         }));
     };
 
-    const getStringValue = (value: Value) => {
-        switch (typeof value) {
-            case "object":
-            case "number":
-                return String(value);
-            case "boolean":
-                return value ? "true" : "false";
-            default:
-                return typeof value === "undefined" ? "" : value as string;
-        }
-    };
+    const getStringValue = (value: Value) => formatValue(value);
 
-    const iconSize = 15;
+    // The schema table is the same table with nothing to edit: a key holds a
+    // type instead of a value, so the value and action columns fall away.
+    if (schema) {
+        const rules = (object.data[SCHEMA_RULES_KEY] ?? {}) as SchemaPropertyRulesMap;
+
+        return (
+            <div className={cn("flex flex-col gap-4 bg-background rounded-lg overflow-hidden", className)}>
+                <div className="h-1 grow overflow-y-auto overflow-x-hidden">
+                    <div className="w-full grid grid-cols-[minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)]">
+                        <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Key</div>
+                        <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Type</div>
+                        <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Constraints</div>
+                        <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Index</div>
+                        {
+                            attributes.filter((key) => !isSchemaReservedKey(key)).map((key) => (
+                                <Fragment key={key}>
+                                    <div
+                                        className="flex items-center px-1 border-b border-border min-h-6"
+                                        data-testid={`DataPanelAttribute${key}`}
+                                    >
+                                        <p className="w-full truncate">{key}:</p>
+                                    </div>
+                                    <div
+                                        className="flex items-center px-1 border-b border-border min-h-6"
+                                        data-testid={`DataPanelAttributeType${key}`}
+                                    >
+                                        <p className="w-full truncate">{String(object.data[key])}</p>
+                                    </div>
+                                    <div
+                                        className="flex items-center px-1 border-b border-border min-h-6"
+                                        data-testid={`DataPanelAttributeIndicators${key}`}
+                                    >
+                                        <SchemaRuleIndicators propertyKey={key} rules={rules[key]} />
+                                    </div>
+                                    <div
+                                        className="flex items-center px-1 border-b border-border min-h-6"
+                                        data-testid={`DataPanelAttributeIndex${key}`}
+                                    >
+                                        <p className="w-full truncate">{(rules[key]?.indexes ?? []).join(", ")}</p>
+                                    </div>
+                                </Fragment>
+                            ))
+                        }
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className={cn("flex flex-col gap-4 bg-background rounded-lg overflow-hidden", className)}>
@@ -514,7 +640,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                                     >
                                         {
                                             editable === key ?
-                                                getCellEditableContent(typeof newVal as ValueType)
+                                                getCellEditableContent(newType)
                                                 : (
                                                     <div className="flex w-full flex-col gap-1">
                                                         <Button
@@ -562,7 +688,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                                         onMouseLeave={() => setHover("")}
                                         key={`${key}-type`}
                                     >
-                                        {editable === key ? getNewTypeInput() : <p className="w-full truncate">{typeof value}</p>}
+                                        {editable === key ? getNewTypeInput() : <p className="w-full truncate">{inferValueType(value)}</p>}
                                     </div>
                                     <div
                                         className={cellClass}
@@ -580,7 +706,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                                                             variant="button"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                setProperty(key, newVal, true);
+                                                                commitValue(key, newVal, newType, true);
                                                             }}
                                                             isLoading={isSetLoading}
                                                         >
@@ -729,5 +855,6 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
 }
 
 DataTable.defaultProps = {
-    className: undefined
+    className: undefined,
+    schema: false
 };

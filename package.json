@@ -2,14 +2,14 @@
   "name": "falkordb-browser",
   "author": "FalkorDB",
   "description": "FalkorDB Browser",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "private": true,
   "engines": {
     "node": ">=24.0.0"
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "test": "node --test \"app/**/*.test.ts\" \"lib/**/*.test.ts\"",
@@ -21,7 +21,7 @@
     "@aws-sdk/client-s3": "^3.1095.0",
     "@aws-sdk/lib-storage": "^3.1095.0",
     "@aws-sdk/s3-request-presigner": "^3.1095.0",
-    "@falkordb/canvas": "^0.2.6",
+    "@falkordb/canvas": "^0.2.7",
     "@falkordb/text-to-cypher": "^0.2.4",
     "@hookform/resolvers": "^5.5.5",
     "@monaco-editor/react": "^4.6.0",

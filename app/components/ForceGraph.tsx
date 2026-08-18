@@ -5,7 +5,7 @@
 
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
-import type { Data, GraphLink, GraphNode, ViewportState, LayoutMode, HierarchyDirection, RadialDirection } from "@falkordb/canvas";
+import type { Data, GraphLink, GraphNode, ViewportState, LayoutMode, HierarchyDirection, RadialDirection, NodeShape } from "@falkordb/canvas";
 import { getActiveConnectionIdGlobal, getConnectionEpoch, securedFetch, getTheme, GraphRef, GraphData, Node, Relationship, Link, convertToCanvasData, CanvasLayout, captureCanvasLayout, applyCanvasLayout, CANVAS_AUTO_ZOOM_DELAY } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Graph } from "../api/graph/model";
@@ -26,6 +26,17 @@ interface Props {
     viewport?: ViewportState
     setViewport?: Dispatch<SetStateAction<ViewportState>>
     dimmed?: boolean
+    /**
+     * Turns off double-click expansion. Set it for a graph whose nodes are not
+     * real elements (the schema view), where expanding would query the database
+     * for a node id that does not exist.
+     */
+    disableExpand?: boolean
+    /** Shape the nodes are drawn with. Left out, the canvas draws circles. */
+    nodeShape?: NodeShape
+    /** `window` property the e2e tests read the canvas data from. */
+    testHookName?: string
+    testId?: string
 }
 
 export default function ForceGraph({
@@ -40,6 +51,10 @@ export default function ForceGraph({
     viewport = undefined,
     setViewport = undefined,
     dimmed = false,
+    disableExpand = false,
+    nodeShape = undefined,
+    testHookName = "graph",
+    testId = "graphCanvasWrapper",
 }: Props) {
 
     const { setIndicator } = useContext(IndicatorContext);
@@ -77,11 +92,19 @@ export default function ForceGraph({
     useEffect(() => {
         const canvas = canvasRef.current;
 
-        if (!canvas || !canvasLoaded) return;
+        if (!canvas || !canvasLoaded) return undefined;
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any)["graph"] = () => canvas.getGraphData();
-    }, [canvasRef, canvasLoaded]);
+        const globals = window as unknown as Record<string, unknown>;
+        const hook = () => canvas.getGraphData();
+
+        globals[testHookName] = hook;
+
+        // Leaving it behind would keep an unmounted canvas — and its data —
+        // reachable, and hand the next test a stale instance.
+        return () => {
+            if (globals[testHookName] === hook) delete globals[testHookName];
+        };
+    }, [canvasRef, canvasLoaded, testHookName]);
 
     // Load saved viewport on mount
     useEffect(() => {
@@ -192,8 +215,8 @@ export default function ForceGraph({
 
         setRelationships(graph.removeLinks(nodes.map(n => n.id)));
 
-        canvas.setGraphData(convertToCanvasData(graph.Elements));
-    }, [canvasRef, canvasLoaded, graph, setRelationships]);
+        canvas.setGraphData(convertToCanvasData(graph.Elements, nodeShape));
+    }, [canvasRef, canvasLoaded, graph, setRelationships, nodeShape]);
 
     // When focus mode is on, pan the canvas to the centroid of the selected elements.
     const centerOnSelection = useCallback((selection: (Node | Link)[]) => {
@@ -220,7 +243,7 @@ export default function ForceGraph({
 
     const handleNodeClick = useCallback(async (node: GraphNode, _event: MouseEvent) => {
         const fullNode = graph.NodesMap.get(node.id);
-        if (!fullNode) return;
+        if (!fullNode || disableExpand) return;
 
         const now = Date.now();
         const isDoubleClick = now - lastClick.current.date < DOUBLE_CLICK_MS && lastClick.current.id === node.id;
@@ -240,7 +263,7 @@ export default function ForceGraph({
                 deleteNeighbors([fullNode]);
             }
         }
-    }, [graph.NodesMap, onFetchNode, deleteNeighbors]);
+    }, [graph.NodesMap, onFetchNode, deleteNeighbors, disableExpand]);
 
     const handleLinkClick = useCallback((link: GraphLink, event: MouseEvent) => {
         const fullLink = graph.LinksMap.get(link.id);
@@ -498,7 +521,7 @@ export default function ForceGraph({
         // graph (switching from a saved tab straight to an unsaved one).
         clearTimeout(viewportRestoreTimerRef.current);
         viewportRestoreTimerRef.current = undefined;
-        const canvasData = convertToCanvasData(data);
+        const canvasData = convertToCanvasData(data, nodeShape);
         nodeCount = canvasData.nodes.length;
         canvas.setData(canvasData);
 
@@ -526,12 +549,12 @@ export default function ForceGraph({
         }
 
         return undefined;
-    }, [canvasRef, data, graphData, setGraphData, canvasLoaded, viewport]);
+    }, [canvasRef, data, graphData, setGraphData, canvasLoaded, viewport, nodeShape]);
 
     return (
         <div
             className="w-full h-full"
-            data-testid="graphCanvasWrapper"
+            data-testid={testId}
             data-focus-active={String(dimmed && selectedElements.length > 0)}
             data-selection-count={String(selectedElements.length)}
         >

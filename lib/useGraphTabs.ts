@@ -32,6 +32,12 @@ type Params<S> = {
     canRestore: boolean;
     /** Re-read/reset the tab strip when the user switches connection. */
     connectionKey: string | null;
+    /**
+     * The tutorial works on demo graphs of its own, so it gets a strip of its
+     * own too: the user's tabs are neither shown nor written to while it runs,
+     * and are read back from storage when it closes.
+     */
+    tutorialOpen: boolean;
     /** Tab named by the URL on entry; wins over the stored active tab. */
     initialTabId: string;
     graphName: string;
@@ -75,6 +81,7 @@ export default function useGraphTabs<S>({
     prefixReady,
     canRestore,
     connectionKey,
+    tutorialOpen,
     initialTabId,
     graphName,
     query,
@@ -109,8 +116,9 @@ export default function useGraphTabs<S>({
     const limitRef = useRef(limit);
     limitRef.current = limit;
 
-    // The URL param is spent once, at mount: the state→URL sync overwrites it as
-    // soon as the strip settles, so later reads would see our own value.
+    // Captured at mount and spent by the first restore that can act on it: the
+    // state→URL sync overwrites the param as soon as the strip settles, so later
+    // reads would see our own value.
     const initialTabIdRef = useRef(initialTabId);
 
     /** Live snapshots by tab id. Sessions hold graph objects — never persisted. */
@@ -145,8 +153,50 @@ export default function useGraphTabs<S>({
         setState(next);
     }, []);
 
+    const persist = useCallback(() => {
+        // Never write before the restore has run: on mount the state is a single
+        // blank tab, and saving that would erase the stored strip we are about
+        // to read back.
+        if (restoredKeyRef.current === null) return;
+        // ...and not until the restored strip has actually been committed.
+        if (restoredStateRef.current) {
+            if (stateRef.current !== restoredStateRef.current) return;
+            restoredStateRef.current = null;
+        }
+
+        const prev = stateRef.current;
+        setConnectionItem(TABS_STORAGE_KEY, JSON.stringify({
+            tabs: withLive(prev).map(forStorage),
+            activeTabId: prev.activeTabId,
+        }));
+    }, [withLive]);
+
+    // Hand the tutorial a blank strip the moment it takes over. Declared before
+    // the restore effect so it runs first on the commit that opens the tutorial,
+    // while the key `persist` needs is still set — the strip the tutorial hides
+    // is what the restore below reads back once the tutorial ends.
+    const tutorialOpenRef = useRef(false);
     useEffect(() => {
-        if (!prefixReady || !canRestore) {
+        const was = tutorialOpenRef.current;
+        tutorialOpenRef.current = tutorialOpen;
+        if (!tutorialOpen || was) return;
+
+        // Panning, zooming and selecting never reach the persist effect below,
+        // so the active tab holds them in the live state alone. Flush before
+        // handing that state away, or the tutorial costs the user the view they
+        // left behind.
+        persist();
+
+        sessionsRef.current.clear();
+        const tab = createTab();
+        setState({ tabs: [tab], activeTabId: tab.id });
+    }, [tutorialOpen, persist]);
+
+    useEffect(() => {
+        // Dropping the key while the tutorial runs does double duty: it stops
+        // `persist` from writing the tutorial's tabs over the user's, and makes
+        // this effect restore them from storage once the tutorial closes.
+        if (!prefixReady || !canRestore || tutorialOpen) {
             restoredKeyRef.current = null;
             return;
         }
@@ -169,6 +219,10 @@ export default function useGraphTabs<S>({
         }
 
         const urlTabId = initialTabIdRef.current;
+        // Spent here rather than at mount: this effect runs again when the
+        // tutorial closes, and a tab named on entry must not win a second time
+        // over the tab the user was actually on when the tutorial took over.
+        initialTabIdRef.current = "";
         const preferred = [urlTabId, stored.activeTabId].find(id => stored.tabs.some(t => t.id === id));
         const activeTabId = preferred ?? stored.tabs[0].id;
 
@@ -178,25 +232,7 @@ export default function useGraphTabs<S>({
         // activating it would clear a graph auto-selected in the meantime.
         const active = stored.tabs.find(t => t.id === activeTabId)!;
         if (active.graphName) onActivateRef.current(active, undefined);
-    }, [prefixReady, canRestore, connectionKey, commitRestored]);
-
-    const persist = useCallback(() => {
-        // Never write before the restore has run: on mount the state is a single
-        // blank tab, and saving that would erase the stored strip we are about
-        // to read back.
-        if (restoredKeyRef.current === null) return;
-        // ...and not until the restored strip has actually been committed.
-        if (restoredStateRef.current) {
-            if (stateRef.current !== restoredStateRef.current) return;
-            restoredStateRef.current = null;
-        }
-
-        const prev = stateRef.current;
-        setConnectionItem(TABS_STORAGE_KEY, JSON.stringify({
-            tabs: withLive(prev).map(forStorage),
-            activeTabId: prev.activeTabId,
-        }));
-    }, [withLive]);
+    }, [prefixReady, canRestore, tutorialOpen, connectionKey, commitRestored]);
 
     // Structural changes only (add / close / select / rename), plus the two live
     // fields that change at human pace. `tabs` is deliberately not a dependency:
