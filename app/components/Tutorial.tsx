@@ -360,7 +360,7 @@ const tutorialSteps: TutorialStep[] = [
     },
     {
         title: "Query History",
-        description: "Access your previous queries here. You can filter by graph, search queries, and view metadata for each executed query.",
+        description: "Every query you run is kept here, tagged with the graph it ran against. Click to open the history.",
         placementAxis: "y",
         targetSelector: '[data-testid="queryHistory"]',
         advanceOn: "click",
@@ -369,7 +369,7 @@ const tutorialSteps: TutorialStep[] = [
     },
     {
         title: "Query History Window",
-        description: "Access your previous queries here. You can also remove queries from your history or clear the entire history.",
+        description: "Search the list, or narrow it with the graph-name chips and the **Favorites** filter — the star on a row is what puts it there. Click a row to select it, Ctrl/Cmd + click for several, then **Export** them to a .cypher file, **Delete** them from the history, or clear their favorite mark. The tabs below hold the selected query: **Edit Query** to change it and run it again, and **Profile**, **Metadata** and **Explain** for how it ran. Double-click a row to run it straight away.",
         placementAxis: "y",
         targetSelector: '[data-testid="queryHistoryPanel"]',
         hidePrev: true
@@ -705,8 +705,13 @@ function ArrowIcon({ direction }: { direction: "left" | "right" | "top" | "botto
 /** Shape of the keep-alive state for Radix sub-menus during tutorial transitions. */
 interface SubMenuKeepAliveState {
     interval: ReturnType<typeof setInterval>;
-    blockers: Array<{ el: Element; handler: (e: Event) => void }>;
+    blockers: Array<{ el: Element; type: string; handler: (e: Event) => void; capture: boolean }>;
     dimmedSiblings: HTMLElement[];
+}
+
+/** Removes every listener registered as a sub-menu blocker. */
+function removeSubMenuBlockers(blockers: SubMenuKeepAliveState['blockers']): void {
+    blockers.forEach(({ el, type, handler, capture }) => el.removeEventListener(type, handler, capture));
 }
 
 /**
@@ -729,23 +734,30 @@ function createSubMenuKeepAlive(subTrigger: HTMLElement, dimmedSiblings: HTMLEle
 
     // Block pointerleave events on the SubTrigger and the dropdown content
     const blocker = (e: Event) => { e.stopImmediatePropagation(); };
-    const blockers: Array<{ el: Element; handler: (e: Event) => void }> = [];
+    // React synthesizes pointerleave from pointerout at the root container, so the
+    // capture blocker above never reaches Radix's handler — keep the pointerout from
+    // bubbling out of the menu instead.
+    const outBlocker = (e: Event) => { e.stopPropagation(); };
+    const blockers: SubMenuKeepAliveState['blockers'] = [];
+    const addBlocker = (el: Element, type: string, capture: boolean, handler: (e: Event) => void) => {
+        el.addEventListener(type, handler, capture);
+        blockers.push({ el, type, handler, capture });
+    };
 
-    subTrigger.addEventListener('pointerleave', blocker, true);
-    blockers.push({ el: subTrigger, handler: blocker });
+    addBlocker(subTrigger, 'pointerleave', true, blocker);
+    addBlocker(subTrigger, 'pointerout', false, outBlocker);
 
     const dropdownContent = subTrigger.closest('[data-testid="layoutDropdownContent"]');
     if (dropdownContent) {
-        dropdownContent.addEventListener('pointerleave', blocker, true);
-        blockers.push({ el: dropdownContent, handler: blocker });
+        addBlocker(dropdownContent, 'pointerleave', true, blocker);
+        addBlocker(dropdownContent, 'pointerout', false, outBlocker);
         // Also block pointermove on sibling items so Radix doesn't highlight them
         // and close our sub-menu
         const allItems = dropdownContent.querySelectorAll(':scope > *');
         allItems.forEach(item => {
             if (!item.contains(subTrigger)) {
-                item.addEventListener('pointermove', blocker, true);
-                item.addEventListener('pointerenter', blocker, true);
-                blockers.push({ el: item, handler: blocker });
+                addBlocker(item, 'pointermove', true, blocker);
+                addBlocker(item, 'pointerenter', true, blocker);
             }
         });
     }
@@ -756,11 +768,7 @@ function createSubMenuKeepAlive(subTrigger: HTMLElement, dimmedSiblings: HTMLEle
 /** Tears down a keep-alive state: stops interval, removes event blockers, restores siblings. */
 function destroySubMenuKeepAlive(state: SubMenuKeepAliveState): void {
     clearInterval(state.interval);
-    state.blockers.forEach(({ el, handler }) => {
-        el.removeEventListener('pointerleave', handler, true);
-        el.removeEventListener('pointermove', handler, true);
-        el.removeEventListener('pointerenter', handler, true);
-    });
+    removeSubMenuBlockers(state.blockers);
     state.dimmedSiblings.forEach(item => {
         item.style.pointerEvents = '';
         item.style.opacity = '';
@@ -1323,36 +1331,67 @@ function TutorialPortal({
                 if (tutorialSteps[step].passthrough && advanceOn === 'click') {
                     overlay.style.pointerEvents = 'none';
 
-                    // Add pointerleave protection on the sub-trigger so the sub-menu
+                    // Add leave protection on the sub-trigger so the sub-menu
                     // can't close while the user moves to click the direction item.
                     const subTriggerTestId = tutorialSteps[step].parentSubTrigger;
                     const subTrigger = subTriggerTestId
                         ? document.querySelector(`[data-testid="${subTriggerTestId}"]`) as HTMLElement | null
                         : null;
                     const leaveBlocker = (e: Event) => { e.stopImmediatePropagation(); };
-                    if (subTrigger) {
-                        subTrigger.addEventListener('pointerleave', leaveBlocker, true);
-                    }
+                    // React synthesizes pointerleave from pointerout at the root container,
+                    // so a capture blocker on the element never reaches Radix's handler —
+                    // keep the pointerout from bubbling out of the menu instead.
+                    const outBlocker = (e: Event) => { e.stopPropagation(); };
+                    const stepBlockers: SubMenuKeepAliveState['blockers'] = [];
                     const dropdownContent = element.closest('[data-testid="layoutDropdownContent"]');
-                    if (dropdownContent) {
-                        dropdownContent.addEventListener('pointerleave', leaveBlocker, true);
-                    }
+                    [subTrigger, dropdownContent].forEach(el => {
+                        if (!el) return;
+                        el.addEventListener('pointerleave', leaveBlocker, true);
+                        el.addEventListener('pointerout', outBlocker);
+                        stepBlockers.push(
+                            { el, type: 'pointerleave', handler: leaveBlocker, capture: true },
+                            { el, type: 'pointerout', handler: outBlocker, capture: false },
+                        );
+                    });
 
                     // Now that our own blockers are in place, safely stop the keep-alive.
                     // Don't use stopKeepAlive() because it restores siblings
                     // which could let Radix detect pointer on a sibling and close the sub.
                     // Instead, just stop the interval; the old blockers are redundant (ours are active).
                     // We'll do full cleanup (including siblings) when THIS step's cleanup runs.
-                    const keepAliveSiblings = keepAliveRef.current?.dimmedSiblings || [];
+                    const dimmedSiblings = keepAliveRef.current?.dimmedSiblings || [];
                     if (keepAliveRef.current) {
                         clearInterval(keepAliveRef.current.interval);
-                        keepAliveRef.current.blockers.forEach(({ el, handler }) => {
-                            el.removeEventListener('pointerleave', handler, true);
-                            el.removeEventListener('pointermove', handler, true);
-                            el.removeEventListener('pointerenter', handler, true);
-                        });
+                        removeSubMenuBlockers(keepAliveRef.current.blockers);
                         keepAliveRef.current = null;
                     }
+
+                    // Dim the sibling items ourselves. They usually arrive dimmed from the
+                    // hover step's keep-alive, but after a re-open (below) that handoff is
+                    // gone and an interactive sibling can close the sub-menu straight away.
+                    if (dropdownContent && subTrigger) {
+                        dropdownContent.querySelectorAll(':scope > *').forEach(item => {
+                            const htmlItem = item as HTMLElement;
+                            if (htmlItem.contains(subTrigger)) return;
+                            htmlItem.style.pointerEvents = 'none';
+                            htmlItem.style.opacity = '0.3';
+                            if (!dimmedSiblings.includes(htmlItem)) dimmedSiblings.push(htmlItem);
+                        });
+                    }
+
+                    // Radix can still dismiss the sub-menu mid-step — its grace-polygon logic
+                    // focuses the parent content, which closes the sub and detaches the
+                    // direction item, leaving this step pointing at a dead node. Re-run the
+                    // effect so the retry path above re-opens the sub-menu and re-binds.
+                    const reopenWatcher = window.setInterval(() => {
+                        if (element.isConnected) return;
+                        window.clearInterval(reopenWatcher);
+                        setRetryCount(c => c + 1);
+                    }, 150);
+
+                    // A re-open spent part of the retry budget; the item is back, so give the
+                    // next one a full budget again (no-op — and no re-run — when already 0).
+                    setRetryCount(0);
 
                     const clickHandler = () => {
                         if (advancePendingRef.current) return;
@@ -1376,11 +1415,11 @@ function TutorialPortal({
                         clearAdvance();
                         disabledObserver.disconnect();
                         element.removeEventListener('click', clickHandler);
-                        // Remove pointerleave protection
-                        if (subTrigger) subTrigger.removeEventListener('pointerleave', leaveBlocker, true);
-                        if (dropdownContent) dropdownContent.removeEventListener('pointerleave', leaveBlocker, true);
-                        // Restore dimmed siblings from the keep-alive (safe now — step is done)
-                        keepAliveSiblings.forEach(item => {
+                        window.clearInterval(reopenWatcher);
+                        // Remove leave protection
+                        removeSubMenuBlockers(stepBlockers);
+                        // Restore the dimmed siblings (safe now — step is done)
+                        dimmedSiblings.forEach(item => {
                             item.style.pointerEvents = '';
                             item.style.opacity = '';
                         });
