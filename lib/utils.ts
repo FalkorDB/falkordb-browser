@@ -12,7 +12,7 @@ import { signOut } from "next-auth/react";
 import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, enrichSyntaxMessage, type SyntaxErrorInfo, type HintLink } from "./cypherErrors.ts";
 import { suggestForError, findFuncArgTypo } from "./cypherSuggestions.ts";
 import { quoteCypherIdentifier } from "./cypher.ts";
-import type { GeoPoint } from "./graphValues.ts";
+import type { PropertyValue } from "./graphValues.ts";
 
 export { parseSyntaxError };
 export type { SyntaxErrorInfo };
@@ -38,8 +38,11 @@ export const screenSize = {
 };
 
 
-/** Every type FalkorDB can persist as a property value. */
-export type Value = string | number | boolean | GeoPoint | Value[];
+/**
+ * Every type FalkorDB can persist as a property value. Aliased so the editor
+ * and the parsing/validation layer cannot drift apart.
+ */
+export type Value = PropertyValue;
 
 export type HistoryQuery = {
   queries: Query[];
@@ -211,6 +214,18 @@ export type TextCell = {
 };
 
 export type Tab = "Graph" | "Table" | "Metadata" | "Schema";
+
+/**
+ * The tab ids, as values. Ownership checks (who drives the legend, which
+ * selection is live) key off these instead of spelling the id out inline, so a
+ * rename stays a single edit and can never be confused with a display label.
+ */
+export const TAB = {
+  Graph: "Graph",
+  Table: "Table",
+  Metadata: "Metadata",
+  Schema: "Schema",
+} as const satisfies Record<Tab, Tab>;
 
 /**
  * One observed placement of a relationship type: the source label, the
@@ -847,7 +862,8 @@ export function prepareArg(arg: string) {
  * Reads a panel width back out of storage, which anything can have written to.
  * The size is applied in an animation frame, where a throw is swallowed and the
  * panel would silently keep the wrong width, so a value that is not a usable
- * percentage yields `undefined` and the caller falls back to its default.
+ * percentage — anything outside `(0, 100]` — yields `undefined` and the caller
+ * falls back to its default.
  */
 export function parsePanelSizePercent(stored: string | null | undefined): number | undefined {
   if (!stored) return undefined;
@@ -855,7 +871,7 @@ export function parsePanelSizePercent(stored: string | null | undefined): number
   try {
     const parsed: unknown = JSON.parse(stored);
 
-    return typeof parsed === "number" && Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+    return typeof parsed === "number" && Number.isFinite(parsed) && parsed > 0 && parsed <= 100 ? parsed : undefined;
   } catch {
     return undefined;
   }

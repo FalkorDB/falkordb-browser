@@ -456,6 +456,7 @@ describe("parsePanelSizePercent", () => {
   it("accepts a stored percentage", () => {
     assert.equal(parsePanelSizePercent("42"), 42);
     assert.equal(parsePanelSizePercent("33.5"), 33.5);
+    assert.equal(parsePanelSizePercent("100"), 100);
   });
 
   it("rejects anything that is not a usable percentage, so the caller keeps its default", () => {
@@ -474,6 +475,8 @@ describe("parsePanelSizePercent", () => {
     assert.equal(parsePanelSizePercent("0"), undefined);
     assert.equal(parsePanelSizePercent("-10"), undefined);
     assert.equal(parsePanelSizePercent("1e999"), undefined);
+    // Over a full width: would have produced a CSS size of `150%`.
+    assert.equal(parsePanelSizePercent("150"), undefined);
   });
 });
 
