@@ -64,7 +64,7 @@ describe("updateGraphElementAttribute", () => {
 
       assert.equal(result.success, false, JSON.stringify(body));
       // The schema names the type it was checking, so the reason is a substring.
-      assert.match(result.error?.issues[0].message ?? "", new RegExp(CALENDAR_DATE_ERROR), JSON.stringify(body));
+      assert.ok((result.error?.issues[0].message ?? "").includes(CALENDAR_DATE_ERROR), JSON.stringify(body));
     });
 
     // A leap day the year actually has still goes through.

@@ -1506,6 +1506,25 @@ function TutorialPortal({
                 </div>
                 <div className="text-muted-foreground">
                     {parseDescription(description, toast)}
+                    {
+                        // The live region is mounted for every step, not only while the
+                        // message shows: a region inserted together with its text is
+                        // announced unreliably, and one that is only ever replaced by an
+                        // identical copy is not re-announced at all. Keeping it means the
+                        // content genuinely goes empty -> text on each occurrence.
+                        // It sits inside the description rather than beside it because an
+                        // empty child of the panel's `space-y-4` would still add a gap.
+                    }
+                    <div role="status" aria-live="polite">
+                        {
+                            targetUnavailable &&
+                            <div className="mt-4 flex items-center gap-2 p-3 bg-secondary rounded-lg" data-testid="tutorialTargetUnavailable">
+                                <span className="text-sm text-muted-foreground">
+                                    We couldn&apos;t find this step&apos;s element on the page. Continue to the next step or skip the tutorial.
+                                </span>
+                            </div>
+                        }
+                    </div>
                 </div>
                 {
                     step === 1 &&
@@ -1533,24 +1552,6 @@ function TutorialPortal({
                         <span className="text-sm text-primary font-medium">Click the highlighted element to continue</span>
                     </div>
                 }
-                {
-                    // The live region is mounted for every step, not only while the
-                    // message shows: a region inserted together with its text is
-                    // announced unreliably, and one that is only ever replaced by an
-                    // identical copy is not re-announced at all. Keeping it means the
-                    // content genuinely goes empty -> text on each occurrence.
-                    // `empty:hidden` keeps the placeholder out of the panel's layout.
-                }
-                <div role="status" aria-live="polite" className="empty:hidden">
-                    {
-                        targetUnavailable &&
-                        <div className="flex items-center gap-2 p-3 bg-secondary rounded-lg" data-testid="tutorialTargetUnavailable">
-                            <span className="text-sm text-muted-foreground">
-                                We couldn&apos;t find this step&apos;s element on the page. Continue to the next step or skip the tutorial.
-                            </span>
-                        </div>
-                    }
-                </div>
                 {
                     step > 0 &&
                     <div className="flex justify-between items-center gap-4 pt-4">
