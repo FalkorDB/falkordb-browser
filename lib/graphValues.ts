@@ -25,13 +25,18 @@ export type ValueType = (typeof VALUE_TYPES)[number];
 /** A geospatial point, in the shape the client hands back. */
 export type GeoPoint = { latitude: number; longitude: number };
 
+/** The values FalkorDB stores as-is. */
+export type ScalarValue = string | number | boolean;
+
+/**
+ * A list FalkorDB can persist. Lists nest as deep as they like, but they hold
+ * scalars only — a point inside a list is not storable, so it stays out of the
+ * type as well.
+ */
+export type ValueArray = (ScalarValue | ValueArray)[];
+
 /** Anything that can sit on the right-hand side of a `SET n.key = …`. */
-export type PropertyValue =
-  | string
-  | number
-  | boolean
-  | GeoPoint
-  | PropertyValue[];
+export type PropertyValue = ScalarValue | GeoPoint | ValueArray;
 
 /**
  * How each type is written. Everything travels as a query parameter; the types
@@ -65,9 +70,13 @@ export const VALUE_PLACEHOLDERS: Partial<Record<ValueType, string>> = {
   duration: "P3DT12H",
 };
 
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-const TIME_PATTERN = /^\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
-const DATETIME_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
+// Digit counts alone would let `2025-13-45` or `25:61` through to FalkorDB,
+// where the failure surfaces as a raw Cypher error instead of the format hint.
+const DATE_BODY = String.raw`\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])`;
+const TIME_BODY = String.raw`([01]\d|2[0-3]):[0-5]\d(:[0-5]\d(\.\d+)?)?`;
+const DATE_PATTERN = new RegExp(`^${DATE_BODY}$`);
+const TIME_PATTERN = new RegExp(`^${TIME_BODY}$`);
+const DATETIME_PATTERN = new RegExp(`^${DATE_BODY}T${TIME_BODY}$`);
 // ISO 8601 duration: at least one component, time components after the `T`.
 const DURATION_PATTERN =
   /^P(?!$)(\d+Y)?(\d+M)?(\d+W)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+(\.\d+)?S)?)?$/;
@@ -83,6 +92,31 @@ export const VALUE_PATTERNS = {
   datetime: DATETIME_PATTERN,
   duration: DURATION_PATTERN,
 } as const;
+
+export type TemporalType = keyof typeof VALUE_PATTERNS;
+
+/** What a shape-valid date that names a day the month never had is told. */
+export const CALENDAR_DATE_ERROR = "That day does not exist in that month";
+
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+const isLeapYear = (year: number): boolean =>
+  (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+
+/**
+ * The regex bounds the day to 1–31, which still lets `2025-02-31` — and
+ * `2025-02-29`, a leap day in a year that has none — through to FalkorDB. This
+ * bounds it to the month it actually sits in. Only meaningful once the shape
+ * has already matched.
+ */
+export const isCalendarDate = (type: TemporalType, text: string): boolean => {
+  if (type !== "date" && type !== "datetime") return true;
+
+  const [year, month, day] = text.slice(0, 10).split("-").map(Number);
+  const lastDay = month === 2 && isLeapYear(year) ? 29 : DAYS_IN_MONTH[month - 1];
+
+  return day <= lastDay;
+};
 
 export const isGeoPoint = (value: unknown): value is GeoPoint =>
   typeof value === "object" &&
@@ -185,7 +219,7 @@ export function parseValue(type: ValueType, raw: PropertyValue): ParseResult {
         return { error: "An array holds strings, numbers, booleans or arrays of them" };
       }
 
-      return { value: parsed as PropertyValue[] };
+      return { value: parsed as ValueArray };
     }
     case "date":
     case "time":
@@ -196,6 +230,8 @@ export function parseValue(type: ValueType, raw: PropertyValue): ParseResult {
       if (!VALUE_PATTERNS[type].test(text)) {
         return { error: `Expected the format ${VALUE_PLACEHOLDERS[type]}` };
       }
+
+      if (!isCalendarDate(type, text)) return { error: CALENDAR_DATE_ERROR };
 
       return { value: text };
     }

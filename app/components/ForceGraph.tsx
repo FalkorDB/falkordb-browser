@@ -67,6 +67,11 @@ export default function ForceGraph({
     const { background, foreground } = getTheme(theme);
 
     const lastClick = useRef<{ date: number, id: number }>({ date: 0, id: -1 });
+    // One counter per node, bumped whenever a double-click toggles its expansion.
+    // An expand awaits a fetch, so a collapse and a re-expand can both land while
+    // it is in flight; a completion only touches the graph while its token is
+    // still the node's latest.
+    const expandTokens = useRef(new Map<number, number>());
     // When non-null, holds the `data` snapshot at the moment a graphData restore
     // was consumed. The immediately-following setGraphData(undefined) re-run is
     // skipped only when data still matches — if React batches a real data refresh
@@ -142,7 +147,11 @@ export default function ForceGraph({
         };
     }, [canvasRef, setGraphData, setViewport, canvasLoaded]);
 
-    const onFetchNode = useCallback(async (node: Node, clickedNode: GraphNode) => {
+    // `isCurrent` reports whether the toggle that started this fetch is still the
+    // one that owns the node's neighbours. It is checked before every commit, not
+    // just on the way out: a superseded expansion that merged its result would
+    // paint neighbours back onto a node the user has since collapsed.
+    const onFetchNode = useCallback(async (node: Node, isCurrent: () => boolean) => {
         const canvas = canvasRef.current;
         if (!canvas || !canvasLoaded) return;
         const startEpoch = getConnectionEpoch();
@@ -155,13 +164,13 @@ export default function ForceGraph({
             }
         }, toast, setIndicator, cid);
 
-        if (getConnectionEpoch() !== startEpoch) return;
+        if (getConnectionEpoch() !== startEpoch || !isCurrent()) return;
         if (result.ok) {
             const json = await result.json();
-            if (getConnectionEpoch() !== startEpoch) return;
+            if (getConnectionEpoch() !== startEpoch || !isCurrent()) return;
 
             const elements = await graph.extend(json.result, true, true);
-            if (getConnectionEpoch() !== startEpoch) return;
+            if (getConnectionEpoch() !== startEpoch || !isCurrent()) return;
 
             if (elements.length === 0) {
                 toast({
@@ -252,9 +261,23 @@ export default function ForceGraph({
         lastClick.current = isDoubleClick ? { date: 0, id: -1 } : { date: now, id: node.id };
 
         if (isDoubleClick) {
+            const token = (expandTokens.current.get(node.id) ?? 0) + 1;
+            expandTokens.current.set(node.id, token);
+
             fullNode.expand = !fullNode.expand;
             if (fullNode.expand) {
-                await onFetchNode(fullNode, node);
+                await onFetchNode(fullNode, () => expandTokens.current.get(node.id) === token);
+
+                if (expandTokens.current.get(node.id) !== token) {
+                    // A newer toggle superseded this one while the fetch was in
+                    // flight; it owns the node's neighbours now. `graph.extend`
+                    // mutates in place and awaits along the way, so a collapse
+                    // that landed mid-merge may have swept before the neighbours
+                    // arrived — sweep again for it.
+                    if (!fullNode.expand) deleteNeighbors([fullNode]);
+                    return;
+                }
+
                 // Guard: if the node was collapsed while fetching, undo the expansion.
                 if (!fullNode.expand) {
                     deleteNeighbors([fullNode]);

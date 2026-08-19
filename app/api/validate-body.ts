@@ -2,7 +2,14 @@ import { z } from "zod";
 // Relative, extension-carrying paths: the schemas are unit-tested under plain
 // node, which has no view of the bundler's `@/` alias.
 import { UDF_CHAT_MAX_LIBRARIES, UDF_CHAT_MAX_FUNCTIONS_PER_LIBRARY, UDF_CHAT_MAX_NAME_LENGTH } from "../utils.ts";
-import { VALUE_TYPES, VALUE_PATTERNS, VALUE_PLACEHOLDERS, type ValueType } from "../../lib/graphValues.ts";
+import {
+  VALUE_TYPES,
+  VALUE_PATTERNS,
+  VALUE_PLACEHOLDERS,
+  CALENDAR_DATE_ERROR,
+  isCalendarDate,
+  type ValueType,
+} from "../../lib/graphValues.ts";
 
 export const createUser = z.object({
   username: z
@@ -122,7 +129,10 @@ const attributeText = z.string().min(1, "Attribute value cannot be empty");
 const geoPoint = z.object({ latitude: z.number(), longitude: z.number() });
 
 const temporal = (type: keyof typeof VALUE_PATTERNS) =>
-  z.string().regex(VALUE_PATTERNS[type], `Expected the format ${VALUE_PLACEHOLDERS[type]}`);
+  z
+    .string()
+    .regex(VALUE_PATTERNS[type], `Expected the format ${VALUE_PLACEHOLDERS[type]}`)
+    .refine((text) => isCalendarDate(type, text), CALENDAR_DATE_ERROR);
 
 /**
  * What each type needs `value` to hold. The route hands `value` to the Cypher

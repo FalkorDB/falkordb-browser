@@ -20,6 +20,15 @@ import Combobox from "../components/ui/combobox";
 const iconSize = 15;
 
 /**
+ * Identifies a selected element across renders. FalkorDB hands out node ids and
+ * relationship ids from separate namespaces, so the same number names both a
+ * node and a relationship — the kind has to be part of the key, or picking one
+ * right after the other reads as "same element" and carries its edit state over.
+ */
+export const elementKey = (element: Node | Link): string =>
+    `${"source" in element ? "l" : "n"}:${element.id}`;
+
+/**
  * The constraints the graph enforces on a schema property, as icons. The index
  * types get a column of their own since they read as text, not as a flag.
  */
@@ -54,7 +63,12 @@ function SchemaRuleIndicators({ propertyKey, rules }: { propertyKey: string, rul
                 indicators.map(({ id, label, description, Icon }) => (
                     <Tooltip key={id}>
                         <TooltipTrigger asChild>
-                            <span role="img" aria-label={label} data-testid={`DataPanelAttribute${id}${propertyKey}`}>
+                            <span
+                                role="img"
+                                tabIndex={0}
+                                aria-label={label}
+                                data-testid={`DataPanelAttribute${id}${propertyKey}`}
+                            >
                                 <Icon size={iconSize} />
                             </span>
                         </TooltipTrigger>
@@ -71,14 +85,19 @@ function SchemaRuleIndicators({ propertyKey, rules }: { propertyKey: string, rul
 interface Props {
     object: Node | Link
     type: boolean
-    lastObjId: MutableRefObject<number | undefined>
+    /**
+     * Identifies the element the panel last showed. Nodes and relationships get
+     * their ids from separate FalkorDB namespaces, so the id alone collides —
+     * the key carries which of the two it belongs to.
+     */
+    lastObjKey: MutableRefObject<string | undefined>
     canvasRef: GraphRef
     className?: string
     /** Schema elements have no values, only the type(s) each key holds. */
     schema?: boolean
 }
 
-export default function DataTable({ object, type, lastObjId, canvasRef, className, schema }: Props) {
+export default function DataTable({ object, type, lastObjKey, canvasRef, className, schema }: Props) {
 
     const { graph, setGraphInfo } = useContext(GraphContext);
     const { settings: { userExperienceSettings: { captionKeysSettings: { captionsKeys } } } } = useContext(BrowserSettingsContext);
@@ -202,7 +221,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
     }, [isAddValue]);
 
     useEffect(() => {
-        if (lastObjId.current !== object.id) {
+        if (lastObjKey.current !== elementKey(object)) {
             setEditable("");
             setNewVal("");
             setNewKey("");
@@ -211,7 +230,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
         }
         setAttributes(Object.keys(object.data));
         setExpandedAttributes({});
-    }, [lastObjId, object, setAttributes, type]);
+    }, [lastObjKey, object, setAttributes, type]);
 
     // A map is the only thing a property can never hold, and it is the only
     // shape the editor has nothing to offer for.
@@ -230,7 +249,9 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
             return;
         }
 
-        const valueType = value === undefined ? "string" : inferValueType(value);
+        // The type the property was last written with wins: a temporal value reads
+        // back as plain ISO text, which inference alone reports as a string.
+        const valueType = value === undefined ? "string" : (writtenTypes.current[key] ?? inferValueType(value));
 
         setEditable(key);
         // Only the switch holds a value as-is; every other type is edited as
@@ -688,7 +709,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                                         onMouseLeave={() => setHover("")}
                                         key={`${key}-type`}
                                     >
-                                        {editable === key ? getNewTypeInput() : <p className="w-full truncate">{inferValueType(value)}</p>}
+                                        {editable === key ? getNewTypeInput() : <p className="w-full truncate">{writtenTypes.current[key] ?? inferValueType(value)}</p>}
                                     </div>
                                     <div
                                         className={cellClass}

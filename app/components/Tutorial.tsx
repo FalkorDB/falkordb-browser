@@ -559,6 +559,9 @@ const tutorialSteps: TutorialStep[] = [
 const NEXT_TARGET_TIMEOUT = 10000;
 const NEXT_TARGET_POLL = 150;
 
+/** How often a step whose target never arrived keeps looking for it. */
+const TARGET_WATCH_POLL = 300;
+
 /** Helper: close any open overlays/panels that might be stale */
 function closeStaleOverlays(): void {
     // Close layout dropdown if open (check content portal existence, not data-state which conflicts with TooltipTrigger)
@@ -792,6 +795,9 @@ function TutorialPortal({
 
     const [mounted, setMounted] = useState(false);
     const [targetDisabled, setTargetDisabled] = useState(false);
+    // The step's target never showed up. An action-gated step has no Next of its
+    // own, so without this the user would sit on a step with nothing to click.
+    const [targetUnavailable, setTargetUnavailable] = useState(false);
     // Whether the step Next leads to has its target on screen yet.
     const [nextReady, setNextReady] = useState(true);
     const [arrowStyle, setArrowStyle] = useState<React.CSSProperties>({ display: 'none' });
@@ -845,6 +851,7 @@ function TutorialPortal({
     // Also stop keep-alive UNLESS the incoming step is the expected passthrough consumer.
     useEffect(() => {
         setRetryCount(0);
+        setTargetUnavailable(false);
         advancePendingRef.current = false;
         advanceCancelledRef.current = false;
         // Only preserve keep-alive for passthrough steps that will consume it
@@ -912,10 +919,25 @@ function TutorialPortal({
                     const id = window.setTimeout(() => setRetryCount(c => c + 1), 150);
                     return () => window.clearTimeout(id);
                 }
-                // Gave up after 15 retries — clean up keep-alive and hide arrow
+                // Gave up after 15 retries — clean up keep-alive, hide the arrow
+                // and fall back to a manual Next so the step stays escapable.
                 stopKeepAlive();
+                setTargetUnavailable(true);
                 setArrowStyle({ display: 'none' });
-                return () => { };
+
+                // The fallback is an escape hatch, not a verdict: a target that
+                // simply took longer than the retry budget (a slow fetch, a late
+                // render) must not leave an action-gated step permanently
+                // advanceable with no arrow. Keep watching, and hand the step
+                // back to the normal path the moment it shows up.
+                const watch = window.setInterval(() => {
+                    if (!document.querySelector(targetSelector)) return;
+                    window.clearInterval(watch);
+                    setTargetUnavailable(false);
+                    setRetryCount(0);
+                }, TARGET_WATCH_POLL);
+
+                return () => window.clearInterval(watch);
             }
 
             if (element) {
@@ -1484,6 +1506,25 @@ function TutorialPortal({
                 </div>
                 <div className="text-muted-foreground">
                     {parseDescription(description, toast)}
+                    {
+                        // The live region is mounted for every step, not only while the
+                        // message shows: a region inserted together with its text is
+                        // announced unreliably, and one that is only ever replaced by an
+                        // identical copy is not re-announced at all. Keeping it means the
+                        // content genuinely goes empty -> text on each occurrence.
+                        // It sits inside the description rather than beside it because an
+                        // empty child of the panel's `space-y-4` would still add a gap.
+                    }
+                    <div role="status" aria-live="polite">
+                        {
+                            targetUnavailable &&
+                            <div className="mt-4 flex items-center gap-2 p-3 bg-secondary rounded-lg" data-testid="tutorialTargetUnavailable">
+                                <span className="text-sm text-muted-foreground">
+                                    We couldn&apos;t find this step&apos;s element on the page. Continue to the next step or skip the tutorial.
+                                </span>
+                            </div>
+                        }
+                    </div>
                 </div>
                 {
                     step === 1 &&
@@ -1503,7 +1544,7 @@ function TutorialPortal({
                     </>
                 }
                 {
-                    advanceOn && targetSelector &&
+                    advanceOn && targetSelector && !targetUnavailable &&
                     <div className="flex items-center gap-2 p-3 bg-primary/10 rounded-lg">
                         <svg className="w-5 h-5 text-primary flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
@@ -1534,8 +1575,10 @@ function TutorialPortal({
                                 />
                             }
                             {
-                                // If step does not require user action, show enabled Next/Finish
-                                !advanceOn && (
+                                // A step the user advances by acting on the page
+                                // has no Next of its own — unless its target never
+                                // arrived, in which case Next is the only way out.
+                                (!advanceOn || targetUnavailable) && (
                                     <>
                                         {
                                             // A disabled button fires no pointer
@@ -1549,7 +1592,7 @@ function TutorialPortal({
                                         }
                                         <Button
                                             data-testid="tutorialNext"
-                                            disabled={targetDisabled || !nextReady}
+                                            disabled={(targetDisabled && !targetUnavailable) || !nextReady}
                                             variant="Primary"
                                             label={isLastStep ? "Finish" : "Next"}
                                             onClick={isLastStep ? onClose : onNext}

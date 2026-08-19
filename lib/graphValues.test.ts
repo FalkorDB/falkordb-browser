@@ -132,6 +132,42 @@ test("parseValue checks the temporal formats", () => {
     assert.match(failure("duration", "P3T12H"), /Expected the format/);
 });
 
+test("parseValue rejects a temporal value that has the right shape but cannot exist", () => {
+    // These used to reach FalkorDB, where `date()`/`localtime()` failed and the
+    // user saw a raw Cypher error instead of the format hint.
+    assert.match(failure("date", "2025-13-15"), /Expected the format/);
+    assert.match(failure("date", "2025-09-45"), /Expected the format/);
+    assert.match(failure("date", "2025-00-15"), /Expected the format/);
+    assert.match(failure("time", "25:00"), /Expected the format/);
+    assert.match(failure("time", "07:61"), /Expected the format/);
+    assert.match(failure("time", "07:00:61"), /Expected the format/);
+    assert.match(failure("datetime", "2025-06-29T25:61"), /Expected the format/);
+
+    // The edges of each range still pass.
+    assert.equal(parsed("date", "2025-12-31"), "2025-12-31");
+    assert.equal(parsed("time", "23:59:59"), "23:59:59");
+    assert.equal(parsed("datetime", "2025-01-01T00:00"), "2025-01-01T00:00");
+});
+
+test("parseValue rejects a day the month never had", () => {
+    // The component ranges alone let these through: the day is within 1-31, but
+    // not within the month it sits in.
+    assert.match(failure("date", "2025-02-31"), /does not exist/);
+    assert.match(failure("date", "2025-04-31"), /does not exist/);
+    assert.match(failure("date", "2025-06-31"), /does not exist/);
+    assert.match(failure("datetime", "2025-02-30T12:00"), /does not exist/);
+
+    // February follows the leap year, including the century rules.
+    assert.match(failure("date", "2025-02-29"), /does not exist/);
+    assert.match(failure("date", "1900-02-29"), /does not exist/);
+    assert.equal(parsed("date", "2024-02-29"), "2024-02-29");
+    assert.equal(parsed("date", "2000-02-29"), "2000-02-29");
+    assert.equal(parsed("date", "2025-02-28"), "2025-02-28");
+
+    // A time carries no date, so it is left alone.
+    assert.equal(parsed("time", "23:59:59"), "23:59:59");
+});
+
 test("parseValue passes strings through", () => {
     assert.equal(parsed("string", "  keeps its spaces  "), "  keeps its spaces  ");
 });

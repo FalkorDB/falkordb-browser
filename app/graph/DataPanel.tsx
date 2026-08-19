@@ -6,7 +6,7 @@ import { Pencil, TableProperties, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import Button from "../components/ui/Button";
 import { IndicatorContext, GraphContext, ConnectionContext } from "../components/provider";
-import DataTable from "./DataTable";
+import DataTable, { elementKey } from "./DataTable";
 import AddLabel from "./addLabel";
 import RemoveLabel from "./RemoveLabel";
 
@@ -27,7 +27,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef, schem
     // A schema element is derived, so it is read-only whatever the connection is.
     const readOnly = isReadOnly || !!schema;
 
-    const lastObjId = useRef<number | undefined>(undefined);
+    const lastObjKey = useRef<string | undefined>(undefined);
     const labelsListRef = useRef<HTMLUListElement>(null);
 
     const { toast } = useToast();
@@ -51,13 +51,13 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef, schem
     }, [handleClose]);
 
     useEffect(() => {
-        if (lastObjId.current !== object.id) {
+        if (lastObjKey.current !== elementKey(object)) {
             setLabelsHover(false);
         }
         // The unlabeled schema node stands for a label of its own, so its empty
         // name is kept and rendered as "No Label" rather than dropped.
         setLabel(type ? (object as Node).labels.filter((c) => schema || c !== "") : [object.relationship]);
-        lastObjId.current = object.id;
+        lastObjKey.current = elementKey(object);
     }, [object, type, schema]);
 
     const handleAddLabel = async (newLabel: string) => {
@@ -245,7 +245,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef, schem
             </div>
             <DataTable
                 className="h-1 grow w-full"
-                lastObjId={lastObjId}
+                lastObjKey={lastObjKey}
                 object={object}
                 type={type}
                 canvasRef={canvasRef}
