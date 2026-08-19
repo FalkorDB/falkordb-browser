@@ -1534,18 +1534,23 @@ function TutorialPortal({
                     </div>
                 }
                 {
-                    targetUnavailable &&
-                    <div
-                        role="status"
-                        aria-live="polite"
-                        className="flex items-center gap-2 p-3 bg-secondary rounded-lg"
-                        data-testid="tutorialTargetUnavailable"
-                    >
-                        <span className="text-sm text-muted-foreground">
-                            We couldn&apos;t find this step&apos;s element on the page. Continue to the next step or skip the tutorial.
-                        </span>
-                    </div>
+                    // The live region is mounted for every step, not only while the
+                    // message shows: a region inserted together with its text is
+                    // announced unreliably, and one that is only ever replaced by an
+                    // identical copy is not re-announced at all. Keeping it means the
+                    // content genuinely goes empty -> text on each occurrence.
+                    // `empty:hidden` keeps the placeholder out of the panel's layout.
                 }
+                <div role="status" aria-live="polite" className="empty:hidden">
+                    {
+                        targetUnavailable &&
+                        <div className="flex items-center gap-2 p-3 bg-secondary rounded-lg" data-testid="tutorialTargetUnavailable">
+                            <span className="text-sm text-muted-foreground">
+                                We couldn&apos;t find this step&apos;s element on the page. Continue to the next step or skip the tutorial.
+                            </span>
+                        </div>
+                    }
+                </div>
                 {
                     step > 0 &&
                     <div className="flex justify-between items-center gap-4 pt-4">
