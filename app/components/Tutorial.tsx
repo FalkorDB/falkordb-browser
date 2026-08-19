@@ -559,6 +559,9 @@ const tutorialSteps: TutorialStep[] = [
 const NEXT_TARGET_TIMEOUT = 10000;
 const NEXT_TARGET_POLL = 150;
 
+/** How often a step whose target never arrived keeps looking for it. */
+const TARGET_WATCH_POLL = 300;
+
 /** Helper: close any open overlays/panels that might be stale */
 function closeStaleOverlays(): void {
     // Close layout dropdown if open (check content portal existence, not data-state which conflicts with TooltipTrigger)
@@ -921,7 +924,20 @@ function TutorialPortal({
                 stopKeepAlive();
                 setTargetUnavailable(true);
                 setArrowStyle({ display: 'none' });
-                return () => { };
+
+                // The fallback is an escape hatch, not a verdict: a target that
+                // simply took longer than the retry budget (a slow fetch, a late
+                // render) must not leave an action-gated step permanently
+                // advanceable with no arrow. Keep watching, and hand the step
+                // back to the normal path the moment it shows up.
+                const watch = window.setInterval(() => {
+                    if (!document.querySelector(targetSelector)) return;
+                    window.clearInterval(watch);
+                    setTargetUnavailable(false);
+                    setRetryCount(0);
+                }, TARGET_WATCH_POLL);
+
+                return () => window.clearInterval(watch);
             }
 
             if (element) {
@@ -1519,7 +1535,12 @@ function TutorialPortal({
                 }
                 {
                     targetUnavailable &&
-                    <div className="flex items-center gap-2 p-3 bg-secondary rounded-lg" data-testid="tutorialTargetUnavailable">
+                    <div
+                        role="status"
+                        aria-live="polite"
+                        className="flex items-center gap-2 p-3 bg-secondary rounded-lg"
+                        data-testid="tutorialTargetUnavailable"
+                    >
                         <span className="text-sm text-muted-foreground">
                             We couldn&apos;t find this step&apos;s element on the page. Continue to the next step or skip the tutorial.
                         </span>
