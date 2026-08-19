@@ -93,6 +93,31 @@ export const VALUE_PATTERNS = {
   duration: DURATION_PATTERN,
 } as const;
 
+export type TemporalType = keyof typeof VALUE_PATTERNS;
+
+/** What a shape-valid date that names a day the month never had is told. */
+export const CALENDAR_DATE_ERROR = "That day does not exist in that month";
+
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+const isLeapYear = (year: number): boolean =>
+  (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+
+/**
+ * The regex bounds the day to 1–31, which still lets `2025-02-31` — and
+ * `2025-02-29`, a leap day in a year that has none — through to FalkorDB. This
+ * bounds it to the month it actually sits in. Only meaningful once the shape
+ * has already matched.
+ */
+export const isCalendarDate = (type: TemporalType, text: string): boolean => {
+  if (type !== "date" && type !== "datetime") return true;
+
+  const [year, month, day] = text.slice(0, 10).split("-").map(Number);
+  const lastDay = month === 2 && isLeapYear(year) ? 29 : DAYS_IN_MONTH[month - 1];
+
+  return day <= lastDay;
+};
+
 export const isGeoPoint = (value: unknown): value is GeoPoint =>
   typeof value === "object" &&
   value !== null &&
@@ -205,6 +230,8 @@ export function parseValue(type: ValueType, raw: PropertyValue): ParseResult {
       if (!VALUE_PATTERNS[type].test(text)) {
         return { error: `Expected the format ${VALUE_PLACEHOLDERS[type]}` };
       }
+
+      if (!isCalendarDate(type, text)) return { error: CALENDAR_DATE_ERROR };
 
       return { value: text };
     }

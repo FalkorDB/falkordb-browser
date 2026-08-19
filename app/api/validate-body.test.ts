@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { updateGraphElementAttribute } from "./validate-body.ts";
+import { CALENDAR_DATE_ERROR } from "../../lib/graphValues.ts";
 
 const parse = (body: unknown) => updateGraphElementAttribute.safeParse(body);
 
@@ -48,6 +49,27 @@ describe("updateGraphElementAttribute", () => {
     assert.equal(result.success, false);
     assert.deepEqual(result.error?.issues[0].path, ["value"]);
     assert.match(result.error?.issues[0].message ?? "", /date/);
+  });
+
+  it("turns away a day the month never had, the shape alone cannot catch it", () => {
+    const impossible: unknown[] = [
+      { type: true, valueType: "date", value: "2025-02-29" },
+      { type: true, valueType: "date", value: "2025-04-31" },
+      { type: true, valueType: "date", value: "1900-02-29" },
+      { type: true, valueType: "datetime", value: "2025-02-30T12:00:00" },
+    ];
+
+    impossible.forEach((body) => {
+      const result = parse(body);
+
+      assert.equal(result.success, false, JSON.stringify(body));
+      // The schema names the type it was checking, so the reason is a substring.
+      assert.ok((result.error?.issues[0].message ?? "").includes(CALENDAR_DATE_ERROR), JSON.stringify(body));
+    });
+
+    // A leap day the year actually has still goes through.
+    assert.equal(parse({ type: true, valueType: "date", value: "2024-02-29" }).success, true);
+    assert.equal(parse({ type: true, valueType: "date", value: "2000-02-29" }).success, true);
   });
 
   it("without a type, takes only what a query parameter carries on its own", () => {

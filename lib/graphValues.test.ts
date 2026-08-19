@@ -149,6 +149,25 @@ test("parseValue rejects a temporal value that has the right shape but cannot ex
     assert.equal(parsed("datetime", "2025-01-01T00:00"), "2025-01-01T00:00");
 });
 
+test("parseValue rejects a day the month never had", () => {
+    // The component ranges alone let these through: the day is within 1-31, but
+    // not within the month it sits in.
+    assert.match(failure("date", "2025-02-31"), /does not exist/);
+    assert.match(failure("date", "2025-04-31"), /does not exist/);
+    assert.match(failure("date", "2025-06-31"), /does not exist/);
+    assert.match(failure("datetime", "2025-02-30T12:00"), /does not exist/);
+
+    // February follows the leap year, including the century rules.
+    assert.match(failure("date", "2025-02-29"), /does not exist/);
+    assert.match(failure("date", "1900-02-29"), /does not exist/);
+    assert.equal(parsed("date", "2024-02-29"), "2024-02-29");
+    assert.equal(parsed("date", "2000-02-29"), "2000-02-29");
+    assert.equal(parsed("date", "2025-02-28"), "2025-02-28");
+
+    // A time carries no date, so it is left alone.
+    assert.equal(parsed("time", "23:59:59"), "23:59:59");
+});
+
 test("parseValue passes strings through", () => {
     assert.equal(parsed("string", "  keeps its spaces  "), "  keeps its spaces  ");
 });
