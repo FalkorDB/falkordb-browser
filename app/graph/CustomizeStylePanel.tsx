@@ -2,7 +2,7 @@
 
 import { useContext, useState, useEffect, useCallback, useRef } from "react";
 import { X, Palette } from "lucide-react";
-import { CustomizingItem, LabelStyle, LinkStyle, Label, cn } from "@/lib/utils";
+import { CustomizingItem, LabelStyle, LinkStyle, Label, cn, TAB } from "@/lib/utils";
 import { GraphContext, ForceGraphContext, BrowserSettingsContext } from "@/app/components/provider";
 import { STYLE_COLORS, getLabelWithFewestElements } from "@/app/api/graph/model";
 import { setConnectionItem } from "@/lib/connection-storage";
@@ -118,7 +118,7 @@ export default function CustomizeStylePanel({ customizing, onClose }: Props) {
         // schema view keeps a legend of its own — built from its own elements —
         // and re-derives it from the graph info below, so handing it the graph's
         // labels would only flash the wrong list at it.
-        const ownsLegend = currentTab !== "Schema";
+        const ownsLegend = currentTab !== TAB.Schema;
 
         if (isNode) {
             const size = NODE_SIZE * scale;

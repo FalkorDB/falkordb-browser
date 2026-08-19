@@ -67,6 +67,11 @@ export default function ForceGraph({
     const { background, foreground } = getTheme(theme);
 
     const lastClick = useRef<{ date: number, id: number }>({ date: 0, id: -1 });
+    // One counter per node, bumped whenever a double-click toggles its expansion.
+    // An expand awaits a fetch, so a collapse and a re-expand can both land while
+    // it is in flight; a completion only touches the graph while its token is
+    // still the node's latest.
+    const expandTokens = useRef(new Map<number, number>());
     // When non-null, holds the `data` snapshot at the moment a graphData restore
     // was consumed. The immediately-following setGraphData(undefined) re-run is
     // skipped only when data still matches — if React batches a real data refresh
@@ -252,9 +257,15 @@ export default function ForceGraph({
         lastClick.current = isDoubleClick ? { date: 0, id: -1 } : { date: now, id: node.id };
 
         if (isDoubleClick) {
+            const token = (expandTokens.current.get(node.id) ?? 0) + 1;
+            expandTokens.current.set(node.id, token);
+
             fullNode.expand = !fullNode.expand;
             if (fullNode.expand) {
                 await onFetchNode(fullNode, node);
+                // A newer toggle superseded this one while the fetch was in
+                // flight; it owns the node's neighbours now.
+                if (expandTokens.current.get(node.id) !== token) return;
                 // Guard: if the node was collapsed while fetching, undo the expansion.
                 if (!fullNode.expand) {
                     deleteNeighbors([fullNode]);

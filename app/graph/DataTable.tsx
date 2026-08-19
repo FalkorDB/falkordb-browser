@@ -54,7 +54,12 @@ function SchemaRuleIndicators({ propertyKey, rules }: { propertyKey: string, rul
                 indicators.map(({ id, label, description, Icon }) => (
                     <Tooltip key={id}>
                         <TooltipTrigger asChild>
-                            <span role="img" aria-label={label} data-testid={`DataPanelAttribute${id}${propertyKey}`}>
+                            <span
+                                role="img"
+                                tabIndex={0}
+                                aria-label={label}
+                                data-testid={`DataPanelAttribute${id}${propertyKey}`}
+                            >
                                 <Icon size={iconSize} />
                             </span>
                         </TooltipTrigger>
@@ -230,7 +235,9 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
             return;
         }
 
-        const valueType = value === undefined ? "string" : inferValueType(value);
+        // The type the property was last written with wins: a temporal value reads
+        // back as plain ISO text, which inference alone reports as a string.
+        const valueType = value === undefined ? "string" : (writtenTypes.current[key] ?? inferValueType(value));
 
         setEditable(key);
         // Only the switch holds a value as-is; every other type is edited as
@@ -688,7 +695,7 @@ export default function DataTable({ object, type, lastObjId, canvasRef, classNam
                                         onMouseLeave={() => setHover("")}
                                         key={`${key}-type`}
                                     >
-                                        {editable === key ? getNewTypeInput() : <p className="w-full truncate">{inferValueType(value)}</p>}
+                                        {editable === key ? getNewTypeInput() : <p className="w-full truncate">{writtenTypes.current[key] ?? inferValueType(value)}</p>}
                                     </div>
                                     <div
                                         className={cellClass}
