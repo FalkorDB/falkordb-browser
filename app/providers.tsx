@@ -15,7 +15,7 @@ import { setFunctionCandidates } from "@/lib/cypherSuggestions";
 import { udfFunctionNames } from "@/lib/cypherLang";
 import { computeEditorDiagnostics, type DiagnosticsResult } from "@/lib/cypherDiagnostics";
 import { isAiFixSupported } from "@/lib/aiFix";
-import { hasLdapServers, type StubsResponse } from "@/lib/enterprise";
+import { type StubsResponse } from "@/lib/enterprise";
 import { PanelImperativeHandle } from "react-resizable-panels";
 import type { LayoutMode, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
@@ -329,7 +329,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [dbVersion, setDbVersion] = useState<string>("");
   const [supportsOffload, setSupportsOffload] = useState(false);
   const [offloadedGraphs, setOffloadedGraphs] = useState<string[]>([]);
-  const [usesLdap, setUsesLdap] = useState(false);
+  const [usesLdap, setUsesLdap] = useState<boolean | null>(null);
   const [connectionType, setConnectionType] = useState<ConnectionType>("Standalone");
   const [connectionInfo, setConnectionInfo] = useState<ConnectionInfo>({});
   const [additionalConnections, setAdditionalConnections] = useState<SessionConnection[]>([]);
@@ -1424,6 +1424,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     let cancelled = false;
 
     (async () => {
+      // Unknown until this connection's probe resolves.
+      setUsesLdap(null);
+
       try {
         const result = await fetch("/api/DBVersion", { method: "GET" });
         if (cancelled) return;
@@ -1431,7 +1434,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
           setShowMemoryUsage(false);
           setSupportsOffload(false);
           setOffloadedGraphs([]);
-          setUsesLdap(false);
           return;
         }
         const json = await result.json();
@@ -1449,15 +1451,16 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         // ask for it only once the module is confirmed. When it is set,
         // FalkorDB defers authentication and authorization to LDAP and the
         // browser must not offer user/role management.
-        setUsesLdap(false);
-
-        if (json.enterprise !== true) return;
+        if (json.enterprise !== true) {
+          setUsesLdap(false);
+          return;
+        }
 
         const ldapResult = await fetch("/api/ldap", { method: "GET" });
         if (cancelled || !ldapResult.ok) return;
         const ldapJson = await ldapResult.json();
         if (cancelled) return;
-        setUsesLdap(hasLdapServers(ldapJson.config));
+        setUsesLdap(ldapJson.usesLdap === true);
       } catch { /* ignore */ }
     })();
 

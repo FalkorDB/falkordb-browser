@@ -300,8 +300,9 @@ type ConnectionContextType = {
   refreshOffloadedGraphs: () => Promise<void>;
   // True when the enterprise module is loaded with LDAP servers configured. In
   // that case FalkorDB defers authentication and authorization to LDAP, so the
-  // browser must not offer user/role management for this connection.
-  usesLdap: boolean;
+  // browser must not offer user/role management for this connection. `null`
+  // means the probe hasn't resolved, which callers must treat as "assume LDAP".
+  usesLdap: boolean | null;
   additionalConnections: SessionConnection[];
   setAdditionalConnections: Dispatch<SetStateAction<SessionConnection[]>>;
   activeConnectionId: string | null;
@@ -593,7 +594,7 @@ export const ConnectionContext = createContext<ConnectionContextType>({
   supportsOffload: false,
   offloadedGraphs: [],
   refreshOffloadedGraphs: async () => { },
-  usesLdap: false,
+  usesLdap: null,
   additionalConnections: [],
   setAdditionalConnections: () => { },
   activeConnectionId: null,

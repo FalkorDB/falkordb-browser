@@ -38,10 +38,11 @@ export function hasLdapServers(config: Record<string, unknown> | null | undefine
   if (!entry) return false;
 
   const [, value] = entry;
+  // Anything that isn't a non-empty string means "not configured" — coercing
+  // would turn `null` or an object into a truthy server entry.
+  const isServer = (item: unknown) => typeof item === "string" && item.trim() !== "";
 
-  if (Array.isArray(value)) return value.some((item) => String(item).trim() !== "");
-
-  return typeof value === "string" && value.trim() !== "";
+  return Array.isArray(value) ? value.some(isServer) : isServer(value);
 }
 
 export type StubsResponse = {

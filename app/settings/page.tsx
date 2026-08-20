@@ -75,8 +75,10 @@ export default function Settings() {
     const canShowAdminTabs = isMounted && isAdmin;
     // FalkorDB Enterprise with `falkordbe.ldap_servers` set delegates both
     // authentication and authorization to LDAP, so users and roles are not
-    // managed in the database for this connection.
-    const canManageUsers = isAdmin && !usesLdap;
+    // managed in the database for this connection. `null` means the probe
+    // hasn't resolved yet, so stay closed rather than briefly offering a tab
+    // that LDAP-backed connections must never show.
+    const canManageUsers = isAdmin && usesLdap === false;
     const adminOnlyTabs: Tab[] = ["Users", "Configurations"];
     useEffect(() => {
         // Don't reset tabs while session is still loading — isAdmin would be

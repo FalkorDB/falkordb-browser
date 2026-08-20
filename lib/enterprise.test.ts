@@ -49,6 +49,14 @@ describe("hasLdapServers", () => {
     assert.equal(hasLdapServers({ "falkordbe.ldap_servers": ["ldap://host"] }), true);
     assert.equal(hasLdapServers({ "falkordbe.ldap_servers": [] }), false);
     assert.equal(hasLdapServers({ "falkordbe.ldap_servers": [""] }), false);
+    assert.equal(hasLdapServers({ "falkordbe.ldap_servers": [null, undefined] }), false);
+  });
+
+  it("returns false for non-string scalars", () => {
+    assert.equal(hasLdapServers({ "falkordbe.ldap_servers": 1 }), false);
+    assert.equal(hasLdapServers({ "falkordbe.ldap_servers": true }), false);
+    assert.equal(hasLdapServers({ "falkordbe.ldap_servers": {} }), false);
+    assert.equal(hasLdapServers({ "falkordbe.ldap_servers": null }), false);
   });
 
   it("returns false for a null or undefined reply", () => {
