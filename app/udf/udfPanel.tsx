@@ -7,19 +7,31 @@ import LoadUDF from "./LoadUdf";
 import FlushUDFs from "./FlushUdfs";
 import DeleteUDF from "./DeleteUdf";
 
-function LibrarySection({ libraryName, libraryFunctionCount, functions, isSelected, onSelect, onDelete }: {
+function LibrarySection({
+    libraryName,
+    libraryFunctionCount,
+    functions,
+    isSelected,
+    isExpanded,
+    onToggleExpand,
+    onSelect,
+    onFunctionSelect,
+    onDelete,
+}: {
     libraryName: string
     libraryFunctionCount: number
     functions: string[]
     isSelected: boolean
+    isExpanded: boolean
+    onToggleExpand: () => void
     onSelect: () => void
+    onFunctionSelect: (functionName: string) => void
     onDelete: () => void
 }) {
-    const [open, setOpen] = useState(false);
     const iconSize = 16;
 
     return (
-        <div className="flex flex-col gap-2">
+        <div className={cn("flex flex-col gap-2", isExpanded && "basis-[40%] min-h-[40%]")}>
             <div
                 className={cn(
                     "flex items-center gap-2 w-full text-left text-xs font-medium py-1 px-1 rounded hover:bg-secondary",
@@ -28,12 +40,12 @@ function LibrarySection({ libraryName, libraryFunctionCount, functions, isSelect
             >
                 <button
                     type="button"
-                    aria-expanded={open}
+                    aria-expanded={isExpanded}
                     aria-label={`Toggle ${libraryName} functions`}
-                    onClick={() => setOpen(!open)}
+                    onClick={onToggleExpand}
                     className="flex items-center gap-1"
                 >
-                    {open ? <ChevronDown size={iconSize} /> : <ChevronRight size={iconSize} />}
+                    {isExpanded ? <ChevronDown size={iconSize} /> : <ChevronRight size={iconSize} />}
                 </button>
                 <button
                     className="basis-0 grow flex justify-between items-center"
@@ -47,16 +59,18 @@ function LibrarySection({ libraryName, libraryFunctionCount, functions, isSelect
                 </button>
                 <DeleteUDF iconSize={iconSize} udfName={libraryName} onDelete={onDelete} />
             </div>
-            {open && (
-                <div className="flex flex-col ml-5 overflow-y-auto max-h-32">
+            {isExpanded && (
+                <div className="basis-0 grow min-h-0 flex flex-col ml-5 overflow-y-auto">
                     {functions.map((fn) => (
-                        <p
+                        <button
                             key={fn}
-                            className="min-h-fit text-xs py-0.5 px-1 text-muted-foreground truncate"
+                            className="text-left min-h-fit text-xs py-0.5 px-1 text-muted-foreground truncate hover:bg-secondary rounded"
                             title={fn}
+                            type="button"
+                            onClick={() => onFunctionSelect(fn)}
                         >
                             {fn}
-                        </p>
+                        </button>
                     ))}
                 </div>
             )}
@@ -65,19 +79,22 @@ function LibrarySection({ libraryName, libraryFunctionCount, functions, isSelect
 }
 
 export default function UdfPanel() {
-    const { udfList, setUdfList, selectedUdf, setSelectedUdf } = useContext(UDFContext);
+    const { udfList, setUdfList, selectedUdf, setSelectedUdf, setSelectedUdfFunction } = useContext(UDFContext);
     const { setIndicator } = useContext(IndicatorContext);
     const { toast } = useToast();
     const [selectedLib, setSelectedLib] = useState<string | undefined>(selectedUdf?.[1]);
+    const [expandedLib, setExpandedLib] = useState<string | undefined>(selectedUdf?.[1]);
 
     useEffect(() => {
         setSelectedLib(selectedUdf?.[1]);
+        setExpandedLib(selectedUdf?.[1]);
     }, [selectedUdf]);
 
     const handleSelectLib = async (libraryName: string) => {
         if (selectedLib === libraryName) return;
 
         setSelectedLib(libraryName);
+        setSelectedUdfFunction(undefined);
 
         const res = await securedFetch(`/api/udf/${encodeURIComponent(libraryName)}`, {
             method: "GET",
@@ -106,6 +123,7 @@ export default function UdfPanel() {
         });
         setSelectedLib(loadedName);
         setSelectedUdf(loaded);
+        setSelectedUdfFunction(undefined);
     };
 
     return (
@@ -121,6 +139,8 @@ export default function UdfPanel() {
                         setUdfList([]);
                         setSelectedLib(undefined);
                         setSelectedUdf(undefined);
+                        setSelectedUdfFunction(undefined);
+                        setExpandedLib(undefined);
                     }}
                 />
             </div>
@@ -135,13 +155,30 @@ export default function UdfPanel() {
                             libraryFunctionCount={functions.length}
                             functions={functions}
                             isSelected={selectedLib === libraryName}
+                            isExpanded={expandedLib === libraryName}
+                            onToggleExpand={() => {
+                                const shouldOpen = expandedLib !== libraryName;
+                                setExpandedLib(shouldOpen ? libraryName : undefined);
+                                if (shouldOpen) {
+                                    void handleSelectLib(libraryName);
+                                }
+                            }}
                             onSelect={() => handleSelectLib(libraryName)}
+                            onFunctionSelect={(functionName) => {
+                                void handleSelectLib(libraryName).then(() => {
+                                    setSelectedUdfFunction(functionName);
+                                });
+                            }}
                             onDelete={() => {
                                 setUdfList(udfList.filter(([, name]) => name !== libraryName));
 
                                 if (selectedLib === libraryName) {
                                     setSelectedLib(undefined);
                                     setSelectedUdf(undefined);
+                                    setSelectedUdfFunction(undefined);
+                                }
+                                if (expandedLib === libraryName) {
+                                    setExpandedLib(undefined);
                                 }
                             }}
                         />

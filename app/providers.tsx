@@ -341,6 +341,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [cypherOnly, setCypherOnly] = useState<boolean>(false);
   const [udfList, setUdfList] = useState<UDFEntry[]>([]);
   const [selectedUdf, setSelectedUdf] = useState<UDFEntryWithCode>();
+  const [selectedUdfFunction, setSelectedUdfFunction] = useState<string>();
   const [columnWidth, setColumnWidth] = useState<number>(25);
   const [rowHeight, setRowHeight] = useState<number>(40);
   const [newColumnWidth, setNewColumnWidth] = useState<number>(25);
@@ -782,8 +783,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     udfList,
     setUdfList,
     selectedUdf,
-    setSelectedUdf
-  }), [selectedUdf, udfList]);
+    setSelectedUdf,
+    selectedUdfFunction,
+    setSelectedUdfFunction,
+  }), [selectedUdf, selectedUdfFunction, udfList]);
 
   const cypherLanguageContext = useMemo(() => ({
     cypherLanguageConfig,

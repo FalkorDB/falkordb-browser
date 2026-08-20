@@ -317,6 +317,8 @@ type UDFContextType = {
   setUdfList: Dispatch<SetStateAction<UDFEntry[]>>;
   selectedUdf: UDFEntryWithCode | undefined;
   setSelectedUdf: Dispatch<SetStateAction<UDFEntryWithCode | undefined>>;
+  selectedUdfFunction: string | undefined;
+  setSelectedUdfFunction: Dispatch<SetStateAction<string | undefined>>;
 };
 
 type CypherLanguageContextType = {
@@ -604,6 +606,8 @@ export const UDFContext = createContext<UDFContextType>({
   setUdfList: () => { },
   selectedUdf: undefined,
   setSelectedUdf: () => { },
+  selectedUdfFunction: undefined,
+  setSelectedUdfFunction: () => { },
 });
 
 export const CypherLanguageContext = createContext<CypherLanguageContextType>({

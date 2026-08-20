@@ -1,11 +1,13 @@
 "use client";
 
-import { useContext, useMemo } from "react";
+import { useContext, useEffect, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import { UDFContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import Export from "../components/Export";
 import { LanguageConfig } from "../components/EditorComponent";
+import type { editor } from "monaco-editor";
+import { findFunctionLine } from "./functionNavigation";
 
 const EditorComponent = dynamic(() => import("../components/EditorComponent"), {
     ssr: false,
@@ -35,7 +37,8 @@ const UDF_LANGUAGE_NAME = "udf-javascript";
 
 export default function Page() {
 
-    const { selectedUdf } = useContext(UDFContext);
+    const { selectedUdf, selectedUdfFunction } = useContext(UDFContext);
+    const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
     // Extract function names from the selected UDF library
     const udfFunctions = useMemo(() => selectedUdf?.[3] || [], [selectedUdf]);
@@ -73,7 +76,6 @@ export default function Page() {
                         // Regular identifiers
                         [/[a-zA-Z_$][\w$]*/, 'variable'],
                         // Brackets
-                        // eslint-disable-next-line no-useless-escape
                         [/[{}()\[\]]/, '@brackets'],
                         // Operators
                         [/[;,.]/, 'delimiter'],
@@ -132,6 +134,16 @@ export default function Page() {
         };
     }, [udfFunctions]);
 
+    useEffect(() => {
+        if (!selectedUdfFunction || !selectedUdf?.[5] || !editorRef.current) return;
+
+        const lineNumber = findFunctionLine(selectedUdf[5], selectedUdfFunction);
+        if (!lineNumber) return;
+
+        editorRef.current.setPosition({ lineNumber, column: 1 });
+        editorRef.current.revealLineInCenter(lineNumber);
+    }, [selectedUdf, selectedUdfFunction]);
+
     return (
         <div className="Page">
             {
@@ -150,6 +162,9 @@ export default function Page() {
                     value={selectedUdf?.[5] || "// Select a Library to view its code"}
                     language={UDF_LANGUAGE_NAME}
                     languageConfig={udfJsLanguageConfig}
+                    onMount={(editorInstance) => {
+                        editorRef.current = editorInstance;
+                    }}
                     height="100%"
                     readOnly
                     options={{
