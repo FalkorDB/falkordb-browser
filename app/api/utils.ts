@@ -219,7 +219,9 @@ export function shouldUseSecureCookies(request: Request): boolean {
 export function corsHeaders(requestOrigin?: string | null): Record<string, string> {
     const headers: Record<string, string> = {
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        // `securedFetch` puts the active connection on every request as
+        // `X-Connection-Id`; leaving it out fails the cross-origin preflight.
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Connection-Id',
         'Vary': 'Origin',
     };
 

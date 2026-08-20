@@ -77,8 +77,10 @@ export default function Settings() {
     // authentication and authorization to LDAP, so users and roles are not
     // managed in the database for this connection. `null` means the probe
     // hasn't resolved yet, so stay closed rather than briefly offering a tab
-    // that LDAP-backed connections must never show.
-    const canManageUsers = isAdmin && usesLdap === false;
+    // that LDAP-backed connections must never show. `SessionProvider` keeps
+    // the previous session around while it revalidates, so require a settled
+    // one too.
+    const canManageUsers = sessionStatus === "authenticated" && isAdmin && usesLdap === false;
     const adminOnlyTabs: Tab[] = ["Users", "Configurations"];
     useEffect(() => {
         // Don't reset tabs while session is still loading — isAdmin would be
@@ -129,9 +131,16 @@ export default function Settings() {
         }
         switch (current) {
             case 'Users':
-                // Render nothing rather than flashing another tab's content
-                // while the LDAP probe is still unresolved.
-                if (usesLdap === null) return null;
+                // Wait for the LDAP probe rather than flashing another tab's
+                // content. It stays `null` when the probe fails, so say so
+                // instead of leaving the page blank.
+                if (usesLdap === null) {
+                    return (
+                        <p className="text-sm opacity-50" data-testid="settingsUsersPending">
+                            Checking user management availability…
+                        </p>
+                    );
+                }
                 return canManageUsers ? <Users /> : <BrowserSettings />;
             case 'Configurations':
                 return <Configurations />;
