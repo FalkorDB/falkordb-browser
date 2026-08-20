@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { Braces, ChevronDown, ChevronRight } from "lucide-react";
 import { cn, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
@@ -84,6 +84,12 @@ export default function UdfPanel() {
     const { toast } = useToast();
     const [selectedLib, setSelectedLib] = useState<string | undefined>(selectedUdf?.[1]);
     const [expandedLib, setExpandedLib] = useState<string | undefined>(selectedUdf?.[1]);
+    const functionRequestIdRef = useRef(0);
+
+    const selectFunction = (functionName: string) => {
+        functionRequestIdRef.current += 1;
+        setSelectedUdfFunction({ name: functionName, requestId: functionRequestIdRef.current });
+    };
 
     useEffect(() => {
         setSelectedLib(selectedUdf?.[1]);
@@ -166,7 +172,7 @@ export default function UdfPanel() {
                             onSelect={() => handleSelectLib(libraryName)}
                             onFunctionSelect={(functionName) => {
                                 void handleSelectLib(libraryName).then(() => {
-                                    setSelectedUdfFunction(functionName);
+                                    selectFunction(functionName);
                                 });
                             }}
                             onDelete={() => {
