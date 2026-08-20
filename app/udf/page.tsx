@@ -177,7 +177,12 @@ export default function Page() {
         const source = selectedUdf?.[5];
         const functionName = selectedUdfFunction?.name;
 
-        if (!functionName || !source) return undefined;
+        if (!functionName || !source) {
+            // Drop any navigation intent that was never consumed, so a later
+            // mount does not jump to a function the user has since deselected.
+            pendingFunctionRef.current = undefined;
+            return undefined;
+        }
 
         if (revealFunction(functionName, source)) {
             pendingFunctionRef.current = undefined;

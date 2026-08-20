@@ -85,6 +85,8 @@ export default function UdfPanel() {
     const [selectedLib, setSelectedLib] = useState<string | undefined>(selectedUdf?.[1]);
     const [expandedLib, setExpandedLib] = useState<string | undefined>(selectedUdf?.[1]);
     const functionRequestIdRef = useRef(0);
+    // Guards against an older library fetch resolving after a newer pick.
+    const libRequestIdRef = useRef(0);
 
     const selectFunction = (functionName: string) => {
         functionRequestIdRef.current += 1;
@@ -96,8 +98,12 @@ export default function UdfPanel() {
         setExpandedLib(selectedUdf?.[1]);
     }, [selectedUdf]);
 
-    const handleSelectLib = async (libraryName: string) => {
-        if (selectedLib === libraryName) return;
+    /** Resolves to false when a newer selection superseded this one. */
+    const handleSelectLib = async (libraryName: string): Promise<boolean> => {
+        if (selectedLib === libraryName) return true;
+
+        libRequestIdRef.current += 1;
+        const requestId = libRequestIdRef.current;
 
         setSelectedLib(libraryName);
         setSelectedUdfFunction(undefined);
@@ -106,11 +112,15 @@ export default function UdfPanel() {
             method: "GET",
         }, toast, setIndicator);
 
-        if (!res.ok) return;
+        if (!res.ok) return false;
 
         const data = await res.json();
 
+        if (libRequestIdRef.current !== requestId) return false;
+
         setSelectedUdf(data.result[0]);
+
+        return true;
     };
 
     const handleLoad = async (name: string) => {
@@ -121,6 +131,8 @@ export default function UdfPanel() {
         if (!res.ok) return;
 
         const data = await res.json();
+
+        libRequestIdRef.current += 1;
         const loaded = data.result[0];
         const loadedName = loaded[1];
         setUdfList((prev) => {
@@ -142,6 +154,7 @@ export default function UdfPanel() {
                 <LoadUDF onLoad={handleLoad} />
                 <FlushUDFs
                     onFlush={() => {
+                        libRequestIdRef.current += 1;
                         setUdfList([]);
                         setSelectedLib(undefined);
                         setSelectedUdf(undefined);
@@ -171,14 +184,15 @@ export default function UdfPanel() {
                             }}
                             onSelect={() => handleSelectLib(libraryName)}
                             onFunctionSelect={(functionName) => {
-                                void handleSelectLib(libraryName).then(() => {
-                                    selectFunction(functionName);
+                                void handleSelectLib(libraryName).then((isCurrent) => {
+                                    if (isCurrent) selectFunction(functionName);
                                 });
                             }}
                             onDelete={() => {
-                                setUdfList(udfList.filter(([, name]) => name !== libraryName));
+                                setUdfList((prev) => prev.filter(([, name]) => name !== libraryName));
 
                                 if (selectedLib === libraryName) {
+                                    libRequestIdRef.current += 1;
                                     setSelectedLib(undefined);
                                     setSelectedUdf(undefined);
                                     setSelectedUdfFunction(undefined);
