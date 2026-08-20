@@ -298,6 +298,10 @@ type ConnectionContextType = {
   supportsOffload: boolean;
   offloadedGraphs: string[];
   refreshOffloadedGraphs: () => Promise<void>;
+  // True when the enterprise module is loaded with LDAP servers configured. In
+  // that case FalkorDB defers authentication and authorization to LDAP, so the
+  // browser must not offer user/role management for this connection.
+  usesLdap: boolean;
   additionalConnections: SessionConnection[];
   setAdditionalConnections: Dispatch<SetStateAction<SessionConnection[]>>;
   activeConnectionId: string | null;
@@ -589,6 +593,7 @@ export const ConnectionContext = createContext<ConnectionContextType>({
   supportsOffload: false,
   offloadedGraphs: [],
   refreshOffloadedGraphs: async () => { },
+  usesLdap: false,
   additionalConnections: [],
   setAdditionalConnections: () => { },
   activeConnectionId: null,
