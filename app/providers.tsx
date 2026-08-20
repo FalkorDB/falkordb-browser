@@ -329,7 +329,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [dbVersion, setDbVersion] = useState<string>("");
   const [supportsOffload, setSupportsOffload] = useState(false);
   const [offloadedGraphs, setOffloadedGraphs] = useState<string[]>([]);
-  const [usesLdap, setUsesLdap] = useState<boolean | null>(null);
+  const [ldapProbe, setLdapProbe] = useState<{ connectionId: string | null; usesLdap: boolean } | null>(null);
   const [connectionType, setConnectionType] = useState<ConnectionType>("Standalone");
   const [connectionInfo, setConnectionInfo] = useState<ConnectionInfo>({});
   const [additionalConnections, setAdditionalConnections] = useState<SessionConnection[]>([]);
@@ -757,6 +757,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       if (isCurrent()) setOffloadedGraphs([]);
     }
   }, [supportsOffload]);
+
+  // A probe answer only describes the connection it was made for; anything else
+  // (including the render right after a switch) reads as unresolved.
+  const usesLdap = ldapProbe !== null && ldapProbe.connectionId === activeConnectionId
+    ? ldapProbe.usesLdap
+    : null;
 
   const connectionContext = useMemo(() => ({
     connectionType,
@@ -1417,18 +1423,20 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   useEffect(() => {
     if (status !== "authenticated") return undefined;
-    // Use plain fetch with no X-Connection-Id — the server resolves the
-    // connection via session.activeConnectionId from the JWT, which is always
-    // correct (set by every connection switch). This avoids the timing race
-    // where activeConnectionId is null on page load and the check never fires.
+    // On first load `activeConnectionId` is still null and the JWT is the only
+    // source of truth. After a connection switch it changes *before* the JWT is
+    // synced, so pin the requests to the connection this run is for — otherwise
+    // the answers describe the previous connection.
+    const connectionId = activeConnectionId;
+    const headers = connectionId ? { "X-Connection-Id": connectionId } : undefined;
     let cancelled = false;
 
     (async () => {
       // Unknown until this connection's probe resolves.
-      setUsesLdap(null);
+      setLdapProbe(null);
 
       try {
-        const result = await fetch("/api/DBVersion", { method: "GET" });
+        const result = await fetch("/api/DBVersion", { method: "GET", headers });
         if (cancelled) return;
         if (!result.ok) {
           setShowMemoryUsage(false);
@@ -1452,15 +1460,15 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         // FalkorDB defers authentication and authorization to LDAP and the
         // browser must not offer user/role management.
         if (json.enterprise !== true) {
-          setUsesLdap(false);
+          setLdapProbe({ connectionId, usesLdap: false });
           return;
         }
 
-        const ldapResult = await fetch("/api/ldap", { method: "GET" });
+        const ldapResult = await fetch("/api/ldap", { method: "GET", headers });
         if (cancelled || !ldapResult.ok) return;
         const ldapJson = await ldapResult.json();
         if (cancelled) return;
-        setUsesLdap(ldapJson.usesLdap === true);
+        setLdapProbe({ connectionId, usesLdap: ldapJson.usesLdap === true });
       } catch { /* ignore */ }
     })();
 

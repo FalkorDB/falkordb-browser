@@ -89,11 +89,13 @@ export default function Settings() {
             setCurrentTab("Browser");
             return;
         }
-        if (!canManageUsers && current === "Users") {
+        // Only redirect once the probe has resolved — bouncing while it is
+        // still `null` would drop a ?tab=Users deep link on non-LDAP instances.
+        if (usesLdap === true && current === "Users") {
             setCurrentTab("Browser");
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isAdmin, canManageUsers, current, sessionStatus]);
+    }, [isAdmin, usesLdap, current, sessionStatus]);
 
     useEffect(() => {
         const prev = prevActiveConnectionIdRef.current;
@@ -127,6 +129,9 @@ export default function Settings() {
         }
         switch (current) {
             case 'Users':
+                // Render nothing rather than flashing another tab's content
+                // while the LDAP probe is still unresolved.
+                if (usesLdap === null) return null;
                 return canManageUsers ? <Users /> : <BrowserSettings />;
             case 'Configurations':
                 return <Configurations />;
