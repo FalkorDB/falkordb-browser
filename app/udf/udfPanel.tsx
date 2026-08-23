@@ -31,7 +31,7 @@ function LibrarySection({
     const iconSize = 16;
 
     return (
-        <div className={cn("flex flex-col gap-2", isExpanded && "basis-[40%] min-h-[40%]")}>
+        <div className={cn("flex flex-col gap-2", isExpanded && "min-h-[40%] h-fit")}>
             <div
                 className={cn(
                     "flex items-center gap-2 w-full text-left text-xs font-medium py-1 px-1 rounded hover:bg-secondary",
@@ -60,7 +60,7 @@ function LibrarySection({
                 <DeleteUDF iconSize={iconSize} udfName={libraryName} onDelete={onDelete} />
             </div>
             {isExpanded && (
-                <div className="basis-0 grow min-h-0 flex flex-col ml-5 overflow-y-auto">
+                <div className="flex flex-col ml-5 overflow-y-auto">
                     {functions.map((fn) => (
                         <button
                             key={fn}
@@ -163,48 +163,48 @@ export default function UdfPanel() {
                     }}
                 />
             </div>
-                    <h2 className="text-sm font-semibold text-muted-foreground">Libraries</h2>
+            <h2 className="text-sm font-semibold text-muted-foreground">Libraries</h2>
             {
-            udfList.length > 0 && (
-                <div className="basis-0 grow flex flex-col gap-2 overflow-y-auto">
-                    {udfList.map(([, libraryName, , functions]) => (
-                        <LibrarySection
-                            key={libraryName}
-                            libraryName={libraryName}
-                            libraryFunctionCount={functions.length}
-                            functions={functions}
-                            isSelected={selectedLib === libraryName}
-                            isExpanded={expandedLib === libraryName}
-                            onToggleExpand={() => {
-                                const shouldOpen = expandedLib !== libraryName;
-                                setExpandedLib(shouldOpen ? libraryName : undefined);
-                                if (shouldOpen) {
-                                    void handleSelectLib(libraryName);
-                                }
-                            }}
-                            onSelect={() => handleSelectLib(libraryName)}
-                            onFunctionSelect={(functionName) => {
-                                void handleSelectLib(libraryName).then((isCurrent) => {
-                                    if (isCurrent) selectFunction(functionName);
-                                });
-                            }}
-                            onDelete={() => {
-                                setUdfList((prev) => prev.filter(([, name]) => name !== libraryName));
+                udfList.length > 0 && (
+                    <div className="basis-0 grow flex flex-col gap-2 overflow-y-auto">
+                        {udfList.map(([, libraryName, , functions]) => (
+                            <LibrarySection
+                                key={libraryName}
+                                libraryName={libraryName}
+                                libraryFunctionCount={functions.length}
+                                functions={functions}
+                                isSelected={selectedLib === libraryName}
+                                isExpanded={expandedLib === libraryName}
+                                onToggleExpand={() => {
+                                    const shouldOpen = expandedLib !== libraryName;
+                                    setExpandedLib(shouldOpen ? libraryName : undefined);
+                                    if (shouldOpen) {
+                                        void handleSelectLib(libraryName);
+                                    }
+                                }}
+                                onSelect={() => handleSelectLib(libraryName)}
+                                onFunctionSelect={(functionName) => {
+                                    void handleSelectLib(libraryName).then((isCurrent) => {
+                                        if (isCurrent) selectFunction(functionName);
+                                    });
+                                }}
+                                onDelete={() => {
+                                    setUdfList((prev) => prev.filter(([, name]) => name !== libraryName));
 
-                                if (selectedLib === libraryName) {
-                                    libRequestIdRef.current += 1;
-                                    setSelectedLib(undefined);
-                                    setSelectedUdf(undefined);
-                                    setSelectedUdfFunction(undefined);
-                                }
-                                if (expandedLib === libraryName) {
-                                    setExpandedLib(undefined);
-                                }
-                            }}
-                        />
-                    ))}
-                </div>
-            )
+                                    if (selectedLib === libraryName) {
+                                        libRequestIdRef.current += 1;
+                                        setSelectedLib(undefined);
+                                        setSelectedUdf(undefined);
+                                        setSelectedUdfFunction(undefined);
+                                    }
+                                    if (expandedLib === libraryName) {
+                                        setExpandedLib(undefined);
+                                    }
+                                }}
+                            />
+                        ))}
+                    </div>
+                )
             }
         </div>
     );
