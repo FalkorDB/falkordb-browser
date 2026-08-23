@@ -317,11 +317,17 @@ type ConnectionContextType = {
   isLatestSwitch: (ticket: number) => boolean;
 };
 
+// `requestId` makes every pick a distinct value, so re-clicking the function
+// that is already selected still re-triggers the jump in the editor.
+export type UDFFunctionSelection = { name: string; requestId: number };
+
 type UDFContextType = {
   udfList: UDFEntry[];
   setUdfList: Dispatch<SetStateAction<UDFEntry[]>>;
   selectedUdf: UDFEntryWithCode | undefined;
   setSelectedUdf: Dispatch<SetStateAction<UDFEntryWithCode | undefined>>;
+  selectedUdfFunction: UDFFunctionSelection | undefined;
+  setSelectedUdfFunction: Dispatch<SetStateAction<UDFFunctionSelection | undefined>>;
 };
 
 type CypherLanguageContextType = {
@@ -610,6 +616,8 @@ export const UDFContext = createContext<UDFContextType>({
   setUdfList: () => { },
   selectedUdf: undefined,
   setSelectedUdf: () => { },
+  selectedUdfFunction: undefined,
+  setSelectedUdfFunction: () => { },
 });
 
 export const CypherLanguageContext = createContext<CypherLanguageContextType>({
