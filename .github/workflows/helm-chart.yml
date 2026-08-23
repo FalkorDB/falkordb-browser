@@ -42,6 +42,19 @@ jobs:
         run: |
           helm template test-release helm/falkordb-browser > /dev/null
           echo "✅ Helm chart templates rendered successfully"
+      
+      - name: Validate Pod Security restricted-required defaults
+        run: |
+          TEMPLATE_OUTPUT=$(helm template test-release helm/falkordb-browser --show-only templates/deployment.yaml)
+
+          echo "$TEMPLATE_OUTPUT" | grep -q 'seccompProfile:'
+          echo "$TEMPLATE_OUTPUT" | grep -q 'type: RuntimeDefault'
+          echo "$TEMPLATE_OUTPUT" | grep -q 'allowPrivilegeEscalation: false'
+          echo "$TEMPLATE_OUTPUT" | grep -q 'drop:'
+          echo "$TEMPLATE_OUTPUT" | grep -q -- '- ALL'
+          echo "$TEMPLATE_OUTPUT" | grep -q 'runAsNonRoot: true'
+
+          echo "✅ Restricted-required securityContext defaults are present"
 
       - name: Template with various configurations
         run: |
