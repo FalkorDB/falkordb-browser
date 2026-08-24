@@ -92,6 +92,8 @@ The following table lists the configurable parameters of the FalkorDB Browser ch
 | `persistence.size` | Size of persistent volume | `1Gi` |
 | `persistence.accessMode` | Access mode for persistent volume | `ReadWriteOnce` |
 
+> **Note:** The default security contexts require an image that runs as non-root, which the chart `appVersion` image does. Some older images (for example `v1.6.7` and `v2.0.0`) start as root and drop privileges themselves, so pinning `image.tag` to one of those also requires relaxing `podSecurityContext`/`securityContext`.
+
 ## Examples
 
 ### Basic installation with ClusterIP service
