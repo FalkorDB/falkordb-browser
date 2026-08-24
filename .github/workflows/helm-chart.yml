@@ -149,8 +149,15 @@ jobs:
         run: |
           helm install test-release helm/falkordb-browser \
             --wait \
-            --timeout 5m \
+            --timeout 10m \
             --set env.nextauthSecret=test-secret-for-ci
+
+      - name: Dump diagnostics when install fails
+        if: failure()
+        run: |
+          kubectl get pods -A -o wide || true
+          kubectl get events -A --sort-by=.metadata.creationTimestamp | tail -n 200 || true
+          kubectl describe pod -l app.kubernetes.io/name=falkordb-browser || true
 
       - name: Verify deployment
         run: |
