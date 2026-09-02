@@ -22,11 +22,13 @@ const stripNamespace = (functionName: string) => functionName.slice(functionName
  */
 const FUNCTION_PATTERNS = [
   (name: string) => new RegExp(`\\bfunction\\s+${escapeRegExp(name)}\\s*\\(`),
-  // The trailing alternation covers `function`, a parenthesised parameter list
-  // and a bare-identifier arrow parameter (`const fn = x => …`).
+  // The trailing alternation covers `function`, an arrow parameter list — closed
+  // on this line or still open on a wrapped signature — and a bare-identifier
+  // arrow parameter (`const fn = x => …`). A closed paren with no arrow after it
+  // is an expression (`const fn = (1 + 2)`), not a declaration.
   (name: string) =>
     new RegExp(
-      `\\b(?:const|let|var)\\s+${escapeRegExp(name)}\\s*=\\s*(?:async\\s*)?(?:function\\b|\\(|[A-Za-z_$][\\w$]*\\s*=>)`
+      `\\b(?:const|let|var)\\s+${escapeRegExp(name)}\\s*=\\s*(?:async\\s*)?(?:function\\b|\\([^()]*\\)\\s*=>|\\([^)]*$|[A-Za-z_$][\\w$]*\\s*=>)`
     ),
   (name: string) => new RegExp(`\\b${escapeRegExp(name)}\\s*:\\s*(?:async\\s*)?function\\b`),
   // Any `name(` — covers class methods, shorthand object methods and

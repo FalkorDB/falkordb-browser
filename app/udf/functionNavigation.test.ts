@@ -42,6 +42,16 @@ describe("findFunctionLine", () => {
     assert.equal(findFunctionLine(withCallSite, "beta"), 2);
   });
 
+  it("finds an arrow declaration whose parameter list wraps", () => {
+    const wrapped = ["const beta = (", "  a,", "  b", ") => a + b;"].join("\n");
+    assert.equal(findFunctionLine(wrapped, "beta"), 1);
+  });
+
+  it("does not treat a parenthesised expression as the declaration", () => {
+    const shadowed = ["const beta = (1 + 2);", "function beta() { return 3; }"].join("\n");
+    assert.equal(findFunctionLine(shadowed, "beta"), 2);
+  });
+
   it("falls back to a registration entry", () => {
     const registered = ["const impl = () => 1;", "falkor.register('Echo', impl);"].join("\n");
     assert.equal(findFunctionLine(registered, "Echo"), 2);

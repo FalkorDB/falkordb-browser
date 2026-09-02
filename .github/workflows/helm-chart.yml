@@ -45,7 +45,7 @@ jobs:
       
       - name: Validate Pod Security restricted-required defaults
         run: |
-          python3 -m pip install --quiet --disable-pip-version-check pyyaml
+          python3 -m pip install --quiet --disable-pip-version-check pyyaml==6.0.3
           helm template test-release helm/falkordb-browser --show-only templates/deployment.yaml > /tmp/deployment.yaml
           python3 - <<'PY'
           import sys

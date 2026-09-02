@@ -87,6 +87,8 @@ export default function UdfPanel() {
     const functionRequestIdRef = useRef(0);
     // Guards against an older library fetch resolving after a newer pick.
     const libRequestIdRef = useRef(0);
+    // `selectedLib` is optimistic; this is the library the editor actually shows.
+    const committedLibRef = useRef(selectedUdf?.[1]);
 
     const selectFunction = (functionName: string) => {
         functionRequestIdRef.current += 1;
@@ -94,6 +96,7 @@ export default function UdfPanel() {
     };
 
     useEffect(() => {
+        committedLibRef.current = selectedUdf?.[1];
         setSelectedLib(selectedUdf?.[1]);
         setExpandedLib(selectedUdf?.[1]);
     }, [selectedUdf]);
@@ -104,28 +107,42 @@ export default function UdfPanel() {
 
         libRequestIdRef.current += 1;
         const requestId = libRequestIdRef.current;
-        const previousLib = selectedLib;
 
         setSelectedLib(libraryName);
         setSelectedUdfFunction(undefined);
 
-        const res = await securedFetch(`/api/udf/${encodeURIComponent(libraryName)}`, {
-            method: "GET",
-        }, toast, setIndicator);
+        // The editor still shows the committed library, so the highlight has to go
+        // back to it — never to whatever the last optimistic pick was.
+        const rollback = () => {
+            if (libRequestIdRef.current === requestId) setSelectedLib(committedLibRef.current);
+        };
 
-        if (!res.ok) {
-            // The editor still shows the previous library, so the highlight has to go back to it.
-            if (libRequestIdRef.current === requestId) setSelectedLib(previousLib);
+        try {
+            const res = await securedFetch(`/api/udf/${encodeURIComponent(libraryName)}`, {
+                method: "GET",
+            }, toast, setIndicator);
+
+            if (!res.ok) {
+                rollback();
+                return false;
+            }
+
+            const data = await res.json();
+
+            if (libRequestIdRef.current !== requestId) return false;
+
+            setSelectedUdf(data.result[0]);
+
+            return true;
+        } catch {
+            rollback();
+            toast({
+                title: "Error",
+                description: `Failed to load the library ${libraryName}`,
+                variant: "destructive",
+            });
             return false;
         }
-
-        const data = await res.json();
-
-        if (libRequestIdRef.current !== requestId) return false;
-
-        setSelectedUdf(data.result[0]);
-
-        return true;
     };
 
     const handleLoad = async (name: string) => {
