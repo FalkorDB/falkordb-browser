@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import type { FalkorDB } from "falkordb";
-import { hasLdapServers, LDAP_SERVERS_CONFIG } from "@/lib/enterprise";
 import { getCorsHeaders } from "../utils";
+import resolveLdapRejection, { LDAP_MANAGED_MESSAGE } from "./ldap-guard-decision";
 
-export const LDAP_MANAGED_MESSAGE =
-  "Users and roles are managed by LDAP on this connection";
+export { LDAP_MANAGED_MESSAGE };
 
 /**
  * Users and roles live in LDAP once the enterprise module has LDAP servers
@@ -12,27 +11,17 @@ export const LDAP_MANAGED_MESSAGE =
  * UI hides the tab, but the API is reachable on its own.
  *
  * Returns the response to send, or `null` when the caller may proceed.
- * Community deployments don't register the parameter and `CONFIG GET` answers
- * with an empty map, which reads as "not LDAP-backed".
  */
 export default async function rejectLdapManagedUsers(
   client: FalkorDB,
   request: Request
 ): Promise<NextResponse | null> {
-  try {
-    const config = await (await client.connection).configGet(LDAP_SERVERS_CONFIG);
+  const rejection = await resolveLdapRejection(client);
 
-    if (!hasLdapServers(config)) return null;
+  if (!rejection) return null;
 
-    return NextResponse.json(
-      { message: LDAP_MANAGED_MESSAGE },
-      { status: 403, headers: getCorsHeaders(request) }
-    );
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json(
-      { message: "Failed to read LDAP configuration" },
-      { status: 502, headers: getCorsHeaders(request) }
-    );
-  }
+  return NextResponse.json(
+    { message: rejection.message },
+    { status: rejection.status, headers: getCorsHeaders(request) }
+  );
 }
