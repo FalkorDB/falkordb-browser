@@ -111,10 +111,13 @@ export default function UdfPanel() {
         setSelectedLib(libraryName);
         setSelectedUdfFunction(undefined);
 
-        // The editor still shows the committed library, so the highlight has to go
-        // back to it — never to whatever the last optimistic pick was.
+        // The editor still shows the committed library, so both the highlight and the
+        // open section go back to it — never to whatever the last optimistic pick was.
         const rollback = () => {
-            if (libRequestIdRef.current === requestId) setSelectedLib(committedLibRef.current);
+            if (libRequestIdRef.current !== requestId) return;
+
+            setSelectedLib(committedLibRef.current);
+            setExpandedLib(committedLibRef.current);
         };
 
         try {
