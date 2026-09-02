@@ -3,7 +3,10 @@ name: falkordb-browser
 description: A Helm chart for deploying FalkorDB Browser to Kubernetes
 type: application
 version: 1.7.0
-appVersion: "2.5.1"
+# Tracks the last PUBLISHED image tag, not package.json: the default image tag is
+# `v{{ .Chart.AppVersion }}` and `falkordb/falkordb-browser:v<next>` only exists
+# once the release tag is pushed. The publish job rewrites this from the tag.
+appVersion: "2.5.0"
 keywords:
   - falkordb
   - browser
