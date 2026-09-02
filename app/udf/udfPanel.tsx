@@ -101,7 +101,7 @@ export default function UdfPanel() {
         setExpandedLib(selectedUdf?.[1]);
     }, [selectedUdf]);
 
-    /** Resolves to false when a newer selection superseded this one. */
+    /** Resolves to false when the library did not become the selection: failed, or superseded by a newer pick. */
     const handleSelectLib = async (libraryName: string): Promise<boolean> => {
         if (selectedLib === libraryName) return true;
 
