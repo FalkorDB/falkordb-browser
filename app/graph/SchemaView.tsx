@@ -21,10 +21,11 @@ import {
     captureCanvasLayout,
     convertToCanvasData,
     getActiveConnectionIdGlobal,
+    getOntologySchema,
     getSchema,
     isAbortError,
 } from "@/lib/utils";
-import { normalizeDirection, normalizeLayout, type SchemaViewMeta } from "@/lib/useGraphTabs";
+import { normalizeDirection, normalizeLayout, type SchemaSource, type SchemaViewMeta } from "@/lib/useGraphTabs";
 import {
     BrowserSettingsContext,
     ConnectionContext,
@@ -34,6 +35,7 @@ import {
     GraphTabsContext,
     IndicatorContext,
 } from "../components/provider";
+import Button from "../components/ui/Button";
 import { Graph } from "../api/graph/model";
 
 /** Shown in place of the synthetic "" label FalkorDB reports for unlabeled nodes. */
@@ -100,6 +102,7 @@ type SchemaCache = {
     pinned: boolean;
     dimmed: boolean;
     expand: boolean;
+    source: SchemaSource;
 };
 
 /**
@@ -253,14 +256,16 @@ export default function SchemaScope({ active, fallback, selectedElements, setSel
 type SchemaGraphProps = Omit<SchemaScopeProps, "active" | "fallback"> & { cacheKey: string, storedMeta: SchemaViewMeta };
 
 function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElements, children }: SchemaGraphProps) {
-    const { graph, graphName } = useContext(GraphContext);
+    const { graph, graphName, ontologyGraphs, ontologyTypes, ontologyVersion } = useContext(GraphContext);
     const { graphInfoVersion } = useContext(GraphInfoContext);
     const { setIndicator } = useContext(IndicatorContext);
-    const { setSchemaMeta } = useContext(GraphTabsContext);
+    const { setSchemaMeta, setSchemaSource } = useContext(GraphTabsContext);
     const connection = useContext(ConnectionContext);
     const browserSettings = useContext(BrowserSettingsContext);
 
     const { toast } = useToast();
+
+    const hasOntology = ontologyGraphs.includes(graphName);
 
     const restored = readCache(cacheKey);
     // Only the reload path reads the tab: with a cache entry in hand, that entry
@@ -286,6 +291,7 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
             pinned: false,
             dimmed: true,
             expand: true,
+            source: "ontology",
         };
 
         writeCache(cacheKey, { ...base, ...patch, key: cacheKey });
@@ -301,6 +307,16 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
     const [pinned, setPinned] = usePersisted("pinned", restored?.pinned ?? stored.pinned ?? false, persist);
     const [dimmed, setDimmed] = usePersisted("dimmed", restored?.dimmed ?? stored.dimmed ?? true, persist);
     const [expand, setExpand] = usePersisted("expand", restored?.expand ?? stored.expand ?? true, persist);
+    // The ontology is what the graph was ingested under, so it is what a graph
+    // that declares one opens on.
+    const [source, setSource] = usePersisted("source", restored?.source ?? stored.source ?? "ontology", persist);
+
+    const showOntology = hasOntology && source === "ontology";
+
+    // The data panel sits outside this view and describes whatever it shows.
+    useEffect(() => {
+        setSchemaSource(showOntology ? "ontology" : "discovered");
+    }, [showOntology, setSchemaSource]);
 
     const [isLoading, setIsLoading] = useState(false);
     const [labels, setLabels] = useState<Label[]>([]);
@@ -320,8 +336,20 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
     const storedSelectedRef = useRef(stored.selected);
     const selectionRestoredRef = useRef(false);
 
-    // Discover the schema. Re-runs when the graph changes; a superseded request
-    // is dropped silently.
+    // The other schema is a different set of elements handed the same ids, so a
+    // selection carried across the switch would end up pointing at something
+    // else once the new one arrives.
+    const shownSourceRef = useRef(showOntology);
+    useEffect(() => {
+        if (shownSourceRef.current === showOntology) return;
+
+        shownSourceRef.current = showOntology;
+        storedSelectedRef.current = undefined;
+        setSelectedElements([]);
+    }, [showOntology, setSelectedElements]);
+
+    // Discover the schema. Re-runs when the graph changes or its ontology is
+    // edited; a superseded request is dropped silently.
     useEffect(() => {
         if (!graphName) return undefined;
 
@@ -330,7 +358,11 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
 
         setIsLoading(true);
 
-        getSchema(graphName, toast, setIndicator, { signal: controller.signal, connectionId })
+        // A graph that declares an ontology has a schema already; the one read
+        // back out of its data is a different thing, and is asked for by name.
+        const read = showOntology ? getOntologySchema : getSchema;
+
+        read(graphName, toast, setIndicator, { signal: controller.signal, connectionId })
             .then((result) => {
                 if (controller.signal.aborted) return;
                 // Keeping the previous object when nothing changed is what makes
@@ -348,7 +380,7 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
             });
 
         return () => controller.abort();
-    }, [graphName, toast, setIndicator, setSchema]);
+    }, [graphName, showOntology, ontologyVersion, toast, setIndicator, setSchema]);
 
     // Only the set of labels decides when the graph is rebuilt from the graph
     // info side. Colors are applied in place further down, so a poll never
@@ -363,6 +395,10 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
         // map itself is mutated in place.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [graph, graphInfoVersion]);
+
+    // The graph info carries the declared types alongside the ones the data has,
+    // so they can be told apart by the count they were folded in with.
+    const declaredLabels = useMemo(() => new Set(ontologyTypes.labels), [ontologyTypes]);
 
     const schemaGraph = useMemo(() => {
         const g = Graph.empty(graphName);
@@ -406,7 +442,19 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
             return id;
         };
 
-        graph.GraphInfo.Labels.forEach((_, name) => addLabel(name));
+        // A declared schema names its own entities, including ones the data has
+        // no instance of yet. Only a discovered one takes them from the graph,
+        // and it drops the ones the graph info only knows because the ontology
+        // declares them — the point of this view is what the data holds.
+        if (schema.labels) {
+            schema.labels.forEach(addLabel);
+        } else {
+            graph.GraphInfo.Labels.forEach(({ count }, name) => {
+                if (count === 0 && declaredLabels.has(name)) return;
+
+                addLabel(name);
+            });
+        }
 
         schema.edges.forEach(({ source, relationship, target }, index) => {
             const link: Link = {
@@ -443,7 +491,7 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
         return g;
         // `graph` is only read for its label names, which labelNamesKey covers.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [graphName, labelNamesKey, schema]);
+    }, [graphName, labelNamesKey, schema, declaredLabels]);
 
     // Written after commit rather than from the memo above: React may run a
     // memo callback more than once (StrictMode, an interrupted render), and a
@@ -530,8 +578,9 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
             pinned,
             dimmed,
             expand,
+            source,
         });
-    }, [setSchemaMeta, schemaGraph, selectedElements, viewport, layout, direction, animation, pinned, dimmed, expand]);
+    }, [setSchemaMeta, schemaGraph, selectedElements, viewport, layout, direction, animation, pinned, dimmed, expand, source]);
 
     // Colors, sizes and visibility never change the graph's shape, so they are
     // applied in place instead of costing a re-layout. The styles come from the
@@ -747,6 +796,21 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
             // not of distinct relationship types — hence "Connections".
             <>
                 {isLoading && <Loader2 data-testid="schemaLoading" role="status" aria-label="Discovering schema" className="animate-spin" size={16} />}
+                {
+                    hasOntology &&
+                    <>
+                        <div className="h-4 w-px bg-border rounded-full" />
+                        <Button
+                            data-testid="schemaSourceToggle"
+                            className="text-nowrap px-2 py-1 pointer-events-auto rounded-md hover:bg-secondary"
+                            label={showOntology ? "Ontology" : "Generated"}
+                            title={showOntology
+                                ? "Showing the ontology this graph declares.\nSwitch to the schema generated from the data it holds."
+                                : "Showing the schema generated from the data this graph holds.\nSwitch to the ontology it declares."}
+                            onClick={() => setSource(showOntology ? "discovered" : "ontology")}
+                        />
+                    </>
+                }
                 {
                     !isEmpty &&
                     <>

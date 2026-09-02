@@ -27,8 +27,11 @@ export default async function RootLayout({
   // Setting suppressHydrationWarning on html tag to prevent warning
   // caused by mismatched client/server content caused by next-themes
   return (
-    <html className="w-screen h-screen" lang="en" suppressHydrationWarning>
-      <body className="w-full h-full bg-background flex flex-col">
+    // Percentages, not vw/vh: those measure the viewport including the
+    // scrollbar gutter, which is itself enough to make the page scroll.
+    <html className="w-full h-full overflow-hidden" lang="en" suppressHydrationWarning>
+      {/* The shell is sized to the viewport: anything wider or taller is clipped, not scrolled to. */}
+      <body className="w-full h-full bg-background flex flex-col overflow-hidden">
         <GTM />
         <TooltipProvider>
           <NextAuthProvider nonce={nonce}>

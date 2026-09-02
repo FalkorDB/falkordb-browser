@@ -3,6 +3,7 @@
 import { Asterisk, Check, CirclePlus, Fingerprint, Info, LucideIcon, Pencil, Trash2, X } from "lucide-react";
 import { cn, getActiveConnectionIdGlobal, getConnectionEpoch, isSchemaReservedKey, prepareArg, securedFetch, GraphRef, Link, Node, SchemaPropertyRules, SchemaPropertyRulesMap, SCHEMA_RULES_KEY, Value } from "@/lib/utils";
 import { formatValue, getDefaultValue, inferValueType, isGeoPoint, parseValue, VALUE_PLACEHOLDERS, VALUE_TYPES, type ValueType } from "@/lib/graphValues";
+import { ontologyDeclaredType, ONTOLOGY_PROPERTY_TYPE_NAMES, type OntologyOwnerKind } from "@/lib/ontology";
 import { useToast } from "@/components/ui/use-toast";
 import { Fragment, MutableRefObject, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Switch } from "@/components/ui/switch";
@@ -12,10 +13,11 @@ import Input from "../components/ui/Input";
 import DialogComponent from "../components/DialogComponent";
 import CloseDialog from "../components/CloseDialog";
 import { EMPTY_DISPLAY_NAME } from "../api/graph/model";
-import { BrowserSettingsContext, GraphContext, IndicatorContext, ConnectionContext } from "../components/provider";
+import { BrowserSettingsContext, GraphContext, GraphTabsContext, IndicatorContext, ConnectionContext } from "../components/provider";
 import ToastButton from "../components/ToastButton";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
+import OntologyChangeWarning, { type PendingOntologyChange } from "./OntologyChangeWarning";
 
 const iconSize = 15;
 
@@ -99,7 +101,8 @@ interface Props {
 
 export default function DataTable({ object, type, lastObjKey, canvasRef, className, schema }: Props) {
 
-    const { graph, setGraphInfo } = useContext(GraphContext);
+    const { graph, setGraphInfo, graphName, ontologyGraphs, bumpOntologyVersion } = useContext(GraphContext);
+    const { schemaSource } = useContext(GraphTabsContext);
     const { settings: { userExperienceSettings: { captionKeysSettings: { captionsKeys } } } } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
     const { toast } = useToast();
@@ -129,6 +132,16 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
      */
     const writtenTypes = useRef<Record<string, ValueType>>({});
     const [valueOverflowMap, setValueOverflowMap] = useState<Record<string, boolean>>({});
+    // Editing what an ontology declares. Separate from the value editor above:
+    // a declaration has no value to edit, only the type it promises.
+    const [declaredEditKey, setDeclaredEditKey] = useState<string>("");
+    const [declaredType, setDeclaredType] = useState<string>(ONTOLOGY_PROPERTY_TYPE_NAMES[0]);
+    const [declaredNewKey, setDeclaredNewKey] = useState<string>("");
+    const [isDeclaring, setIsDeclaring] = useState(false);
+    // Every ontology edit is confirmed before it is sent, because it reaches
+    // further than the graph it is made in — see OntologyChangeWarning.
+    const [pendingChange, setPendingChange] = useState<PendingOntologyChange | undefined>(undefined);
+    const [isApplyingChange, setIsApplyingChange] = useState(false);
 
     const setValueParagraphRef = useCallback((key: string) => (el: HTMLParagraphElement | null) => {
         if (!el) {
@@ -226,6 +239,9 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
             setNewVal("");
             setNewKey("");
             setIsAddValue(false);
+            setDeclaredEditKey("");
+            setDeclaredNewKey("");
+            setIsDeclaring(false);
             writtenTypes.current = {};
         }
         setAttributes(Object.keys(object.data));
@@ -575,50 +591,304 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
     const getStringValue = (value: Value) => formatValue(value);
 
     // The schema table is the same table with nothing to edit: a key holds a
-    // type instead of a value, so the value and action columns fall away.
+    // type instead of a value, so the value column falls away. A declared
+    // ontology is the exception — it is written by hand, so it can be edited.
     if (schema) {
         const rules = (object.data[SCHEMA_RULES_KEY] ?? {}) as SchemaPropertyRulesMap;
+        // A graph that declares an ontology can still be showing the schema read
+        // back out of its data, which reports storage like any other. Only the
+        // declaration itself describes types alone, and can be edited.
+        const isOntology = ontologyGraphs.includes(graphName) && schemaSource === "ontology";
+        // Editing a discovered schema would mean editing the data it was read
+        // off, which is not what the schema view is for.
+        const canDeclare = isOntology && !isReadOnly;
+        const declaredKeys = attributes.filter((key) => !isSchemaReservedKey(key));
+        const ownerKind: OntologyOwnerKind = type ? "entity" : "relation";
+        const owner = type ? (object as Node).labels[0] : (object as Link).relationship;
+        const columns = ["Key", "Type", ...(isOntology ? [] : ["Constraints", "Index"])];
+
+        // An ontology the SDK did not write may declare a type this build has
+        // no name for. Offering it keeps such a property editable.
+        const typeOptions = (declared: string) => (
+            ONTOLOGY_PROPERTY_TYPE_NAMES.includes(declared)
+                ? ONTOLOGY_PROPERTY_TYPE_NAMES
+                : [declared, ...ONTOLOGY_PROPERTY_TYPE_NAMES]
+        );
+
+        const stopDeclaring = () => {
+            setDeclaredEditKey("");
+            setDeclaredNewKey("");
+            setIsDeclaring(false);
+        };
+
+        // Rejected here rather than by the dialog, so a mistyped key is caught
+        // before the user is asked to weigh what the change means.
+        const proposeDeclaration = (name: string, typeName: string, action: "added" | "retyped") => {
+            const key = name.trim();
+
+            if (!key) {
+                toast({
+                    title: "Error",
+                    description: "Please fill in the key field",
+                    variant: "destructive",
+                });
+                return;
+            }
+
+            if (action === "added" && declaredKeys.includes(key)) {
+                toast({
+                    title: "Error",
+                    description: `"${owner}" already declares "${key}"`,
+                    variant: "destructive",
+                });
+                return;
+            }
+
+            setPendingChange({ action, owner, property: key, type: typeName });
+        };
+
+        const applyChange = async () => {
+            if (!pendingChange) return;
+
+            const { action, property, type: typeName } = pendingChange;
+            const removing = action === "removed";
+            const startEpoch = getConnectionEpoch();
+            const cid = getActiveConnectionIdGlobal();
+
+            setIsApplyingChange(true);
+
+            try {
+                const result = await securedFetch(`api/graph/${prepareArg(graphName)}/ontology/property`, {
+                    method: removing ? "DELETE" : "POST",
+                    body: JSON.stringify({
+                        ownerKind,
+                        owner,
+                        name: property,
+                        ...(removing ? {} : { type: ontologyDeclaredType(typeName ?? "") }),
+                    }),
+                }, toast, setIndicator, cid);
+
+                if (getConnectionEpoch() !== startEpoch || !result.ok) return;
+
+                if (removing) {
+                    delete object.data[property];
+                } else {
+                    object.data[property] = typeName;
+                }
+
+                setAttributes(Object.keys(object.data));
+                stopDeclaring();
+                bumpOntologyVersion();
+                setPendingChange(undefined);
+            } finally {
+                setIsApplyingChange(false);
+            }
+        };
 
         return (
             <div className={cn("flex flex-col gap-4 bg-background rounded-lg overflow-hidden", className)}>
                 <div className="h-1 grow overflow-y-auto overflow-x-hidden">
-                    <div className="w-full grid grid-cols-[minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)]">
-                        <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Key</div>
-                        <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Type</div>
-                        <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Constraints</div>
-                        <div className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">Index</div>
+                    <div
+                        className={cn(
+                            "w-full grid",
+                            isOntology
+                                ? "grid-cols-[minmax(0,max-content)_minmax(0,max-content)]"
+                                : "grid-cols-[minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)]",
+                            canDeclare && "grid-cols-[minmax(0,max-content)_minmax(0,max-content)_38px]"
+                        )}
+                    >
                         {
-                            attributes.filter((key) => !isSchemaReservedKey(key)).map((key) => (
-                                <Fragment key={key}>
-                                    <div
-                                        className="flex items-center px-1 border-b border-border min-h-6"
-                                        data-testid={`DataPanelAttribute${key}`}
-                                    >
-                                        <p className="w-full truncate">{key}:</p>
-                                    </div>
-                                    <div
-                                        className="flex items-center px-1 border-b border-border min-h-6"
-                                        data-testid={`DataPanelAttributeType${key}`}
-                                    >
-                                        <p className="w-full truncate">{String(object.data[key])}</p>
-                                    </div>
-                                    <div
-                                        className="flex items-center px-1 border-b border-border min-h-6"
-                                        data-testid={`DataPanelAttributeIndicators${key}`}
-                                    >
-                                        <SchemaRuleIndicators propertyKey={key} rules={rules[key]} />
-                                    </div>
-                                    <div
-                                        className="flex items-center px-1 border-b border-border min-h-6"
-                                        data-testid={`DataPanelAttributeIndex${key}`}
-                                    >
-                                        <p className="w-full truncate">{(rules[key]?.indexes ?? []).join(", ")}</p>
-                                    </div>
-                                </Fragment>
+                            columns.map((column) => (
+                                <div key={column} className="flex items-center font-medium text-muted-foreground px-1 border-y border-border h-10">
+                                    <p className="w-full truncate" title={column}>{column}</p>
+                                </div>
                             ))
                         }
+                        {
+                            canDeclare &&
+                            <div className="flex items-center px-1 border-y border-border h-10"><div className="w-6" /></div>
+                        }
+                        {
+                            declaredKeys.map((key) => {
+                                const declared = String(object.data[key]);
+
+                                return (
+                                    <Fragment key={key}>
+                                        <div
+                                            className="flex items-center px-1 border-b border-border min-h-6"
+                                            data-testid={`DataPanelAttribute${key}`}
+                                            onMouseEnter={() => setHover(key)}
+                                            onMouseLeave={() => setHover("")}
+                                        >
+                                            <p className="w-full truncate">{key}:</p>
+                                        </div>
+                                        <div
+                                            className="flex items-center px-1 border-b border-border min-h-6"
+                                            data-testid={`DataPanelAttributeType${key}`}
+                                            onMouseEnter={() => setHover(key)}
+                                            onMouseLeave={() => setHover("")}
+                                        >
+                                            {
+                                                declaredEditKey === key
+                                                    ? <Combobox
+                                                        inTable
+                                                        label="Type"
+                                                        options={typeOptions(declared)}
+                                                        selectedValue={declaredType}
+                                                        setSelectedValue={setDeclaredType}
+                                                    />
+                                                    : <p className="w-full truncate">{declared}</p>
+                                            }
+                                        </div>
+                                        {
+                                            !isOntology &&
+                                            <>
+                                                <div
+                                                    className="flex items-center px-1 border-b border-border min-h-6"
+                                                    data-testid={`DataPanelAttributeIndicators${key}`}
+                                                >
+                                                    <SchemaRuleIndicators propertyKey={key} rules={rules[key]} />
+                                                </div>
+                                                <div
+                                                    className="flex items-center px-1 border-b border-border min-h-6"
+                                                    data-testid={`DataPanelAttributeIndex${key}`}
+                                                >
+                                                    <p className="w-full truncate">{(rules[key]?.indexes ?? []).join(", ")}</p>
+                                                </div>
+                                            </>
+                                        }
+                                        {
+                                            canDeclare &&
+                                            <div
+                                                className="flex items-center gap-1 px-1 border-b border-border min-h-6"
+                                                onMouseEnter={() => setHover(key)}
+                                                onMouseLeave={() => setHover("")}
+                                            >
+                                                {
+                                                    declaredEditKey === key ?
+                                                        <>
+                                                            <Button
+                                                                data-testid="DataPanelSetDeclaredTypeConfirm"
+                                                                indicator={indicator}
+                                                                variant="button"
+                                                                title="Save"
+                                                                disabled={declaredType === declared}
+                                                                onClick={() => proposeDeclaration(key, declaredType, "retyped")}
+                                                            >
+                                                                <Check size={iconSize} />
+                                                            </Button>
+                                                            <Button
+                                                                data-testid="DataPanelSetDeclaredTypeCancel"
+                                                                variant="button"
+                                                                title="Cancel"
+                                                                onClick={stopDeclaring}
+                                                            >
+                                                                <X size={iconSize} />
+                                                            </Button>
+                                                        </>
+                                                        : hover === key &&
+                                                        <>
+                                                            <Button
+                                                                data-testid="DataPanelSetDeclaredType"
+                                                                variant="button"
+                                                                title="Edit the declared type"
+                                                                disabled={isDeclaring}
+                                                                onClick={() => {
+                                                                    setIsDeclaring(false);
+                                                                    setDeclaredType(declared);
+                                                                    setDeclaredEditKey(key);
+                                                                }}
+                                                            >
+                                                                <Pencil size={iconSize} />
+                                                            </Button>
+                                                            <Button
+                                                                data-testid="DataPanelDeleteDeclaredProperty"
+                                                                variant="button"
+                                                                title="Remove from the ontology"
+                                                                onClick={() => setPendingChange({ action: "removed", owner, property: key })}
+                                                            >
+                                                                <Trash2 size={iconSize} />
+                                                            </Button>
+                                                        </>
+                                                }
+                                            </div>
+                                        }
+                                    </Fragment>
+                                );
+                            })
+                        }
+                        {
+                            isDeclaring &&
+                            <>
+                                <div className="flex items-center px-1 border-b border-border min-h-14">
+                                    <Input
+                                        className="w-full"
+                                        data-testid="DataPanelAddDeclaredPropertyKey"
+                                        ref={addInputRef}
+                                        value={declaredNewKey}
+                                        onChange={(e) => setDeclaredNewKey(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter") proposeDeclaration(declaredNewKey, declaredType, "added");
+                                            if (e.key === "Escape") stopDeclaring();
+                                        }}
+                                    />
+                                </div>
+                                <div className="flex items-center px-1 border-b border-border min-h-14">
+                                    <Combobox
+                                        inTable
+                                        label="Type"
+                                        options={ONTOLOGY_PROPERTY_TYPE_NAMES}
+                                        selectedValue={declaredType}
+                                        setSelectedValue={setDeclaredType}
+                                    />
+                                </div>
+                                <div className="flex items-center gap-1 px-1 border-b border-border min-h-14">
+                                    <Button
+                                        data-testid="DataPanelAddDeclaredPropertyConfirm"
+                                        indicator={indicator}
+                                        variant="button"
+                                        title="Save"
+                                        onClick={() => proposeDeclaration(declaredNewKey, declaredType, "added")}
+                                    >
+                                        <Check size={iconSize} />
+                                    </Button>
+                                    <Button
+                                        data-testid="DataPanelAddDeclaredPropertyCancel"
+                                        variant="button"
+                                        title="Cancel"
+                                        onClick={stopDeclaring}
+                                    >
+                                        <X size={iconSize} />
+                                    </Button>
+                                </div>
+                            </>
+                        }
                     </div>
+                    {
+                        canDeclare &&
+                        <Button
+                            className="mt-4"
+                            variant="Primary"
+                            data-testid="DataPanelAddDeclaredProperty"
+                            title="Declare a new property"
+                            disabled={isDeclaring || !!declaredEditKey}
+                            onClick={() => {
+                                setDeclaredNewKey("");
+                                setDeclaredType(ONTOLOGY_PROPERTY_TYPE_NAMES[0]);
+                                setIsDeclaring(true);
+                            }}
+                        >
+                            <CirclePlus size={iconSize} />
+                        </Button>
+                    }
                 </div>
+                <OntologyChangeWarning
+                    change={pendingChange}
+                    indicator={indicator}
+                    isLoading={isApplyingChange}
+                    onCancel={() => setPendingChange(undefined)}
+                    onConfirm={applyChange}
+                />
             </div>
         );
     }

@@ -254,7 +254,8 @@ function GraphView({
                                     </>
                                 }
                             </div>
-                            <div className="flex gap-2 items-center">
+                            {/* Nothing here gives way on overflow: the row runs past the canvas and is clipped rather than reflowed. */}
+                            <div className="flex gap-2 items-center [&>*]:shrink-0">
                                 <TabsList className="bg-transparent flex gap-2 pointer-events-auto p-0">
                                     <TabsTrigger
                                         data-testid="graphTab"

@@ -12,6 +12,7 @@ import { signOut } from "next-auth/react";
 import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, enrichSyntaxMessage, type SyntaxErrorInfo, type HintLink } from "./cypherErrors.ts";
 import { suggestForError, findFuncArgTypo } from "./cypherSuggestions.ts";
 import { quoteCypherIdentifier } from "./cypher.ts";
+import { ontologyGraphName, ontologyPropertyType, type OntologyTypeNames } from "./ontology.ts";
 import type { PropertyValue } from "./graphValues.ts";
 
 export { parseSyntaxError };
@@ -271,6 +272,13 @@ export type SchemaPropertyRulesMap = Record<string, SchemaPropertyRules>;
 /** Everything the Schema view draws, discovered with read-only queries. */
 export type SchemaSnapshot = {
   edges: SchemaEdge[];
+  /**
+   * The labels to draw, when the snapshot knows them. A discovered schema
+   * leaves this out and the view takes them from the graph's own labels; a
+   * declared one sets it, because an ontology can name an entity the data does
+   * not hold yet — and can leave out one the data does.
+   */
+  labels?: string[];
   /** Keyed by label; unlabeled nodes are under `""`. */
   labelKeys: Record<string, SchemaPropertyKeys>;
   /** Keyed by relationship type. */
@@ -1321,6 +1329,157 @@ RETURN DISTINCT source, type(e) AS relationship, target`;
   };
 };
 
+/**
+ * Reads the ontology a graph declares, in the shape the Schema view draws.
+ *
+ * A graph with an ontology already has a schema, written down before the data
+ * was: it names entities and relations the data may hold no instance of yet,
+ * and it is what the graph is supposed to look like rather than what it
+ * happens to look like. Discovery can only report the latter, so where an
+ * ontology exists this replaces it rather than adding to it.
+ *
+ * Returns undefined when the ontology graph cannot be read, leaving the caller
+ * free to fall back to `getSchema`.
+ */
+export const getOntologySchema = async (
+  name: string,
+  toast: ToastFn,
+  setIndicator: (indicator: "online" | "offline") => void,
+  options?: { signal?: AbortSignal; connectionId?: string | null },
+): Promise<SchemaSnapshot | undefined> => {
+  if (!name) return undefined;
+
+  const graphName = ontologyGraphName(name);
+
+  const run = (query: string) => getSSEGraphResult(
+    `/api/graph/${prepareArg(graphName)}?query=${encodeURIComponent(query)}&readOnly=true`,
+    toast,
+    setIndicator,
+    { signal: options?.signal, connectionId: options?.connectionId, query },
+  ) as Promise<{ data?: unknown[] } | undefined>;
+
+  const [entityResult, entityKeyResult, relationResult, relationKeyResult] = await Promise.all([
+    // An entity in no relation still gets a node, so the entities cannot be
+    // read off the placements.
+    run("MATCH (e:Entity) RETURN DISTINCT e.label AS label"),
+    run("MATCH (e:Entity)-[:HAS_PROPERTY]->(p:Property)"
+      + " RETURN DISTINCT e.label AS owner, p.label AS key, p.type AS keyType"),
+    // A relation declared without a pattern has no endpoints to draw between,
+    // so only the patterned ones become placements.
+    run("MATCH (r:Relation)-[:SOURCE]->(s:Entity), (r)-[:TARGET]->(t:Entity)"
+      + " RETURN DISTINCT r.label AS relationship, s.label AS source, t.label AS target"),
+    run("MATCH (r:Relation)-[:HAS_PROPERTY]->(p:Property)"
+      + " RETURN DISTINCT r.label AS owner, p.label AS key, p.type AS keyType"),
+  ]);
+
+  if (!entityResult || !Array.isArray(entityResult.data)) return undefined;
+
+  const rowsOf = (result: { data?: unknown[] } | undefined) => (
+    (Array.isArray(result?.data) ? result.data : []).filter(
+      (row): row is Record<string, unknown> => !!row && typeof row === "object" && !Array.isArray(row),
+    )
+  );
+
+  const labels = [...new Set(
+    rowsOf(entityResult)
+      .map(({ label }) => label)
+      .filter((label): label is string => typeof label === "string" && label !== ""),
+  )].sort((a, b) => a.localeCompare(b));
+
+  const edges: SchemaEdge[] = [];
+  const seenEdges = new Set<string>();
+
+  rowsOf(relationResult).forEach(({ source, relationship, target }) => {
+    if (
+      typeof source !== "string"
+      || typeof relationship !== "string"
+      || typeof target !== "string"
+    ) return;
+
+    const placement = `${source}\u0000${relationship}\u0000${target}`;
+
+    if (seenEdges.has(placement)) return;
+
+    seenEdges.add(placement);
+    edges.push({ source, relationship, target });
+  });
+
+  const collectKeys = (result: { data?: unknown[] } | undefined) => {
+    const into: Record<string, SchemaPropertyKeys> = {};
+
+    rowsOf(result).forEach(({ owner, key, keyType }) => {
+      if (typeof owner !== "string" || typeof key !== "string") return;
+
+      addSchemaPropertyKey(into, owner, key, ontologyPropertyType(keyType));
+    });
+
+    return into;
+  };
+
+  // Canonicalized for the same reason a discovered snapshot is: two reads of
+  // an unchanged ontology have to compare equal or a refresh re-lays the view.
+  edges.sort((a, b) => (
+    a.source.localeCompare(b.source)
+    || a.relationship.localeCompare(b.relationship)
+    || a.target.localeCompare(b.target)
+  ));
+
+  return {
+    edges,
+    labels,
+    labelKeys: sortSchemaKeys(collectKeys(entityKeyResult)),
+    relationshipKeys: sortSchemaKeys(collectKeys(relationKeyResult)),
+    // An ontology declares no indexes or constraints. Those belong to the data
+    // graph, and reporting them here would attribute them to the ontology.
+    labelRules: {},
+    relationshipRules: {},
+  };
+};
+
+/**
+ * The entity and relation labels a graph's ontology declares.
+ *
+ * Cheaper than `getOntologySchema` on purpose: the graph info only needs the
+ * vocabulary, not the properties or the patterns.
+ */
+export const getOntologyTypeNames = async (
+  name: string,
+  toast: ToastFn,
+  setIndicator: (indicator: "online" | "offline") => void,
+  options?: { signal?: AbortSignal; connectionId?: string | null },
+): Promise<OntologyTypeNames | undefined> => {
+  if (!name) return undefined;
+
+  const graphName = ontologyGraphName(name);
+
+  const run = (query: string) => getSSEGraphResult(
+    `/api/graph/${prepareArg(graphName)}?query=${encodeURIComponent(query)}&readOnly=true`,
+    toast,
+    setIndicator,
+    { signal: options?.signal, connectionId: options?.connectionId, query },
+  ) as Promise<{ data?: unknown[] } | undefined>;
+
+  const [entityResult, relationResult] = await Promise.all([
+    run("MATCH (e:Entity) RETURN DISTINCT e.label AS label"),
+    run("MATCH (r:Relation) RETURN DISTINCT r.label AS label"),
+  ]);
+
+  if (!entityResult || !Array.isArray(entityResult.data)) return undefined;
+
+  const namesOf = (result: { data?: unknown[] } | undefined) => [...new Set(
+    (Array.isArray(result?.data) ? result.data : [])
+      .map((row) => (row && typeof row === "object" && !Array.isArray(row)
+        ? (row as Record<string, unknown>).label
+        : undefined))
+      .filter((label): label is string => typeof label === "string" && label !== ""),
+  )].sort((a, b) => a.localeCompare(b));
+
+  return {
+    labels: namesOf(entityResult),
+    relationshipTypes: namesOf(relationResult),
+  };
+};
+
 export function rgbToHSL(hex: string): string {
   // Remove the # if present
   const formattedHex = hex.replace(/^#/, "");
@@ -1651,7 +1810,7 @@ export async function fetchOptions(
   setIndicator: (indicator: "online" | "offline") => void,
   indicator: "online" | "offline",
   connectionId?: string | null,
-): Promise<{ opts: string[]; autoSelect: string | null } | null> {
+): Promise<{ opts: string[]; ontologies: string[]; autoSelect: string | null } | null> {
   if (indicator === "offline") return null;
 
   const result = await securedFetch(
@@ -1666,11 +1825,11 @@ export async function fetchOptions(
 
   if (!result.ok) return null;
 
-  const { opts } = (await result.json()) as { opts: string[] };
+  const { opts, ontologies } = (await result.json()) as { opts: string[]; ontologies?: string[] };
 
   // Return the data so callers can apply it under their own ownership guard
   // (a stale refresh must not overwrite the list/selection after a switch).
-  return { opts, autoSelect: opts.length === 1 ? formatName(opts[0]) : null };
+  return { opts, ontologies: ontologies ?? [], autoSelect: opts.length === 1 ? formatName(opts[0]) : null };
 }
 
 export const areCaptionKeysEqual = (left: [string, boolean][], right: [string, boolean][]) =>

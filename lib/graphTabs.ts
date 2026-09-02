@@ -31,10 +31,19 @@ export type GraphViewMeta = ViewTabMeta & {
 };
 
 /**
+ * Which of the two schemas the Schema tab shows. A graph that declares an
+ * ontology has both: the ontology it was ingested under, and the schema read
+ * back out of the data itself. Every other graph only ever has the latter.
+ */
+export type SchemaSource = "ontology" | "discovered";
+
+/**
  * The schema view is derived from the graph, so it has no query, no results and
  * no graph info of its own — only the view state it shares with the graph.
  */
-export type SchemaViewMeta = ViewTabMeta;
+export type SchemaViewMeta = ViewTabMeta & {
+    source?: SchemaSource;
+};
 
 /** Everything a tab remembers, split by the view it belongs to. */
 export type GraphTabMeta = {

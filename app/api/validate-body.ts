@@ -190,6 +190,36 @@ export const deleteGraphElementAttribute = z.object({
   }),
 });
 
+// Ontology schemas. Both the owner and the property are matched as parameters,
+// so they need no more than to be there.
+const ontologyOwner = z.object({
+  ownerKind: z.enum(["entity", "relation"], {
+    error: (issue) => issue.input === undefined ? "Owner kind is required" : "Invalid Owner kind",
+  }),
+  owner: z
+    .string({
+      error: (issue) => issue.input === undefined ? "Owner is required" : "Invalid Owner",
+    })
+    .min(1, "Owner cannot be empty"),
+  name: z
+    .string({
+      error: (issue) => issue.input === undefined ? "Name is required" : "Invalid Name",
+    })
+    .min(1, "Name cannot be empty"),
+});
+
+export const upsertOntologyProperty = ontologyOwner.extend({
+  // Free-form on purpose: an ontology may already declare a type this build
+  // has never heard of, and rejecting it would make the property uneditable.
+  type: z
+    .string({
+      error: (issue) => issue.input === undefined ? "Type is required" : "Invalid Type",
+    })
+    .min(1, "Type cannot be empty"),
+});
+
+export const deleteOntologyProperty = ontologyOwner;
+
 // UDF schemas
 export const loadUdf = z.object({
   code: z

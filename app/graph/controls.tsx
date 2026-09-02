@@ -179,7 +179,7 @@ export default function Controls({
     const animationDisabled = pinned || layout !== 'force';
 
     return (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 [&>*]:shrink-0">
             {
                 graph.getElements().length > 0 &&
                 <>

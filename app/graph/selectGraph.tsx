@@ -8,7 +8,7 @@ import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
 import { ChevronDown, ChevronUp, Loader2, Settings, X } from "lucide-react";
 import Button from "../components/ui/Button";
-import { IndicatorContext, BrowserSettingsContext, ConnectionContext } from "../components/provider";
+import { IndicatorContext, BrowserSettingsContext, ConnectionContext, GraphContext } from "../components/provider";
 import PaginationList from "../components/PaginationList";
 import TableComponent from "../components/TableComponent";
 import ExportGraph from "../components/ExportGraph";
@@ -44,6 +44,7 @@ interface Props {
 export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, setGraph }: Props) {
     const { indicator, setIndicator } = useContext(IndicatorContext);
     const { isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs } = useContext(ConnectionContext);
+    const { setOntologyGraphs } = useContext(GraphContext);
     const {
         settings: {
             graphInfo: { showMemoryUsage },
@@ -104,11 +105,12 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         const prev = optionsRef.current;
         const unchanged = prev !== undefined && prev.length === res.opts.length && prev.every((name, i) => name === res.opts[i]);
         if (!unchanged) setOptions(res.opts);
+        setOntologyGraphs(res.ontologies);
         if (res.autoSelect) setSelectedValue(res.autoSelect);
         // Offloaded graphs can change between refreshes, so keep the enterprise
         // load indicators in sync with the list.
         refreshOffloadedGraphs();
-    }, [toast, setIndicator, indicator, setSelectedValue, setOptions, refreshOffloadedGraphs]);
+    }, [toast, setIndicator, indicator, setSelectedValue, setOptions, setOntologyGraphs, refreshOffloadedGraphs]);
 
     const loadMemory = useCallback((opt: string) =>
         async () => {

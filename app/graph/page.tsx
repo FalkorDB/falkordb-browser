@@ -2,6 +2,7 @@
 
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { cn, convertToCanvasData, getActiveConnectionIdGlobal, getConnectionEpoch, getMemoryUsage, getMetaStats, getSSEGraphResult, isAbortError, isTwoNodes, Link, MemoryValue, Node, parsePanelSizePercent, prepareArg, securedFetch, Value } from "@/lib/utils";
+import { withDeclaredTypes } from "@/lib/ontology";
 import { useToast } from "@/components/ui/use-toast";
 import dynamicImport from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -73,6 +74,7 @@ export default function Page() {
         setGraphInfo,
         graphNames,
         setGraphNames,
+        ontologyTypes,
         labels,
         setLabels,
         relationships,
@@ -317,8 +319,8 @@ export default function Page() {
 
             const memoryUsage = showMemoryUsage ? await getMemoryUsage(graphName, toast, setIndicator, pollConnectionId, signal) : new Map<string, MemoryValue>();
             if (cancelled || getConnectionEpoch() !== pollEpoch) return;
-            const newLabels = newDataStats?.[0] || [];
-            const newRelationships = newDataStats?.[1] || [];
+            const newLabels = withDeclaredTypes(newDataStats?.[0] || [], ontologyTypes.labels);
+            const newRelationships = withDeclaredTypes(newDataStats?.[1] || [], ontologyTypes.relationshipTypes);
 
             const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, toast, setIndicator, pollConnectionId);
             if (cancelled || getConnectionEpoch() !== pollEpoch) return;
@@ -353,7 +355,7 @@ export default function Page() {
             clearInterval(interval);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [fetchCount, fetchInfo, fetchMetaStats, graphName, refreshInterval, runDefaultQuery, setGraphInfo, setIndicator, showMemoryUsage, toast]);
+    }, [fetchCount, fetchInfo, fetchMetaStats, graphName, ontologyTypes, refreshInterval, runDefaultQuery, setGraphInfo, setIndicator, showMemoryUsage, toast]);
 
     useEffect(() => {
         if (graphName) return;

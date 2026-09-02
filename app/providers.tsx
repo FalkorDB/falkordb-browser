@@ -3,7 +3,8 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchOptions, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, CustomizingRef, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, CanvasLayout, captureCanvasLayout } from "@/lib/utils";
+import { fetchOptions, getDefaultQuery, getOntologyTypeNames, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch, setActiveConnectionIdGlobal, getActiveConnectionIdGlobal, getConnectionEpoch, isAbortError, Tab, getMemoryUsage, GraphRef, ConnectionType, ConnectionInfo, CustomizingRef, UDFEntry, UDFEntryWithCode, getMetaStats, HistoryQuery, GraphData, Label, Relationship, Query, Data, MemoryValue, CanvasLayout, captureCanvasLayout } from "@/lib/utils";
+import { EMPTY_ONTOLOGY_TYPES, withDeclaredTypes, type OntologyTypeNames } from "@/lib/ontology";
 import { serverEncrypt, serverDecrypt, looksServerEncrypted, isLegacyEncrypted, legacyDecrypt, clearLegacyEncryptionKey } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, SELECTED_CHAT_API_KEY_ID_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { getConnectionItem, setConnectionItem, removeConnectionItem, setConnectionPrefix, clearConnectionPrefix, migrateToScopedStorage } from "@/lib/connection-storage";
@@ -26,7 +27,7 @@ import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContex
 import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
 import { GRAPH_OFFLOAD_VERSION_THRESHOLD, MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
-import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDirection, normalizeLayout } from "@/lib/useGraphTabs";
+import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaSource, SchemaViewMeta, normalizeDirection, normalizeLayout } from "@/lib/useGraphTabs";
 
 /**
  * A live snapshot of everything the graph view is showing.
@@ -211,6 +212,13 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [selectedParam, setSelectedParam] = useState<string>("");
   const [runDefaultQuery, setRunDefaultQuery] = useState(false);
   const [graphNames, setGraphNames] = useState<string[] | undefined>(undefined);
+  const [ontologyGraphs, setOntologyGraphs] = useState<string[]>([]);
+  const [ontologyTypes, setOntologyTypes] = useState<OntologyTypeNames>(EMPTY_ONTOLOGY_TYPES);
+  // Read by the graph info builders, which run outside React's render pass.
+  const ontologyTypesRef = useRef<OntologyTypeNames>(ontologyTypes);
+  ontologyTypesRef.current = ontologyTypes;
+  const [ontologyVersion, setOntologyVersion] = useState(0);
+  const bumpOntologyVersion = useCallback(() => setOntologyVersion((version) => version + 1), []);
   // Always-current ref so effects can validate graph names without re-running
   // on every graphNames mutation (prevents spurious URL→state rollbacks).
   const graphNamesRef = useRef<string[]>([]);
@@ -989,8 +997,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         fetchInfo("(property key)", n, { connectionId: cid, epoch, isCurrent }),
       ]).then(async ([metaStats, newPropertyKeys]) => {
         const memoryUsage = showMemoryUsage ? await getMemoryUsage(n, guardedToast, guardedSetIndicator, cid) : new Map<string, MemoryValue>();
-        const newLabels = metaStats?.[0] || [];
-        const newRelationships = metaStats?.[1] || [];
+        const declared = ontologyTypesRef.current;
+        const newLabels = withDeclaredTypes(metaStats?.[0] || [], declared.labels);
+        const newRelationships = withDeclaredTypes(metaStats?.[1] || [], declared.relationshipTypes);
         // Pin the GraphInfo's fallback metadata queries to this connection too.
         const gi = await GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, guardedToast, guardedSetIndicator, cid);
         // gi is embedded in the graph via Graph.create below and also pushed to
@@ -1143,6 +1152,31 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setHistoryQuery(h => ({ ...h, query: "", currentQuery: defaultQueryHistory.currentQuery }));
   }, [toast, setIndicator, bumpContextGen, showPropertyKeyPrefix, limit]);
 
+  // Fetched here rather than where they are shown, so every GraphInfo built for
+  // this graph already carries them — a type the data has no instance of gets
+  // its color and its place in the vocabulary from the same path as the rest.
+  useEffect(() => {
+    if (!graphName || !ontologyGraphs.includes(graphName)) {
+      setOntologyTypes(EMPTY_ONTOLOGY_TYPES);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const connectionId = getActiveConnectionIdGlobal();
+
+    getOntologyTypeNames(graphName, toast, setIndicator, { signal: controller.signal, connectionId })
+      .then((result) => {
+        if (controller.signal.aborted || !result) return;
+        setOntologyTypes(result);
+      })
+      .catch((error) => {
+        if (isAbortError(error) || controller.signal.aborted) return;
+        console.error("Failed to fetch the declared ontology types:", error);
+      });
+
+    return () => controller.abort();
+  }, [graphName, ontologyGraphs, ontologyVersion, toast, setIndicator]);
+
   const graphContext = useMemo(() => ({
     graph,
     setGraph,
@@ -1151,6 +1185,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     setGraphInfo,
     graphNames,
     setGraphNames,
+    ontologyGraphs,
+    setOntologyGraphs,
+    ontologyTypes,
+    ontologyVersion,
+    bumpOntologyVersion,
     labels,
     setLabels,
     relationships,
@@ -1170,7 +1209,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     selectedParam,
     setSelectedParam,
     pendingAutoLoadRef,
-  }), [graph, graphName, handleSetGraphName, graphNames, labels, relationships, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, chatOpen, selectedParam]);
+  }), [graph, graphName, handleSetGraphName, graphNames, ontologyGraphs, ontologyTypes, ontologyVersion, bumpOntologyVersion, labels, relationships, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, chatOpen, selectedParam]);
 
   // Everything a tab needs to show its results again without querying. Mirrored
   // at render so `captureGraphSession` can read it without a dependency list.
@@ -1215,6 +1254,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const setSchemaMeta = useCallback((meta: SchemaViewMeta) => {
     schemaMetaRef.current = meta;
   }, []);
+
+  // Which schema the view is on, mirrored out of it because the data panel is
+  // rendered outside the view and has to describe the same thing.
+  const [schemaSource, setSchemaSource] = useState<SchemaSource>("ontology");
 
   const captureGraphSession = useCallback((): GraphSession => {
     const state = sessionStateRef.current;
@@ -1395,8 +1438,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   });
 
   const graphTabsContext = useMemo(
-    () => ({ ...graphTabs, setSchemaMeta }),
-    [graphTabs, setSchemaMeta],
+    () => ({ ...graphTabs, setSchemaMeta, schemaSource, setSchemaSource }),
+    [graphTabs, setSchemaMeta, schemaSource],
   );
 
   useEffect(() => {
@@ -1862,8 +1905,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     if (!isCurrent()) return;
     if (res) {
       setGraphNames(res.opts);
+      setOntologyGraphs(res.ontologies);
     } else if (options?.clear) {
       setGraphNames([]);
+      setOntologyGraphs([]);
     }
     setGraphNamesLoaded(true);
     // Auto-select is graph-scoped: only apply if the graph context is unchanged.

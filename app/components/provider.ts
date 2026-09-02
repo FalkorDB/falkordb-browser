@@ -3,11 +3,12 @@ import type { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import type { AIProvider } from "@/lib/ai-provider-utils";
 import { CanvasLayout, ConnectionInfo, ConnectionType, CustomizingRef, GraphData, GraphRef, HistoryQuery, Label, Panel, Relationship, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
 import type { DiagnosticsResult } from "@/lib/cypherDiagnostics";
+import type { OntologyTypeNames } from "@/lib/ontology";
 import type { LayoutMode, ViewportState } from "@falkordb/canvas";
 import type { SessionConnection } from "next-auth";
 import type { LanguageConfig } from "./EditorComponent";
 import { Graph, GraphInfo } from "../api/graph/model";
-import { DEFAULT_GRAPH_TABS, GraphTab, SchemaViewMeta } from "@/lib/useGraphTabs";
+import { DEFAULT_GRAPH_TABS, GraphTab, SchemaSource, SchemaViewMeta } from "@/lib/useGraphTabs";
 
 export type ChatApiKey = {
   id: string;
@@ -157,6 +158,26 @@ type GraphContextType = {
   setGraphInfo: (gi: GraphInfo) => void;
   graphNames: string[] | undefined;
   setGraphNames: Dispatch<SetStateAction<string[] | undefined>>;
+  /**
+   * The graphs whose ontology graph was found and verified. Their ontology is
+   * shown in place of a discovered schema, and it is listed through them
+   * rather than as a graph of its own.
+   */
+  ontologyGraphs: string[];
+  setOntologyGraphs: Dispatch<SetStateAction<string[]>>;
+  /**
+   * The types the active graph's ontology declares. Folded into every
+   * GraphInfo that is built, so the ones the data holds no instance of are
+   * still named, colored and offered for completion.
+   */
+  ontologyTypes: OntologyTypeNames;
+  /**
+   * Bumped whenever the active graph's ontology is edited. The ontology is
+   * read once per graph and cached, so without a signal an edit would only
+   * show up the next time the graph is switched to.
+   */
+  ontologyVersion: number;
+  bumpOntologyVersion: () => void;
   labels: Label[];
   setLabels: Dispatch<SetStateAction<Label[]>>;
   relationships: Relationship[];
@@ -245,6 +266,12 @@ type GraphTabsContextType = {
    * captured.
    */
   setSchemaMeta: (meta: SchemaViewMeta) => void;
+  /**
+   * Which schema the schema view is showing. Only a graph that declares an
+   * ontology has a choice; everywhere else this stays on the discovered one.
+   */
+  schemaSource: SchemaSource;
+  setSchemaSource: (source: SchemaSource) => void;
 };
 
 type ForceGraphContextType = {
@@ -462,6 +489,11 @@ export const GraphContext = createContext<GraphContextType>({
   setGraphInfo: () => { },
   graphNames: undefined,
   setGraphNames: () => { },
+  ontologyGraphs: [],
+  setOntologyGraphs: () => { },
+  ontologyTypes: { labels: [], relationshipTypes: [] },
+  ontologyVersion: 0,
+  bumpOntologyVersion: () => { },
   labels: [],
   setLabels: () => { },
   relationships: [],
@@ -546,6 +578,8 @@ export const GraphTabsContext = createContext<GraphTabsContextType>({
   renameTab: () => { },
   closeTab: () => { },
   setSchemaMeta: () => { },
+  schemaSource: "ontology",
+  setSchemaSource: () => { },
 });
 
 export const ForceGraphContext = createContext<ForceGraphContextType>({

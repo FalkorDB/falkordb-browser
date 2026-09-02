@@ -23,7 +23,7 @@ function escapeIdentifier(id: string): string {
  * @returns The Graph Info panel React element containing graph name, memory usage, node/edge counts, property keys, and query buttons
  */
 export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizingLabel }: { onClose: () => void, customizingLabel: CustomizingRef | null, setCustomizingLabel: Dispatch<SetStateAction<CustomizingRef | null>> }) {
-    const { graph, runQuery, graphName, handleSetGraphName, graphNames, setGraphNames, setGraph } = useContext(GraphContext);
+    const { graph, runQuery, graphName, handleSetGraphName, graphNames, setGraphNames, setGraph, ontologyTypes } = useContext(GraphContext);
     const { graphInfoVersion, nodesCount, edgesCount } = useContext(GraphInfoContext);
     const { Labels, Relationships, PropertyKeys, MemoryUsage } = graph.GraphInfo;
     const { isQueryLoading } = useContext(QueryLoadingContext);
@@ -33,6 +33,8 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     const [nodesSearch, setNodesSearch] = useState("");
     const [edgesSearch, setEdgesSearch] = useState("");
     const [propertyKeysSearch, setPropertyKeysSearch] = useState("");
+    const declaredLabelNames = new Set(ontologyTypes.labels);
+    const declaredRelationshipNames = new Set(ontologyTypes.relationshipTypes);
     // Only the kind and name are held in state, so the styles shown always come
     // from the current graph info. An item that is gone falls back to the normal
     // view. Names are compared through Map lookups rather than tested for
@@ -217,6 +219,8 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                     const isEmptyLabel = label.name === "";
                                     const name = label.name || "Empty";
                                     const labelColor = label.style.color;
+                                    // Declared by the ontology, with no instance in the data to match.
+                                    const isDeclaredOnly = label.count === 0 && declaredLabelNames.has(label.name);
 
                                     return (
                                         <li key={`${name}-${labelColor}`} className="max-w-full">
@@ -251,7 +255,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                             data-testid={`runLabel${name}`}
                                                             title={isEmptyLabel ? "Nodes without a label cannot be matched by label" : undefined}
                                                             onClick={() => runQuery(`MATCH (n:${escapeIdentifier(name)}) RETURN n`)}
-                                                            disabled={isQueryLoading || isEmptyLabel}
+                                                            disabled={isQueryLoading || isEmptyLabel || isDeclaredOnly}
                                                         >
                                                             <Play size={12} />
                                                             Run
@@ -329,6 +333,8 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                 </li>
                                 {Array.from(Relationships.values()).filter(relationship => relationship.name.toLowerCase().includes(edgesSearch.toLowerCase())).sort((a, b) => b.count - a.count).map((relationship) => {
                                     const relationshipColor = relationship.style.color;
+                                    // Declared by the ontology, with no instance in the data to match.
+                                    const isDeclaredOnly = relationship.count === 0 && declaredRelationshipNames.has(relationship.name);
 
                                     return (
                                         <li key={relationship.name} className="max-w-full">
@@ -363,7 +369,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                             data-testid={`runRelationship${relationship.name}`}
                                                             title={`MATCH p=()-[:${escapeIdentifier(relationship.name)}]-() RETURN p`}
                                                             onClick={() => runQuery(`MATCH p=()-[:${escapeIdentifier(relationship.name)}]-() RETURN p`)}
-                                                            disabled={isQueryLoading}
+                                                            disabled={isQueryLoading || isDeclaredOnly}
                                                         >
                                                             <Play size={12} />
                                                             Run
