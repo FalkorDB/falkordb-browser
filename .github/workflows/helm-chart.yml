@@ -45,14 +45,43 @@ jobs:
       
       - name: Validate Pod Security restricted-required defaults
         run: |
-          TEMPLATE_OUTPUT=$(helm template test-release helm/falkordb-browser --show-only templates/deployment.yaml)
+          python3 -m pip install --quiet --disable-pip-version-check pyyaml
+          helm template test-release helm/falkordb-browser --show-only templates/deployment.yaml > /tmp/deployment.yaml
+          python3 - <<'PY'
+          import sys
 
-          echo "$TEMPLATE_OUTPUT" | grep -q 'seccompProfile:'
-          echo "$TEMPLATE_OUTPUT" | grep -q 'type: RuntimeDefault'
-          echo "$TEMPLATE_OUTPUT" | grep -q 'allowPrivilegeEscalation: false'
-          echo "$TEMPLATE_OUTPUT" | grep -q 'drop:'
-          echo "$TEMPLATE_OUTPUT" | grep -q -- '- ALL'
-          echo "$TEMPLATE_OUTPUT" | grep -q 'runAsNonRoot: true'
+          import yaml
+
+          with open("/tmp/deployment.yaml", encoding="utf-8") as handle:
+              spec = yaml.safe_load(handle)["spec"]["template"]["spec"]
+
+          expected_pod = {
+              "runAsNonRoot": True,
+              "runAsUser": 1001,
+              "runAsGroup": 1001,
+              "seccompProfile": {"type": "RuntimeDefault"},
+          }
+          expected_container = {
+              "allowPrivilegeEscalation": False,
+              "capabilities": {"drop": ["ALL"]},
+              "runAsNonRoot": True,
+              "runAsUser": 1001,
+              "runAsGroup": 1001,
+          }
+
+          actual_pod = spec.get("securityContext")
+          actual_container = spec["containers"][0].get("securityContext")
+
+          failures = []
+          if actual_pod != expected_pod:
+              failures.append(f"pod securityContext: expected {expected_pod}, got {actual_pod}")
+          if actual_container != expected_container:
+              failures.append(f"container securityContext: expected {expected_container}, got {actual_container}")
+
+          if failures:
+              print("\n".join(failures))
+              sys.exit(1)
+          PY
 
           echo "✅ Restricted-required securityContext defaults are present"
 

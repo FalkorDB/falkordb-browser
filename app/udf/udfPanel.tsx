@@ -104,6 +104,7 @@ export default function UdfPanel() {
 
         libRequestIdRef.current += 1;
         const requestId = libRequestIdRef.current;
+        const previousLib = selectedLib;
 
         setSelectedLib(libraryName);
         setSelectedUdfFunction(undefined);
@@ -112,7 +113,11 @@ export default function UdfPanel() {
             method: "GET",
         }, toast, setIndicator);
 
-        if (!res.ok) return false;
+        if (!res.ok) {
+            // The editor still shows the previous library, so the highlight has to go back to it.
+            if (libRequestIdRef.current === requestId) setSelectedLib(previousLib);
+            return false;
+        }
 
         const data = await res.json();
 

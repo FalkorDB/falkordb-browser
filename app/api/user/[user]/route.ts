@@ -3,6 +3,7 @@ import { getClient } from "../../auth/[...nextauth]/options";
 import { ROLE, getRoleWithKeys, extractKeysFromACL } from "../model";
 import { updateUser, validateBody } from "../../validate-body";
 import { getCorsHeaders } from "../../utils";
+import rejectLdapManagedUsers from "../ldap-guard";
 
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
@@ -21,6 +22,9 @@ export async function PATCH(
     }
 
     const { client } = session;
+
+    const ldapRejection = await rejectLdapManagedUsers(client, request);
+    if (ldapRejection) return ldapRejection;
 
     const { user: username } = await params;
     

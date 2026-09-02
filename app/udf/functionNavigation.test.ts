@@ -32,6 +32,16 @@ describe("findFunctionLine", () => {
     assert.equal(findFunctionLine(withCallSite, "alpha"), 2);
   });
 
+  it("prefers a bare-identifier arrow declaration over an earlier call site", () => {
+    const withCallSite = ["beta(1);", "const beta = x => x + 1;"].join("\n");
+    assert.equal(findFunctionLine(withCallSite, "beta"), 2);
+  });
+
+  it("prefers an async bare-identifier arrow declaration over an earlier call site", () => {
+    const withCallSite = ["beta(1);", "const beta = async x => x + 1;"].join("\n");
+    assert.equal(findFunctionLine(withCallSite, "beta"), 2);
+  });
+
   it("falls back to a registration entry", () => {
     const registered = ["const impl = () => 1;", "falkor.register('Echo', impl);"].join("\n");
     assert.equal(findFunctionLine(registered, "Echo"), 2);

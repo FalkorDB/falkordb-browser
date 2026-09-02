@@ -2,7 +2,7 @@ apiVersion: v2
 name: falkordb-browser
 description: A Helm chart for deploying FalkorDB Browser to Kubernetes
 type: application
-version: 1.6.9
+version: 1.7.0
 appVersion: "2.5.0"
 keywords:
   - falkordb

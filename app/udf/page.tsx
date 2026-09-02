@@ -47,7 +47,9 @@ export default function Page() {
     const pendingFunctionRef = useRef<string | undefined>(undefined);
     const sourceRef = useRef<string | undefined>(undefined);
 
-    sourceRef.current = selectedUdf?.[5];
+    useEffect(() => {
+        sourceRef.current = selectedUdf?.[5];
+    }, [selectedUdf]);
 
     // Extract function names from the selected UDF library
     const udfFunctions = useMemo(() => selectedUdf?.[3] || [], [selectedUdf]);
