@@ -15,14 +15,14 @@ import { setFunctionCandidates } from "@/lib/cypherSuggestions";
 import { udfFunctionNames } from "@/lib/cypherLang";
 import { computeEditorDiagnostics, type DiagnosticsResult } from "@/lib/cypherDiagnostics";
 import { isAiFixSupported } from "@/lib/aiFix";
-import type { StubsResponse } from "@/lib/enterprise";
+import { type StubsResponse } from "@/lib/enterprise";
 import { PanelImperativeHandle } from "react-resizable-panels";
 import type { LayoutMode, ViewportState } from "@falkordb/canvas";
 import LoginVerification from "./loginVerification";
 import AiFixDialogs from "./components/AiFixDialogs";
 import { Graph, GraphInfo } from "./api/graph/model";
 import type { LanguageConfig } from "./components/EditorComponent";
-import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, CypherLanguageContext, GraphTabsContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider } from "./components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext, ForceGraphContext, TableViewContext, ConnectionContext, UDFContext, DiagnosticsContext, AiFixContext, CypherLanguageContext, GraphTabsContext, type AiFixResult, SessionConnection, type ChatApiKey, type ChatModelSource, type LocalLlmProvider, type UDFFunctionSelection } from "./components/provider";
 import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
 import { GRAPH_OFFLOAD_VERSION_THRESHOLD, MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
@@ -329,6 +329,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [dbVersion, setDbVersion] = useState<string>("");
   const [supportsOffload, setSupportsOffload] = useState(false);
   const [offloadedGraphs, setOffloadedGraphs] = useState<string[]>([]);
+  const [ldapProbe, setLdapProbe] = useState<{ connectionId: string | null; usesLdap: boolean } | null>(null);
   const [connectionType, setConnectionType] = useState<ConnectionType>("Standalone");
   const [connectionInfo, setConnectionInfo] = useState<ConnectionInfo>({});
   const [additionalConnections, setAdditionalConnections] = useState<SessionConnection[]>([]);
@@ -341,6 +342,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [cypherOnly, setCypherOnly] = useState<boolean>(false);
   const [udfList, setUdfList] = useState<UDFEntry[]>([]);
   const [selectedUdf, setSelectedUdf] = useState<UDFEntryWithCode>();
+  const [selectedUdfFunction, setSelectedUdfFunction] = useState<UDFFunctionSelection>();
   const [columnWidth, setColumnWidth] = useState<number>(25);
   const [rowHeight, setRowHeight] = useState<number>(40);
   const [newColumnWidth, setNewColumnWidth] = useState<number>(25);
@@ -757,6 +759,12 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     }
   }, [supportsOffload]);
 
+  // A probe answer only describes the connection it was made for; anything else
+  // (including the render right after a switch) reads as unresolved.
+  const usesLdap = ldapProbe !== null && ldapProbe.connectionId === activeConnectionId
+    ? ldapProbe.usesLdap
+    : null;
+
   const connectionContext = useMemo(() => ({
     connectionType,
     setConnectionType,
@@ -768,6 +776,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     supportsOffload,
     offloadedGraphs,
     refreshOffloadedGraphs,
+    usesLdap,
     additionalConnections,
     setAdditionalConnections,
     activeConnectionId,
@@ -776,14 +785,16 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     beginConnectionSwitch,
     endConnectionSwitch,
     isLatestSwitch,
-  }), [connectionType, connectionInfo, dbVersion, isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, additionalConnections, activeConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
+  }), [connectionType, connectionInfo, dbVersion, isReadOnly, supportsOffload, offloadedGraphs, refreshOffloadedGraphs, usesLdap, additionalConnections, activeConnectionId, updateSession, beginConnectionSwitch, endConnectionSwitch, isLatestSwitch]);
 
   const udfContext = useMemo(() => ({
     udfList,
     setUdfList,
     selectedUdf,
-    setSelectedUdf
-  }), [selectedUdf, udfList]);
+    setSelectedUdf,
+    selectedUdfFunction,
+    setSelectedUdfFunction,
+  }), [selectedUdf, selectedUdfFunction, udfList]);
 
   const cypherLanguageContext = useMemo(() => ({
     cypherLanguageConfig,
@@ -1415,20 +1426,34 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   useEffect(() => {
     if (status !== "authenticated") return undefined;
-    // Use plain fetch with no X-Connection-Id — the server resolves the
-    // connection via session.activeConnectionId from the JWT, which is always
-    // correct (set by every connection switch). This avoids the timing race
-    // where activeConnectionId is null on page load and the check never fires.
+    // On first load `activeConnectionId` is still null and the JWT is the only
+    // source of truth. After a connection switch it changes *before* the JWT is
+    // synced, so pin the requests to the connection this run is for — otherwise
+    // the answers describe the previous connection.
+    const connectionId = activeConnectionId;
+    const headers = connectionId ? { "X-Connection-Id": connectionId } : undefined;
     let cancelled = false;
 
     (async () => {
+      // Unknown until this connection's probe resolves.
+      setLdapProbe(null);
+
+      // An unanswered probe must still resolve, or the UI waits forever for an
+      // answer that is never coming. Resolve it closed: the ACL routes reject
+      // writes (502) when their own probe fails, so offering user management
+      // here would only lead to requests the server refuses.
+      const resolveClosed = () => {
+        if (!cancelled) setLdapProbe({ connectionId, usesLdap: true });
+      };
+
       try {
-        const result = await fetch("/api/DBVersion", { method: "GET" });
+        const result = await fetch("/api/DBVersion", { method: "GET", headers });
         if (cancelled) return;
         if (!result.ok) {
           setShowMemoryUsage(false);
           setSupportsOffload(false);
           setOffloadedGraphs([]);
+          resolveClosed();
           return;
         }
         const json = await result.json();
@@ -1441,7 +1466,28 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         setSupportsOffload(
           json.enterprise === true && name === "graph" && version >= GRAPH_OFFLOAD_VERSION_THRESHOLD
         );
-      } catch { /* ignore */ }
+
+        // `falkordbe.ldap_servers` only exists on enterprise deployments, so
+        // ask for it only once the module is confirmed. When it is set,
+        // FalkorDB defers authentication and authorization to LDAP and the
+        // browser must not offer user/role management.
+        if (json.enterprise !== true) {
+          setLdapProbe({ connectionId, usesLdap: false });
+          return;
+        }
+
+        const ldapResult = await fetch("/api/ldap", { method: "GET", headers });
+        if (cancelled) return;
+        if (!ldapResult.ok) {
+          resolveClosed();
+          return;
+        }
+        const ldapJson = await ldapResult.json();
+        if (cancelled) return;
+        setLdapProbe({ connectionId, usesLdap: ldapJson.usesLdap === true });
+      } catch {
+        resolveClosed();
+      }
     })();
 
     // Stop a response for the previous connection (or a signed-out session) from

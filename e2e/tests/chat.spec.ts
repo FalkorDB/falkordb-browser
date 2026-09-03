@@ -557,6 +557,74 @@ test.describe("Chat Feature Tests", () => {
     await apiCall.removeGraph(graphName);
   });
 
+  test(`@readwrite Verify chat keeps the CYPHER parameter header in the displayed query and it runs`, async () => {
+    // Regression test for #2076: the chat stripped a leading "cypher" token from the
+    // generated query, which also removed the mandatory CYPHER keyword of a FalkorDB
+    // parameter header and left an unparseable query in the chat bubble / Run button.
+    const graphName = getRandomString("chat");
+    await apiCall.addGraph(graphName);
+    let page: Awaited<ReturnType<typeof browser.getPage>> | undefined;
+
+    try {
+      await apiCall.runQuery(
+        graphName,
+        "CREATE (tlv:airport {code: 'TLV'})-[:route]->(ist:airport {code: 'IST'})-[:route]->(nrt:airport {code: 'NRT', desc: 'Tokyo Narita International'})"
+      );
+
+      const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
+      await browser.setPageToFullScreen();
+
+      page = await browser.getPage();
+      await page.evaluate(() => {
+        localStorage.setItem("model", "gpt-4o-mini");
+        localStorage.setItem("chatModelSource", "local");
+      });
+      await page.reload({ waitUntil: "networkidle" });
+
+      await chat.selectGraphByName(graphName);
+      await chat.openChat();
+      await chat.waitForChatPanel();
+
+      // This is what text-to-cypher returns after normalizing the LLM output.
+      const cypherQuery =
+        "CYPHER sourceCode='TLV' targetDesc='Narita' MATCH (src:airport), (dst:airport) WHERE src.code = $sourceCode AND toLower(dst.desc) CONTAINS toLower($targetDesc) CALL algo.SPpaths({sourceNode: src, targetNode: dst, relTypes: ['route'], relDirection: 'outgoing', pathCount: 1}) YIELD path, pathWeight RETURN [n IN nodes(path) | n.code] AS codes, pathWeight";
+
+      await page.route("**/api/chat", (route) => {
+        route.fulfill({
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cypherQuery,
+            cypherResult: null,
+            answer: "The shortest path from TLV to Narita is TLV → IST → NRT.",
+            confidence: 92,
+            tokenUsage: null,
+          }),
+        });
+      });
+
+      await chat.fillChatInput("find a path from tlv to narita airport");
+      await chat.clickChatSendButton();
+
+      expect(await chat.waitForAssistantResponse("CypherQuery")).toBe(true);
+
+      // The displayed query must keep the mandatory CYPHER prefix.
+      const displayedQuery = await chat.getLastAssistantMessageContent("CypherQuery");
+      expect(displayedQuery?.trim().startsWith("CYPHER sourceCode='TLV'")).toBe(true);
+
+      // Running it from the chat must execute successfully against FalkorDB.
+      await chat.clickChatRunQueryButton();
+
+      await expect.poll(() => chat.getEditorInput(), { timeout: 10000 })
+        .toMatch(/^CYPHER sourceCode='TLV'/);
+      await expect.poll(() => chat.getTableTabEnabled(), { timeout: 10000 }).toBe(true);
+      expect(await chat.getNotificationErrorToast()).toBe(false);
+    } finally {
+      await page?.unroute("**/api/chat");
+      await apiCall.removeGraph(graphName);
+    }
+  });
+
   test(`@readwrite Verify messages are graph-specific and respect maxSavedMessages limit`, async () => {
     test.setTimeout(90000);
     const graph1Name = getRandomString("chat");

@@ -64,12 +64,10 @@ jobs:
         run: |
           ARCH_TAGS=$(echo "$BASE_TAGS" | awk -v arch="${{ matrix.arch }}" -F',' '{for(i=1;i<=NF;i++){printf "%s-%s", $i, arch; if(i<NF) printf ","}}')
           echo "ARCH_TAGS=$ARCH_TAGS" >> $GITHUB_ENV
-          if [ "${{ matrix.arch }}" = "amd64" ]; then
-            echo "TRIVY_TAG=$(echo "$BASE_TAGS" | cut -d',' -f1)-amd64" >> $GITHUB_ENV
-          fi
+          echo "TRIVY_TAG=$(echo "$BASE_TAGS" | cut -d',' -f1)-${{ matrix.arch }}" >> $GITHUB_ENV
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       - name: Login to DockerHub
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -90,8 +88,9 @@ jobs:
           cache-from: type=gha,scope=falkordb-browser-${{ matrix.arch }}
           cache-to: type=gha,mode=max,ignore-error=true,scope=falkordb-browser-${{ matrix.arch }}
 
+      # Runs on both arches: each matrix job is on a native runner, and
+      # publish-manifest waits on all of them, so either scan blocks the release.
       - name: Run Trivy vulnerability scanner
-        if: matrix.arch == 'amd64'
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           image-ref: ${{ env.TRIVY_TAG }}
@@ -108,7 +107,7 @@ jobs:
       BASE_TAGS: ${{ needs.prepare.outputs.tags }}
     steps:
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       - name: Login to DockerHub
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0

@@ -298,6 +298,11 @@ type ConnectionContextType = {
   supportsOffload: boolean;
   offloadedGraphs: string[];
   refreshOffloadedGraphs: () => Promise<void>;
+  // True when the enterprise module is loaded with LDAP servers configured. In
+  // that case FalkorDB defers authentication and authorization to LDAP, so the
+  // browser must not offer user/role management for this connection. `null`
+  // means the probe hasn't resolved, which callers must treat as "assume LDAP".
+  usesLdap: boolean | null;
   additionalConnections: SessionConnection[];
   setAdditionalConnections: Dispatch<SetStateAction<SessionConnection[]>>;
   activeConnectionId: string | null;
@@ -312,11 +317,17 @@ type ConnectionContextType = {
   isLatestSwitch: (ticket: number) => boolean;
 };
 
+// `requestId` makes every pick a distinct value, so re-clicking the function
+// that is already selected still re-triggers the jump in the editor.
+export type UDFFunctionSelection = { name: string; requestId: number };
+
 type UDFContextType = {
   udfList: UDFEntry[];
   setUdfList: Dispatch<SetStateAction<UDFEntry[]>>;
   selectedUdf: UDFEntryWithCode | undefined;
   setSelectedUdf: Dispatch<SetStateAction<UDFEntryWithCode | undefined>>;
+  selectedUdfFunction: UDFFunctionSelection | undefined;
+  setSelectedUdfFunction: Dispatch<SetStateAction<UDFFunctionSelection | undefined>>;
 };
 
 type CypherLanguageContextType = {
@@ -589,6 +600,7 @@ export const ConnectionContext = createContext<ConnectionContextType>({
   supportsOffload: false,
   offloadedGraphs: [],
   refreshOffloadedGraphs: async () => { },
+  usesLdap: null,
   additionalConnections: [],
   setAdditionalConnections: () => { },
   activeConnectionId: null,
@@ -604,6 +616,8 @@ export const UDFContext = createContext<UDFContextType>({
   setUdfList: () => { },
   selectedUdf: undefined,
   setSelectedUdf: () => { },
+  selectedUdfFunction: undefined,
+  setSelectedUdfFunction: () => { },
 });
 
 export const CypherLanguageContext = createContext<CypherLanguageContextType>({

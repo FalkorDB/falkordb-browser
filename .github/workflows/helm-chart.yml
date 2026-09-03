@@ -42,6 +42,48 @@ jobs:
         run: |
           helm template test-release helm/falkordb-browser > /dev/null
           echo "✅ Helm chart templates rendered successfully"
+      
+      - name: Validate Pod Security restricted-required defaults
+        run: |
+          python3 -m pip install --quiet --disable-pip-version-check pyyaml==6.0.3
+          helm template test-release helm/falkordb-browser --show-only templates/deployment.yaml > /tmp/deployment.yaml
+          python3 - <<'PY'
+          import sys
+
+          import yaml
+
+          with open("/tmp/deployment.yaml", encoding="utf-8") as handle:
+              spec = yaml.safe_load(handle)["spec"]["template"]["spec"]
+
+          expected_pod = {
+              "runAsNonRoot": True,
+              "runAsUser": 1001,
+              "runAsGroup": 1001,
+              "seccompProfile": {"type": "RuntimeDefault"},
+          }
+          expected_container = {
+              "allowPrivilegeEscalation": False,
+              "capabilities": {"drop": ["ALL"]},
+              "runAsNonRoot": True,
+              "runAsUser": 1001,
+              "runAsGroup": 1001,
+          }
+
+          actual_pod = spec.get("securityContext")
+          actual_container = spec["containers"][0].get("securityContext")
+
+          failures = []
+          if actual_pod != expected_pod:
+              failures.append(f"pod securityContext: expected {expected_pod}, got {actual_pod}")
+          if actual_container != expected_container:
+              failures.append(f"container securityContext: expected {expected_container}, got {actual_container}")
+
+          if failures:
+              print("\n".join(failures))
+              sys.exit(1)
+          PY
+
+          echo "✅ Restricted-required securityContext defaults are present"
 
       - name: Template with various configurations
         run: |
@@ -138,6 +180,15 @@ jobs:
             --wait \
             --timeout 5m \
             --set env.nextauthSecret=test-secret-for-ci
+
+      - name: Dump diagnostics when install fails
+        if: failure()
+        run: |
+          kubectl get pods -A -o wide || true
+          kubectl get events -A --sort-by=.metadata.creationTimestamp | tail -n 200 || true
+          kubectl describe pod -l app.kubernetes.io/name=falkordb-browser || true
+          kubectl logs -l app.kubernetes.io/name=falkordb-browser --all-containers --tail=200 || true
+          kubectl logs -l app.kubernetes.io/name=falkordb-browser --all-containers --tail=200 --previous || true
 
       - name: Verify deployment
         run: |
