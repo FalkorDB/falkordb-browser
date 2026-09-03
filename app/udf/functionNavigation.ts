@@ -18,10 +18,24 @@ const stripNamespace = (functionName: string) => functionName.slice(functionName
 /**
  * A signature whose parameter list wraps closes on a later line; only an arrow
  * after that closing paren makes it a declaration rather than an expression.
+ * The list can nest (`(a = fallback(), b)`), so track depth instead of stopping
+ * at the first line that merely contains a `)`.
  */
 const closesIntoArrow = (lines: string[], index: number) => {
-  for (let i = index + 1; i < lines.length; i += 1) {
-    if (lines[i].includes(")")) return /^[^()]*\)\s*=>/.test(lines[i]);
+  // The matched line carries no `)` after its opening paren, so the last `(` on
+  // it is the one that must close.
+  let depth = 1;
+
+  for (let i = index; i < lines.length; i += 1) {
+    const line = lines[i];
+
+    for (let c = i === index ? line.lastIndexOf("(") + 1 : 0; c < line.length; c += 1) {
+      if (line[c] === "(") depth += 1;
+      else if (line[c] === ")") {
+        depth -= 1;
+        if (depth === 0) return /^\s*=>/.test(line.slice(c + 1));
+      }
+    }
   }
 
   return false;

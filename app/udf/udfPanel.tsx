@@ -138,6 +138,10 @@ export default function UdfPanel() {
 
             return true;
         } catch {
+            // A superseded request must stay silent: the pick the user moved on to
+            // owns both the highlight and any error message.
+            if (libRequestIdRef.current !== requestId) return false;
+
             rollback();
             toast({
                 title: "Error",

@@ -47,6 +47,16 @@ describe("findFunctionLine", () => {
     assert.equal(findFunctionLine(wrapped, "beta"), 1);
   });
 
+  it("finds a wrapped arrow declaration whose parameters carry a call default", () => {
+    const wrapped = ["beta(1);", "const beta = (", "  a = fallback(),", "  b", ") => a + b;"].join("\n");
+    assert.equal(findFunctionLine(wrapped, "beta"), 2);
+  });
+
+  it("does not treat a wrapped nested call as the declaration", () => {
+    const shadowed = ["const beta = (", "  fallback(1)", ");", "falkor.register('beta', impl);"].join("\n");
+    assert.equal(findFunctionLine(shadowed, "beta"), 4);
+  });
+
   it("finds an arrow declaration whose parameters carry a call default", () => {
     const withCallSite = ["beta(1);", "const beta = (a = fallback()) => a;"].join("\n");
     assert.equal(findFunctionLine(withCallSite, "beta"), 2);

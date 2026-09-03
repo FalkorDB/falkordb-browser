@@ -6,25 +6,41 @@ import resolveLdapRejection, {
     LDAP_PROBE_FAILED_MESSAGE,
 } from "./ldap-guard-decision.ts";
 
-function makeClient(configGet: () => Promise<Record<string, unknown>>): FalkorDB {
-    return { connection: Promise.resolve({ configGet }) } as unknown as FalkorDB;
+function makeClient(configGet: () => Promise<Record<string, unknown>>) {
+    const params: string[] = [];
+    const client = {
+        connection: Promise.resolve({
+            configGet: (param: string) => {
+                params.push(param);
+                return configGet();
+            },
+        }),
+    } as unknown as FalkorDB;
+
+    // Spelled out rather than imported: the point is to catch the guard probing
+    // a different parameter than the one FalkorDB Enterprise registers.
+    const assertProbedLdapServers = () => assert.deepEqual(params, ["falkordbe.ldap_servers"]);
+
+    return { client, assertProbedLdapServers };
 }
 
 describe("resolveLdapRejection", () => {
     it("lets the write through on a community deployment", async () => {
-        const client = makeClient(async () => ({}));
+        const { client, assertProbedLdapServers } = makeClient(async () => ({}));
 
         assert.equal(await resolveLdapRejection(client), null);
+        assertProbedLdapServers();
     });
 
     it("lets the write through when the parameter is present but empty", async () => {
-        const client = makeClient(async () => ({ "falkordbe.ldap_servers": "" }));
+        const { client, assertProbedLdapServers } = makeClient(async () => ({ "falkordbe.ldap_servers": "" }));
 
         assert.equal(await resolveLdapRejection(client), null);
+        assertProbedLdapServers();
     });
 
     it("refuses the write when LDAP servers are configured", async () => {
-        const client = makeClient(async () => ({
+        const { client, assertProbedLdapServers } = makeClient(async () => ({
             "falkordbe.ldap_servers": "ldap://ldap.example.com:389",
         }));
 
@@ -32,10 +48,11 @@ describe("resolveLdapRejection", () => {
             status: 403,
             message: LDAP_MANAGED_MESSAGE,
         });
+        assertProbedLdapServers();
     });
 
     it("fails closed when the probe throws", async () => {
-        const client = makeClient(async () => {
+        const { client } = makeClient(async () => {
             throw new Error("CONFIG GET failed");
         });
         const consoleError = mock.method(console, "error", () => { });
