@@ -563,6 +563,7 @@ test.describe("Chat Feature Tests", () => {
     // parameter header and left an unparseable query in the chat bubble / Run button.
     const graphName = getRandomString("chat");
     await apiCall.addGraph(graphName);
+    let page: Awaited<ReturnType<typeof browser.getPage>> | undefined;
 
     try {
       await apiCall.runQuery(
@@ -573,7 +574,7 @@ test.describe("Chat Feature Tests", () => {
       const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
       await browser.setPageToFullScreen();
 
-      const page = await browser.getPage();
+      page = await browser.getPage();
       await page.evaluate(() => {
         localStorage.setItem("model", "gpt-4o-mini");
         localStorage.setItem("chatModelSource", "local");
@@ -618,9 +619,8 @@ test.describe("Chat Feature Tests", () => {
         .toMatch(/^CYPHER sourceCode='TLV'/);
       await expect.poll(() => chat.getTableTabEnabled(), { timeout: 10000 }).toBe(true);
       expect(await chat.getNotificationErrorToast()).toBe(false);
-
-      await page.unroute("**/api/chat");
     } finally {
+      await page?.unroute("**/api/chat");
       await apiCall.removeGraph(graphName);
     }
   });
