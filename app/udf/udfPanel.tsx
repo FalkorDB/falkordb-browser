@@ -158,25 +158,48 @@ export default function UdfPanel() {
         libRequestIdRef.current += 1;
         const requestId = libRequestIdRef.current;
 
-        const res = await securedFetch(`/api/udf/${encodeURIComponent(name)}`, {
-            method: "GET",
-        }, toast, setIndicator);
+        // That claim also silenced any pick still in flight, so a failure here has
+        // to put the highlight back on the library the editor is actually showing.
+        const abandon = () => {
+            if (libRequestIdRef.current !== requestId) return;
 
-        if (!res.ok) return;
+            setSelectedLib(committedLibRef.current);
+            setExpandedLib(committedLibRef.current);
+        };
 
-        const data = await res.json();
+        try {
+            const res = await securedFetch(`/api/udf/${encodeURIComponent(name)}`, {
+                method: "GET",
+            }, toast, setIndicator);
 
-        if (libRequestIdRef.current !== requestId) return;
+            if (!res.ok) {
+                abandon();
+                return;
+            }
 
-        const loaded = data.result[0];
-        const loadedName = loaded[1];
-        setUdfList((prev) => {
-            const filtered = prev.filter(([, libName]) => libName !== loadedName);
-            return [...filtered, loaded];
-        });
-        setSelectedLib(loadedName);
-        setSelectedUdf(loaded);
-        setSelectedUdfFunction(undefined);
+            const data = await res.json();
+
+            if (libRequestIdRef.current !== requestId) return;
+
+            const loaded = data.result[0];
+            const loadedName = loaded[1];
+            setUdfList((prev) => {
+                const filtered = prev.filter(([, libName]) => libName !== loadedName);
+                return [...filtered, loaded];
+            });
+            setSelectedLib(loadedName);
+            setSelectedUdf(loaded);
+            setSelectedUdfFunction(undefined);
+        } catch {
+            if (libRequestIdRef.current !== requestId) return;
+
+            abandon();
+            toast({
+                title: "Error",
+                description: `Failed to load the library ${name}`,
+                variant: "destructive",
+            });
+        }
     };
 
     return (
