@@ -91,7 +91,12 @@ jobs:
       # Runs on both arches: each matrix job is on a native runner, and
       # publish-manifest waits on all of them, so either scan blocks the release.
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          # The tag is pushed, not loaded, so Trivy resolves it from the registry.
+          # buildx attaches a provenance attestation, making it an index, and
+          # Trivy's remote resolver defaults to linux/amd64 for an index.
+          TRIVY_PLATFORM: linux/${{ matrix.arch }}
         with:
           image-ref: ${{ env.TRIVY_TAG }}
           format: 'table'
