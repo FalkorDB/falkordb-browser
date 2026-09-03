@@ -149,6 +149,11 @@ export default function UdfPanel() {
     };
 
     const handleLoad = async (name: string) => {
+        // Claim the id before awaiting, so a library pick that is already in
+        // flight cannot still consider itself current and overwrite the load.
+        libRequestIdRef.current += 1;
+        const requestId = libRequestIdRef.current;
+
         const res = await securedFetch(`/api/udf/${encodeURIComponent(name)}`, {
             method: "GET",
         }, toast, setIndicator);
@@ -157,7 +162,8 @@ export default function UdfPanel() {
 
         const data = await res.json();
 
-        libRequestIdRef.current += 1;
+        if (libRequestIdRef.current !== requestId) return;
+
         const loaded = data.result[0];
         const loadedName = loaded[1];
         setUdfList((prev) => {

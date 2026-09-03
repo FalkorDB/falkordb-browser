@@ -132,8 +132,8 @@ export default function Settings() {
         switch (current) {
             case 'Users':
                 // Wait for the LDAP probe rather than flashing another tab's
-                // content. It stays `null` when the probe fails, so say so
-                // instead of leaving the page blank.
+                // content. A failed probe resolves closed, so this is only ever
+                // shown while the request is in flight.
                 if (usesLdap === null) {
                     return (
                         <p className="text-sm opacity-50" data-testid="settingsUsersPending">
