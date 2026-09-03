@@ -16,21 +16,67 @@ export interface FunctionLocation {
 const stripNamespace = (functionName: string) => functionName.slice(functionName.lastIndexOf(".") + 1);
 
 /**
+ * A signature whose parameter list wraps closes on a later line; only an arrow
+ * after that closing paren makes it a declaration rather than an expression.
+ * The list can nest (`(a = fallback(), b)`), so track depth instead of stopping
+ * at the first line that merely contains a `)`.
+ */
+const closesIntoArrow = (lines: string[], index: number) => {
+  // The matched line carries no `)` after its opening paren, so the last `(` on
+  // it is the one that must close.
+  let depth = 1;
+
+  for (let i = index; i < lines.length; i += 1) {
+    const line = lines[i];
+
+    for (let c = i === index ? line.lastIndexOf("(") + 1 : 0; c < line.length; c += 1) {
+      if (line[c] === "(") depth += 1;
+      else if (line[c] === ")") {
+        depth -= 1;
+        if (depth === 0) return /^\s*=>/.test(line.slice(c + 1));
+      }
+    }
+  }
+
+  return false;
+};
+
+interface FunctionPattern {
+  build: (name: string) => RegExp;
+  /** Extra check against the lines after a match. */
+  confirm?: (lines: string[], index: number) => boolean;
+}
+
+/**
  * Ordered from the most specific declaration form down to a bare occurrence.
  * Every line is scanned with one pattern before moving on to the next, so a
  * declaration always wins over a call site further up the file.
  */
-const FUNCTION_PATTERNS = [
-  (name: string) => new RegExp(`\\bfunction\\s+${escapeRegExp(name)}\\s*\\(`),
-  (name: string) => new RegExp(`\\b(?:const|let|var)\\s+${escapeRegExp(name)}\\s*=\\s*(?:async\\s*)?(?:function\\b|\\()`),
-  (name: string) => new RegExp(`\\b${escapeRegExp(name)}\\s*:\\s*(?:async\\s*)?function\\b`),
+const FUNCTION_PATTERNS: FunctionPattern[] = [
+  { build: (name: string) => new RegExp(`\\bfunction\\s+${escapeRegExp(name)}\\s*\\(`) },
+  // The trailing alternation covers `function`, an arrow parameter list (greedy
+  // to the last paren, so defaults may contain calls) and a bare-identifier
+  // arrow parameter (`const fn = x => …`). A parameter list with no arrow after
+  // it is an expression (`const fn = (1 + 2)`), not a declaration.
+  {
+    build: (name: string) =>
+      new RegExp(
+        `\\b(?:const|let|var)\\s+${escapeRegExp(name)}\\s*=\\s*(?:async\\s*)?(?:function\\b|\\(.*\\)\\s*=>|[A-Za-z_$][\\w$]*\\s*=>)`
+      ),
+  },
+  {
+    build: (name: string) =>
+      new RegExp(`\\b(?:const|let|var)\\s+${escapeRegExp(name)}\\s*=\\s*(?:async\\s*)?\\([^)]*$`),
+    confirm: closesIntoArrow,
+  },
+  { build: (name: string) => new RegExp(`\\b${escapeRegExp(name)}\\s*:\\s*(?:async\\s*)?function\\b`) },
   // Any `name(` — covers class methods, shorthand object methods and
   // declaration styles the patterns above don't spell out.
-  (name: string) => new RegExp(`\\b${escapeRegExp(name)}\\s*\\(`),
+  { build: (name: string) => new RegExp(`\\b${escapeRegExp(name)}\\s*\\(`) },
   // `falkor.register('name', impl)` — the registered name may differ from the
   // implementation it points at, so this is the only anchor for such libraries.
-  (name: string) => new RegExp(`register\\s*\\(\\s*['"\`]${escapeRegExp(name)}['"\`]`),
-  (name: string) => new RegExp(`\\b${escapeRegExp(name)}\\b`),
+  { build: (name: string) => new RegExp(`register\\s*\\(\\s*['"\`]${escapeRegExp(name)}['"\`]`) },
+  { build: (name: string) => new RegExp(`\\b${escapeRegExp(name)}\\b`) },
 ];
 
 export const findFunctionLocation = (source: string, functionName: string): FunctionLocation | null => {
@@ -42,12 +88,13 @@ export const findFunctionLocation = (source: string, functionName: string): Func
   const lines = source.split(/\r?\n/);
 
   for (let p = 0; p < FUNCTION_PATTERNS.length; p += 1) {
-    const pattern = FUNCTION_PATTERNS[p](name);
+    const { build, confirm } = FUNCTION_PATTERNS[p];
+    const pattern = build(name);
 
     for (let i = 0; i < lines.length; i += 1) {
       const match = pattern.exec(lines[i]);
 
-      if (match) {
+      if (match && (!confirm || confirm(lines, i))) {
         const offset = match[0].indexOf(name);
         return {
           lineNumber: i + 1,

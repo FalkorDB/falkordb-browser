@@ -45,9 +45,6 @@ export default function Page() {
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
     // The editor is loaded dynamically, so a pick can land before it mounts.
     const pendingFunctionRef = useRef<string | undefined>(undefined);
-    const sourceRef = useRef<string | undefined>(undefined);
-
-    sourceRef.current = selectedUdf?.[5];
 
     // Extract function names from the selected UDF library
     const udfFunctions = useMemo(() => selectedUdf?.[3] || [], [selectedUdf]);
@@ -228,7 +225,9 @@ export default function Page() {
                         editorRef.current = editorInstance;
 
                         const functionName = pendingFunctionRef.current;
-                        const source = sourceRef.current;
+                        // EditorComponent keeps this callback fresh, so the
+                        // selection read here is the one on screen.
+                        const source = selectedUdf?.[5];
 
                         if (functionName && source && revealFunction(functionName, source)) {
                             pendingFunctionRef.current = undefined;

@@ -1438,6 +1438,14 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       // Unknown until this connection's probe resolves.
       setLdapProbe(null);
 
+      // An unanswered probe must still resolve, or the UI waits forever for an
+      // answer that is never coming. Resolve it closed: the ACL routes reject
+      // writes (502) when their own probe fails, so offering user management
+      // here would only lead to requests the server refuses.
+      const resolveClosed = () => {
+        if (!cancelled) setLdapProbe({ connectionId, usesLdap: true });
+      };
+
       try {
         const result = await fetch("/api/DBVersion", { method: "GET", headers });
         if (cancelled) return;
@@ -1445,6 +1453,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
           setShowMemoryUsage(false);
           setSupportsOffload(false);
           setOffloadedGraphs([]);
+          resolveClosed();
           return;
         }
         const json = await result.json();
@@ -1468,11 +1477,17 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         }
 
         const ldapResult = await fetch("/api/ldap", { method: "GET", headers });
-        if (cancelled || !ldapResult.ok) return;
+        if (cancelled) return;
+        if (!ldapResult.ok) {
+          resolveClosed();
+          return;
+        }
         const ldapJson = await ldapResult.json();
         if (cancelled) return;
         setLdapProbe({ connectionId, usesLdap: ldapJson.usesLdap === true });
-      } catch { /* ignore */ }
+      } catch {
+        resolveClosed();
+      }
     })();
 
     // Stop a response for the previous connection (or a signed-out session) from

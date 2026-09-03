@@ -32,6 +32,46 @@ describe("findFunctionLine", () => {
     assert.equal(findFunctionLine(withCallSite, "alpha"), 2);
   });
 
+  it("prefers a bare-identifier arrow declaration over an earlier call site", () => {
+    const withCallSite = ["beta(1);", "const beta = x => x + 1;"].join("\n");
+    assert.equal(findFunctionLine(withCallSite, "beta"), 2);
+  });
+
+  it("prefers an async bare-identifier arrow declaration over an earlier call site", () => {
+    const withCallSite = ["beta(1);", "const beta = async x => x + 1;"].join("\n");
+    assert.equal(findFunctionLine(withCallSite, "beta"), 2);
+  });
+
+  it("finds an arrow declaration whose parameter list wraps", () => {
+    const wrapped = ["const beta = (", "  a,", "  b", ") => a + b;"].join("\n");
+    assert.equal(findFunctionLine(wrapped, "beta"), 1);
+  });
+
+  it("finds a wrapped arrow declaration whose parameters carry a call default", () => {
+    const wrapped = ["beta(1);", "const beta = (", "  a = fallback(),", "  b", ") => a + b;"].join("\n");
+    assert.equal(findFunctionLine(wrapped, "beta"), 2);
+  });
+
+  it("does not treat a wrapped nested call as the declaration", () => {
+    const shadowed = ["const beta = (", "  fallback(1)", ");", "falkor.register('beta', impl);"].join("\n");
+    assert.equal(findFunctionLine(shadowed, "beta"), 4);
+  });
+
+  it("finds an arrow declaration whose parameters carry a call default", () => {
+    const withCallSite = ["beta(1);", "const beta = (a = fallback()) => a;"].join("\n");
+    assert.equal(findFunctionLine(withCallSite, "beta"), 2);
+  });
+
+  it("does not treat a parenthesised expression as the declaration", () => {
+    const shadowed = ["const beta = (1 + 2);", "falkor.register('beta', impl);"].join("\n");
+    assert.equal(findFunctionLine(shadowed, "beta"), 2);
+  });
+
+  it("does not treat a wrapped parenthesised expression as the declaration", () => {
+    const shadowed = ["const beta = (", "  1 + 2", ");", "falkor.register('beta', impl);"].join("\n");
+    assert.equal(findFunctionLine(shadowed, "beta"), 4);
+  });
+
   it("falls back to a registration entry", () => {
     const registered = ["const impl = () => 1;", "falkor.register('Echo', impl);"].join("\n");
     assert.equal(findFunctionLine(registered, "Echo"), 2);
