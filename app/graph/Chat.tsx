@@ -19,6 +19,7 @@ import { getConnectionItem, setConnectionItem, getConnectionPrefix } from "@/lib
 import { tabScopedKey } from "@/lib/useGraphTabs";
 import { getConfidenceStyle, normalizeConfidence } from "./confidence";
 import { parseStoredMessages, serializeChatHistory } from "./chatHistory";
+import { stripCypherFenceTag } from "./cypherDisplay";
 
 const mdInstance = new MarkdownIt({
     html: false,
@@ -379,7 +380,7 @@ export default function Chat({ onClose }: Props) {
             // Show cypher query if available
             if (data.cypherQuery) {
                 const cypherContent = typeof data.cypherQuery === "string"
-                    ? data.cypherQuery.replace(/^cypher\s+/i, "")
+                    ? stripCypherFenceTag(data.cypherQuery)
                     : data.cypherQuery;
                 setQueryCollapse(prev => ({ ...prev, [newMessages.length]: false }));
                 handleSetMessages({
