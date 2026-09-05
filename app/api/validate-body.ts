@@ -379,6 +379,18 @@ export const login = z.object({
     })
     .min(1, "CA certificate cannot be empty")
     .optional(),
+  cert: z
+    .string({
+      error: "Invalid client certificate",
+    })
+    .min(1, "Client certificate cannot be empty")
+    .optional(),
+  key: z
+    .string({
+      error: "Invalid client key",
+    })
+    .min(1, "Client key cannot be empty")
+    .optional(),
   name: z
     .string({
       error: "Invalid token name",
@@ -451,6 +463,12 @@ export const addConnection = z.object({
     .optional(),
   ca: z
     .string({ error: "Invalid CA certificate" })
+    .optional(),
+  cert: z
+    .string({ error: "Invalid client certificate" })
+    .optional(),
+  key: z
+    .string({ error: "Invalid client key" })
     .optional(),
 });
 

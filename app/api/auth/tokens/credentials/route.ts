@@ -14,6 +14,8 @@ type LoginInput = {
   port?: string | number;
   tls?: string | boolean;
   ca?: string;
+  cert?: string;
+  key?: string;
   name?: string;
   expiresAt?: string | null;
   ttlSeconds?: number | undefined;
@@ -68,6 +70,8 @@ export async function POST(request: NextRequest) {
       port = "6379",
       tls = "false",
       ca,
+      cert,
+      key,
       name = "API Token",
       expiresAt = null,
       ttlSeconds = undefined,
@@ -89,6 +93,8 @@ export async function POST(request: NextRequest) {
           password: userPassword === "" ? undefined : userPassword,
           tls: String(tls),
           ca: ca || "undefined",
+          cert: cert || "undefined",
+          key: key || "undefined",
         },
         userId
       );
