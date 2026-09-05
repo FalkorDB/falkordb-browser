@@ -31,6 +31,8 @@ interface CustomJWTPayload {
   port: number;
   tls: boolean;
   ca?: string;
+  cert?: string;
+  key?: string;
   url?: string;
 }
 
@@ -42,6 +44,8 @@ interface AuthenticatedUser {
   port: number;
   tls: boolean;
   ca?: string;
+  cert?: string;
+  key?: string;
   url?: string;
   credentialRef?: string;
 }
@@ -90,6 +94,8 @@ export async function newClient(
     username?: string;
     tls?: string;
     ca?: string;
+    cert?: string;
+    key?: string;
     url?: string;
   },
   id: string
@@ -115,6 +121,14 @@ export async function newClient(
               !credentials.ca || credentials.ca === "undefined"
                 ? undefined
                 : [Buffer.from(credentials.ca, "base64").toString("utf8")],
+            cert:
+              !credentials.cert || credentials.cert === "undefined"
+                ? undefined
+                : Buffer.from(credentials.cert, "base64").toString("utf8"),
+            key:
+              !credentials.key || credentials.key === "undefined"
+                ? undefined
+                : Buffer.from(credentials.key, "base64").toString("utf8"),
           },
           password: credentials.password ?? undefined,
           username: credentials.username ?? undefined,
@@ -207,6 +221,7 @@ export interface ConnectionInfo {
   port: number;
   tls: boolean;
   ca?: string;
+  cert?: string;
 }
 
 /**
@@ -223,6 +238,8 @@ export async function addSessionConnection(
     username?: string;
     tls?: string;
     ca?: string;
+    cert?: string;
+    key?: string;
   }
 ): Promise<ConnectionInfo> {
   const connId = uuidv4();
@@ -250,6 +267,8 @@ export async function addSessionConnection(
       kind: "session",
       tls: credentials.tls === "true",
       ca: credentials.ca,
+      cert: credentials.cert,
+      key: credentials.key,
       expiresAtUnix: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS,
     });
   } catch (storageError) {
@@ -270,6 +289,7 @@ export async function addSessionConnection(
     port: credentials.port ? parseInt(credentials.port, 10) : 6379,
     tls: credentials.tls === "true",
     ca: credentials.ca,
+    cert: credentials.cert,
   };
 }
 
@@ -290,6 +310,7 @@ export async function listSessionConnections(sessionId: string): Promise<Connect
       port: t.port,
       tls: t.tls ?? false,
       ca: t.ca || undefined,
+      cert: t.cert || undefined,
     }));
 }
 
@@ -365,6 +386,8 @@ async function getConnectionClient(
         password,
         tls: (tokenData.tls ?? false).toString(),
         ca: tokenData.ca || undefined,
+        cert: tokenData.cert || undefined,
+        key: tokenData.encrypted_key ? decrypt(tokenData.encrypted_key) : undefined,
       },
       key
     );
@@ -379,6 +402,7 @@ async function getConnectionClient(
         port: tokenData.port,
         tls: tokenData.tls ?? false,
         ca: tokenData.ca || undefined,
+        cert: tokenData.cert || undefined,
       },
     };
   }
@@ -417,6 +441,7 @@ async function getConnectionClient(
         port: tokenData.port,
         tls: tokenData.tls ?? false,
         ca: tokenData.ca || undefined,
+        cert: tokenData.cert || undefined,
       },
     };
   } catch (metaErr) {
@@ -518,6 +543,8 @@ function createUserFromJWTPayload(payload: CustomJWTPayload): AuthenticatedUser 
     port: payload.port,
     tls: payload.tls || false,
     ca: payload.ca,
+    cert: payload.cert,
+    key: payload.key,
     url: payload.url,
   };
 }
@@ -619,6 +646,8 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
             password,
             tls: payload.tls.toString(),
             ca: payload.ca || undefined,
+            cert: payload.cert || undefined,
+            key: payload.key || undefined,
           },
           payload.sub
         );
@@ -681,6 +710,8 @@ const authOptions: NextAuthConfig = {
         password: { label: "Password", type: "password" },
         tls: { label: "tls", type: "boolean" },
         ca: { label: "ca", type: "string" },
+        cert: { label: "cert", type: "string" },
+        key: { label: "key", type: "string" },
         url: { label: "url", type: "string" },
       },
       async authorize(credentials) {
@@ -696,6 +727,8 @@ const authOptions: NextAuthConfig = {
           username: (credentials.username as string) || undefined,
           tls: (credentials.tls as string) || undefined,
           ca: (credentials.ca as string) || undefined,
+          cert: (credentials.cert as string) || undefined,
+          key: (credentials.key as string) || undefined,
           url: (credentials.url as string) || undefined,
         };
 
@@ -734,6 +767,8 @@ const authOptions: NextAuthConfig = {
               kind: 'session',
               tls: creds.tls === "true",
               ca: creds.url ? undefined : creds.ca,
+              cert: creds.url ? undefined : creds.cert,
+              key: creds.url ? undefined : creds.key,
               expiresAtUnix: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS,
             });
           } catch (storageError) {
@@ -759,6 +794,8 @@ const authOptions: NextAuthConfig = {
             username: creds.username || "default",
             tls: creds.tls === "true",
             ca: creds.url ? undefined : creds.ca,
+            cert: creds.url ? undefined : creds.cert,
+            key: creds.url ? undefined : creds.key,
             role,
           };
           return res;
@@ -823,6 +860,8 @@ const authOptions: NextAuthConfig = {
       delete token.picture;
       delete token.image;
       delete token.ca;          // CA certs are large; stored in Token DB
+      delete token.cert;      // client cert; stored in Token DB
+      delete token.key;       // client key is sensitive; stored in Token DB
       delete token.url;         // Connection URL; stored in Token DB
       delete token.credentialRef; // Legacy field replaced by Token DB
 

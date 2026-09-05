@@ -32,6 +32,10 @@ export interface TokenData {
   tls?: boolean;
   /** Base64-encoded CA certificate for TLS connections. */
   ca?: string;
+  /** Base64-encoded client certificate for mTLS (public; stored as-is). */
+  cert?: string;
+  /** Encrypted base64-encoded client private key for mTLS. Never stored in plaintext. */
+  encrypted_key?: string;
 }
 
 /**

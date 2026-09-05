@@ -155,6 +155,8 @@ export default function ConnectionManager() {
         password: credentials.password,
         tls: credentials.tls,
         ca: credentials.ca || undefined,
+        cert: credentials.cert || undefined,
+        key: credentials.key || undefined,
       }),
     }, toast, setIndicator);
 
