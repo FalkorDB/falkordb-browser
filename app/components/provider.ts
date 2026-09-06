@@ -178,6 +178,14 @@ type GraphContextType = {
    */
   ontologyVersion: number;
   bumpOntologyVersion: () => void;
+  /**
+   * The graphs whose ontology was edited here since the page was loaded. The
+   * edit itself lands immediately; what these graphs are still waiting for is
+   * the re-ingest that would make their stored data match the new declaration.
+   * Nothing in the graph records that, so it is only knowable for this session.
+   */
+  ontologyEditedGraphs: string[];
+  markOntologyEdited: (name: string) => void;
   labels: Label[];
   setLabels: Dispatch<SetStateAction<Label[]>>;
   relationships: Relationship[];
@@ -494,6 +502,8 @@ export const GraphContext = createContext<GraphContextType>({
   ontologyTypes: { labels: [], relationshipTypes: [] },
   ontologyVersion: 0,
   bumpOntologyVersion: () => { },
+  ontologyEditedGraphs: [],
+  markOntologyEdited: () => { },
   labels: [],
   setLabels: () => { },
   relationships: [],

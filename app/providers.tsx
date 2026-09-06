@@ -219,6 +219,10 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   ontologyTypesRef.current = ontologyTypes;
   const [ontologyVersion, setOntologyVersion] = useState(0);
   const bumpOntologyVersion = useCallback(() => setOntologyVersion((version) => version + 1), []);
+  const [ontologyEditedGraphs, setOntologyEditedGraphs] = useState<string[]>([]);
+  const markOntologyEdited = useCallback((name: string) => (
+    setOntologyEditedGraphs((names) => (names.includes(name) ? names : [...names, name]))
+  ), []);
   // Always-current ref so effects can validate graph names without re-running
   // on every graphNames mutation (prevents spurious URL→state rollbacks).
   const graphNamesRef = useRef<string[]>([]);
@@ -1190,6 +1194,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     ontologyTypes,
     ontologyVersion,
     bumpOntologyVersion,
+    ontologyEditedGraphs,
+    markOntologyEdited,
     labels,
     setLabels,
     relationships,
@@ -1209,7 +1215,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     selectedParam,
     setSelectedParam,
     pendingAutoLoadRef,
-  }), [graph, graphName, handleSetGraphName, graphNames, ontologyGraphs, ontologyTypes, ontologyVersion, bumpOntologyVersion, labels, relationships, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, chatOpen, selectedParam]);
+  }), [graph, graphName, handleSetGraphName, graphNames, ontologyGraphs, ontologyTypes, ontologyVersion, bumpOntologyVersion, ontologyEditedGraphs, markOntologyEdited, labels, relationships, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading, expandFilter, chatOpen, selectedParam]);
 
   // Everything a tab needs to show its results again without querying. Mirrored
   // at render so `captureGraphSession` can read it without a dependency list.
@@ -1897,6 +1903,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
     // Only the connection-reset path clears the list; an ordinary refresh keeps
     // the last good list so a failed/slow refresh can't empty the selector.
     if (options?.clear) setGraphNames(undefined);
+    // Graph names are only unique within a connection, so an edit recorded
+    // against one would otherwise be read as the next connection's.
+    if (options?.clear) setOntologyEditedGraphs([]);
 
     const res = await fetchOptions(gToast, gInd, indicator, cid);
 

@@ -17,7 +17,6 @@ import { BrowserSettingsContext, GraphContext, GraphTabsContext, IndicatorContex
 import ToastButton from "../components/ToastButton";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
-import OntologyChangeWarning, { type PendingOntologyChange } from "./OntologyChangeWarning";
 
 const iconSize = 15;
 
@@ -101,7 +100,7 @@ interface Props {
 
 export default function DataTable({ object, type, lastObjKey, canvasRef, className, schema }: Props) {
 
-    const { graph, setGraphInfo, graphName, ontologyGraphs, bumpOntologyVersion } = useContext(GraphContext);
+    const { graph, setGraphInfo, graphName, ontologyGraphs, bumpOntologyVersion, markOntologyEdited } = useContext(GraphContext);
     const { schemaSource } = useContext(GraphTabsContext);
     const { settings: { userExperienceSettings: { captionKeysSettings: { captionsKeys } } } } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
@@ -138,9 +137,6 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
     const [declaredType, setDeclaredType] = useState<string>(ONTOLOGY_PROPERTY_TYPE_NAMES[0]);
     const [declaredNewKey, setDeclaredNewKey] = useState<string>("");
     const [isDeclaring, setIsDeclaring] = useState(false);
-    // Every ontology edit is confirmed before it is sent, because it reaches
-    // further than the graph it is made in — see OntologyChangeWarning.
-    const [pendingChange, setPendingChange] = useState<PendingOntologyChange | undefined>(undefined);
     const [isApplyingChange, setIsApplyingChange] = useState(false);
 
     const setValueParagraphRef = useCallback((key: string) => (el: HTMLParagraphElement | null) => {
@@ -621,37 +617,8 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
             setIsDeclaring(false);
         };
 
-        // Rejected here rather than by the dialog, so a mistyped key is caught
-        // before the user is asked to weigh what the change means.
-        const proposeDeclaration = (name: string, typeName: string, action: "added" | "retyped") => {
-            const key = name.trim();
-
-            if (!key) {
-                toast({
-                    title: "Error",
-                    description: "Please fill in the key field",
-                    variant: "destructive",
-                });
-                return;
-            }
-
-            if (action === "added" && declaredKeys.includes(key)) {
-                toast({
-                    title: "Error",
-                    description: `"${owner}" already declares "${key}"`,
-                    variant: "destructive",
-                });
-                return;
-            }
-
-            setPendingChange({ action, owner, property: key, type: typeName });
-        };
-
-        const applyChange = async () => {
-            if (!pendingChange) return;
-
-            const { action, property, type: typeName } = pendingChange;
-            const removing = action === "removed";
+        const applyChange = async (property: string, typeName?: string) => {
+            const removing = typeName === undefined;
             const startEpoch = getConnectionEpoch();
             const cid = getActiveConnectionIdGlobal();
 
@@ -664,7 +631,7 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
                         ownerKind,
                         owner,
                         name: property,
-                        ...(removing ? {} : { type: ontologyDeclaredType(typeName ?? "") }),
+                        ...(removing ? {} : { type: ontologyDeclaredType(typeName) }),
                     }),
                 }, toast, setIndicator, cid);
 
@@ -679,10 +646,37 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
                 setAttributes(Object.keys(object.data));
                 stopDeclaring();
                 bumpOntologyVersion();
-                setPendingChange(undefined);
+                // What the graph already holds was extracted under the ontology as
+                // it stood before this edit, and nothing records that but the page.
+                markOntologyEdited(graphName);
             } finally {
                 setIsApplyingChange(false);
             }
+        };
+
+        // A mistyped or duplicate key is caught before anything is sent.
+        const declare = (name: string, typeName: string, isNew: boolean) => {
+            const key = name.trim();
+
+            if (!key) {
+                toast({
+                    title: "Error",
+                    description: "Please fill in the key field",
+                    variant: "destructive",
+                });
+                return;
+            }
+
+            if (isNew && declaredKeys.includes(key)) {
+                toast({
+                    title: "Error",
+                    description: `"${owner}" already declares "${key}"`,
+                    variant: "destructive",
+                });
+                return;
+            }
+
+            void applyChange(key, typeName);
         };
 
         return (
@@ -772,8 +766,9 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
                                                                 indicator={indicator}
                                                                 variant="button"
                                                                 title="Save"
+                                                                isLoading={isApplyingChange}
                                                                 disabled={declaredType === declared}
-                                                                onClick={() => proposeDeclaration(key, declaredType, "retyped")}
+                                                                onClick={() => declare(key, declaredType, false)}
                                                             >
                                                                 <Check size={iconSize} />
                                                             </Button>
@@ -801,14 +796,34 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
                                                             >
                                                                 <Pencil size={iconSize} />
                                                             </Button>
-                                                            <Button
-                                                                data-testid="DataPanelDeleteDeclaredProperty"
-                                                                variant="button"
-                                                                title="Remove from the ontology"
-                                                                onClick={() => setPendingChange({ action: "removed", owner, property: key })}
+                                                            <DialogComponent
+                                                                trigger={
+                                                                    <Button
+                                                                        data-testid="DataPanelDeleteDeclaredProperty"
+                                                                        variant="button"
+                                                                        title="Remove from the ontology"
+                                                                    >
+                                                                        <Trash2 size={iconSize} />
+                                                                    </Button>
+                                                                }
+                                                                title="Remove Declaration"
+                                                                description={`Are you sure you want to remove "${key}" from the ontology? This will stop it being extracted, but values already ingested under it stay in the graph.`}
                                                             >
-                                                                <Trash2 size={iconSize} />
-                                                            </Button>
+                                                                <div className="flex justify-end gap-4">
+                                                                    <Button
+                                                                        data-testid="DataPanelDeleteDeclaredPropertyConfirm"
+                                                                        variant="Delete"
+                                                                        label="Remove"
+                                                                        onClick={() => void applyChange(key)}
+                                                                        isLoading={isApplyingChange}
+                                                                    />
+                                                                    <CloseDialog
+                                                                        data-testid="DataPanelDeleteDeclaredPropertyCancel"
+                                                                        label="Cancel"
+                                                                        variant="Cancel"
+                                                                    />
+                                                                </div>
+                                                            </DialogComponent>
                                                         </>
                                                 }
                                             </div>
@@ -828,7 +843,7 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
                                         value={declaredNewKey}
                                         onChange={(e) => setDeclaredNewKey(e.target.value)}
                                         onKeyDown={(e) => {
-                                            if (e.key === "Enter") proposeDeclaration(declaredNewKey, declaredType, "added");
+                                            if (e.key === "Enter") declare(declaredNewKey, declaredType, true);
                                             if (e.key === "Escape") stopDeclaring();
                                         }}
                                     />
@@ -848,7 +863,8 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
                                         indicator={indicator}
                                         variant="button"
                                         title="Save"
-                                        onClick={() => proposeDeclaration(declaredNewKey, declaredType, "added")}
+                                        isLoading={isApplyingChange}
+                                        onClick={() => declare(declaredNewKey, declaredType, true)}
                                     >
                                         <Check size={iconSize} />
                                     </Button>
@@ -882,13 +898,6 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
                         </Button>
                     }
                 </div>
-                <OntologyChangeWarning
-                    change={pendingChange}
-                    indicator={indicator}
-                    isLoading={isApplyingChange}
-                    onCancel={() => setPendingChange(undefined)}
-                    onConfirm={applyChange}
-                />
             </div>
         );
     }

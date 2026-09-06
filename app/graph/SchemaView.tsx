@@ -1,10 +1,11 @@
 "use client";
 
 import { Dispatch, ReactNode, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, TriangleAlert } from "lucide-react";
 import type { FalkorDBCanvas, LayoutMode, ViewportState, NodeShape } from "@falkordb/canvas";
 import { NODE_SIZE } from "@falkordb/canvas";
 import { useToast } from "@/components/ui/use-toast";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import ForceGraph from "@/app/components/ForceGraph";
 import {
     CANVAS_AUTO_ZOOM_DELAY,
@@ -256,7 +257,7 @@ export default function SchemaScope({ active, fallback, selectedElements, setSel
 type SchemaGraphProps = Omit<SchemaScopeProps, "active" | "fallback"> & { cacheKey: string, storedMeta: SchemaViewMeta };
 
 function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElements, children }: SchemaGraphProps) {
-    const { graph, graphName, ontologyGraphs, ontologyTypes, ontologyVersion } = useContext(GraphContext);
+    const { graph, graphName, ontologyGraphs, ontologyTypes, ontologyVersion, ontologyEditedGraphs } = useContext(GraphContext);
     const { graphInfoVersion } = useContext(GraphInfoContext);
     const { setIndicator } = useContext(IndicatorContext);
     const { setSchemaMeta, setSchemaSource } = useContext(GraphTabsContext);
@@ -266,6 +267,9 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
     const { toast } = useToast();
 
     const hasOntology = ontologyGraphs.includes(graphName);
+    // The declaration has moved since the data was ingested under it. Only this
+    // page knows that, so it is the only thing that can say so.
+    const ontologyEdited = ontologyEditedGraphs.includes(graphName);
 
     const restored = readCache(cacheKey);
     // Only the reload path reads the tab: with a cache entry in hand, that entry
@@ -809,6 +813,33 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
                                 : "Showing the schema generated from the data this graph holds.\nSwitch to the ontology it declares."}
                             onClick={() => setSource(showOntology ? "discovered" : "ontology")}
                         />
+                    </>
+                }
+                {
+                    showOntology && ontologyEdited &&
+                    <>
+                        <div className="h-4 w-px bg-border rounded-full" />
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span
+                                    className="flex items-center gap-1 text-nowrap text-yellow-500 pointer-events-auto"
+                                    data-testid="schemaOntologyEdited"
+                                    role="status"
+                                >
+                                    <TriangleAlert size={14} />
+                                    Edited
+                                </span>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-[24rem]">
+                                <p>
+                                    The ontology has been edited here. The data already in
+                                    this graph was extracted under the ontology as it stood
+                                    before, and editing the declaration does not go back and
+                                    change it. Re-ingest with the GraphRAG SDK to have the
+                                    stored data match.
+                                </p>
+                            </TooltipContent>
+                        </Tooltip>
                     </>
                 }
                 {
