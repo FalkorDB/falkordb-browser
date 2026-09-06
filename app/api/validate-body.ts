@@ -342,6 +342,31 @@ export const fixRequest = z.object({
 });
 
 // Auth schemas
+// mTLS material is only usable as a PAIR, and only under TLS. A certificate without
+// its key (or either with tls off) cannot open a connection, and without this it fails
+// far away in the TLS handshake with an opaque error instead of here, naming the field.
+const requireMtlsPair = (
+  // tls arrives as a string on the login schema and as string | boolean on
+  // addConnection, so both spellings of "on" have to count.
+  v: { tls?: string | boolean; cert?: string; key?: string },
+  ctx: z.RefinementCtx
+) => {
+  if (!!v.cert !== !!v.key) {
+    ctx.addIssue({
+      code: "custom",
+      path: [v.cert ? "key" : "cert"],
+      message: "Client certificate and client key must be provided together",
+    });
+  }
+  if ((v.cert || v.key) && !(v.tls === "true" || v.tls === true)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["tls"],
+      message: "Client certificate authentication requires TLS to be enabled",
+    });
+  }
+};
+
 export const login = z.object({
   username: z
     .string({
@@ -407,7 +432,7 @@ export const login = z.object({
       error: "Invalid TTL value",
     })
     .optional(),
-});
+}).superRefine(requireMtlsPair);
 
 export const revokeToken = z.object({
   token: z
@@ -470,7 +495,7 @@ export const addConnection = z.object({
   key: z
     .string({ error: "Invalid client key" })
     .optional(),
-});
+}).superRefine(requireMtlsPair);
 
 // Token creation schema
 export const createToken = z.object({

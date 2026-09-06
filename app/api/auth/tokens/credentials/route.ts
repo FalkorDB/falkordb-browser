@@ -77,6 +77,21 @@ export async function POST(request: NextRequest) {
       ttlSeconds = undefined,
     } = validation.data as LoginInput;
 
+    // API tokens cannot carry mTLS material. This route persists neither the client
+    // certificate nor its key, so a token issued with them would authenticate once
+    // against the cached connection and then fail on every reconnect after a restart
+    // or cache eviction. Refuse at issue time rather than hand out a token that
+    // breaks later for a reason nothing here explains.
+    if (cert || key) {
+      return NextResponse.json(
+        {
+          message:
+            "Client certificate authentication is not supported for API tokens; use a password-based token.",
+        },
+        { status: 400 }
+      );
+    }
+
     // 3. Authenticate user with provided credentials
     let authenticatedUser;
     let userPassword;
@@ -93,8 +108,6 @@ export async function POST(request: NextRequest) {
           password: userPassword === "" ? undefined : userPassword,
           tls: String(tls),
           ca: ca || "undefined",
-          cert: cert || "undefined",
-          key: key || "undefined",
         },
         userId
       );

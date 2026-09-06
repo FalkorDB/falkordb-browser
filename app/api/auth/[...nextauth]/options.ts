@@ -794,8 +794,12 @@ const authOptions: NextAuthConfig = {
             username: creds.username || "default",
             tls: creds.tls === "true",
             ca: creds.url ? undefined : creds.ca,
-            cert: creds.url ? undefined : creds.cert,
-            key: creds.url ? undefined : creds.key,
+            // cert/key are deliberately NOT on the returned User. They are already
+            // persisted for this connection (the key encrypted) in the Token DB above
+            // and re-read on reconnect, so putting them on the session user would add
+            // no capability - only the risk that a later refactor lets a private key
+            // reach a JWT or the client. The jwt callback strips them today; not
+            // carrying them here means it does not have to.
             role,
           };
           return res;
