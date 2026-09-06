@@ -7,10 +7,12 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import React, { type RefObject } from "react";
-import type { FalkorDBCanvas, Data as CanvasData } from "@falkordb/canvas";
+import type { FalkorDBCanvas, Data as CanvasData, NodeShape } from "@falkordb/canvas";
 import { signOut } from "next-auth/react";
 import { getCypherErrorHint, SYNTAX_ERROR_HINT, parseSyntaxError, enrichSyntaxMessage, type SyntaxErrorInfo, type HintLink } from "./cypherErrors.ts";
 import { suggestForError, findFuncArgTypo } from "./cypherSuggestions.ts";
+import { quoteCypherIdentifier } from "./cypher.ts";
+import type { PropertyValue } from "./graphValues.ts";
 
 export { parseSyntaxError };
 export type { SyntaxErrorInfo };
@@ -36,7 +38,11 @@ export const screenSize = {
 };
 
 
-export type Value = string | number | boolean;
+/**
+ * Every type FalkorDB can persist as a property value. Aliased so the editor
+ * and the parsing/validation layer cannot drift apart.
+ */
+export type Value = PropertyValue;
 
 export type HistoryQuery = {
   queries: Query[];
@@ -81,6 +87,9 @@ export type Link = {
   visible: boolean;
   expand: boolean;
   collapsed: boolean;
+  width?: number;
+  fontSize?: number;
+  arrowSize?: number;
   data: {
     [key: string]: any;
   };
@@ -124,11 +133,20 @@ export type Data = DataRow[];
 
 export type MemoryValue = number | Map<string, MemoryValue>;
 
-export interface LinkStyle {
+export interface BaseStyle {
   color: string;
 }
 
-export interface LabelStyle extends LinkStyle {
+export interface LinkStyle extends BaseStyle {
+  /** Link line width (defaults to the canvas LINK_WIDTH) */
+  width?: number;
+  /** Relationship-type caption font size (defaults to the canvas LINK_FONT_SIZE) */
+  fontSize?: number;
+  /** Arrowhead length (defaults to the canvas ARROW_SIZE) */
+  arrowSize?: number;
+}
+
+export interface LabelStyle extends BaseStyle {
   size?: number;
 }
 
@@ -161,6 +179,17 @@ export interface Relationship extends Omit<InfoRelationship, "count"> {
   textDescent?: number;
 }
 
+/**
+ * Identifies the item whose style panel is open. Only the kind and name are
+ * held, so the styles rendered always come from the current graph info.
+ */
+export type CustomizingRef = { kind: "node" | "edge"; name: string };
+
+/** Item currently open in the Customize Style panel, resolved from a `CustomizingRef`. */
+export type CustomizingItem =
+  | { kind: "node"; item: InfoLabel }
+  | { kind: "edge"; item: InfoRelationship };
+
 export type GraphRef = RefObject<FalkorDBCanvas | null>;
 
 export type Panel = "data" | "add" | undefined;
@@ -184,7 +213,90 @@ export type TextCell = {
   onChange: (value: string) => Promise<boolean>;
 };
 
-export type Tab = "Graph" | "Table" | "Metadata";
+export type Tab = "Graph" | "Table" | "Metadata" | "Schema";
+
+/**
+ * The tab ids, as values. Ownership checks (who drives the legend, which
+ * selection is live) key off these instead of spelling the id out inline, so a
+ * rename stays a single edit and can never be confused with a display label.
+ */
+export const TAB = {
+  Graph: "Graph",
+  Table: "Table",
+  Metadata: "Metadata",
+  Schema: "Schema",
+} as const satisfies Record<Tab, Tab>;
+
+/**
+ * One observed placement of a relationship type: the source label, the
+ * relationship type and the target label of at least one real edge.
+ * Unlabeled endpoints are reported as the empty string, matching the synthetic
+ * "" label `GraphInfo` uses for them.
+ */
+export type SchemaEdge = {
+  source: string;
+  relationship: string;
+  target: string;
+};
+
+/**
+ * The property keys one label or relationship type carries, mapped to the value
+ * type(s) observed for them. FalkorDB enforces no schema, so the same key can
+ * hold different types on different elements; those are joined (`"Integer | String"`).
+ * Discovered from a sample of the elements, not from all of them.
+ */
+export type SchemaPropertyKeys = Record<string, string>;
+
+/**
+ * What the graph itself declares about one property, as opposed to what a
+ * sample of the elements happens to hold. Unlike the property keys these are
+ * exact: they are read off the index and constraint definitions.
+ */
+export type SchemaPropertyRules = {
+  /**
+   * The index types covering the property, lower-cased at ingest so every
+   * reader shows the same form: `"range"`, `"fulltext"`, `"vector"`. Empty
+   * when the property is not indexed.
+   */
+  indexes: string[];
+  /** No two elements of the type may hold the same value. */
+  unique: boolean;
+  /** Every element of the type has to carry the property. */
+  mandatory: boolean;
+};
+
+/** The rules of each property of one label or relationship type. */
+export type SchemaPropertyRulesMap = Record<string, SchemaPropertyRules>;
+
+/** Everything the Schema view draws, discovered with read-only queries. */
+export type SchemaSnapshot = {
+  edges: SchemaEdge[];
+  /** Keyed by label; unlabeled nodes are under `""`. */
+  labelKeys: Record<string, SchemaPropertyKeys>;
+  /** Keyed by relationship type. */
+  relationshipKeys: Record<string, SchemaPropertyKeys>;
+  /** Keyed by label. Only the properties that carry a rule appear. */
+  labelRules: Record<string, SchemaPropertyRulesMap>;
+  /** Keyed by relationship type. Only the properties that carry a rule appear. */
+  relationshipRules: Record<string, SchemaPropertyRulesMap>;
+};
+
+/**
+ * The canvas captions an element from its `data`, so a schema element carries
+ * its name there next to its property keys. The key is reserved rather than
+ * "label" so a real property of that name cannot be shadowed by it, and the
+ * data panel knows which entry to leave out.
+ */
+export const SCHEMA_CAPTION_KEY = "__schemaCaption";
+
+/**
+ * Where a schema element carries its `SchemaPropertyRulesMap`, for the same
+ * reason the caption travels in `data`: that is all the details panel is given.
+ */
+export const SCHEMA_RULES_KEY = "__schemaRules";
+
+/** True for the entries of a schema element's `data` that are not properties of it. */
+export const isSchemaReservedKey = (key: string) => key === SCHEMA_CAPTION_KEY || key === SCHEMA_RULES_KEY;
 
 export type ReadOnlyCell = {
   value: string;
@@ -259,36 +371,71 @@ export async function getSSEGraphResult(
   url: string,
   toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void,
-  errorContext?: { query?: string }
+  options?: { query?: string; signal?: AbortSignal; connectionId?: string | null }
 ): Promise<unknown> {
+  const signal = options?.signal;
+  // Already superseded before we even open the stream.
+  if (signal?.aborted) return Promise.reject(createAbortError());
+
   return new Promise((resolve, reject) => {
-    let handled = false;
+    let settled = false;
+
+    // Route through an explicit connection id when provided, so every request in
+    // a batch targets the same connection even if the global changes mid-flight.
+    const connId = options?.connectionId !== undefined ? options.connectionId : _activeConnectionId;
 
     // EventSource doesn't support headers — inject connectionId as a query param.
     let effectiveUrl = normalizeApiUrl(url);
-    if (_activeConnectionId) {
+    if (connId) {
       const sep = effectiveUrl.includes("?") ? "&" : "?";
-      effectiveUrl += `${sep}connectionId=${encodeURIComponent(_activeConnectionId)}`;
+      effectiveUrl += `${sep}connectionId=${encodeURIComponent(connId)}`;
     }
 
     const evtSource = new EventSource(effectiveUrl);
+
+    const onAbort = () => {
+      // Superseded (e.g. graph/connection switch): close silently — no toast, no
+      // indicator change — and reject so callers can drop the result.
+      finishReject(createAbortError());
+    };
+
+    function cleanup() {
+      if (signal) signal.removeEventListener("abort", onAbort);
+      evtSource.close();
+    }
+    function finishResolve(value: unknown) {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(value);
+    }
+    function finishReject(error: Error) {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(error);
+    }
+
+    if (signal) signal.addEventListener("abort", onAbort);
+
     evtSource.addEventListener("result", (event: MessageEvent) => {
+      if (settled) return;
       const payloadText = typeof event.data === "string" ? event.data : "";
 
       try {
         const result = JSON.parse(payloadText);
-        evtSource.close();
         setIndicator("online");
-        resolve(result);
+        finishResolve(result);
       } catch (error) {
         console.error("Failed to parse SSE result event:", error);
-        evtSource.close();
         setIndicator("offline");
-        reject(new Error("Invalid server response"));
+        finishReject(new Error("Invalid server response"));
       }
     });
 
     evtSource.addEventListener("error", (event: MessageEvent) => {
+      if (settled) return;
+
       const eventData = typeof (event as { data?: unknown }).data === "string"
         ? (event as { data?: string }).data
         : "";
@@ -298,7 +445,12 @@ export async function getSSEGraphResult(
       // offline/network error instead of a generic "Request failed".
       if (!eventData) return;
 
-      handled = true;
+      // Superseded while the error was arriving — drop it without a toast.
+      if (signal?.aborted) {
+        finishReject(createAbortError());
+        return;
+      }
+
       let rawMessage: unknown = "";
       let rawStatus: unknown = 0;
       let code: string | undefined;
@@ -325,34 +477,37 @@ export async function getSSEGraphResult(
       const parsedStatus = Number(rawStatus);
       const status = Number.isFinite(parsedStatus) ? parsedStatus : 0;
 
-      evtSource.close();
-
       if (status === 401 && code === "SESSION_INVALID") {
         triggerSessionInvalidationSignOut();
         setIndicator("offline");
-        reject(new Error(message));
+        finishReject(new Error(message));
         return;
       }
 
-      const friendly = toUserFriendlyMessage(message, status, errorContext);
-      toast({ title: friendly.title, description: friendly.description, variant: "destructive", rawMessage: friendly.rawMessage, hint: friendly.hint, hintLink: friendly.hintLink, query: errorContext?.query });
+      const friendly = toUserFriendlyMessage(message, status, options?.query ? { query: options.query } : undefined);
+      toast({ title: friendly.title, description: friendly.description, variant: "destructive", rawMessage: friendly.rawMessage, hint: friendly.hint, hintLink: friendly.hintLink, query: options?.query });
 
       if (status === 401 || status >= 500) setIndicator("offline");
 
-      reject(new Error(message));
+      finishReject(new Error(message));
     });
 
     evtSource.onerror = () => {
-      if (handled) return;
+      if (settled) return;
 
-      evtSource.close();
+      // Superseded — drop it without a toast / offline flip.
+      if (signal?.aborted) {
+        finishReject(createAbortError());
+        return;
+      }
+
       toast({
         title: "Error",
         description: "Network or server error",
         variant: "destructive",
       });
       setIndicator("offline");
-      reject(new Error("Network or server error"));
+      finishReject(new Error("Network or server error"));
     };
   });
 }
@@ -476,6 +631,31 @@ const USER_READABLE_ERROR_PATTERNS = [
   /^cannot connect to falkordb\b/i,
   /^authentication failed\b/i,
   /^connection timed out\b/i,
+  // Data ingestion / file upload (app/api/upload, app/api/graph/[graph]/upload).
+  // These messages are authored for end users, so show them verbatim.
+  /\brequires a (?:\.dump|\.csv|\.txt|\.cypher)\b/i,
+  /\bbatch files can be executed\b/i,
+  /\brequires a query\b/i,
+  /^invalid upload mode\b/i,
+  /\btemporarily disabled\b/i,
+  /^invalid request body\b/i,
+  /^(?:invalid|unsupported) file (?:type|name|contents)\b/i,
+  /^file is too large\b/i,
+  /^no file uploaded\b/i,
+  /^request body is missing\b/i,
+  /^failed to parse upload\b/i,
+  /^malformed multipart body\b/i,
+  /^expected multipart\/form-data with a boundary\.?$/i,
+  /^uploaded file not found\b/i,
+  /^mode and fileId are required\b/i,
+  /^you do not have permission\b/i,
+  /\bmust be a single cypher statement\b/i,
+  /^the csv query is empty\b/i,
+  /\bis not a valid identifier\b/i,
+  /^duplicate csv column\b/i,
+  /\bfailed to (?:restore the graph dump|process csv rows?|process the csv file|execute cypher statement|execute the cypher batch)\b/i,
+  /\bcan only fetch csv files over https\b/i,
+  /^the csv storage produced an invalid url\b/i,
 ];
 
 function isAllowlistedUserError(message: string): boolean {
@@ -571,13 +751,47 @@ function triggerSessionInvalidationSignOut(): void {
 // Not initialised from localStorage to avoid overriding restricted-user sessions.
 // providers.tsx keeps it in sync after every render.
 let _activeConnectionId: string | null = null;
+// Monotonic counter bumped whenever the active connection id actually changes.
+// Async callers can capture it before a request and re-check it before applying
+// results, so a switch (including A→B→A, where the id repeats) is still detected.
+let _connectionEpoch = 0;
 
 export function setActiveConnectionIdGlobal(id: string | null) {
+  // Bump only when switching AWAY from an already-established connection (the old
+  // id is non-null). The initial null→id establishment on every page load is not
+  // a "switch" and must not discard the first graph-list load / query, which
+  // capture the epoch before the connection id settles.
+  if (_activeConnectionId !== null && id !== _activeConnectionId) _connectionEpoch += 1;
   _activeConnectionId = id;
 }
 
 export function getActiveConnectionIdGlobal(): string | null {
   return _activeConnectionId;
+}
+
+export function getConnectionEpoch(): number {
+  return _connectionEpoch;
+}
+
+/** Error thrown when an in-flight request is superseded (e.g. a graph/connection
+ *  switch aborts its AbortSignal). Callers should treat it as a no-op, not a
+ *  failure — it must never surface a toast. */
+export function createAbortError(): Error {
+  const err = new Error("The operation was aborted.");
+  err.name = "AbortError";
+  return err;
+}
+
+/** True when the given error is an abort (from createAbortError or a native
+ *  fetch/AbortController abort). Native aborts reject with a DOMException named
+ *  "AbortError", which is NOT an `instanceof Error` in browsers — so match on
+ *  the `name` of any object rather than the Error prototype. */
+export function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { name?: unknown }).name === "AbortError"
+  );
 }
 
 function normalizeApiUrl(input: string): string {
@@ -593,12 +807,18 @@ export async function securedFetch(
   init: RequestInit,
   toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void,
+  // Pin the request to a specific connection. `undefined` falls back to the
+  // active global connection (default behaviour); an explicit `null` forces
+  // "no connection", so a poll that captured null at start can't be silently
+  // re-pinned to whatever connection later becomes active.
+  connectionId?: string | null,
 ): Promise<Response> {
   // Callers that set X-Connection-Id explicitly take priority over the global.
   const effectiveInit = { ...init };
   const existingHeaders = new Headers(effectiveInit.headers);
-  if (_activeConnectionId && !existingHeaders.has("X-Connection-Id")) {
-    existingHeaders.set("X-Connection-Id", _activeConnectionId);
+  const effectiveConnId = connectionId !== undefined ? connectionId : _activeConnectionId;
+  if (effectiveConnId && !existingHeaders.has("X-Connection-Id")) {
+    existingHeaders.set("X-Connection-Id", effectiveConnId);
   }
   effectiveInit.headers = existingHeaders;
 
@@ -638,6 +858,130 @@ export function prepareArg(arg: string) {
   return encodeURIComponent(arg.trim());
 }
 
+/**
+ * Reads a panel width back out of storage, which anything can have written to.
+ * The size is applied in an animation frame, where a throw is swallowed and the
+ * panel would silently keep the wrong width, so a value that is not a usable
+ * percentage — anything outside `(0, 100]` — yields `undefined` and the caller
+ * falls back to its default.
+ */
+export function parsePanelSizePercent(stored: string | null | undefined): number | undefined {
+  if (!stored) return undefined;
+
+  try {
+    const parsed: unknown = JSON.parse(stored);
+
+    return typeof parsed === "number" && Number.isFinite(parsed) && parsed > 0 && parsed <= 100 ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Upload a single file via XHR so the caller can render real request-body upload
+ * progress (the fetch API can't report it). Mirrors securedFetch's behaviour:
+ * injects X-Connection-Id, surfaces a friendly error toast, and drives the
+ * online/offline indicator. Resolves (never rejects) with the raw response.
+ */
+export function uploadFileWithProgress(
+  input: string,
+  file: File,
+  toast: ToastFn,
+  setIndicator: (indicator: "online" | "offline") => void,
+  onProgress?: (percent: number) => void,
+  // Optional cancellation. Aborting rejects the (never-thrown) promise with an
+  // ok:false result so a stalled/long upload can be cancelled instead of hanging.
+  signal?: AbortSignal,
+): Promise<{ ok: boolean; status: number; body: string }> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) {
+      // A pre-aborted signal is a local cancellation/supersession, not an outage.
+      resolve({ ok: false, status: 0, body: "" });
+      return;
+    }
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", normalizeApiUrl(input));
+
+    if (_activeConnectionId) {
+      xhr.setRequestHeader("X-Connection-Id", _activeConnectionId);
+    }
+
+    const onAbort = () => xhr.abort();
+    const cleanupSignal = () => signal?.removeEventListener("abort", onAbort);
+    signal?.addEventListener("abort", onAbort);
+
+    xhr.upload.onprogress = (event) => {
+      if (onProgress && event.lengthComputable) {
+        onProgress(Math.round((event.loaded / event.total) * 100));
+      }
+    };
+
+    xhr.onload = () => {
+      cleanupSignal();
+      const { status, responseText: body } = xhr;
+
+      if (status === 401 && xhr.getResponseHeader("X-Session-Invalid") === "1") {
+        triggerSessionInvalidationSignOut();
+        setIndicator("offline");
+        resolve({ ok: false, status, body });
+        return;
+      }
+
+      if (status >= 300) {
+        const friendly = toUserFriendlyMessage(extractResponseErrorMessage(body), status);
+        toast({
+          title: friendly.title,
+          description: friendly.description,
+          variant: "destructive",
+          rawMessage: friendly.rawMessage,
+          hint: friendly.hint,
+          hintLink: friendly.hintLink,
+        });
+        if (status === 401 || status >= 500) setIndicator("offline");
+        resolve({ ok: false, status, body });
+        return;
+      }
+
+      setIndicator("online");
+      resolve({ ok: true, status, body });
+    };
+
+    xhr.onerror = () => {
+      cleanupSignal();
+      toast({
+        title: "Error",
+        description: "Network error while uploading the file. Please try again.",
+        variant: "destructive",
+      });
+      setIndicator("offline");
+      resolve({ ok: false, status: 0, body: "" });
+    };
+
+    xhr.onabort = () => {
+      cleanupSignal();
+      // Abort is a local cancellation/supersession, not a server outage — settle
+      // silently without flipping the indicator offline.
+      resolve({ ok: false, status: 0, body: "" });
+    };
+
+    xhr.ontimeout = () => {
+      cleanupSignal();
+      toast({
+        title: "Error",
+        description: "Upload timed out. Please try again.",
+        variant: "destructive",
+      });
+      setIndicator("offline");
+      resolve({ ok: false, status: 0, body: "" });
+    };
+
+    const formData = new FormData();
+    formData.append("file", file);
+    xhr.send(formData);
+  });
+}
+
 export const between = (hash: number, from: number, to: number) => {
   if (to <= from) return from;
   return (Math.abs(hash) % (to - from)) + from;
@@ -646,14 +990,25 @@ export const between = (hash: number, from: number, to: number) => {
 export const getDefaultQuery = (q?: string) =>
   q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN * LIMIT 100";
 
-export const getMetaStats = async (name: string, toast: ToastFn, setIndicator: (indicator: "online" | "offline") => void, isReadOnly?: boolean) => {
+export const getMetaStats = async (
+  name: string,
+  toast: ToastFn,
+  setIndicator: (indicator: "online" | "offline") => void,
+  isReadOnly?: boolean,
+  options?: { signal?: AbortSignal; connectionId?: string | null },
+) => {
   if (!name) return undefined;
 
   const q = "CALL db.meta.stats() YIELD labels, relTypes RETURN labels, relTypes as relationships";
   const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
 
   try {
-    const result = await getSSEGraphResult(`/api/graph/${prepareArg(name)}?query=${encodeURIComponent(q)}${readOnlyParam}`, toast, setIndicator) as { data: { labels: { [key: string]: number }, relationships: { [key: string]: number } }[] };
+    const result = await getSSEGraphResult(
+      `/api/graph/${prepareArg(name)}?query=${encodeURIComponent(q)}${readOnlyParam}`,
+      toast,
+      setIndicator,
+      { signal: options?.signal, connectionId: options?.connectionId },
+    ) as { data: { labels: { [key: string]: number }, relationships: { [key: string]: number } }[] };
 
     if (!result) return undefined;
 
@@ -671,9 +1026,299 @@ export const getMetaStats = async (name: string, toast: ToastFn, setIndicator: (
 
     return [l, r];
   } catch (error) {
+    // A superseded request (graph/connection switch) is not a real failure.
+    if (isAbortError(error)) return undefined;
     console.error("Failed to fetch meta stats:", error);
     return undefined;
   }
+};
+
+/**
+ * Folds a discovered `(owner, key, type)` row into an accumulator, joining the
+ * types a key was seen with. A graph without an enforced schema can hold, say,
+ * a `port` that is an Integer on one node and a String on another.
+ */
+const addSchemaPropertyKey = (
+  into: Record<string, SchemaPropertyKeys>,
+  owner: string,
+  key: string,
+  type: string,
+) => {
+  const keys = into[owner] ?? {};
+  const seen = keys[key];
+
+  keys[key] = !seen || seen === type
+    ? type
+    : [...new Set([...seen.split(" | "), type])].sort().join(" | ");
+
+  into[owner] = keys;
+};
+
+/** Orders owners and their keys so that two equal snapshots serialize equally. */
+const sortSchemaKeys = <T>(records: Record<string, Record<string, T>>): Record<string, Record<string, T>> =>
+  Object.fromEntries(
+    Object.entries(records)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([owner, keys]) => [
+        owner,
+        Object.fromEntries(Object.entries(keys).sort(([a], [b]) => a.localeCompare(b))),
+      ]),
+  );
+
+/**
+ * How many elements of a label or relationship type are inspected for property
+ * keys. FalkorDB enforces no schema, so this is a sample rather than the truth:
+ * a key only the eleventh node of a label carries is not reported. Scanning
+ * every element of a large graph to find that out costs far more than it is
+ * worth, and a per-label scan stops after this many rows.
+ */
+const SCHEMA_KEY_SAMPLE_SIZE = 10;
+
+/**
+ * How many labels or relationship types one query covers. The query travels in
+ * the URL, so it is split into batches rather than sent as one huge UNION.
+ */
+const SCHEMA_KEY_BATCH_SIZE = 20;
+
+/** Quotes a label or relationship type for use as a pattern in a query. */
+const quoteSchemaName = quoteCypherIdentifier;
+
+/** Quotes a label or relationship type for use as a returned string literal. */
+const schemaNameLiteral = (name: string) => `'${name.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+
+/** The rules recorded for one property, created on first mention. */
+const schemaRuleFor = (
+  into: Record<string, SchemaPropertyRulesMap>,
+  owner: string,
+  key: string,
+) => {
+  const keys = into[owner] ?? {};
+  const rule = keys[key] ?? { indexes: [], unique: false, mandatory: false };
+
+  keys[key] = rule;
+  into[owner] = keys;
+
+  return rule;
+};
+
+/**
+ * Discovers everything the Schema view draws:
+ * - every placement a relationship type has, i.e. which
+ *   (source label)-[type]->(target label) triples actually occur;
+ * - the property keys each label and each relationship type carries, with the
+ *   value type(s) they hold;
+ * - the indexes and constraints declared on those properties.
+ *
+ * Placements are exact: that query aggregates server-side and returns only the
+ * distinct combinations, so no edges are ever transferred. Property keys are
+ * sampled per label and per relationship type — see `SCHEMA_KEY_SAMPLE_SIZE`.
+ *
+ * Always issued read-only: schema discovery must never (re)create a graph.
+ */
+export const getSchema = async (
+  name: string,
+  toast: ToastFn,
+  setIndicator: (indicator: "online" | "offline") => void,
+  options?: { signal?: AbortSignal; connectionId?: string | null },
+): Promise<SchemaSnapshot | undefined> => {
+  if (!name) return undefined;
+
+  // Unlabeled endpoints are folded into the "" label so they line up with the
+  // synthetic "Empty" label the graph info panel shows.
+  const edgesQuery = `MATCH (a)-[e]->(b)
+UNWIND (CASE WHEN size(labels(a)) = 0 THEN [''] ELSE labels(a) END) AS source
+UNWIND (CASE WHEN size(labels(b)) = 0 THEN [''] ELSE labels(b) END) AS target
+RETURN DISTINCT source, type(e) AS relationship, target`;
+
+  const run = (query: string, reportErrors: boolean = true) => getSSEGraphResult(
+    `/api/graph/${prepareArg(name)}?query=${encodeURIComponent(query)}&readOnly=true`,
+    reportErrors ? toast : () => {},
+    setIndicator,
+    { signal: options?.signal, connectionId: options?.connectionId, query },
+  ) as Promise<{ data?: unknown[] } | undefined>;
+
+  /**
+   * Index and constraint rules are detail on top of a schema, not the schema
+   * itself: a server that does not expose the procedures, or a user not allowed
+   * to call them, still gets the view. An abort is not a failed query, so it
+   * still propagates.
+   */
+  const runOptional = (query: string) => run(query, false).catch((error: unknown) => {
+    if (isAbortError(error)) throw error;
+
+    return undefined;
+  });
+
+  const [edgeResult, labelsResult, indexesResult, constraintsResult] = await Promise.all([
+    run(edgesQuery),
+    // Labels that carry no edge still get a node in the view, so they cannot be
+    // read off the placements.
+    run("CALL db.labels() YIELD label RETURN label"),
+    // `types` maps every indexed property to the index types covering it, so
+    // the property list adds nothing on top of it.
+    runOptional("CALL db.indexes() YIELD label, types, entitytype RETURN label, types, entitytype"),
+    runOptional("CALL db.constraints() YIELD type, label, properties, entitytype, status"
+      + " RETURN type, label, properties, entitytype, status"),
+  ]);
+
+  if (!edgeResult || !Array.isArray(edgeResult.data)) return undefined;
+
+  const edges: SchemaEdge[] = [];
+  const seenEdges = new Set<string>();
+
+  edgeResult.data.forEach((row) => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) return;
+
+    const { source, relationship, target } = row as Record<string, unknown>;
+
+    if (
+      typeof source !== "string"
+      || typeof relationship !== "string"
+      || typeof target !== "string"
+    ) return;
+
+    const placement = `${source}\u0000${relationship}\u0000${target}`;
+
+    if (seenEdges.has(placement)) return;
+
+    seenEdges.add(placement);
+    edges.push({ source, relationship, target });
+  });
+
+  const labelNames = new Set<string>(
+    (Array.isArray(labelsResult?.data) ? labelsResult.data : [])
+      .map((row) => (row && typeof row === "object" && !Array.isArray(row)
+        ? (row as Record<string, unknown>).label
+        : undefined))
+      .filter((label): label is string => typeof label === "string"),
+  );
+
+  // Nodes with no labels are their own group, which `db.labels()` does not
+  // report. There is no index to scan for them, but the scan stops as soon as
+  // the sample is full and costs ~20ms on a graph of 100k labeled nodes.
+  labelNames.add("");
+
+  /**
+   * Runs one sampling branch per owner, batched into a handful of queries, and
+   * folds the rows into the accumulator every caller expects.
+   */
+  const collectKeys = async (owners: string[], branch: (owner: string) => string) => {
+    const into: Record<string, SchemaPropertyKeys> = {};
+    const batches: string[][] = [];
+
+    for (let i = 0; i < owners.length; i += SCHEMA_KEY_BATCH_SIZE) {
+      batches.push(owners.slice(i, i + SCHEMA_KEY_BATCH_SIZE));
+    }
+
+    const results = await Promise.all(
+      batches.map((batch) => run(batch.map(branch).join("\nUNION\n"))),
+    );
+
+    results.forEach((result) => {
+      if (!result || !Array.isArray(result.data)) return;
+
+      result.data.forEach((row) => {
+        if (!row || typeof row !== "object" || Array.isArray(row)) return;
+
+        const { owner, key, keyType } = row as Record<string, unknown>;
+
+        if (typeof owner !== "string" || typeof key !== "string" || typeof keyType !== "string") return;
+
+        addSchemaPropertyKey(into, owner, key, keyType);
+      });
+    });
+
+    return into;
+  };
+
+  const [labelKeys, relationshipKeys] = await Promise.all([
+    collectKeys([...labelNames], (label) => {
+      const match = label === ""
+        ? "MATCH (n) WHERE size(labels(n)) = 0"
+        : `MATCH (n:${quoteSchemaName(label)})`;
+
+      return `${match} WITH n LIMIT ${SCHEMA_KEY_SAMPLE_SIZE} UNWIND keys(n) AS key`
+        + ` RETURN DISTINCT ${schemaNameLiteral(label)} AS owner, key, typeOf(n[key]) AS keyType`;
+    }),
+    collectKeys([...new Set(edges.map(({ relationship }) => relationship))], (relationship) => (
+      `MATCH ()-[e:${quoteSchemaName(relationship)}]->() WITH e LIMIT ${SCHEMA_KEY_SAMPLE_SIZE} UNWIND keys(e) AS key`
+      + ` RETURN DISTINCT ${schemaNameLiteral(relationship)} AS owner, key, typeOf(e[key]) AS keyType`
+    )),
+  ]);
+
+  const labelRules: Record<string, SchemaPropertyRulesMap> = {};
+  const relationshipRules: Record<string, SchemaPropertyRulesMap> = {};
+
+  /** Which side an index or constraint belongs to, or nothing when unreadable. */
+  const rulesOf = (entityType: unknown) => {
+    if (entityType === "NODE") return labelRules;
+    if (entityType === "RELATIONSHIP") return relationshipRules;
+
+    return undefined;
+  };
+
+  const procedureRows = (result: { data?: unknown[] } | undefined) => (
+    (Array.isArray(result?.data) ? result.data : []).filter(
+      (row): row is Record<string, unknown> => !!row && typeof row === "object" && !Array.isArray(row),
+    )
+  );
+
+  procedureRows(indexesResult).forEach(({ label, types, entitytype }) => {
+    const into = rulesOf(entitytype);
+
+    if (!into || typeof label !== "string" || !types || typeof types !== "object" || Array.isArray(types)) return;
+
+    Object.entries(types as Record<string, unknown>).forEach(([key, indexTypes]) => {
+      const reported = Array.isArray(indexTypes)
+        ? indexTypes.filter((type): type is string => typeof type === "string").map((type) => type.toLowerCase())
+        : [];
+      const rule = schemaRuleFor(into, label, key);
+
+      rule.indexes = [...new Set([...rule.indexes, ...reported])].sort();
+    });
+  });
+
+  procedureRows(constraintsResult).forEach(({ type, label, properties, entitytype, status }) => {
+    const into = rulesOf(entitytype);
+
+    // A constraint that is still building or has failed is not enforced, so
+    // reporting it would promise more than the graph delivers.
+    if (!into || status !== "OPERATIONAL" || typeof label !== "string" || !Array.isArray(properties)) return;
+    if (type !== "UNIQUE" && type !== "MANDATORY") return;
+    // A unique constraint over several properties makes the combination
+    // unique, not any of them on its own, so it is not a per-property flag.
+    // A mandatory one does require each listed property, so it still is.
+    if (type === "UNIQUE" && properties.length > 1) return;
+
+    properties.forEach((property) => {
+      if (typeof property !== "string") return;
+
+      const rule = schemaRuleFor(into, label, property);
+
+      if (type === "UNIQUE") {
+        rule.unique = true;
+      } else {
+        rule.mandatory = true;
+      }
+    });
+  });
+
+  // FalkorDB returns the rows in no guaranteed order, so the snapshot is
+  // canonicalized: two runs over an unchanged graph have to compare equal,
+  // otherwise a refresh would look like a change and re-lay-out the view.
+  edges.sort((a, b) => (
+    a.source.localeCompare(b.source)
+    || a.relationship.localeCompare(b.relationship)
+    || a.target.localeCompare(b.target)
+  ));
+
+  return {
+    edges,
+    labelKeys: sortSchemaKeys(labelKeys),
+    relationshipKeys: sortSchemaKeys(relationshipKeys),
+    labelRules: sortSchemaKeys(labelRules),
+    relationshipRules: sortSchemaKeys(relationshipRules),
+  };
 };
 
 export function rgbToHSL(hex: string): string {
@@ -747,7 +1392,8 @@ export const getMemoryUsage = async (
   // Pass activeConnectionId explicitly from React context/closure.
   // This avoids relying on the module-level global _activeConnectionId
   // which can be reset to null by Next.js HMR between renders.
-  connectionId?: string | null
+  connectionId?: string | null,
+  signal?: AbortSignal,
 ): Promise<Map<string, MemoryValue>> => {
   // Use plain fetch (not securedFetch) so NOPERM / version-too-low 400 errors
   // from restricted users don't produce error toasts — memory usage is an
@@ -758,11 +1404,12 @@ export const getMemoryUsage = async (
     if (effectiveConnId) {
       headers.set("X-Connection-Id", effectiveConnId);
     }
-    const result = await fetch(`/api/graph/${prepareArg(name)}/memory`, { headers });
+    const result = await fetch(`/api/graph/${prepareArg(name)}/memory`, { headers, signal });
     if (!result.ok) return new Map();
     const json = await result.json();
     return processEntries(json.result);
   } catch {
+    // Includes AbortError when superseded — treat as "no memory info".
     return new Map();
   }
 };
@@ -898,7 +1545,7 @@ export function getQueryWithLimit(
   return [query, existingLimit];
 }
 
-export const convertToCanvasData = (graphData: GraphData): CanvasData => ({
+export const convertToCanvasData = (graphData: GraphData, shape?: NodeShape): CanvasData => ({
     nodes: graphData.nodes.map(({ id, labels, color, visible, size, data, expand }) => ({
         id,
         labels,
@@ -906,18 +1553,95 @@ export const convertToCanvasData = (graphData: GraphData): CanvasData => ({
         visible,
         size,
         expand,
+        shape,
         data
     })),
-    links: graphData.links.map(({ id, relationship, color, visible, source, target, data }) => ({
+    links: graphData.links.map(({ id, relationship, color, visible, source, target, width, fontSize, arrowSize, data }) => ({
         id,
         relationship,
         color,
         visible,
         source,
         target,
+        width,
+        fontSize,
+        arrowSize,
         data
     }))
 });
+
+/** A node's settled coordinates on the canvas. */
+export type CanvasNodePosition = { id: number, x: number, y: number };
+
+/**
+ * A canvas snapshot: the graph structure plus the node coordinates that the
+ * canvas's own `Data` type deliberately leaves out.
+ */
+export type CanvasLayout = { data: CanvasData, positions: CanvasNodePosition[] };
+
+/**
+ * How long to wait before re-applying a viewport after `setData`.
+ *
+ * `setData` schedules its own `zoomToFit` on an internal ~50ms timer and offers
+ * no callback for it, so a viewport restored before that fires gets overwritten.
+ * We re-apply once the timer has comfortably passed.
+ */
+export const CANVAS_AUTO_ZOOM_DELAY = 150;
+
+/**
+ * Snapshot the canvas so it can later be put back exactly as it looks now.
+ *
+ * `getData()` strips x/y (see `graphDataToData` in @falkordb/canvas), so a
+ * snapshot taken from it alone always re-runs the layout on restore. The settled
+ * coordinates live only on the internal nodes from `getGraphData()`, and they
+ * must be COPIED out: the canvas reuses node objects between updates, so holding
+ * references would let a later simulation mutate the snapshot from under us.
+ */
+export const captureCanvasLayout = (canvas: FalkorDBCanvas): CanvasLayout | undefined => {
+    const data = canvas.getData();
+
+    if (data.nodes.length === 0) return undefined;
+
+    return {
+        data,
+        positions: canvas.getGraphData().nodes
+            .filter(({ x, y }) => x !== undefined && y !== undefined)
+            .map(({ id, x, y }) => ({ id, x: x!, y: y! }))
+    };
+};
+
+/**
+ * Restore a snapshot without laying the graph out again.
+ *
+ * The canvas has no API to seed positions — `setData` resets x/y on every node
+ * it hasn't seen and lays them out from scratch — so we set the structure first
+ * and then write the saved coordinates onto the live nodes. Pinning them (fx/fy)
+ * is what makes it stick: `setData` kicks off an async force warmup that would
+ * otherwise drag them off the restored layout before it settles. That matches
+ * the steady state anyway, since the canvas pins every node once the engine
+ * stops while animation is off.
+ */
+export const applyCanvasLayout = (canvas: FalkorDBCanvas, layout: CanvasLayout): void => {
+    canvas.setData(layout.data);
+
+    const positions = new Map(layout.positions.map(position => [position.id, position]));
+
+    canvas.getGraphData().nodes.forEach(node => {
+        const position = positions.get(node.id);
+
+        if (!position) return;
+
+        node.x = position.x;
+        node.y = position.y;
+        node.fx = position.x;
+        node.fy = position.y;
+        node.vx = 0;
+        node.vy = 0;
+        node.initialPositionCalculated = true;
+    });
+
+    canvas.refresh();
+};
 
 export const formatName = (newGraphName: string) =>
   newGraphName === '""' ? "" : newGraphName;
@@ -926,10 +1650,9 @@ export async function fetchOptions(
   toast: ToastFn,
   setIndicator: (indicator: "online" | "offline") => void,
   indicator: "online" | "offline",
-  setSelectedValue: (value: string) => void,
-  setOptions: (options: string[]) => void,
-) {
-  if (indicator === "offline") return;
+  connectionId?: string | null,
+): Promise<{ opts: string[]; autoSelect: string | null } | null> {
+  if (indicator === "offline") return null;
 
   const result = await securedFetch(
     `/api/graph`,
@@ -937,17 +1660,17 @@ export async function fetchOptions(
       method: "GET",
     },
     toast,
-    setIndicator
+    setIndicator,
+    connectionId,
   );
 
-  if (!result.ok) return;
-
+  if (!result.ok) return null;
 
   const { opts } = (await result.json()) as { opts: string[] };
 
-  setOptions(opts);
-
-  if (opts.length === 1) setSelectedValue(formatName(opts[0]));
+  // Return the data so callers can apply it under their own ownership guard
+  // (a stale refresh must not overwrite the list/selection after a switch).
+  return { opts, autoSelect: opts.length === 1 ? formatName(opts[0]) : null };
 }
 
 export const areCaptionKeysEqual = (left: [string, boolean][], right: [string, boolean][]) =>

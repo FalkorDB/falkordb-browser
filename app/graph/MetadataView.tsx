@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { createNestedObject, getTheme, prepareArg, securedFetch, Query } from "@/lib/utils";
+import { createNestedObject, getActiveConnectionIdGlobal, getConnectionEpoch, getTheme, prepareArg, securedFetch, Query } from "@/lib/utils";
 import { JSONTree } from "react-json-tree";
 import { useContext, useMemo, useState } from "react";
 import { Info } from "lucide-react";
@@ -36,21 +35,27 @@ export function Profile({ query, setQuery, fetchCount, background, hideTitle }: 
 
 
     const handleProfile = async () => {
+        const startEpoch = getConnectionEpoch();
+        const cid = getActiveConnectionIdGlobal();
         setIsLoading(true);
         try {
             const readOnlyParam = isReadOnly ? '&readOnly=true' : '';
             const result = await securedFetch(`/api/graph/${query.graphName}/profile?query=${prepareArg(query.text)}${readOnlyParam}`, {
                 method: "GET",
-            }, toast, setIndicator);
+            }, toast, setIndicator, cid);
+
+            if (getConnectionEpoch() !== startEpoch) return;
 
             if (!result.ok) return;
 
             const json = await result.json();
+            if (getConnectionEpoch() !== startEpoch) return;
             setProfile(json.result);
             setQuery({
                 ...query,
                 profile: json.result
             });
+            if (getConnectionEpoch() !== startEpoch) return;
             fetchCount();
         } finally {
             setIsLoading(false);
@@ -119,7 +124,6 @@ export function Metadata({ query, hideTitle }: {
             {!hideTitle && <h1 className="text-2xl font-bold">Metadata</h1>}
             <ul className="flex flex-col gap-2 p-2 h-1 grow overflow-auto SofiaSans text-xs">
                 {query.metadata.map((m, i) => (
-                    // eslint-disable-next-line react/no-array-index-key
                     <li key={i}>{m}</li>
                 ))}
             </ul>

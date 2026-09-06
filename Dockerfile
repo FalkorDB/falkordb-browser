@@ -1,6 +1,6 @@
 ARG CYPHER_VERSION=latest
 
-FROM node:24-alpine3.23@sha256:2bdb65ed1dab192432bc31c95f94155ca5ad7fc1392fb7eb7526ab682fa5bf14 AS base
+FROM node:24-alpine3.23@sha256:0388af2af070cd4736a1567cfed02469ba117848845b4165d87a333edb53d2ca AS base
 
 # Cache-bust arg to ensure apk upgrade always runs with latest packages
 ARG CACHEBUST=1
@@ -47,6 +47,9 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV CSV_STORAGE=local
+ENV CSV_LOCAL_TEMP_DIR=/var/lib/FalkorDB/import
+ENV CSV_LOCAL_LOAD_URI_MODE=file
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -67,6 +70,10 @@ RUN chown nextjs:nodejs .next
 # Create data directory for token storage
 RUN mkdir .data
 RUN chown nextjs:nodejs .data
+
+# Default local CSV temp directory used for LOAD CSV file:// imports.
+RUN mkdir -p /var/lib/FalkorDB/import
+RUN chown nextjs:nodejs /var/lib/FalkorDB/import
 
 # Automatically leverage output traces to reduce image size
 # https://nextjs.org/docs/advanced-features/output-file-tracing

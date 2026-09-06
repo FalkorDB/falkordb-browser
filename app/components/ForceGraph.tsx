@@ -5,8 +5,8 @@
 
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
-import type { Data, GraphLink, GraphNode, ViewportState, LayoutMode, HierarchyDirection, RadialDirection } from "@falkordb/canvas";
-import { securedFetch, getTheme, GraphRef, GraphData, Node, Relationship, Link, convertToCanvasData } from "@/lib/utils";
+import type { Data, GraphLink, GraphNode, ViewportState, LayoutMode, HierarchyDirection, RadialDirection, NodeShape } from "@falkordb/canvas";
+import { getActiveConnectionIdGlobal, getConnectionEpoch, securedFetch, getTheme, GraphRef, GraphData, Node, Relationship, Link, convertToCanvasData, CanvasLayout, captureCanvasLayout, applyCanvasLayout, CANVAS_AUTO_ZOOM_DELAY } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Graph } from "../api/graph/model";
 import { BrowserSettingsContext, IndicatorContext, ConnectionContext, ForceGraphContext } from "./provider";
@@ -17,8 +17,8 @@ interface Props {
     graph: Graph
     data: GraphData
     setData: Dispatch<SetStateAction<GraphData>>
-    graphData: Data | undefined
-    setGraphData: Dispatch<SetStateAction<Data | undefined>>
+    graphData: CanvasLayout | undefined
+    setGraphData: Dispatch<SetStateAction<CanvasLayout | undefined>>
     canvasRef: GraphRef
     selectedElements: (Node | Link)[]
     setSelectedElements: (el?: (Node | Link)[]) => void
@@ -26,6 +26,17 @@ interface Props {
     viewport?: ViewportState
     setViewport?: Dispatch<SetStateAction<ViewportState>>
     dimmed?: boolean
+    /**
+     * Turns off double-click expansion. Set it for a graph whose nodes are not
+     * real elements (the schema view), where expanding would query the database
+     * for a node id that does not exist.
+     */
+    disableExpand?: boolean
+    /** Shape the nodes are drawn with. Left out, the canvas draws circles. */
+    nodeShape?: NodeShape
+    /** `window` property the e2e tests read the canvas data from. */
+    testHookName?: string
+    testId?: string
 }
 
 export default function ForceGraph({
@@ -40,23 +51,38 @@ export default function ForceGraph({
     viewport = undefined,
     setViewport = undefined,
     dimmed = false,
+    disableExpand = false,
+    nodeShape = undefined,
+    testHookName = "graph",
+    testId = "graphCanvasWrapper",
 }: Props) {
 
     const { setIndicator } = useContext(IndicatorContext);
-    const { settings: { captionsKeysSettings: { captionsKeys }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
+    const { settings: { userExperienceSettings: { captionKeysSettings: { captionsKeys, showPropertyKeyPrefix } } } } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
-    const { layout: ctxLayout, direction: ctxDirection } = useContext(ForceGraphContext);
+    const { layout: ctxLayout, direction: ctxDirection, animation: ctxAnimation, pinned: ctxPinned } = useContext(ForceGraphContext);
 
     const { theme } = useTheme();
     const { toast } = useToast();
     const { background, foreground } = getTheme(theme);
 
     const lastClick = useRef<{ date: number, id: number }>({ date: 0, id: -1 });
+    // One counter per node, bumped whenever a double-click toggles its expansion.
+    // An expand awaits a fetch, so a collapse and a re-expand can both land while
+    // it is in flight; a completion only touches the graph while its token is
+    // still the node's latest.
+    const expandTokens = useRef(new Map<number, number>());
     // When non-null, holds the `data` snapshot at the moment a graphData restore
     // was consumed. The immediately-following setGraphData(undefined) re-run is
     // skipped only when data still matches — if React batches a real data refresh
     // into the same render, the references differ and the canvas gets updated.
     const pendingRestoreDataRef = useRef<typeof data | null>(null);
+    // Re-applies a restored viewport after the canvas's own deferred zoomToFit.
+    // Held in a ref so it survives the effect re-run that consuming a restore
+    // triggers; cancelled as soon as real data lands, and on unmount.
+    const viewportRestoreTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+    useEffect(() => () => clearTimeout(viewportRestoreTimerRef.current), []);
 
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>();
     const [canvasLoaded, setCanvasLoaded] = useState(false);
@@ -71,50 +97,80 @@ export default function ForceGraph({
     useEffect(() => {
         const canvas = canvasRef.current;
 
-        if (!canvas || !canvasLoaded) return;
+        if (!canvas || !canvasLoaded) return undefined;
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any)["graph"] = () => canvas.getGraphData();
-    }, [canvasRef, canvasLoaded]);
+        const globals = window as unknown as Record<string, unknown>;
+        const hook = () => canvas.getGraphData();
+
+        globals[testHookName] = hook;
+
+        // Leaving it behind would keep an unmounted canvas — and its data —
+        // reachable, and hand the next test a stale instance.
+        return () => {
+            if (globals[testHookName] === hook) delete globals[testHookName];
+        };
+    }, [canvasRef, canvasLoaded, testHookName]);
 
     // Load saved viewport on mount
     useEffect(() => {
-        if (!viewport || !canvasRef.current || !canvasLoaded) return;
+        if (!viewport || !canvasRef.current || !canvasLoaded) return undefined;
 
         canvasRef.current.setViewport(viewport);
+        // A viewport that arrives alongside fresh results (a tab rebuilt from its
+        // stored metadata) races the canvas's own deferred zoomToFit, which would
+        // otherwise win. Re-apply once that has had its turn.
+        const handle = setTimeout(() => canvasRef.current?.setViewport(viewport), CANVAS_AUTO_ZOOM_DELAY);
+
+        return () => clearTimeout(handle);
     }, [canvasRef, viewport, canvasLoaded]);
 
-    // Save viewport on unmount
+    // Save the canvas layout on unmount, so leaving the Graph view and coming
+    // back restores the positions instead of re-running the simulation.
+    // Deliberately not keyed on the graph: a mid-life re-run would push the
+    // outgoing graph's nodes into a context that has already moved on (a tab
+    // switch), and the restore branch below would paint them back onto the
+    // canvas. Only a real unmount may capture.
     useEffect(() => {
         const canvas = canvasRef.current;
 
-        return () => {
-            if (canvas && setViewport && canvasLoaded) {
-                const savedData = canvas.getData();
+        // Held onto rather than read in the cleanup: React detaches the ref
+        // before passive cleanups run, so `canvasRef.current` would be null.
+        if (!setViewport || !canvasLoaded || !canvas) return undefined;
 
-                if (savedData.nodes.length !== 0) {
-                    setViewport(canvas.getViewport());
-                    setGraphData(savedData);
-                }
+        return () => {
+            const layout = captureCanvasLayout(canvas);
+
+            if (layout) {
+                setViewport(canvas.getViewport());
+                setGraphData(layout);
             }
         };
-    }, [canvasRef, graph.Id, setGraphData, setViewport, canvasLoaded]);
+    }, [canvasRef, setGraphData, setViewport, canvasLoaded]);
 
-    const onFetchNode = useCallback(async (node: Node, clickedNode: GraphNode) => {
+    // `isCurrent` reports whether the toggle that started this fetch is still the
+    // one that owns the node's neighbours. It is checked before every commit, not
+    // just on the way out: a superseded expansion that merged its result would
+    // paint neighbours back onto a node the user has since collapsed.
+    const onFetchNode = useCallback(async (node: Node, isCurrent: () => boolean) => {
         const canvas = canvasRef.current;
         if (!canvas || !canvasLoaded) return;
+        const startEpoch = getConnectionEpoch();
+        const cid = getActiveConnectionIdGlobal();
 
         const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}${isReadOnly ? '?readOnly=true' : ''}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
             }
-        }, toast, setIndicator);
+        }, toast, setIndicator, cid);
 
+        if (getConnectionEpoch() !== startEpoch || !isCurrent()) return;
         if (result.ok) {
             const json = await result.json();
+            if (getConnectionEpoch() !== startEpoch || !isCurrent()) return;
 
             const elements = await graph.extend(json.result, true, true);
+            if (getConnectionEpoch() !== startEpoch || !isCurrent()) return;
 
             if (elements.length === 0) {
                 toast({
@@ -168,8 +224,8 @@ export default function ForceGraph({
 
         setRelationships(graph.removeLinks(nodes.map(n => n.id)));
 
-        canvas.setGraphData(convertToCanvasData(graph.Elements));
-    }, [canvasRef, canvasLoaded, graph, setRelationships]);
+        canvas.setGraphData(convertToCanvasData(graph.Elements, nodeShape));
+    }, [canvasRef, canvasLoaded, graph, setRelationships, nodeShape]);
 
     // When focus mode is on, pan the canvas to the centroid of the selected elements.
     const centerOnSelection = useCallback((selection: (Node | Link)[]) => {
@@ -196,7 +252,7 @@ export default function ForceGraph({
 
     const handleNodeClick = useCallback(async (node: GraphNode, _event: MouseEvent) => {
         const fullNode = graph.NodesMap.get(node.id);
-        if (!fullNode) return;
+        if (!fullNode || disableExpand) return;
 
         const now = Date.now();
         const isDoubleClick = now - lastClick.current.date < DOUBLE_CLICK_MS && lastClick.current.id === node.id;
@@ -205,9 +261,23 @@ export default function ForceGraph({
         lastClick.current = isDoubleClick ? { date: 0, id: -1 } : { date: now, id: node.id };
 
         if (isDoubleClick) {
+            const token = (expandTokens.current.get(node.id) ?? 0) + 1;
+            expandTokens.current.set(node.id, token);
+
             fullNode.expand = !fullNode.expand;
             if (fullNode.expand) {
-                await onFetchNode(fullNode, node);
+                await onFetchNode(fullNode, () => expandTokens.current.get(node.id) === token);
+
+                if (expandTokens.current.get(node.id) !== token) {
+                    // A newer toggle superseded this one while the fetch was in
+                    // flight; it owns the node's neighbours now. `graph.extend`
+                    // mutates in place and awaits along the way, so a collapse
+                    // that landed mid-merge may have swept before the neighbours
+                    // arrived — sweep again for it.
+                    if (!fullNode.expand) deleteNeighbors([fullNode]);
+                    return;
+                }
+
                 // Guard: if the node was collapsed while fetching, undo the expansion.
                 if (!fullNode.expand) {
                     deleteNeighbors([fullNode]);
@@ -216,7 +286,7 @@ export default function ForceGraph({
                 deleteNeighbors([fullNode]);
             }
         }
-    }, [graph.NodesMap, onFetchNode, deleteNeighbors]);
+    }, [graph.NodesMap, onFetchNode, deleteNeighbors, disableExpand]);
 
     const handleLinkClick = useCallback((link: GraphLink, event: MouseEvent) => {
         const fullLink = graph.LinksMap.get(link.id);
@@ -365,7 +435,7 @@ export default function ForceGraph({
         canvasRef.current.setForegroundColor(foreground);
     }, [canvasRef, foreground, canvasLoaded]);
 
-    // Initialize layout from context (sourced from URL on first load)
+    // Initialize layout from context (the active tab supplies it on activation)
     useEffect(() => {
         if (!canvasRef.current || !canvasLoaded) return;
         const mode = (ctxLayout || 'force') as LayoutMode;
@@ -385,6 +455,18 @@ export default function ForceGraph({
 
         canvasRef.current.setLayout(mode);
     }, [canvasRef, canvasLoaded, ctxLayout, ctxDirection]);
+
+    // The remaining view toggles are tab state too, so the canvas follows the
+    // context rather than the control that changed it.
+    useEffect(() => {
+        if (!canvasRef.current || !canvasLoaded) return;
+        canvasRef.current.setAnimation(ctxAnimation);
+    }, [canvasRef, canvasLoaded, ctxAnimation]);
+
+    useEffect(() => {
+        if (!canvasRef.current || !canvasLoaded) return;
+        canvasRef.current.setPinOnDragEnd(ctxPinned);
+    }, [canvasRef, canvasLoaded, ctxPinned]);
 
     // Update event handlers and selection functions
     useEffect(() => {
@@ -425,9 +507,26 @@ export default function ForceGraph({
             // Restore a saved canvas layout. Store the current data snapshot so
             // the cleanup re-run can verify data hasn't changed before skipping.
             pendingRestoreDataRef.current = data;
-            canvas.setData(graphData);
+            applyCanvasLayout(canvas, graphData);
             setGraphData(undefined);
-            return undefined; // zoom correction not needed for a restored viewport
+
+            // setData (inside applyCanvasLayout) schedules its own zoomToFit,
+            // which would land after the mount effect restored the viewport and
+            // undo it. Re-apply once that timer has run. The handle lives in a
+            // ref rather than this effect's cleanup because setGraphData(undefined)
+            // re-runs the effect immediately, which would cancel the timer.
+            if (viewport) {
+                canvas.setViewport(viewport);
+                clearTimeout(viewportRestoreTimerRef.current);
+                viewportRestoreTimerRef.current = setTimeout(() => {
+                    // The canvas captured at effect time, not canvasRef.current:
+                    // a late callback must never touch whatever canvas is
+                    // mounted now.
+                    canvas.setViewport(viewport);
+                }, CANVAS_AUTO_ZOOM_DELAY);
+            }
+
+            return undefined;
         }
 
         // Skip only when this re-run was triggered by setGraphData(undefined)
@@ -440,7 +539,12 @@ export default function ForceGraph({
         }
         pendingRestoreDataRef.current = null;
 
-        const canvasData = convertToCanvasData(data);
+        // Past this point the canvas is about to be handed real data, so a
+        // viewport still queued for the previous restore would land on the wrong
+        // graph (switching from a saved tab straight to an unsaved one).
+        clearTimeout(viewportRestoreTimerRef.current);
+        viewportRestoreTimerRef.current = undefined;
+        const canvasData = convertToCanvasData(data, nodeShape);
         nodeCount = canvasData.nodes.length;
         canvas.setData(canvasData);
 
@@ -468,12 +572,12 @@ export default function ForceGraph({
         }
 
         return undefined;
-    }, [canvasRef, data, graphData, setGraphData, canvasLoaded]);
+    }, [canvasRef, data, graphData, setGraphData, canvasLoaded, viewport, nodeShape]);
 
     return (
         <div
             className="w-full h-full"
-            data-testid="graphCanvasWrapper"
+            data-testid={testId}
             data-focus-active={String(dimmed && selectedElements.length > 0)}
             data-selection-count={String(selectedElements.length)}
         >

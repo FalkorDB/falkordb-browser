@@ -2,9 +2,10 @@
 
 import { ArrowDownToLine } from 'lucide-react';
 import React, { useCallback, useState } from 'react';
-import { Accept, useDropzone } from 'react-dropzone';
+import { Accept, FileRejection, useDropzone } from 'react-dropzone';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
+import { resolveDroppedFiles } from './dropzone-utils';
 
 type TableFile = {
     name: string
@@ -20,7 +21,9 @@ interface Props {
     withTable?: boolean
     accept?: Accept
     disabled?: boolean
+    maxFiles?: number
     onFileDrop: (acceptedFiles: File[]) => void
+    onDropRejected?: (fileRejections: FileRejection[]) => void
 }
 
 const FileProps = [
@@ -29,24 +32,31 @@ const FileProps = [
     "Type",
 ];
 
-function Dropzone({ title = "Upload File", filesCount = false, className = "", withTable = false, disabled = false, accept, onFileDrop }: Props) {
+function Dropzone({ title = "Upload File", filesCount = false, className = "", withTable = false, disabled = false, accept, maxFiles, onFileDrop, onDropRejected }: Props) {
 
     const [files, setFiles] = useState<TableFile[]>([]);
 
-    const onDrop = useCallback((acceptedFiles: File[]) => {
-        const newFiles = acceptedFiles.map((file: File) => ({
+    const onDrop = useCallback((acceptedFiles: File[], fileRejections: FileRejection[]) => {
+        // Keep drop behavior consistent with prior react-dropzone versions:
+        // if anything is rejected, ignore the whole drop and keep the current
+        // selection. Rejection feedback is surfaced through `onDropRejected`,
+        // so `onFileDrop` is only ever called with accepted files.
+        const selected = resolveDroppedFiles(acceptedFiles, fileRejections);
+        if (selected === null) return;
+
+        const newFiles = selected.map((file: File) => ({
             name: file.name,
             size: file.size,
             type: file.type,
         }));
         setFiles(newFiles);
-        onFileDrop(acceptedFiles);
+        onFileDrop(selected);
     }, [onFileDrop]);
 
-    const { getRootProps, getInputProps } = useDropzone({ onDrop, disabled, accept });
+    const { getRootProps, getInputProps } = useDropzone({ onDrop, onDropRejected, disabled, accept, maxFiles });
 
     return (
-        <div className={cn('flex gap-4 grow', className)}>
+        <div className={cn('flex gap-4', withTable && 'grow', className)}>
             {/* eslint-disable-next-line react/jsx-props-no-spreading */}
             <div {...getRootProps(withTable ? { className: cn("Dropzone", filesCount && "py-20 px-40") } : {})}>
                 {/* eslint-disable-next-line react/jsx-props-no-spreading */}

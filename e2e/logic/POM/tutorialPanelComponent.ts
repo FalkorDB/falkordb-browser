@@ -164,6 +164,31 @@ export default class TutorialPanel extends GraphPage {
     return false;
   }
 
+  /** Close button of the customize-style panel — absent once the panel is closed. */
+  public get customizeStyleClose(): Locator {
+    return this.page.getByTestId("customizeStyleClose");
+  }
+
+  /** The layout dropdown trigger, which is labelled with the active layout. */
+  public get layoutControl(): Locator {
+    return this.page.getByTestId("layoutControl");
+  }
+
+  /**
+   * The rename box of the tab the tutorial points at — always the active one,
+   * so a stale input on another tab can never be picked up.
+   */
+  public get activeTabRenameInput(): Locator {
+    return this.page.locator(
+      '[data-testid="graphSubHeader"] > div[data-active="true"] input[data-testid^="graphTabRename-"]'
+    );
+  }
+
+  /** The schema canvas the tutorial's schema steps point at. */
+  public get schemaView(): Locator {
+    return this.page.getByTestId("schemaView");
+  }
+
   /**
    * Wait for a specific step title to appear. Useful after clicking an advance target.
    */

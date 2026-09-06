@@ -1,3 +1,5 @@
+const colors = require('tailwindcss/colors')
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ["class"],
@@ -57,6 +59,10 @@ module.exports = {
   				foreground: 'hsl(var(--card-foreground))'
   			},
   			green: 'hsl(var(--green))',
+  			yellow: {
+  				...colors.yellow,
+  				DEFAULT: 'hsl(var(--yellow))'
+  			},
   			fav: 'hsl(var(--fav))',
   			sidebar: {
   				DEFAULT: 'hsl(var(--sidebar-background))',

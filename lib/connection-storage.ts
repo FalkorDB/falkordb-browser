@@ -63,6 +63,21 @@ export function removeConnectionItem(key: string): void {
   localStorage.removeItem(prefixed(key));
 }
 
+/**
+ * Removes every scoped key starting with `keyPrefix`. Used to drop the
+ * per-tab entries (chat history, …) of a tab the user just closed.
+ */
+export function removeConnectionItemsByPrefix(keyPrefix: string): void {
+  if (!isBrowser()) return;
+  const full = prefixed(keyPrefix);
+  const doomed: string[] = [];
+  for (let i = 0; i < localStorage.length; i += 1) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith(full)) doomed.push(key);
+  }
+  doomed.forEach(key => localStorage.removeItem(key));
+}
+
 // ── legacy migration ───────────────────────────────────────────────
 
 /**
@@ -71,10 +86,10 @@ export function removeConnectionItem(key: string): void {
  * scoped key and remove the legacy entry so migration is one-time.
  * Must be called AFTER setConnectionPrefix().
  */
-const SCOPED_KEYS = ["query history", "savedContent"];
+const SCOPED_KEYS = ["query history"];
 
-/** Prefixes used by graph-specific keys stored as `prefix-graphName`. */
-const SCOPED_KEY_PREFIXES = ["chat-", "cypherOnly-", "labelStyle_"];
+/** Prefixes used by keys scoped to a single graph entity, e.g. `chat-<graphName>` or `labelStyle_<label>`. */
+const SCOPED_KEY_PREFIXES = ["chat-", "cypherOnly-", "labelStyle_", "relationshipStyle_"];
 
 export function migrateToScopedStorage(): void {
   if (!isBrowser() || !_prefix) return;

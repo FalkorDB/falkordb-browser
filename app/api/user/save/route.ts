@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getClient } from "../../auth/[...nextauth]/options";
 import { getCorsHeaders } from "../../utils";
+import rejectLdapManagedUsers from "../ldap-guard";
 
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
@@ -16,6 +17,9 @@ export async function POST(request: Request) {
     }
 
     const { client } = session;
+
+    const ldapRejection = await rejectLdapManagedUsers(client, request);
+    if (ldapRejection) return ldapRejection;
 
     try {
       await (await client.connection).aclSave();

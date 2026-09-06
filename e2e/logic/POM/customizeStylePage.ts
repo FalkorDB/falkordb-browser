@@ -37,7 +37,10 @@ export default class CustomizeStylePage extends GraphInfoPage {
   }
 
   private get closeButton(): Locator {
-    return this.page.locator('button[title="Close"]').first();
+    // Its own test id, not `button[title="Close"]`: half a dozen panels ship a
+    // close button with that title, so `.first()` picked whichever came first
+    // in the DOM — usually the graph info panel's, which is not even visible.
+    return this.page.getByTestId("customizeStyleClose");
   }
 
   private get saveStyleButton(): Locator {

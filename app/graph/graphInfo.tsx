@@ -2,14 +2,14 @@ import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useState 
 import { Loader2, X, Palette, Play, Plus, Network, Search } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger, PopoverClose } from "@/components/ui/popover";
-import { cn, formatName, InfoLabel } from "@/lib/utils";
+import { cn, formatName, CustomizingItem, CustomizingRef } from "@/lib/utils";
 import Button from "../components/ui/Button";
 import { BrowserSettingsContext, ConnectionContext, GraphContext, GraphInfoContext, QueryLoadingContext } from "../components/provider";
-import CustomizeStylePanel from "./CustomizeStylePanel";
 import Input from "../components/ui/Input";
 import SelectGraph from "./selectGraph";
 import { Graph } from "../api/graph/model";
 import CreateGraph from "../components/CreateGraph";
+import CustomizeStylePanel from "./CustomizeStylePanel";
 
 /** Escape a Cypher identifier by wrapping it in backticks (doubles any internal backticks). */
 function escapeIdentifier(id: string): string {
@@ -22,7 +22,7 @@ function escapeIdentifier(id: string): string {
  * @param onClose - Callback invoked when the panel's close button is clicked
  * @returns The Graph Info panel React element containing graph name, memory usage, node/edge counts, property keys, and query buttons
  */
-export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizingLabel }: { onClose: () => void, customizingLabel: InfoLabel | null, setCustomizingLabel: Dispatch<SetStateAction<InfoLabel | null>> }) {
+export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizingLabel }: { onClose: () => void, customizingLabel: CustomizingRef | null, setCustomizingLabel: Dispatch<SetStateAction<CustomizingRef | null>> }) {
     const { graph, runQuery, graphName, handleSetGraphName, graphNames, setGraphNames, setGraph } = useContext(GraphContext);
     const { graphInfoVersion, nodesCount, edgesCount } = useContext(GraphInfoContext);
     const { Labels, Relationships, PropertyKeys, MemoryUsage } = graph.GraphInfo;
@@ -33,6 +33,41 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     const [nodesSearch, setNodesSearch] = useState("");
     const [edgesSearch, setEdgesSearch] = useState("");
     const [propertyKeysSearch, setPropertyKeysSearch] = useState("");
+    // Only the kind and name are held in state, so the styles shown always come
+    // from the current graph info. An item that is gone falls back to the normal
+    // view. Names are compared through Map lookups rather than tested for
+    // truthiness: the synthetic label for unlabeled nodes is named "".
+    const customizing: CustomizingItem | null = (() => {
+        if (customizingLabel === null) return null;
+
+        if (customizingLabel.kind === "node") {
+            const item = Labels.get(customizingLabel.name);
+            return item ? { kind: "node", item } : null;
+        }
+
+        const item = Relationships.get(customizingLabel.name);
+        return item ? { kind: "edge", item } : null;
+    })();
+    const hasSelectedGraph = graphName !== "";
+    const memoryValue = MemoryUsage.get("total_graph_sz_mb");
+    const isGraphInfoLoaded =
+        graphInfoVersion > 0
+        || nodesCount !== undefined
+        || edgesCount !== undefined
+        || Labels.size > 0
+        || Relationships.size > 0
+        || (PropertyKeys?.length ?? 0) > 0;
+    const memoryDisplay = (() => {
+        if (memoryValue === undefined || memoryValue === null) return undefined;
+
+        const numericMemoryValue = typeof memoryValue === "number"
+            ? memoryValue
+            : Number(memoryValue);
+
+        if (!Number.isFinite(numericMemoryValue)) return undefined;
+
+        return `${numericMemoryValue === 0 ? "<1" : numericMemoryValue} MB`;
+    })();
 
     // Reset searches only when the active graph changes or the display limit
     // changes — not on every periodic poll that refreshes GraphInfoContext.
@@ -45,7 +80,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     // Stable callbacks so SelectGraph's handleSetRows useCallback is not
     // invalidated on every GraphInfoContext poll update, which would trigger
     // its useEffect([options, handleSetRows]) and reset checked rows.
-    const handleSetOptions = useCallback((opts: string[]) => {
+    const handleSetOptions = useCallback((opts: string[] | undefined) => {
         setGraphNames(opts);
     }, [setGraphNames]);
 
@@ -58,9 +93,9 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
     }, [setGraph]);
 
     return (
-        <div data-testid="graphInfoPanel" data-graph-info-version={graphInfoVersion} className={cn("relative h-full w-full p-3 grid gap-3", showMemoryUsage ? "grid-rows-[max-content_max-content_max-content_1fr_1fr_1fr]" : "grid-rows-[max-content_max-content_1fr_1fr_1fr]")}>
+        <div data-testid="graphInfoPanel" data-graph-info-version={graphInfoVersion} className={cn("relative h-full w-full p-3 gap-3", customizing ? "flex flex-col" : cn("grid", showMemoryUsage ? "grid-rows-[max-content_max-content_max-content_1fr_1fr_1fr]" : "grid-rows-[max-content_max-content_1fr_1fr_1fr]"))}>
             {
-                !customizingLabel ? (
+                !customizing ? (
                     <>
                         <Button
                             className="absolute top-2 right-2"
@@ -84,10 +119,10 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             {
                                 !isReadOnly &&
                                 <CreateGraph
-                                    graphNames={graphNames}
+                                    graphNames={graphNames ?? []}
                                     onSetGraphName={(newGraphName) => {
                                         handleSetGraphName(formatName(newGraphName));
-                                        setGraphNames(prev => [...prev, formatName(newGraphName)]);
+                                        setGraphNames(prev => [...(prev ?? []), formatName(newGraphName)]);
                                     }}
                                     trigger={
                                         <Button
@@ -107,15 +142,19 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             <div className="w-full flex items-center gap-2">
                                     <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Memory</h2>
                                     {
-                                        MemoryUsage.get("total_graph_sz_mb") !== undefined || graphName === ""
+                                        !hasSelectedGraph
+                                            ? <p tabIndex={0} role="text" aria-label="No graph selected" className="truncate pointer-events-auto text-sm font-semibold">-</p>
+                                            : memoryDisplay !== undefined
                                             ? <Tooltip>
                                                 <TooltipTrigger asChild>
-                                                    <p tabIndex={0} role="text" aria-label={graphName === "" ? "0" : `${ MemoryUsage.get("total_graph_sz_mb") || "<1"} MB`} className="truncate pointer-events-auto text-sm font-semibold">{graphName === "" ? "0" : `${MemoryUsage.get("total_graph_sz_mb") || "<1"} MB`}</p>
+                                                    <p tabIndex={0} role="text" aria-label={memoryDisplay} className="truncate pointer-events-auto text-sm font-semibold">{memoryDisplay}</p>
                                                 </TooltipTrigger>
                                                 <TooltipContent>
-                                                    {graphName === "" ? "0" : `${MemoryUsage.get("total_graph_sz_mb") || "<1"} MB`}
+                                                    {memoryDisplay}
                                                 </TooltipContent>
                                             </Tooltip>
+                                            : isGraphInfoLoaded
+                                            ? <p tabIndex={0} role="text" aria-label="Memory unavailable" className="truncate pointer-events-auto text-sm font-semibold">N/A</p>
                                             : <Loader2 className="animate-spin" />
                                     }
                             </div>
@@ -124,21 +163,31 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             <div className="flex gap-2 items-center">
                                 <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Nodes</h2>
                                 {
-                                    nodesCount !== undefined || graphName === "" ?
+                                    !hasSelectedGraph ?
+                                        <p
+                                            data-testid="nodesCount"
+                                            tabIndex={0}
+                                            role="text"
+                                            aria-label="No graph selected"
+                                            className="truncate pointer-events-auto text-sm font-semibold"
+                                        >
+                                            -
+                                        </p>
+                                        : nodesCount !== undefined ?
                                      <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <p
                                                     data-testid="nodesCount"
                                                     tabIndex={0}
                                                     role="text"
-                                                    aria-label={`${nodesCount?.toLocaleString() || 0} nodes`}
+                                                    aria-label={`${nodesCount.toLocaleString()} nodes`}
                                                     className="truncate pointer-events-auto text-sm font-semibold"
                                                 >
-                                                    {nodesCount?.toLocaleString() || 0}
+                                                    {nodesCount.toLocaleString()}
                                                 </p>
                                             </TooltipTrigger>
                                             <TooltipContent>
-                                                {nodesCount?.toLocaleString() || 0}
+                                                {nodesCount.toLocaleString()}
                                             </TooltipContent>
                                         </Tooltip>
                                         : <Loader2 data-testid="nodesCountLoader" className="animate-spin" />
@@ -163,6 +212,9 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                     />
                                 </li>
                                 {Array.from(Labels.values()).filter(label => label.name.toLowerCase().includes(nodesSearch.toLowerCase())).sort((a, b) => b.count - a.count).map((label) => {
+                                    // Unlabeled nodes are grouped under a synthetic label named "",
+                                    // which has no Cypher equivalent to match on.
+                                    const isEmptyLabel = label.name === "";
                                     const name = label.name || "Empty";
                                     const labelColor = label.style.color;
 
@@ -197,8 +249,9 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                         <Button
                                                             className="w-full justify-start gap-2 px-2 py-1 text-xs hover:bg-secondary rounded-md"
                                                             data-testid={`runLabel${name}`}
+                                                            title={isEmptyLabel ? "Nodes without a label cannot be matched by label" : undefined}
                                                             onClick={() => runQuery(`MATCH (n:${escapeIdentifier(name)}) RETURN n`)}
-                                                            disabled={isQueryLoading}
+                                                            disabled={isQueryLoading || isEmptyLabel}
                                                         >
                                                             <Play size={12} />
                                                             Run
@@ -208,7 +261,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                                                         <Button
                                                             className="w-full justify-start gap-2 px-2 py-1 text-xs hover:bg-secondary rounded-md"
                                                             data-testid={`customizeStyle${name}`}
-                                                            onClick={() => setCustomizingLabel(label)}
+                                                            onClick={() => setCustomizingLabel({ kind: "node", name: label.name })}
                                                         >
                                                             <Palette size={12} />
                                                             Customize
@@ -225,21 +278,31 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             <div className="flex gap-2 items-center">
                                 <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Edges</h2>
                                 {
-                                    edgesCount !== undefined || graphName === "" ?
+                                    !hasSelectedGraph ?
+                                        <p
+                                            data-testid="edgesCount"
+                                            tabIndex={0}
+                                            role="text"
+                                            aria-label="No graph selected"
+                                            className="truncate pointer-events-auto text-sm font-semibold"
+                                        >
+                                            -
+                                        </p>
+                                        : edgesCount !== undefined ?
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <p
                                                     data-testid="edgesCount"
                                                     tabIndex={0}
                                                     role="text"
-                                                    aria-label={`${edgesCount?.toLocaleString() || 0} edges`}
+                                                    aria-label={`${edgesCount.toLocaleString()} edges`}
                                                     className="truncate pointer-events-auto text-sm font-semibold"
                                                 >
-                                                    {edgesCount?.toLocaleString() || 0}
+                                                    {edgesCount.toLocaleString()}
                                                 </p>
                                             </TooltipTrigger>
                                             <TooltipContent>
-                                                {edgesCount?.toLocaleString() || 0}
+                                                {edgesCount.toLocaleString()}
                                             </TooltipContent>
                                         </Tooltip>
                                         :
@@ -269,17 +332,55 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
 
                                     return (
                                         <li key={relationship.name} className="max-w-full">
-                                            <Button
-                                                title={`MATCH p=()-[:${escapeIdentifier(relationship.name)}]-() RETURN p
-                                                    #: ${relationship.count.toLocaleString()}`}
-                                                className="h-6 max-w-full px-2 rounded-md flex items-center gap-1.5 bg-secondary text-foreground text-xs hover:bg-secondary/80 transition-colors overflow-hidden border-l-4"
-                                                style={{ borderColor: relationshipColor }}
-                                                data-testid={`graphInfo${relationship.name}Edge`}
-                                                onClick={() => runQuery(`MATCH p=()-[:${escapeIdentifier(relationship.name)}]-() RETURN p`)}
-                                                disabled={isQueryLoading}
-                                            >
-                                                <span className="truncate">{relationship.name}</span>
-                                            </Button>
+                                            <Popover>
+                                                <PopoverTrigger asChild>
+                                                    <Button
+                                                        title={`${relationship.name} #: ${relationship.count.toLocaleString()}`}
+                                                        className="h-6 max-w-full px-2 rounded-md flex items-center gap-1.5 bg-secondary text-foreground text-xs hover:bg-secondary/80 transition-colors overflow-hidden border-l-4 cursor-pointer"
+                                                        style={{ borderColor: relationshipColor }}
+                                                        data-testid={`graphInfo${relationship.name}Edge`}
+                                                    >
+                                                        <span className="truncate">{relationship.name}</span>
+                                                    </Button>
+                                                </PopoverTrigger>
+                                                <PopoverContent
+                                                    className="z-30 w-fit p-1 flex flex-col gap-1"
+                                                    align="start"
+                                                    onInteractOutside={(e) => {
+                                                        if ((e.target as Element)?.closest?.('[data-tutorial-overlay]')) {
+                                                            e.preventDefault();
+                                                        }
+                                                    }}
+                                                    onEscapeKeyDown={(e) => {
+                                                        if ((e.target as Element)?.closest?.('[data-tutorial-overlay]')) {
+                                                            e.preventDefault();
+                                                        }
+                                                    }}
+                                                >
+                                                    <PopoverClose asChild>
+                                                        <Button
+                                                            className="w-full justify-start gap-2 px-2 py-1 text-xs hover:bg-secondary rounded-md"
+                                                            data-testid={`runRelationship${relationship.name}`}
+                                                            title={`MATCH p=()-[:${escapeIdentifier(relationship.name)}]-() RETURN p`}
+                                                            onClick={() => runQuery(`MATCH p=()-[:${escapeIdentifier(relationship.name)}]-() RETURN p`)}
+                                                            disabled={isQueryLoading}
+                                                        >
+                                                            <Play size={12} />
+                                                            Run
+                                                        </Button>
+                                                    </PopoverClose>
+                                                    <PopoverClose asChild>
+                                                        <Button
+                                                            className="w-full justify-start gap-2 px-2 py-1 text-xs hover:bg-secondary rounded-md"
+                                                            data-testid={`customizeRelationshipStyle${relationship.name}`}
+                                                            onClick={() => setCustomizingLabel({ kind: "edge", name: relationship.name })}
+                                                        >
+                                                            <Palette size={12} />
+                                                            Customize
+                                                        </Button>
+                                                    </PopoverClose>
+                                                </PopoverContent>
+                                            </Popover>
                                         </li>
                                     );
                                 })}
@@ -289,7 +390,17 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                             <div className="flex gap-2 items-center">
                                 <h2 className="text-xs uppercase tracking-wider text-foreground/60 font-medium">Property Keys</h2>
                                 {
-                                    PropertyKeys !== undefined ?
+                                    !hasSelectedGraph ?
+                                        <p
+                                            data-testid="propertyKeysCount"
+                                            tabIndex={0}
+                                            role="text"
+                                            aria-label="No graph selected"
+                                            className="truncate pointer-events-auto text-sm font-semibold"
+                                        >
+                                            -
+                                        </p>
+                                        : PropertyKeys !== undefined ?
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <p
@@ -340,7 +451,7 @@ export default function GraphInfoPanel({ onClose, customizingLabel, setCustomizi
                     </>
                 ) : (
                     <CustomizeStylePanel
-                        label={customizingLabel}
+                        customizing={customizing}
                         onClose={() => setCustomizingLabel(null)}
                     />
                 )

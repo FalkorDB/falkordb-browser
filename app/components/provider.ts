@@ -1,10 +1,13 @@
-import { createContext, Dispatch, SetStateAction } from "react";
+import { createContext, Dispatch, RefObject, SetStateAction } from "react";
+import type { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import type { AIProvider } from "@/lib/ai-provider-utils";
-import { ConnectionInfo, ConnectionType, GraphData, GraphRef, HistoryQuery, Label, Panel, Relationship, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
+import { CanvasLayout, ConnectionInfo, ConnectionType, CustomizingRef, GraphData, GraphRef, HistoryQuery, Label, Panel, Relationship, Tab, UDFEntry, UDFEntryWithCode } from "@/lib/utils";
 import type { DiagnosticsResult } from "@/lib/cypherDiagnostics";
-import type { Data as CanvasData, LayoutMode, ViewportState } from "@falkordb/canvas";
+import type { LayoutMode, ViewportState } from "@falkordb/canvas";
 import type { SessionConnection } from "next-auth";
+import type { LanguageConfig } from "./EditorComponent";
 import { Graph, GraphInfo } from "../api/graph/model";
+import { DEFAULT_GRAPH_TABS, GraphTab, SchemaViewMeta } from "@/lib/useGraphTabs";
 
 export type ChatApiKey = {
   id: string;
@@ -19,41 +22,37 @@ export type LocalLlmProvider = "ollama" | "lmstudio";
 
 type BrowserSettingsContextType = {
   newSettings: {
-    limitSettings: {
-      newLimit: number;
-      setNewLimit: Dispatch<SetStateAction<number>>;
-    };
-    timeoutSettings: {
+    querySettings: {
+      limitSettings: {
+        newLimit: number;
+        setNewLimit: Dispatch<SetStateAction<number>>;
+      };
       newTimeout: number;
       setNewTimeout: Dispatch<SetStateAction<number>>;
-    };
-    runDefaultQuerySettings: {
       newRunDefaultQuery: boolean;
       setNewRunDefaultQuery: Dispatch<SetStateAction<boolean>>;
-    };
-    defaultQuerySettings: {
       newDefaultQuery: string;
       setNewDefaultQuery: Dispatch<SetStateAction<string>>;
     };
-    contentPersistenceSettings: {
-      newContentPersistence: boolean;
-      setNewContentPersistence: Dispatch<SetStateAction<boolean>>;
-    };
-    captionsKeysSettings: {
-      newCaptionsKeys: [string, boolean][];
-      setNewCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
-    };
-    tableViewSettings: {
-      newColumnWidth: number;
-      setNewColumnWidth: Dispatch<SetStateAction<number>>;
-      newRowHeight: number;
-      setNewRowHeight: Dispatch<SetStateAction<number>>;
-      newRowHeightExpandMultiple: number;
-      setNewRowHeightExpandMultiple: Dispatch<SetStateAction<number>>;
-    };
-    showPropertyKeyPrefixSettings: {
-      newShowPropertyKeyPrefix: boolean;
-      setNewShowPropertyKeyPrefix: Dispatch<SetStateAction<boolean>>;
+    userExperienceSettings: {
+      newRefreshInterval: number;
+      setNewRefreshInterval: Dispatch<SetStateAction<number>>;
+      newMaxTabs: number;
+      setNewMaxTabs: Dispatch<SetStateAction<number>>;
+      captionKeysSettings: {
+        newCaptionsKeys: [string, boolean][];
+        setNewCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
+        newShowPropertyKeyPrefix: boolean;
+        setNewShowPropertyKeyPrefix: Dispatch<SetStateAction<boolean>>;
+      };
+      tableViewSettings: {
+        newColumnWidth: number;
+        setNewColumnWidth: Dispatch<SetStateAction<number>>;
+        newRowHeight: number;
+        setNewRowHeight: Dispatch<SetStateAction<number>>;
+        newRowHeightExpandMultiple: number;
+        setNewRowHeightExpandMultiple: Dispatch<SetStateAction<number>>;
+      };
     };
     chatSettings: {
       newSecretKey: string;
@@ -72,50 +71,45 @@ type BrowserSettingsContextType = {
       setNewModel: Dispatch<SetStateAction<string>>;
     };
     graphInfo: {
-      newRefreshInterval: number;
-      setNewRefreshInterval: Dispatch<SetStateAction<number>>;
       newMaxItemsForSearch: number;
       setNewMaxItemsForSearch: Dispatch<SetStateAction<number>>;
     };
   };
   settings: {
-    limitSettings: {
-      limit: number;
-      setLimit: Dispatch<SetStateAction<number>>;
-      lastLimit: number;
-      setLastLimit: Dispatch<SetStateAction<number>>;
-    };
-    timeoutSettings: {
+    querySettings: {
+      limitSettings: {
+        limit: number;
+        setLimit: Dispatch<SetStateAction<number>>;
+        lastLimit: number;
+        setLastLimit: Dispatch<SetStateAction<number>>;
+      };
       timeout: number;
       setTimeout: Dispatch<SetStateAction<number>>;
-    };
-    runDefaultQuerySettings: {
       runDefaultQuery: boolean;
       setRunDefaultQuery: Dispatch<SetStateAction<boolean>>;
-    };
-    defaultQuerySettings: {
       defaultQuery: string;
       setDefaultQuery: Dispatch<SetStateAction<string>>;
     };
-    contentPersistenceSettings: {
-      contentPersistence: boolean;
-      setContentPersistence: Dispatch<SetStateAction<boolean>>;
-    };
-    showPropertyKeyPrefixSettings: {
-      showPropertyKeyPrefix: boolean;
-      setShowPropertyKeyPrefix: Dispatch<SetStateAction<boolean>>;
-    };
-    captionsKeysSettings: {
-      captionsKeys: [string, boolean][];
-      setCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
-    };
-    tableViewSettings: {
-      columnWidth: number;
-      setColumnWidth: Dispatch<SetStateAction<number>>;
-      rowHeight: number;
-      setRowHeight: Dispatch<SetStateAction<number>>;
-      rowHeightExpandMultiple: number;
-      setRowHeightExpandMultiple: Dispatch<SetStateAction<number>>;
+    userExperienceSettings: {
+      refreshInterval: number;
+      setRefreshInterval: Dispatch<SetStateAction<number>>;
+      /** Upper bound on open graph tabs, between 4 and 10. */
+      maxTabs: number;
+      setMaxTabs: Dispatch<SetStateAction<number>>;
+      captionKeysSettings: {
+        captionsKeys: [string, boolean][];
+        setCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
+        showPropertyKeyPrefix: boolean;
+        setShowPropertyKeyPrefix: Dispatch<SetStateAction<boolean>>;
+      };
+      tableViewSettings: {
+        columnWidth: number;
+        setColumnWidth: Dispatch<SetStateAction<number>>;
+        rowHeight: number;
+        setRowHeight: Dispatch<SetStateAction<number>>;
+        rowHeightExpandMultiple: number;
+        setRowHeightExpandMultiple: Dispatch<SetStateAction<number>>;
+      };
     };
     chatSettings: {
       secretKey: string;
@@ -161,8 +155,8 @@ type GraphContextType = {
   graphName: string;
   handleSetGraphName: (name: string) => void;
   setGraphInfo: (gi: GraphInfo) => void;
-  graphNames: string[];
-  setGraphNames: Dispatch<SetStateAction<string[]>>;
+  graphNames: string[] | undefined;
+  setGraphNames: Dispatch<SetStateAction<string[] | undefined>>;
   labels: Label[];
   setLabels: Dispatch<SetStateAction<Label[]>>;
   relationships: Relationship[];
@@ -170,16 +164,28 @@ type GraphContextType = {
   currentTab: Tab;
   setCurrentTab: Dispatch<SetStateAction<Tab>>;
   runQuery: (query: string, name?: string) => Promise<void>;
-  fetchCount: (name?: string) => Promise<void>;
+  fetchCount: (name?: string, options?: { signal?: AbortSignal; connectionId?: string | null; epoch?: number }) => Promise<void>;
   handleCooldown: (ticks?: number, isSetLoading?: boolean) => void;
   cooldownTicks: number | undefined;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
   expand: boolean;
   setExpand: Dispatch<SetStateAction<boolean>>;
+  /** Chat panel open. Tab metadata, so each tab keeps its own chat visible. */
+  chatOpen: boolean;
+  setChatOpen: Dispatch<SetStateAction<boolean>>;
   selectedParam: string;
   setSelectedParam: Dispatch<SetStateAction<string>>;
-  initialQuery: string;
+  /**
+   * The graph name whose automatic first load is still pending, or null.
+   *
+   * Armed by `handleSetGraphName` when the selection actually changes and
+   * disarmed by whoever loads it (`runQuery`, or /graph's auto-load effect).
+   * Because it is a one-shot rather than a `graphName !== graph.Id` comparison,
+   * remounting /graph, switching tabs or restoring a session can never replay
+   * the initial query.
+   */
+  pendingAutoLoadRef: RefObject<string | null>;
 };
 
 type HistoryQueryContextType = {
@@ -195,13 +201,50 @@ type IndicatorContextType = {
 type PanelContextType = {
   panel: Panel;
   setPanel: Dispatch<SetStateAction<Panel>>;
+  /** Whether the graph info side panel is expanded. */
   panelOpen: boolean;
+  /** Expands/collapses the graph info side panel, restoring its persisted width. */
   onTogglePanel: () => void;
+  /**
+   * Imperative handle for the graph info side panel. The panel is rendered by
+   * the /graph route (so a sub-header can span both it and the graph view) while
+   * its state stays here, where `Tutorial` and `Selector` can also reach it.
+   */
+  infoPanelRef: RefObject<PanelImperativeHandle | null>;
+  onInfoPanelResize: (size: PanelSize) => void;
+  /**
+   * Kind and name of the label or relationship whose style is being customized,
+   * or null for the normal info view. Held by name — not by object — so it
+   * survives a graph info refresh and can be stored as tab metadata.
+   */
+  customizingLabel: CustomizingRef | null;
+  setCustomizingLabel: Dispatch<SetStateAction<CustomizingRef | null>>;
 };
 
 type QueryLoadingContextType = {
   isQueryLoading: boolean;
   setIsQueryLoading: Dispatch<SetStateAction<boolean>>;
+};
+
+type GraphTabsContextType = {
+  /** Working contexts for the current connection, ordered left to right. */
+  tabs: GraphTab[];
+  activeTabId: string;
+  /** The user's tab limit, also used to size the tab strip. */
+  maxTabs: number;
+  selectTab: (id: string) => void;
+  /** No-op once `maxTabs` tabs are open. */
+  addTab: () => void;
+  /** Sets a custom label; a blank name falls back to the graph name. */
+  renameTab: (id: string, name: string) => void;
+  /** No-op when only one tab is left. */
+  closeTab: (id: string) => void;
+  /**
+   * The schema view is unmounted while it is not the active view, so it hands
+   * its metadata over as it changes instead of being sampled when the tab is
+   * captured.
+   */
+  setSchemaMeta: (meta: SchemaViewMeta) => void;
 };
 
 type ForceGraphContextType = {
@@ -210,12 +253,21 @@ type ForceGraphContextType = {
   setViewport: Dispatch<SetStateAction<ViewportState>>;
   data: GraphData;
   setData: Dispatch<SetStateAction<GraphData>>;
-  graphData: CanvasData | undefined;
-  setGraphData: Dispatch<SetStateAction<CanvasData | undefined>>;
+  graphData: CanvasLayout | undefined;
+  setGraphData: Dispatch<SetStateAction<CanvasLayout | undefined>>;
   layout: LayoutMode;
   setLayout: Dispatch<SetStateAction<LayoutMode>>;
   direction: string;
   setDirection: Dispatch<SetStateAction<string>>;
+  /** Simulation running. Only meaningful for the force layout with nodes unpinned. */
+  animation: boolean;
+  setAnimation: Dispatch<SetStateAction<boolean>>;
+  /** Nodes stay where they are dropped. */
+  pinned: boolean;
+  setPinned: Dispatch<SetStateAction<boolean>>;
+  /** Focus mode: everything but the selection and its neighbours is dimmed. */
+  dimmed: boolean;
+  setDimmed: Dispatch<SetStateAction<boolean>>;
 };
 
 type TableViewContextType = {
@@ -240,52 +292,83 @@ type ConnectionContextType = {
   dbVersion: string;
   setDbVersion: Dispatch<SetStateAction<string>>;
   isReadOnly: boolean;
+  // Graph offloading: `supportsOffload` gates the offload UI (enterprise module
+  // plus a recent enough FalkorDB) and `offloadedGraphs` holds the graphs
+  // currently offloaded from memory.
+  supportsOffload: boolean;
+  offloadedGraphs: string[];
+  refreshOffloadedGraphs: () => Promise<void>;
+  // True when the enterprise module is loaded with LDAP servers configured. In
+  // that case FalkorDB defers authentication and authorization to LDAP, so the
+  // browser must not offer user/role management for this connection. `null`
+  // means the probe hasn't resolved, which callers must treat as "assume LDAP".
+  usesLdap: boolean | null;
   additionalConnections: SessionConnection[];
   setAdditionalConnections: Dispatch<SetStateAction<SessionConnection[]>>;
   activeConnectionId: string | null;
   setActiveConnectionId: Dispatch<SetStateAction<string | null>>;
   updateSession: (data: { activeConnectionId?: string | null }) => Promise<unknown>;
+  // Mark a user connection switch as in-progress (blocks graph ops + supersedes
+  // in-flight ones) and clear it once the switch settles. `beginConnectionSwitch`
+  // returns a ticket; `isLatestSwitch(ticket)` reports whether it is still the
+  // newest switch, so out-of-order completions don't publish a stale connection.
+  beginConnectionSwitch: () => number;
+  endConnectionSwitch: () => void;
+  isLatestSwitch: (ticket: number) => boolean;
 };
+
+// `requestId` makes every pick a distinct value, so re-clicking the function
+// that is already selected still re-triggers the jump in the editor.
+export type UDFFunctionSelection = { name: string; requestId: number };
 
 type UDFContextType = {
   udfList: UDFEntry[];
   setUdfList: Dispatch<SetStateAction<UDFEntry[]>>;
   selectedUdf: UDFEntryWithCode | undefined;
   setSelectedUdf: Dispatch<SetStateAction<UDFEntryWithCode | undefined>>;
+  selectedUdfFunction: UDFFunctionSelection | undefined;
+  setSelectedUdfFunction: Dispatch<SetStateAction<UDFFunctionSelection | undefined>>;
+};
+
+type CypherLanguageContextType = {
+  cypherLanguageConfig: LanguageConfig | null;
+  setCypherLanguageConfig: Dispatch<SetStateAction<LanguageConfig | null>>;
 };
 
 export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
   {
     newSettings: {
-      limitSettings: { newLimit: 0, setNewLimit: () => { } },
-      timeoutSettings: { newTimeout: 0, setNewTimeout: () => { } },
-      runDefaultQuerySettings: {
+      querySettings: {
+        limitSettings: {
+          newLimit: 0,
+          setNewLimit: () => { },
+        },
+        newTimeout: 0,
+        setNewTimeout: () => { },
         newRunDefaultQuery: false,
         setNewRunDefaultQuery: () => { },
-      },
-      defaultQuerySettings: {
         newDefaultQuery: "",
         setNewDefaultQuery: () => { },
       },
-      contentPersistenceSettings: {
-        newContentPersistence: false,
-        setNewContentPersistence: () => { },
-      },
-      captionsKeysSettings: {
-        newCaptionsKeys: [],
-        setNewCaptionsKeys: () => { },
-      },
-      tableViewSettings: {
-        newColumnWidth: 0,
-        setNewColumnWidth: () => { },
-        newRowHeight: 0,
-        setNewRowHeight: () => { },
-        newRowHeightExpandMultiple: 0,
-        setNewRowHeightExpandMultiple: () => { },
-      },
-      showPropertyKeyPrefixSettings: {
-        newShowPropertyKeyPrefix: false,
-        setNewShowPropertyKeyPrefix: () => { },
+      userExperienceSettings: {
+        captionKeysSettings: {
+          newCaptionsKeys: [],
+          setNewCaptionsKeys: () => { },
+          newShowPropertyKeyPrefix: false,
+          setNewShowPropertyKeyPrefix: () => { },
+        },
+        tableViewSettings: {
+          newColumnWidth: 0,
+          setNewColumnWidth: () => { },
+          newRowHeight: 0,
+          setNewRowHeight: () => { },
+          newRowHeightExpandMultiple: 0,
+          setNewRowHeightExpandMultiple: () => { },
+        },
+        newRefreshInterval: 0,
+        setNewRefreshInterval: () => { },
+        newMaxTabs: DEFAULT_GRAPH_TABS,
+        setNewMaxTabs: () => { },
       },
       chatSettings: {
         newSecretKey: "",
@@ -304,44 +387,44 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         setNewModel: () => { },
       },
       graphInfo: {
-        newRefreshInterval: 0,
-        setNewRefreshInterval: () => { },
         newMaxItemsForSearch: 0,
         setNewMaxItemsForSearch: () => { },
       },
     },
     settings: {
-      limitSettings: {
-        limit: 0,
-        setLimit: () => { },
-        lastLimit: 0,
-        setLastLimit: () => { },
-      },
-      timeoutSettings: { timeout: 0, setTimeout: () => { } },
-      runDefaultQuerySettings: {
+      querySettings: {
+        limitSettings: {
+          limit: 0,
+          setLimit: () => { },
+          lastLimit: 0,
+          setLastLimit: () => { },
+        },
+        timeout: 0,
+        setTimeout: () => { },
         runDefaultQuery: false,
         setRunDefaultQuery: () => { },
+        defaultQuery: "",
+        setDefaultQuery: () => { },
       },
-      defaultQuerySettings: { defaultQuery: "", setDefaultQuery: () => { } },
-      contentPersistenceSettings: {
-        contentPersistence: false,
-        setContentPersistence: () => { },
-      },
-      captionsKeysSettings: {
-        captionsKeys: [],
-        setCaptionsKeys: () => { },
-      },
-      tableViewSettings: {
-        columnWidth: 0,
-        setColumnWidth: () => { },
-        rowHeight: 0,
-        setRowHeight: () => { },
-        rowHeightExpandMultiple: 0,
-        setRowHeightExpandMultiple: () => { },
-      },
-      showPropertyKeyPrefixSettings: {
-        showPropertyKeyPrefix: false,
-        setShowPropertyKeyPrefix: () => { },
+      userExperienceSettings: {
+        refreshInterval: 0,
+        setRefreshInterval: () => { },
+        maxTabs: DEFAULT_GRAPH_TABS,
+        setMaxTabs: () => { },
+        captionKeysSettings: {
+          captionsKeys: [],
+          setCaptionsKeys: () => { },
+          showPropertyKeyPrefix: false,
+          setShowPropertyKeyPrefix: () => { },
+        },
+        tableViewSettings: {
+          columnWidth: 0,
+          setColumnWidth: () => { },
+          rowHeight: 0,
+          setRowHeight: () => { },
+          rowHeightExpandMultiple: 0,
+          setRowHeightExpandMultiple: () => { },
+        },
       },
       chatSettings: {
         secretKey: "",
@@ -388,7 +471,7 @@ export const GraphContext = createContext<GraphContextType>({
   graphName: "",
   handleSetGraphName: () => { },
   setGraphInfo: () => { },
-  graphNames: [],
+  graphNames: undefined,
   setGraphNames: () => { },
   labels: [],
   setLabels: () => { },
@@ -404,9 +487,11 @@ export const GraphContext = createContext<GraphContextType>({
   setIsLoading: () => { },
   expand: true,
   setExpand: () => { },
+  chatOpen: false,
+  setChatOpen: () => { },
   selectedParam: "",
   setSelectedParam: () => { },
-  initialQuery: "",
+  pendingAutoLoadRef: { current: null },
 });
 
 type GraphInfoContextType = {
@@ -452,11 +537,26 @@ export const PanelContext = createContext<PanelContextType>({
   setPanel: () => { },
   panelOpen: false,
   onTogglePanel: () => { },
+  infoPanelRef: { current: null },
+  onInfoPanelResize: () => { },
+  customizingLabel: null,
+  setCustomizingLabel: () => { },
 });
 
 export const QueryLoadingContext = createContext<QueryLoadingContextType>({
   isQueryLoading: false,
   setIsQueryLoading: () => { },
+});
+
+export const GraphTabsContext = createContext<GraphTabsContextType>({
+  tabs: [],
+  activeTabId: "",
+  maxTabs: DEFAULT_GRAPH_TABS,
+  selectTab: () => { },
+  addTab: () => { },
+  renameTab: () => { },
+  closeTab: () => { },
+  setSchemaMeta: () => { },
 });
 
 export const ForceGraphContext = createContext<ForceGraphContextType>({
@@ -465,12 +565,18 @@ export const ForceGraphContext = createContext<ForceGraphContextType>({
   setViewport: () => { },
   data: { nodes: [], links: [] },
   setData: () => { },
-  graphData: { nodes: [], links: [] },
+  graphData: undefined,
   setGraphData: () => { },
   layout: 'force',
   setLayout: () => { },
   direction: '',
   setDirection: () => { },
+  animation: false,
+  setAnimation: () => { },
+  pinned: false,
+  setPinned: () => { },
+  dimmed: true,
+  setDimmed: () => { },
 });
 
 export const TableViewContext = createContext<TableViewContextType>({
@@ -491,11 +597,18 @@ export const ConnectionContext = createContext<ConnectionContextType>({
   dbVersion: "",
   setDbVersion: () => { },
   isReadOnly: false,
+  supportsOffload: false,
+  offloadedGraphs: [],
+  refreshOffloadedGraphs: async () => { },
+  usesLdap: null,
   additionalConnections: [],
   setAdditionalConnections: () => { },
   activeConnectionId: null,
   setActiveConnectionId: () => { },
   updateSession: async () => { },
+  beginConnectionSwitch: () => 0,
+  endConnectionSwitch: () => { },
+  isLatestSwitch: () => true,
 });
 
 export const UDFContext = createContext<UDFContextType>({
@@ -503,7 +616,14 @@ export const UDFContext = createContext<UDFContextType>({
   setUdfList: () => { },
   selectedUdf: undefined,
   setSelectedUdf: () => { },
-}); 
+  selectedUdfFunction: undefined,
+  setSelectedUdfFunction: () => { },
+});
+
+export const CypherLanguageContext = createContext<CypherLanguageContextType>({
+  cypherLanguageConfig: null,
+  setCypherLanguageConfig: () => { },
+});
 
 type DiagnosticsContextType = {
   diagnostics: DiagnosticsResult | null;
@@ -528,6 +648,9 @@ type AiFixContextType = {
   result: AiFixResult;
   pendingConsentProvider: string | null;
   requestAiFix: (query: string, errorMessage: string) => void;
+  /** Register a client-side (pre-run) failure — e.g. a grammar syntax error —
+   *  so the same "Fix with AI" affordance appears without executing the query. */
+  reportClientError: (query: string, errorMessage: string) => void;
   confirmConsent: (dontAskAgain: boolean) => void;
   cancelConsent: () => void;
   dismissResult: () => void;
@@ -540,6 +663,7 @@ export const AiFixContext = createContext<AiFixContextType>({
   result: { status: "idle" },
   pendingConsentProvider: null,
   requestAiFix: () => { },
+  reportClientError: () => { },
   confirmConsent: () => { },
   cancelConsent: () => { },
   dismissResult: () => { },

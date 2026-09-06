@@ -35,6 +35,15 @@ if (typeof window !== 'undefined') {
 
 loader.config({ monaco });
 
+// Expose the bundled Monaco instance for debugging and deterministic E2E
+// automation. Because the editor is bundled (loader.config above) rather than
+// loaded from a CDN, `window.monaco` is otherwise undefined; tests use it to set
+// editor contents reliably (Monaco intercepts synthetic select-all/navigation
+// keys, so keyboard-based replacement of prefilled content is flaky).
+if (typeof window !== "undefined") {
+    (window as typeof window & { monaco?: typeof monaco }).monaco = monaco;
+}
+
 // ---------------------------------------------------------------------------
 // Singleton completion-provider registry.
 // Monaco calls ALL registered providers for a language — registering one per

@@ -26,7 +26,7 @@ function isValidTab(value: string): value is Tab {
 export default function Settings() {
 
     const { hasChanges, saveSettings, resetSettings } = useContext(BrowserSettingsContext);
-    const { activeConnectionId } = useContext(ConnectionContext);
+    const { activeConnectionId, usesLdap } = useContext(ConnectionContext);
     const { indicator } = useContext(IndicatorContext);
     const { data: session, status: sessionStatus } = useSession();
     const { toast } = useToast();
@@ -73,6 +73,14 @@ export default function Settings() {
     // active connection is not admin (e.g. user switches to a read/write connection).
     const isAdmin = session?.user.role === "Admin" && indicator === "online";
     const canShowAdminTabs = isMounted && isAdmin;
+    // FalkorDB Enterprise with `falkordbe.ldap_servers` set delegates both
+    // authentication and authorization to LDAP, so users and roles are not
+    // managed in the database for this connection. `null` means the probe
+    // hasn't resolved yet, so stay closed rather than briefly offering a tab
+    // that LDAP-backed connections must never show. `SessionProvider` keeps
+    // the previous session around while it revalidates, so require a settled
+    // one too.
+    const canManageUsers = sessionStatus === "authenticated" && isAdmin && usesLdap === false;
     const adminOnlyTabs: Tab[] = ["Users", "Configurations"];
     useEffect(() => {
         // Don't reset tabs while session is still loading — isAdmin would be
@@ -81,9 +89,15 @@ export default function Settings() {
         if (sessionStatus !== "authenticated") return;
         if (!isAdmin && adminOnlyTabs.includes(current)) {
             setCurrentTab("Browser");
+            return;
+        }
+        // Only redirect once the probe has resolved — bouncing while it is
+        // still `null` would drop a ?tab=Users deep link on non-LDAP instances.
+        if (usesLdap === true && current === "Users") {
+            setCurrentTab("Browser");
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isAdmin, current, sessionStatus]);
+    }, [isAdmin, usesLdap, current, sessionStatus]);
 
     useEffect(() => {
         const prev = prevActiveConnectionIdRef.current;
@@ -117,7 +131,17 @@ export default function Settings() {
         }
         switch (current) {
             case 'Users':
-                return <Users />;
+                // Wait for the LDAP probe rather than flashing another tab's
+                // content. A failed probe resolves closed, so this is only ever
+                // shown while the request is in flight.
+                if (usesLdap === null) {
+                    return (
+                        <p className="text-sm opacity-50" data-testid="settingsUsersPending">
+                            Checking user management availability…
+                        </p>
+                    );
+                }
+                return canManageUsers ? <Users /> : <BrowserSettings />;
             case 'Configurations':
                 return <Configurations />;
             case 'Tokens':
@@ -148,13 +172,16 @@ export default function Settings() {
                             title="Configure database settings"
                             onClick={() => handleSetCurrent("Configurations")}
                         />
-                        <Button
-                            data-testid="settingsTabUsers"
-                            className={cn("p-2 rounded-lg", current === "Users" ? "bg-background" : "text-gray-500")}
-                            label="Users"
-                            title="Manage users accounts"
-                            onClick={() => handleSetCurrent("Users")}
-                        />
+                        {
+                            canManageUsers &&
+                            <Button
+                                data-testid="settingsTabUsers"
+                                className={cn("p-2 rounded-lg", current === "Users" ? "bg-background" : "text-gray-500")}
+                                label="Users"
+                                title="Manage users accounts"
+                                onClick={() => handleSetCurrent("Users")}
+                            />
+                        }
                     </>
                 }
                 <Button

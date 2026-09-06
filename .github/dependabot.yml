@@ -9,12 +9,14 @@ updates:
   - package-ecosystem: "npm" # See documentation for possible values
     directory: "/" # Location of package manifests
     schedule:
-      interval: "daily"
+      interval: "weekly"
     target-branch: "staging"
     groups:
-      npm-minor-patch:
-        update-types:
-          - "patch"
+      npm-all:
+        patterns:
+          - "*"
+    cooldown:
+      default-days: 7
     ignore:
       # TypeScript 7.0 (native Go compiler) ships no JS Compiler API, which
       # Next.js relies on for `next build` type-checking, so the bump breaks
@@ -23,4 +25,19 @@ updates:
       # See https://github.com/vercel/next.js/pull/95639
       - dependency-name: "typescript"
         versions: ["7.0.x"]
+
+      # eslint-plugin-react (pulled in transitively by eslint-config-next) has no
+      # ESLint 10 compatible release yet: its latest (7.37.x) peer-caps at
+      # eslint ^9.7, and eslint 10 removed the context.getFilename()/ScopeManager
+      # APIs the Next.js lint stack relies on, which crashes `npm run lint`. Stay
+      # on the eslint 9.x maintenance line until eslint-config-next /
+      # eslint-plugin-react / typescript-eslint support eslint 10.
+      - dependency-name: "eslint"
+        versions: [">=10.0.0"]
+
+      # Monaco 0.56.x worker entrypoint changes are incompatible with this
+      # Turbopack setup; keep Dependabot from reopening noisy bump PRs until
+      # the worker-resolution migration is completed.
+      - dependency-name: "monaco-editor"
+        versions: ["0.56.x"]
 

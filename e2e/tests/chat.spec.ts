@@ -492,9 +492,14 @@ test.describe("Chat Feature Tests", () => {
     // Inject fake model + plain-text API key into localStorage so
     // handleSubmit does not bail out before sending the request.
     const page = await browser.getPage();
+    // The response is mocked below, so no real LLM/key is needed. Use the "local"
+    // model source to skip handleSubmit's API-key guard — this avoids the flaky
+    // async legacy-secretKey → encrypted-chatApiKeys migration (server round-trips
+    // after reload) that previously made this test race and intermittently fail
+    // with "No API Key Provided".
     await page.evaluate(() => {
       localStorage.setItem("model", "gpt-4o-mini");
-      localStorage.setItem("secretKey", "fake-test-key-for-markdown");
+      localStorage.setItem("chatModelSource", "local");
     });
     // Reload so the React context picks up the new values
     await page.reload({ waitUntil: "networkidle" });
@@ -544,9 +549,80 @@ test.describe("Chat Feature Tests", () => {
     const hasCodeBlock = await markdownDiv.locator("pre code").count();
     expect(hasCodeBlock).toBeGreaterThanOrEqual(1);
 
+    // A null confidence must not render a badge
+    expect(await chat.getChatConfidenceBadgeCount()).toBe(0);
+
     // Cleanup mock
     await page.unroute("**/api/chat");
     await apiCall.removeGraph(graphName);
+  });
+
+  test(`@readwrite Verify chat keeps the CYPHER parameter header in the displayed query and it runs`, async () => {
+    // Regression test for #2076: the chat stripped a leading "cypher" token from the
+    // generated query, which also removed the mandatory CYPHER keyword of a FalkorDB
+    // parameter header and left an unparseable query in the chat bubble / Run button.
+    const graphName = getRandomString("chat");
+    await apiCall.addGraph(graphName);
+    let page: Awaited<ReturnType<typeof browser.getPage>> | undefined;
+
+    try {
+      await apiCall.runQuery(
+        graphName,
+        "CREATE (tlv:airport {code: 'TLV'})-[:route]->(ist:airport {code: 'IST'})-[:route]->(nrt:airport {code: 'NRT', desc: 'Tokyo Narita International'})"
+      );
+
+      const chat = await browser.createNewPage(ChatComponent, urls.graphUrl);
+      await browser.setPageToFullScreen();
+
+      page = await browser.getPage();
+      await page.evaluate(() => {
+        localStorage.setItem("model", "gpt-4o-mini");
+        localStorage.setItem("chatModelSource", "local");
+      });
+      await page.reload({ waitUntil: "networkidle" });
+
+      await chat.selectGraphByName(graphName);
+      await chat.openChat();
+      await chat.waitForChatPanel();
+
+      // This is what text-to-cypher returns after normalizing the LLM output.
+      const cypherQuery =
+        "CYPHER sourceCode='TLV' targetDesc='Narita' MATCH (src:airport), (dst:airport) WHERE src.code = $sourceCode AND toLower(dst.desc) CONTAINS toLower($targetDesc) CALL algo.SPpaths({sourceNode: src, targetNode: dst, relTypes: ['route'], relDirection: 'outgoing', pathCount: 1}) YIELD path, pathWeight RETURN [n IN nodes(path) | n.code] AS codes, pathWeight";
+
+      await page.route("**/api/chat", (route) => {
+        route.fulfill({
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cypherQuery,
+            cypherResult: null,
+            answer: "The shortest path from TLV to Narita is TLV → IST → NRT.",
+            confidence: 92,
+            tokenUsage: null,
+          }),
+        });
+      });
+
+      await chat.fillChatInput("find a path from tlv to narita airport");
+      await chat.clickChatSendButton();
+
+      expect(await chat.waitForAssistantResponse("CypherQuery")).toBe(true);
+
+      // The displayed query must keep the mandatory CYPHER prefix.
+      const displayedQuery = await chat.getLastAssistantMessageContent("CypherQuery");
+      expect(displayedQuery?.trim().startsWith("CYPHER sourceCode='TLV'")).toBe(true);
+
+      // Running it from the chat must execute successfully against FalkorDB.
+      await chat.clickChatRunQueryButton();
+
+      await expect.poll(() => chat.getEditorInput(), { timeout: 10000 })
+        .toMatch(/^CYPHER sourceCode='TLV'/);
+      await expect.poll(() => chat.getTableTabEnabled(), { timeout: 10000 }).toBe(true);
+      expect(await chat.getNotificationErrorToast()).toBe(false);
+    } finally {
+      await page?.unroute("**/api/chat");
+      await apiCall.removeGraph(graphName);
+    }
   });
 
   test(`@readwrite Verify messages are graph-specific and respect maxSavedMessages limit`, async () => {
@@ -671,6 +747,7 @@ test.describe("Chat Feature Tests", () => {
     await page.addInitScript(({ selectedModel }) => {
       localStorage.setItem("model", selectedModel);
       localStorage.setItem("secretKey", "fake-key-footer-test");
+      localStorage.setItem("chatModelSource", "local"); // mock-only: skip API-key guard (avoids flaky async key migration)
     }, { selectedModel: DEFAULT_CHAT_MODEL });
     await page.goto(urls.graphUrl);
     await page.waitForLoadState("networkidle");
@@ -683,7 +760,7 @@ test.describe("Chat Feature Tests", () => {
           cypherQuery: "MATCH (a:Person)-[:KNOWS]->(b) RETURN b.name",
           cypherResult: null,
           answer: "Bob is Alice's friend.",
-          confidence: 0.9,
+          confidence: 90,
           tokenUsage: { totalTokens: 150 },
         }),
       });
@@ -696,6 +773,16 @@ test.describe("Chat Feature Tests", () => {
     await chat.fillChatInput("Who are Alice's friends?");
     await chat.clickChatSendButton();
     await chat.waitForAssistantResponse("Result");
+
+    // Confidence badge should render the 0-100 value directly (not as a 0-1 fraction)
+    const hasConfidenceBadge = await chat.waitForChatConfidenceBadge();
+    expect(hasConfidenceBadge).toBe(true);
+
+    // The badge text carries the visible percentage plus the screen-reader tier label
+    const confidenceText = await chat.getChatConfidenceBadgeText();
+    expect(confidenceText).toContain("90%");
+    // 90 falls in the high-confidence tier
+    expect(confidenceText).toContain("High confidence");
 
     // Footer should now display token data
     const hasTokens = await chat.waitForChatFooterTokens();
@@ -723,6 +810,7 @@ test.describe("Chat Feature Tests", () => {
     await page.addInitScript(({ selectedModel }) => {
       localStorage.setItem("model", selectedModel);
       localStorage.setItem("secretKey", "fake-key-footer-test");
+      localStorage.setItem("chatModelSource", "local"); // mock-only: skip API-key guard (avoids flaky async key migration)
     }, { selectedModel: DEFAULT_CHAT_MODEL });
     await page.goto(urls.graphUrl);
     await page.waitForLoadState("networkidle");
@@ -778,6 +866,91 @@ test.describe("Chat Feature Tests", () => {
     await apiCall.removeGraph(graphName);
   });
 
+  test(`@readwrite Verify confidence badge renders the correct tier and percentage per message`, async () => {
+    const graphName = getRandomString("chat");
+    await apiCall.addGraph(graphName);
+    try {
+      await apiCall.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[:KNOWS]->(b:Person {name: "Bob"})');
+
+      const chat = await browser.createNewPage(ChatComponent);
+      await browser.setPageToFullScreen();
+      const page = await browser.getPage();
+
+      await page.addInitScript(({ selectedModel }) => {
+        localStorage.setItem("model", selectedModel);
+        localStorage.setItem("secretKey", "fake-key-confidence-tiers");
+        localStorage.setItem("chatModelSource", "local"); // mock-only: skip API-key guard (avoids flaky async key migration)
+      }, { selectedModel: DEFAULT_CHAT_MODEL });
+      await page.goto(urls.graphUrl);
+      await page.waitForLoadState("networkidle");
+
+      // Each call returns the next confidence on the 0-100 scale so we exercise
+      // every tier boundary: 90 (high), 70 (medium), 69 (low).
+      const confidences = [90, 70, 69];
+      let callCount = 0;
+      await page.route("**/api/chat", (route) => {
+        const confidence = confidences[Math.min(callCount, confidences.length - 1)];
+        callCount += 1;
+        route.fulfill({
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cypherQuery: "MATCH (n) RETURN n",
+            cypherResult: null,
+            answer: `Answer with confidence ${confidence}.`,
+            confidence,
+            tokenUsage: { totalTokens: 10 },
+          }),
+        });
+      });
+
+      await chat.selectGraphByName(graphName);
+      await chat.openChat();
+      await chat.waitForChatPanel();
+
+      // 90 → High confidence (inclusive lower boundary)
+      await chat.fillChatInput("First question");
+      await chat.clickChatSendButton();
+      await chat.waitForAssistantResponse("Result");
+      expect(await chat.getChatConfidenceBadgeText()).toContain("90%");
+      expect(await chat.getChatConfidenceBadgeText()).toContain("High confidence");
+
+      // 70 → Medium confidence (inclusive lower boundary)
+      await chat.fillChatInput("Second question");
+      await chat.waitForChatSendButtonEnabled();
+      await chat.clickChatSendButton();
+      await chat.waitForAssistantResponse("Result");
+      await page.waitForFunction(
+        () => {
+          const badge = document.querySelectorAll('[data-testid="chatConfidenceBadge"]');
+          return badge[badge.length - 1]?.textContent?.includes("Medium confidence");
+        },
+        { timeout: 5000 }
+      );
+      expect(await chat.getChatConfidenceBadgeText()).toContain("70%");
+      expect(await chat.getChatConfidenceBadgeText()).toContain("Medium confidence");
+
+      // 69 → Low confidence (just below the medium boundary)
+      await chat.fillChatInput("Third question");
+      await chat.waitForChatSendButtonEnabled();
+      await chat.clickChatSendButton();
+      await chat.waitForAssistantResponse("Result");
+      await page.waitForFunction(
+        () => {
+          const badge = document.querySelectorAll('[data-testid="chatConfidenceBadge"]');
+          return badge[badge.length - 1]?.textContent?.includes("Low confidence");
+        },
+        { timeout: 5000 }
+      );
+      expect(await chat.getChatConfidenceBadgeText()).toContain("69%");
+      expect(await chat.getChatConfidenceBadgeText()).toContain("Low confidence");
+
+      await page.unroute("**/api/chat");
+    } finally {
+      await apiCall.removeGraph(graphName).catch(() => undefined);
+    }
+  });
+
   test(`@readwrite Verify token usage persists after closing and reopening chat`, async () => {
     const graphName = getRandomString("chat");
     await apiCall.addGraph(graphName);
@@ -790,6 +963,7 @@ test.describe("Chat Feature Tests", () => {
     await page.addInitScript(({ selectedModel }) => {
       localStorage.setItem("model", selectedModel);
       localStorage.setItem("secretKey", "fake-key-footer-persist");
+      localStorage.setItem("chatModelSource", "local"); // mock-only: skip API-key guard (avoids flaky async key migration)
     }, { selectedModel: DEFAULT_CHAT_MODEL });
     await page.goto(urls.graphUrl);
     await page.waitForLoadState("networkidle");
@@ -847,6 +1021,7 @@ test.describe("Chat Feature Tests", () => {
     await page.addInitScript(({ selectedModel }) => {
       localStorage.setItem("model", selectedModel);
       localStorage.setItem("secretKey", "fake-key-footer-model");
+      localStorage.setItem("chatModelSource", "local"); // mock-only: skip API-key guard (avoids flaky async key migration)
     }, { selectedModel: DEFAULT_CHAT_MODEL });
     await page.goto(urls.graphUrl);
     await page.waitForLoadState("networkidle");

@@ -10,7 +10,7 @@ import Export from "../components/Export";
 export default function TableView() {
     const { graph } = useContext(GraphContext);
     const { scrollPosition, setScrollPosition, search, setSearch, expand, setExpand, dataHash } = useContext(TableViewContext);
-    const { settings: { tableViewSettings: { rowHeight, rowHeightExpandMultiple, columnWidth } } } = useContext(BrowserSettingsContext);
+    const { settings: { userExperienceSettings: { tableViewSettings: { rowHeight, rowHeightExpandMultiple, columnWidth } } } } = useContext(BrowserSettingsContext);
     const previousDataHash = useRef<string>("");
 
     const tableData = useMemo(() => {

@@ -12,12 +12,6 @@ export default function LoginVerification({ children }: { children: React.ReactN
     const searchParams = useSearchParams();
 
     useEffect(() => {
-        if (data?.user || data === undefined) return;
-        // Clear legacy unscoped savedContent (scoped cleanup handled by providers.tsx)
-        localStorage.removeItem("savedContent");
-    }, [data]);
-
-    useEffect(() => {
         // Skip authentication redirects for /docs routes
         if (url.startsWith('/docs')) return;
 

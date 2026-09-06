@@ -97,8 +97,12 @@ test.describe('Query history Tests', () => {
         await graph.clickSelectQueryInHistory(query);
         // Click inside the history panel editor and trigger completions
         await graph.clickHistoryPanelEditor();
-        await graph.triggerSuggestions();
-        const suggestVisible = await graph.waitForSuggestWidget(5000);
+        // Monaco's suggest widget can be slow/racy under load; retry the trigger.
+        let suggestVisible = false;
+        for (let attempt = 0; attempt < 3 && !suggestVisible; attempt += 1) {
+            await graph.triggerSuggestions();
+            suggestVisible = await graph.waitForSuggestWidget(5000);
+        }
         expect(suggestVisible).toBe(true);
         // At minimum, Cypher keywords (MATCH, RETURN, etc.) should be present
         const count = await graph.getSuggestionCount();

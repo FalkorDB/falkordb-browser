@@ -1,8 +1,8 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Button from "./ui/Button";
-import { ConnectionContext, IndicatorContext } from "./provider";
-import { useCallback, useContext, useEffect, useState } from "react";
+import { BrowserSettingsContext, ConnectionContext, GraphContext, IndicatorContext } from "./provider";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Copy, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
@@ -31,18 +31,36 @@ function formatVersion(version: string | undefined): string {
 
 export default function Header() {
     const { indicator, setIndicator } = useContext(IndicatorContext);
-    const { connectionType, connectionInfo, dbVersion } = useContext(ConnectionContext);
+    const { graphNames } = useContext(GraphContext);
+    const { settings: { userExperienceSettings: { refreshInterval } } } = useContext(BrowserSettingsContext);
+    const { connectionType, connectionInfo, dbVersion, supportsOffload, offloadedGraphs } = useContext(ConnectionContext);
     const { status, data: session } = useSession();
     const { toast } = useToast();
 
     const [usedMemory, setUsedMemory] = useState<string | null>(null);
     const [mounted, setMounted] = useState(false);
 
+    // GRAPH.LIST covers both loaded and offloaded graphs, and GRAPH.STUBS reports
+    // only the offloaded ones — so the loaded count is the difference.
+    const { totalCount, loadedCount, offloadedCount } = useMemo(() => {
+        const total = graphNames?.length ?? 0;
+        const offloaded = supportsOffload ? offloadedGraphs.length : 0;
+
+        return {
+            totalCount: total,
+            loadedCount: Math.max(total - offloaded, 0),
+            offloadedCount: offloaded,
+        };
+    }, [graphNames, offloadedGraphs, supportsOffload]);
+
     useEffect(() => { setMounted(true); }, []);
 
     useEffect(() => {
         setUsedMemory(null);
-        (async () => {
+        const intervalSeconds = Number.isFinite(refreshInterval) && refreshInterval > 0 ? refreshInterval : 30;
+        let cancelled = false;
+
+        const fetchMemory = async () => {
             if (status !== "authenticated") return;
 
             const result = await securedFetch("/api/info?section=memory", {
@@ -56,10 +74,20 @@ export default function Header() {
             const match = data.match(/used_memory_human:(\S+)/);
 
             if (!match) return;
+            if (cancelled) return;
 
             setUsedMemory(match[1]);
-        })();
-    }, [toast, setIndicator, connectionType, connectionInfo]);
+        };
+
+        fetchMemory();
+
+        const interval = setInterval(fetchMemory, intervalSeconds * 1000);
+
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+        };
+    }, [toast, setIndicator, connectionType, connectionInfo, status, refreshInterval]);
 
     const handleCopy = useCallback((text: string) => {
         if (!navigator.clipboard?.writeText) {
@@ -94,6 +122,45 @@ export default function Header() {
                     usedMemory !== null ?
                         <h2>{usedMemory}</h2>
                         : <Loader2 className="animate-spin" size={16} />
+                }
+            </div>
+            <div className="flex gap-1 items-center">
+                <Tooltip>
+                    <TooltipTrigger>
+                        <span className="font-bold">Graphs:</span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>Graphs Count</p>
+                    </TooltipContent>
+                </Tooltip>
+                {
+                    graphNames === undefined
+                        ? <Loader2 data-testid="graphsCountLoader" className="animate-spin" size={16} />
+                        : <h2 data-testid="graphsCountValue">{totalCount}</h2>
+                }
+                {
+                    supportsOffload && graphNames !== undefined &&
+                    <div className="flex gap-1 items-center">
+                        <span>[</span>
+                        <Tooltip>
+                            <TooltipTrigger>
+                                <span className="text-green" data-testid="graphsOnLoadCountValue">{loadedCount}</span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Loaded</p>
+                            </TooltipContent>
+                        </Tooltip>
+                        <span>,</span>
+                        <Tooltip>
+                            <TooltipTrigger>
+                                <span className="text-yellow" data-testid="graphsOffLoadCountValue">{offloadedCount}</span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Offloaded</p>
+                            </TooltipContent>
+                        </Tooltip>
+                        <span>]</span>
+                    </div>
                 }
             </div>
             <div className="flex gap-1 items-center">

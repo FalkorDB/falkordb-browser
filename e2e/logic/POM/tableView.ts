@@ -58,14 +58,32 @@ export default class TableView extends GraphPage {
         }, 'Export Table View Button');
     }
 
+    private get expandAllCellsButton(): Locator {
+        return this.tableViewTabPanel.getByRole('button', { name: 'Expand All' }).first();
+    }
+
+    /**
+     * Expands every JSON-tree cell in the table so nested keys (e.g. a PATH
+     * value's `nodes`/`edges`) become visible for text assertions. Object cells
+     * render collapsed by default (showing only "N keys").
+     */
+    public async expandAllCells(): Promise<void> {
+        await interactWhenVisible(this.expandAllCellsButton, async (el: Locator) => {
+            await el.click();
+        }, 'Table Expand All Cells');
+    }
+
     /**
      * Returns true if the first data cell in the first table row contains `text`.
      * For PATH results the JSONTree renders nodes/edges keys, so checking for
      * `'nodes'` or `'edges'` confirms the cell holds a PATH value.
+     *
+     * The first `<td>` is the row-index column (e.g. "1."), so the first data
+     * cell is `td` index 1. Call `expandAllCells()` first so nested keys render.
      */
     public async firstCellContains(text: string): Promise<boolean> {
         await this.tableViewTabPanel.waitFor({ state: 'visible', timeout: 10000 });
-        const firstCell = this.tableViewTableRows.first().locator('td').first();
+        const firstCell = this.tableViewTableRows.first().locator('td').nth(1);
         await firstCell.waitFor({ state: 'visible', timeout: 5000 });
         const content = await firstCell.textContent();
         return (content ?? '').includes(text);

@@ -49,4 +49,5 @@ next-env.d.ts
 /playwright
 /tls
 /uploads/
+/falkordb-import/
 .history

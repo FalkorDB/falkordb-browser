@@ -555,6 +555,31 @@ test.describe('@browser Browser Settings tests', () => {
         expect(savedValue).toBe(originalValue);
     });
 
+    test('@readwrite Verify max tabs slider can be changed and persists', async () => {
+        const settingsBrowserPage = await browser.createNewPage(SettingsBrowserPage, urls.settingsUrl);
+        await settingsBrowserPage.expandUserExperienceSection();
+
+        const originalValue = await settingsBrowserPage.getMaxTabsValue();
+
+        try {
+            await settingsBrowserPage.setMaxTabsSlider(4);
+            await settingsBrowserPage.clickSaveSettingsButton();
+            await settingsBrowserPage.waitForTimeout(500);
+
+            await settingsBrowserPage.reloadPage();
+            await settingsBrowserPage.waitForTimeout(1000);
+            await settingsBrowserPage.expandUserExperienceSection();
+
+            const value = await settingsBrowserPage.getMaxTabsValue();
+            expect(value).toBe(4);
+        } finally {
+            // Restore original value
+            await settingsBrowserPage.expandUserExperienceSection();
+            await settingsBrowserPage.setMaxTabsSlider(originalValue);
+            await settingsBrowserPage.clickSaveSettingsButton();
+        }
+    });
+
     // ===== Graph Info Section =====
 
     test('@readwrite Verify refresh interval slider can be changed and persists', async () => {

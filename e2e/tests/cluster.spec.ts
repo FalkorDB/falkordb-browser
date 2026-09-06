@@ -4,7 +4,7 @@ import BrowserWrapper from "../infra/ui/browserWrapper";
 import LoginPage from "../logic/POM/loginPage";
 import GraphPage from "../logic/POM/graphPage";
 import ApiCalls from "../logic/api/apiCalls";
-import { getRandomString } from "../infra/utils";
+import { getRandomString, urlPath } from "../infra/utils";
 
 // Cluster configuration for testing
 const CLUSTER_NODES = [
@@ -37,7 +37,7 @@ test.describe("Cluster Functionality Tests", () => {
       await loginPage.clickConnect();
       await loginPage.waitForSuccessfulLogin(urls.graphUrl);
 
-      expect(loginPage.getCurrentURL()).toBe(urls.graphUrl);
+      expect(urlPath(loginPage.getCurrentURL())).toBe(urlPath(urls.graphUrl));
     });
 
     CLUSTER_NODES.forEach((node, index) => {
@@ -52,7 +52,7 @@ test.describe("Cluster Functionality Tests", () => {
         await loginPage.clickConnect();
         await loginPage.waitForSuccessfulLogin(urls.graphUrl);
 
-        expect(loginPage.getCurrentURL()).toBe(urls.graphUrl);
+        expect(urlPath(loginPage.getCurrentURL())).toBe(urlPath(urls.graphUrl));
       });
     });
 

@@ -42,7 +42,7 @@ export default function CreateElementPanel(props: Props) {
     const setSelectedNodes = !type ? props.setSelectedNodes : undefined;
 
     const { indicator } = useContext(IndicatorContext);
-    const { settings: { captionsKeysSettings: { captionsKeys }, showPropertyKeyPrefixSettings: { showPropertyKeyPrefix } } } = useContext(BrowserSettingsContext);
+    const { settings: { userExperienceSettings: { captionKeysSettings: { captionsKeys, showPropertyKeyPrefix } } } } = useContext(BrowserSettingsContext);
     const { toast } = useToast();
 
     const setInputRef = useRef<HTMLInputElement>(null);

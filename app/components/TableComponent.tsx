@@ -42,7 +42,10 @@ interface Props {
     onSearchChange?: Dispatch<SetStateAction<string>>
     initialExpand?: Map<number, number>
     onExpandChange?: Dispatch<SetStateAction<Map<number, number>>>
+    rowIndicator?: (rowName: string) => React.ReactNode
 }
+
+const hasCellValue = (value: unknown) => value !== undefined && value !== null;
 
 /**
  * Render a virtualized, searchable, and editable table for heterogeneous row data.
@@ -87,7 +90,8 @@ export default function TableComponent({
     initialSearch,
     onSearchChange,
     initialExpand,
-    onExpandChange
+    onExpandChange,
+    rowIndicator
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext);
@@ -308,7 +312,7 @@ export default function TableComponent({
                 validCellKeys.add(cellKey);
 
                 // If cell has a value, keep it as loaded
-                if (cell.value) {
+                if (hasCellValue(cell.value)) {
                     newLoadedCells.add(cellKey);
                     newLoadAttempts.add(cellKey);
                 }
@@ -341,6 +345,27 @@ export default function TableComponent({
             return newSet;
         });
     }, [rows]);
+
+    useEffect(() => {
+        const pendingLoads: Array<{ rowName: string; cellIndex: number; loadCell: () => Promise<any> }> = [];
+
+        visibleRows.forEach((row) => {
+            row.cells.forEach((cell, cellIndex) => {
+                const cellKey = `${row.name}-${cellIndex}`;
+                const isLazyCell = cell.type === "readonly" && "loadCell" in cell && cell.loadCell;
+                const isCellValueMissing = !hasCellValue(cell.value);
+
+                if (isLazyCell && isCellValueMissing && !loadingCells.has(cellKey) && !loadAttemptedRef.current.has(cellKey)) {
+                    pendingLoads.push({ rowName: row.name, cellIndex, loadCell: cell.loadCell });
+                }
+            });
+        });
+
+        pendingLoads.forEach(({ rowName, cellIndex, loadCell }) => {
+            loadAttemptedRef.current.add(`${rowName}-${cellIndex}`);
+            handleLoadLazyCell(rowName, cellIndex, loadCell);
+        });
+    }, [visibleRows, loadingCells, handleLoadLazyCell]);
 
     useEffect(() => {
         // Restore scroll position on mount
@@ -390,7 +415,7 @@ export default function TableComponent({
         </svg>`
     ), [itemHeight]);
     const stripBackground = useMemo(() => `url("data:image/svg+xml,${stripSVG}")`, [stripSVG]);
-    const columnCount = (setRows ? headerNames.length + 1 : headerNames.length) + 1;
+    const columnCount = (setRows ? headerNames.length + 1 : headerNames.length) + (rowIndicator ? 2 : 1);
 
     const renderValue = (v: any) => (
         <span className={cn("pointer-events-auto text-xs", valueClassName)}>{v}</span>
@@ -465,6 +490,11 @@ export default function TableComponent({
                                         }}
                                     />
                                 </TableHead>
+                                : null
+                        }
+                        {
+                            rowIndicator ?
+                                <TableHead key="indicator" className="w-5 border-r border-border p-2 text-center">Status</TableHead>
                                 : null
                         }
                         <TableHead key="index" className="w-5 border-r border-border p-2">
@@ -633,6 +663,13 @@ export default function TableComponent({
                                             </TableCell>
                                             : null
                                     }
+                                    {
+                                        rowIndicator ?
+                                            <TableCell className="border-r border-border p-1">
+                                                <div className="flex items-center justify-center">{rowIndicator(row.name)}</div>
+                                            </TableCell>
+                                            : null
+                                    }
                                     <TableCell className="border-r border-border p-1">
                                         <p className={cn(!isObjectType && "grow basis-0 text-center")}>{actualIndex + 1}.</p>
                                     </TableCell>
@@ -643,15 +680,11 @@ export default function TableComponent({
                                             const cellTestId = `${label}${row.name}`;
                                             const isCellLoading = loadingCells.has(cellKey);
                                             const isLazyCell = cell.type === "readonly" && "loadCell" in cell && cell.loadCell;
+                                            const isCellValueMissing = !hasCellValue(cell.value);
+                                            const hasLoadAttempted = loadAttemptedRef.current.has(cellKey);
 
-                                            // Only load if it's a lazy cell, has no value, not currently loading, and we haven't attempted to load it yet
-                                            if (isLazyCell && !cell.value && !loadingCells.has(cellKey) && !loadAttemptedRef.current.has(cellKey)) {
-                                                loadAttemptedRef.current.add(cellKey);
-                                                handleLoadLazyCell(row.name, j, cell.loadCell);
-                                            }
-
-                                            // Show loader while loading
-                                            if (isCellLoading) {
+                                            // Show loader while actively loading and during the initial lazy-cell paint only.
+                                            if (isCellLoading || (isLazyCell && isCellValueMissing && !hasLoadAttempted)) {
                                                 return (
                                                     <TableCell
                                                         className={cn(

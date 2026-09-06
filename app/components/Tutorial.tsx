@@ -7,7 +7,7 @@ import { createPortal } from "react-dom";
 import { Copy, CornerDownLeft, CornerDownRight, CornerLeftDown, CornerRightDown } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { cn, Tab, GraphRef } from "@/lib/utils";
-import type { LayoutMode, RadialDirection } from "@falkordb/canvas";
+import type { LayoutMode } from "@falkordb/canvas";
 import { Graph } from "@/app/api/graph/model";
 import { GraphContext, PanelContext, ForceGraphContext } from "./provider";
 import Button from "./ui/Button";
@@ -198,12 +198,61 @@ const tutorialSteps: TutorialStep[] = [
         hidePrev: true
     },
     {
-        title: "Get KNOWS edge",
-        description: "Click this button to retrieve all edges of type 'KNOWS' in the graph. This will show you the count and details of all KNOWS relationships.",
+        title: "Open Edge Options",
+        description: "Edges can be styled just like nodes. Click on the 'KNOWS' edge type to see the available options for this relationship.",
         placementAxis: "x",
         targetSelector: '[data-testid="graphInfoKNOWSEdge"]',
         advanceOn: "click",
-        forward: ["mouseenter", "mouseleave"]
+        forward: ["mouseenter", "mouseleave", "pointerdown"]
+    },
+    {
+        title: "Customize Edge Styles",
+        description: "Click 'Customize' to open the style panel for this relationship type.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="customizeRelationshipStyleKNOWS"]',
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave", "pointerdown"],
+        hidePrev: true
+    },
+    {
+        title: "Choose Edge Color",
+        description: "Pick a color for every edge of this type. Use a preset or the RGB picker — the graph updates as you choose.",
+        placementAxis: "x",
+        targetSelector: 'button[aria-label^="Select color"]',
+        advanceOn: "click",
+        hidePrev: true
+    },
+    {
+        title: "Adjust Edge Size",
+        description: "One multiplier scales the whole edge — line width, arrowhead and caption font size all grow together.",
+        placementAxis: "x",
+        targetSelector: 'button[aria-label^="Select size"]',
+        advanceOn: "click",
+    },
+    {
+        title: "Save Edge Style Changes",
+        description: "Click 'Save Changes' to apply your edge style. Styles are stored per connection, so they are still there the next time you open this graph.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="saveStyleChanges"]',
+        advanceOn: "click",
+    },
+    {
+        title: "Reopen Edge Options",
+        description: "Saving closes the style panel. Click the 'KNOWS' edge type again to reopen its options.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="graphInfoKNOWSEdge"]',
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave", "pointerdown"],
+        hidePrev: true
+    },
+    {
+        title: "Get KNOWS edge",
+        description: "Click 'Run' to retrieve all edges of type 'KNOWS' in the graph. This will show you the count and details of all KNOWS relationships.",
+        placementAxis: "x",
+        targetSelector: '[data-testid="runRelationshipKNOWS"]',
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave", "pointerdown"],
+        hidePrev: true
     },
     ///// Query and Canvas (Track 3)
     {
@@ -286,8 +335,32 @@ const tutorialSteps: TutorialStep[] = [
         forward: ["mousedown", "mouseenter", "mouseleave"],
     },
     {
+        title: "Graph Schema",
+        description: "The last tab answers a different question: not what a query returned, but what the graph is made of. Click **Schema** to see it.",
+        placementAxis: "y",
+        targetSelector: '[data-testid="schemaTab"]',
+        advanceOn: "mousedown",
+        forward: ["mousedown", "mouseenter", "mouseleave"],
+    },
+    {
+        title: "Schema View",
+        description: "Every node here is a label and every edge a relationship between two labels, discovered from the data itself — nothing has to be declared up front. The label and connection counts sit next to the tabs, and the legend hides a label or a relationship the same way it does in the graph.",
+        placementAxis: "x",
+        targetSelector: 'falkordb-canvas',
+        spotlightSelector: '[data-testid="schemaView"]',
+        forward: ["mousedown", "mouseup", "mousemove", "mouseenter", "mouseleave", "mouseover", "mouseout", "contextmenu", "pointerdown", "pointerup", "pointermove", "pointerenter", "pointerleave", "wheel"],
+    },
+    {
+        title: "Label Properties",
+        description: "Right-click a label or a relationship to open its data panel. It lists the property keys that label carries and the type of each one, so you can learn a graph you have never seen before without writing a single query.",
+        placementAxis: "x",
+        targetSelector: 'falkordb-canvas',
+        spotlightSelector: '[data-testid="schemaView"]',
+        forward: ["mousedown", "mouseup", "mousemove", "mouseenter", "mouseleave", "mouseover", "mouseout", "contextmenu", "pointerdown", "pointerup", "pointermove", "pointerenter", "pointerleave", "wheel"],
+    },
+    {
         title: "Query History",
-        description: "Access your previous queries here. You can filter by graph, search queries, and view metadata for each executed query.",
+        description: "Every query you run is kept here, tagged with the graph it ran against. Click to open the history.",
         placementAxis: "y",
         targetSelector: '[data-testid="queryHistory"]',
         advanceOn: "click",
@@ -296,7 +369,7 @@ const tutorialSteps: TutorialStep[] = [
     },
     {
         title: "Query History Window",
-        description: "Access your previous queries here. You can also remove queries from your history or clear the entire history.",
+        description: "Search the list, or narrow it with the graph-name chips and the **Favorites** filter — the star on a row is what puts it there. Click a row to select it, Ctrl/Cmd + click for several, then **Export** them to a .cypher file, **Delete** them from the history, or clear their favorite mark. The tabs below hold the selected query: **Edit Query** to change it and run it again, and **Profile**, **Metadata** and **Explain** for how it ran. Double-click a row to run it straight away.",
         placementAxis: "y",
         targetSelector: '[data-testid="queryHistoryPanel"]',
         hidePrev: true
@@ -419,7 +492,50 @@ const tutorialSteps: TutorialStep[] = [
         placementAxis: "x",
         targetSelector: '[data-testid="zoomControls"]',
     },
-    ///// Theme and Navigation (Track 5)
+    ///// Graph tabs (Track 5)
+    {
+        title: "Graph Tabs",
+        description: "The tab strip keeps several working contexts side by side. Each tab remembers its own graph, query, layout, selection and open panels — and they are all restored the next time you open the browser.",
+        placementAxis: "y",
+        targetSelector: '[data-testid="graphSubHeader"]',
+        hidePrev: true
+    },
+    {
+        title: "Open a New Tab",
+        description: "Click **+** to open another tab. It starts empty, so you can explore a second graph without losing anything you have set up here.",
+        placementAxis: "y",
+        targetSelector: '[data-testid="graphTabAdd"]',
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave"],
+        hidePrev: true
+    },
+    {
+        title: "Rename a Tab",
+        description: "The pencil on the active tab opens a name box. Whatever you type is saved as soon as you leave the box, and clearing it brings the graph name back. Hover it to see the hint, then click Next — there is nothing to rename yet.",
+        placementAxis: "y",
+        targetSelector: '[data-testid="graphSubHeader"] > div[data-active="true"] [data-testid^="graphTabRenameTrigger-"]',
+        forward: ["mouseenter", "mouseleave"],
+        hidePrev: true
+    },
+    {
+        title: "Switch Between Tabs",
+        description: "Click the first tab to switch back to it. Its graph, query and canvas come back exactly as you left them.",
+        placementAxis: "y",
+        targetSelector: '[data-testid="graphSubHeader"] > div:first-of-type [data-testid^="graphTabSelect-"]',
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave"],
+        hidePrev: true
+    },
+    {
+        title: "Close a Tab",
+        description: "Click the **X** on the last tab to close it. The last remaining tab can't be closed — there is always one context open.",
+        placementAxis: "y",
+        targetSelector: '[data-testid="graphSubHeader"] > div:last-of-type [data-testid^="graphTabClose-"]',
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave"],
+        hidePrev: true
+    },
+    ///// Theme and Navigation (Track 6)
     {
         title: "Theme Toggle",
         description: "Switch between light, dark, and system themes for a comfortable viewing experience.",
@@ -439,6 +555,13 @@ const tutorialSteps: TutorialStep[] = [
     }
 ];
 
+/** How long Next waits for the next step's target before letting the user through anyway. */
+const NEXT_TARGET_TIMEOUT = 10000;
+const NEXT_TARGET_POLL = 150;
+
+/** How often a step whose target never arrived keeps looking for it. */
+const TARGET_WATCH_POLL = 300;
+
 /** Helper: close any open overlays/panels that might be stale */
 function closeStaleOverlays(): void {
     // Close layout dropdown if open (check content portal existence, not data-state which conflicts with TooltipTrigger)
@@ -455,6 +578,21 @@ function closeStaleOverlays(): void {
     // Close query history panel
     const closeHistory = document.querySelector('[data-testid="queryHistoryCloseButton"]') as HTMLElement | null;
     if (closeHistory) closeHistory.click();
+}
+
+/**
+ * Shared setup for the tracks that resume with the social-demo graph laid out
+ * radially — the state steps 45-48 leave behind.
+ */
+async function setupSocialDemoRadial(ctx: TrackSetupContext) {
+    closeStaleOverlays();
+    ctx.handleSetGraphName("social-demo");
+    await ctx.runQuery("MATCH p=()-[:MANAGES]->() RETURN p", "social-demo");
+    ctx.setCurrentTab("Graph");
+    ctx.setLayout('radial');
+    ctx.setDirection('out');
+    ctx.canvasRef.current?.setLayout('radial');
+    ctx.canvasRef.current?.setLayoutOptions({ radial: { direction: 'out' } });
 }
 
 /**
@@ -494,11 +632,11 @@ const tutorialTracks: TutorialTrack[] = [
         },
     },
     {
-        // State after step 14 (Get KNOWS edge): social-demo selected,
+        // State after step 20 (Get KNOWS edge): social-demo selected,
         // KNOWS query was run → graph has edges visible, Graph tab active,
-        // no DataPanel open, no query history open
+        // no DataPanel open, no query history open, style panel closed
         name: "Query & Results",
-        startIndex: 15,
+        startIndex: 21,
         setup: async (ctx) => {
             closeStaleOverlays();
             ctx.handleSetGraphName("social-demo");
@@ -510,37 +648,35 @@ const tutorialTracks: TutorialTrack[] = [
         },
     },
     {
-        // State after step 27 (Close Query History Window): social-demo selected,
-        // query was run (graph has elements), Metadata tab is active (from step 24),
-        // query history panel is CLOSED (step 27 closed it), no DataPanel
+        // State after step 36 (Close Query History Window): social-demo selected,
+        // query was run (graph has elements), the Schema tab is active (from the
+        // schema steps), query history panel is CLOSED (step 36 closed it), no DataPanel
         name: "Layouts & Canvas",
-        startIndex: 28,
+        startIndex: 37,
         setup: async (ctx) => {
             closeStaleOverlays();
             ctx.handleSetGraphName("social-demo");
             await ctx.runQuery("MATCH p=()-[r:KNOWS]-() WHERE r.since > 2018 RETURN p ", "social-demo");
-            // Set Metadata tab directly — the auto-tab-switch useEffect is suppressed during tutorial
-            ctx.setCurrentTab("Metadata");
+            // Set the tab directly — the auto-tab-switch useEffect is suppressed during tutorial
+            ctx.setCurrentTab("Schema");
             ctx.setLayout('force');
             ctx.setDirection('');
             ctx.canvasRef.current?.setLayout('force');
         },
     },
     {
-        // State after step 39 (Zoom Controls): social-demo selected, graph has elements,
+        // State after step 48 (Zoom Controls): social-demo selected, graph has elements,
+        // Graph tab active, radial layout active, no overlays open
+        name: "Graph Tabs",
+        startIndex: 49,
+        setup: setupSocialDemoRadial,
+    },
+    {
+        // State after step 53 (Close a Tab): social-demo selected, graph has elements,
         // Graph tab active, controls visible, radial layout active, no overlays open
         name: "Theme & Navigation",
-        startIndex: 40,
-        setup: async (ctx) => {
-            closeStaleOverlays();
-            ctx.handleSetGraphName("social-demo");
-            await ctx.runQuery("MATCH p=()-[:MANAGES]->() RETURN p", "social-demo");
-            ctx.setCurrentTab("Graph");
-            ctx.setLayout('radial');
-            ctx.setDirection('out');
-            ctx.canvasRef.current?.setLayout('radial');
-            ctx.canvasRef.current?.setLayoutOptions({ radial: { direction: 'out' as RadialDirection } });
-        },
+        startIndex: 54,
+        setup: setupSocialDemoRadial,
     },
 ];
 
@@ -572,8 +708,13 @@ function ArrowIcon({ direction }: { direction: "left" | "right" | "top" | "botto
 /** Shape of the keep-alive state for Radix sub-menus during tutorial transitions. */
 interface SubMenuKeepAliveState {
     interval: ReturnType<typeof setInterval>;
-    blockers: Array<{ el: Element; handler: (e: Event) => void }>;
+    blockers: Array<{ el: Element; type: string; handler: (e: Event) => void; capture: boolean }>;
     dimmedSiblings: HTMLElement[];
+}
+
+/** Removes every listener registered as a sub-menu blocker. */
+function removeSubMenuBlockers(blockers: SubMenuKeepAliveState['blockers']): void {
+    blockers.forEach(({ el, type, handler, capture }) => el.removeEventListener(type, handler, capture));
 }
 
 /**
@@ -596,23 +737,30 @@ function createSubMenuKeepAlive(subTrigger: HTMLElement, dimmedSiblings: HTMLEle
 
     // Block pointerleave events on the SubTrigger and the dropdown content
     const blocker = (e: Event) => { e.stopImmediatePropagation(); };
-    const blockers: Array<{ el: Element; handler: (e: Event) => void }> = [];
+    // React synthesizes pointerleave from pointerout at the root container, so the
+    // capture blocker above never reaches Radix's handler — keep the pointerout from
+    // bubbling out of the menu instead.
+    const outBlocker = (e: Event) => { e.stopPropagation(); };
+    const blockers: SubMenuKeepAliveState['blockers'] = [];
+    const addBlocker = (el: Element, type: string, capture: boolean, handler: (e: Event) => void) => {
+        el.addEventListener(type, handler, capture);
+        blockers.push({ el, type, handler, capture });
+    };
 
-    subTrigger.addEventListener('pointerleave', blocker, true);
-    blockers.push({ el: subTrigger, handler: blocker });
+    addBlocker(subTrigger, 'pointerleave', true, blocker);
+    addBlocker(subTrigger, 'pointerout', false, outBlocker);
 
     const dropdownContent = subTrigger.closest('[data-testid="layoutDropdownContent"]');
     if (dropdownContent) {
-        dropdownContent.addEventListener('pointerleave', blocker, true);
-        blockers.push({ el: dropdownContent, handler: blocker });
+        addBlocker(dropdownContent, 'pointerleave', true, blocker);
+        addBlocker(dropdownContent, 'pointerout', false, outBlocker);
         // Also block pointermove on sibling items so Radix doesn't highlight them
         // and close our sub-menu
         const allItems = dropdownContent.querySelectorAll(':scope > *');
         allItems.forEach(item => {
             if (!item.contains(subTrigger)) {
-                item.addEventListener('pointermove', blocker, true);
-                item.addEventListener('pointerenter', blocker, true);
-                blockers.push({ el: item, handler: blocker });
+                addBlocker(item, 'pointermove', true, blocker);
+                addBlocker(item, 'pointerenter', true, blocker);
             }
         });
     }
@@ -623,11 +771,7 @@ function createSubMenuKeepAlive(subTrigger: HTMLElement, dimmedSiblings: HTMLEle
 /** Tears down a keep-alive state: stops interval, removes event blockers, restores siblings. */
 function destroySubMenuKeepAlive(state: SubMenuKeepAliveState): void {
     clearInterval(state.interval);
-    state.blockers.forEach(({ el, handler }) => {
-        el.removeEventListener('pointerleave', handler, true);
-        el.removeEventListener('pointermove', handler, true);
-        el.removeEventListener('pointerenter', handler, true);
-    });
+    removeSubMenuBlockers(state.blockers);
     state.dimmedSiblings.forEach(item => {
         item.style.pointerEvents = '';
         item.style.opacity = '';
@@ -651,6 +795,11 @@ function TutorialPortal({
 
     const [mounted, setMounted] = useState(false);
     const [targetDisabled, setTargetDisabled] = useState(false);
+    // The step's target never showed up. An action-gated step has no Next of its
+    // own, so without this the user would sit on a step with nothing to click.
+    const [targetUnavailable, setTargetUnavailable] = useState(false);
+    // Whether the step Next leads to has its target on screen yet.
+    const [nextReady, setNextReady] = useState(true);
     const [arrowStyle, setArrowStyle] = useState<React.CSSProperties>({ display: 'none' });
     const [arrowDirection, setArrowDirection] = useState<"left" | "right" | "top" | "bottom">("top");
     // retryCount forces the setup effect to re-run when a target element isn’t in the DOM yet
@@ -689,6 +838,7 @@ function TutorialPortal({
 
     const currentStep = tutorialSteps[step];
     const { targetSelector, advanceOn, forward, description, position, title, hidePrev, spotlightSelector, placementAxis } = currentStep;
+    const nextTargetSelector = tutorialSteps[step + 1]?.targetSelector;
 
     useEffect(() => {
         setMounted(true);
@@ -701,6 +851,7 @@ function TutorialPortal({
     // Also stop keep-alive UNLESS the incoming step is the expected passthrough consumer.
     useEffect(() => {
         setRetryCount(0);
+        setTargetUnavailable(false);
         advancePendingRef.current = false;
         advanceCancelledRef.current = false;
         // Only preserve keep-alive for passthrough steps that will consume it
@@ -708,6 +859,31 @@ function TutorialPortal({
             stopKeepAlive();
         }
     }, [step, stopKeepAlive]);
+
+    // Hold Next until the step it leads to has something to point at. Entering a
+    // track starts a fetch, so a label or a panel the next step highlights can
+    // still be on its way — advancing then lands on a step with no target.
+    // Steps the user advances by acting on the page have no Next to hold.
+    useEffect(() => {
+        if (advanceOn || !nextTargetSelector || document.querySelector(nextTargetSelector)) {
+            setNextReady(true);
+            return () => { };
+        }
+
+        setNextReady(false);
+
+        // Bounded: a target that never arrives must not strand the user on this
+        // step — the next step retries on its own, and can be skipped past.
+        const deadline = Date.now() + NEXT_TARGET_TIMEOUT;
+        const id = window.setInterval(() => {
+            if (!document.querySelector(nextTargetSelector) && Date.now() < deadline) return;
+            window.clearInterval(id);
+            setNextReady(true);
+        }, NEXT_TARGET_POLL);
+
+        return () => window.clearInterval(id);
+    }, [step, advanceOn, nextTargetSelector]);
+
 
     useEffect(() => {
         const forwardArr = [...(forward || []), advanceOn].filter(ev => !!ev);
@@ -743,10 +919,25 @@ function TutorialPortal({
                     const id = window.setTimeout(() => setRetryCount(c => c + 1), 150);
                     return () => window.clearTimeout(id);
                 }
-                // Gave up after 15 retries — clean up keep-alive and hide arrow
+                // Gave up after 15 retries — clean up keep-alive, hide the arrow
+                // and fall back to a manual Next so the step stays escapable.
                 stopKeepAlive();
+                setTargetUnavailable(true);
                 setArrowStyle({ display: 'none' });
-                return () => { };
+
+                // The fallback is an escape hatch, not a verdict: a target that
+                // simply took longer than the retry budget (a slow fetch, a late
+                // render) must not leave an action-gated step permanently
+                // advanceable with no arrow. Keep watching, and hand the step
+                // back to the normal path the moment it shows up.
+                const watch = window.setInterval(() => {
+                    if (!document.querySelector(targetSelector)) return;
+                    window.clearInterval(watch);
+                    setTargetUnavailable(false);
+                    setRetryCount(0);
+                }, TARGET_WATCH_POLL);
+
+                return () => window.clearInterval(watch);
             }
 
             if (element) {
@@ -1162,36 +1353,67 @@ function TutorialPortal({
                 if (tutorialSteps[step].passthrough && advanceOn === 'click') {
                     overlay.style.pointerEvents = 'none';
 
-                    // Add pointerleave protection on the sub-trigger so the sub-menu
+                    // Add leave protection on the sub-trigger so the sub-menu
                     // can't close while the user moves to click the direction item.
                     const subTriggerTestId = tutorialSteps[step].parentSubTrigger;
                     const subTrigger = subTriggerTestId
                         ? document.querySelector(`[data-testid="${subTriggerTestId}"]`) as HTMLElement | null
                         : null;
                     const leaveBlocker = (e: Event) => { e.stopImmediatePropagation(); };
-                    if (subTrigger) {
-                        subTrigger.addEventListener('pointerleave', leaveBlocker, true);
-                    }
+                    // React synthesizes pointerleave from pointerout at the root container,
+                    // so a capture blocker on the element never reaches Radix's handler —
+                    // keep the pointerout from bubbling out of the menu instead.
+                    const outBlocker = (e: Event) => { e.stopPropagation(); };
+                    const stepBlockers: SubMenuKeepAliveState['blockers'] = [];
                     const dropdownContent = element.closest('[data-testid="layoutDropdownContent"]');
-                    if (dropdownContent) {
-                        dropdownContent.addEventListener('pointerleave', leaveBlocker, true);
-                    }
+                    [subTrigger, dropdownContent].forEach(el => {
+                        if (!el) return;
+                        el.addEventListener('pointerleave', leaveBlocker, true);
+                        el.addEventListener('pointerout', outBlocker);
+                        stepBlockers.push(
+                            { el, type: 'pointerleave', handler: leaveBlocker, capture: true },
+                            { el, type: 'pointerout', handler: outBlocker, capture: false },
+                        );
+                    });
 
                     // Now that our own blockers are in place, safely stop the keep-alive.
                     // Don't use stopKeepAlive() because it restores siblings
                     // which could let Radix detect pointer on a sibling and close the sub.
                     // Instead, just stop the interval; the old blockers are redundant (ours are active).
                     // We'll do full cleanup (including siblings) when THIS step's cleanup runs.
-                    const keepAliveSiblings = keepAliveRef.current?.dimmedSiblings || [];
+                    const dimmedSiblings = keepAliveRef.current?.dimmedSiblings || [];
                     if (keepAliveRef.current) {
                         clearInterval(keepAliveRef.current.interval);
-                        keepAliveRef.current.blockers.forEach(({ el, handler }) => {
-                            el.removeEventListener('pointerleave', handler, true);
-                            el.removeEventListener('pointermove', handler, true);
-                            el.removeEventListener('pointerenter', handler, true);
-                        });
+                        removeSubMenuBlockers(keepAliveRef.current.blockers);
                         keepAliveRef.current = null;
                     }
+
+                    // Dim the sibling items ourselves. They usually arrive dimmed from the
+                    // hover step's keep-alive, but after a re-open (below) that handoff is
+                    // gone and an interactive sibling can close the sub-menu straight away.
+                    if (dropdownContent && subTrigger) {
+                        dropdownContent.querySelectorAll(':scope > *').forEach(item => {
+                            const htmlItem = item as HTMLElement;
+                            if (htmlItem.contains(subTrigger)) return;
+                            htmlItem.style.pointerEvents = 'none';
+                            htmlItem.style.opacity = '0.3';
+                            if (!dimmedSiblings.includes(htmlItem)) dimmedSiblings.push(htmlItem);
+                        });
+                    }
+
+                    // Radix can still dismiss the sub-menu mid-step — its grace-polygon logic
+                    // focuses the parent content, which closes the sub and detaches the
+                    // direction item, leaving this step pointing at a dead node. Re-run the
+                    // effect so the retry path above re-opens the sub-menu and re-binds.
+                    const reopenWatcher = window.setInterval(() => {
+                        if (element.isConnected) return;
+                        window.clearInterval(reopenWatcher);
+                        setRetryCount(c => c + 1);
+                    }, 150);
+
+                    // A re-open spent part of the retry budget; the item is back, so give the
+                    // next one a full budget again (no-op — and no re-run — when already 0).
+                    setRetryCount(0);
 
                     const clickHandler = () => {
                         if (advancePendingRef.current) return;
@@ -1215,11 +1437,11 @@ function TutorialPortal({
                         clearAdvance();
                         disabledObserver.disconnect();
                         element.removeEventListener('click', clickHandler);
-                        // Remove pointerleave protection
-                        if (subTrigger) subTrigger.removeEventListener('pointerleave', leaveBlocker, true);
-                        if (dropdownContent) dropdownContent.removeEventListener('pointerleave', leaveBlocker, true);
-                        // Restore dimmed siblings from the keep-alive (safe now — step is done)
-                        keepAliveSiblings.forEach(item => {
+                        window.clearInterval(reopenWatcher);
+                        // Remove leave protection
+                        removeSubMenuBlockers(stepBlockers);
+                        // Restore the dimmed siblings (safe now — step is done)
+                        dimmedSiblings.forEach(item => {
                             item.style.pointerEvents = '';
                             item.style.opacity = '';
                         });
@@ -1284,6 +1506,25 @@ function TutorialPortal({
                 </div>
                 <div className="text-muted-foreground">
                     {parseDescription(description, toast)}
+                    {
+                        // The live region is mounted for every step, not only while the
+                        // message shows: a region inserted together with its text is
+                        // announced unreliably, and one that is only ever replaced by an
+                        // identical copy is not re-announced at all. Keeping it means the
+                        // content genuinely goes empty -> text on each occurrence.
+                        // It sits inside the description rather than beside it because an
+                        // empty child of the panel's `space-y-4` would still add a gap.
+                    }
+                    <div role="status" aria-live="polite">
+                        {
+                            targetUnavailable &&
+                            <div className="mt-4 flex items-center gap-2 p-3 bg-secondary rounded-lg" data-testid="tutorialTargetUnavailable">
+                                <span className="text-sm text-muted-foreground">
+                                    We couldn&apos;t find this step&apos;s element on the page. Continue to the next step or skip the tutorial.
+                                </span>
+                            </div>
+                        }
+                    </div>
                 </div>
                 {
                     step === 1 &&
@@ -1303,7 +1544,7 @@ function TutorialPortal({
                     </>
                 }
                 {
-                    advanceOn && targetSelector &&
+                    advanceOn && targetSelector && !targetUnavailable &&
                     <div className="flex items-center gap-2 p-3 bg-primary/10 rounded-lg">
                         <svg className="w-5 h-5 text-primary flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
@@ -1334,14 +1575,29 @@ function TutorialPortal({
                                 />
                             }
                             {
-                                // If step does not require user action, show enabled Next/Finish
-                                !advanceOn && (
-                                    <Button
-                                        disabled={targetDisabled}
-                                        variant="Primary"
-                                        label={isLastStep ? "Finish" : "Next"}
-                                        onClick={isLastStep ? onClose : onNext}
-                                    />
+                                // A step the user advances by acting on the page
+                                // has no Next of its own — unless its target never
+                                // arrived, in which case Next is the only way out.
+                                (!advanceOn || targetUnavailable) && (
+                                    <>
+                                        {
+                                            // A disabled button fires no pointer
+                                            // events, so a `title` on it would
+                                            // never be seen — the wait is spelled
+                                            // out beside it instead.
+                                            !nextReady &&
+                                            <span className="text-xs opacity-70" data-testid="tutorialNextPending">
+                                                Preparing the next step
+                                            </span>
+                                        }
+                                        <Button
+                                            data-testid="tutorialNext"
+                                            disabled={(targetDisabled && !targetUnavailable) || !nextReady}
+                                            variant="Primary"
+                                            label={isLastStep ? "Finish" : "Next"}
+                                            onClick={isLastStep ? onClose : onNext}
+                                        />
+                                    </>
                                 )
                             }
                         </div>
@@ -1506,6 +1762,12 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
     // Load demo graphs when tutorial opens and auto-advance to step 1
     useEffect(() => {
         if (open && step === 0 && !demoLoaded) {
+            // Every step before the schema track is written against the graph
+            // view, and the tutorial's own strip is handed over without going
+            // through a tab activation — so the view the user was on would
+            // otherwise carry into it.
+            setCurrentTab("Graph");
+
             if (onLoadDemoGraphs) {
                 onLoadDemoGraphs()
                     .then(() => {
@@ -1521,7 +1783,7 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
                 setStep(1);
             }
         }
-    }, [open, step, demoLoaded, onLoadDemoGraphs, onClose]);
+    }, [open, step, demoLoaded, onLoadDemoGraphs, onClose, setCurrentTab]);
 
     const handleNextStep = useCallback(async () => {
         const currentStepDef = tutorialSteps[step];

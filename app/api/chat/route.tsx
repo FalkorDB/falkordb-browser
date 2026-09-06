@@ -210,7 +210,7 @@ export async function POST(request: NextRequest) {
             cypherQuery: result.cypherQuery || null,
             cypherResult: result.cypherResult || null,
             answer: result.answer || null,
-            confidence: (result as { confidence?: number }).confidence ?? null,
+            confidence: result.confidence ?? null,
             tokenUsage: result.tokenUsage || null,
         }, { headers: getCorsHeaders(request) });
 

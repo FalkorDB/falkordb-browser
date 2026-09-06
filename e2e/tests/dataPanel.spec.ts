@@ -85,7 +85,7 @@ test.describe("Data panel Tests", () => {
     await graph.insertQuery(FETCH_FIRST_TEN_NODES);
     await graph.clickRunQuery();
     await graph.searchElementInCanvas("Alice");
-    await graph.addAttribute("age", "30", "number");
+    await graph.addAttribute("age", "30", "integer");
     const response = await apicalls.runQuery(
       graphName,
       FETCH_FIRST_TEN_NODES ?? ""
@@ -198,7 +198,7 @@ test.describe("Data panel Tests", () => {
     await graph.insertQuery(FETCH_FIRST_TEN_NODES);
     await graph.clickRunQuery();
     await graph.searchElementInCanvas("Alice");
-    await graph.setAttribute("age", "70", "number");
+    await graph.setAttribute("age", "70", "integer");
     const response = await apicalls.runQuery(
       graphName,
       FETCH_FIRST_TEN_NODES ?? ""
@@ -403,7 +403,7 @@ test.describe("Data panel Tests", () => {
     await graph.clickRunQuery();
     await graph.searchElementInCanvas("1");
     const valueAttribute = await graph.getAttributeValue("id");
-    await graph.setAttribute("id", "10", "number");
+    await graph.setAttribute("id", "10", "integer");
     await graph.clickUnDoButtonInToast();
     expect(await graph.getAttributeValue("id")).toBe(valueAttribute);
     await apicalls.removeGraph(graphName);
@@ -452,7 +452,7 @@ test.describe("Data panel Tests", () => {
     );
     await graph.clickRunQuery();
     await graph.searchElementInCanvas("1");
-    await graph.setAttribute("id", "10", "number");
+    await graph.setAttribute("id", "10", "integer");
     const response = await apicalls.runQuery(graphName, "match (n) return n");
     expect(response.data.length).toBeGreaterThan(1);
     expect(response.data[1].n.properties.id).toBe(10);

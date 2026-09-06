@@ -1,11 +1,13 @@
 "use client";
 
-import { useContext, useMemo } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import { UDFContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import Export from "../components/Export";
 import { LanguageConfig } from "../components/EditorComponent";
+import type { editor } from "monaco-editor";
+import { findFunctionLocation } from "./functionNavigation";
 
 const EditorComponent = dynamic(() => import("../components/EditorComponent"), {
     ssr: false,
@@ -33,9 +35,16 @@ const JS_CONSTANTS = [
 
 const UDF_LANGUAGE_NAME = "udf-javascript";
 
+// Monaco normalises a model's line endings, so compare against the raw source
+// with the same normalisation — otherwise a CRLF library never matches.
+const normalizeEol = (value: string) => value.replace(/\r\n/g, "\n");
+
 export default function Page() {
 
-    const { selectedUdf } = useContext(UDFContext);
+    const { selectedUdf, selectedUdfFunction } = useContext(UDFContext);
+    const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+    // The editor is loaded dynamically, so a pick can land before it mounts.
+    const pendingFunctionRef = useRef<string | undefined>(undefined);
 
     // Extract function names from the selected UDF library
     const udfFunctions = useMemo(() => selectedUdf?.[3] || [], [selectedUdf]);
@@ -73,7 +82,6 @@ export default function Page() {
                         // Regular identifiers
                         [/[a-zA-Z_$][\w$]*/, 'variable'],
                         // Brackets
-                        // eslint-disable-next-line no-useless-escape
                         [/[{}()\[\]]/, '@brackets'],
                         // Operators
                         [/[;,.]/, 'delimiter'],
@@ -132,6 +140,69 @@ export default function Page() {
         };
     }, [udfFunctions]);
 
+    /**
+     * Jumps to `functionName` and selects its name, the way a double-click would.
+     * Returns false while the editor has not caught up with `source` yet, so the
+     * caller can retry once the model content lands.
+     */
+    const revealFunction = useCallback((functionName: string, source: string) => {
+        const editorInstance = editorRef.current;
+        if (!editorInstance) return false;
+
+        const model = editorInstance.getModel();
+        if (!model || normalizeEol(model.getValue()) !== normalizeEol(source)) return false;
+
+        const location = findFunctionLocation(source, functionName);
+        // Nothing to jump to — stop retrying.
+        if (!location) return true;
+
+        const range = {
+            startLineNumber: location.lineNumber,
+            startColumn: location.column,
+            endLineNumber: location.lineNumber,
+            endColumn: location.column + location.length,
+        };
+
+        editorInstance.setSelection(range);
+        editorInstance.revealRangeInCenter(range);
+        editorInstance.focus();
+
+        return true;
+    }, []);
+
+    useEffect(() => {
+        const source = selectedUdf?.[5];
+        const functionName = selectedUdfFunction?.name;
+
+        if (!functionName || !source) {
+            // Drop any navigation intent that was never consumed, so a later
+            // mount does not jump to a function the user has since deselected.
+            pendingFunctionRef.current = undefined;
+            return undefined;
+        }
+
+        if (revealFunction(functionName, source)) {
+            pendingFunctionRef.current = undefined;
+            return undefined;
+        }
+
+        pendingFunctionRef.current = functionName;
+
+        const editorInstance = editorRef.current;
+        if (!editorInstance) return undefined;
+
+        // The editor is mounted but still holds the previous library's code;
+        // retry once its model is updated with the new value.
+        const disposable = editorInstance.onDidChangeModelContent(() => {
+            if (revealFunction(functionName, source)) {
+                pendingFunctionRef.current = undefined;
+                disposable.dispose();
+            }
+        });
+
+        return () => disposable.dispose();
+    }, [selectedUdf, selectedUdfFunction, revealFunction]);
+
     return (
         <div className="Page">
             {
@@ -150,6 +221,18 @@ export default function Page() {
                     value={selectedUdf?.[5] || "// Select a Library to view its code"}
                     language={UDF_LANGUAGE_NAME}
                     languageConfig={udfJsLanguageConfig}
+                    onMount={(editorInstance) => {
+                        editorRef.current = editorInstance;
+
+                        const functionName = pendingFunctionRef.current;
+                        // EditorComponent keeps this callback fresh, so the
+                        // selection read here is the one on screen.
+                        const source = selectedUdf?.[5];
+
+                        if (functionName && source && revealFunction(functionName, source)) {
+                            pendingFunctionRef.current = undefined;
+                        }
+                    }}
                     height="100%"
                     readOnly
                     options={{

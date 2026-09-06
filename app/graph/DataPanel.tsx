@@ -1,16 +1,12 @@
-/* eslint-disable @typescript-eslint/no-use-before-define */
-/* eslint-disable no-param-reassign */
-/* eslint-disable react/require-default-props */
-
 'use client';
 
-import { prepareArg, securedFetch, GraphRef, Node, Link, Label } from "@/lib/utils";
+import { getActiveConnectionIdGlobal, getConnectionEpoch, isSchemaReservedKey, prepareArg, securedFetch, GraphRef, Node, Link, Label } from "@/lib/utils";
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Pencil, TableProperties, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import Button from "../components/ui/Button";
 import { IndicatorContext, GraphContext, ConnectionContext } from "../components/provider";
-import DataTable from "./DataTable";
+import DataTable, { elementKey } from "./DataTable";
 import AddLabel from "./addLabel";
 import RemoveLabel from "./RemoveLabel";
 
@@ -19,14 +15,19 @@ interface Props {
     onClose: () => void;
     setLabels: Dispatch<SetStateAction<Label[]>>;
     canvasRef: GraphRef;
+    /** Describes a label or a relationship type instead of a single element. */
+    schema?: boolean;
 }
 
-export default function DataPanel({ object, onClose, setLabels, canvasRef }: Props) {
+export default function DataPanel({ object, onClose, setLabels, canvasRef, schema }: Props) {
     const { setIndicator } = useContext(IndicatorContext);
     const { graph, setGraphInfo } = useContext(GraphContext);
     const { isReadOnly } = useContext(ConnectionContext);
 
-    const lastObjId = useRef<number | undefined>(undefined);
+    // A schema element is derived, so it is read-only whatever the connection is.
+    const readOnly = isReadOnly || !!schema;
+
+    const lastObjKey = useRef<string | undefined>(undefined);
     const labelsListRef = useRef<HTMLUListElement>(null);
 
     const { toast } = useToast();
@@ -50,14 +51,18 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
     }, [handleClose]);
 
     useEffect(() => {
-        if (lastObjId.current !== object.id) {
+        if (lastObjKey.current !== elementKey(object)) {
             setLabelsHover(false);
         }
-        setLabel(type ? [...(object as Node).labels.filter((c) => c !== "")] : [object.relationship]);
-        lastObjId.current = object.id;
-    }, [object, type]);
+        // The unlabeled schema node stands for a label of its own, so its empty
+        // name is kept and rendered as "No Label" rather than dropped.
+        setLabel(type ? (object as Node).labels.filter((c) => schema || c !== "") : [object.relationship]);
+        lastObjKey.current = elementKey(object);
+    }, [object, type, schema]);
 
     const handleAddLabel = async (newLabel: string) => {
+        const startEpoch = getConnectionEpoch();
+        const cid = getActiveConnectionIdGlobal();
         const node = object as Node;
         if (newLabel === "") {
             toast({
@@ -80,10 +85,12 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
             body: JSON.stringify({
                 label: newLabel
             })
-        }, toast, setIndicator);
+        }, toast, setIndicator, cid);
 
+        if (getConnectionEpoch() !== startEpoch) return false;
         if (result.ok) {
             setLabels([...await graph.addLabel(newLabel, node)]);
+            if (getConnectionEpoch() !== startEpoch) return false;
             setLabel([...node.labels]);
             const newGraphInfo = graph.GraphInfo.clone();
             setGraphInfo(newGraphInfo);
@@ -112,6 +119,8 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
     };
 
     const handleRemoveLabel = async (removeLabel: string) => {
+        const startEpoch = getConnectionEpoch();
+        const cid = getActiveConnectionIdGlobal();
         const node = object as Node;
 
         if (removeLabel === "") {
@@ -128,10 +137,12 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
             body: JSON.stringify({
                 label: removeLabel
             })
-        }, toast, setIndicator);
+        }, toast, setIndicator, cid);
 
+        if (getConnectionEpoch() !== startEpoch) return false;
         if (result.ok) {
             await graph.removeLabel(removeLabel, node);
+            if (getConnectionEpoch() !== startEpoch) return false;
             setLabels([...graph.Labels]);
             setLabel([...node.labels]);
             const newGraphInfo = graph.GraphInfo.clone();
@@ -173,12 +184,12 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
             </Button>
             <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between pr-5">
-                    <h1 className="text-lg font-semibold">{type ? "Node" : "Edge"} Data</h1>
+                    <h1 className="text-lg font-semibold">{schema ? `${type ? "Label" : "Relationship"} Schema` : `${type ? "Node" : "Edge"} Data`}</h1>
                     <TableProperties size={20} className="text-foreground/50" />
                 </div>
                 <div className="flex flex-col gap-1 text-sm text-nowrap">
-                    <p>ID: <span className="Gradient text-transparent bg-clip-text font-semibold">{object.id}</span></p>
-                    <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text font-semibold">{Object.keys(object.data).length}</span></p>
+                    {!schema && <p>ID: <span className="Gradient text-transparent bg-clip-text font-semibold">{object.id}</span></p>}
+                    <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text font-semibold">{Object.keys(object.data).filter((key) => !isSchemaReservedKey(key)).length}</span></p>
                 </div>
                 <ul
                     ref={labelsListRef}
@@ -195,7 +206,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
                         >
                             <p>{l || "No Label"}</p>
                             {
-                                type && l && !isReadOnly &&
+                                type && l && !readOnly &&
                                 <RemoveLabel
                                     onRemoveLabel={handleRemoveLabel}
                                     selectedLabel={l}
@@ -214,7 +225,7 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
                     ))}
                     <li className="h-8 w-[106px] flex justify-center items-center" key="addLabel">
                         {
-                            type && (labelsHover || label.length === 0) && !isReadOnly &&
+                            type && (labelsHover || label.length === 0) && !readOnly &&
                             <AddLabel
                                 onAddLabel={handleAddLabel}
                                 trigger={
@@ -234,11 +245,16 @@ export default function DataPanel({ object, onClose, setLabels, canvasRef }: Pro
             </div>
             <DataTable
                 className="h-1 grow w-full"
-                lastObjId={lastObjId}
+                lastObjKey={lastObjKey}
                 object={object}
                 type={type}
                 canvasRef={canvasRef}
+                schema={schema}
             />
         </div >
     );
 }
+
+DataPanel.defaultProps = {
+    schema: false
+};

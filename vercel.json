@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/csv-temp/cleanup",
+      "schedule": "*/30 * * * *"
+    }
+  ]
+}

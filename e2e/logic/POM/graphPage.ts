@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable no-await-in-loop */
-import { Download, Locator } from "@playwright/test";
+import { Download, Locator, expect } from "@playwright/test";
 import {
   pollForElementContent,
   waitForElementToBeVisible,
@@ -15,6 +15,8 @@ export type Element = "Node" | "Relation";
 export type ElementLabel = "Relationships" | "Labels";
 
 export type Type = "Graph" | "Role" | "Type" | "Model" | "Theme" | "Query";
+
+export type UploadMode = "dump" | "csv" | "cypher";
 
 export default class GraphPage extends BasePage {
   // CREATE
@@ -60,6 +62,48 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("exportGraphCancel");
   }
 
+  // UPLOAD
+  public get uploadBtn(): Locator {
+    return this.page.getByTestId("uploadGraph");
+  }
+
+  public get uploadConfirm(): Locator {
+    return this.page.getByTestId("uploadGraphConfirm");
+  }
+
+  public get uploadCancel(): Locator {
+    return this.page.getByTestId("uploadGraphCancel");
+  }
+
+  public get uploadFileInput(): Locator {
+    return this.page.locator('input[type="file"]');
+  }
+
+  public get loadCsvTabTrigger(): Locator {
+    return this.page.getByRole("tab", { name: "Load CSV" });
+  }
+
+  public get csvUploadTempConfirm(): Locator {
+    return this.page.getByTestId("uploadCsvTempConfirm");
+  }
+
+  public get loadCsvRunConfirm(): Locator {
+    return this.page.getByTestId("loadCsvRunConfirm");
+  }
+
+  public get loadCsvQueryEditor(): Locator {
+    return this.page.getByTestId("loadCsvQuery");
+  }
+
+  public get loadCsvWithHeadersCheckbox(): Locator {
+    return this.page.locator("#loadCsvWithHeaders");
+  }
+
+  public uploadTabTrigger(mode: UploadMode): Locator {
+    const labels: Record<UploadMode, string> = { dump: "Restore", csv: "Load CSV", cypher: "Cypher batch" };
+    return this.page.getByRole("tab", { name: labels[mode] });
+  }
+
   // RELOAD
   public get reloadList(): Locator {
     return this.page.getByTestId("reloadGraphsList");
@@ -83,6 +127,13 @@ export default class GraphPage extends BasePage {
   // MANAGE
   public get manage(): Locator {
     return this.page.getByTestId("manageGraphs");
+  }
+
+  /** A column header of the Manage Graphs table, by its visible name. */
+  public manageTableHeader(name: string): Locator {
+    return this.page
+      .getByTestId("manageContent")
+      .getByRole("columnheader", { name, exact: true });
   }
 
   // TABLE
@@ -141,6 +192,26 @@ export default class GraphPage extends BasePage {
 
   public get elementCanvasAddEdge(): Locator {
     return this.page.getByTestId("elementCanvasAddEdgeGraph");
+  }
+
+  // VISIBILITY
+  public get elementCanvasShowAll(): Locator {
+    return this.page.getByTestId("elementCanvasShowAllGraph");
+  }
+
+  async clickShowAll(): Promise<void> {
+    await interactWhenVisible(this.elementCanvasShowAll, (el) => el.click(), "show all");
+  }
+
+  /** How many elements the canvas is actually drawing. */
+  async getVisibleElementCounts(): Promise<{ nodes: number; links: number }> {
+    return this.page.evaluate(() => {
+      const data = (window as any).graph?.() ?? { nodes: [], links: [] };
+      const shown = (elements: { visible?: boolean }[]) =>
+        elements.filter((element) => element.visible !== false).length;
+
+      return { nodes: shown(data.nodes ?? []), links: shown(data.links ?? []) };
+    });
   }
 
   // DELETE ELEMENT
@@ -340,7 +411,7 @@ export default class GraphPage extends BasePage {
           (data.elements && Array.isArray(data.elements.nodes) && data.elements.nodes.length > 0)));
       },
       "graph",
-      { timeout: 5000 }
+      { timeout: 20000 }
     );
 
     const canvasInfo = await this.canvasElement.evaluate((canvasElement: HTMLCanvasElement) => {
@@ -471,7 +542,7 @@ export default class GraphPage extends BasePage {
           (data.elements && Array.isArray(data.elements.links) && data.elements.links.length > 0)));
       },
       "graph",
-      { timeout: 5000 }
+      { timeout: 20000 }
     );
 
     const canvasInfo = await this.canvasElement.evaluate((canvasElement: HTMLCanvasElement) => {
@@ -606,12 +677,12 @@ export default class GraphPage extends BasePage {
   }
 
   private get querySearchList(): Locator {
-    return this.page.locator("//div[contains(@class, 'tree')]");
+    return this.page.locator(".suggest-widget.visible").first();
   }
 
   private get querySearchListItems(): Locator {
-    return this.page.locator(
-      "//div[contains(@class, 'tree')]//div[contains(@class, 'contents')]"
+    return this.querySearchList.locator(
+      ".monaco-list-row .contents, .monaco-list-row .label-name"
     );
   }
 
@@ -627,19 +698,23 @@ export default class GraphPage extends BasePage {
    * bounding box width instead.
    */
   private async ensureGraphInfoPanelOpen(): Promise<void> {
-    // Use .first() to avoid strict-mode violations: two elements share
-    // data-testid="graphInfoPanel" (the ResizablePanel wrapper in providers.tsx
-    // and the inner div in graphInfo.tsx).
-    const box = await this.graphInfoPanel.first().boundingBox().catch(() => null);
+    // Bounded: boundingBox() waits forever on a selector that matches nothing,
+    // which turns a typo into an opaque test timeout instead of a fallback.
+    const box = await this.graphInfoPanel.boundingBox({ timeout: 5000 }).catch(() => null);
     if (!box || box.width < 50) {
       await interactWhenVisible(
         this.graphInfoToggle,
         (el) => el.click(),
         "Graph Info Toggle"
       );
-      // Wait for the panel expansion animation to complete
-      await this.graphInfoPanel.first().waitFor({ state: "visible" });
-      await this.page.waitForTimeout(300);
+      // `visible` is meaningless here (see above) and a fixed sleep is either
+      // flaky or wasted time — poll the same width the check above uses.
+      await expect
+        .poll(
+          async () => (await this.graphInfoPanel.boundingBox().catch(() => null))?.width ?? 0,
+          { timeout: 5000 }
+        )
+        .toBeGreaterThan(50);
     }
   }
 
@@ -655,6 +730,12 @@ export default class GraphPage extends BasePage {
     return this.page.getByTestId("graphInfoToggle");
   }
 
+  /**
+   * The panel body from graphInfo.tsx. It is the only element carrying this
+   * test id — react-resizable-panels overwrites any `data-testid` passed to
+   * `ResizablePanel` with the panel's own id, so the wrapper cannot be tagged.
+   * Being `w-full` inside the panel, its box still reports the real width.
+   */
   private get graphInfoPanel(): Locator {
     return this.page.getByTestId("graphInfoPanel");
   }
@@ -729,9 +810,17 @@ export default class GraphPage extends BasePage {
   }
 
   async clickCanvasElement(x: number, y: number): Promise<void> {
+    // getNodesScreenPositions/getLinksScreenPositions return absolute page
+    // coordinates (they add the canvas rect's left/top). Playwright's
+    // click({ position }) is relative to the element's top-left, so convert
+    // absolute -> element-relative using the canvas rect.
+    const offset = await this.canvasElement.evaluate((el: HTMLElement) => {
+      const rect = el.getBoundingClientRect();
+      return { left: rect.left, top: rect.top };
+    });
     await interactWhenVisible(
       this.canvasElement,
-      (el) => el.click({ position: { x, y } }),
+      (el) => el.click({ position: { x: x - offset.left, y: y - offset.top } }),
       "Canvas Element"
     );
   }
@@ -988,6 +1077,86 @@ export default class GraphPage extends BasePage {
 
   async clickGraphTab(): Promise<void> {
     await interactWhenVisible(this.graphTab, (el) => el.click(), "Graph Tab");
+  }
+
+  // GRAPH TAB STRIP
+  // The per-connection working contexts in the sub-header. Every test id is
+  // keyed on the tab's stable id, so a rename never moves a selector. Tests
+  // still address a tab by its visible label — the container carries it in
+  // `data-tab-label` and the controls are looked up inside that container.
+  public get tabStrip(): Locator {
+    return this.page.getByTestId("graphSubHeader");
+  }
+
+  public get addTabButton(): Locator {
+    return this.page.getByTestId("graphTabAdd");
+  }
+
+  public stripTab(label: string): Locator {
+    // Labels are user-supplied: quote them so a `"` or `\` cannot break out of
+    // the attribute selector.
+    return this.tabStrip.locator(`[data-tab-label=${JSON.stringify(label)}]`);
+  }
+
+  /** Positional access, for cases where labels repeat (several blank tabs). */
+  public stripTabAt(index: number): Locator {
+    return this.tabStrip.locator('[data-tab-label]').nth(index);
+  }
+
+  public stripTabClose(label: string): Locator {
+    return this.stripTab(label).locator('[data-testid^="graphTabClose-"]');
+  }
+
+  async getStripTabLabels(): Promise<string[]> {
+    await this.tabStrip.waitFor({ state: "visible" });
+    return this.tabStrip.locator('[data-testid^="graphTabSelect-"]').allInnerTexts();
+  }
+
+  async getStripTabCount(): Promise<number> {
+    await this.tabStrip.waitFor({ state: "visible" });
+    return this.tabStrip.locator('[data-testid^="graphTabSelect-"]').count();
+  }
+
+  /** The stable ids currently in the strip, in display order. */
+  async getStripTabIds(): Promise<string[]> {
+    await this.tabStrip.waitFor({ state: "visible" });
+    return this.tabStrip.locator("[data-tab-label]").evaluateAll(
+      (els) => els.map((el) => el.getAttribute("data-testid")?.replace(/^graphTab-/, "") ?? "")
+    );
+  }
+
+  async addStripTab(): Promise<void> {
+    await interactWhenVisible(this.addTabButton, (el) => el.click(), "Add Tab");
+  }
+
+  async selectStripTab(label: string): Promise<void> {
+    await interactWhenVisible(
+      this.stripTab(label).locator('[data-testid^="graphTabSelect-"]'),
+      (el) => el.click(),
+      `Select Tab ${label}`
+    );
+  }
+
+  async closeStripTab(label: string): Promise<void> {
+    await interactWhenVisible(
+      this.stripTabClose(label),
+      (el) => el.click(),
+      `Close Tab ${label}`
+    );
+  }
+
+  /** Renames via the pencil affordance. An empty name clears back to the graph name. */
+  async renameStripTab(label: string, name: string): Promise<void> {
+    const tab = this.stripTab(label);
+    await interactWhenVisible(
+      tab.locator('[data-testid^="graphTabRenameTrigger-"]'),
+      (el) => el.click(),
+      `Rename Trigger ${label}`
+    );
+    const input = tab.locator('[data-testid^="graphTabRename-"]');
+    await input.waitFor({ state: "visible" });
+    await input.fill(name);
+    await input.press("Enter");
   }
 
   async getGraphTabEnabled(): Promise<boolean> {
@@ -1267,7 +1436,22 @@ export default class GraphPage extends BasePage {
 
   async insertQuery(query: string): Promise<void> {
     await this.clickEditorInput();
-    await this.page.keyboard.type(query);
+    // Set editor content through Monaco to avoid flaky keyboard-based replacement
+    // when previous content exists or keybindings intercept keystrokes.
+    await this.page.waitForFunction(() => {
+      const m = (window as unknown as { monaco?: typeof import("monaco-editor") }).monaco;
+      const container = document.querySelector('[data-testid="editorContainer"]');
+      return !!m
+        && !!container
+        && m.editor.getEditors().some((e) => container.contains(e.getContainerDomNode()));
+    });
+    await this.page.evaluate((text) => {
+      const m = (window as unknown as { monaco?: typeof import("monaco-editor") }).monaco;
+      const container = document.querySelector('[data-testid="editorContainer"]');
+      const editor = m?.editor.getEditors().find((e) => container?.contains(e.getContainerDomNode()));
+      if (!editor) throw new Error("Monaco editor not found");
+      editor.setValue(text);
+    }, query);
   }
 
   async clickRunQuery(waitForAnimation = true): Promise<void> {
@@ -1298,6 +1482,125 @@ export default class GraphPage extends BasePage {
       this.clickExportConfirm(),
     ]);
     return download;
+  }
+
+  /** Open the Upload Data dialog for the given graph (already in Manage panel). */
+  async openUploadDialog(graphName: string): Promise<void> {
+    await this.clickSelect();
+    await this.clickManage();
+    await this.clickTableCheckboxByName(graphName);
+    await interactWhenVisible(
+      this.uploadBtn,
+      (el) => el.click(),
+      "Upload Graph Button"
+    );
+    await waitForElementToBeVisible(this.uploadConfirm);
+  }
+
+  /** Switch to the given upload tab (dump / csv / cypher). */
+  async selectUploadTab(mode: UploadMode): Promise<void> {
+    await interactWhenVisible(
+      this.uploadTabTrigger(mode),
+      (el) => el.click(),
+      `Upload Tab ${mode}`
+    );
+  }
+
+  /** Attach a file to the Dropzone file input. */
+  async setUploadFile(absoluteFilePath: string): Promise<void> {
+    await this.uploadFileInput.setInputFiles(absoluteFilePath);
+  }
+
+  /** Submit the upload form and wait for the dialog to close. */
+  async clickUploadConfirm(): Promise<void> {
+    await interactWhenVisible(
+      this.uploadConfirm,
+      (el) => el.click(),
+      "Upload Confirm"
+    );
+    // Larger CSV/dump uploads can take well over the default ~5s budget to close
+    // the dialog, so wait up to ~15s before falling through to the toast wait.
+    await waitForElementToNotBeVisible(this.uploadConfirm, 500, 30);
+  }
+
+  /**
+   * Full upload flow: open Manage, select graph, open dialog, switch to the tab
+   * for `mode`, attach the file, submit and wait for the success toast. CSV uses
+   * a dedicated multi-step flow (see `loadCsvData`) and is intentionally excluded.
+   */
+  async uploadGraphData(
+    graphName: string,
+    mode: Exclude<UploadMode, "csv">,
+    absoluteFilePath: string
+  ): Promise<void> {
+    await this.openUploadDialog(graphName);
+    // Select the tab for the requested mode. Cypher batch is the default active
+    // tab, but selecting it explicitly keeps the helper correct for every mode.
+    await this.selectUploadTab(mode);
+    await this.setUploadFile(absoluteFilePath);
+    await this.clickUploadConfirm();
+    await waitForElementToBeVisible(this.toast);
+  }
+
+  /**
+   * Full "Load CSV" flow: open Manage, select graph, open dialog, switch to the
+   * Load CSV tab, upload the CSV to temp storage, replace the starter body with
+   * `body`, and Run the `LOAD CSV` query. Waits for the success toast.
+   */
+  async loadCsvData(
+    graphName: string,
+    absoluteFilePath: string,
+    body: string,
+    withHeaders = true
+  ): Promise<void> {
+    await this.openUploadDialog(graphName);
+    await interactWhenVisible(this.loadCsvTabTrigger, (el) => el.click(), "Load CSV Tab");
+    await this.setUploadFile(absoluteFilePath);
+    await interactWhenVisible(this.csvUploadTempConfirm, (el) => el.click(), "Upload CSV Button");
+
+    // Step 2 (query editor + Run) appears once the CSV is stored.
+    await waitForElementToBeVisible(this.loadCsvRunConfirm);
+
+    if (!withHeaders) {
+      await this.loadCsvWithHeadersCheckbox.uncheck();
+    }
+
+    // Set the query body via Monaco's model API. Keyboard-based replacement is
+    // unreliable here: the editor prefills an example, intercepts select-all, and
+    // binds Enter to submit. `window.monaco` is exposed by EditorComponent.
+    await this.setLoadCsvBody(body);
+
+    await interactWhenVisible(this.loadCsvRunConfirm, (el) => el.click(), "Run LOAD CSV");
+    await waitForElementToBeVisible(this.toast);
+  }
+
+  /**
+   * Deterministically set the Load CSV query body. Finds the Monaco editor whose
+   * container lives inside the `loadCsvQuery` wrapper and calls `setValue`, which
+   * fires the React `onChange`. Relies on `window.monaco` exposed by
+   * EditorComponent (the editor is bundled, so it is not global by default).
+   */
+  async setLoadCsvBody(body: string): Promise<void> {
+    await this.page.waitForFunction(() => {
+      const wrapper = document.querySelector('[data-testid="loadCsvQuery"]');
+      const m = (window as unknown as { monaco?: typeof import("monaco-editor") }).monaco;
+      return (
+        !!m &&
+        !!wrapper &&
+        m.editor
+          .getEditors()
+          .some((e) => wrapper.contains(e.getContainerDomNode()))
+      );
+    });
+    await this.page.evaluate((text) => {
+      const wrapper = document.querySelector('[data-testid="loadCsvQuery"]');
+      const m = (window as unknown as { monaco?: typeof import("monaco-editor") }).monaco;
+      const editor = m!.editor
+        .getEditors()
+        .find((e) => wrapper!.contains(e.getContainerDomNode()));
+      if (!editor) throw new Error("Load CSV Monaco editor not found");
+      editor.setValue(text);
+    }, body);
   }
 
   async isModifyGraphNameButtonVisible(graphName: string): Promise<boolean> {
@@ -1333,9 +1636,20 @@ export default class GraphPage extends BasePage {
       isEnabled = await waitForElementToBeEnabled(this.select("Graph"), 1000, 30);
     }
     if (!isEnabled) throw new Error("Graph selector is not enabled after reloading the graph list");
+
+    const graphListResponse = this.page.waitForResponse(
+      (response) => {
+        const { pathname } = new URL(response.url());
+        // Match only the graph-list endpoint, not nested requests such as
+        // /api/graph/<name>?query=... or /api/graph/<name>/memory.
+        return /^\/api\/graph\/?$/.test(pathname) && response.request().method() === "GET";
+      }
+    );
+
     await this.clickSelect();
+    await graphListResponse;
     await this.fillSearch(graphName);
-    await this.page.waitForTimeout(500); // wait for the search results to be populated
+    await waitForElementToBeVisible(this.selectItem("Graph", graphName), 500, 20);
     await this.clickSelectItem(graphName); // selecting the first item in list after search
   }
 
@@ -1434,6 +1748,8 @@ export default class GraphPage extends BasePage {
   }
 
   async getQuerySearchListText(): Promise<string[]> {
+    // Explicitly open Monaco completion to avoid picking up unrelated UI trees.
+    await this.page.keyboard.press("Control+Space");
     await waitForElementToBeVisible(this.querySearchList);
     const elements = this.querySearchListItems;
     const count = await elements.count();

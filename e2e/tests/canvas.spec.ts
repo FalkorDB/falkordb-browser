@@ -54,8 +54,12 @@ test.describe('Canvas Tests', () => {
         await graph.clickZoomInControl();
         await graph.waitForScaleToStabilize();
         const updatedGraph = await graph.getCanvasScaling();
-        expect(updatedGraph.scaleX - initialGraph.scaleX).toBeCloseTo(1, 0);
-        expect(updatedGraph.scaleY - initialGraph.scaleY).toBeCloseTo(1, 0);
+        // Zoom is multiplicative (each click scales by 1.1), so two zoom-in
+        // clicks multiply the scale by 1.1 * 1.1 = 1.21. Assert the ratio rather
+        // than an absolute delta, which depends on the (layout-dependent) base
+        // zoom and made this test flaky.
+        expect(updatedGraph.scaleX / initialGraph.scaleX).toBeCloseTo(1.21, 1);
+        expect(updatedGraph.scaleY / initialGraph.scaleY).toBeCloseTo(1.21, 1);
         await apicalls.removeGraph(graphName);
     });
 
@@ -74,8 +78,12 @@ test.describe('Canvas Tests', () => {
         await graph.clickZoomOutControl();
         await graph.waitForScaleToStabilize();
         const updatedGraph = await graph.getCanvasScaling();
-        expect(initialGraph.scaleX - updatedGraph.scaleX).toBeCloseTo(1, 0);
-        expect(initialGraph.scaleY - updatedGraph.scaleY).toBeCloseTo(1, 0);
+        // Zoom is multiplicative (each click scales by 0.9), so two zoom-out
+        // clicks multiply the scale by 0.9 * 0.9 = 0.81. Assert the ratio rather
+        // than an absolute delta, which depends on the (layout-dependent) base
+        // zoom and made this test flaky.
+        expect(updatedGraph.scaleX / initialGraph.scaleX).toBeCloseTo(0.81, 1);
+        expect(updatedGraph.scaleY / initialGraph.scaleY).toBeCloseTo(0.81, 1);
 
         await apicalls.removeGraph(graphName);
     });
@@ -244,6 +252,24 @@ test.describe('Canvas Tests', () => {
         await graph.clickLabelsButtonByLabel("Relationships", "KNOWS");
         const links2 = await graph.getLinksScreenPositions();
         expect(links2[0].visible).toBeTruthy();
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin Validate show all brings back what the legend hid`, async () => {
+        const graphName = getRandomString('graph');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery(CREATE_QUERY);
+        await graph.clickRunQuery();
+
+        await graph.clickLabelsButtonByLabel("Labels", "person1");
+        await graph.clickLabelsButtonByLabel("Relationships", "KNOWS");
+        expect(await graph.getVisibleElementCounts()).toEqual({ nodes: 1, links: 0 });
+
+        await graph.clickShowAll();
+        expect(await graph.getVisibleElementCounts()).toEqual({ nodes: 2, links: 1 });
         await apicalls.removeGraph(graphName);
     });
 

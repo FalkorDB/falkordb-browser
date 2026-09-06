@@ -35,6 +35,10 @@ export default class ChatComponent extends GraphPage {
     return this.page.getByTestId(`chatAssistantMessage-${type}`);
   }
 
+  private get chatConfidenceBadge(): Locator {
+    return this.page.getByTestId("chatConfidenceBadge");
+  }
+
   // Input and Send
   private get chatForm(): Locator {
     return this.page.getByTestId("chatForm");
@@ -243,8 +247,14 @@ export default class ChatComponent extends GraphPage {
   }
 
   // Combined Actions
+  /**
+   * Idempotent: the chat panel is part of the tab's persisted state, so after a
+   * reload it can already be open. Toggling it blindly would close it.
+   */
   async openChat(): Promise<void> {
-    await this.clickChatToggleButton();
+    if (!(await this.isChatPanelVisible())) {
+      await this.clickChatToggleButton();
+    }
     await this.waitForChatPanel();
   }
 
@@ -397,5 +407,26 @@ export default class ChatComponent extends GraphPage {
       (el) => el.textContent(),
       "Chat Footer Model"
     );
+  }
+
+  async waitForChatConfidenceBadge(): Promise<boolean> {
+    try {
+      await this.chatConfidenceBadge.last().waitFor({ state: "visible", timeout: 10000 });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async getChatConfidenceBadgeText(): Promise<string | null> {
+    return interactWhenVisible(
+      this.chatConfidenceBadge.last(),
+      (el) => el.textContent(),
+      "Chat Confidence Badge"
+    );
+  }
+
+  async getChatConfidenceBadgeCount(): Promise<number> {
+    return this.chatConfidenceBadge.count();
   }
 }

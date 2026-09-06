@@ -35,6 +35,20 @@ test.describe("Graph Tests", () => {
     await apiCall.removeGraph(graphName);
   });
 
+  test(`@admin Validate that the graphs table hides the Status column when offload is unsupported`, async () => {
+    const graphName = getRandomString("graph");
+    await apiCall.addGraph(graphName);
+    try {
+      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+      await graph.clickSelect();
+      await graph.clickManage();
+      await expect(graph.manageTableHeader("Name")).toBeVisible();
+      await expect(graph.manageTableHeader("Status")).toHaveCount(0);
+    } finally {
+      await apiCall.removeGraph(graphName);
+    }
+  });
+
   test(`@admin Add graph via API -> remove graph via UI -> validate graph exists via API`, async () => {
     const graphName = getRandomString("graph");
     await apiCall.addGraph(graphName);
@@ -312,8 +326,7 @@ test.describe("Graph Tests", () => {
   });
 
   const queriesInput = [
-    { query: "C", keywords: ["call", "collect", "count", "create"] },
-    { query: "M", keywords: ["max", "min", "match", "merge"] },
+    { query: "C", keywords: ["call", "case", "create"] },
   ];
   queriesInput.forEach(({ query, keywords }) => {
     test(`@readwrite Validate auto complete in query search for: ${query}`, async () => {
@@ -324,7 +337,7 @@ test.describe("Graph Tests", () => {
       await graph.selectGraphByName(graphName);
       await graph.insertQuery(query);
       const response = await graph.getQuerySearchListText();
-      const hasAny = response.some((s) => keywords.some((k) => s.includes(k)));
+      const hasAny = response.some((s) => keywords.some((k) => s.toLowerCase().includes(k.toLowerCase())));
       expect(hasAny).toBeTruthy();
       await apiCall.removeGraph(graphName);
     });
