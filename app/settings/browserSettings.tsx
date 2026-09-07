@@ -16,6 +16,7 @@ import { detectProviderFromApiKey, getProviderDisplayName } from "@/lib/ai-provi
 import { serverEncrypt } from "@/lib/server-encryption";
 import { CHAT_API_KEYS_STORAGE_KEY, getSelectedChatApiKey, persistSelectedChatApiKeyId } from "@/lib/chat-api-key-storage";
 import { MAX_GRAPH_TABS, MIN_GRAPH_TABS } from "@/lib/useGraphTabs";
+import { MAX_UI_FONT_SCALE, MIN_UI_FONT_SCALE, UI_FONT_SCALE_STEP } from "@/lib/uiScale";
 import { BrowserSettingsContext, type ChatModelSource, type LocalLlmProvider } from "../components/provider";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -53,6 +54,8 @@ export default function BrowserSettings() {
                 setNewRefreshInterval,
                 newMaxTabs,
                 setNewMaxTabs,
+                newUiFontScale,
+                setNewUiFontScale,
             },
             chatSettings: { setNewSecretKey, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly, newChatModelSource, setNewChatModelSource, newLocalLlmProvider, setNewLocalLlmProvider, newLocalLlmEndpoint, setNewLocalLlmEndpoint, newModel, setNewModel },
             graphInfo: { newMaxItemsForSearch, setNewMaxItemsForSearch },
@@ -69,6 +72,7 @@ export default function BrowserSettings() {
                 captionKeysSettings: { captionsKeys, showPropertyKeyPrefix },
                 refreshInterval,
                 maxTabs,
+                uiFontScale,
                 tableViewSettings: { columnWidth, rowHeight, rowHeightExpandMultiple },
             },
             chatSettings: { secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, model, setModel, setSecretKey, setSelectedChatApiKeyId, setChatApiKeys, maxSavedMessages, cypherOnly, perSourceModels, setPerSourceModels },
@@ -293,6 +297,7 @@ export default function BrowserSettings() {
         setEditingKeyValue("");
         setNewRefreshInterval(refreshInterval);
         setNewMaxTabs(maxTabs);
+        setNewUiFontScale(uiFontScale);
         setNewMaxSavedMessages(maxSavedMessages);
         setNewCaptionsKeys(captionsKeys);
         setNewShowPropertyKeyPrefix(showPropertyKeyPrefix);
@@ -305,7 +310,7 @@ export default function BrowserSettings() {
         setNewLocalLlmProvider(localLlmProvider);
         setNewLocalLlmEndpoint(localLlmEndpoint);
         setNewModel(model);
-    }, [runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewRefreshInterval, refreshInterval, setNewMaxTabs, maxTabs, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch, chatModelSource, localLlmProvider, localLlmEndpoint, model, setNewChatModelSource, setNewLocalLlmProvider, setNewLocalLlmEndpoint, setNewModel, rowHeight]);
+    }, [runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, setNewRefreshInterval, refreshInterval, setNewMaxTabs, maxTabs, setNewMaxSavedMessages, maxSavedMessages, setNewCaptionsKeys, captionsKeys, setNewShowPropertyKeyPrefix, showPropertyKeyPrefix, setNewCypherOnly, cypherOnly, setNewColumnWidth, columnWidth, setNewRowHeight, setNewRowHeightExpandMultiple, rowHeightExpandMultiple, setNewMaxItemsForSearch, maxItemsForSearch, chatModelSource, localLlmProvider, localLlmEndpoint, model, setNewChatModelSource, setNewLocalLlmProvider, setNewLocalLlmEndpoint, setNewModel, rowHeight, uiFontScale, setNewUiFontScale]);
 
     useEffect(() => {
         setHasChanges(
@@ -315,6 +320,7 @@ export default function BrowserSettings() {
             newRunDefaultQuery !== runDefaultQuery ||
             refreshInterval !== newRefreshInterval ||
             newMaxTabs !== maxTabs ||
+            newUiFontScale !== uiFontScale ||
             newMaxSavedMessages !== maxSavedMessages ||
             !areCaptionKeysEqual(newCaptionsKeys, captionsKeys) ||
             newShowPropertyKeyPrefix !== showPropertyKeyPrefix ||
@@ -328,7 +334,7 @@ export default function BrowserSettings() {
             newLocalLlmEndpoint !== localLlmEndpoint ||
             newModel !== model
         );
-    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newTimeout, runDefaultQuery, setHasChanges, timeoutValue, refreshInterval, newRefreshInterval, maxTabs, newMaxTabs, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, newChatModelSource, chatModelSource, newLocalLlmProvider, localLlmProvider, newLocalLlmEndpoint, localLlmEndpoint, newModel, model]);
+    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newTimeout, runDefaultQuery, setHasChanges, timeoutValue, refreshInterval, newRefreshInterval, maxTabs, newMaxTabs, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, newChatModelSource, chatModelSource, newLocalLlmProvider, localLlmProvider, newLocalLlmEndpoint, localLlmEndpoint, newModel, model, uiFontScale, newUiFontScale]);
 
     const handleSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
         e?.preventDefault();
@@ -1473,6 +1479,50 @@ export default function BrowserSettings() {
                                             <div className="flex justify-between text-xs text-muted-foreground mt-2">
                                                 <span>{MIN_GRAPH_TABS}</span>
                                                 <span>{MAX_GRAPH_TABS}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Text Size */}
+                                    <div className="basis-0 grow flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 p-2 bg-muted/10 rounded-lg">
+                                        <div className="flex flex-col gap-2 flex-1">
+                                            <label id="uiFontScaleLabel" htmlFor="uiFontScale" className="text-lg font-semibold">Text Size</label>
+                                            <p className="text-sm text-muted-foreground">
+                                                Scale every text in the interface to {newUiFontScale}% of its default size.
+                                            </p>
+                                        </div>
+                                        <div className="sm:w-64">
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    aria-label="Decrease text size"
+                                                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background hover:bg-muted"
+                                                    onClick={() => nudgeSlider(newUiFontScale, -UI_FONT_SCALE_STEP, MIN_UI_FONT_SCALE, MAX_UI_FONT_SCALE, setNewUiFontScale, "uiFontScale")}
+                                                >
+                                                    <Minus className="h-4 w-4" />
+                                                </button>
+                                                <Slider
+                                                    id="uiFontScale"
+                                                    aria-labelledby="uiFontScaleLabel"
+                                                    className="w-full"
+                                                    min={MIN_UI_FONT_SCALE}
+                                                    max={MAX_UI_FONT_SCALE}
+                                                    step={UI_FONT_SCALE_STEP}
+                                                    value={[newUiFontScale]}
+                                                    onValueChange={(value) => createChangeHandler(setNewUiFontScale)(value[value.length - 1], "uiFontScale")}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    aria-label="Increase text size"
+                                                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background hover:bg-muted"
+                                                    onClick={() => nudgeSlider(newUiFontScale, UI_FONT_SCALE_STEP, MIN_UI_FONT_SCALE, MAX_UI_FONT_SCALE, setNewUiFontScale, "uiFontScale")}
+                                                >
+                                                    <Plus className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                            <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                                                <span>{MIN_UI_FONT_SCALE}%</span>
+                                                <span>{MAX_UI_FONT_SCALE}%</span>
                                             </div>
                                         </div>
                                     </div>

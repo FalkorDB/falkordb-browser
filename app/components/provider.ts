@@ -9,6 +9,7 @@ import type { SessionConnection } from "next-auth";
 import type { LanguageConfig } from "./EditorComponent";
 import { Graph, GraphInfo } from "../api/graph/model";
 import { DEFAULT_GRAPH_TABS, GraphTab, SchemaViewMeta } from "@/lib/useGraphTabs";
+import { DEFAULT_UI_FONT_SCALE } from "@/lib/uiScale";
 
 export type ChatApiKey = {
   id: string;
@@ -40,6 +41,8 @@ type BrowserSettingsContextType = {
       setNewRefreshInterval: Dispatch<SetStateAction<number>>;
       newMaxTabs: number;
       setNewMaxTabs: Dispatch<SetStateAction<number>>;
+      newUiFontScale: number;
+      setNewUiFontScale: Dispatch<SetStateAction<number>>;
       captionKeysSettings: {
         newCaptionsKeys: [string, boolean][];
         setNewCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
@@ -97,6 +100,9 @@ type BrowserSettingsContextType = {
       /** Upper bound on open graph tabs, between 4 and 10. */
       maxTabs: number;
       setMaxTabs: Dispatch<SetStateAction<number>>;
+      /** UI text size, as a percentage of the default type scale. */
+      uiFontScale: number;
+      setUiFontScale: Dispatch<SetStateAction<number>>;
       captionKeysSettings: {
         captionsKeys: [string, boolean][];
         setCaptionsKeys: Dispatch<SetStateAction<[string, boolean][]>>;
@@ -387,6 +393,8 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         setNewRefreshInterval: () => { },
         newMaxTabs: DEFAULT_GRAPH_TABS,
         setNewMaxTabs: () => { },
+        newUiFontScale: DEFAULT_UI_FONT_SCALE,
+        setNewUiFontScale: () => { },
       },
       chatSettings: {
         newSecretKey: "",
@@ -429,6 +437,8 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         setRefreshInterval: () => { },
         maxTabs: DEFAULT_GRAPH_TABS,
         setMaxTabs: () => { },
+        uiFontScale: DEFAULT_UI_FONT_SCALE,
+        setUiFontScale: () => { },
         captionKeysSettings: {
           captionsKeys: [],
           setCaptionsKeys: () => { },

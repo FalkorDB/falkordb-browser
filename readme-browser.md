@@ -100,6 +100,7 @@ The `/settings` area includes multiple sections:
   - User experience:
     - content persistence (auto-save/restore)
     - display-text priority (controls which node property is shown as the node caption)
+    - text size (scales every UI text size between 80% and 150%)
   - Graph info refresh interval.
   - Tutorial replay.
 - **DB configurations** (Admin)

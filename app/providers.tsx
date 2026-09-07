@@ -28,6 +28,7 @@ import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } f
 import { GRAPH_OFFLOAD_VERSION_THRESHOLD, MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
 import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDirection, normalizeLayout } from "@/lib/useGraphTabs";
+import { applyUiFontScale, clampUiFontScale, DEFAULT_UI_FONT_SCALE, UI_FONT_SCALE_STORAGE_KEY } from "@/lib/uiScale";
 
 /**
  * A live snapshot of everything the graph view is showing.
@@ -309,6 +310,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   const [newRefreshInterval, setNewRefreshInterval] = useState(0);
   const [maxTabs, setMaxTabs] = useState(DEFAULT_GRAPH_TABS);
   const [newMaxTabs, setNewMaxTabs] = useState(DEFAULT_GRAPH_TABS);
+  const [uiFontScale, setUiFontScale] = useState(DEFAULT_UI_FONT_SCALE);
+  const [newUiFontScale, setNewUiFontScale] = useState(DEFAULT_UI_FONT_SCALE);
   const [currentTab, setCurrentTab] = useState<Tab>("Graph");
   const [newSecretKey, setNewSecretKey] = useState("");
   const [secretKey, setSecretKey] = useState("");
@@ -451,6 +454,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         setNewRefreshInterval,
         newMaxTabs,
         setNewMaxTabs,
+        newUiFontScale,
+        setNewUiFontScale,
       },
       chatSettings: { newSecretKey, setNewSecretKey, newMaxSavedMessages, setNewMaxSavedMessages, newCypherOnly, setNewCypherOnly, newChatModelSource, setNewChatModelSource, newLocalLlmProvider, setNewLocalLlmProvider, newLocalLlmEndpoint, setNewLocalLlmEndpoint, newModel, setNewModel },
       graphInfo: { newMaxItemsForSearch, setNewMaxItemsForSearch },
@@ -470,6 +475,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
         setRefreshInterval,
         maxTabs,
         setMaxTabs,
+        uiFontScale,
+        setUiFontScale,
         captionKeysSettings: { captionsKeys, setCaptionsKeys, showPropertyKeyPrefix, setShowPropertyKeyPrefix },
         tableViewSettings: { columnWidth, setColumnWidth, rowHeight, setRowHeight, rowHeightExpandMultiple, setRowHeightExpandMultiple },
       },
@@ -488,6 +495,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       localStorage.setItem("limit", newLimit.toString());
       localStorage.setItem("refreshInterval", newRefreshInterval.toString());
       localStorage.setItem("maxTabs", clampMaxTabs(newMaxTabs).toString());
+      localStorage.setItem(UI_FONT_SCALE_STORAGE_KEY, clampUiFontScale(newUiFontScale).toString());
       localStorage.setItem("maxSavedMessages", newMaxSavedMessages.toString());
       localStorage.setItem("captionsKeys", JSON.stringify(newCaptionsKeys));
       localStorage.setItem("showPropertyKeyPrefix", newShowPropertyKeyPrefix.toString());
@@ -505,6 +513,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setLastLimit(limit);
       setRefreshInterval(newRefreshInterval);
       setMaxTabs(clampMaxTabs(newMaxTabs));
+      setUiFontScale(clampUiFontScale(newUiFontScale));
       setMaxSavedMessages(newMaxSavedMessages);
       setCaptionsKeys(newCaptionsKeys);
       setShowPropertyKeyPrefix(newShowPropertyKeyPrefix);
@@ -544,6 +553,7 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setNewSecretKey(secretKey);
       setNewRefreshInterval(refreshInterval);
       setNewMaxTabs(maxTabs);
+      setNewUiFontScale(uiFontScale);
       setNewMaxSavedMessages(maxSavedMessages);
       setNewCaptionsKeys(captionsKeys);
       setNewShowPropertyKeyPrefix(showPropertyKeyPrefix);
@@ -559,7 +569,11 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       setHasChanges(false);
     }
 
-  }), [defaultQuery, hasChanges, lastLimit, limit, model, newDefaultQuery, newLimit, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, maxTabs, newMaxTabs, runDefaultQuery, secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, toast, perSourceModels, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, newModel]);
+  }), [defaultQuery, hasChanges, lastLimit, limit, model, newDefaultQuery, newLimit, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, maxTabs, newMaxTabs, uiFontScale, newUiFontScale, runDefaultQuery, secretKey, chatApiKeys, selectedChatApiKeyId, chatModelSource, localLlmProvider, localLlmEndpoint, timeout, replayTutorial, tutorialOpen, showMemoryUsage, newMaxSavedMessages, maxSavedMessages, newCaptionsKeys, captionsKeys, newShowPropertyKeyPrefix, showPropertyKeyPrefix, newCypherOnly, cypherOnly, newColumnWidth, columnWidth, newRowHeight, rowHeight, newRowHeightExpandMultiple, rowHeightExpandMultiple, newMaxItemsForSearch, maxItemsForSearch, toast, perSourceModels, newChatModelSource, newLocalLlmProvider, newLocalLlmEndpoint, newModel]);
+
+  useEffect(() => {
+    applyUiFontScale(uiFontScale);
+  }, [uiFontScale]);
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -1748,6 +1762,9 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
       // Seed the settings-form value too, otherwise the form keeps showing the
       // default and reads as "changed" against the value actually in effect.
       setNewMaxTabs(loadedMaxTabs);
+      const loadedUiFontScale = clampUiFontScale(parseInt(localStorage.getItem(UI_FONT_SCALE_STORAGE_KEY) || "", 10));
+      setUiFontScale(loadedUiFontScale);
+      setNewUiFontScale(loadedUiFontScale);
       setMaxSavedMessages(parseInt(localStorage.getItem("maxSavedMessages") || "5", 10));
       setShowPropertyKeyPrefix(localStorage.getItem("showPropertyKeyPrefix") === "true");
       setCypherOnly(localStorage.getItem("cypherOnly") === "true");

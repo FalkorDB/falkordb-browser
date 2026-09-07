@@ -1,8 +1,31 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
+/*
+ * Every Tailwind `text-*` utility resolves its font size through these theme
+ * variables, so multiplying them here rescales the whole UI type scale at once.
+ * `--ui-font-scale` is written on <html> from the "Text Size" setting (see
+ * lib/uiScale.ts). Line heights are unitless ratios, so they follow along.
+ */
+@theme {
+    --text-xs: calc(0.75rem * var(--ui-font-scale, 1));
+    --text-sm: calc(0.875rem * var(--ui-font-scale, 1));
+    --text-base: calc(1rem * var(--ui-font-scale, 1));
+    --text-lg: calc(1.125rem * var(--ui-font-scale, 1));
+    --text-xl: calc(1.25rem * var(--ui-font-scale, 1));
+    --text-2xl: calc(1.5rem * var(--ui-font-scale, 1));
+    --text-3xl: calc(1.875rem * var(--ui-font-scale, 1));
+    --text-4xl: calc(2.25rem * var(--ui-font-scale, 1));
+    --text-5xl: calc(3rem * var(--ui-font-scale, 1));
+    --text-6xl: calc(3.75rem * var(--ui-font-scale, 1));
+    --text-7xl: calc(4.5rem * var(--ui-font-scale, 1));
+    --text-8xl: calc(6rem * var(--ui-font-scale, 1));
+    --text-9xl: calc(8rem * var(--ui-font-scale, 1));
+}
+
 @layer base {
     :root {
+        --ui-font-scale: 1;
         --background: 0 0% 100%;
         --foreground: 0 0% 10%;
         --secondary: 0 0% 95%;
@@ -30,7 +53,8 @@
         --yellow: 48 96% 53%;
         --fav: 48 96% 53%;
     }
-  .theme {
+
+    .theme {
         --animate-shine: shine var(--duration) infinite linear;
     }
 }
@@ -61,7 +85,7 @@
     }
 
     .tabs-trigger {
-        @apply !p-0 rounded-lg border border-transparent text-foreground hover:!bg-secondary hover:!border-border/10 data-[state=active]:!text-primary;
+        @apply !p-0 rounded-lg border border-transparent text-foreground hover: !bg-secondary hover: !border-border/10 data-[state=active]: !text-primary;
     }
 
     .hide-scrollbar {
@@ -224,9 +248,17 @@ input[type="color"]::-webkit-color-swatch {
     line-height: 1.25;
 }
 
-.markdown-body h1 { font-size: 1.25em; }
-.markdown-body h2 { font-size: 1.15em; }
-.markdown-body h3 { font-size: 1.05em; }
+.markdown-body h1 {
+    font-size: 1.25em;
+}
+
+.markdown-body h2 {
+    font-size: 1.15em;
+}
+
+.markdown-body h3 {
+    font-size: 1.05em;
+}
 
 .markdown-body ul,
 .markdown-body ol {
@@ -234,8 +266,13 @@ input[type="color"]::-webkit-color-swatch {
     padding-left: 1.5em;
 }
 
-.markdown-body ul { list-style: disc; }
-.markdown-body ol { list-style: decimal; }
+.markdown-body ul {
+    list-style: disc;
+}
+
+.markdown-body ol {
+    list-style: decimal;
+}
 
 .markdown-body li {
     margin: 0.125em 0;
@@ -295,8 +332,13 @@ input[type="color"]::-webkit-color-swatch {
     padding: 0.25em 0.5em;
 }
 
-.markdown-body strong { font-weight: 600; }
-.markdown-body em { font-style: italic; }
+.markdown-body strong {
+    font-weight: 600;
+}
+
+.markdown-body em {
+    font-style: italic;
+}
 
 /* Monaco's overflow widgets (suggest, find, hover) are rendered as direct children
    of .overflowingContentWidgets / .overflowingOverlayWidgets at document.body level
@@ -304,8 +346,8 @@ input[type="color"]::-webkit-color-swatch {
    but their z-index comes from selectors like `.monaco-editor .suggest-widget` which
    don't match when the widget lives outside .monaco-editor.
    Set z-index on the widgets themselves so they paint above Radix UI overlays (z-30). */
-.overflowingContentWidgets > *,
-.overflowingOverlayWidgets > * {
+.overflowingContentWidgets>*,
+.overflowingOverlayWidgets>* {
     z-index: 50;
 }
 
