@@ -4,7 +4,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { EyeIcon, EyeOffIcon, ExternalLink, InfoIcon, X } from "lucide-react";
+import { CircleAlert, EyeIcon, EyeOffIcon, ExternalLink, InfoIcon, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
@@ -138,6 +138,8 @@ function TagInput({ field }: { field: TagField }) {
 export default function FormComponent({ handleSubmit, fields, error = undefined, children = undefined, submitButtonLabel = "Submit", className = "" }: Props) {
     const [show, setShow] = useState<{ [key: string]: boolean }>({});
     const [errors, setErrors] = useState<{ [key: string]: boolean }>({});
+    // Label of the field whose error bubble is showing — raised when validation fires, dismissed on blur
+    const [bubbleField, setBubbleField] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const isMountedRef = useRef(false);
     const prevFieldsKeyRef = useRef<string | null>(null);
@@ -198,10 +200,13 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
             {
                 fields.map((field) => {
                     const passwordType = show[field.label] ? "text" : "password";
+                    const errorMessage = errors[field.label]
+                        ? field.errors?.find((err) => err.condition(field.value))?.message
+                        : undefined;
                     return (
                         <div className="flex flex-col gap-1" key={field.label}>
                             <div className={cn(field.info && "flex gap-2 items-center")}>
-                                <label className={cn(errors[field.label] && "text-destructive")} htmlFor={field.label}>{field.required && <span>*</span>} {field.label}</label>
+                                <label className={cn(errorMessage && "text-destructive")} htmlFor={field.label}>{field.required && <span>*</span>} {field.label}</label>
                                 {
                                     field.info &&
                                     <Tooltip>
@@ -245,31 +250,43 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                         />
                                         : field.type === "tag" ?
                                             <TagInput field={field} />
-                                        : <Input
-                                            className={cn("w-full", field.type === "password" && "pr-10")}
-                                            id={field.label}
-                                            type={field.type === "password" ? passwordType : field.type}
-                                            placeholder={field.placeholder}
-                                            value={field.value}
-                                            disabled={field.disabled}
-                                            onChange={(e) => {
-                                                field.onChange(e);
-                                                if (field.type === "password") {
-                                                    const confirmPasswordField = fields.find(f => f.label === "Confirm Password");
-                                                    if (confirmPasswordField && confirmPasswordField.errors) {
-                                                        setErrors(prev => ({
-                                                            ...prev,
-                                                            "Confirm Password": confirmPasswordField.errors!.some(err => err.condition(confirmPasswordField.value, e.target.value))
-                                                        }));
-                                                    }
-                                                }
-                                                if (field.errors) {
-                                                    setErrors(prev => ({
-                                                        ...prev,
-                                                        [field.label]: field.errors!.some(err => err.condition(e.target.value))
-                                                    }));
-                                                }
-                                            }} />
+                                        : <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Input
+                                                    className={cn("w-full", field.type === "password" && "pr-10", errorMessage && "border-destructive")}
+                                                    id={field.label}
+                                                    type={field.type === "password" ? passwordType : field.type}
+                                                    placeholder={field.placeholder}
+                                                    value={field.value}
+                                                    disabled={field.disabled}
+                                                    aria-invalid={!!errorMessage}
+                                                    onBlur={() => setBubbleField(prev => (prev === field.label ? null : prev))}
+                                                    onChange={(e) => {
+                                                        field.onChange(e);
+                                                        if (field.type === "password") {
+                                                            const confirmPasswordField = fields.find(f => f.label === "Confirm Password");
+                                                            if (confirmPasswordField && confirmPasswordField.errors) {
+                                                                setErrors(prev => ({
+                                                                    ...prev,
+                                                                    "Confirm Password": confirmPasswordField.errors!.some(err => err.condition(confirmPasswordField.value, e.target.value))
+                                                                }));
+                                                            }
+                                                        }
+                                                        if (field.errors) {
+                                                            const hasError = field.errors.some(err => err.condition(e.target.value));
+                                                            setErrors(prev => ({
+                                                                ...prev,
+                                                                [field.label]: hasError
+                                                            }));
+                                                            setBubbleField(prev => {
+                                                                if (hasError) return field.label;
+                                                                return prev === field.label ? null : prev;
+                                                            });
+                                                        }
+                                                    }} />
+                                            </TooltipTrigger>
+                                            {errorMessage && <TooltipContent>{errorMessage}</TooltipContent>}
+                                        </Tooltip>
                                 }
                                 <p className="text-sm text-gray-500">{field.description}</p>
                                 {
@@ -285,12 +302,13 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                     </a>
                                 }
                                 {
-                                    field.errors &&
-                                    <div className="h-5">
-                                        {
-                                            errors[field.label] &&
-                                            <p className="text-sm text-destructive">{field.errors.find((err) => err.condition(field.value))?.message}</p>
-                                        }
+                                    errorMessage && bubbleField === field.label &&
+                                    <div
+                                        role="alert"
+                                        className="absolute bottom-full left-1/2 -translate-x-1/2 z-[9999] mb-1 flex w-max max-w-full items-center gap-2 rounded-md border border-border bg-background px-2 py-1 text-sm shadow-md"
+                                    >
+                                        <CircleAlert className="shrink-0 text-destructive" size={16} />
+                                        {errorMessage}
                                     </div>
                                 }
                             </div>
@@ -299,9 +317,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                 })
             }
             {children}
-            <div className="min-h-8">
-                {error?.show && (typeof error.message === "string" ? <p className="text-sm text-destructive">{error.message}</p> : error?.message)}
-            </div>
+            {error?.show && (typeof error.message === "string" ? <p className="text-sm text-destructive">{error.message}</p> : error?.message)}
             <div className="flex justify-end gap-2">
                 <Button
                     id="submit-button"

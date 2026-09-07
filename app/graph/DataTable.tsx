@@ -13,7 +13,7 @@ import Input from "../components/ui/Input";
 import DialogComponent from "../components/DialogComponent";
 import CloseDialog from "../components/CloseDialog";
 import { EMPTY_DISPLAY_NAME } from "../api/graph/model";
-import { BrowserSettingsContext, GraphContext, GraphTabsContext, IndicatorContext, ConnectionContext } from "../components/provider";
+import { BrowserSettingsContext, GraphContext, IndicatorContext, ConnectionContext } from "../components/provider";
 import ToastButton from "../components/ToastButton";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
@@ -101,7 +101,6 @@ interface Props {
 export default function DataTable({ object, type, lastObjKey, canvasRef, className, schema }: Props) {
 
     const { graph, setGraphInfo, graphName, ontologyGraphs, bumpOntologyVersion, markOntologyEdited } = useContext(GraphContext);
-    const { schemaSource } = useContext(GraphTabsContext);
     const { settings: { userExperienceSettings: { captionKeysSettings: { captionsKeys } } } } = useContext(BrowserSettingsContext);
     const { isReadOnly } = useContext(ConnectionContext);
     const { toast } = useToast();
@@ -591,10 +590,9 @@ export default function DataTable({ object, type, lastObjKey, canvasRef, classNa
     // ontology is the exception — it is written by hand, so it can be edited.
     if (schema) {
         const rules = (object.data[SCHEMA_RULES_KEY] ?? {}) as SchemaPropertyRulesMap;
-        // A graph that declares an ontology can still be showing the schema read
-        // back out of its data, which reports storage like any other. Only the
-        // declaration itself describes types alone, and can be edited.
-        const isOntology = ontologyGraphs.includes(graphName) && schemaSource === "ontology";
+        // A declared ontology describes types alone, and is written by hand, so
+        // it can be edited. A discovered schema reports storage and cannot.
+        const isOntology = ontologyGraphs.includes(graphName);
         // Editing a discovered schema would mean editing the data it was read
         // off, which is not what the schema view is for.
         const canDeclare = isOntology && !isReadOnly;

@@ -220,6 +220,10 @@ function GraphView({
                 fallback={graphView}
                 selectedElements={selectedSchemaElements}
                 setSelectedElements={setSelectedSchemaElements}
+                isAddNode={isAddNode}
+                isAddEdge={isAddEdge}
+                setIsAddNode={setIsAddNode}
+                setIsAddEdge={setIsAddEdge}
             >
                 {(view) => (
                     <>
@@ -242,6 +246,9 @@ function GraphView({
                                             setExpand={view.setExpand}
                                             isAddEdge={view.isAddEdge}
                                             isAddNode={view.isAddNode}
+                                            addNodeTitle={view.addNodeTitle}
+                                            addEdgeTitle={view.addEdgeTitle}
+                                            deleteDescription={view.deleteDescription}
                                         />
                                         {
                                             view.expand && (view.labels.length !== 0 || view.relationships.length !== 0) &&

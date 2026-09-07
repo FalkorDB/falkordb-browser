@@ -2,7 +2,7 @@
 
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { cn, convertToCanvasData, getActiveConnectionIdGlobal, getConnectionEpoch, getMemoryUsage, getMetaStats, getSSEGraphResult, isAbortError, isTwoNodes, Link, MemoryValue, Node, parsePanelSizePercent, prepareArg, securedFetch, Value } from "@/lib/utils";
-import { withDeclaredTypes } from "@/lib/ontology";
+import { ontologyDeclaredType, withDeclaredTypes } from "@/lib/ontology";
 import { useToast } from "@/components/ui/use-toast";
 import dynamicImport from "next/dynamic";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -29,6 +29,10 @@ const CreateElementPanel = dynamicImport(() => import("./CreateElementPanel"), {
     ssr: false,
 });
 
+const CreateOntologyElementPanel = dynamicImport(() => import("./CreateOntologyElementPanel"), {
+    ssr: false,
+});
+
 const Selector = dynamicImport(() => import("./Selector"), {
     ssr: false,
     loading: () => <div className="h-[50px] flex flex-row gap-3 items-center">
@@ -46,6 +50,9 @@ const GraphView = dynamicImport(() => import("./GraphView"), {
 
 /** Shared so a tab with no schema selection keeps a stable identity. */
 const EMPTY_SELECTION: (Node | Link)[] = [];
+
+/** Which create panel is open. The two open different ones, so they differ. */
+type AddKind = "node" | "edge";
 
 /**
  * Render the main Graph page UI that orchestrates the selector, graph view, and right-hand panels.
@@ -88,6 +95,8 @@ export default function Page() {
         currentTab,
         chatOpen,
         setChatOpen,
+        bumpOntologyVersion,
+        markOntologyEdited,
     } = useContext(GraphContext);
     const {
         settings: {
@@ -104,7 +113,12 @@ export default function Page() {
     // showMemoryUsage becoming true (where we must fetch immediately).
     const prevGraphNameRef = useRef<string | undefined>(undefined);
 
-    const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
+    const [selectedElements, setSelectedElementsState] = useState<(Node | Link)[]>([]);
+    // Selecting and adding are the same slot: the create panel stands for the
+    // element about to exist, so opening it ends the selection and picking
+    // something ends it. Which kind is being added is part of the value, since
+    // a node and an edge open different panels.
+    const [adding, setAdding] = useState<AddKind | undefined>(undefined);
     // The Schema tab has a selection of its own — of labels and relationship
     // types, not elements — and it shares the panel with the graph's. It is kept
     // per graph tab, like everything else a tab remembers.
@@ -114,15 +128,22 @@ export default function Page() {
     const schemaSelection = schemaSelections[activeTabId];
     const selectedSchemaElements = schemaSelection?.graphName === graphName ? schemaSelection.elements : EMPTY_SELECTION;
 
-    const setSelectedSchemaElements = useCallback<Dispatch<SetStateAction<(Node | Link)[]>>>((next) => {
+    const writeSchemaSelection = useCallback((elements: (Node | Link)[]) => {
         setSchemaSelections((prev) => {
             const entry = prev[activeTabId];
             const current = entry?.graphName === graphName ? entry.elements : EMPTY_SELECTION;
-            const resolved = typeof next === "function" ? next(current) : next;
 
-            return resolved === current ? prev : { ...prev, [activeTabId]: { graphName, elements: resolved } };
+            return elements === current ? prev : { ...prev, [activeTabId]: { graphName, elements } };
         });
     }, [activeTabId, graphName]);
+
+    const setSelectedSchemaElements = useCallback<Dispatch<SetStateAction<(Node | Link)[]>>>((next) => {
+        const resolved = typeof next === "function" ? next(selectedSchemaElements) : next;
+
+        writeSchemaSelection(resolved);
+        setAdding(undefined);
+        setPanel(resolved.length !== 0 ? "data" : undefined);
+    }, [selectedSchemaElements, writeSchemaSelection, setPanel]);
 
     // Tab ids are never reused, so a closed tab's selection would just leak.
     useEffect(() => {
@@ -146,8 +167,16 @@ export default function Page() {
     const { size: chatSize, onResize: onChatResize } = useResizableSize("chat-size", 400, 500, 300, 300);
     const [queriesOpen, setQueriesOpen] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(true);
-    const [isAddNode, setIsAddNode] = useState(false);
-    const [isAddEdge, setIsAddEdge] = useState(false);
+    const isAddNode = adding === "node";
+    const isAddEdge = adding === "edge";
+
+    // Picking something in the graph ends an add in progress. The raw setter
+    // stays available for the create panel's own swap, which reorders the two
+    // nodes it is about to join rather than making a new selection.
+    const setSelectedElements = useCallback<Dispatch<SetStateAction<(Node | Link)[]>>>((next) => {
+        setSelectedElementsState(next);
+        setAdding(undefined);
+    }, []);
 
     // Graph and Schema each have a selection of their own; the other tabs have
     // none. `panel` is shared by all of them, so it stays "data" across a tab
@@ -401,12 +430,8 @@ export default function Page() {
 
         setPanel(el.length !== 0 ? "data" : undefined);
 
-        if (el.length !== 0) {
-            setChatOpen(false);
-            setIsAddEdge(false);
-            setIsAddNode(false);
-        }
-    }, [setPanel, setChatOpen, setSelectedParam]);
+        if (el.length !== 0) setChatOpen(false);
+    }, [setSelectedElements, setPanel, setChatOpen, setSelectedParam]);
 
     // Keep selectedElementsRef in sync so the restore effect below can read the
     // full multi-selection without adding selectedElements as a dependency.
@@ -507,16 +532,28 @@ export default function Page() {
         canvasRef.current?.zoomToFit(4, filter);
     }, [isLoading, canvasRef]);
 
-    const handleSetIsAdd = useCallback((mainSetter: (isAdd: boolean) => void, setter: (isAdd: boolean) => void) => (isAdd: boolean) => {
-        mainSetter(isAdd);
-
-        if (isAdd) {
-            setter(false);
-            setPanel("add");
-        } else {
+    // The other side of the same slot: starting an add ends the selection, except
+    // for an edge, which is declared between the two nodes already picked.
+    const handleSetAdding = useCallback((kind: AddKind) => (isAdd: boolean) => {
+        if (!isAdd) {
+            setAdding(undefined);
             setPanel(undefined);
+            return;
         }
-    }, [setPanel]);
+
+        if (kind === "node") {
+            setSelectedElementsState([]);
+            writeSchemaSelection(EMPTY_SELECTION);
+            setSelectedParam("");
+        }
+
+        setAdding(kind);
+        setChatOpen(false);
+        setPanel("add");
+    }, [setPanel, setChatOpen, setSelectedParam, writeSchemaSelection]);
+
+    const setIsAddNode = useMemo(() => handleSetAdding("node"), [handleSetAdding]);
+    const setIsAddEdge = useMemo(() => handleSetAdding("edge"), [handleSetAdding]);
 
     const handleCreateElement = useCallback(async (attributes: [string, Value][], label: string[]) => {
         if (!canvasRef.current) return false;
@@ -545,14 +582,14 @@ export default function Page() {
 
                 if (node) {
                     setLabels(prev => [...prev, ...node.labels.filter(c => !prev.some(p => p.name === c)).map(c => graph.LabelsMap.get(c)!)]);
-                    handleSetIsAdd(setIsAddNode, setIsAddEdge)(false);
+                    setIsAddNode(false);
                 }
             } else {
                 const link = await graph.extendEdge(json.result.data[0].e, false, true);
 
                 if (link) {
                     setRelationships(prev => [...prev.filter(p => p.name !== link.relationship), graph.RelationshipsMap.get(link.relationship)!]);
-                    handleSetIsAdd(setIsAddEdge, setIsAddNode)(false);
+                    setIsAddEdge(false);
                 }
             }
 
@@ -564,7 +601,7 @@ export default function Page() {
         canvasRef.current?.setGraphData(convertToCanvasData(graph.Elements));
 
         return result.ok;
-    }, [fetchCount, graph, graphName, handleSetIsAdd, isAddNode, selectedElements, canvasRef, setIndicator, setLabels, setRelationships, toast]);
+    }, [fetchCount, graph, graphName, setIsAddNode, setIsAddEdge, setSelectedElements, isAddNode, selectedElements, canvasRef, setIndicator, setLabels, setRelationships, toast]);
 
     const handleDeleteElement = useCallback(async () => {
         if (!canvasRef.current) return;
@@ -629,7 +666,53 @@ export default function Page() {
             description: `${deletedElements.length > 1 ? "Elements" : "Element"} deleted
             ${selectedElements.length > deletedElements.length ? `, ${selectedElements.length - deletedElements.length} failed` : ""}.`,
         });
-    }, [selectedElements, graph, graphName, setRelationships, canvasRef, fetchCount, panel, handleSetSelectedElements, toast, setIndicator]);
+    }, [selectedElements, graph, graphName, setRelationships, setSelectedElements, canvasRef, fetchCount, panel, handleSetSelectedElements, toast, setIndicator]);
+
+    // Declaring on the ontology rather than creating in the graph: what the
+    // Schema tab's add controls do, since a graph that declares an ontology
+    // shows that declaration and the declaration is what can be edited.
+    const handleCreateOntologyElement = useCallback(async (label: string, description: string, properties: [string, string][]) => {
+        const nodes = isTwoNodes(selectedSchemaElements) ? selectedSchemaElements : undefined;
+
+        if (!isAddNode && !nodes) return false;
+
+        const startEpoch = getConnectionEpoch();
+        const cid = getActiveConnectionIdGlobal();
+        const ownerKind = isAddNode ? "entity" : "relation";
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/ontology/${ownerKind}`, {
+            method: "POST",
+            body: JSON.stringify(isAddNode
+                ? { label, description }
+                : { label, description, source: nodes![0].labels[0], target: nodes![1].labels[0] }),
+        }, toast, setIndicator, cid);
+
+        if (getConnectionEpoch() !== startEpoch || !result.ok) return false;
+
+        // The properties hang off what was just declared, so they can only go in
+        // once it exists. One at a time, against the route that already knows how.
+        await properties.reduce(async (previous, [name, typeName]) => {
+            await previous;
+
+            await securedFetch(`api/graph/${prepareArg(graphName)}/ontology/property`, {
+                method: "POST",
+                body: JSON.stringify({ ownerKind, owner: label, name, type: ontologyDeclaredType(typeName) }),
+            }, toast, setIndicator, cid);
+        }, Promise.resolve());
+
+        if (getConnectionEpoch() !== startEpoch) return false;
+
+        bumpOntologyVersion();
+        // What the graph already holds was extracted under the ontology as it
+        // stood before this, and nothing in the graph itself records that.
+        markOntologyEdited(graphName);
+
+        if (isAddNode) setIsAddNode(false);
+        else setIsAddEdge(false);
+
+        writeSchemaSelection(EMPTY_SELECTION);
+
+        return true;
+    }, [graphName, isAddNode, selectedSchemaElements, writeSchemaSelection, setIsAddNode, setIsAddEdge, bumpOntologyVersion, markOntologyEdited, toast, setIndicator]);
 
     const getCurrentPanel = useCallback(() => {
         if (!graphName) return undefined;
@@ -650,11 +733,24 @@ export default function Page() {
             }
 
             case "add": {
+                if (adding === undefined) return undefined;
+
                 const onCloseHandler = () => {
+                    setAdding(undefined);
                     setPanel(undefined);
-                    setIsAddEdge(false);
-                    setIsAddNode(false);
                 };
+
+                if (currentTab === "Schema") {
+                    if (!isAddNode && !isTwoNodes(selectedSchemaElements)) return undefined;
+
+                    return <CreateOntologyElementPanel
+                        type={isAddNode}
+                        onCreate={handleCreateOntologyElement}
+                        onClose={onCloseHandler}
+                        selectedNodes={isTwoNodes(selectedSchemaElements) ? selectedSchemaElements : undefined}
+                        setSelectedNodes={writeSchemaSelection}
+                    />;
+                }
 
                 if (isAddNode) {
                     return <CreateElementPanel
@@ -671,7 +767,7 @@ export default function Page() {
                     onCreate={handleCreateElement}
                     onClose={onCloseHandler}
                     selectedNodes={selectedElements}
-                    setSelectedNodes={setSelectedElements}
+                    setSelectedNodes={setSelectedElementsState}
                 />;
             }
 
@@ -679,7 +775,7 @@ export default function Page() {
                 return undefined;
         }
 
-    }, [graphName, panel, handleSetSelectedElements, setPanel, isAddNode, selectedElements, handleCreateElement, setLabels, canvasRef, currentTab, selectedSchemaElements, setSelectedSchemaElements]);
+    }, [graphName, panel, adding, handleSetSelectedElements, setPanel, isAddNode, selectedElements, handleCreateElement, handleCreateOntologyElement, setLabels, canvasRef, currentTab, selectedSchemaElements, setSelectedSchemaElements, writeSchemaSelection]);
 
     return (
         <div className="h-full w-full flex flex-col min-h-0">
@@ -752,8 +848,8 @@ export default function Page() {
                                         fetchCount={fetchCount}
                                         historyQuery={historyQuery}
                                         setHistoryQuery={setHistoryQuery}
-                                        setIsAddNode={handleSetIsAdd(setIsAddNode, setIsAddEdge)}
-                                        setIsAddEdge={handleSetIsAdd(setIsAddEdge, setIsAddNode)}
+                                        setIsAddNode={setIsAddNode}
+                                        setIsAddEdge={setIsAddEdge}
                                         isAddEdge={isAddEdge}
                                         isAddNode={isAddNode}
                                     />

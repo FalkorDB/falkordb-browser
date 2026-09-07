@@ -220,6 +220,43 @@ export const upsertOntologyProperty = ontologyOwner.extend({
 
 export const deleteOntologyProperty = ontologyOwner;
 
+// An entity or a relation is identified by its label alone; a relation also by
+// the pair of entities it runs between, since the same label can be declared
+// more than once between different endpoints.
+const ontologyLabel = z
+  .string({
+    error: (issue) => issue.input === undefined ? "Label is required" : "Invalid Label",
+  })
+  .min(1, "Label cannot be empty");
+
+export const upsertOntologyEntity = z.object({
+  label: ontologyLabel,
+  // What the extractor is actually told to look for, so it is worth having,
+  // but a declaration without one is still a declaration.
+  description: z.string({ error: "Invalid Description" }).optional(),
+});
+
+export const deleteOntologyEntity = z.object({
+  label: ontologyLabel,
+});
+
+export const upsertOntologyRelation = z.object({
+  label: ontologyLabel,
+  source: z
+    .string({
+      error: (issue) => issue.input === undefined ? "Source is required" : "Invalid Source",
+    })
+    .min(1, "Source cannot be empty"),
+  target: z
+    .string({
+      error: (issue) => issue.input === undefined ? "Target is required" : "Invalid Target",
+    })
+    .min(1, "Target cannot be empty"),
+  description: z.string({ error: "Invalid Description" }).optional(),
+});
+
+export const deleteOntologyRelation = upsertOntologyRelation.omit({ description: true });
+
 // UDF schemas
 export const loadUdf = z.object({
   code: z

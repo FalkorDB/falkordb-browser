@@ -24,6 +24,14 @@ interface Props {
     expand: boolean
     isAddNode: boolean
     isAddEdge: boolean
+    /**
+     * What the add and delete controls act on. The schema view reuses this
+     * toolbar to edit an ontology, where they declare and undeclare types
+     * rather than create and delete elements.
+     */
+    addNodeTitle?: string
+    addEdgeTitle?: string
+    deleteDescription?: string
 }
 
 const ITEM_HEIGHT = 32;
@@ -44,6 +52,9 @@ export default function Toolbar({
     isAddNode,
     setExpand,
     expand,
+    addNodeTitle = "Add Node",
+    addEdgeTitle = "Add Edge",
+    deleteDescription = "Are you sure you want to delete this element(s)?",
 }: Props) {
 
     const { isLoading: isLoadingGraph } = useContext(GraphContext);
@@ -349,7 +360,7 @@ export default function Toolbar({
                             variant="Secondary"
                             tooltipVariant="Primary"
                             tooltipSide="bottom"
-                            title="Add Node"
+                            title={addNodeTitle}
                             onClick={() => setIsAddNode(!isAddNode)}
                         >
                             <Circle size={20} />
@@ -362,7 +373,7 @@ export default function Toolbar({
                                 variant="Secondary"
                                 tooltipVariant="Primary"
                                 tooltipSide="bottom"
-                                title="Add Edge"
+                                title={addEdgeTitle}
                                 onClick={() => setIsAddEdge(!isAddEdge)}
                             >
                                 <ArrowRight size={20} />
@@ -371,7 +382,7 @@ export default function Toolbar({
                         {
                             selectedElements.length !== 0 &&
                             <DeleteElement
-                                description="Are you sure you want to delete this element(s)?"
+                                description={deleteDescription}
                                 open={deleteOpen}
                                 setOpen={setDeleteOpen}
                                 onDeleteElement={handleDeleteElement}

@@ -8,7 +8,7 @@ import type { LayoutMode, ViewportState } from "@falkordb/canvas";
 import type { SessionConnection } from "next-auth";
 import type { LanguageConfig } from "./EditorComponent";
 import { Graph, GraphInfo } from "../api/graph/model";
-import { DEFAULT_GRAPH_TABS, GraphTab, SchemaSource, SchemaViewMeta } from "@/lib/useGraphTabs";
+import { DEFAULT_GRAPH_TABS, GraphTab, SchemaViewMeta } from "@/lib/useGraphTabs";
 
 export type ChatApiKey = {
   id: string;
@@ -274,12 +274,6 @@ type GraphTabsContextType = {
    * captured.
    */
   setSchemaMeta: (meta: SchemaViewMeta) => void;
-  /**
-   * Which schema the schema view is showing. Only a graph that declares an
-   * ontology has a choice; everywhere else this stays on the discovered one.
-   */
-  schemaSource: SchemaSource;
-  setSchemaSource: (source: SchemaSource) => void;
 };
 
 type ForceGraphContextType = {
@@ -588,8 +582,6 @@ export const GraphTabsContext = createContext<GraphTabsContextType>({
   renameTab: () => { },
   closeTab: () => { },
   setSchemaMeta: () => { },
-  schemaSource: "ontology",
-  setSchemaSource: () => { },
 });
 
 export const ForceGraphContext = createContext<ForceGraphContextType>({

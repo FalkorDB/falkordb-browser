@@ -22,11 +22,14 @@ import {
     captureCanvasLayout,
     convertToCanvasData,
     getActiveConnectionIdGlobal,
+    getConnectionEpoch,
     getOntologySchema,
     getSchema,
     isAbortError,
+    prepareArg,
+    securedFetch,
 } from "@/lib/utils";
-import { normalizeDirection, normalizeLayout, type SchemaSource, type SchemaViewMeta } from "@/lib/useGraphTabs";
+import { normalizeDirection, normalizeLayout, type SchemaViewMeta } from "@/lib/useGraphTabs";
 import {
     BrowserSettingsContext,
     ConnectionContext,
@@ -103,7 +106,6 @@ type SchemaCache = {
     pinned: boolean;
     dimmed: boolean;
     expand: boolean;
-    source: SchemaSource;
 };
 
 /**
@@ -186,6 +188,10 @@ export type ActiveGraphView = {
     setIsAddEdge?: (isAddEdge: boolean) => void;
     isAddNode: boolean;
     isAddEdge: boolean;
+    /** Left to the toolbar's own wording unless the view acts on something else. */
+    addNodeTitle?: string;
+    addEdgeTitle?: string;
+    deleteDescription?: string;
     dimmed: boolean;
     setDimmed: Dispatch<SetStateAction<boolean>>;
     /** True when the view has nothing for the controls to act on. */
@@ -219,10 +225,18 @@ type SchemaScopeProps = {
     fallback: ActiveGraphView;
     selectedElements: (Node | Link)[];
     setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>;
+    /**
+     * The page's own add-element state, shared with the graph view: the panel
+     * these open is the page's, and only one of the two views is ever on screen.
+     */
+    isAddNode: boolean;
+    isAddEdge: boolean;
+    setIsAddNode: (isAddNode: boolean) => void;
+    setIsAddEdge: (isAddEdge: boolean) => void;
     children: (view: ActiveGraphView) => ReactNode;
 };
 
-export default function SchemaScope({ active, fallback, selectedElements, setSelectedElements, children }: SchemaScopeProps) {
+export default function SchemaScope({ active, fallback, selectedElements, setSelectedElements, isAddNode, isAddEdge, setIsAddNode, setIsAddEdge, children }: SchemaScopeProps) {
     const { graphName } = useContext(GraphContext);
     const { activeConnectionId } = useContext(ConnectionContext);
     const { activeTabId, tabs } = useContext(GraphTabsContext);
@@ -248,6 +262,10 @@ export default function SchemaScope({ active, fallback, selectedElements, setSel
             storedMeta={storedMeta}
             selectedElements={selectedElements}
             setSelectedElements={setSelectedElements}
+            isAddNode={isAddNode}
+            isAddEdge={isAddEdge}
+            setIsAddNode={setIsAddNode}
+            setIsAddEdge={setIsAddEdge}
         >
             {children}
         </SchemaGraph>
@@ -256,11 +274,11 @@ export default function SchemaScope({ active, fallback, selectedElements, setSel
 
 type SchemaGraphProps = Omit<SchemaScopeProps, "active" | "fallback"> & { cacheKey: string, storedMeta: SchemaViewMeta };
 
-function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElements, children }: SchemaGraphProps) {
-    const { graph, graphName, ontologyGraphs, ontologyTypes, ontologyVersion, ontologyEditedGraphs } = useContext(GraphContext);
+function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElements, isAddNode, isAddEdge, setIsAddNode, setIsAddEdge, children }: SchemaGraphProps) {
+    const { graph, graphName, ontologyGraphs, ontologyTypes, ontologyVersion, ontologyEditedGraphs, bumpOntologyVersion, markOntologyEdited } = useContext(GraphContext);
     const { graphInfoVersion } = useContext(GraphInfoContext);
     const { setIndicator } = useContext(IndicatorContext);
-    const { setSchemaMeta, setSchemaSource } = useContext(GraphTabsContext);
+    const { setSchemaMeta } = useContext(GraphTabsContext);
     const connection = useContext(ConnectionContext);
     const browserSettings = useContext(BrowserSettingsContext);
 
@@ -295,7 +313,6 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
             pinned: false,
             dimmed: true,
             expand: true,
-            source: "ontology",
         };
 
         writeCache(cacheKey, { ...base, ...patch, key: cacheKey });
@@ -311,16 +328,11 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
     const [pinned, setPinned] = usePersisted("pinned", restored?.pinned ?? stored.pinned ?? false, persist);
     const [dimmed, setDimmed] = usePersisted("dimmed", restored?.dimmed ?? stored.dimmed ?? true, persist);
     const [expand, setExpand] = usePersisted("expand", restored?.expand ?? stored.expand ?? true, persist);
-    // The ontology is what the graph was ingested under, so it is what a graph
-    // that declares one opens on.
-    const [source, setSource] = usePersisted("source", restored?.source ?? stored.source ?? "ontology", persist);
 
-    const showOntology = hasOntology && source === "ontology";
-
-    // The data panel sits outside this view and describes whatever it shows.
-    useEffect(() => {
-        setSchemaSource(showOntology ? "ontology" : "discovered");
-    }, [showOntology, setSchemaSource]);
+    // A graph that declares an ontology is described by it: that is what its
+    // data was extracted under, and it is the only one of the two that can be
+    // edited. Everything else falls back to the schema read out of the data.
+    const showOntology = hasOntology;
 
     const [isLoading, setIsLoading] = useState(false);
     const [labels, setLabels] = useState<Label[]>([]);
@@ -582,9 +594,8 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
             pinned,
             dimmed,
             expand,
-            source,
         });
-    }, [setSchemaMeta, schemaGraph, selectedElements, viewport, layout, direction, animation, pinned, dimmed, expand, source]);
+    }, [setSchemaMeta, schemaGraph, selectedElements, viewport, layout, direction, animation, pinned, dimmed, expand]);
 
     // Colors, sizes and visibility never change the graph's shape, so they are
     // applied in place instead of costing a re-layout. The styles come from the
@@ -691,9 +702,60 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
         setHiddenRelationships([]);
     }, [setHiddenLabels, setHiddenRelationships]);
 
-    // The schema is derived, not edited: there is nothing to add or delete.
-    const handleDeleteElement = useCallback(async () => { }, []);
+    // A discovered schema is derived from the data, so there is nothing here to
+    // edit. A declared ontology is written by hand, so there is.
+    const canEdit = showOntology && !connection.isReadOnly;
+
     const noop = useCallback(() => { }, []);
+
+    // Undeclaring, rather than deleting: the elements here stand for what the
+    // ontology says the graph should hold, not for anything it does hold.
+    const handleDeleteElement = useCallback(async () => {
+        if (!canEdit || selectedElements.length === 0) return;
+
+        const startEpoch = getConnectionEpoch();
+        const cid = getActiveConnectionIdGlobal();
+
+        const removed = await Promise.all(selectedElements.map(async (element) => {
+            const isLink = "source" in element;
+            const body = isLink
+                ? {
+                    label: element.relationship,
+                    source: schemaGraph.NodesMap.get(element.source as number)?.labels[0],
+                    target: schemaGraph.NodesMap.get(element.target as number)?.labels[0],
+                }
+                : { label: element.labels[0] };
+
+            if (isLink && (body.source === undefined || body.target === undefined)) return false;
+
+            const result = await securedFetch(
+                `api/graph/${prepareArg(graphName)}/ontology/${isLink ? "relation" : "entity"}`,
+                { method: "DELETE", body: JSON.stringify(body) },
+                toast,
+                setIndicator,
+                cid,
+            );
+
+            return result.ok;
+        }));
+
+        if (getConnectionEpoch() !== startEpoch) return;
+
+        const count = removed.filter(Boolean).length;
+
+        if (count === 0) return;
+
+        setSelectedElements([]);
+        bumpOntologyVersion();
+        // The data extracted under the old declaration stays where it is, and
+        // nothing in the graph records that the declaration has moved.
+        markOntologyEdited(graphName);
+
+        toast({
+            title: "Success",
+            description: `${count > 1 ? "Declarations" : "Declaration"} removed${removed.length > count ? `, ${removed.length - count} failed` : ""}.`,
+        });
+    }, [canEdit, selectedElements, schemaGraph, graphName, setSelectedElements, bumpOntologyVersion, markOntologyEdited, toast, setIndicator]);
     const setData = noop as Dispatch<SetStateAction<GraphData>>;
 
     const forceGraphValue = useMemo(() => ({
@@ -719,8 +781,10 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
         direction, setDirection, animation, setAnimation, pinned, setPinned, dimmed, setDimmed,
     ]);
 
-    // Read-only by nature: the schema is a view of the data, not the data.
-    const connectionValue = useMemo(() => ({ ...connection, isReadOnly: true }), [connection]);
+    // A discovered schema is a view of the data rather than the data, so it has
+    // nothing to edit. A declared ontology does, and this is what lets the
+    // toolbar and the details panel show its editing controls.
+    const connectionValue = useMemo(() => ({ ...connection, isReadOnly: !canEdit }), [connection, canEdit]);
 
     // Schema nodes carry a single caption key the user's settings know nothing about.
     const settingsValue = useMemo(() => ({
@@ -755,10 +819,19 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
         handleDeleteElement,
         expand,
         setExpand,
-        // The schema is derived, not edited: there is nothing to add.
-        setIsAddNode: noop,
-        isAddNode: false,
-        isAddEdge: false,
+        // Only a declared ontology can be added to; a discovered schema is
+        // derived from the data, so there is nothing there to add.
+        setIsAddNode: canEdit ? setIsAddNode : noop,
+        // A relation is declared between two entities, so there has to be a pair
+        // of them selected for there to be one to declare.
+        setIsAddEdge: canEdit && selectedElements.length === 2 && selectedElements.every((e) => "labels" in e)
+            ? setIsAddEdge
+            : undefined,
+        isAddNode: canEdit && isAddNode,
+        isAddEdge: canEdit && isAddEdge,
+        addNodeTitle: "Declare Entity",
+        addEdgeTitle: "Declare Relation",
+        deleteDescription: "Are you sure you want to remove this from the ontology? This will stop it being extracted, but what was already ingested under it stays in the graph.",
         dimmed,
         setDimmed,
         isEmpty,
@@ -800,21 +873,6 @@ function SchemaGraph({ cacheKey, storedMeta, selectedElements, setSelectedElemen
             // not of distinct relationship types — hence "Connections".
             <>
                 {isLoading && <Loader2 data-testid="schemaLoading" role="status" aria-label="Discovering schema" className="animate-spin" size={16} />}
-                {
-                    hasOntology &&
-                    <>
-                        <div className="h-4 w-px bg-border rounded-full" />
-                        <Button
-                            data-testid="schemaSourceToggle"
-                            className="text-nowrap px-2 py-1 pointer-events-auto rounded-md hover:bg-secondary"
-                            label={showOntology ? "Ontology" : "Generated"}
-                            title={showOntology
-                                ? "Showing the ontology this graph declares.\nSwitch to the schema generated from the data it holds."
-                                : "Showing the schema generated from the data this graph holds.\nSwitch to the ontology it declares."}
-                            onClick={() => setSource(showOntology ? "discovered" : "ontology")}
-                        />
-                    </>
-                }
                 {
                     showOntology && ontologyEdited &&
                     <>

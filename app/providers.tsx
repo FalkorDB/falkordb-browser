@@ -27,7 +27,7 @@ import { GraphContext, HistoryQueryContext, IndicatorContext, QueryLoadingContex
 import GraphInfoProvider, { type GraphInfoPendingUpdates, type GraphInfoSync } from "./components/GraphInfoProvider";
 import { GRAPH_OFFLOAD_VERSION_THRESHOLD, MEMORY_USAGE_VERSION_THRESHOLD } from "./utils";
 import ProviderLayout from "./components/ProviderLayout";
-import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaSource, SchemaViewMeta, normalizeDirection, normalizeLayout } from "@/lib/useGraphTabs";
+import useGraphTabs, { clampMaxTabs, DEFAULT_GRAPH_TABS, GraphTab, GraphTabMeta, SchemaViewMeta, normalizeDirection, normalizeLayout } from "@/lib/useGraphTabs";
 
 /**
  * A live snapshot of everything the graph view is showing.
@@ -1263,7 +1263,6 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
 
   // Which schema the view is on, mirrored out of it because the data panel is
   // rendered outside the view and has to describe the same thing.
-  const [schemaSource, setSchemaSource] = useState<SchemaSource>("ontology");
 
   const captureGraphSession = useCallback((): GraphSession => {
     const state = sessionStateRef.current;
@@ -1444,8 +1443,8 @@ function ProvidersWithSession({ children, nonce }: { children: React.ReactNode; 
   });
 
   const graphTabsContext = useMemo(
-    () => ({ ...graphTabs, setSchemaMeta, schemaSource, setSchemaSource }),
-    [graphTabs, setSchemaMeta, schemaSource],
+    () => ({ ...graphTabs, setSchemaMeta }),
+    [graphTabs, setSchemaMeta],
   );
 
   useEffect(() => {
