@@ -1490,7 +1490,7 @@ function TutorialPortal({
         <div
             ref={tooltipRef}
             data-tutorial-overlay="true"
-            className="fixed bg-background border border-border rounded-lg p-6 shadow-2xl max-w-[500px] z-[52] pointer-events-auto"
+            className="fixed bg-background border border-border rounded-lg p-6 shadow-2xl max-w-[min(500px,calc(100vw-2rem))] z-[52] pointer-events-auto"
             style={fixedPositionStyle}
         >
             <div className="space-y-4">
@@ -1605,7 +1605,7 @@ function TutorialPortal({
                 }
                 {
                     step > 0 &&
-                    <div className="flex items-center justify-center gap-1 pt-3 border-t border-border mt-3">
+                    <div className="flex flex-wrap items-center justify-center gap-1 pt-3 border-t border-border mt-3">
                         {tutorialTracks.map((track, i) => {
                             const currentTrack = getTrackForStep(step);
                             const isActive = i === currentTrack;

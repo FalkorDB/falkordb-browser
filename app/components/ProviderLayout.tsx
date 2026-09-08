@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { CustomizingRef, Panel } from "@/lib/utils";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
+import useIsMobile, { splitBounds, splitOrientation } from "@/lib/useIsMobile";
 import { PanelContext } from "./provider";
 import Header from "./Header";
 import Navbar from "./Navbar";
@@ -40,6 +41,7 @@ export default function ProviderLayout({
   showUDF,
 }: ProviderLayoutProps) {
   const pathname = usePathname();
+  const isMobile = useIsMobile();
   const showNavbarAndHeader = pathname !== "/" && pathname !== "/login";
   const isGraph = pathname === "/graph";
   const isUdf = pathname === "/udf";
@@ -96,6 +98,14 @@ export default function ProviderLayout({
     const currentPanel = panelRef.current;
     if (!currentPanel) return undefined;
 
+    // Stacked on a phone the panel is a band across the top rather than a
+    // sidebar, so it stays closed until the user asks for it instead of eating
+    // a fifth of the screen on arrival.
+    if (isMobile) {
+      currentPanel.collapse();
+      return undefined;
+    }
+
     if (currentPanel.isCollapsed()) currentPanel.expand();
 
     const stored = localStorage.getItem("panel-size-/graph");
@@ -111,7 +121,7 @@ export default function ProviderLayout({
     });
 
     return () => cancelAnimationFrame(rafId);
-  }, [isGraph, panelRef]);
+  }, [isGraph, isMobile, panelRef]);
 
   // Restore the UDF panel's persisted width on /udf.
   useEffect(() => {
@@ -160,34 +170,32 @@ export default function ProviderLayout({
         showNavbarAndHeader &&
         <Header />
       }
-      <div className="basis-0 grow min-h-0 flex">
+      <div className="basis-0 grow min-h-0 flex flex-col-reverse md:flex-row">
         {
           showNavbarAndHeader &&
           <Navbar showUDF={showUDF} />
         }
         {
           isUdf ?
-            <ResizablePanelGroup orientation="horizontal" className="w-1 grow">
+            <ResizablePanelGroup orientation={splitOrientation(isMobile)} className="basis-0 grow min-w-0 min-h-0">
               <ResizablePanel
                 panelRef={udfPanelRef}
-                defaultSize="20%"
-                minSize="15%"
-                maxSize="30%"
+                defaultSize={isMobile ? "40%" : "20%"}
+                {...splitBounds(isMobile, { minSize: "15%", maxSize: "30%" })}
                 onResize={onUdfPanelResize}
               >
                 <UdfPanel />
               </ResizablePanel>
               <ResizableHandle withHandle className="bg-border" />
               <ResizablePanel
-                defaultSize="80%"
-                minSize="70%"
-                maxSize="100%"
+                defaultSize={isMobile ? "60%" : "80%"}
+                {...splitBounds(isMobile, { minSize: "70%", maxSize: "100%" })}
               >
                 {children}
               </ResizablePanel>
             </ResizablePanelGroup>
             :
-            <div className="w-1 grow min-h-0">
+            <div className="basis-0 grow min-w-0 min-h-0">
               {children}
             </div>
         }

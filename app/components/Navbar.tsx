@@ -15,6 +15,7 @@ import { Drawer, DrawerContent, DrawerDescription, DrawerTitle, DrawerTrigger } 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { useTheme } from "next-themes";
+import useIsMobile from "@/lib/useIsMobile";
 import Button from "./ui/Button";
 import DialogComponent from "./DialogComponent";
 import CloseDialog from "./CloseDialog";
@@ -39,6 +40,7 @@ export default function Navbar({ showUDF }: Props) {
     const pathname = usePathname();
     const router = useRouter();
     const { toast } = useToast();
+    const isMobile = useIsMobile();
 
     const [mounted, setMounted] = useState(false);
     const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
@@ -63,15 +65,15 @@ export default function Navbar({ showUDF }: Props) {
         setMounted(true);
     }, []);
 
-    const separator = <div className="h-px w-[80%] bg-border/50 rounded-full" />;
+    const separator = <div className="shrink-0 h-5 w-px md:h-px md:w-[80%] bg-border/50 rounded-full" />;
 
     return (
-        <div className="py-5 px-2 flex flex-col justify-between items-center border-r border-border/50">
-            <div className="w-full flex flex-col gap-3 items-center">
+        <div className="shrink-0 flex flex-row md:flex-col justify-between items-center gap-2 px-3 py-1.5 md:px-2 md:py-5 border-t md:border-t-0 md:border-r border-border/50 overflow-x-auto hide-scrollbar">
+            <div className="flex flex-row md:flex-col md:w-full gap-3 items-center">
                 {
                     mounted && currentTheme &&
                     <Link
-                        className="rounded-full h-12 w-12 overflow-hidden"
+                        className="hidden md:block rounded-full h-12 w-12 overflow-hidden"
                         aria-label="FalkorDB"
                         href="https://www.falkordb.com"
                         target="_blank" rel="noreferrer"
@@ -79,7 +81,7 @@ export default function Navbar({ showUDF }: Props) {
                         <Image style={{ width: 'auto', height: '48px' }} priority src={`/icons/F-${currentTheme}.svg`} alt="FalkorDB Logo" width={0} height={0} />
                     </Link>
                 }
-                <div data-testid="NavigationButtons" className="p-1 flex flex-col items-center gap-2 bg-foreground/5 rounded-lg">
+                <div data-testid="NavigationButtons" className="p-1 flex flex-row md:flex-col items-center gap-2 bg-foreground/5 rounded-lg">
                     <Button
                         title="View and manage your graphs"
                         className={cn(
@@ -107,7 +109,7 @@ export default function Navbar({ showUDF }: Props) {
                     }
                 </div>
             </div>
-            <div className="w-full flex flex-col gap-2 items-center">
+            <div className="flex flex-row md:flex-col md:w-full gap-2 items-center">
                 <Button
                     data-testid="settings"
                     className={cn(
@@ -127,7 +129,7 @@ export default function Navbar({ showUDF }: Props) {
                                 <FileCode size={iconSize} />
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent side="right" className="bg-background w-full p-2 ml-4">
+                        <DropdownMenuContent side={isMobile ? "top" : "right"} className="bg-background w-full p-2 md:ml-4">
                             <DropdownMenuGroup className="h-full w-full flex flex-col gap-2 p-2">
                                 <DropdownMenuItem className="focus:bg-transparent">
                                     <a className="flex gap-2 items-center" href="https://docs.falkordb.com/" target="_blank" rel="noreferrer noreferrer">
@@ -173,7 +175,7 @@ export default function Navbar({ showUDF }: Props) {
                             <DrawerTitle />
                             <DrawerDescription />
                         </VisuallyHidden>
-                        <div className="h-full flex flex-col gap-8 max-w-[30rem] p-4">
+                        <div className="h-full flex flex-col gap-8 max-w-[min(30rem,85vw)] p-4">
                             <div className="h-1 grow flex flex-col gap-8 items-center justify-center">
                                 {mounted && currentTheme && <Image style={{ width: 'auto', height: '50px' }} priority src={`/icons/Falkordb-${currentTheme}.svg`} alt="" width={0} height={0} />}
                                 <h1 className="text-3xl font-bold">We Make AI Reliable</h1>

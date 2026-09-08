@@ -100,7 +100,7 @@ export default function Header() {
     }, [toast]);
 
     return (
-        <header className="flex gap-4 w-full border-b border-border/50 px-3 py-1.5 items-center text-sm">
+        <header className="flex flex-wrap gap-x-3 md:gap-x-4 gap-y-1 w-full border-b border-border/50 px-3 py-1.5 items-center text-xs md:text-sm">
             <ConnectionManager />
             {
                 mounted && formatVersion(dbVersion) &&
@@ -199,7 +199,7 @@ export default function Header() {
             </div>
             {
                 mounted && session?.user &&
-                <div className="flex gap-1 items-center">
+                <div className="flex gap-1 items-center min-w-0">
                     <Button
                         title="Copy deployment info"
                         className="p-0.5 shrink-0"

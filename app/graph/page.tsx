@@ -14,6 +14,7 @@ import ResizableBox from "@/components/ui/ResizableBox";
 import { useResizableSize } from "@/lib/useResizableSize";
 import { tabScopedKey } from "@/lib/useGraphTabs";
 import { getConnectionItem, setConnectionItem } from "@/lib/connection-storage";
+import useIsMobile, { splitBounds, splitOrientation } from "@/lib/useIsMobile";
 import GraphSubHeader from "./GraphSubHeader";
 
 const GraphInfoPanel = dynamicImport(() => import("./graphInfo"), {
@@ -94,6 +95,7 @@ export default function Page() {
         }
     } = useContext(BrowserSettingsContext);
     const { toast } = useToast();
+    const isMobile = useIsMobile();
 
     const panelRef = useRef<PanelImperativeHandle>(null);
     const pendingZoomRef = useRef<((node: any) => boolean) | null>(null);
@@ -682,13 +684,12 @@ export default function Page() {
     return (
         <div className="h-full w-full flex flex-col min-h-0">
             <GraphSubHeader />
-            <ResizablePanelGroup orientation="horizontal" className="h-1 grow">
+            <ResizablePanelGroup orientation={splitOrientation(isMobile)} className="h-1 grow">
                 <ResizablePanel
                     panelRef={infoPanelRef}
                     defaultSize="0%"
                     collapsible
-                    minSize="15%"
-                    maxSize="30%"
+                    {...splitBounds(isMobile, { minSize: "15%", maxSize: "30%" })}
                     onResize={onInfoPanelResize}
                 >
                     <GraphInfoPanel
@@ -705,8 +706,7 @@ export default function Page() {
                 />
                 <ResizablePanel
                     defaultSize="100%"
-                    minSize="70%"
-                    maxSize="100%"
+                    {...splitBounds(isMobile, { minSize: "70%", maxSize: "100%" })}
                 >
                     <div className="h-full w-full flex flex-col">
                         <div className="Page p-3 gap-3">
@@ -730,7 +730,7 @@ export default function Page() {
                                 queriesOpen={queriesOpen}
                                 setQueriesOpen={setQueriesOpen}
                             />
-                            <ResizablePanelGroup orientation="horizontal" className="h-1 grow relative">
+                            <ResizablePanelGroup orientation={splitOrientation(isMobile)} className="h-1 grow relative">
                                 <ResizablePanel
                                     defaultSize="100%"
                                     collapsible

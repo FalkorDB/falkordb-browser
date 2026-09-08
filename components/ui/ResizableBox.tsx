@@ -113,7 +113,9 @@ export default function ResizableBox({
         <div
             ref={boxRef}
             className={cn("relative", className)}
-            style={{ width, height, ...style }}
+            // Never let a remembered (or default) size push the box off a phone
+            // screen; dragging is already bounded by `getMaxSize`.
+            style={{ width, height, maxWidth: "calc(100vw - 3rem)", maxHeight: "calc(100dvh - 8rem)", ...style }}
             data-testid={dataTestId}
         >
             {children}

@@ -313,7 +313,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     </Button>
                 </PopoverTrigger>
                 <PopoverContent
-                    className="z-20 h-[40dvh] min-h-fit w-[350px] mt-2 overflow-hidden border border-border rounded-lg flex flex-col items-center p-2"
+                    className="z-20 h-[40dvh] min-h-fit w-[min(350px,calc(100vw-2rem))] mt-2 overflow-hidden border border-border rounded-lg flex flex-col items-center p-2"
                     onInteractOutside={(e) => { if (openMenage || tutorialOpen) e.preventDefault(); }}
                     onEscapeKeyDown={(e) => { if (openMenage || tutorialOpen) e.preventDefault(); }}
                 >

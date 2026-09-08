@@ -66,7 +66,7 @@ export default function LoginPage() {
   return (
     <div className="relative h-full w-full flex flex-col">
       <div className="grow basis-0 flex items-center justify-center overflow-auto">
-        <div className="flex flex-col gap-2 items-center max-h-full w-[500px]">
+        <div className="flex flex-col gap-2 items-center max-h-full w-full max-w-[500px] px-4">
           {mounted && currentTheme && <Image style={{ width: 'auto', height: '80px' }} priority src={`/icons/Browser-${currentTheme}.svg`} alt="FalkorDB Browser Logo" width={0} height={0} />}
           <LoginForm
             onSubmit={handleLogin}

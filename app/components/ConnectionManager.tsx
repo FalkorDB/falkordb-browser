@@ -213,7 +213,7 @@ export default function ConnectionManager() {
             <ChevronDown size={14} />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-[300px]" data-testid="connections-dropdown-content">
+        <DropdownMenuContent align="start" className="w-[min(300px,90vw)]" data-testid="connections-dropdown-content">
           <DropdownMenuLabel>Connections</DropdownMenuLabel>
           <DropdownMenuSeparator />
 

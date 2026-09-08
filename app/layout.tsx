@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 
 import "./globals.css";
-import { Metadata } from "next";
+import { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,6 +17,14 @@ export const metadata: Metadata = {
   description: "FalkorDB Browser is a web-based UI for FalkorDB.",
 };
 
+// Lay the app out against the real device width instead of a fake desktop one,
+// and let it extend under the notch/home indicator on phones.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export default async function RootLayout({
   children,
 }: {
@@ -27,7 +35,7 @@ export default async function RootLayout({
   // Setting suppressHydrationWarning on html tag to prevent warning
   // caused by mismatched client/server content caused by next-themes
   return (
-    <html className="w-screen h-screen" lang="en" suppressHydrationWarning>
+    <html className="w-full h-dvh" lang="en" suppressHydrationWarning>
       <body className="w-full h-full bg-background flex flex-col">
         <GTM />
         <TooltipProvider>

@@ -71,13 +71,13 @@ export default function Selector({
     };
 
     return (
-        <div className="z-20 w-full h-[44px] flex flex-row gap-3 items-center">
+        <div className="z-20 w-full flex flex-wrap md:flex-nowrap gap-2 md:gap-3 items-center md:h-[44px]">
             <Button
                 aria-label="Graph info panel"
                 aria-pressed={panelOpen}
                 indicator={indicator}
                 className={cn(
-                    "h-full text-foreground p-2 rounded-lg border border-border bg-background hover:bg-secondary",
+                    "h-[44px] text-foreground p-2 rounded-lg border border-border bg-background hover:bg-secondary",
                     panelOpen && "!text-primary"
                 )}
                 title="Graph info"
@@ -91,7 +91,7 @@ export default function Selector({
             <Button
                 aria-label="Upload data"
                 className={cn(
-                    "h-full text-foreground p-2 rounded-lg border border-border bg-background hover:bg-secondary"
+                    "h-[44px] text-foreground p-2 rounded-lg border border-border bg-background hover:bg-secondary"
                 )}
                 title="Upload data"
                 disabled={isReadOnly || !graphName}
@@ -106,7 +106,9 @@ export default function Selector({
                 open={uploadOpen}
                 onOpenChange={setUploadOpen}
             />
-            <div className="h-full w-1 grow relative overflow-visible">
+            {/* On a phone the editor drops onto a line of its own so it keeps a
+                usable width instead of sharing one row with every button. */}
+            <div className="order-last md:order-none basis-full md:basis-0 w-full md:w-1 grow h-[44px] relative overflow-visible">
                 <CypherEditor
                     graph={graph}
                     graphName={graphName}
@@ -120,7 +122,7 @@ export default function Selector({
                     onLanguageConfig={handleLanguageConfig}
                 />
             </div>
-            <div className="h-full w-fit flex gap-3 items-center p-2 border border-border rounded-lg bg-background">
+            <div className="h-[44px] w-fit flex gap-3 items-center p-2 border border-border rounded-lg bg-background">
                 <Popover open={queriesOpen} onOpenChange={setQueriesOpen}>
                     <PopoverTrigger asChild>
                         <Button
