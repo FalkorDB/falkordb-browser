@@ -45,6 +45,8 @@ export default function LoginPage() {
       port: credentials.port,
       tls: credentials.tls,
       ca: credentials.ca,
+      cert: credentials.cert,
+      key: credentials.key,
     };
 
     if (credentials.username) {

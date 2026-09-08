@@ -126,6 +126,8 @@ export async function storeEncryptedCredential(params: {
   kind?: 'session' | 'pat';
   tls?: boolean;
   ca?: string;
+  cert?: string;
+  key?: string;
 }): Promise<void> {
   const storage = StorageFactory.getStorage();
   const nowUnix = Math.floor(Date.now() / 1000);
@@ -147,5 +149,8 @@ export async function storeEncryptedCredential(params: {
     kind: params.kind ?? 'pat',
     tls: params.tls ?? false,
     ca: params.ca,
+    cert: params.cert,
+    // Client private key is encrypted at rest, exactly like the password.
+    encrypted_key: params.key ? encrypt(params.key) : undefined,
   });
 }
