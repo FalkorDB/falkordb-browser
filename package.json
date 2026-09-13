@@ -136,7 +136,7 @@
     "prismjs": "^1.30.0",
     "postcss": "^8.5.17",
     "@babel/core": "^7.29.6",
-    "sharp": "^0.35.3",
+    "sharp": "^0.35.4",
     "depcheck": {
       "js-yaml": "^3.15.0"
     },
